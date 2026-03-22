@@ -130,3 +130,111 @@ export const conversation = [
   },
 ];
 
+export const landingPillars = [
+  {
+    title: 'Curaduría real',
+    text: 'Perfiles moderados con tono sofisticado, filtros claros y señales de confianza antes del primer mensaje.',
+  },
+  {
+    title: 'Discreción total',
+    text: 'Controles de privacidad, visibilidad gradual y experiencias diseñadas para no exponer más de lo necesario.',
+  },
+  {
+    title: 'Mobile first',
+    text: 'Todo el flujo está diseñado para navegar con una mano: onboarding, feed, chat y gestión del perfil.',
+  },
+];
+
+export const membershipTiers = [
+  {
+    name: 'Black Key',
+    badge: 'Recomendado',
+    description: 'Acceso prioritario al feed, desbloqueo de galerías privadas y mensajes ampliados.',
+    perks: ['10 mensajes diarios', 'Filtros avanzados', 'Perfil más visible'],
+  },
+  {
+    name: 'Velvet Circle',
+    badge: 'Solo invitación',
+    description: 'Pensado para parejas y perfiles con agenda selectiva que priorizan encuentros boutique.',
+    perks: ['Concierge digital', 'Listas privadas', 'Eventos sugeridos'],
+  },
+  {
+    name: 'Private Host',
+    badge: 'Elite',
+    description: 'Modo anfitrión para usuarios que prefieren vetting más estricto y control total del match.',
+    perks: ['Aprobación manual', 'Salas VIP', 'Insignia de anfitrión'],
+  },
+];
+
+export const testimonials = [
+  {
+    name: 'Pareja en Palermo',
+    quote: 'Se siente más a un members club que a una app de contactos. El tono cambia todo.',
+  },
+  {
+    name: 'Perfil verificado en Madrid',
+    quote: 'El onboarding ordena expectativas desde el inicio y eso baja muchísimo el ruido.',
+  },
+  {
+    name: 'Miembro Black Key',
+    quote: 'La experiencia en móvil está muy cuidada. Se nota pensada para uso nocturno y discreto.',
+  },
+];
+
+export const messageThreads = [
+  {
+    id: 1,
+    name: 'Valentina & Mauro',
+    role: 'Pareja',
+    city: 'Buenos Aires',
+    preview: 'Nos gusta el plan. ¿Prefieren rooftop o speakeasy?',
+    time: '22:18',
+    unread: 2,
+  },
+  {
+    id: 2,
+    name: 'Luna',
+    role: 'Mujer Sola',
+    city: 'Madrid',
+    preview: 'Tengo disponibilidad el viernes y dress code oscuro.',
+    time: '21:04',
+    unread: 0,
+  },
+  {
+    id: 3,
+    name: 'Thiago',
+    role: 'Hombre Solo',
+    city: 'São Paulo',
+    preview: 'Prefiero coordinar con tiempo y lugar privado.',
+    time: 'Ayer',
+    unread: 1,
+  },
+];
+
+export const activityFeed = [
+  {
+    title: '3 nuevos perfiles compatibles',
+    detail: 'Coinciden con tus filtros de parejas discretas y ambiente boutique.',
+    time: 'Hace 12 min',
+  },
+  {
+    title: 'Tu perfil subió de nivel',
+    detail: 'Has completado el 92% del onboarding y tu visibilidad mejoró.',
+    time: 'Hace 1 h',
+  },
+  {
+    title: 'Recomendación del concierge',
+    detail: 'Activa las notas privadas para guardar dinámicas y límites por match.',
+    time: 'Hoy',
+  },
+];
+
+export const onboardingChoices = {
+  relationshipStyles: ['Reservado', 'Explorador', 'Social selecto', 'Solo química real'],
+  intentions: ['Encuentros selectos', 'Conexiones continuas', 'Solo chat inicial', 'Viajes y escapadas'],
+  fetishes: ['Cuckold', 'Trío', 'Swinger', 'Exhibicionismo suave', 'Roleplay light', 'Voyeur'],
+  interests: ['Wine bars', 'Hoteles boutique', 'Dress code', 'Spa nocturno', 'Música en vivo', 'Rooftops'],
+  privacyModes: ['Fantasma visible solo con match', 'Visible en mi ciudad', 'Disponible para viajes'],
+  notificationModes: ['Solo matches', 'Mensajes y likes', 'Todo activado'],
+  galleryStyles: ['Velvet Portrait', 'Black Tie', 'Lounge Mirror', 'Minimal Gold'],
+};
