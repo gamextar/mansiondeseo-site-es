@@ -1,0 +1,132 @@
+export const quickStats = [
+  { label: 'Miembros verificados', value: '2.4K' },
+  { label: 'Ciudades activas', value: '38' },
+  { label: 'Conexiones hoy', value: '187' },
+];
+
+export const profiles = [
+  {
+    id: 1,
+    name: 'Valentina & Mauro',
+    age: '31 / 36',
+    city: 'Buenos Aires',
+    country: 'Argentina',
+    role: 'Pareja',
+    fetish: 'Swinger',
+    status: 'En línea',
+    distance: '4 km',
+    photo:
+      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=80',
+    bio: 'Pareja elegante, discreta y muy cuidadosa con la química. Preferimos encuentros en lounges privados, buena conversación y cero improvisación.',
+    interests: ['Cenas privadas', 'Hoteles boutique', 'Exhibicionismo suave', 'Viajes'],
+    highlights: ['Identidad verificada', 'Fotos privadas desbloqueables', 'Responde en menos de 1 hora'],
+  },
+  {
+    id: 2,
+    name: 'Luna',
+    age: '29',
+    city: 'Madrid',
+    country: 'España',
+    role: 'Mujer Sola',
+    fetish: 'Trío',
+    status: 'Nueva',
+    distance: '12 km',
+    photo:
+      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=80',
+    bio: 'Selectiva, curiosa y fan del lujo silencioso. Me atraen las parejas con complicidad real y escenarios bien cuidados.',
+    interests: ['Champagne', 'Roleplay light', 'After hours', 'Parejas'],
+    highlights: ['Perfil destacado', 'Preferencia por planificaciones VIP', 'Disponible fines de semana'],
+  },
+  {
+    id: 3,
+    name: 'Thiago',
+    age: '34',
+    city: 'São Paulo',
+    country: 'Brasil',
+    role: 'Hombre Solo',
+    fetish: 'Cuckold',
+    status: 'Activo ahora',
+    distance: '8 km',
+    photo:
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80',
+    bio: 'Caballero, atlético y muy orientado a acuerdos claros. Busco experiencias consentidas donde el respeto y la estética mandan.',
+    interests: ['Dress code', 'Conexión mental', 'Ambientes privados', 'Viajes cortos'],
+    highlights: ['Audio presentación', 'Cuenta premium', 'Disponible para encuentros discretos'],
+  },
+  {
+    id: 4,
+    name: 'Sofía & Iris',
+    age: '28 / 30',
+    city: 'Ciudad de México',
+    country: 'México',
+    role: 'Pareja',
+    fetish: 'Trío',
+    status: 'En línea',
+    distance: '2 km',
+    photo:
+      'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=80',
+    bio: 'Nos gusta la energía auténtica, el humor inteligente y los espacios íntimos. Nos mueve la confianza antes que la prisa.',
+    interests: ['Wine bars', 'Música downtempo', 'Fantasías guiadas', 'Spa nocturno'],
+    highlights: ['Verificación por video', 'Encuentros solo con matching mutuo', 'Alta tasa de respuesta'],
+  },
+  {
+    id: 5,
+    name: 'Camila',
+    age: '33',
+    city: 'Bogotá',
+    country: 'Colombia',
+    role: 'Mujer Sola',
+    fetish: 'Swinger',
+    status: 'Conectada',
+    distance: '5 km',
+    photo:
+      'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=900&q=80',
+    bio: 'Me atraen las conexiones pulidas, adultos seguros y conversaciones con intención. Lo exclusivo no tiene por qué ser frío.',
+    interests: ['Coctelería', 'Lingerie', 'Masajes', 'Tratos claros'],
+    highlights: ['Fotos profesionales', 'Disponible para viajes', 'Prefiere citas nocturnas'],
+  },
+  {
+    id: 6,
+    name: 'Nicolás & Vera',
+    age: '35 / 32',
+    city: 'Miami',
+    country: 'Estados Unidos',
+    role: 'Pareja',
+    fetish: 'Cuckold',
+    status: 'Activos hoy',
+    distance: '15 km',
+    photo:
+      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80',
+    bio: 'Pareja cosmopolita, con gusto por la tensión elegante y las dinámicas bien habladas. Valoramos la discreción como parte del juego.',
+    interests: ['Rooftops', 'Selección cuidadosa', 'Códigos privados', 'Música en vivo'],
+    highlights: ['Anfitriones frecuentes', 'Espacios premium', 'Invitaciones limitadas'],
+  },
+];
+
+export const conversation = [
+  {
+    id: 1,
+    sender: 'them',
+    text: 'Hola, nos gustó tu perfil. ¿Buscan algo para esta noche o prefieren coordinar con tiempo?',
+    time: '22:11',
+  },
+  {
+    id: 2,
+    sender: 'me',
+    text: 'Nos interesa algo bien cuidado. Preferimos una primera copa en un lugar discreto antes de avanzar.',
+    time: '22:14',
+  },
+  {
+    id: 3,
+    sender: 'them',
+    text: 'Perfecto. Nos encaja ese plan. Tenemos reserva en Palermo a las 23:00 y salón privado luego.',
+    time: '22:16',
+  },
+  {
+    id: 4,
+    sender: 'me',
+    text: 'Suena ideal. Envíennos dress code y ubicación. Si la energía fluye, seguimos.',
+    time: '22:18',
+  },
+];
+

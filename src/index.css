@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family: 'Manrope', sans-serif;
+  background: #0a0a0a;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at top, rgba(212, 175, 55, 0.08), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(91, 24, 38, 0.18), transparent 30%),
+    #0a0a0a;
+  color: #f7f3ea;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 140px 140px;
+  mask-image: radial-gradient(circle at center, black, transparent 85%);
+  opacity: 0.35;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.35);
+  border-radius: 999px;
+}
+
+@layer components {
+  .glass-panel {
+    @apply border border-white/10 bg-white/5 backdrop-blur-xl;
+  }
+
+  .gold-ring {
+    @apply ring-1 ring-gold/40;
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-white/70 transition duration-200;
+  }
+
+  .chip-active {
+    @apply border-gold/60 bg-gold/10 text-gold shadow-[0_0_30px_rgba(212,175,55,0.14)];
+  }
+}
