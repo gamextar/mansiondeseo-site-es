@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, ChevronLeft, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Bug, GripVertical } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Bug } from 'lucide-react';
 import { useAuth } from '../App';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile } from '../lib/api';
 
@@ -16,16 +16,72 @@ export default function ProfilePage() {
   const [isReordering, setIsReordering] = useState(false);
   const [orderedPhotos, setOrderedPhotos] = useState([]);
   const [savingOrder, setSavingOrder] = useState(false);
+  const dragItem = useRef(null);
+  const dragOverItem = useRef(null);
 
-  const movePhoto = useCallback((from, dir) => {
-    const to = from + dir;
+  const handleDragStart = useCallback((i) => {
+    dragItem.current = i;
+  }, []);
+
+  const handleDragEnter = useCallback((i) => {
+    dragOverItem.current = i;
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    if (dragItem.current === null || dragOverItem.current === null || dragItem.current === dragOverItem.current) {
+      dragItem.current = null;
+      dragOverItem.current = null;
+      return;
+    }
     setOrderedPhotos(prev => {
-      if (to < 0 || to >= prev.length) return prev;
       const next = [...prev];
-      [next[from], next[to]] = [next[to], next[from]];
+      const [removed] = next.splice(dragItem.current, 1);
+      next.splice(dragOverItem.current, 0, removed);
       return next;
     });
+    dragItem.current = null;
+    dragOverItem.current = null;
   }, []);
+
+  // Touch drag support
+  const touchState = useRef({ index: null, el: null, clone: null });
+
+  const handleTouchStart = useCallback((i, e) => {
+    const el = e.currentTarget;
+    const touch = e.touches[0];
+    const rect = el.getBoundingClientRect();
+    const clone = el.cloneNode(true);
+    clone.style.cssText = `position:fixed;z-index:999;width:${rect.width}px;height:${rect.height}px;pointer-events:none;opacity:0.85;border-radius:12px;overflow:hidden;`;
+    clone.style.left = `${rect.left}px`;
+    clone.style.top = `${rect.top}px`;
+    document.body.appendChild(clone);
+    touchState.current = { index: i, el, clone, startX: touch.clientX, startY: touch.clientY, originLeft: rect.left, originTop: rect.top };
+    el.style.opacity = '0.3';
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    const ts = touchState.current;
+    if (!ts.clone) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    ts.clone.style.left = `${ts.originLeft + (touch.clientX - ts.startX)}px`;
+    ts.clone.style.top = `${ts.originTop + (touch.clientY - ts.startY)}px`;
+    // Find which grid cell we're over
+    const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+    const cell = elUnder?.closest('[data-reorder-index]');
+    if (cell) dragOverItem.current = Number(cell.dataset.reorderIndex);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    const ts = touchState.current;
+    if (ts.clone) {
+      ts.clone.remove();
+      if (ts.el) ts.el.style.opacity = '';
+    }
+    dragItem.current = ts.index;
+    handleDragEnd();
+    touchState.current = { index: null, el: null, clone: null };
+  }, [handleDragEnd]);
 
   const savePhotoOrder = async () => {
     setSavingOrder(true);
@@ -254,7 +310,7 @@ export default function ProfilePage() {
                     disabled={savingOrder}
                     className="text-xs text-mansion-gold font-semibold hover:text-mansion-gold/80 transition-colors disabled:opacity-50"
                   >
-                    {savingOrder ? 'Guardando…' : 'Guardar orden'}
+                    {savingOrder ? 'Guardando…' : 'Guardar'}
                   </button>
                 </div>
               ) : (
@@ -272,27 +328,28 @@ export default function ProfilePage() {
 
           <div className="grid grid-cols-3 gap-2">
             {(isReordering ? orderedPhotos : photos).map((url, i) => (
-              <div key={url} className="relative group aspect-square rounded-xl overflow-hidden bg-mansion-card border border-mansion-border/30">
-                <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
-                {isReordering ? (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => movePhoto(i, -1)}
-                      disabled={i === 0}
-                      className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/40 disabled:opacity-20 flex items-center justify-center transition-colors"
-                    >
-                      <ChevronLeft className="w-4 h-4 text-white" />
-                    </button>
-                    <span className="text-white/80 text-xs font-bold">{i + 1}</span>
-                    <button
-                      onClick={() => movePhoto(i, 1)}
-                      disabled={i === orderedPhotos.length - 1}
-                      className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/40 disabled:opacity-20 flex items-center justify-center transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4 text-white" />
-                    </button>
+              <div
+                key={url}
+                data-reorder-index={i}
+                draggable={isReordering}
+                onDragStart={isReordering ? () => handleDragStart(i) : undefined}
+                onDragEnter={isReordering ? () => handleDragEnter(i) : undefined}
+                onDragEnd={isReordering ? handleDragEnd : undefined}
+                onDragOver={isReordering ? (e) => e.preventDefault() : undefined}
+                onTouchStart={isReordering ? (e) => handleTouchStart(i, e) : undefined}
+                onTouchMove={isReordering ? handleTouchMove : undefined}
+                onTouchEnd={isReordering ? handleTouchEnd : undefined}
+                className={`relative group aspect-square rounded-xl overflow-hidden bg-mansion-card border transition-all ${
+                  isReordering ? 'border-mansion-gold/30 cursor-grab active:cursor-grabbing' : 'border-mansion-border/30'
+                }`}
+              >
+                <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover pointer-events-none" />
+                {isReordering && (
+                  <div className="absolute bottom-1 left-1 bg-black/60 rounded-full w-5 h-5 flex items-center justify-center">
+                    <span className="text-[10px] text-white font-bold">{i + 1}</span>
                   </div>
-                ) : (
+                )}
+                {!isReordering && (
                   <button
                     onClick={() => handleDeletePhoto(url)}
                     disabled={deleting === url}
