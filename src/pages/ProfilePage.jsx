@@ -32,7 +32,7 @@ export default function ProfilePage() {
   const displayName = user?.username || 'Tu Perfil';
   const displayCity = user?.city || '';
   const displayRole = user?.role || '';
-  const avatarUrl = user?.avatar_url || 'https://picsum.photos/seed/myprofile/200/200';
+  const avatarUrl = user?.avatar_url || '';
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">

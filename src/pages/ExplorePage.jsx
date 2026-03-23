@@ -1,38 +1,27 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, SlidersHorizontal } from 'lucide-react';
-import mockProfiles from '../data/mockProfiles';
 import ProfileCard from '../components/ProfileCard';
 import { getProfiles, getToken } from '../lib/api';
 
 export default function ExplorePage() {
   const [search, setSearch] = useState('');
-  const [apiProfiles, setApiProfiles] = useState(null);
+  const [profiles, setProfiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
-  // Debounced API search
   useEffect(() => {
-    if (!getToken()) return;
+    if (!getToken()) { navigate('/login'); return; }
+    setLoading(true);
     const timeout = setTimeout(() => {
       getProfiles({ q: search || undefined })
-        .then(data => setApiProfiles(data.profiles))
-        .catch(() => setApiProfiles(null));
+        .then(data => setProfiles(data.profiles || []))
+        .catch(() => setProfiles([]))
+        .finally(() => setLoading(false));
     }, 300);
     return () => clearTimeout(timeout);
-  }, [search]);
-
-  const results = useMemo(() => {
-    if (apiProfiles && apiProfiles.length > 0) return apiProfiles;
-
-    if (!search.trim()) return mockProfiles;
-    const q = search.toLowerCase();
-    return mockProfiles.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.city.toLowerCase().includes(q) ||
-        p.role.toLowerCase().includes(q) ||
-        p.interests.some((i) => i.toLowerCase().includes(q))
-    );
-  }, [search, apiProfiles]);
+  }, [search, navigate]);
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
@@ -59,13 +48,19 @@ export default function ExplorePage() {
       {/* Results */}
       <div className="px-4 lg:px-8 mt-2">
         <p className="text-text-dim text-xs mb-3">
-          {results.length} resultados
+          {profiles.length} resultados
         </p>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
-          {results.map((profile, index) => (
+          {profiles.map((profile, index) => (
             <ProfileCard key={profile.id} profile={profile} index={index} />
           ))}
         </div>
+        )}
       </div>
     </div>
   );

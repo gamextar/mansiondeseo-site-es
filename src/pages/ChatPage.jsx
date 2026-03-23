@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Send, Lock, ImageIcon, Smile } from 'lucide-react';
-import { mockConversations, mockMessages } from '../data/mockMessages';
+import { ChevronLeft, Send, Lock, ImageIcon, Smile, MessageCircle } from 'lucide-react';
 import { useMessageLimit } from '../hooks/useMessageLimit';
 import DesktopSidebar from '../components/DesktopSidebar';
-import { getMessages as apiGetMessages, sendMessage as apiSendMessage, getMessageLimit, getToken } from '../lib/api';
+import { getMessages as apiGetMessages, sendMessage as apiSendMessage, getMessageLimit, getProfile, getToken } from '../lib/api';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -14,32 +13,25 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [apiLimit, setApiLimit] = useState(null);
+  const [partner, setPartner] = useState(null);
+  const [loading, setLoading] = useState(true);
   const scrollRef = useRef(null);
 
-  const conv = mockConversations.find((c) => c.id === id);
-
-  // Determine the partner's user ID (for API calls) from the conversation
-  const partnerId = conv?.profileId || id;
+  // Extract partner ID from conversation ID (conv-{userId} format)
+  const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
 
   useEffect(() => {
-    if (getToken()) {
-      apiGetMessages(partnerId)
-        .then(data => {
-          if (data.messages && data.messages.length > 0) {
-            setMessages(data.messages);
-          } else {
-            setMessages(mockMessages[id] || []);
-          }
-        })
-        .catch(() => setMessages(mockMessages[id] || []));
+    if (!getToken()) { navigate('/login'); return; }
 
-      getMessageLimit()
-        .then(data => setApiLimit(data))
-        .catch(() => {});
-    } else {
-      setMessages(mockMessages[id] || []);
-    }
-  }, [id, partnerId]);
+    setLoading(true);
+
+    // Fetch partner profile and messages in parallel
+    Promise.all([
+      getProfile(partnerId).then(data => setPartner(data.profile)).catch(() => null),
+      apiGetMessages(partnerId).then(data => setMessages(data.messages || [])).catch(() => setMessages([])),
+      getMessageLimit().then(data => setApiLimit(data)).catch(() => {}),
+    ]).finally(() => setLoading(false));
+  }, [id, partnerId, navigate]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -47,10 +39,18 @@ export default function ChatPage() {
     }
   }, [messages]);
 
-  if (!conv) {
+  if (!partner && !loading) {
     return (
       <div className="min-h-screen bg-mansion-base flex items-center justify-center">
         <p className="text-text-muted">Conversación no encontrada</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-mansion-base flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
     );
   }
@@ -112,17 +112,17 @@ export default function ChatPage() {
 
           <div className="relative flex-shrink-0">
             <div className="w-10 h-10 rounded-full overflow-hidden">
-              <img src={conv.avatar} alt={conv.name} className="w-full h-full object-cover" />
+              <img src={partner.avatar_url || partner.photos?.[0] || ''} alt={partner.name} className="w-full h-full object-cover" />
             </div>
-            {conv.online && (
+            {partner.online && (
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-mansion-card" />
             )}
           </div>
 
           <div className="flex-1 min-w-0">
-            <h2 className="font-medium text-sm text-text-primary truncate">{conv.name}</h2>
+            <h2 className="font-medium text-sm text-text-primary truncate">{partner.name}</h2>
             <p className="text-[11px] text-text-dim">
-              {conv.online ? 'En línea' : 'Última vez: ' + conv.timestamp}
+              {partner.online ? 'En línea' : 'Desconectado'}
             </p>
           </div>
         </div>

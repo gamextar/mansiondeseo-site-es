@@ -15,7 +15,8 @@ const ROLE_BG = {
 };
 
 export default function ProfileCard({ profile, index = 0 }) {
-  const { id, name, age, city, role, interests, photos, verified, online, premium } = profile;
+  const { id, name, age, city, role, interests, photos = [], verified, online, premium } = profile;
+  const mainPhoto = photos[0] || profile.avatar_url || '';
 
   return (
     <motion.div
@@ -28,7 +29,7 @@ export default function ProfileCard({ profile, index = 0 }) {
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">
           {/* Photo with blur effect */}
           <img
-            src={photos[0]}
+            src={mainPhoto}
             alt={name}
             loading="lazy"
             className="absolute inset-0 w-full h-full object-cover transition-all duration-500 

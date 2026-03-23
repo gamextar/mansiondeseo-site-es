@@ -1,23 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search } from 'lucide-react';
-import { mockConversations } from '../data/mockMessages';
+import { Search, MessageCircle } from 'lucide-react';
 import { getConversations, getToken } from '../lib/api';
 
 export default function ChatListPage() {
-  const [conversations, setConversations] = useState(mockConversations);
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (!getToken()) return;
+    if (!getToken()) { navigate('/login'); return; }
+    setLoading(true);
     getConversations()
-      .then(data => {
-        if (data.conversations && data.conversations.length > 0) {
-          setConversations(data.conversations);
-        }
-      })
-      .catch(() => {});
-  }, []);
+      .then(data => setConversations(data.conversations || []))
+      .catch(() => setConversations([]))
+      .finally(() => setLoading(false));
+  }, [navigate]);
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
       {/* Header */}
@@ -37,7 +36,18 @@ export default function ChatListPage() {
 
       {/* Conversation list */}
       <div className="px-2 lg:px-6 lg:max-w-3xl">
-        {conversations.map((conv, index) => (
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+          </div>
+        ) : conversations.length === 0 ? (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20">
+            <MessageCircle className="w-12 h-12 text-text-dim mx-auto mb-4" />
+            <p className="text-text-muted text-lg mb-2">Sin mensajes aún</p>
+            <p className="text-text-dim text-sm">Explora perfiles y envía tu primer mensaje</p>
+          </motion.div>
+        ) : (
+        conversations.map((conv, index) => (
           <motion.div
             key={conv.id}
             initial={{ opacity: 0, y: 10 }}
@@ -93,7 +103,8 @@ export default function ChatListPage() {
               </div>
             </Link>
           </motion.div>
-        ))}
+        ))
+        )}
       </div>
     </div>
   );

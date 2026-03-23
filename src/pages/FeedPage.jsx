@@ -1,43 +1,24 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import mockProfiles from '../data/mockProfiles';
 import FilterBar from '../components/FilterBar';
 import ProfileCard from '../components/ProfileCard';
-import { getProfiles } from '../lib/api';
-import { getToken } from '../lib/api';
+import { getProfiles, getToken } from '../lib/api';
 
 export default function FeedPage() {
   const [activeFilter, setActiveFilter] = useState('all');
-  const [apiProfiles, setApiProfiles] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [profiles, setProfiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (!getToken()) return;
+    if (!getToken()) { navigate('/login'); return; }
     setLoading(true);
     getProfiles({ filter: activeFilter === 'all' ? undefined : activeFilter })
-      .then(data => setApiProfiles(data.profiles))
-      .catch(() => setApiProfiles(null))
+      .then(data => setProfiles(data.profiles || []))
+      .catch(() => setProfiles([]))
       .finally(() => setLoading(false));
-  }, [activeFilter]);
-
-  const filtered = useMemo(() => {
-    // Use API profiles if available, fallback to mock
-    if (apiProfiles && apiProfiles.length > 0) return apiProfiles;
-
-    if (activeFilter === 'all') return mockProfiles;
-
-    return mockProfiles.filter((p) => {
-      const filterLower = activeFilter.toLowerCase();
-
-      // Role-based filters
-      if (filterLower === 'pareja') return p.role === 'Pareja';
-      if (filterLower === 'mujer') return p.role === 'Mujer Sola';
-      if (filterLower === 'hombre') return p.role === 'Hombre Solo';
-
-      // Interest-based filters
-      return p.interests.some((i) => i.toLowerCase().includes(filterLower));
-    });
-  }, [activeFilter, apiProfiles]);
+  }, [activeFilter, navigate]);
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
@@ -57,15 +38,19 @@ export default function FeedPage() {
       {/* Results count */}
       <div className="px-4 lg:px-8 pb-3">
         <p className="text-text-dim text-xs">
-          {filtered.length} {filtered.length === 1 ? 'perfil' : 'perfiles'} encontrados
+          {profiles.length} {profiles.length === 1 ? 'perfil' : 'perfiles'} encontrados
         </p>
       </div>
 
       {/* Grid */}
       <div className="px-4 lg:px-8">
-        {filtered.length > 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+          </div>
+        ) : profiles.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
-            {filtered.map((profile, index) => (
+            {profiles.map((profile, index) => (
               <ProfileCard key={profile.id} profile={profile} index={index} />
             ))}
           </div>

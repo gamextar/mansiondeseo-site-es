@@ -5,7 +5,6 @@ import {
   ArrowLeft, Heart, MessageCircle, Share2, Shield, Crown,
   MapPin, Clock, ChevronLeft,
 } from 'lucide-react';
-import mockProfiles from '../data/mockProfiles';
 import { getProfile, getToken } from '../lib/api';
 
 const ROLE_COLOR = {
@@ -21,19 +20,13 @@ export default function ProfileDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Try API first, fallback to mock
-    if (getToken()) {
-      getProfile(id)
-        .then(data => setProfile(data.profile))
-        .catch(() => {
-          setProfile(mockProfiles.find((p) => p.id === id) || null);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setProfile(mockProfiles.find((p) => p.id === id) || null);
-      setLoading(false);
-    }
-  }, [id]);
+    if (!getToken()) { navigate('/login'); return; }
+    setLoading(true);
+    getProfile(id)
+      .then(data => setProfile(data.profile))
+      .catch(() => setProfile(null))
+      .finally(() => setLoading(false));
+  }, [id, navigate]);
 
   if (loading) {
     return (
