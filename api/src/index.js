@@ -889,11 +889,12 @@ async function handleUpdateProfile(request, env) {
   if (!auth) return error('No autorizado', 401);
 
   const body = await request.json();
-  const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'city', 'bio', 'avatar_url'];
+  const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'city', 'bio', 'avatar_url', 'premium'];
 
   // ghost_mode is only allowed for premium users
   const currentUser = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
-  if (currentUser && currentUser.premium === 1) {
+  const isPremium = body.premium !== undefined ? (body.premium ? 1 : 0) : currentUser?.premium;
+  if (isPremium === 1) {
     allowedFields.push('ghost_mode');
   }
 
@@ -905,7 +906,7 @@ async function handleUpdateProfile(request, env) {
       if (field === 'interests') {
         updates.push(`${field} = ?`);
         values.push(JSON.stringify(body[field]));
-      } else if (field === 'ghost_mode') {
+      } else if (field === 'ghost_mode' || field === 'premium') {
         updates.push(`${field} = ?`);
         values.push(body[field] ? 1 : 0);
       } else {

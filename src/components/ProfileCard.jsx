@@ -18,10 +18,7 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false 
   const { id, name, age, city, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const mainPhoto = photos[0] || profile.avatar_url || '';
 
-  // Photos are blurred if: free viewer looking at ANY profile (tease), OR ghost mode user blurred for free viewer
-  // Free viewers see all photos blurred (thumbnail tease). Premium see all clear.
-  // Ghost mode blurred profiles get extra heavy blur.
-  const shouldBlur = !viewerPremium;
+  // Only blur if the target user has ghost mode ON and viewer can't see them
   const isGhostBlurred = blurred;
 
   return (
@@ -39,11 +36,7 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false 
             alt={name}
             loading="lazy"
             className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100 ${
-              isGhostBlurred
-                ? 'filter blur-[14px]'
-                : shouldBlur
-                  ? 'filter blur-[6px] group-hover:blur-0 group-focus:blur-0'
-                  : ''
+              isGhostBlurred ? 'filter blur-[14px]' : ''
             }`}
           />
 
@@ -54,12 +47,6 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false 
                 <Lock className="w-5 h-5" />
                 <span className="text-[10px] font-semibold">Modo Fantasma</span>
               </div>
-            </div>
-          )}
-
-          {/* VIP lock overlay for free viewers */}
-          {shouldBlur && !isGhostBlurred && (
-            <div className="absolute inset-0 flex items-center justify-center z-10 opacity-0 group-hover:opacity-0">
             </div>
           )}
 

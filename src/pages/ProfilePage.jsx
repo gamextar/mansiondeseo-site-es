@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Bug } from 'lucide-react';
 import { useAuth } from '../App';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile } from '../lib/api';
 
@@ -12,6 +12,7 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [togglingGhost, setTogglingGhost] = useState(false);
+  const [togglingPremium, setTogglingPremium] = useState(false);
 
   const handleLogout = async () => {
     await apiLogout();
@@ -71,6 +72,22 @@ export default function ProfilePage() {
       // Silently fail
     } finally {
       setTogglingGhost(false);
+    }
+  };
+
+  const handleTogglePremium = async () => {
+    if (togglingPremium) return;
+    setTogglingPremium(true);
+    try {
+      const newPremium = !user.premium;
+      const fields = { premium: newPremium };
+      if (!newPremium) fields.ghost_mode = false;
+      const data = await updateProfile(fields);
+      setUser(prev => prev ? { ...prev, premium: data.user.premium, ghost_mode: data.user.ghost_mode } : prev);
+    } catch {
+      // Silently fail
+    } finally {
+      setTogglingPremium(false);
     }
   };
 
@@ -267,6 +284,41 @@ export default function ProfilePage() {
                 <LogOut className="w-5 h-5" />
               </div>
               <span className="text-sm font-medium text-mansion-crimson">Cerrar sesión</span>
+            </button>
+          </div>
+
+          {/* Debug: Premium toggle */}
+          <div className="pt-6 border-t border-mansion-border/20 mt-4">
+            <p className="text-[10px] uppercase tracking-wider text-text-dim mb-2 flex items-center gap-1">
+              <Bug className="w-3 h-3" /> Debug
+            </p>
+            <button
+              onClick={handleTogglePremium}
+              disabled={togglingPremium}
+              className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all ${
+                user?.premium
+                  ? 'bg-mansion-gold/10 border border-mansion-gold/30'
+                  : 'bg-mansion-card/50 border border-mansion-border/30'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                user?.premium ? 'bg-mansion-gold/20 text-mansion-gold' : 'bg-mansion-elevated text-text-muted'
+              }`}>
+                <Crown className="w-5 h-5" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium text-text-primary">Modo Premium</p>
+                <p className="text-xs text-text-dim">
+                  {user?.premium ? 'VIP activo' : 'Usuario gratuito'}
+                </p>
+              </div>
+              <div className={`w-11 h-6 rounded-full transition-colors relative ${
+                user?.premium ? 'bg-mansion-gold' : 'bg-mansion-border'
+              }`}>
+                <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                  user?.premium ? 'translate-x-5' : 'translate-x-0.5'
+                }`} />
+              </div>
             </button>
           </div>
         </div>

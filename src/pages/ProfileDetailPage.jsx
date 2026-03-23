@@ -50,8 +50,7 @@ export default function ProfileDetailPage() {
 
   const { name, age, city, role, interests, bio, photos, verified, online, premium, blurred } = profile;
 
-  // Blur logic: free viewers see light blur on all photos; ghost blurred gets heavy blur
-  const shouldBlur = !viewerPremium;
+  // Only blur ghost mode users (not all photos)
   const isGhostBlurred = blurred;
 
   return (
@@ -70,7 +69,7 @@ export default function ProfileDetailPage() {
             src={photos[0]}
             alt={name}
             className={`w-full h-full object-cover ${
-              isGhostBlurred ? 'filter blur-[16px]' : shouldBlur ? 'filter blur-[8px]' : ''
+              isGhostBlurred ? 'filter blur-[16px]' : ''
             }`}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-mansion-base via-mansion-base/20 to-transparent" />
@@ -84,15 +83,7 @@ export default function ProfileDetailPage() {
               </div>
             </div>
           )}
-          {/* Free viewer VIP prompt */}
-          {shouldBlur && !isGhostBlurred && (
-            <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-10">
-              <div className="flex items-center gap-2 bg-mansion-gold/20 backdrop-blur-sm border border-mansion-gold/30 rounded-full px-4 py-2">
-                <Crown className="w-4 h-4 text-mansion-gold" />
-                <span className="text-xs font-semibold text-mansion-gold">Hazte VIP para ver sin blur</span>
-              </div>
-            </div>
-          )}
+
         </motion.div>
 
         {/* Top nav overlay — z-[60] to sit above Navbar */}
@@ -202,7 +193,7 @@ export default function ProfileDetailPage() {
                 {photos.map((photo, i) => (
                   <div key={i} className="aspect-square rounded-xl overflow-hidden bg-mansion-card relative">
                     <img src={photo} alt="" className={`w-full h-full object-cover ${
-                      isGhostBlurred ? 'filter blur-[14px]' : shouldBlur ? 'filter blur-[6px]' : ''
+                      isGhostBlurred ? 'filter blur-[14px]' : ''
                     }`} />
                     {isGhostBlurred && (
                       <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
