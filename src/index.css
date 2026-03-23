@@ -1,13 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
-  font-family: 'Manrope', sans-serif;
-  background: #0a0a0a;
+/* ═══════════════════════════════════════════
+   MANSION DESEO — BASE STYLES
+   ═══════════════════════════════════════════ */
+
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 html {
@@ -15,60 +15,96 @@ html {
 }
 
 body {
-  min-height: 100vh;
-  margin: 0;
-  background:
-    radial-gradient(circle at top, rgba(212, 175, 55, 0.08), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(91, 24, 38, 0.18), transparent 30%),
-    #0a0a0a;
-  color: #f7f3ea;
+  @apply bg-mansion-base text-text-primary font-body antialiased;
+  overflow-x: hidden;
 }
 
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
-  background-size: 140px 140px;
-  mask-image: radial-gradient(circle at center, black, transparent 85%);
-  opacity: 0.35;
-}
-
-#root {
-  min-height: 100vh;
-}
-
+/* Scrollbar styling */
 ::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
+  width: 4px;
 }
-
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
+  background: #08080E;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(212, 175, 55, 0.35);
-  border-radius: 999px;
+  background: #2A2A38;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C9A84C;
 }
 
-@layer components {
-  .glass-panel {
-    @apply border border-white/10 bg-white/5 backdrop-blur-xl;
+/* Selection color */
+::selection {
+  background: rgba(201, 168, 76, 0.3);
+  color: #F0EDE8;
+}
+
+/* Custom utilities */
+@layer utilities {
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-mansion-gold via-mansion-gold-light to-mansion-gold;
   }
 
-  .gold-ring {
-    @apply ring-1 ring-gold/40;
+  .text-gradient-crimson {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-mansion-crimson via-red-400 to-mansion-crimson;
   }
 
-  .chip {
-    @apply inline-flex items-center rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-white/70 transition duration-200;
+  .border-gradient-gold {
+    border-image: linear-gradient(135deg, #C9A84C, #E0C97A, #C9A84C) 1;
   }
 
-  .chip-active {
-    @apply border-gold/60 bg-gold/10 text-gold shadow-[0_0_30px_rgba(212,175,55,0.14)];
+  .glass {
+    @apply bg-mansion-card/80 backdrop-blur-xl border border-mansion-border/50;
   }
+
+  .glass-elevated {
+    @apply bg-mansion-elevated/90 backdrop-blur-xl border border-mansion-border/60;
+  }
+
+  .btn-gold {
+    @apply bg-gradient-to-r from-mansion-gold to-mansion-gold-light text-mansion-base 
+           font-semibold rounded-xl px-6 py-3 transition-all duration-300 
+           hover:shadow-glow-gold hover:scale-[1.02] active:scale-[0.98]
+           font-body tracking-wide;
+  }
+
+  .btn-crimson {
+    @apply bg-gradient-to-r from-mansion-crimson to-mansion-crimson-dark text-white 
+           font-semibold rounded-xl px-6 py-3 transition-all duration-300 
+           hover:shadow-glow-crimson hover:scale-[1.02] active:scale-[0.98]
+           font-body tracking-wide;
+  }
+
+  .btn-ghost {
+    @apply border border-mansion-border text-text-muted rounded-xl px-6 py-3 
+           transition-all duration-300 hover:border-mansion-gold hover:text-mansion-gold
+           font-body;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* Input styling */
+input, textarea, select {
+  @apply bg-mansion-elevated border border-mansion-border rounded-xl px-4 py-3 
+         text-text-primary placeholder:text-text-dim font-body
+         focus:outline-none focus:border-mansion-gold/60 focus:ring-1 focus:ring-mansion-gold/30
+         transition-all duration-200;
+}
+
+/* Smooth page transitions base */
+.page-enter {
+  opacity: 0;
+  transform: translateY(12px);
+}
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
 }

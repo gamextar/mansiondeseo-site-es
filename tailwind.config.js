@@ -1,52 +1,60 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{js,jsx}'],
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
   theme: {
     extend: {
       colors: {
-        obsidian: '#0a0a0a',
-        gold: '#d4af37',
-        wine: '#5b1826',
-        night: '#111111',
-        mist: '#e7ddc2',
+        mansion: {
+          base: '#08080E',
+          card: '#111118',
+          elevated: '#1A1A24',
+          border: '#2A2A38',
+          gold: '#C9A84C',
+          'gold-light': '#E0C97A',
+          crimson: '#D4183D',
+          'crimson-dark': '#9B1C3A',
+          'crimson-glow': 'rgba(212, 24, 61, 0.15)',
+          'gold-glow': 'rgba(201, 168, 76, 0.12)',
+        },
+        text: {
+          primary: '#F0EDE8',
+          muted: '#888899',
+          dim: '#555566',
+        }
       },
       fontFamily: {
-        display: ['"Cormorant Garamond"', 'serif'],
-        body: ['"Manrope"', 'sans-serif'],
-      },
-      boxShadow: {
-        luxe: '0 18px 55px rgba(0, 0, 0, 0.45)',
+        display: ['"Playfair Display"', 'Georgia', 'serif'],
+        body: ['Inter', 'system-ui', 'sans-serif'],
       },
       backgroundImage: {
-        velvet:
-          'radial-gradient(circle at top, rgba(212, 175, 55, 0.2), transparent 32%), radial-gradient(circle at bottom, rgba(91, 24, 38, 0.22), transparent 28%), linear-gradient(180deg, #111111 0%, #0a0a0a 48%, #090909 100%)',
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'gradient-mansion': 'linear-gradient(135deg, #08080E 0%, #1A1A24 50%, #08080E 100%)',
       },
-      keyframes: {
-        fadeUp: {
-          '0%': {
-            opacity: '0',
-            transform: 'translateY(24px)',
-          },
-          '100%': {
-            opacity: '1',
-            transform: 'translateY(0)',
-          },
-        },
-        pulseGlow: {
-          '0%, 100%': {
-            boxShadow: '0 0 0 rgba(212, 175, 55, 0)',
-          },
-          '50%': {
-            boxShadow: '0 0 32px rgba(212, 175, 55, 0.18)',
-          },
-        },
+      boxShadow: {
+        'glow-gold': '0 0 20px rgba(201, 168, 76, 0.15)',
+        'glow-crimson': '0 0 20px rgba(212, 24, 61, 0.2)',
+        'card': '0 4px 24px rgba(0, 0, 0, 0.4)',
+        'elevated': '0 8px 32px rgba(0, 0, 0, 0.6)',
       },
       animation: {
-        'fade-up': 'fadeUp 700ms ease forwards',
-        'pulse-glow': 'pulseGlow 3.2s ease-in-out infinite',
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'shimmer': 'shimmer 2s linear infinite',
+        'float': 'float 6s ease-in-out infinite',
       },
+      keyframes: {
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-10px)' },
+        }
+      }
     },
   },
   plugins: [],
-};
-
+}
