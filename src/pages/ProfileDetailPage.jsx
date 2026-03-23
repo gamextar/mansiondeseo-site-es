@@ -407,22 +407,23 @@ export default function ProfileDetailPage() {
               <div className="w-10" />
             </div>
 
-            {/* Swipeable image container */}
-            <div
-              ref={lightboxScrollRef}
-              onScroll={handleLightboxScroll}
-              className="flex-1 flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
-              style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
-            >
+            {/* Swipeable image container — flex-1 min-h-0 + absolute inner guarantees correct height */}
+            <div className="flex-1 relative min-h-0">
+              <div
+                ref={lightboxScrollRef}
+                onScroll={handleLightboxScroll}
+                className="absolute inset-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide"
+                style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+              >
               {photos.map((photo, i) => {
                 const blocked = isPhotoBlocked(i);
                 return (
-                  <div key={i} className="w-full h-full flex-shrink-0 snap-center relative overflow-hidden">
+                  <div key={i} className="flex-shrink-0 snap-center relative overflow-hidden" style={{ width: '100%', minWidth: '100%', height: '100%' }}>
                     <img
                       src={photo}
                       alt={blocked ? '' : `${name} ${i + 1}`}
                       className="w-full h-full object-cover select-none"
-                      style={blocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
+                      style={blocked ? { filter: `blur(${blurLevel}px)` } : undefined}
                       draggable={false}
                     />
                     {blocked && (
@@ -436,6 +437,7 @@ export default function ProfileDetailPage() {
                   </div>
                 );
               })}
+              </div>
             </div>
 
             {/* Desktop arrow buttons */}
