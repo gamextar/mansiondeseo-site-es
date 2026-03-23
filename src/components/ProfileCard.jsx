@@ -17,12 +17,9 @@ const ROLE_BG = {
 export default function ProfileCard({ profile, index = 0, viewerPremium = false, settings = {} }) {
   const { id, name, age, city, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const mainPhoto = photos[0] || profile.avatar_url || '';
-  const blurLevel = settings.blurLevel || 14;
 
-  // Ghost mode blur (whole card) or first photo beyond free limit
-  const isGhostBlurred = blurred;
-  // Card always shows photo[0]; blur it only if ghost mode
-  const cardBlurred = isGhostBlurred;
+  // Photo is blocked if backend sent null (ghost mode)
+  const cardBlocked = !mainPhoto;
 
   return (
     <motion.div
@@ -33,17 +30,20 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
     >
       <Link to={`/perfiles/${id}`} className="block group">
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">
-          {/* Photo with conditional blur */}
-          <img
-            src={mainPhoto}
-            alt={name}
-            loading="lazy"
-            className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100`}
-            style={cardBlurred ? { filter: `blur(${blurLevel}px)` } : undefined}
-          />
+          {/* Photo — only render img if we have a real URL */}
+          {cardBlocked ? (
+            <div className="absolute inset-0 bg-mansion-elevated" />
+          ) : (
+            <img
+              src={mainPhoto}
+              alt={name}
+              loading="lazy"
+              className="absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100"
+            />
+          )}
 
           {/* Ghost mode overlay */}
-          {cardBlurred && (
+          {cardBlocked && (
             <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10">
               <div className="flex flex-col items-center gap-1 text-white/70">
                 <Lock className="w-5 h-5" />

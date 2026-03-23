@@ -529,6 +529,13 @@ async function handleProfiles(request, env) {
     const profileIsPremium = !!u.premium;
     // Ghost mode blur: blurred unless viewer is premium OR the ghost-mode user has favorited the viewer
     const blurred = hasGhostMode && !viewerIsPremium && !favoritedBySet.has(u.id);
+    const allPhotos = safeParseJSON(u.photos, []);
+    // Strip URLs from photos the viewer shouldn't access
+    const photos = viewerIsPremium
+      ? allPhotos
+      : blurred
+        ? allPhotos.map(() => null)
+        : allPhotos.map((url, idx) => idx < settings.freeVisiblePhotos ? url : null);
     return {
       id: u.id,
       name: u.username,
@@ -537,7 +544,8 @@ async function handleProfiles(request, env) {
       role: mapRoleToDisplay(u.role),
       interests: safeParseJSON(u.interests, []),
       bio: u.bio,
-      photos: safeParseJSON(u.photos, []),
+      photos,
+      totalPhotos: allPhotos.length,
       verified: !!u.verified,
       online: !!u.online,
       premium: profileIsPremium,
@@ -579,6 +587,15 @@ async function handleProfileDetail(request, env, userId) {
   // Ghost mode blur: blurred unless viewer is premium, OR profile owner favorited viewer
   const blurred = hasGhostMode && !viewerIsPremium && !profileFavoritedViewer;
 
+  const allPhotos = safeParseJSON(user.photos, []);
+  // Strip URLs from photos the viewer shouldn't access
+  const visibleLimit = isOwnProfile ? settings.freeOwnPhotos : settings.freeVisiblePhotos;
+  const photos = viewerIsPremium
+    ? allPhotos
+    : blurred
+      ? allPhotos.map(() => null)
+      : allPhotos.map((url, idx) => idx < visibleLimit ? url : null);
+
   return json({
     profile: {
       id: user.id,
@@ -588,7 +605,8 @@ async function handleProfileDetail(request, env, userId) {
       role: mapRoleToDisplay(user.role),
       interests: safeParseJSON(user.interests, []),
       bio: user.bio,
-      photos: safeParseJSON(user.photos, []),
+      photos,
+      totalPhotos: allPhotos.length,
       verified: !!user.verified,
       online: !!user.online,
       premium: !!user.premium,

@@ -127,18 +127,13 @@ export default function ProfileDetailPage() {
     );
   }
 
-  const { name, age, city, role, interests, bio, photos, verified, online, premium, blurred, isOwnProfile } = profile;
+  const { name, age, city, role, interests, bio, photos, totalPhotos, verified, online, premium, blurred, isOwnProfile } = profile;
 
   // Ghost mode blur (whole profile)
   const isGhostBlurred = blurred;
 
-  // Per-photo blur: determines if a specific photo index should be blurred
-  const shouldBlurPhoto = (index) => {
-    if (viewerPremium) return false;
-    if (isGhostBlurred) return true;
-    if (isOwnProfile) return index >= settings.freeOwnPhotos;
-    return index >= settings.freeVisiblePhotos;
-  };
+  // A photo is blocked if the backend sent null for it
+  const isPhotoBlocked = (index) => !photos[index];
 
   return (
     <div className="min-h-screen bg-mansion-base pb-28 lg:pb-8">
@@ -160,33 +155,30 @@ export default function ProfileDetailPage() {
             style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
           >
             {photos.map((photo, i) => {
-              const blurThis = shouldBlurPhoto(i);
+              const blocked = isPhotoBlocked(i);
               return (
                 <div
                   key={i}
                   className="w-full h-full flex-shrink-0 snap-center relative cursor-pointer"
-                  onClick={() => !blurThis && openLightbox(i)}
+                  onClick={() => !blocked && openLightbox(i)}
                 >
-                  <img
-                    src={photo}
-                    alt={`${name} ${i + 1}`}
-                    className="w-full h-full object-cover"
-                    style={blurThis ? { filter: `blur(${settings.blurLevel}px)` } : undefined}
-                    draggable={false}
-                  />
-                  {blurThis && (
+                  {blocked ? (
+                    <div className="w-full h-full bg-mansion-card" />
+                  ) : (
+                    <img
+                      src={photo}
+                      alt={`${name} ${i + 1}`}
+                      className="w-full h-full object-cover"
+                      draggable={false}
+                    />
+                  )}
+                  {blocked && (
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                       <div className="flex flex-col items-center gap-2 text-white/80">
                         <Lock className="w-8 h-8" />
                         <span className="text-sm font-semibold">{isGhostBlurred ? 'Modo Fantasma' : 'Contenido VIP'}</span>
                         <span className="text-xs text-white/60">Solo visible para usuarios VIP</span>
                       </div>
-                    </div>
-                  )}
-                  {/* Zoom hint on non-blurred photos */}
-                  {!blurThis && (
-                    <div className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      <ZoomIn className="w-4 h-4 text-white/70" />
                     </div>
                   )}
                 </div>
@@ -211,7 +203,7 @@ export default function ProfileDetailPage() {
           {/* Photo counter */}
           {photos.length > 1 && (
             <span className="text-xs font-medium text-white/80 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1">
-              {heroIndex + 1} / {photos.length}
+              {heroIndex + 1} / {totalPhotos || photos.length}
             </span>
           )}
 
@@ -312,23 +304,26 @@ export default function ProfileDetailPage() {
               <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2">Galería</h3>
               <div className="grid grid-cols-3 gap-2">
                 {photos.map((photo, i) => {
-                  const photoBlurred = shouldBlurPhoto(i);
+                  const blocked = isPhotoBlocked(i);
                   return (
                     <button
                       key={i}
-                      onClick={() => !photoBlurred && openLightbox(i)}
+                      onClick={() => !blocked && openLightbox(i)}
                       className="aspect-square rounded-xl overflow-hidden bg-mansion-card relative group"
                     >
-                      <img src={photo} alt="" className="w-full h-full object-cover"
-                        style={photoBlurred ? { filter: `blur(${settings.blurLevel}px)` } : undefined}
-                        draggable={false}
-                      />
-                      {photoBlurred && (
+                      {blocked ? (
+                        <div className="w-full h-full bg-mansion-elevated" />
+                      ) : (
+                        <img src={photo} alt="" className="w-full h-full object-cover"
+                          draggable={false}
+                        />
+                      )}
+                      {blocked && (
                         <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                           <Lock className="w-4 h-4 text-white/60" />
                         </div>
                       )}
-                      {!photoBlurred && (
+                      {!blocked && (
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                           <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-70 transition-opacity" />
                         </div>
@@ -386,7 +381,7 @@ export default function ProfileDetailPage() {
                 <X className="w-5 h-5 text-white" />
               </button>
               <span className="text-sm font-medium text-white/80">
-                {lightboxIndex + 1} / {photos.length}
+                {lightboxIndex + 1} / {totalPhotos || photos.length}
               </span>
               <div className="w-10" />
             </div>
@@ -399,17 +394,20 @@ export default function ProfileDetailPage() {
               style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
             >
               {photos.map((photo, i) => {
-                const blurThis = shouldBlurPhoto(i);
+                const blocked = isPhotoBlocked(i);
                 return (
-                  <div key={i} className="w-full h-full flex-shrink-0 snap-center flex items-center justify-center p-4">
-                    <img
-                      src={photo}
-                      alt={`${name} ${i + 1}`}
-                      className="max-w-full max-h-full object-contain rounded-lg select-none"
-                      style={blurThis ? { filter: `blur(${settings.blurLevel}px)` } : undefined}
-                      draggable={false}
-                    />
-                    {blurThis && (
+                  <div key={i} className="w-full h-full flex-shrink-0 snap-center flex items-center justify-center p-4 relative">
+                    {blocked ? (
+                      <div className="w-full h-full rounded-lg bg-mansion-elevated" />
+                    ) : (
+                      <img
+                        src={photo}
+                        alt={`${name} ${i + 1}`}
+                        className="max-w-full max-h-full object-contain rounded-lg select-none"
+                        draggable={false}
+                      />
+                    )}
+                    {blocked && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <div className="flex flex-col items-center gap-2 text-white/80">
                           <Lock className="w-10 h-10" />
