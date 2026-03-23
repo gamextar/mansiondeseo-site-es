@@ -530,12 +530,12 @@ async function handleProfiles(request, env) {
     // Ghost mode blur: blurred unless viewer is premium OR the ghost-mode user has favorited the viewer
     const blurred = hasGhostMode && !viewerIsPremium && !favoritedBySet.has(u.id);
     const allPhotos = safeParseJSON(u.photos, []);
-    // Strip URLs from photos the viewer shouldn't access
-    const photos = viewerIsPremium
-      ? allPhotos
+    // Send all URLs; frontend applies CSS blur to blocked ones
+    const visiblePhotos = viewerIsPremium
+      ? allPhotos.length
       : blurred
-        ? allPhotos.map(() => null)
-        : allPhotos.map((url, idx) => idx < settings.freeVisiblePhotos ? url : null);
+        ? 0
+        : settings.freeVisiblePhotos;
     return {
       id: u.id,
       name: u.username,
@@ -544,8 +544,9 @@ async function handleProfiles(request, env) {
       role: mapRoleToDisplay(u.role),
       interests: safeParseJSON(u.interests, []),
       bio: u.bio,
-      photos,
+      photos: allPhotos,
       totalPhotos: allPhotos.length,
+      visiblePhotos,
       verified: !!u.verified,
       online: !!u.online,
       premium: profileIsPremium,
@@ -588,13 +589,13 @@ async function handleProfileDetail(request, env, userId) {
   const blurred = hasGhostMode && !viewerIsPremium && !profileFavoritedViewer;
 
   const allPhotos = safeParseJSON(user.photos, []);
-  // Strip URLs from photos the viewer shouldn't access
+  // Send all URLs; frontend applies CSS blur to blocked ones
   const visibleLimit = isOwnProfile ? settings.freeOwnPhotos : settings.freeVisiblePhotos;
-  const photos = viewerIsPremium
-    ? allPhotos
+  const visiblePhotos = viewerIsPremium
+    ? allPhotos.length
     : blurred
-      ? allPhotos.map(() => null)
-      : allPhotos.map((url, idx) => idx < visibleLimit ? url : null);
+      ? 0
+      : visibleLimit;
 
   return json({
     profile: {
@@ -605,8 +606,9 @@ async function handleProfileDetail(request, env, userId) {
       role: mapRoleToDisplay(user.role),
       interests: safeParseJSON(user.interests, []),
       bio: user.bio,
-      photos,
+      photos: allPhotos,
       totalPhotos: allPhotos.length,
+      visiblePhotos,
       verified: !!user.verified,
       online: !!user.online,
       premium: !!user.premium,

@@ -18,13 +18,10 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
   const { id, name, age, city, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const blurLevel = settings.blurLevel || 14;
 
-  // Backend sends null for blocked photos; check photos[0] explicitly
-  // `blurred` = true means ghost mode — all photos are null from backend
-  const cardBlocked = blurred || photos[0] === null;
-  // Visible photo: first non-null in array, or avatar_url
-  const mainPhoto = photos.find(p => p) || profile.avatar_url || '';
-  // For blocked cards, use avatar_url as the blur placeholder background
-  const blurPlaceholder = profile.avatar_url || mainPhoto;
+  // visiblePhotos tells us how many photos are unblurred
+  const visiblePhotos = profile.visiblePhotos ?? photos.length;
+  const cardBlocked = blurred || visiblePhotos === 0;
+  const mainPhoto = photos[0] || profile.avatar_url || '';
 
   return (
     <motion.div
@@ -35,9 +32,9 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
     >
       <Link to={`/perfiles/${id}`} className="block group">
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">
-          {/* Photo — use blur placeholder for blocked cards */}
+          {/* Photo — use actual photo with blur for blocked cards */}
           <img
-            src={cardBlocked ? blurPlaceholder : mainPhoto}
+            src={mainPhoto}
             alt={cardBlocked ? '' : name}
             loading="lazy"
             className="absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100"

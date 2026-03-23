@@ -132,10 +132,9 @@ export default function ProfileDetailPage() {
   // Ghost mode blur (whole profile)
   const isGhostBlurred = blurred;
 
-  // A photo is blocked if the backend sent null for it
-  const isPhotoBlocked = (index) => !photos[index];
-  // First visible photo to use as blur placeholder for blocked slots
-  const blurPlaceholder = photos.find(p => p) || profile.avatar_url || '';
+  // A photo is blocked if its index >= visiblePhotos count from backend
+  const visiblePhotos = profile.visiblePhotos ?? photos.length;
+  const isPhotoBlocked = (index) => index >= visiblePhotos;
   const blurLevel = settings.blurLevel || 14;
 
   return (
@@ -154,8 +153,8 @@ export default function ProfileDetailPage() {
           <div
             ref={heroScrollRef}
             onScroll={handleHeroScroll}
-            className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide"
-            style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', overscrollBehavior: 'contain' }}
+            className="flex w-full h-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide"
+            style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
           >
             {photos.map((photo, i) => {
               const blocked = isPhotoBlocked(i);
@@ -166,7 +165,7 @@ export default function ProfileDetailPage() {
                   onClick={() => !blocked && openLightbox(i)}
                 >
                   <img
-                    src={blocked ? blurPlaceholder : photo}
+                    src={photo}
                     alt={blocked ? '' : `${name} ${i + 1}`}
                     className="w-full h-full object-cover"
                     style={blocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
@@ -218,6 +217,28 @@ export default function ProfileDetailPage() {
             </motion.button>
           </div>
         </div>
+
+        {/* Desktop arrow buttons */}
+        {photos.length > 1 && (
+          <>
+            {heroIndex > 0 && (
+              <button
+                onClick={() => scrollToHeroPhoto(heroIndex - 1)}
+                className="hidden lg:flex absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 items-center justify-center transition-colors z-20"
+              >
+                <ChevronLeft className="w-5 h-5 text-white" />
+              </button>
+            )}
+            {heroIndex < photos.length - 1 && (
+              <button
+                onClick={() => scrollToHeroPhoto(heroIndex + 1)}
+                className="hidden lg:flex absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 items-center justify-center transition-colors z-20"
+              >
+                <ChevronRightIcon className="w-5 h-5 text-white" />
+              </button>
+            )}
+          </>
+        )}
 
         {/* Interactive dots */}
         {photos.length > 1 && (
@@ -312,7 +333,7 @@ export default function ProfileDetailPage() {
                       className="aspect-square rounded-xl overflow-hidden bg-mansion-card relative group"
                     >
                       <img
-                        src={blocked ? blurPlaceholder : photo}
+                        src={photo}
                         alt=""
                         className="w-full h-full object-cover"
                         style={blocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
@@ -398,7 +419,7 @@ export default function ProfileDetailPage() {
                 return (
                   <div key={i} className="w-full h-full flex-shrink-0 snap-center flex items-center justify-center p-4 relative">
                     <img
-                      src={blocked ? blurPlaceholder : photo}
+                      src={photo}
                       alt={blocked ? '' : `${name} ${i + 1}`}
                       className={blocked ? 'w-full h-full object-cover rounded-lg select-none' : 'max-w-full max-h-full object-contain rounded-lg select-none'}
                       style={blocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.05)' } : undefined}
