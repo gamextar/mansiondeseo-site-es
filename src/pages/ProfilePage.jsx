@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Bug } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, ChevronLeft, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Bug, GripVertical } from 'lucide-react';
 import { useAuth } from '../App';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile } from '../lib/api';
 
@@ -13,6 +13,32 @@ export default function ProfilePage() {
   const [deleting, setDeleting] = useState(null);
   const [togglingGhost, setTogglingGhost] = useState(false);
   const [togglingPremium, setTogglingPremium] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
+  const [orderedPhotos, setOrderedPhotos] = useState([]);
+  const [savingOrder, setSavingOrder] = useState(false);
+
+  const movePhoto = useCallback((from, dir) => {
+    const to = from + dir;
+    setOrderedPhotos(prev => {
+      if (to < 0 || to >= prev.length) return prev;
+      const next = [...prev];
+      [next[from], next[to]] = [next[to], next[from]];
+      return next;
+    });
+  }, []);
+
+  const savePhotoOrder = async () => {
+    setSavingOrder(true);
+    try {
+      const data = await updateProfile({ photos: orderedPhotos });
+      setUser(prev => prev ? { ...prev, photos: data.user.photos || orderedPhotos } : prev);
+      setIsReordering(false);
+    } catch {
+      // Silently fail
+    } finally {
+      setSavingOrder(false);
+    }
+  };
 
   const handleLogout = async () => {
     await apiLogout();
@@ -206,41 +232,91 @@ export default function ProfilePage() {
               <h3 className="text-sm font-semibold text-text-primary">Mi Galería</h3>
               <span className="text-xs text-text-dim">({photos.length})</span>
             </div>
-            <button
-              onClick={() => galleryInputRef.current?.click()}
-              disabled={uploading}
-              className="flex items-center gap-1 text-xs text-mansion-gold hover:text-mansion-gold-light transition-colors disabled:opacity-50"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              {uploading ? 'Subiendo...' : 'Agregar'}
-            </button>
+            <div className="flex items-center gap-3">
+              {!isReordering && photos.length > 1 && (
+                <button
+                  onClick={() => { setOrderedPhotos([...photos]); setIsReordering(true); }}
+                  className="text-xs text-text-muted hover:text-mansion-gold transition-colors"
+                >
+                  Reordenar
+                </button>
+              )}
+              {isReordering ? (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setIsReordering(false)}
+                    className="text-xs text-text-muted hover:text-text-primary transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={savePhotoOrder}
+                    disabled={savingOrder}
+                    className="text-xs text-mansion-gold font-semibold hover:text-mansion-gold/80 transition-colors disabled:opacity-50"
+                  >
+                    {savingOrder ? 'Guardando…' : 'Guardar orden'}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => galleryInputRef.current?.click()}
+                  disabled={uploading}
+                  className="flex items-center gap-1 text-xs text-mansion-gold hover:text-mansion-gold-light transition-colors disabled:opacity-50"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {uploading ? 'Subiendo...' : 'Agregar'}
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            {photos.map((url, i) => (
-              <div key={i} className="relative group aspect-square rounded-xl overflow-hidden bg-mansion-card border border-mansion-border/30">
+            {(isReordering ? orderedPhotos : photos).map((url, i) => (
+              <div key={url} className="relative group aspect-square rounded-xl overflow-hidden bg-mansion-card border border-mansion-border/30">
                 <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
-                <button
-                  onClick={() => handleDeletePhoto(url)}
-                  disabled={deleting === url}
-                  className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center lg:opacity-0 lg:group-hover:opacity-100 transition-opacity disabled:opacity-50"
-                >
-                  {deleting === url ? (
-                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <X className="w-4 h-4" />
-                  )}
-                </button>
+                {isReordering ? (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => movePhoto(i, -1)}
+                      disabled={i === 0}
+                      className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/40 disabled:opacity-20 flex items-center justify-center transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4 text-white" />
+                    </button>
+                    <span className="text-white/80 text-xs font-bold">{i + 1}</span>
+                    <button
+                      onClick={() => movePhoto(i, 1)}
+                      disabled={i === orderedPhotos.length - 1}
+                      className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/40 disabled:opacity-20 flex items-center justify-center transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleDeletePhoto(url)}
+                    disabled={deleting === url}
+                    className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center lg:opacity-0 lg:group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                  >
+                    {deleting === url ? (
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <X className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
               </div>
             ))}
-            <button
-              onClick={() => galleryInputRef.current?.click()}
-              disabled={uploading}
-              className="aspect-square rounded-xl border-2 border-dashed border-mansion-border/40 hover:border-mansion-gold/40 flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-50"
-            >
-              <Plus className="w-5 h-5 text-text-dim" />
-              <span className="text-[10px] text-text-dim">Foto</span>
-            </button>
+            {!isReordering && (
+              <button
+                onClick={() => galleryInputRef.current?.click()}
+                disabled={uploading}
+                className="aspect-square rounded-xl border-2 border-dashed border-mansion-border/40 hover:border-mansion-gold/40 flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-50"
+              >
+                <Plus className="w-5 h-5 text-text-dim" />
+                <span className="text-[10px] text-text-dim">Foto</span>
+              </button>
+            )}
           </div>
 
           <input
