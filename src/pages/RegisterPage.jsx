@@ -13,7 +13,7 @@ import {
   Heart,
 } from 'lucide-react';
 import { useAuth } from '../App';
-import { register as apiRegister, uploadImage } from '../lib/api';
+import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode } from '../lib/api';
 
 // ────────────────────────────────────────────
 // Constants
@@ -610,6 +610,141 @@ function StepPhoto({ photoFile, onPhotoSelect }) {
 }
 
 // ────────────────────────────────────────────
+// Email Verification Screen
+// ────────────────────────────────────────────
+
+function VerificationScreen({ email, devCode, onVerified, onResend }) {
+  const [code, setCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState('');
+  const [resent, setResent] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  const handleVerify = async () => {
+    if (code.length < 6) return;
+    setVerifying(true);
+    setError('');
+    try {
+      const data = await apiVerifyCode(email, code);
+      onVerified(data);
+    } catch (err) {
+      setError(err.message || 'Código inválido');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    setResent(false);
+    try {
+      await apiResendCode(email);
+      setResent(true);
+      setTimeout(() => setResent(false), 5000);
+    } catch {
+      // silently fail
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleVerify();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex flex-col items-center justify-center text-center px-6"
+    >
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: [0, 1.2, 1] }}
+        transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+      >
+        <div className="w-20 h-20 rounded-full bg-mansion-gold/10 border border-mansion-gold/30 flex items-center justify-center mb-6">
+          <Mail className="w-9 h-9 text-mansion-gold" />
+        </div>
+      </motion.div>
+
+      <motion.h2
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="font-display text-2xl font-bold text-text-primary mb-2"
+      >
+        Verifica tu email
+      </motion.h2>
+
+      <motion.p
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="text-text-muted text-sm mb-8 max-w-xs"
+      >
+        Hemos enviado un código de 6 dígitos a <span className="text-mansion-gold font-medium">{email}</span>
+      </motion.p>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="w-full max-w-[280px]"
+      >
+        <input
+          type="text"
+          inputMode="numeric"
+          maxLength={6}
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          onKeyDown={handleKeyDown}
+          placeholder="000000"
+          className="w-full text-center text-3xl tracking-[0.5em] font-mono py-4"
+          autoFocus
+        />
+
+        {error && (
+          <p className="text-mansion-crimson text-xs mt-3">{error}</p>
+        )}
+
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={handleVerify}
+          disabled={code.length < 6 || verifying}
+          className={`w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 mt-6 transition-all ${
+            code.length === 6 && !verifying
+              ? 'btn-gold'
+              : 'bg-mansion-elevated text-text-dim cursor-not-allowed'
+          }`}
+        >
+          {verifying ? 'Verificando...' : 'Verificar'}
+          {!verifying && <ChevronRight className="w-5 h-5" />}
+        </motion.button>
+
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <button
+            onClick={handleResend}
+            disabled={resending || resent}
+            className="text-mansion-gold text-xs font-medium hover:underline disabled:opacity-50"
+          >
+            {resent ? '✓ Código reenviado' : resending ? 'Reenviando...' : '¿No recibiste el código? Reenviar'}
+          </button>
+          <p className="text-text-dim text-[10px]">
+            Revisa tu carpeta de spam
+          </p>
+          {devCode && (
+            <p className="mt-3 px-3 py-2 rounded-lg bg-mansion-gold/10 border border-mansion-gold/20 text-mansion-gold text-xs font-mono">
+              DEV: {devCode}
+            </p>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ────────────────────────────────────────────
 // Success Screen
 // ────────────────────────────────────────────
 
@@ -710,6 +845,8 @@ export default function RegisterPage() {
   const [info, setInfo] = useState({ name: '', age: '', city: '', bio: '' });
   const [photoFile, setPhotoFile] = useState(null);
   const [completed, setCompleted] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [devCode, setDevCode] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
 
@@ -762,7 +899,7 @@ export default function RegisterPage() {
       setSubmitting(true);
       setApiError('');
       try {
-        const data = await apiRegister({
+        const regResult = await apiRegister({
           email,
           password,
           username: info.name,
@@ -773,19 +910,10 @@ export default function RegisterPage() {
           city: info.city,
           bio: info.bio,
         });
-        setUser(data.user);
-        setRegistered(true);
 
-        // Upload photo if selected
-        if (photoFile) {
-          try {
-            await uploadImage(photoFile);
-          } catch {
-            // Photo upload failed silently — user can retry later
-          }
-        }
-
-        setCompleted(true);
+        // Show verification screen
+        if (regResult.devCode) setDevCode(regResult.devCode);
+        setPendingVerification(true);
       } catch (err) {
         setApiError(err.message || 'Error al registrar. Intenta de nuevo.');
       } finally {
@@ -797,6 +925,22 @@ export default function RegisterPage() {
     }
   };
 
+  const handleVerified = async (data) => {
+    setUser(data.user);
+    setRegistered(true);
+
+    // Upload photo if selected (now that we have a token)
+    if (photoFile) {
+      try {
+        await uploadImage(photoFile);
+      } catch {
+        // Photo upload failed silently — user can retry later
+      }
+    }
+
+    setCompleted(true);
+  };
+
   const prev = () => {
     if (step === 0) {
       navigate('/bienvenida');
@@ -805,6 +949,26 @@ export default function RegisterPage() {
       setStep((s) => s - 1);
     }
   };
+
+  if (pendingVerification && !completed) {
+    return (
+      <div className="min-h-screen bg-mansion-base flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/3 right-0 w-72 h-72 bg-mansion-crimson/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/3 left-0 w-64 h-64 bg-mansion-gold/5 rounded-full blur-3xl" />
+        </div>
+        <VerificationScreen
+          email={email}
+          devCode={devCode}
+          onVerified={handleVerified}
+          onResend={async () => {
+            const res = await apiResendCode(email);
+            if (res.devCode) setDevCode(res.devCode);
+          }}
+        />
+      </div>
+    );
+  }
 
   if (completed) {
     return (

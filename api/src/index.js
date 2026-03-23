@@ -151,6 +151,12 @@ function handleOptions(env) {
 
 // ── POST /api/auth/register ─────────────────────────────
 
+function generateVerificationCode() {
+  const array = new Uint32Array(1);
+  crypto.getRandomValues(array);
+  return String(array[0] % 1000000).padStart(6, '0');
+}
+
 async function handleRegister(request, env) {
   const body = await request.json();
   const { email, password, username, role, seeking, interests, age, city, bio } = body;
@@ -164,9 +170,15 @@ async function handleRegister(request, env) {
   }
 
   // Check duplicate
-  const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email.toLowerCase()).first();
-  if (existing) {
+  const existing = await env.DB.prepare('SELECT id, status FROM users WHERE email = ?').bind(email.toLowerCase()).first();
+  if (existing && existing.status === 'verified') {
     return error('Este email ya está registrado', 409);
+  }
+
+  // If pending user exists, delete and re-create
+  if (existing) {
+    await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(existing.id).run();
+    await env.DB.prepare('DELETE FROM verification_tokens WHERE user_id = ?').bind(existing.id).run();
   }
 
   const userId = generateId();
@@ -175,7 +187,7 @@ async function handleRegister(request, env) {
 
   await env.DB.prepare(`
     INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, city, country, bio, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'verified')
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
   `).bind(
     userId,
     email.toLowerCase(),
@@ -190,14 +202,92 @@ async function handleRegister(request, env) {
     bio || ''
   ).run();
 
-  const token = await signJWT({ sub: userId, email: email.toLowerCase(), role }, env.JWT_SECRET);
+  // Generate 6-digit verification code
+  const code = generateVerificationCode();
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 min
 
-  const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  await env.DB.prepare(`
+    INSERT INTO verification_tokens (id, user_id, email, token, purpose, expires_at)
+    VALUES (?, ?, ?, ?, 'verify_email', ?)
+  `).bind(generateId(), userId, email.toLowerCase(), code, expiresAt).run();
+
+  // TODO: Send real email in production (Resend, SendGrid, etc.)
+  console.log(`📧 VERIFICATION CODE for ${email}: ${code}`);
 
   return json({
-    token,
-    user: sanitizeUser(user),
+    needsVerification: true,
+    email: email.toLowerCase(),
+    message: 'Código de verificación enviado a tu email.',
+    ...(env.ENVIRONMENT !== 'production' && { devCode: code }),
   }, 201);
+}
+
+// ── POST /api/auth/verify-code ──────────────────────────
+
+async function handleVerifyCode(request, env) {
+  const { email, code } = await request.json();
+
+  if (!email || !code) {
+    return error('Email y código requeridos');
+  }
+
+  const record = await env.DB.prepare(`
+    SELECT * FROM verification_tokens
+    WHERE email = ? AND token = ? AND purpose = 'verify_email' AND used = 0 AND expires_at > datetime('now')
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(email.toLowerCase(), code.trim()).first();
+
+  if (!record) {
+    return error('Código inválido o expirado', 401);
+  }
+
+  // Mark token as used
+  await env.DB.prepare('UPDATE verification_tokens SET used = 1 WHERE id = ?')
+    .bind(record.id).run();
+
+  // Verify the user
+  await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now') WHERE id = ?")
+    .bind(record.user_id).run();
+
+  const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
+  const token = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
+
+  return json({ token, user: sanitizeUser(user) });
+}
+
+// ── POST /api/auth/resend-code ──────────────────────────
+
+async function handleResendCode(request, env) {
+  const { email } = await request.json();
+
+  if (!email) return error('Email requerido');
+
+  const user = await env.DB.prepare("SELECT id, status FROM users WHERE email = ? AND status = 'pending'")
+    .bind(email.toLowerCase()).first();
+
+  if (!user) {
+    return error('No hay registro pendiente para este email', 404);
+  }
+
+  // Invalidate old codes
+  await env.DB.prepare("UPDATE verification_tokens SET used = 1 WHERE user_id = ? AND purpose = 'verify_email' AND used = 0")
+    .bind(user.id).run();
+
+  // Generate new code
+  const code = generateVerificationCode();
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+  await env.DB.prepare(`
+    INSERT INTO verification_tokens (id, user_id, email, token, purpose, expires_at)
+    VALUES (?, ?, ?, ?, 'verify_email', ?)
+  `).bind(generateId(), user.id, email.toLowerCase(), code, expiresAt).run();
+
+  console.log(`📧 RESEND CODE for ${email}: ${code}`);
+
+  return json({
+    message: 'Nuevo código enviado.',
+    ...(env.ENVIRONMENT !== 'production' && { devCode: code }),
+  });
 }
 
 // ── POST /api/auth/login ────────────────────────────────
@@ -214,6 +304,10 @@ async function handleLogin(request, env) {
 
   if (!user || !user.password_hash) {
     return error('Credenciales inválidas', 401);
+  }
+
+  if (user.status === 'pending') {
+    return error('Debes verificar tu email antes de iniciar sesión. Revisa tu bandeja de entrada.', 403);
   }
 
   const valid = await verifyPassword(password, user.password_hash);
@@ -598,7 +692,7 @@ async function handleUpload(request, env) {
 
   const publicUrl = env.R2_PUBLIC_URL
     ? `${env.R2_PUBLIC_URL}/${key}`
-    : key; // Return key if no public URL configured
+    : `/api/images/${key}`; // Serve via Worker in dev
 
   // Update user photos array
   const user = await env.DB.prepare('SELECT photos, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
@@ -615,6 +709,23 @@ async function handleUpload(request, env) {
   `).bind(JSON.stringify(photos), publicUrl, auth.sub).run();
 
   return json({ url: publicUrl, key }, 201);
+}
+
+// ── GET /api/images/* ───────────────────────────────────
+
+async function handleServeImage(request, env, path) {
+  const key = path.replace('/api/images/', '');
+  if (!key || key.includes('..')) return error('Ruta inválida', 400);
+
+  const object = await env.IMAGES.get(key);
+  if (!object) return error('Imagen no encontrada', 404);
+
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': object.httpMetadata?.contentType || 'image/jpeg',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    },
+  });
 }
 
 // ── PUT /api/profile ────────────────────────────────────
@@ -714,6 +825,8 @@ async function handleRequest(request, env) {
   // ── Auth routes
   if (path === '/api/auth/register' && method === 'POST') return handleRegister(request, env);
   if (path === '/api/auth/login' && method === 'POST') return handleLogin(request, env);
+  if (path === '/api/auth/verify-code' && method === 'POST') return handleVerifyCode(request, env);
+  if (path === '/api/auth/resend-code' && method === 'POST') return handleResendCode(request, env);
   if (path === '/api/auth/magic-link' && method === 'POST') return handleMagicLink(request, env);
   if (path === '/api/auth/verify' && method === 'GET') return handleVerifyToken(request, env);
   if (path === '/api/auth/me' && method === 'GET') return handleMe(request, env);
@@ -734,6 +847,9 @@ async function handleRequest(request, env) {
 
   // ── Upload
   if (path === '/api/upload' && method === 'POST') return handleUpload(request, env);
+
+  // ── Serve R2 images
+  if (path.startsWith('/api/images/') && method === 'GET') return handleServeImage(request, env, path);
 
   return error('Ruta no encontrada', 404);
 }

@@ -13,7 +13,7 @@ compatibility_date = "2024-12-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "mansion-deseo-db"
-database_id = ""                    # Fill after: wrangler d1 create mansion-deseo-db
+database_id = "22136d29-2f21-4c86-96f5-7513f88ff464"
 
 # ── R2 Bucket (image storage) ───────────────────────
 [[r2_buckets]]
@@ -24,7 +24,7 @@ bucket_name = "mansion-deseo-images"
 # ── Environment Variables ────────────────────────────
 [vars]
 TURNSTILE_SECRET = ""               # Get from Cloudflare Dashboard → Turnstile
-JWT_SECRET = ""                     # Generate: openssl rand -hex 32
+JWT_SECRET = "78b85a92c0ba6b2ca96d6ba06605371a1f4683c2fa37e7783b818d4f9b7baca7"
 CORS_ORIGIN = "http://localhost:5173"
 R2_PUBLIC_URL = ""                  # Custom domain or R2 public bucket URL
 
@@ -32,6 +32,7 @@ R2_PUBLIC_URL = ""                  # Custom domain or R2 public bucket URL
 [env.production]
 [env.production.vars]
 CORS_ORIGIN = "https://mansiondeseo.com"
+ENVIRONMENT = "production"
 
 # ── Routes (if using custom domain) ─────────────────
 # routes = [

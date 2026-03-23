@@ -89,9 +89,25 @@ export async function register({ email, password, username, role, seeking, inter
     method: 'POST',
     body: JSON.stringify({ email, password, username, role, seeking, interests, age: Number(age), city, bio }),
   });
+  // Registration now returns needsVerification instead of token
+  return data;
+}
+
+export async function verifyCode(email, code) {
+  const data = await apiFetch('/auth/verify-code', {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+  });
   setToken(data.token);
   setStoredUser(data.user);
   return data;
+}
+
+export async function resendCode(email) {
+  return apiFetch('/auth/resend-code', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
 }
 
 export async function login({ email, password }) {
