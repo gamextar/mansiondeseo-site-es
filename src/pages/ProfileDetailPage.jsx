@@ -417,12 +417,12 @@ export default function ProfileDetailPage() {
               {photos.map((photo, i) => {
                 const blocked = isPhotoBlocked(i);
                 return (
-                  <div key={i} className="w-full h-full flex-shrink-0 snap-center flex items-center justify-center p-4 relative">
+                  <div key={i} className="w-full h-full flex-shrink-0 snap-center relative overflow-hidden">
                     <img
                       src={photo}
                       alt={blocked ? '' : `${name} ${i + 1}`}
-                      className={blocked ? 'w-full h-full object-cover rounded-lg select-none' : 'max-w-full max-h-full object-contain rounded-lg select-none'}
-                      style={blocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.05)' } : undefined}
+                      className="w-full h-full object-cover select-none"
+                      style={blocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
                       draggable={false}
                     />
                     {blocked && (
