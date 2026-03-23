@@ -3,18 +3,31 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../App';
+import { login as apiLogin } from '../lib/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { setRegistered } = useAuth();
+  const { setRegistered, setUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setRegistered(true);
-    navigate('/');
+    setLoading(true);
+    setError('');
+    try {
+      const data = await apiLogin({ email, password });
+      setUser(data.user);
+      setRegistered(true);
+      navigate('/');
+    } catch (err) {
+      setError(err.message || 'Credenciales inválidas');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -82,13 +95,18 @@ export default function LoginPage() {
             </button>
           </div>
 
+          {error && (
+            <p className="text-mansion-crimson text-xs text-center">{error}</p>
+          )}
+
           <motion.button
             whileTap={{ scale: 0.97 }}
             type="submit"
-            className="btn-gold w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 mt-2"
+            disabled={loading}
+            className="btn-gold w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
           >
-            Entrar
-            <ArrowRight className="w-5 h-5" />
+            {loading ? 'Entrando...' : 'Entrar'}
+            {!loading && <ArrowRight className="w-5 h-5" />}
           </motion.button>
         </form>
 

@@ -5,20 +5,41 @@ import { ChevronLeft, Send, Lock, ImageIcon, Smile } from 'lucide-react';
 import { mockConversations, mockMessages } from '../data/mockMessages';
 import { useMessageLimit } from '../hooks/useMessageLimit';
 import DesktopSidebar from '../components/DesktopSidebar';
+import { getMessages as apiGetMessages, sendMessage as apiSendMessage, getMessageLimit, getToken } from '../lib/api';
 
 export default function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { remaining, canSend, sendMessage, max } = useMessageLimit();
+  const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([]);
+  const [apiLimit, setApiLimit] = useState(null);
   const scrollRef = useRef(null);
 
   const conv = mockConversations.find((c) => c.id === id);
 
+  // Determine the partner's user ID (for API calls) from the conversation
+  const partnerId = conv?.profileId || id;
+
   useEffect(() => {
-    setMessages(mockMessages[id] || []);
-  }, [id]);
+    if (getToken()) {
+      apiGetMessages(partnerId)
+        .then(data => {
+          if (data.messages && data.messages.length > 0) {
+            setMessages(data.messages);
+          } else {
+            setMessages(mockMessages[id] || []);
+          }
+        })
+        .catch(() => setMessages(mockMessages[id] || []));
+
+      getMessageLimit()
+        .then(data => setApiLimit(data))
+        .catch(() => {});
+    } else {
+      setMessages(mockMessages[id] || []);
+    }
+  }, [id, partnerId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -34,19 +55,38 @@ export default function ChatPage() {
     );
   }
 
-  const handleSend = () => {
-    if (!input.trim() || !canSend) return;
+  const effectiveRemaining = apiLimit ? apiLimit.remaining : remaining;
+  const effectiveCanSend = apiLimit ? apiLimit.canSend : canSend;
+  const effectiveMax = apiLimit ? apiLimit.max : max;
 
+  const handleSend = async () => {
+    if (!input.trim() || !effectiveCanSend) return;
+
+    const text = input.trim();
     const newMsg = {
       id: `m${messages.length + 1}`,
       senderId: 'me',
-      text: input.trim(),
+      text,
       timestamp: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
     };
 
     setMessages((prev) => [...prev, newMsg]);
     setInput('');
-    sendMessage();
+    localSendMessage();
+
+    // Send via API
+    if (getToken()) {
+      try {
+        await apiSendMessage(partnerId, text);
+        // Refresh limit
+        getMessageLimit().then(data => setApiLimit(data)).catch(() => {});
+      } catch (err) {
+        // If limit exceeded, show error
+        if (err.status === 403) {
+          setApiLimit({ remaining: 0, canSend: false, max: 5, sent: 5 });
+        }
+      }
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -90,27 +130,27 @@ export default function ChatPage() {
         {/* Message limit banner */}
         <div className="px-4 pb-2 lg:px-6 max-w-4xl lg:mx-auto">
           <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
-            remaining <= 2
+            effectiveRemaining <= 2
               ? 'bg-mansion-crimson/10 border border-mansion-crimson/20'
               : 'bg-mansion-gold/5 border border-mansion-gold/10'
           }`}>
             <Lock className={`w-3.5 h-3.5 flex-shrink-0 ${
-              remaining <= 2 ? 'text-mansion-crimson' : 'text-mansion-gold'
+              effectiveRemaining <= 2 ? 'text-mansion-crimson' : 'text-mansion-gold'
             }`} />
-            <span className={remaining <= 2 ? 'text-mansion-crimson' : 'text-mansion-gold'}>
-              Te quedan <strong>{remaining}</strong> mensajes hoy
+            <span className={effectiveRemaining <= 2 ? 'text-mansion-crimson' : 'text-mansion-gold'}>
+              Te quedan <strong>{effectiveRemaining}</strong> mensajes hoy
             </span>
             <div className="flex-1" />
             {/* Progress bar */}
             <div className="w-16 h-1.5 bg-mansion-elevated rounded-full overflow-hidden">
               <motion.div
                 className={`h-full rounded-full ${
-                  remaining <= 2
+                  effectiveRemaining <= 2
                     ? 'bg-mansion-crimson'
                     : 'bg-mansion-gold'
                 }`}
                 initial={false}
-                animate={{ width: `${(remaining / max) * 100}%` }}
+                animate={{ width: `${(effectiveRemaining / effectiveMax) * 100}%` }}
               />
             </div>
           </div>
@@ -172,8 +212,8 @@ export default function ChatPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={canSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
-              disabled={!canSend}
+              placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
+              disabled={!effectiveCanSend}
               rows={1}
               className="w-full resize-none max-h-24 py-2.5 pr-10 text-sm !rounded-2xl"
               style={{ minHeight: '42px' }}

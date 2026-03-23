@@ -13,6 +13,7 @@ import {
   Heart,
 } from 'lucide-react';
 import { useAuth } from '../App';
+import { register as apiRegister, uploadImage } from '../lib/api';
 
 // ────────────────────────────────────────────
 // Constants
@@ -560,7 +561,9 @@ function StepBasicInfo({ data, onChange }) {
   );
 }
 
-function StepPhoto() {
+function StepPhoto({ photoFile, onPhotoSelect }) {
+  const previewUrl = photoFile ? URL.createObjectURL(photoFile) : null;
+
   return (
     <div className="text-center">
       <h2 className="font-display text-2xl font-bold text-text-primary mb-2">
@@ -570,16 +573,34 @@ function StepPhoto() {
         Los perfiles con foto reciben 10x más mensajes
       </p>
 
-      <motion.div
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        className="w-36 h-36 mx-auto rounded-full border-2 border-dashed border-mansion-gold/40
-                   bg-mansion-card flex flex-col items-center justify-center cursor-pointer
-                   hover:border-mansion-gold/60 hover:bg-mansion-gold/5 transition-all"
-      >
-        <Camera className="w-8 h-8 text-mansion-gold mb-2" />
-        <span className="text-text-muted text-xs">Subir foto</span>
-      </motion.div>
+      <label htmlFor="photo-upload" className="cursor-pointer block">
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="w-36 h-36 mx-auto rounded-full border-2 border-dashed border-mansion-gold/40
+                     bg-mansion-card flex flex-col items-center justify-center
+                     hover:border-mansion-gold/60 hover:bg-mansion-gold/5 transition-all overflow-hidden"
+        >
+          {previewUrl ? (
+            <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+          ) : (
+            <>
+              <Camera className="w-8 h-8 text-mansion-gold mb-2" />
+              <span className="text-text-muted text-xs">Subir foto</span>
+            </>
+          )}
+        </motion.div>
+      </label>
+      <input
+        id="photo-upload"
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onPhotoSelect(file);
+        }}
+      />
 
       <p className="text-text-dim text-xs mt-6">
         Puedes subir tu foto más tarde desde tu perfil
@@ -678,7 +699,7 @@ function SuccessScreen({ onEnter }) {
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { setRegistered } = useAuth();
+  const { setRegistered, setUser } = useAuth();
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [email, setEmail] = useState('');
@@ -687,7 +708,10 @@ export default function RegisterPage() {
   const [seeking, setSeeking] = useState(null);
   const [interests, setInterests] = useState([]);
   const [info, setInfo] = useState({ name: '', age: '', city: '', bio: '' });
+  const [photoFile, setPhotoFile] = useState(null);
   const [completed, setCompleted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const toggleInterest = (id) => {
     setInterests((prev) =>
@@ -733,10 +757,40 @@ export default function RegisterPage() {
     return true;
   };
 
-  const next = () => {
+  const next = async () => {
     if (step === TOTAL_STEPS - 1) {
-      setRegistered(true);
-      setCompleted(true);
+      setSubmitting(true);
+      setApiError('');
+      try {
+        const data = await apiRegister({
+          email,
+          password,
+          username: info.name,
+          role: iAm,
+          seeking,
+          interests,
+          age: info.age,
+          city: info.city,
+          bio: info.bio,
+        });
+        setUser(data.user);
+        setRegistered(true);
+
+        // Upload photo if selected
+        if (photoFile) {
+          try {
+            await uploadImage(photoFile);
+          } catch {
+            // Photo upload failed silently — user can retry later
+          }
+        }
+
+        setCompleted(true);
+      } catch (err) {
+        setApiError(err.message || 'Error al registrar. Intenta de nuevo.');
+      } finally {
+        setSubmitting(false);
+      }
     } else {
       setDirection(1);
       setStep((s) => s + 1);
@@ -813,7 +867,7 @@ export default function RegisterPage() {
       case 4:
         return <StepBasicInfo data={info} onChange={setInfo} />;
       case 5:
-        return <StepPhoto />;
+        return <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />;
       default:
         return null;
     }
@@ -878,18 +932,25 @@ export default function RegisterPage() {
 
       {/* Bottom CTA */}
       <div className="relative z-10 px-6 pb-10">
+        {apiError && (
+          <p className="text-mansion-crimson text-xs text-center mb-3">{apiError}</p>
+        )}
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={next}
-          disabled={!canNext()}
+          disabled={!canNext() || submitting}
           className={`w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 transition-all ${
-            canNext()
+            canNext() && !submitting
               ? 'btn-gold'
               : 'bg-mansion-elevated text-text-dim cursor-not-allowed'
           }`}
         >
-          {step === TOTAL_STEPS - 1 ? 'Completar Registro' : 'Continuar'}
-          <ChevronRight className="w-5 h-5" />
+          {submitting
+            ? 'Registrando...'
+            : step === TOTAL_STEPS - 1
+            ? 'Completar Registro'
+            : 'Continuar'}
+          {!submitting && <ChevronRight className="w-5 h-5" />}
         </motion.button>
 
         {step === 0 && (

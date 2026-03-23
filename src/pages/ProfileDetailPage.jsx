@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -5,6 +6,7 @@ import {
   MapPin, Clock, ChevronLeft,
 } from 'lucide-react';
 import mockProfiles from '../data/mockProfiles';
+import { getProfile, getToken } from '../lib/api';
 
 const ROLE_COLOR = {
   Pareja: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
@@ -15,7 +17,31 @@ const ROLE_COLOR = {
 export default function ProfileDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const profile = mockProfiles.find((p) => p.id === id);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Try API first, fallback to mock
+    if (getToken()) {
+      getProfile(id)
+        .then(data => setProfile(data.profile))
+        .catch(() => {
+          setProfile(mockProfiles.find((p) => p.id === id) || null);
+        })
+        .finally(() => setLoading(false));
+    } else {
+      setProfile(mockProfiles.find((p) => p.id === id) || null);
+      setLoading(false);
+    }
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-mansion-base flex items-center justify-center">
+        <p className="text-text-muted">Cargando perfil...</p>
+      </div>
+    );
+  }
 
   if (!profile) {
     return (

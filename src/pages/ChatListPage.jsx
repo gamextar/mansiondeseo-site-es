@@ -1,9 +1,23 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search } from 'lucide-react';
 import { mockConversations } from '../data/mockMessages';
+import { getConversations, getToken } from '../lib/api';
 
 export default function ChatListPage() {
+  const [conversations, setConversations] = useState(mockConversations);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    getConversations()
+      .then(data => {
+        if (data.conversations && data.conversations.length > 0) {
+          setConversations(data.conversations);
+        }
+      })
+      .catch(() => {});
+  }, []);
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
       {/* Header */}
@@ -23,7 +37,7 @@ export default function ChatListPage() {
 
       {/* Conversation list */}
       <div className="px-2 lg:px-6 lg:max-w-3xl">
-        {mockConversations.map((conv, index) => (
+        {conversations.map((conv, index) => (
           <motion.div
             key={conv.id}
             initial={{ opacity: 0, y: 10 }}

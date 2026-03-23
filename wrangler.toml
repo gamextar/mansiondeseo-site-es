@@ -1,0 +1,43 @@
+# ═══════════════════════════════════════════════════════
+# MANSIÓN DESEO — Cloudflare Worker Configuration
+# ═══════════════════════════════════════════════════════
+
+name = "mansion-deseo-api"
+main = "api/src/index.js"
+compatibility_date = "2024-12-01"
+
+# ── Account (set via env or `wrangler login`) ────────
+# account_id = "YOUR_ACCOUNT_ID"
+
+# ── D1 Database ──────────────────────────────────────
+[[d1_databases]]
+binding = "DB"
+database_name = "mansion-deseo-db"
+database_id = ""                    # Fill after: wrangler d1 create mansion-deseo-db
+
+# ── R2 Bucket (image storage) ───────────────────────
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "mansion-deseo-images"
+# Create with: wrangler r2 bucket create mansion-deseo-images
+
+# ── Environment Variables ────────────────────────────
+[vars]
+TURNSTILE_SECRET = ""               # Get from Cloudflare Dashboard → Turnstile
+JWT_SECRET = ""                     # Generate: openssl rand -hex 32
+CORS_ORIGIN = "http://localhost:5173"
+R2_PUBLIC_URL = ""                  # Custom domain or R2 public bucket URL
+
+# ── Production overrides ─────────────────────────────
+[env.production]
+[env.production.vars]
+CORS_ORIGIN = "https://mansiondeseo.com"
+
+# ── Routes (if using custom domain) ─────────────────
+# routes = [
+#   { pattern = "api.mansiondeseo.com/*", zone_name = "mansiondeseo.com" }
+# ]
+
+# ── Dev settings ─────────────────────────────────────
+[dev]
+port = 8787

@@ -1,13 +1,29 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import mockProfiles from '../data/mockProfiles';
 import FilterBar from '../components/FilterBar';
 import ProfileCard from '../components/ProfileCard';
+import { getProfiles } from '../lib/api';
+import { getToken } from '../lib/api';
 
 export default function FeedPage() {
   const [activeFilter, setActiveFilter] = useState('all');
+  const [apiProfiles, setApiProfiles] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    setLoading(true);
+    getProfiles({ filter: activeFilter === 'all' ? undefined : activeFilter })
+      .then(data => setApiProfiles(data.profiles))
+      .catch(() => setApiProfiles(null))
+      .finally(() => setLoading(false));
+  }, [activeFilter]);
 
   const filtered = useMemo(() => {
+    // Use API profiles if available, fallback to mock
+    if (apiProfiles && apiProfiles.length > 0) return apiProfiles;
+
     if (activeFilter === 'all') return mockProfiles;
 
     return mockProfiles.filter((p) => {
@@ -21,7 +37,7 @@ export default function FeedPage() {
       // Interest-based filters
       return p.interests.some((i) => i.toLowerCase().includes(filterLower));
     });
-  }, [activeFilter]);
+  }, [activeFilter, apiProfiles]);
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
