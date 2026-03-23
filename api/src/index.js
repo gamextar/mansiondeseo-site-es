@@ -914,6 +914,15 @@ async function handleUpdateProfile(request, env) {
   const body = await request.json();
   const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'city', 'bio', 'avatar_url', 'premium'];
 
+  // Validate and allow photos reorder (all URLs must originate from our R2 bucket)
+  if (body.photos !== undefined) {
+    if (!Array.isArray(body.photos)) return error('photos debe ser un arreglo', 400);
+    const r2Base = env.R2_PUBLIC_URL || '';
+    const allValid = body.photos.every(url => typeof url === 'string' && url.startsWith(r2Base));
+    if (!allValid) return error('URL de foto inválida', 400);
+    allowedFields.push('photos');
+  }
+
   // ghost_mode is only allowed for premium users
   const currentUser = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
   const isPremium = body.premium !== undefined ? (body.premium ? 1 : 0) : currentUser?.premium;
@@ -926,7 +935,7 @@ async function handleUpdateProfile(request, env) {
 
   for (const field of allowedFields) {
     if (body[field] !== undefined) {
-      if (field === 'interests') {
+      if (field === 'interests' || field === 'photos') {
         updates.push(`${field} = ?`);
         values.push(JSON.stringify(body[field]));
       } else if (field === 'ghost_mode' || field === 'premium') {

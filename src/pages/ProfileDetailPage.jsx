@@ -3,9 +3,9 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Heart, MessageCircle, Share2, Shield, Crown,
-  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn,
+  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical,
 } from 'lucide-react';
-import { getProfile, getToken, toggleFavorite } from '../lib/api';
+import { getProfile, getToken, toggleFavorite, updateProfile } from '../lib/api';
 
 const ROLE_COLOR = {
   Pareja: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
@@ -22,6 +22,9 @@ export default function ProfileDetailPage() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [togglingFav, setTogglingFav] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isReordering, setIsReordering] = useState(false);
+  const [orderedPhotos, setOrderedPhotos] = useState([]);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
@@ -29,6 +32,7 @@ export default function ProfileDetailPage() {
     getProfile(id)
       .then(data => {
         setProfile(data.profile);
+        setOrderedPhotos(data.profile.photos || []);
         setViewerPremium(data.viewerPremium || false);
         if (data.settings) setSettings(data.settings);
         if (data.profile.isFavorited !== undefined) setIsFavorited(data.profile.isFavorited);
@@ -36,6 +40,28 @@ export default function ProfileDetailPage() {
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
   }, [id, navigate]);
+
+  const movePhoto = useCallback((from, dir) => {
+    const to = from + dir;
+    setOrderedPhotos(prev => {
+      if (to < 0 || to >= prev.length) return prev;
+      const next = [...prev];
+      [next[from], next[to]] = [next[to], next[from]];
+      return next;
+    });
+  }, []);
+
+  const savePhotoOrder = async () => {
+    setSavingOrder(true);
+    try {
+      await updateProfile({ photos: orderedPhotos });
+      setIsReordering(false);
+    } catch {
+      // Silently fail
+    } finally {
+      setSavingOrder(false);
+    }
+  };
 
   const handleToggleFavorite = async () => {
     if (togglingFav) return;
@@ -143,11 +169,11 @@ export default function ProfileDetailPage() {
       <div className="lg:flex lg:gap-8 lg:px-8 lg:pt-20 lg:max-w-6xl lg:mx-auto">
 
       {/* Hero image carousel */}
-      <div className="relative lg:w-2/5 lg:flex-shrink-0 lg:sticky lg:top-20 lg:self-start">
+      <div className="relative lg:w-[46%] lg:flex-shrink-0 lg:sticky lg:top-20 lg:self-start">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="aspect-[3/4] max-h-[70vh] lg:max-h-[80vh] overflow-hidden lg:rounded-3xl relative"
+          className="w-full aspect-[3/4] max-h-[70vh] lg:max-h-[85vh] overflow-hidden lg:rounded-3xl relative"
         >
           {/* Scroll-snap container */}
           <div
@@ -322,16 +348,39 @@ export default function ProfileDetailPage() {
           {/* Photo gallery */}
           {photos.length > 1 && (
             <div className="mb-4">
-              <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2">Galería</h3>
-              <div className="grid grid-cols-3 gap-2">
-                {photos.map((photo, i) => {
-                  const blocked = isPhotoBlocked(i);
-                  return (
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider">Galería</h3>
+                {isOwnProfile && !isReordering && (
+                  <button
+                    onClick={() => { setOrderedPhotos(photos); setIsReordering(true); }}
+                    className="text-xs text-mansion-gold hover:text-mansion-gold/80 transition-colors"
+                  >
+                    Editar orden
+                  </button>
+                )}
+                {isOwnProfile && isReordering && (
+                  <div className="flex gap-2">
                     <button
-                      key={i}
-                      onClick={() => !blocked && openLightbox(i)}
-                      className="aspect-square rounded-xl overflow-hidden bg-mansion-card relative group"
+                      onClick={() => setIsReordering(false)}
+                      className="text-xs text-text-muted hover:text-text-primary transition-colors"
                     >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={savePhotoOrder}
+                      disabled={savingOrder}
+                      className="text-xs text-mansion-gold font-semibold hover:text-mansion-gold/80 transition-colors disabled:opacity-50"
+                    >
+                      {savingOrder ? 'Guardando…' : 'Guardar'}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {(isReordering ? orderedPhotos : photos).map((photo, i) => {
+                  const blocked = !isReordering && isPhotoBlocked(i);
+                  return (
+                    <div key={isReordering ? photo : i} className="aspect-square rounded-xl overflow-hidden bg-mansion-card relative group">
                       <img
                         src={photo}
                         alt=""
@@ -344,12 +393,33 @@ export default function ProfileDetailPage() {
                           <Lock className="w-4 h-4 text-white/60" />
                         </div>
                       )}
-                      {!blocked && (
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                      {isReordering ? (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => movePhoto(i, -1)}
+                            disabled={i === 0}
+                            className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/40 disabled:opacity-20 flex items-center justify-center transition-colors"
+                          >
+                            <ChevronLeft className="w-4 h-4 text-white" />
+                          </button>
+                          <span className="text-white/70 text-xs font-bold">{i + 1}</span>
+                          <button
+                            onClick={() => movePhoto(i, 1)}
+                            disabled={i === orderedPhotos.length - 1}
+                            className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/40 disabled:opacity-20 flex items-center justify-center transition-colors"
+                          >
+                            <ChevronRightIcon className="w-4 h-4 text-white" />
+                          </button>
+                        </div>
+                      ) : !blocked && (
+                        <div
+                          className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center cursor-pointer"
+                          onClick={() => openLightbox(i)}
+                        >
                           <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-70 transition-opacity" />
                         </div>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
