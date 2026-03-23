@@ -16,13 +16,15 @@ const ROLE_BG = {
 
 export default function ProfileCard({ profile, index = 0, viewerPremium = false, settings = {} }) {
   const { id, name, age, city, role, interests, photos = [], verified, online, premium, blurred } = profile;
-  const mainPhoto = photos[0] || profile.avatar_url || '';
   const blurLevel = settings.blurLevel || 14;
 
-  // Photo is blocked if backend sent null (ghost mode — all photos null)
-  const cardBlocked = !mainPhoto;
-  // For blocked cards, use avatar_url as blur placeholder
-  const blurPlaceholder = profile.avatar_url || '';
+  // Backend sends null for blocked photos; check photos[0] explicitly
+  // `blurred` = true means ghost mode — all photos are null from backend
+  const cardBlocked = blurred || photos[0] === null;
+  // Visible photo: first non-null in array, or avatar_url
+  const mainPhoto = photos.find(p => p) || profile.avatar_url || '';
+  // For blocked cards, use avatar_url as the blur placeholder background
+  const blurPlaceholder = profile.avatar_url || mainPhoto;
 
   return (
     <motion.div

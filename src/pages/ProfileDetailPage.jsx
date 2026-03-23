@@ -155,7 +155,7 @@ export default function ProfileDetailPage() {
             ref={heroScrollRef}
             onScroll={handleHeroScroll}
             className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide"
-            style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+            style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', overscrollBehavior: 'contain' }}
           >
             {photos.map((photo, i) => {
               const blocked = isPhotoBlocked(i);
