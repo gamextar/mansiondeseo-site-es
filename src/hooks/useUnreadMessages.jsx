@@ -8,7 +8,7 @@ const POLL_INTERVAL = 15_000; // 15 seconds
 export function UnreadProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [toast, setToast] = useState(null);
-  const prevCountRef = useRef(0);
+  const prevCountRef = useRef(-1); // -1 = not yet loaded
   const timerRef = useRef(null);
 
   const fetchUnread = useCallback(() => {
@@ -24,13 +24,11 @@ export function UnreadProvider({ children }) {
           (sum, c) => sum + (c.unread || 0),
           0
         );
-        // Show toast if count increased
-        if (total > prevCountRef.current && prevCountRef.current >= 0) {
+        // Show toast if count increased (skip first load)
+        if (prevCountRef.current >= 0 && total > prevCountRef.current) {
           const diff = total - prevCountRef.current;
-          if (prevCountRef.current > 0) {
-            setToast(`${diff} nuevo${diff > 1 ? 's' : ''} mensaje${diff > 1 ? 's' : ''}`);
-            setTimeout(() => setToast(null), 4000);
-          }
+          setToast(`${diff} nuevo${diff > 1 ? 's' : ''} mensaje${diff > 1 ? 's' : ''}`);
+          setTimeout(() => setToast(null), 4000);
         }
         prevCountRef.current = total;
         setUnreadCount(total);
