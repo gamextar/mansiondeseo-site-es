@@ -1,10 +1,24 @@
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { MessageCircle, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getConversations } from '../lib/api';
 
 export default function Navbar() {
   const location = useLocation();
   const isChat = location.pathname.startsWith('/mensajes');
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    getConversations()
+      .then((convos) => {
+        const total = (convos || []).reduce((sum, c) => sum + (c.unread || 0), 0);
+        setUnreadCount(total);
+      })
+      .catch(() => {});
+  }, [location.pathname]);
 
   return (
     <motion.header
@@ -47,9 +61,11 @@ export default function Navbar() {
               }`}
             >
               <MessageCircle className="w-5 h-5" />
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-mansion-crimson text-white text-[10px] font-bold flex items-center justify-center px-1">
-                3
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-mansion-crimson text-white text-[10px] font-bold flex items-center justify-center px-1">
+                  {unreadCount}
+                </span>
+              )}
             </Link>
 
             {/* Avatar */}

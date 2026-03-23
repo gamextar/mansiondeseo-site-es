@@ -511,6 +511,26 @@ function StepInterests({ selected, onToggle }) {
 }
 
 function StepBasicInfo({ data, onChange }) {
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const ARGENTINA_CITIES = [
+    'Buenos Aires', 'CABA', 'Córdoba', 'Rosario', 'Mendoza', 'San Miguel de Tucumán',
+    'La Plata', 'Mar del Plata', 'Salta', 'Santa Fe', 'San Juan', 'Resistencia',
+    'Neuquén', 'Santiago del Estero', 'Corrientes', 'Bahía Blanca', 'Posadas',
+    'San Salvador de Jujuy', 'Paraná', 'Formosa', 'San Luis', 'La Rioja',
+    'Catamarca', 'Río Gallegos', 'Ushuaia', 'Rawson', 'Viedma', 'Santa Rosa',
+    'Río Cuarto', 'Tandil', 'Pilar', 'Tigre', 'Quilmes', 'Lanús', 'Avellaneda',
+    'López', 'Lomas de Zamora', 'Moreno', 'Merlo', 'Florencio Varela',
+    'San Isidro', 'Vicente López', 'San Fernando', 'Tres de Febrero',
+    'Comodoro Rivadavia', 'Bariloche', 'Villa Carlos Paz', 'Zárate',
+  ];
+
+  const filtered = data.city
+    ? ARGENTINA_CITIES.filter(c =>
+        c.toLowerCase().includes(data.city.toLowerCase()) && c.toLowerCase() !== data.city.toLowerCase()
+      ).slice(0, 5)
+    : [];
+
   return (
     <div className="text-center">
       <h2 className="font-display text-2xl font-bold text-text-primary mb-2">Casi listo</h2>
@@ -548,10 +568,33 @@ function StepBasicInfo({ data, onChange }) {
             <input
               type="text"
               value={data.city}
-              onChange={(e) => onChange({ ...data, city: e.target.value })}
-              placeholder="Madrid"
+              onChange={(e) => {
+                onChange({ ...data, city: e.target.value });
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              placeholder="Buenos Aires"
               className="w-full pl-10"
             />
+            {showSuggestions && filtered.length > 0 && (
+              <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-mansion-card border border-mansion-border/40 rounded-xl overflow-hidden shadow-lg">
+                {filtered.map((city) => (
+                  <button
+                    key={city}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      onChange({ ...data, city });
+                      setShowSuggestions(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-text-primary hover:bg-mansion-elevated/50 transition-colors"
+                  >
+                    {city}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <div>
@@ -850,7 +893,7 @@ export default function RegisterPage() {
   const [iAm, setIAm] = useState(null);
   const [seeking, setSeeking] = useState(null);
   const [interests, setInterests] = useState([]);
-  const [info, setInfo] = useState({ name: '', age: '', city: '', bio: '' });
+  const [info, setInfo] = useState({ name: '', age: '', city: 'Buenos Aires', bio: '' });
   const [photoFile, setPhotoFile] = useState(null);
   const [completed, setCompleted] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
