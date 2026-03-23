@@ -149,6 +149,67 @@ function handleOptions(env) {
 // ROUTE HANDLERS
 // ══════════════════════════════════════════════════════════
 
+// ── Email via MailChannels ──────────────────────────────
+
+function verificationEmailHTML(code) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;padding:0;background:#08080E;font-family:'Helvetica Neue',Arial,sans-serif}
+  .wrap{max-width:480px;margin:0 auto;padding:40px 24px}
+  .card{background:#111118;border-radius:16px;padding:40px 32px;border:1px solid rgba(201,168,76,0.15)}
+  .logo{text-align:center;font-size:24px;font-weight:700;color:#C9A84C;letter-spacing:1px;margin-bottom:8px}
+  .sub{text-align:center;color:#8a8a9a;font-size:13px;margin-bottom:32px}
+  .code-box{background:#08080E;border:2px solid rgba(201,168,76,0.3);border-radius:12px;padding:20px;text-align:center;margin:24px 0}
+  .code{font-size:36px;letter-spacing:12px;font-weight:700;color:#C9A84C;font-family:'Courier New',monospace}
+  .msg{color:#c4c4d0;font-size:14px;line-height:1.6;text-align:center}
+  .footer{text-align:center;color:#555;font-size:11px;margin-top:32px}
+  .warn{color:#D4183D;font-size:12px;text-align:center;margin-top:16px}
+</style></head>
+<body><div class="wrap"><div class="card">
+  <div class="logo">MANSIÓN DESEO</div>
+  <div class="sub">Verificación de cuenta</div>
+  <p class="msg">Tu código de verificación es:</p>
+  <div class="code-box"><div class="code">${code}</div></div>
+  <p class="msg">Introduce este código en la app para completar tu registro. El código expira en <strong>30 minutos</strong>.</p>
+  <p class="warn">Si no solicitaste esto, ignora este email.</p>
+</div>
+<div class="footer">© Mansión Deseo · Este email fue enviado automáticamente</div>
+</div></body></html>`;
+}
+
+async function sendVerificationEmail(env, toEmail, code) {
+  const fromEmail = env.MAIL_FROM || 'noreply@unicoapps.com';
+  const fromName = 'Mansión Deseo';
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: `${fromName} <${fromEmail}>`,
+        to: [toEmail],
+        subject: `${code} — Tu código de verificación`,
+        text: `Tu código de verificación para Mansión Deseo es: ${code}\n\nExpira en 30 minutos.\n\nSi no solicitaste esto, ignora este email.`,
+        html: verificationEmailHTML(code),
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`Resend error ${res.status}:`, body);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Resend send failed:', err.message);
+    return false;
+  }
+}
+
 // ── POST /api/auth/register ─────────────────────────────
 
 function generateVerificationCode() {
@@ -211,8 +272,12 @@ async function handleRegister(request, env) {
     VALUES (?, ?, ?, ?, 'verify_email', ?)
   `).bind(generateId(), userId, email.toLowerCase(), code, expiresAt).run();
 
-  // TODO: Send real email in production (Resend, SendGrid, etc.)
-  console.log(`📧 VERIFICATION CODE for ${email}: ${code}`);
+  // Send verification email (MailChannels in production, console in dev)
+  if (env.ENVIRONMENT === 'production') {
+    await sendVerificationEmail(env, email.toLowerCase(), code);
+  } else {
+    console.log(`📧 VERIFICATION CODE for ${email}: ${code}`);
+  }
 
   return json({
     needsVerification: true,
@@ -282,7 +347,12 @@ async function handleResendCode(request, env) {
     VALUES (?, ?, ?, ?, 'verify_email', ?)
   `).bind(generateId(), user.id, email.toLowerCase(), code, expiresAt).run();
 
-  console.log(`📧 RESEND CODE for ${email}: ${code}`);
+  // Send verification email
+  if (env.ENVIRONMENT === 'production') {
+    await sendVerificationEmail(env, email.toLowerCase(), code);
+  } else {
+    console.log(`📧 RESEND CODE for ${email}: ${code}`);
+  }
 
   return json({
     message: 'Nuevo código enviado.',

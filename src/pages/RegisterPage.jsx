@@ -7,6 +7,8 @@ import {
   Camera,
   Mail,
   Lock,
+  Eye,
+  EyeOff,
   MapPin,
   Sparkles,
   Check,
@@ -355,6 +357,8 @@ function FichaPreview({ data, currentStep }) {
 // ────────────────────────────────────────────
 
 function StepEmail({ email, password, onEmailChange, onPasswordChange }) {
+  const [showPassword, setShowPassword] = useState(true);
+
   return (
     <div className="text-center">
       <motion.div
@@ -393,13 +397,20 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange }) {
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" />
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => onPasswordChange(e.target.value)}
               placeholder="Mínimo 6 caracteres"
-              className="w-full pl-10"
+              className="w-full pl-10 pr-10"
               autoComplete="new-password"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-dim hover:text-text-muted transition-colors"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
         </div>
       </div>

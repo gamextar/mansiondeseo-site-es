@@ -27,6 +27,7 @@ TURNSTILE_SECRET = ""               # Get from Cloudflare Dashboard → Turnstil
 JWT_SECRET = "78b85a92c0ba6b2ca96d6ba06605371a1f4683c2fa37e7783b818d4f9b7baca7"
 CORS_ORIGIN = "http://localhost:5173"
 R2_PUBLIC_URL = ""                  # Custom domain or R2 public bucket URL
+MAIL_FROM = "noreply@unicoapps.com"
 
 # ── Production overrides ─────────────────────────────
 [env.production]
@@ -46,6 +47,7 @@ ENVIRONMENT = "production"
 JWT_SECRET = "78b85a92c0ba6b2ca96d6ba06605371a1f4683c2fa37e7783b818d4f9b7baca7"
 TURNSTILE_SECRET = ""
 R2_PUBLIC_URL = ""
+MAIL_FROM = "noreply@unicoapps.com"
 
 # ── Routes (if using custom domain) ─────────────────
 # routes = [

@@ -1,16 +1,30 @@
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Home, Search, MessageCircle, User, Crown, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getConversations } from '../lib/api';
 
 const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio' },
   { to: '/explorar', icon: Search, label: 'Explorar' },
-  { to: '/mensajes', icon: MessageCircle, label: 'Mensajes', badge: 3 },
+  { to: '/mensajes', icon: MessageCircle, label: 'Mensajes' },
   { to: '/perfil', icon: User, label: 'Mi Perfil' },
 ];
 
 export default function DesktopSidebar() {
   const location = useLocation();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    getConversations()
+      .then((convos) => {
+        const total = (convos || []).reduce((sum, c) => sum + (c.unread || 0), 0);
+        setUnreadCount(total);
+      })
+      .catch(() => {});
+  }, [location.pathname]);
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
@@ -30,7 +44,7 @@ export default function DesktopSidebar() {
 
       {/* Nav items */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {NAV_ITEMS.map(({ to, icon: Icon, label, badge }) => {
+        {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
           const isActive =
             to === '/'
               ? location.pathname === '/'
@@ -57,9 +71,9 @@ export default function DesktopSidebar() {
                       isActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'
                     }`}
                   />
-                  {badge && (
+                  {to === '/mensajes' && unreadCount > 0 && (
                     <span className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] rounded-full bg-mansion-crimson text-white text-[9px] font-bold flex items-center justify-center px-1">
-                      {badge}
+                      {unreadCount}
                     </span>
                   )}
                 </div>
