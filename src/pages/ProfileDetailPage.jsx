@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Heart, MessageCircle, Share2, Shield, Crown,
-  MapPin, Clock, ChevronLeft,
+  MapPin, ChevronLeft,
 } from 'lucide-react';
 import { getProfile, getToken } from '../lib/api';
 
@@ -44,7 +44,7 @@ export default function ProfileDetailPage() {
     );
   }
 
-  const { name, age, city, role, interests, bio, photos, verified, online, premium, lastActive } = profile;
+  const { name, age, city, role, interests, bio, photos, verified, online, premium } = profile;
 
   return (
     <div className="min-h-screen bg-mansion-base pb-28 lg:pb-8">
@@ -66,8 +66,8 @@ export default function ProfileDetailPage() {
           <div className="absolute inset-0 bg-gradient-to-t from-mansion-base via-mansion-base/20 to-transparent" />
         </motion.div>
 
-        {/* Top nav overlay */}
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 pt-6 safe-top lg:pt-4">
+        {/* Top nav overlay — z-[60] to sit above Navbar */}
+        <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 pt-14 lg:pt-4 z-[60]">
           <motion.button
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
@@ -127,9 +127,6 @@ export default function ProfileDetailPage() {
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5" /> {city}
                 </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" /> {lastActive}
-                </span>
               </div>
             </div>
             {online && (
@@ -186,25 +183,21 @@ export default function ProfileDetailPage() {
 
       </div>{/* end two-column wrapper */}
 
-      {/* Sticky bottom actions — sits above BottomNav on mobile */}
-      <div className="fixed bottom-16 lg:bottom-0 left-0 right-0 z-40 safe-bottom lg:left-64 xl:left-72">
-        <div className="glass border-t border-mansion-border/30">
-          <div className="max-w-6xl mx-auto px-4 lg:px-8 py-3 flex items-center gap-3">
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              className="w-12 h-12 rounded-full border border-mansion-border flex items-center justify-center text-text-muted hover:text-mansion-crimson hover:border-mansion-crimson/40 transition-all"
-            >
-              <Heart className="w-5 h-5" />
-            </motion.button>
-            <Link
-              to={`/mensajes/${id}`}
-              className="btn-crimson flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl"
-            >
-              <MessageCircle className="w-5 h-5" />
-              <span className="font-display font-semibold">Enviar Mensaje</span>
-            </Link>
-          </div>
-        </div>
+      {/* Floating action button — always visible */}
+      <div className="fixed bottom-20 right-4 lg:bottom-8 lg:right-8 z-[60] flex flex-col items-end gap-3">
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          className="w-12 h-12 rounded-full bg-mansion-card/80 backdrop-blur border border-mansion-border/40 flex items-center justify-center text-text-muted hover:text-mansion-crimson hover:border-mansion-crimson/40 transition-all shadow-lg"
+        >
+          <Heart className="w-5 h-5" />
+        </motion.button>
+        <Link
+          to={`/mensajes/${id}`}
+          className="flex items-center gap-2 px-6 py-3.5 rounded-full bg-mansion-crimson text-white shadow-glow-crimson hover:bg-mansion-crimson-dark transition-all"
+        >
+          <MessageCircle className="w-5 h-5" />
+          <span className="font-display font-semibold text-sm">Enviar Mensaje</span>
+        </Link>
       </div>
     </div>
   );
