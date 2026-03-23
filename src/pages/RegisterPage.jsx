@@ -12,6 +12,7 @@ import {
   Check,
   Heart,
 } from 'lucide-react';
+import { useAuth } from '../App';
 
 // ────────────────────────────────────────────
 // Constants
@@ -660,17 +661,13 @@ function SuccessScreen({ onEnter }) {
         Tu perfil está listo. Ahora puedes explorar la Mansión y conectar con personas afines.
       </motion.p>
 
-      <motion.button
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6 }}
-        whileTap={{ scale: 0.97 }}
+      <button
         onClick={onEnter}
-        className="btn-gold text-lg font-display flex items-center gap-2"
+        className="fade-in-up fade-delay-600 btn-gold text-lg font-display flex items-center gap-2 active:scale-[0.97]"
       >
         Entrar a la Mansión
         <ChevronRight className="w-5 h-5" />
-      </motion.button>
+      </button>
     </motion.div>
   );
 }
@@ -681,6 +678,7 @@ function SuccessScreen({ onEnter }) {
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { setRegistered } = useAuth();
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [email, setEmail] = useState('');
@@ -737,7 +735,7 @@ export default function RegisterPage() {
 
   const next = () => {
     if (step === TOTAL_STEPS - 1) {
-      localStorage.setItem('mansion_registered', 'true');
+      setRegistered(true);
       setCompleted(true);
     } else {
       setDirection(1);
@@ -898,7 +896,8 @@ export default function RegisterPage() {
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+            style={{ willChange: 'opacity' }}
             className="text-center mt-4"
           >
             <span className="text-text-dim text-xs">¿Ya tienes cuenta? </span>

@@ -21,7 +21,8 @@ export default function ProfileCard({ profile, index = 0 }) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.06, duration: 0.4 }}
+      transition={{ delay: Math.min(index * 0.06, 0.4), duration: 0.35 }}
+      style={{ willChange: 'opacity, transform' }}
     >
       <Link to={`/perfiles/${id}`} className="block group">
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">

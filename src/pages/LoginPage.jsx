@@ -2,16 +2,18 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { useAuth } from '../App';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { setRegistered } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    localStorage.setItem('mansion_registered', 'true');
+    setRegistered(true);
     navigate('/');
   };
 

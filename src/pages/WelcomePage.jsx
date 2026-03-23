@@ -58,45 +58,26 @@ export default function WelcomePage() {
         </motion.div>
 
         {/* Text */}
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="font-display text-3xl md:text-4xl font-bold text-gradient-gold mb-3"
-        >
+        <h1 className="fade-in-up fade-delay-500 font-display text-3xl md:text-4xl font-bold text-gradient-gold mb-3">
           Mansión Deseo
-        </motion.h1>
+        </h1>
 
-        <motion.p
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="text-text-muted text-sm leading-relaxed mb-10 max-w-xs mx-auto"
-        >
+        <p className="fade-in-up fade-delay-600 text-text-muted text-sm leading-relaxed mb-10 max-w-xs mx-auto">
           Un espacio exclusivo para quienes buscan experiencias únicas con discreción total,
           perfiles verificados y conexiones reales.
-        </motion.p>
+        </p>
 
         {/* CTA */}
-        <motion.button
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          whileTap={{ scale: 0.97 }}
+        <button
           onClick={() => navigate('/registro')}
-          className="btn-gold w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2"
+          className="fade-in-up fade-delay-700 btn-gold w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 active:scale-[0.97]"
         >
           Comenzar
           <ChevronRight className="w-5 h-5" />
-        </motion.button>
+        </button>
 
         {/* Login link */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.9 }}
-          className="text-center mt-6"
-        >
+        <p className="fade-in-up fade-delay-900 text-center mt-6">
           <span className="text-text-dim text-sm">¿Ya tienes cuenta? </span>
           <button
             onClick={() => navigate('/login')}
@@ -104,15 +85,10 @@ export default function WelcomePage() {
           >
             Iniciar sesión
           </button>
-        </motion.p>
+        </p>
 
         {/* Features strip */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="flex items-center justify-center gap-6 mt-10 text-text-dim text-xs"
-        >
+        <div className="fade-in-up fade-delay-900 flex items-center justify-center gap-6 mt-10 text-text-dim text-xs">
           <span className="flex items-center gap-1">
             <Sparkles className="w-3 h-3 text-mansion-gold" /> Verificados
           </span>
@@ -120,7 +96,7 @@ export default function WelcomePage() {
           <span>Discreto</span>
           <span>•</span>
           <span>Exclusivo</span>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

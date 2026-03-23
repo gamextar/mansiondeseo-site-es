@@ -1,7 +1,16 @@
-import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown } from 'lucide-react';
+import { useAuth } from '../App';
 
 export default function ProfilePage() {
+  const navigate = useNavigate();
+  const { setRegistered } = useAuth();
+
+  const handleLogout = () => {
+    setRegistered(false);
+    navigate('/bienvenida');
+  };
+
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
       <div className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-2xl lg:mx-auto">
@@ -26,9 +35,7 @@ export default function ProfilePage() {
           <p className="text-text-muted text-sm">Madrid · Pareja</p>
 
           {/* Premium banner */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+          <div
             className="mt-4 mx-auto max-w-xs bg-gradient-to-r from-mansion-gold/10 to-mansion-gold/5 border border-mansion-gold/20 rounded-2xl p-4"
           >
             <div className="flex items-center gap-2 mb-2">
@@ -39,7 +46,7 @@ export default function ProfilePage() {
             <button className="btn-gold w-full py-2.5 rounded-xl text-sm">
               Desbloquear VIP
             </button>
-          </motion.div>
+          </div>
         </div>
 
         {/* Menu items */}
@@ -65,7 +72,10 @@ export default function ProfilePage() {
           ))}
 
           <div className="pt-4">
-            <button className="w-full flex items-center gap-3 p-3.5 rounded-xl hover:bg-mansion-crimson/5 transition-all group">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 p-3.5 rounded-xl hover:bg-mansion-crimson/5 transition-all group"
+            >
               <div className="w-10 h-10 rounded-xl bg-mansion-crimson/10 flex items-center justify-center text-mansion-crimson">
                 <LogOut className="w-5 h-5" />
               </div>

@@ -27,15 +27,12 @@ export default function FeedPage() {
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
       {/* Hero greeting */}
       <div className="px-4 lg:px-8 pt-4 lg:pt-6 pb-2">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <div>
           <p className="text-text-muted text-sm lg:text-base">Buenas noches 🌙</p>
           <h1 className="font-display text-2xl lg:text-4xl font-bold text-text-primary">
             Descubre la <span className="text-gradient-gold">Mansión</span>
           </h1>
-        </motion.div>
+        </div>
       </div>
 
       {/* Filter bar */}

@@ -35,7 +35,7 @@ export default function BottomNav() {
                 {isActive && (
                   <motion.div
                     layoutId="bottomnav-indicator"
-                    className="absolute -top-px left-1/2 -translate-x-1/2 w-8 h-[2px] bg-mansion-gold rounded-full"
+                    className="absolute -top-px inset-x-0 mx-auto w-8 h-[2px] bg-mansion-gold rounded-full"
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                   />
                 )}
