@@ -186,8 +186,8 @@ export default function ProfileDetailPage() {
 
       </div>{/* end two-column wrapper */}
 
-      {/* Sticky bottom actions */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 safe-bottom lg:left-64 xl:left-72">
+      {/* Sticky bottom actions — sits above BottomNav on mobile */}
+      <div className="fixed bottom-16 lg:bottom-0 left-0 right-0 z-40 safe-bottom lg:left-64 xl:left-72">
         <div className="glass border-t border-mansion-border/30">
           <div className="max-w-6xl mx-auto px-4 lg:px-8 py-3 flex items-center gap-3">
             <motion.button
