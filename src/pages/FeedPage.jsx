@@ -9,6 +9,7 @@ export default function FeedPage() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [profiles, setProfiles] = useState([]);
   const [viewerPremium, setViewerPremium] = useState(false);
+  const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -19,6 +20,7 @@ export default function FeedPage() {
       .then(data => {
         setProfiles(data.profiles || []);
         setViewerPremium(data.viewerPremium || false);
+        if (data.settings) setSettings(data.settings);
       })
       .catch(() => setProfiles([]))
       .finally(() => setLoading(false));
@@ -55,7 +57,7 @@ export default function FeedPage() {
         ) : profiles.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
             {profiles.map((profile, index) => (
-              <ProfileCard key={profile.id} profile={profile} index={index} viewerPremium={viewerPremium} />
+              <ProfileCard key={profile.id} profile={profile} index={index} viewerPremium={viewerPremium} settings={settings} />
             ))}
           </div>
         ) : (

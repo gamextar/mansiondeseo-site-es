@@ -79,3 +79,20 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+-- Favorites table (user A adds user B to favorites)
+CREATE TABLE IF NOT EXISTS favorites (
+  user_id     TEXT NOT NULL REFERENCES users(id),
+  target_id   TEXT NOT NULL REFERENCES users(id),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, target_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_favorites_user   ON favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_target ON favorites(target_id);
+
+-- Site settings (key-value config)
+CREATE TABLE IF NOT EXISTS site_settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);

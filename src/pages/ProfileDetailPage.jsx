@@ -5,7 +5,7 @@ import {
   ArrowLeft, Heart, MessageCircle, Share2, Shield, Crown,
   MapPin, ChevronLeft, Lock,
 } from 'lucide-react';
-import { getProfile, getToken } from '../lib/api';
+import { getProfile, getToken, toggleFavorite } from '../lib/api';
 
 const ROLE_COLOR = {
   Pareja: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
@@ -18,6 +18,9 @@ export default function ProfileDetailPage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [viewerPremium, setViewerPremium] = useState(false);
+  const [settings, setSettings] = useState({ blurLevel: 14, freeVisiblePhotos: 1, freeOwnPhotos: 3 });
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [togglingFav, setTogglingFav] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,10 +30,25 @@ export default function ProfileDetailPage() {
       .then(data => {
         setProfile(data.profile);
         setViewerPremium(data.viewerPremium || false);
+        if (data.settings) setSettings(data.settings);
+        if (data.profile.isFavorited !== undefined) setIsFavorited(data.profile.isFavorited);
       })
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
   }, [id, navigate]);
+
+  const handleToggleFavorite = async () => {
+    if (togglingFav) return;
+    setTogglingFav(true);
+    try {
+      const data = await toggleFavorite(id);
+      setIsFavorited(data.favorited);
+    } catch {
+      // Silently fail
+    } finally {
+      setTogglingFav(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -48,10 +66,18 @@ export default function ProfileDetailPage() {
     );
   }
 
-  const { name, age, city, role, interests, bio, photos, verified, online, premium, blurred } = profile;
+  const { name, age, city, role, interests, bio, photos, verified, online, premium, blurred, isOwnProfile } = profile;
 
-  // Only blur ghost mode users (not all photos)
+  // Ghost mode blur (whole profile)
   const isGhostBlurred = blurred;
+
+  // Per-photo blur: determines if a specific photo index should be blurred
+  const shouldBlurPhoto = (index) => {
+    if (viewerPremium) return false;
+    if (isGhostBlurred) return true;
+    if (isOwnProfile) return index >= settings.freeOwnPhotos;
+    return index >= settings.freeVisiblePhotos;
+  };
 
   return (
     <div className="min-h-screen bg-mansion-base pb-28 lg:pb-8">
@@ -68,17 +94,16 @@ export default function ProfileDetailPage() {
           <img
             src={photos[0]}
             alt={name}
-            className={`w-full h-full object-cover ${
-              isGhostBlurred ? 'filter blur-[16px]' : ''
-            }`}
+            className={`w-full h-full object-cover`}
+            style={shouldBlurPhoto(0) ? { filter: `blur(${settings.blurLevel}px)` } : undefined}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-mansion-base via-mansion-base/20 to-transparent" />
           {/* Ghost blur overlay */}
-          {isGhostBlurred && (
+          {shouldBlurPhoto(0) && (
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
               <div className="flex flex-col items-center gap-2 text-white/80">
                 <Lock className="w-8 h-8" />
-                <span className="text-sm font-semibold">Modo Fantasma</span>
+                <span className="text-sm font-semibold">{isGhostBlurred ? 'Modo Fantasma' : 'Contenido VIP'}</span>
                 <span className="text-xs text-white/60">Solo visible para usuarios VIP</span>
               </div>
             </div>
@@ -190,18 +215,21 @@ export default function ProfileDetailPage() {
             <div className="mb-4">
               <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2">Galería</h3>
               <div className="grid grid-cols-3 gap-2">
-                {photos.map((photo, i) => (
-                  <div key={i} className="aspect-square rounded-xl overflow-hidden bg-mansion-card relative">
-                    <img src={photo} alt="" className={`w-full h-full object-cover ${
-                      isGhostBlurred ? 'filter blur-[14px]' : ''
-                    }`} />
-                    {isGhostBlurred && (
-                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                        <Lock className="w-4 h-4 text-white/60" />
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {photos.map((photo, i) => {
+                  const photoBlurred = shouldBlurPhoto(i);
+                  return (
+                    <div key={i} className="aspect-square rounded-xl overflow-hidden bg-mansion-card relative">
+                      <img src={photo} alt="" className="w-full h-full object-cover"
+                        style={photoBlurred ? { filter: `blur(${settings.blurLevel}px)` } : undefined}
+                      />
+                      {photoBlurred && (
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                          <Lock className="w-4 h-4 text-white/60" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -214,9 +242,15 @@ export default function ProfileDetailPage() {
       <div className="fixed bottom-20 right-4 lg:bottom-8 lg:right-8 z-[60] flex flex-col items-end gap-3">
         <motion.button
           whileTap={{ scale: 0.9 }}
-          className="w-12 h-12 rounded-full bg-mansion-card/80 backdrop-blur border border-mansion-border/40 flex items-center justify-center text-text-muted hover:text-mansion-crimson hover:border-mansion-crimson/40 transition-all shadow-lg"
+          onClick={handleToggleFavorite}
+          disabled={togglingFav}
+          className={`w-12 h-12 rounded-full backdrop-blur border flex items-center justify-center transition-all shadow-lg ${
+            isFavorited
+              ? 'bg-mansion-crimson/20 border-mansion-crimson/40 text-mansion-crimson'
+              : 'bg-mansion-card/80 border-mansion-border/40 text-text-muted hover:text-mansion-crimson hover:border-mansion-crimson/40'
+          }`}
         >
-          <Heart className="w-5 h-5" />
+          <Heart className="w-5 h-5" fill={isFavorited ? 'currentColor' : 'none'} />
         </motion.button>
         <Link
           to={`/mensajes/${id}`}

@@ -256,12 +256,13 @@ export default function ProfilePage() {
         {/* Menu items */}
         <div className="space-y-1.5">
           {[
-            { icon: Settings, label: 'Configuración', sublabel: 'Privacidad, notificaciones' },
-            { icon: Heart, label: 'Mis favoritos', sublabel: '12 perfiles guardados' },
-            { icon: Shield, label: 'Verificación', sublabel: 'Verificar mi identidad' },
-          ].map(({ icon: Icon, label, sublabel }) => (
+            { icon: Settings, label: 'Configuración', sublabel: 'Privacidad, notificaciones', path: '/configuracion' },
+            { icon: Heart, label: 'Mis favoritos', sublabel: 'Perfiles guardados', path: '/explorar' },
+            { icon: Shield, label: 'Verificación', sublabel: 'Verificar mi identidad', path: null },
+          ].map(({ icon: Icon, label, sublabel, path }) => (
             <button
               key={label}
+              onClick={() => path && navigate(path)}
               className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-mansion-card/50 hover:bg-mansion-card transition-all group"
             >
               <div className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-muted group-hover:text-mansion-gold transition-colors">

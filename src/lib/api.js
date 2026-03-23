@@ -203,3 +203,30 @@ export async function deletePhoto(url) {
     body: JSON.stringify({ url }),
   });
 }
+
+// ── Settings ────────────────────────────────────────────
+
+export async function getSettings() {
+  return apiFetch('/settings');
+}
+
+export async function updateSettings(fields) {
+  return apiFetch('/settings', {
+    method: 'PUT',
+    body: JSON.stringify(fields),
+  });
+}
+
+// ── Favorites ───────────────────────────────────────────
+
+export async function toggleFavorite(targetId) {
+  return apiFetch(`/favorites/${targetId}`, { method: 'POST' });
+}
+
+export async function getFavorites() {
+  return apiFetch('/favorites');
+}
+
+export async function checkFavorite(targetId) {
+  return apiFetch(`/favorites/check/${targetId}`);
+}

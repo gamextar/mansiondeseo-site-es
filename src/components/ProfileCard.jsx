@@ -14,12 +14,15 @@ const ROLE_BG = {
   'Mujer Sola': 'bg-pink-500/20 text-pink-300',
 };
 
-export default function ProfileCard({ profile, index = 0, viewerPremium = false }) {
+export default function ProfileCard({ profile, index = 0, viewerPremium = false, settings = {} }) {
   const { id, name, age, city, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const mainPhoto = photos[0] || profile.avatar_url || '';
+  const blurLevel = settings.blurLevel || 14;
 
-  // Only blur if the target user has ghost mode ON and viewer can't see them
+  // Ghost mode blur (whole card) or first photo beyond free limit
   const isGhostBlurred = blurred;
+  // Card always shows photo[0]; blur it only if ghost mode
+  const cardBlurred = isGhostBlurred;
 
   return (
     <motion.div
@@ -35,13 +38,12 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false 
             src={mainPhoto}
             alt={name}
             loading="lazy"
-            className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100 ${
-              isGhostBlurred ? 'filter blur-[14px]' : ''
-            }`}
+            className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100`}
+            style={cardBlurred ? { filter: `blur(${blurLevel}px)` } : undefined}
           />
 
           {/* Ghost mode overlay */}
-          {isGhostBlurred && (
+          {cardBlurred && (
             <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10">
               <div className="flex flex-col items-center gap-1 text-white/70">
                 <Lock className="w-5 h-5" />

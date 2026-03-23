@@ -14,6 +14,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import WelcomePage from './pages/WelcomePage';
 import ProfilePage from './pages/ProfilePage';
+import SettingsPage from './pages/SettingsPage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getMe } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
@@ -102,6 +103,14 @@ function AppLayout() {
             element={
               <RequireRegistration>
                 <ProfilePage />
+              </RequireRegistration>
+            }
+          />
+          <Route
+            path="/configuracion"
+            element={
+              <RequireRegistration>
+                <SettingsPage />
               </RequireRegistration>
             }
           />

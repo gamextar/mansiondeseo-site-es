@@ -478,9 +478,16 @@ async function handleProfiles(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
-  // Get viewer info
+  // Get viewer info + settings + viewer's favorites
   const viewer = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
   const viewerIsPremium = viewer && !!viewer.premium;
+  const settings = await loadSettings(env);
+  const { results: favRows } = await env.DB.prepare('SELECT target_id FROM favorites WHERE user_id = ?').bind(auth.sub).all();
+  const viewerFavorites = new Set(favRows.map(r => r.target_id));
+
+  // Also get who has favorited the viewer (for ghost mode exception)
+  const { results: favByRows } = await env.DB.prepare('SELECT user_id FROM favorites WHERE target_id = ?').bind(auth.sub).all();
+  const favoritedBySet = new Set(favByRows.map(r => r.user_id));
 
   const url = new URL(request.url);
   const filter = url.searchParams.get('filter') || 'all';
@@ -516,24 +523,12 @@ async function handleProfiles(request, env) {
 
   const { results } = await env.DB.prepare(query).bind(...params).all();
 
-  // For ghost mode: check which users have messaged the viewer
-  let messagedViewerSet = new Set();
-  if (!viewerIsPremium) {
-    const ghostIds = results.filter(u => !!u.ghost_mode).map(u => u.id);
-    if (ghostIds.length > 0) {
-      const placeholders = ghostIds.map(() => '?').join(',');
-      const { results: msgRows } = await env.DB.prepare(
-        `SELECT DISTINCT sender_id FROM messages WHERE sender_id IN (${placeholders}) AND receiver_id = ?`
-      ).bind(...ghostIds, auth.sub).all();
-      messagedViewerSet = new Set(msgRows.map(r => r.sender_id));
-    }
-  }
-
-  // Map to frontend shape
+  // Map to frontend shape with new blur logic
   const profiles = results.map(u => {
     const hasGhostMode = !!u.ghost_mode;
-    // Ghost mode user is blurred for free viewers unless that user has messaged them
-    const blurred = hasGhostMode && !viewerIsPremium && !messagedViewerSet.has(u.id);
+    const profileIsPremium = !!u.premium;
+    // Ghost mode blur: blurred unless viewer is premium OR the ghost-mode user has favorited the viewer
+    const blurred = hasGhostMode && !viewerIsPremium && !favoritedBySet.has(u.id);
     return {
       id: u.id,
       name: u.username,
@@ -545,15 +540,16 @@ async function handleProfiles(request, env) {
       photos: safeParseJSON(u.photos, []),
       verified: !!u.verified,
       online: !!u.online,
-      premium: !!u.premium,
+      premium: profileIsPremium,
       ghost_mode: hasGhostMode,
       blurred,
+      isFavorited: viewerFavorites.has(u.id),
       lastActive: u.last_active,
       avatar_url: u.avatar_url,
     };
   });
 
-  return json({ profiles, viewerPremium: viewerIsPremium });
+  return json({ profiles, viewerPremium: viewerIsPremium, settings });
 }
 
 // ── GET /api/profiles/:id ───────────────────────────────
@@ -565,19 +561,23 @@ async function handleProfileDetail(request, env, userId) {
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('Perfil no encontrado', 404);
 
-  // Get viewer info for ghost mode check
+  // Get viewer info + settings
   const viewer = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
   const viewerIsPremium = viewer && !!viewer.premium;
+  const settings = await loadSettings(env);
+
+  // Check if viewer has favorited this profile
+  const favRow = await env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(auth.sub, userId).first();
+  const isFavorited = !!favRow;
+
+  // Check if this profile's owner has favorited the viewer (ghost mode exception)
+  const favByRow = await env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(userId, auth.sub).first();
+  const profileFavoritedViewer = !!favByRow;
 
   const hasGhostMode = !!user.ghost_mode;
-  let blurred = false;
-  if (hasGhostMode && !viewerIsPremium) {
-    // Check if this ghost user has messaged the viewer
-    const msg = await env.DB.prepare(
-      'SELECT id FROM messages WHERE sender_id = ? AND receiver_id = ? LIMIT 1'
-    ).bind(userId, auth.sub).first();
-    blurred = !msg;
-  }
+  const isOwnProfile = auth.sub === userId;
+  // Ghost mode blur: blurred unless viewer is premium, OR profile owner favorited viewer
+  const blurred = hasGhostMode && !viewerIsPremium && !profileFavoritedViewer;
 
   return json({
     profile: {
@@ -594,10 +594,13 @@ async function handleProfileDetail(request, env, userId) {
       premium: !!user.premium,
       ghost_mode: hasGhostMode,
       blurred,
+      isFavorited,
+      isOwnProfile,
       lastActive: user.last_active,
       avatar_url: user.avatar_url,
     },
     viewerPremium: viewerIsPremium,
+    settings,
   });
 }
 
@@ -967,6 +970,84 @@ function safeParseJSON(str, fallback) {
 // ROUTER
 // ══════════════════════════════════════════════════════════
 
+// ── Helper: load site settings as object ────────────────
+async function loadSettings(env) {
+  const { results } = await env.DB.prepare('SELECT key, value FROM site_settings').all();
+  const settings = {};
+  for (const r of results) settings[r.key] = r.value;
+  return {
+    blurLevel: parseInt(settings.blur_level || '14', 10),
+    freeVisiblePhotos: parseInt(settings.free_visible_photos || '1', 10),
+    freeOwnPhotos: parseInt(settings.free_own_photos || '3', 10),
+  };
+}
+
+// ── GET /api/settings ───────────────────────────────────
+async function handleGetSettings(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const settings = await loadSettings(env);
+  return json({ settings });
+}
+
+// ── PUT /api/settings ───────────────────────────────────
+async function handleUpdateSettings(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const body = await request.json();
+  const allowed = ['blur_level', 'free_visible_photos', 'free_own_photos'];
+  for (const key of allowed) {
+    if (body[key] !== undefined) {
+      await env.DB.prepare(
+        'INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?'
+      ).bind(key, String(body[key]), String(body[key])).run();
+    }
+  }
+  const settings = await loadSettings(env);
+  return json({ settings });
+}
+
+// ── POST /api/favorites/:id (toggle) ───────────────────
+async function handleToggleFavorite(request, env, targetId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  if (targetId === auth.sub) return error('No puedes agregarte a favoritos');
+
+  const existing = await env.DB.prepare(
+    'SELECT user_id FROM favorites WHERE user_id = ? AND target_id = ?'
+  ).bind(auth.sub, targetId).first();
+
+  if (existing) {
+    await env.DB.prepare('DELETE FROM favorites WHERE user_id = ? AND target_id = ?')
+      .bind(auth.sub, targetId).run();
+    return json({ favorited: false });
+  } else {
+    await env.DB.prepare('INSERT INTO favorites (user_id, target_id) VALUES (?, ?)')
+      .bind(auth.sub, targetId).run();
+    return json({ favorited: true });
+  }
+}
+
+// ── GET /api/favorites ──────────────────────────────────
+async function handleGetFavorites(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const { results } = await env.DB.prepare(
+    'SELECT target_id FROM favorites WHERE user_id = ?'
+  ).bind(auth.sub).all();
+  return json({ favorites: results.map(r => r.target_id) });
+}
+
+// ── GET /api/favorites/check/:id ────────────────────────
+async function handleCheckFavorite(request, env, targetId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const row = await env.DB.prepare(
+    'SELECT user_id FROM favorites WHERE user_id = ? AND target_id = ?'
+  ).bind(auth.sub, targetId).first();
+  return json({ favorited: !!row });
+}
+
 async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -1014,6 +1095,17 @@ async function handleRequest(request, env) {
   // ── Upload & Photos
   if (path === '/api/upload' && method === 'POST') return handleUpload(request, env);
   if (path === '/api/photos' && method === 'DELETE') return handleDeletePhoto(request, env);
+
+  // ── Settings
+  if (path === '/api/settings' && method === 'GET') return handleGetSettings(request, env);
+  if (path === '/api/settings' && method === 'PUT') return handleUpdateSettings(request, env);
+
+  // ── Favorites
+  if (path === '/api/favorites' && method === 'GET') return handleGetFavorites(request, env);
+  const favCheckMatch = path.match(/^\/api\/favorites\/check\/([a-f0-9-]+)$/);
+  if (favCheckMatch && method === 'GET') return handleCheckFavorite(request, env, favCheckMatch[1]);
+  const favToggleMatch = path.match(/^\/api\/favorites\/([a-f0-9-]+)$/);
+  if (favToggleMatch && method === 'POST') return handleToggleFavorite(request, env, favToggleMatch[1]);
 
   // ── Serve R2 images
   if (path.startsWith('/api/images/') && method === 'GET') return handleServeImage(request, env, path);

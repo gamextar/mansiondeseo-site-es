@@ -97,7 +97,7 @@ export default function DesktopSidebar() {
 
         {/* Settings */}
         <NavLink
-          to="/perfil"
+          to="/configuracion"
           className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-text-dim hover:text-text-muted transition-colors"
         >
           <Settings className="w-4 h-4" />
