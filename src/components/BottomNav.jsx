@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Home, Search, MessageCircle, User } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { getConversations } from '../lib/api';
+import { useUnreadMessages } from '../hooks/useUnreadMessages';
 
 const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio' },
@@ -13,18 +12,7 @@ const NAV_ITEMS = [
 
 export default function BottomNav() {
   const location = useLocation();
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    getConversations()
-      .then((convos) => {
-        const total = (convos || []).reduce((sum, c) => sum + (c.unread || 0), 0);
-        setUnreadCount(total);
-      })
-      .catch(() => {});
-  }, [location.pathname]);
+  const { unreadCount } = useUnreadMessages();
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];

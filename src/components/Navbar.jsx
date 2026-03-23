@@ -1,24 +1,12 @@
-import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { MessageCircle, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { getConversations } from '../lib/api';
+import { useUnreadMessages } from '../hooks/useUnreadMessages';
 
 export default function Navbar() {
   const location = useLocation();
   const isChat = location.pathname.startsWith('/mensajes');
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    getConversations()
-      .then((convos) => {
-        const total = (convos || []).reduce((sum, c) => sum + (c.unread || 0), 0);
-        setUnreadCount(total);
-      })
-      .catch(() => {});
-  }, [location.pathname]);
+  const { unreadCount } = useUnreadMessages();
 
   return (
     <motion.header
