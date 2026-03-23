@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
   photos        TEXT DEFAULT '[]',                  -- JSON array of R2 URLs
   status        TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','verified')),
   premium       INTEGER NOT NULL DEFAULT 0,         -- 0 = free, 1 = VIP
+  ghost_mode    INTEGER NOT NULL DEFAULT 0,         -- 0 = off, 1 = on (premium only)
   verified      INTEGER NOT NULL DEFAULT 0,         -- 0 = no, 1 = verified identity
   online        INTEGER NOT NULL DEFAULT 0,
   last_active   TEXT DEFAULT (datetime('now')),

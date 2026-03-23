@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Heart, MessageCircle, Share2, Shield, Crown,
-  MapPin, ChevronLeft,
+  MapPin, ChevronLeft, Lock,
 } from 'lucide-react';
 import { getProfile, getToken } from '../lib/api';
 
@@ -17,13 +17,17 @@ export default function ProfileDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
+  const [viewerPremium, setViewerPremium] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
     setLoading(true);
     getProfile(id)
-      .then(data => setProfile(data.profile))
+      .then(data => {
+        setProfile(data.profile);
+        setViewerPremium(data.viewerPremium || false);
+      })
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
   }, [id, navigate]);
@@ -44,7 +48,11 @@ export default function ProfileDetailPage() {
     );
   }
 
-  const { name, age, city, role, interests, bio, photos, verified, online, premium } = profile;
+  const { name, age, city, role, interests, bio, photos, verified, online, premium, blurred } = profile;
+
+  // Blur logic: free viewers see light blur on all photos; ghost blurred gets heavy blur
+  const shouldBlur = !viewerPremium;
+  const isGhostBlurred = blurred;
 
   return (
     <div className="min-h-screen bg-mansion-base pb-28 lg:pb-8">
@@ -61,9 +69,30 @@ export default function ProfileDetailPage() {
           <img
             src={photos[0]}
             alt={name}
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover ${
+              isGhostBlurred ? 'filter blur-[16px]' : shouldBlur ? 'filter blur-[8px]' : ''
+            }`}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-mansion-base via-mansion-base/20 to-transparent" />
+          {/* Ghost blur overlay */}
+          {isGhostBlurred && (
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
+              <div className="flex flex-col items-center gap-2 text-white/80">
+                <Lock className="w-8 h-8" />
+                <span className="text-sm font-semibold">Modo Fantasma</span>
+                <span className="text-xs text-white/60">Solo visible para usuarios VIP</span>
+              </div>
+            </div>
+          )}
+          {/* Free viewer VIP prompt */}
+          {shouldBlur && !isGhostBlurred && (
+            <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-10">
+              <div className="flex items-center gap-2 bg-mansion-gold/20 backdrop-blur-sm border border-mansion-gold/30 rounded-full px-4 py-2">
+                <Crown className="w-4 h-4 text-mansion-gold" />
+                <span className="text-xs font-semibold text-mansion-gold">Hazte VIP para ver sin blur</span>
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* Top nav overlay — z-[60] to sit above Navbar */}
@@ -171,8 +200,15 @@ export default function ProfileDetailPage() {
               <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2">Galería</h3>
               <div className="grid grid-cols-3 gap-2">
                 {photos.map((photo, i) => (
-                  <div key={i} className="aspect-square rounded-xl overflow-hidden bg-mansion-card">
-                    <img src={photo} alt="" className="w-full h-full object-cover" />
+                  <div key={i} className="aspect-square rounded-xl overflow-hidden bg-mansion-card relative">
+                    <img src={photo} alt="" className={`w-full h-full object-cover ${
+                      isGhostBlurred ? 'filter blur-[14px]' : shouldBlur ? 'filter blur-[6px]' : ''
+                    }`} />
+                    {isGhostBlurred && (
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                        <Lock className="w-4 h-4 text-white/60" />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

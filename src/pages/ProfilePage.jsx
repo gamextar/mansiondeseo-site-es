@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../App';
-import { logout as apiLogout, uploadImage, deletePhoto, getMe } from '../lib/api';
+import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile } from '../lib/api';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -11,6 +11,7 @@ export default function ProfilePage() {
   const galleryInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [togglingGhost, setTogglingGhost] = useState(false);
 
   const handleLogout = async () => {
     await apiLogout();
@@ -60,6 +61,19 @@ export default function ProfilePage() {
     }
   };
 
+  const handleToggleGhostMode = async () => {
+    if (togglingGhost || !user?.premium) return;
+    setTogglingGhost(true);
+    try {
+      const data = await updateProfile({ ghost_mode: !user.ghost_mode });
+      setUser(prev => prev ? { ...prev, ghost_mode: data.user.ghost_mode } : prev);
+    } catch {
+      // Silently fail
+    } finally {
+      setTogglingGhost(false);
+    }
+  };
+
   // Use real user data or fallback
   const displayName = user?.username || 'Tu Perfil';
   const displayCity = user?.city || '';
@@ -105,18 +119,66 @@ export default function ProfilePage() {
           <p className="text-text-muted text-sm">{[displayCity, displayRole].filter(Boolean).join(' · ')}</p>
 
           {/* Premium banner */}
-          <div
-            className="mt-4 mx-auto max-w-xs bg-gradient-to-r from-mansion-gold/10 to-mansion-gold/5 border border-mansion-gold/20 rounded-2xl p-4"
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <Crown className="w-5 h-5 text-mansion-gold" />
-              <span className="font-display font-semibold text-mansion-gold text-sm">Mansión VIP</span>
+          {user?.premium ? (
+            <>
+              <div
+                className="mt-4 mx-auto max-w-xs bg-gradient-to-r from-mansion-gold/10 to-mansion-gold/5 border border-mansion-gold/20 rounded-2xl p-4"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Crown className="w-5 h-5 text-mansion-gold" />
+                  <span className="font-display font-semibold text-mansion-gold text-sm">Mansión VIP</span>
+                </div>
+                <p className="text-green-400 text-xs font-medium">Miembro activo</p>
+              </div>
+
+              {/* Ghost Mode Toggle */}
+              <div className="mt-3 mx-auto max-w-xs">
+                <button
+                  onClick={handleToggleGhostMode}
+                  disabled={togglingGhost}
+                  className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all ${
+                    user.ghost_mode
+                      ? 'bg-purple-500/10 border border-purple-500/30'
+                      : 'bg-mansion-card/50 border border-mansion-border/30'
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                    user.ghost_mode ? 'bg-purple-500/20 text-purple-400' : 'bg-mansion-elevated text-text-muted'
+                  }`}>
+                    {user.ghost_mode ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium text-text-primary">Modo Fantasma</p>
+                    <p className="text-xs text-text-dim">
+                      {user.ghost_mode
+                        ? 'Activo — tu perfil aparece borroso'
+                        : 'Tu perfil es visible para todos'}
+                    </p>
+                  </div>
+                  <div className={`w-11 h-6 rounded-full transition-colors relative ${
+                    user.ghost_mode ? 'bg-purple-500' : 'bg-mansion-border'
+                  }`}>
+                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                      user.ghost_mode ? 'translate-x-5' : 'translate-x-0.5'
+                    }`} />
+                  </div>
+                </button>
+              </div>
+            </>
+          ) : (
+            <div
+              className="mt-4 mx-auto max-w-xs bg-gradient-to-r from-mansion-gold/10 to-mansion-gold/5 border border-mansion-gold/20 rounded-2xl p-4"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <Crown className="w-5 h-5 text-mansion-gold" />
+                <span className="font-display font-semibold text-mansion-gold text-sm">Mansión VIP</span>
+              </div>
+              <p className="text-text-muted text-xs mb-3">Mensajes ilimitados, fotos Full HD sin blur, Modo Fantasma y badge exclusivo</p>
+              <button className="btn-gold w-full py-2.5 rounded-xl text-sm">
+                Desbloquear VIP
+              </button>
             </div>
-            <p className="text-text-muted text-xs mb-3">Mensajes ilimitados, perfiles sin blur y badge exclusivo</p>
-            <button className="btn-gold w-full py-2.5 rounded-xl text-sm">
-              Desbloquear VIP
-            </button>
-          </div>
+          )}
         </div>
 
         {/* Gallery */}

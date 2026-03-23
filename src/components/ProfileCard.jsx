@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MapPin, Shield, Crown } from 'lucide-react';
+import { MapPin, Shield, Crown, Lock } from 'lucide-react';
 
 const ROLE_COLORS = {
   Pareja: 'from-purple-500/80 to-purple-700/80',
@@ -14,9 +14,15 @@ const ROLE_BG = {
   'Mujer Sola': 'bg-pink-500/20 text-pink-300',
 };
 
-export default function ProfileCard({ profile, index = 0 }) {
-  const { id, name, age, city, role, interests, photos = [], verified, online, premium } = profile;
+export default function ProfileCard({ profile, index = 0, viewerPremium = false }) {
+  const { id, name, age, city, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const mainPhoto = photos[0] || profile.avatar_url || '';
+
+  // Photos are blurred if: free viewer looking at ANY profile (tease), OR ghost mode user blurred for free viewer
+  // Free viewers see all photos blurred (thumbnail tease). Premium see all clear.
+  // Ghost mode blurred profiles get extra heavy blur.
+  const shouldBlur = !viewerPremium;
+  const isGhostBlurred = blurred;
 
   return (
     <motion.div
@@ -27,21 +33,41 @@ export default function ProfileCard({ profile, index = 0 }) {
     >
       <Link to={`/perfiles/${id}`} className="block group">
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">
-          {/* Photo with blur effect */}
+          {/* Photo with conditional blur */}
           <img
             src={mainPhoto}
             alt={name}
             loading="lazy"
-            className="absolute inset-0 w-full h-full object-cover transition-all duration-500 
-                       filter blur-[6px] group-hover:blur-0 group-focus:blur-0
-                       scale-105 group-hover:scale-100"
+            className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100 ${
+              isGhostBlurred
+                ? 'filter blur-[14px]'
+                : shouldBlur
+                  ? 'filter blur-[6px] group-hover:blur-0 group-focus:blur-0'
+                  : ''
+            }`}
           />
+
+          {/* Ghost mode overlay */}
+          {isGhostBlurred && (
+            <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10">
+              <div className="flex flex-col items-center gap-1 text-white/70">
+                <Lock className="w-5 h-5" />
+                <span className="text-[10px] font-semibold">Modo Fantasma</span>
+              </div>
+            </div>
+          )}
+
+          {/* VIP lock overlay for free viewers */}
+          {shouldBlur && !isGhostBlurred && (
+            <div className="absolute inset-0 flex items-center justify-center z-10 opacity-0 group-hover:opacity-0">
+            </div>
+          )}
 
           {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
 
           {/* Top badges */}
-          <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
+          <div className="absolute top-3 left-3 right-3 flex items-start justify-between z-20">
             <div className="flex gap-1.5">
               {premium && (
                 <span className="flex items-center gap-1 bg-mansion-gold/20 backdrop-blur-sm border border-mansion-gold/30 rounded-full px-2 py-0.5 text-[10px] font-semibold text-mansion-gold">
@@ -62,7 +88,7 @@ export default function ProfileCard({ profile, index = 0 }) {
           </div>
 
           {/* Bottom info */}
-          <div className="absolute bottom-0 left-0 right-0 p-3">
+          <div className="absolute bottom-0 left-0 right-0 p-3 z-20">
             {/* Interests pills */}
             <div className="flex flex-wrap gap-1 mb-2">
               {interests.slice(0, 2).map((tag) => (

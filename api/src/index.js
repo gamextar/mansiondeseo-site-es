@@ -478,6 +478,10 @@ async function handleProfiles(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
+  // Get viewer info
+  const viewer = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
+  const viewerIsPremium = viewer && viewer.premium === 1;
+
   const url = new URL(request.url);
   const filter = url.searchParams.get('filter') || 'all';
   const search = url.searchParams.get('q') || '';
@@ -512,24 +516,44 @@ async function handleProfiles(request, env) {
 
   const { results } = await env.DB.prepare(query).bind(...params).all();
 
-  // Map to frontend shape
-  const profiles = results.map(u => ({
-    id: u.id,
-    name: u.username,
-    age: u.age,
-    city: u.city,
-    role: mapRoleToDisplay(u.role),
-    interests: safeParseJSON(u.interests, []),
-    bio: u.bio,
-    photos: safeParseJSON(u.photos, []),
-    verified: u.verified === 1,
-    online: u.online === 1,
-    premium: u.premium === 1,
-    lastActive: u.last_active,
-    avatar_url: u.avatar_url,
-  }));
+  // For ghost mode: check which users have messaged the viewer
+  let messagedViewerSet = new Set();
+  if (!viewerIsPremium) {
+    const ghostIds = results.filter(u => u.ghost_mode === 1).map(u => u.id);
+    if (ghostIds.length > 0) {
+      const placeholders = ghostIds.map(() => '?').join(',');
+      const { results: msgRows } = await env.DB.prepare(
+        `SELECT DISTINCT sender_id FROM messages WHERE sender_id IN (${placeholders}) AND receiver_id = ?`
+      ).bind(...ghostIds, auth.sub).all();
+      messagedViewerSet = new Set(msgRows.map(r => r.sender_id));
+    }
+  }
 
-  return json({ profiles });
+  // Map to frontend shape
+  const profiles = results.map(u => {
+    const hasGhostMode = u.ghost_mode === 1;
+    // Ghost mode user is blurred for free viewers unless that user has messaged them
+    const blurred = hasGhostMode && !viewerIsPremium && !messagedViewerSet.has(u.id);
+    return {
+      id: u.id,
+      name: u.username,
+      age: u.age,
+      city: u.city,
+      role: mapRoleToDisplay(u.role),
+      interests: safeParseJSON(u.interests, []),
+      bio: u.bio,
+      photos: safeParseJSON(u.photos, []),
+      verified: u.verified === 1,
+      online: u.online === 1,
+      premium: u.premium === 1,
+      ghost_mode: hasGhostMode,
+      blurred,
+      lastActive: u.last_active,
+      avatar_url: u.avatar_url,
+    };
+  });
+
+  return json({ profiles, viewerPremium: viewerIsPremium });
 }
 
 // ── GET /api/profiles/:id ───────────────────────────────
@@ -540,6 +564,20 @@ async function handleProfileDetail(request, env, userId) {
 
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('Perfil no encontrado', 404);
+
+  // Get viewer info for ghost mode check
+  const viewer = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
+  const viewerIsPremium = viewer && viewer.premium === 1;
+
+  const hasGhostMode = user.ghost_mode === 1;
+  let blurred = false;
+  if (hasGhostMode && !viewerIsPremium) {
+    // Check if this ghost user has messaged the viewer
+    const msg = await env.DB.prepare(
+      'SELECT id FROM messages WHERE sender_id = ? AND receiver_id = ? LIMIT 1'
+    ).bind(userId, auth.sub).first();
+    blurred = !msg;
+  }
 
   return json({
     profile: {
@@ -554,9 +592,12 @@ async function handleProfileDetail(request, env, userId) {
       verified: user.verified === 1,
       online: user.online === 1,
       premium: user.premium === 1,
+      ghost_mode: hasGhostMode,
+      blurred,
       lastActive: user.last_active,
       avatar_url: user.avatar_url,
     },
+    viewerPremium: viewerIsPremium,
   });
 }
 
@@ -849,6 +890,13 @@ async function handleUpdateProfile(request, env) {
 
   const body = await request.json();
   const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'city', 'bio', 'avatar_url'];
+
+  // ghost_mode is only allowed for premium users
+  const currentUser = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
+  if (currentUser && currentUser.premium === 1) {
+    allowedFields.push('ghost_mode');
+  }
+
   const updates = [];
   const values = [];
 
@@ -857,6 +905,9 @@ async function handleUpdateProfile(request, env) {
       if (field === 'interests') {
         updates.push(`${field} = ?`);
         values.push(JSON.stringify(body[field]));
+      } else if (field === 'ghost_mode') {
+        updates.push(`${field} = ?`);
+        values.push(body[field] ? 1 : 0);
       } else {
         updates.push(`${field} = ?`);
         values.push(body[field]);
@@ -897,6 +948,7 @@ function sanitizeUser(user) {
     verified: safe.verified === 1,
     online: safe.online === 1,
     premium: safe.premium === 1,
+    ghost_mode: safe.ghost_mode === 1,
   };
 }
 
