@@ -111,13 +111,13 @@ export default function ChatPage() {
         <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
           <button
             onClick={() => navigate('/mensajes')}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
 
           <div className="relative flex-shrink-0">
-            <div className="w-10 h-10 rounded-full overflow-hidden">
+            <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-mansion-border/40">
               <img src={partner.avatar_url || partner.photos?.[0] || ''} alt={partner.name} className="w-full h-full object-cover" />
             </div>
             {partner.online && (
@@ -126,39 +126,20 @@ export default function ChatPage() {
           </div>
 
           <div className="flex-1 min-w-0">
-            <h2 className="font-medium text-sm text-text-primary truncate">{partner.name}</h2>
-            <p className="text-[11px] text-text-dim">
-              {partner.online ? 'En línea' : 'Desconectado'}
+            <h2 className="font-semibold text-sm text-text-primary truncate">{partner.name}</h2>
+            <p className={`text-[11px] ${partner.online ? 'text-green-400' : 'text-text-dim'}`}>
+              {partner.online ? '● En línea' : 'Desconectado'}
             </p>
           </div>
-        </div>
 
-        {/* Message limit banner */}
-        <div className="px-4 pb-2 lg:px-6 max-w-4xl lg:mx-auto">
-          <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
+          {/* Limit pill in header */}
+          <div className={`flex-shrink-0 flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border ${
             effectiveRemaining <= 2
-              ? 'bg-mansion-crimson/10 border border-mansion-crimson/20'
-              : 'bg-mansion-gold/5 border border-mansion-gold/10'
+              ? 'bg-mansion-crimson/10 border-mansion-crimson/30 text-mansion-crimson'
+              : 'bg-mansion-gold/5 border-mansion-gold/20 text-mansion-gold'
           }`}>
-            <Lock className={`w-3.5 h-3.5 flex-shrink-0 ${
-              effectiveRemaining <= 2 ? 'text-mansion-crimson' : 'text-mansion-gold'
-            }`} />
-            <span className={effectiveRemaining <= 2 ? 'text-mansion-crimson' : 'text-mansion-gold'}>
-              Te quedan <strong>{effectiveRemaining}</strong> mensajes hoy
-            </span>
-            <div className="flex-1" />
-            {/* Progress bar */}
-            <div className="w-16 h-1.5 bg-mansion-elevated rounded-full overflow-hidden">
-              <motion.div
-                className={`h-full rounded-full ${
-                  effectiveRemaining <= 2
-                    ? 'bg-mansion-crimson'
-                    : 'bg-mansion-gold'
-                }`}
-                initial={false}
-                animate={{ width: `${(effectiveRemaining / effectiveMax) * 100}%` }}
-              />
-            </div>
+            <Lock className="w-3 h-3" />
+            <span>{effectiveRemaining}/{effectiveMax}</span>
           </div>
         </div>
       </div>
@@ -166,9 +147,8 @@ export default function ChatPage() {
       {/* Messages area */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-3 lg:px-6 max-w-4xl lg:mx-auto w-full"
+        className="flex-1 overflow-y-auto px-4 py-5 space-y-4 lg:px-6 max-w-4xl lg:mx-auto w-full"
       >
-        {/* Date separator */}
         <div className="flex items-center justify-center">
           <span className="text-[10px] text-text-dim bg-mansion-elevated px-3 py-1 rounded-full">
             Hoy
@@ -181,22 +161,26 @@ export default function ChatPage() {
             return (
               <motion.div
                 key={msg.id}
-                initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                initial={{ opacity: 0, y: 8, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.2 }}
-                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                transition={{ duration: 0.18 }}
+                className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
               >
+                {/* Partner avatar next to received messages */}
+                {!isMe && (
+                  <div className="flex-shrink-0 w-7 h-7 rounded-full overflow-hidden mb-0.5">
+                    <img src={partner.avatar_url || partner.photos?.[0] || ''} alt="" className="w-full h-full object-cover" />
+                  </div>
+                )}
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                  className={`max-w-[78%] rounded-2xl px-4 py-2.5 ${
                     isMe
-                      ? 'bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white rounded-br-md'
-                      : 'bg-mansion-elevated text-text-primary border border-mansion-border/30 rounded-bl-md'
+                      ? 'bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white rounded-br-sm'
+                      : 'bg-mansion-elevated text-text-primary border border-mansion-border/30 rounded-bl-sm'
                   }`}
                 >
                   <p className="text-sm leading-relaxed">{msg.text}</p>
-                  <p className={`text-[10px] mt-1 text-right ${
-                    isMe ? 'text-white/50' : 'text-text-dim'
-                  }`}>
+                  <p className={`text-[10px] mt-1 ${isMe ? 'text-right text-white/50' : 'text-right text-text-dim'}`}>
                     {msg.timestamp}
                   </p>
                 </div>
@@ -207,13 +191,16 @@ export default function ChatPage() {
       </div>
 
       {/* Input area */}
-      <div className="safe-bottom border-t border-mansion-border/30 bg-mansion-card/80 backdrop-blur-lg">
-        <div className="flex items-center gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
-          <button className="w-10 h-10 rounded-full flex items-center justify-center text-text-dim hover:text-text-muted transition-colors flex-shrink-0">
+      <div className="safe-bottom border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl">
+        <div className="flex items-end gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
+
+          {/* Attach photo */}
+          <button className="flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-colors border border-mansion-border/30">
             <ImageIcon className="w-5 h-5" />
           </button>
 
-          <div className="flex-1 relative">
+          {/* Textarea + emoji inside a compound pill */}
+          <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors overflow-hidden min-h-[44px]">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -221,22 +208,23 @@ export default function ChatPage() {
               placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
               disabled={!effectiveCanSend}
               rows={1}
-              className="w-full resize-none max-h-24 py-2.5 pr-10 text-sm !rounded-2xl"
-              style={{ minHeight: '42px' }}
+              className="flex-1 resize-none bg-transparent py-3 px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50"
+              style={{ minHeight: '44px' }}
             />
-            <button className="absolute right-2 bottom-1.5 w-8 h-8 rounded-full flex items-center justify-center text-text-dim hover:text-text-muted">
-              <Smile className="w-4 h-4" />
+            <button className="flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center text-text-dim hover:text-mansion-gold transition-colors">
+              <Smile className="w-5 h-5" />
             </button>
           </div>
 
+          {/* Send */}
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={handleSend}
-            disabled={!input.trim() || !canSend}
-            className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
-              input.trim() && canSend
+            disabled={!input.trim() || !effectiveCanSend}
+            className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
+              input.trim() && effectiveCanSend
                 ? 'bg-mansion-crimson text-white shadow-glow-crimson'
-                : 'bg-mansion-elevated text-text-dim'
+                : 'bg-mansion-elevated text-text-dim border border-mansion-border/30'
             }`}
           >
             <Send className="w-5 h-5" />
