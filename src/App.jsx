@@ -14,6 +14,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import WelcomePage from './pages/WelcomePage';
 import ProfilePage from './pages/ProfilePage';
+import FavoritesPage from './pages/FavoritesPage';
 import SettingsPage from './pages/SettingsPage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getMe } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
@@ -103,6 +104,14 @@ function AppLayout() {
             element={
               <RequireRegistration>
                 <ProfilePage />
+              </RequireRegistration>
+            }
+          />
+          <Route
+            path="/favoritos"
+            element={
+              <RequireRegistration>
+                <FavoritesPage />
               </RequireRegistration>
             }
           />

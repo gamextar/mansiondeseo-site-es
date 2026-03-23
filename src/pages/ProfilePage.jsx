@@ -405,7 +405,7 @@ export default function ProfilePage() {
         <div className="space-y-1.5">
           {[
             { icon: Settings, label: 'Configuración', sublabel: 'Privacidad, notificaciones', path: '/configuracion' },
-            { icon: Heart, label: 'Mis favoritos', sublabel: 'Perfiles guardados', path: '/explorar' },
+            { icon: Heart, label: 'Mis favoritos', sublabel: 'Perfiles guardados', path: '/favoritos' },
             { icon: Shield, label: 'Verificación', sublabel: 'Verificar mi identidad', path: null },
           ].map(({ icon: Icon, label, sublabel, path }) => (
             <button

@@ -1102,10 +1102,45 @@ async function handleToggleFavorite(request, env, targetId) {
 async function handleGetFavorites(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+
+  const viewer = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
+  const viewerIsPremium = viewer && !!viewer.premium;
+  const settings = await loadSettings(env);
+
+  const { results: favByRows } = await env.DB.prepare('SELECT user_id FROM favorites WHERE target_id = ?').bind(auth.sub).all();
+  const favoritedBySet = new Set(favByRows.map(r => r.user_id));
+
   const { results } = await env.DB.prepare(
-    'SELECT target_id FROM favorites WHERE user_id = ?'
+    `SELECT u.* FROM favorites f JOIN users u ON u.id = f.target_id
+     WHERE f.user_id = ? ORDER BY f.created_at DESC`
   ).bind(auth.sub).all();
-  return json({ favorites: results.map(r => r.target_id) });
+
+  const profiles = results.map(u => {
+    const hasGhostMode = !!u.ghost_mode;
+    const blurred = hasGhostMode && !viewerIsPremium && !favoritedBySet.has(u.id);
+    const allPhotos = safeParseJSON(u.photos, []);
+    const visiblePhotos = viewerIsPremium
+      ? allPhotos.length
+      : blurred ? 0 : settings.freeVisiblePhotos;
+    return {
+      id: u.id,
+      name: u.username,
+      age: u.age,
+      city: u.city,
+      role: mapRoleToDisplay(u.role),
+      interests: safeParseJSON(u.interests, []),
+      photos: allPhotos,
+      totalPhotos: allPhotos.length,
+      visiblePhotos,
+      verified: !!u.verified,
+      online: !!u.online,
+      premium: !!u.premium,
+      blurred,
+      avatar_url: u.avatar_url,
+    };
+  });
+
+  return json({ profiles, viewerPremium: viewerIsPremium, settings });
 }
 
 // ── GET /api/favorites/check/:id ────────────────────────
