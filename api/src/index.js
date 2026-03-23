@@ -781,6 +781,48 @@ async function handleUpload(request, env) {
   return json({ url: publicUrl, key }, 201);
 }
 
+// ── DELETE /api/photos ───────────────────────────────────
+
+async function handleDeletePhoto(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const { url } = await request.json();
+  if (!url || typeof url !== 'string') return error('URL requerida', 400);
+
+  // Get user's current photos
+  const user = await env.DB.prepare('SELECT photos, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!user) return error('Usuario no encontrado', 404);
+
+  const photos = safeParseJSON(user.photos, []);
+  const index = photos.indexOf(url);
+  if (index === -1) return error('Foto no encontrada', 404);
+
+  // Remove from array
+  photos.splice(index, 1);
+
+  // If deleted photo was avatar, set next photo or empty
+  const newAvatar = user.avatar_url === url ? (photos[0] || '') : user.avatar_url;
+
+  await env.DB.prepare('UPDATE users SET photos = ?, avatar_url = ? WHERE id = ?')
+    .bind(JSON.stringify(photos), newAvatar, auth.sub).run();
+
+  // Try to delete from R2 (extract key from URL)
+  try {
+    let key = '';
+    if (url.includes('/api/images/')) {
+      key = url.split('/api/images/')[1];
+    }
+    if (key && key.startsWith('profiles/')) {
+      await env.IMAGES.delete(key);
+    }
+  } catch {
+    // R2 delete is best-effort
+  }
+
+  return json({ photos, avatar_url: newAvatar });
+}
+
 // ── GET /api/images/* ───────────────────────────────────
 
 async function handleServeImage(request, env, path) {
@@ -916,8 +958,9 @@ async function handleRequest(request, env) {
   const msgMatch = path.match(/^\/api\/messages\/([a-f0-9-]+)$/);
   if (msgMatch && method === 'GET') return handleGetMessages(request, env, msgMatch[1]);
 
-  // ── Upload
+  // ── Upload & Photos
   if (path === '/api/upload' && method === 'POST') return handleUpload(request, env);
+  if (path === '/api/photos' && method === 'DELETE') return handleDeletePhoto(request, env);
 
   // ── Serve R2 images
   if (path.startsWith('/api/images/') && method === 'GET') return handleServeImage(request, env, path);

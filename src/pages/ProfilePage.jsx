@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image } from 'lucide-react';
 import { useAuth } from '../App';
-import { logout as apiLogout, uploadImage, getMe } from '../lib/api';
+import { logout as apiLogout, uploadImage, deletePhoto, getMe } from '../lib/api';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -10,6 +10,7 @@ export default function ProfilePage() {
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(null);
 
   const handleLogout = async () => {
     await apiLogout();
@@ -43,6 +44,19 @@ export default function ProfilePage() {
     } finally {
       setUploading(false);
       if (galleryInputRef.current) galleryInputRef.current.value = '';
+    }
+  };
+
+  const handleDeletePhoto = async (url) => {
+    if (deleting) return;
+    setDeleting(url);
+    try {
+      const data = await deletePhoto(url);
+      setUser(prev => prev ? { ...prev, photos: data.photos, avatar_url: data.avatar_url } : prev);
+    } catch {
+      // Silently fail
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -125,8 +139,19 @@ export default function ProfilePage() {
 
           <div className="grid grid-cols-3 gap-2">
             {photos.map((url, i) => (
-              <div key={i} className="aspect-square rounded-xl overflow-hidden bg-mansion-card border border-mansion-border/30">
+              <div key={i} className="relative group aspect-square rounded-xl overflow-hidden bg-mansion-card border border-mansion-border/30">
                 <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                <button
+                  onClick={() => handleDeletePhoto(url)}
+                  disabled={deleting === url}
+                  className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center lg:opacity-0 lg:group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                >
+                  {deleting === url ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <X className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             ))}
             <button

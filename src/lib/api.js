@@ -196,3 +196,10 @@ export async function uploadImage(file) {
   });
   return data;
 }
+
+export async function deletePhoto(url) {
+  return apiFetch('/photos', {
+    method: 'DELETE',
+    body: JSON.stringify({ url }),
+  });
+}
