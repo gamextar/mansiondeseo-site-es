@@ -16,6 +16,7 @@ import WelcomePage from './pages/WelcomePage';
 import ProfilePage from './pages/ProfilePage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getMe } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
+import InstallAppBanner from './components/InstallAppBanner';
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/mensajes/'];
@@ -166,6 +167,7 @@ export default function App() {
       <div className="relative min-h-screen">
         {!verified && <AgeVerificationModal onVerify={verify} />}
         <AppLayout />
+        <InstallAppBanner />
       </div>
       </UnreadProvider>
       </AuthContext.Provider>
