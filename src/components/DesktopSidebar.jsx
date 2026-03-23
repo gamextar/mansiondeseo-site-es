@@ -1,7 +1,9 @@
-import { NavLink, Link, useLocation } from 'react-router-dom';
-import { Home, Search, MessageCircle, User, Crown, Settings } from 'lucide-react';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Home, Search, MessageCircle, User, Crown, Settings, Camera } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
+import { useState, useEffect } from 'react';
+import { getVisits, getToken } from '../lib/api';
 
 const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio' },
@@ -12,7 +14,14 @@ const NAV_ITEMS = [
 
 export default function DesktopSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
+  const [visitors, setVisitors] = useState([]);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    getVisits().then(data => setVisitors(data.visitors || [])).catch(() => {});
+  }, []);
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
@@ -34,8 +43,8 @@ export default function DesktopSidebar() {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
           const isActive =
-            to === '/'
-              ? location.pathname === '/'
+            to === '/' || to === '/perfil'
+              ? location.pathname === to
               : location.pathname.startsWith(to);
 
           return (
@@ -78,6 +87,38 @@ export default function DesktopSidebar() {
           );
         })}
       </nav>
+
+      {/* Recent visitors */}
+      {visitors.length > 0 && (
+        <div className="px-3 py-3 border-t border-mansion-border/20">
+          <p className="px-3 text-[10px] uppercase tracking-wider text-text-dim mb-2">Me visitaron</p>
+          <div className="space-y-0.5 max-h-48 overflow-y-auto scrollbar-thin">
+            {visitors.slice(0, 5).map((v) => (
+              <button
+                key={v.id}
+                onClick={() => navigate(`/perfiles/${v.id}`)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-mansion-elevated/50 transition-all group"
+              >
+                <div className="w-8 h-8 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0">
+                  {v.avatar_url ? (
+                    <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-text-dim">
+                      <Camera className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 text-left min-w-0">
+                  <p className="text-xs font-medium text-text-muted group-hover:text-text-primary truncate">{v.name}</p>
+                </div>
+                {v.online && (
+                  <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Bottom section */}
       <div className="px-3 pb-4 space-y-2">

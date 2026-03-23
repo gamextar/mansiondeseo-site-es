@@ -361,9 +361,9 @@ export default function ProfilePage() {
           />
         </div>
 
-        {/* Visitas */}
+        {/* Visitas (mobile only — desktop shows in sidebar) */}
         {visitors.length > 0 && (
-          <div className="mb-6">
+          <div className="mb-6 lg:hidden">
             <div className="flex items-center gap-2 mb-3">
               <Users className="w-4 h-4 text-mansion-gold" />
               <h3 className="text-sm font-semibold text-text-primary">Visitas recientes</h3>

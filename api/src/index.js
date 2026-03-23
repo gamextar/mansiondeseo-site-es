@@ -588,12 +588,15 @@ async function handleProfileDetail(request, env, userId) {
   // Ghost mode blur: blurred unless viewer is premium, OR profile owner favorited viewer
   const blurred = hasGhostMode && !viewerIsPremium && !profileFavoritedViewer;
 
-  // Record visit (non-blocking, skip own profile)
+  // Record visit (skip own profile)
   if (!isOwnProfile) {
-    const visitId = crypto.randomUUID();
-    env.DB.prepare(
-      'INSERT INTO profile_visits (id, visitor_id, visited_id) VALUES (?, ?, ?)'
-    ).bind(visitId, auth.sub, userId).run().catch(() => {});
+    try {
+      await env.DB.prepare(
+        'INSERT INTO profile_visits (id, visitor_id, visited_id) VALUES (?, ?, ?)'
+      ).bind(crypto.randomUUID(), auth.sub, userId).run();
+    } catch {
+      // Silently fail — duplicate or DB issue
+    }
   }
 
   const allPhotos = safeParseJSON(user.photos, []);
