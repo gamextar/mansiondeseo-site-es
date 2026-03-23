@@ -794,6 +794,7 @@ async function handleServeImage(request, env, path) {
     headers: {
       'Content-Type': object.httpMetadata?.contentType || 'image/jpeg',
       'Cache-Control': 'public, max-age=31536000, immutable',
+      'Access-Control-Allow-Origin': '*',
     },
   });
 }

@@ -1,13 +1,15 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image } from 'lucide-react';
 import { useAuth } from '../App';
-import { logout as apiLogout, uploadImage } from '../lib/api';
+import { logout as apiLogout, uploadImage, getMe } from '../lib/api';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { setRegistered, setUser, user } = useAuth();
   const fileInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
 
   const handleLogout = async () => {
     await apiLogout();
@@ -21,10 +23,26 @@ export default function ProfilePage() {
     if (!file) return;
     try {
       const data = await uploadImage(file);
-      // Refresh user data
-      setUser(prev => prev ? { ...prev, avatar_url: data.url } : prev);
+      setUser(prev => prev ? { ...prev, avatar_url: data.url, photos: [...(prev.photos || []), data.url] } : prev);
     } catch {
       // Silently fail — user can retry
+    }
+  };
+
+  const handleGalleryUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      for (const file of files) {
+        const data = await uploadImage(file);
+        setUser(prev => prev ? { ...prev, photos: [...(prev.photos || []), data.url] } : prev);
+      }
+    } catch {
+      // Partial upload ok
+    } finally {
+      setUploading(false);
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
     }
   };
 
@@ -33,6 +51,7 @@ export default function ProfilePage() {
   const displayCity = user?.city || '';
   const displayRole = user?.role || '';
   const avatarUrl = user?.avatar_url || '';
+  const photos = user?.photos || [];
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
@@ -42,11 +61,15 @@ export default function ProfilePage() {
           <div className="relative inline-block">
             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-mansion-gold to-mansion-gold-light p-[2px] mx-auto">
               <div className="w-full h-full rounded-full bg-mansion-card flex items-center justify-center overflow-hidden">
-                <img
-                  src={avatarUrl}
-                  alt="Mi perfil"
-                  className="w-full h-full object-cover"
-                />
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt="Mi perfil"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Camera className="w-8 h-8 text-text-dim" />
+                )}
               </div>
             </div>
             <button
@@ -80,6 +103,50 @@ export default function ProfilePage() {
               Desbloquear VIP
             </button>
           </div>
+        </div>
+
+        {/* Gallery */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Image className="w-4 h-4 text-mansion-gold" />
+              <h3 className="text-sm font-semibold text-text-primary">Mi Galería</h3>
+              <span className="text-xs text-text-dim">({photos.length})</span>
+            </div>
+            <button
+              onClick={() => galleryInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1 text-xs text-mansion-gold hover:text-mansion-gold-light transition-colors disabled:opacity-50"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              {uploading ? 'Subiendo...' : 'Agregar'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {photos.map((url, i) => (
+              <div key={i} className="aspect-square rounded-xl overflow-hidden bg-mansion-card border border-mansion-border/30">
+                <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+              </div>
+            ))}
+            <button
+              onClick={() => galleryInputRef.current?.click()}
+              disabled={uploading}
+              className="aspect-square rounded-xl border-2 border-dashed border-mansion-border/40 hover:border-mansion-gold/40 flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-50"
+            >
+              <Plus className="w-5 h-5 text-text-dim" />
+              <span className="text-[10px] text-text-dim">Foto</span>
+            </button>
+          </div>
+
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
+            onChange={handleGalleryUpload}
+          />
         </div>
 
         {/* Menu items */}

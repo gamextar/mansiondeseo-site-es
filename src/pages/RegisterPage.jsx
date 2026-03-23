@@ -475,14 +475,11 @@ function StepInterests({ selected, onToggle }) {
       <p className="text-text-muted text-sm mb-8">Selecciona al menos 1</p>
 
       <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
-        {INTERESTS.map((item, i) => {
+        {INTERESTS.map((item) => {
           const isActive = selected.includes(item.id);
           return (
             <motion.button
               key={item.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => onToggle(item.id)}
               className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all border relative ${
@@ -943,7 +940,9 @@ export default function RegisterPage() {
     // Upload photo if selected (now that we have a token)
     if (photoFile) {
       try {
-        await uploadImage(photoFile);
+        const uploadResult = await uploadImage(photoFile);
+        // Update user state with the new avatar_url
+        setUser(prev => prev ? { ...prev, avatar_url: uploadResult.url, photos: [...(prev.photos || []), uploadResult.url] } : prev);
       } catch {
         // Photo upload failed silently — user can retry later
       }
