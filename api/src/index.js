@@ -588,6 +588,14 @@ async function handleProfileDetail(request, env, userId) {
   // Ghost mode blur: blurred unless viewer is premium, OR profile owner favorited viewer
   const blurred = hasGhostMode && !viewerIsPremium && !profileFavoritedViewer;
 
+  // Record visit (non-blocking, skip own profile)
+  if (!isOwnProfile) {
+    const visitId = crypto.randomUUID();
+    env.DB.prepare(
+      'INSERT INTO profile_visits (id, visitor_id, visited_id) VALUES (?, ?, ?)'
+    ).bind(visitId, auth.sub, userId).run().catch(() => {});
+  }
+
   const allPhotos = safeParseJSON(user.photos, []);
   // Send all URLs; frontend applies CSS blur to blocked ones
   const visibleLimit = isOwnProfile ? settings.freeOwnPhotos : settings.freeVisiblePhotos;
@@ -996,6 +1004,39 @@ function safeParseJSON(str, fallback) {
 }
 
 // ══════════════════════════════════════════════════════════
+// PROFILE VISITS
+// ══════════════════════════════════════════════════════════
+
+async function handleGetVisits(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const { results } = await env.DB.prepare(
+    `SELECT DISTINCT u.id, u.username, u.avatar_url, u.age, u.city, u.role, u.premium, u.online,
+            pv.created_at as visited_at
+     FROM profile_visits pv
+     JOIN users u ON u.id = pv.visitor_id
+     WHERE pv.visited_id = ?
+     ORDER BY pv.created_at DESC
+     LIMIT 10`
+  ).bind(auth.sub).all();
+
+  const visitors = results.map(v => ({
+    id: v.id,
+    name: v.username,
+    avatar_url: v.avatar_url,
+    age: v.age,
+    city: v.city,
+    role: v.role,
+    premium: !!v.premium,
+    online: !!v.online,
+    visited_at: v.visited_at,
+  }));
+
+  return json({ visitors });
+}
+
+// ══════════════════════════════════════════════════════════
 // ROUTER
 // ══════════════════════════════════════════════════════════
 
@@ -1135,6 +1176,9 @@ async function handleRequest(request, env) {
   if (favCheckMatch && method === 'GET') return handleCheckFavorite(request, env, favCheckMatch[1]);
   const favToggleMatch = path.match(/^\/api\/favorites\/([a-f0-9-]+)$/);
   if (favToggleMatch && method === 'POST') return handleToggleFavorite(request, env, favToggleMatch[1]);
+
+  // ── Profile Visits
+  if (path === '/api/visits' && method === 'GET') return handleGetVisits(request, env);
 
   // ── Serve R2 images
   if (path.startsWith('/api/images/') && method === 'GET') return handleServeImage(request, env, path);

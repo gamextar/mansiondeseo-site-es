@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Search, MessageCircle, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
 
 export default function BottomNav() {
   const location = useLocation();
+  const navigateTo = useNavigate();
   const { unreadCount } = useUnreadMessages();
 
   // Hide on landing/onboarding/register/login
@@ -24,14 +25,20 @@ export default function BottomNav() {
         <div className="max-w-lg mx-auto flex items-center justify-around h-16 px-2">
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
             const isActive =
-              to === '/'
-                ? location.pathname === '/'
+              to === '/' || to === '/perfil'
+                ? location.pathname === to
                 : location.pathname.startsWith(to);
 
             return (
               <NavLink
                 key={to}
                 to={to}
+                onClick={(e) => {
+                  if (to === '/perfil' && location.pathname !== '/perfil') {
+                    e.preventDefault();
+                    navigateTo('/perfil');
+                  }
+                }}
                 className="relative flex flex-col items-center justify-center w-16 h-full group"
               >
                 {isActive && (

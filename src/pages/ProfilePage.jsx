@@ -1,8 +1,8 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Bug } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Bug, Users } from 'lucide-react';
 import { useAuth } from '../App';
-import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile } from '../lib/api';
+import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits } from '../lib/api';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -13,8 +13,13 @@ export default function ProfilePage() {
   const [deleting, setDeleting] = useState(null);
   const [togglingGhost, setTogglingGhost] = useState(false);
   const [togglingPremium, setTogglingPremium] = useState(false);
+  const [visitors, setVisitors] = useState([]);
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
+
+  useEffect(() => {
+    getVisits().then(data => setVisitors(data.visitors || [])).catch(() => {});
+  }, []);
 
   // Auto-save reordered photos
   const persistOrder = useCallback(async (newPhotos) => {
@@ -355,6 +360,46 @@ export default function ProfilePage() {
             onChange={handleGalleryUpload}
           />
         </div>
+
+        {/* Visitas */}
+        {visitors.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Users className="w-4 h-4 text-mansion-gold" />
+              <h3 className="text-sm font-semibold text-text-primary">Visitas recientes</h3>
+              <span className="text-xs text-text-dim">({visitors.length})</span>
+            </div>
+            <div className="space-y-2">
+              {visitors.map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => navigate(`/perfiles/${v.id}`)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-mansion-card/50 hover:bg-mansion-card transition-all group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0">
+                    {v.avatar_url ? (
+                      <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-text-dim">
+                        <Camera className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{v.name}</p>
+                    <p className="text-xs text-text-dim truncate">
+                      {[v.city, v.role].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                  {v.online && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-green-400 flex-shrink-0" />
+                  )}
+                  <ChevronRight className="w-4 h-4 text-text-dim flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Menu items */}
         <div className="space-y-1.5">

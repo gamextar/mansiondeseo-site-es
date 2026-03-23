@@ -230,3 +230,9 @@ export async function getFavorites() {
 export async function checkFavorite(targetId) {
   return apiFetch(`/favorites/check/${targetId}`);
 }
+
+// ── Visits ──────────────────────────────────────────────
+
+export async function getVisits() {
+  return apiFetch('/visits');
+}
