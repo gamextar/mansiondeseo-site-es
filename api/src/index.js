@@ -480,7 +480,7 @@ async function handleProfiles(request, env) {
 
   // Get viewer info
   const viewer = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
-  const viewerIsPremium = viewer && viewer.premium === 1;
+  const viewerIsPremium = viewer && !!viewer.premium;
 
   const url = new URL(request.url);
   const filter = url.searchParams.get('filter') || 'all';
@@ -519,7 +519,7 @@ async function handleProfiles(request, env) {
   // For ghost mode: check which users have messaged the viewer
   let messagedViewerSet = new Set();
   if (!viewerIsPremium) {
-    const ghostIds = results.filter(u => u.ghost_mode === 1).map(u => u.id);
+    const ghostIds = results.filter(u => !!u.ghost_mode).map(u => u.id);
     if (ghostIds.length > 0) {
       const placeholders = ghostIds.map(() => '?').join(',');
       const { results: msgRows } = await env.DB.prepare(
@@ -531,7 +531,7 @@ async function handleProfiles(request, env) {
 
   // Map to frontend shape
   const profiles = results.map(u => {
-    const hasGhostMode = u.ghost_mode === 1;
+    const hasGhostMode = !!u.ghost_mode;
     // Ghost mode user is blurred for free viewers unless that user has messaged them
     const blurred = hasGhostMode && !viewerIsPremium && !messagedViewerSet.has(u.id);
     return {
@@ -543,9 +543,9 @@ async function handleProfiles(request, env) {
       interests: safeParseJSON(u.interests, []),
       bio: u.bio,
       photos: safeParseJSON(u.photos, []),
-      verified: u.verified === 1,
-      online: u.online === 1,
-      premium: u.premium === 1,
+      verified: !!u.verified,
+      online: !!u.online,
+      premium: !!u.premium,
       ghost_mode: hasGhostMode,
       blurred,
       lastActive: u.last_active,
@@ -567,9 +567,9 @@ async function handleProfileDetail(request, env, userId) {
 
   // Get viewer info for ghost mode check
   const viewer = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
-  const viewerIsPremium = viewer && viewer.premium === 1;
+  const viewerIsPremium = viewer && !!viewer.premium;
 
-  const hasGhostMode = user.ghost_mode === 1;
+  const hasGhostMode = !!user.ghost_mode;
   let blurred = false;
   if (hasGhostMode && !viewerIsPremium) {
     // Check if this ghost user has messaged the viewer
@@ -589,9 +589,9 @@ async function handleProfileDetail(request, env, userId) {
       interests: safeParseJSON(user.interests, []),
       bio: user.bio,
       photos: safeParseJSON(user.photos, []),
-      verified: user.verified === 1,
-      online: user.online === 1,
-      premium: user.premium === 1,
+      verified: !!user.verified,
+      online: !!user.online,
+      premium: !!user.premium,
       ghost_mode: hasGhostMode,
       blurred,
       lastActive: user.last_active,
@@ -894,7 +894,7 @@ async function handleUpdateProfile(request, env) {
   // ghost_mode is only allowed for premium users
   const currentUser = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
   const isPremium = body.premium !== undefined ? (body.premium ? 1 : 0) : currentUser?.premium;
-  if (isPremium === 1) {
+  if (!!isPremium) {
     allowedFields.push('ghost_mode');
   }
 
@@ -946,10 +946,10 @@ function sanitizeUser(user) {
     ...safe,
     interests: safeParseJSON(safe.interests, []),
     photos: safeParseJSON(safe.photos, []),
-    verified: safe.verified === 1,
-    online: safe.online === 1,
-    premium: safe.premium === 1,
-    ghost_mode: safe.ghost_mode === 1,
+    verified: !!safe.verified,
+    online: !!safe.online,
+    premium: !!safe.premium,
+    ghost_mode: !!safe.ghost_mode,
   };
 }
 
