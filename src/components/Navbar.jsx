@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { MessageCircle, Bell } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 
@@ -33,12 +33,6 @@ export default function Navbar() {
 
           {/* Right actions */}
           <div className="flex items-center gap-1">
-            {/* Notifications */}
-            <button className="relative w-10 h-10 rounded-xl flex items-center justify-center text-text-muted hover:text-mansion-gold hover:bg-mansion-elevated/50 transition-all">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-mansion-crimson animate-pulse-slow" />
-            </button>
-
             {/* Messages */}
             <Link
               to="/mensajes"

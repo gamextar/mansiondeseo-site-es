@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Send, Lock, ImageIcon, Smile, MessageCircle } from 'lucide-react';
 import { useMessageLimit } from '../hooks/useMessageLimit';
+import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import { getMessages as apiGetMessages, sendMessage as apiSendMessage, getMessageLimit, getProfile, getToken } from '../lib/api';
 
@@ -10,6 +11,7 @@ export default function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
+  const { refresh: refreshUnread } = useUnreadMessages();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [apiLimit, setApiLimit] = useState(null);
@@ -30,7 +32,11 @@ export default function ChatPage() {
       getProfile(partnerId).then(data => setPartner(data.profile)).catch(() => null),
       apiGetMessages(partnerId).then(data => setMessages(data.messages || [])).catch(() => setMessages([])),
       getMessageLimit().then(data => setApiLimit(data)).catch(() => {}),
-    ]).finally(() => setLoading(false));
+    ]).finally(() => {
+      setLoading(false);
+      // Backend marks messages as read — refresh unread count in nav badges
+      refreshUnread();
+    });
   }, [id, partnerId, navigate]);
 
   useEffect(() => {
