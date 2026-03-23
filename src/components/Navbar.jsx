@@ -17,7 +17,7 @@ export default function Navbar() {
       <div className="glass border-b border-mansion-border/30">
         <div className="max-w-7xl mx-auto px-4 lg:px-8 h-14 flex items-center justify-between">
           {/* Logo — hidden on desktop (sidebar has its own) */}
-          <Link to="/" className="flex items-center gap-2 lg:hidden">
+          <Link to="/" reloadDocument className="flex items-center gap-2 lg:hidden">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
               <span className="font-display text-white text-sm font-bold">M</span>
             </div>

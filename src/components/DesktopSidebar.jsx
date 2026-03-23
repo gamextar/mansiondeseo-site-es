@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Home, Search, MessageCircle, User, Crown, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
@@ -21,14 +21,14 @@ export default function DesktopSidebar() {
   return (
     <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 xl:w-72 z-40 flex-col bg-mansion-card/50 border-r border-mansion-border/30 backdrop-blur-xl">
       {/* Logo */}
-      <div className="px-6 h-16 flex items-center gap-3 border-b border-mansion-border/20">
+      <Link to="/" reloadDocument className="px-6 h-16 flex items-center gap-3 border-b border-mansion-border/20 hover:opacity-80 transition-opacity">
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
           <span className="font-display text-white text-sm font-bold">M</span>
         </div>
         <span className="font-display text-xl font-semibold text-gradient-gold">
           Mansión Deseo
         </span>
-      </div>
+      </Link>
 
       {/* Nav items */}
       <nav className="flex-1 px-3 py-4 space-y-1">

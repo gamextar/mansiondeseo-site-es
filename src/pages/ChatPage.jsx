@@ -208,7 +208,7 @@ export default function ChatPage() {
 
       {/* Input area */}
       <div className="safe-bottom border-t border-mansion-border/30 bg-mansion-card/80 backdrop-blur-lg">
-        <div className="flex items-end gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
+        <div className="flex items-center gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
           <button className="w-10 h-10 rounded-full flex items-center justify-center text-text-dim hover:text-text-muted transition-colors flex-shrink-0">
             <ImageIcon className="w-5 h-5" />
           </button>
@@ -239,7 +239,7 @@ export default function ChatPage() {
                 : 'bg-mansion-elevated text-text-dim'
             }`}
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-5 h-5" />
           </motion.button>
         </div>
       </div>
