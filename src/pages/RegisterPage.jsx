@@ -1,202 +1,51 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronLeft, Camera, Heart, MapPin, User } from 'lucide-react';
+import {
+  ChevronRight,
+  ChevronLeft,
+  Camera,
+  Mail,
+  Lock,
+  MapPin,
+  Sparkles,
+  Check,
+  Heart,
+} from 'lucide-react';
 
-// ─── Step 1: ¿Quién Eres? ──────────────────────────────────────────
+// ────────────────────────────────────────────
+// Constants
+// ────────────────────────────────────────────
+
+const TOTAL_STEPS = 6;
+
 const ROLES = [
   {
     id: 'hombre',
     label: 'Hombre',
-    color: 'from-blue-500 to-blue-700',
-    border: 'border-blue-500/40',
-    activeBg: 'bg-blue-500/15',
+    color: '#3B82F6',
+    colorDark: '#2563EB',
+    bg: 'rgba(59,130,246,0.12)',
+    border: 'rgba(59,130,246,0.4)',
   },
   {
     id: 'mujer',
     label: 'Mujer',
-    color: 'from-pink-500 to-pink-700',
-    border: 'border-pink-500/40',
-    activeBg: 'bg-pink-500/15',
+    color: '#EC4899',
+    colorDark: '#DB2777',
+    bg: 'rgba(236,72,153,0.12)',
+    border: 'rgba(236,72,153,0.4)',
   },
   {
     id: 'pareja',
     label: 'Pareja',
-    color: 'from-purple-500 to-purple-700',
-    border: 'border-purple-500/40',
-    activeBg: 'bg-purple-500/15',
+    color: '#8B5CF6',
+    colorDark: '#7C3AED',
+    bg: 'rgba(139,92,246,0.12)',
+    border: 'rgba(139,92,246,0.4)',
   },
 ];
 
-function PersonIcon({ type, isActive }) {
-  const baseClass = `transition-all duration-300 ${isActive ? 'scale-110' : 'scale-100'}`;
-
-  if (type === 'hombre') {
-    return (
-      <svg viewBox="0 0 80 120" className={`w-16 h-24 ${baseClass}`}>
-        <motion.circle
-          cx="40" cy="25" r="14"
-          fill={isActive ? '#3B82F6' : '#555566'}
-          initial={false}
-          animate={{ r: isActive ? 16 : 14 }}
-          transition={{ type: 'spring', stiffness: 300 }}
-        />
-        <motion.rect
-          x="25" y="42" width="30" height="35" rx="6"
-          fill={isActive ? '#3B82F6' : '#555566'}
-          initial={false}
-          animate={{ width: isActive ? 32 : 30, x: isActive ? 24 : 25 }}
-        />
-        <motion.rect x="25" y="78" width="12" height="28" rx="5" fill={isActive ? '#2563EB' : '#444455'} />
-        <motion.rect x="43" y="78" width="12" height="28" rx="5" fill={isActive ? '#2563EB' : '#444455'} />
-        {isActive && (
-          <motion.circle
-            cx="40" cy="25" r="20"
-            fill="none" stroke="#3B82F6" strokeWidth="1"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-          />
-        )}
-      </svg>
-    );
-  }
-
-  if (type === 'mujer') {
-    return (
-      <svg viewBox="0 0 80 120" className={`w-16 h-24 ${baseClass}`}>
-        <motion.circle
-          cx="40" cy="25" r="14"
-          fill={isActive ? '#EC4899' : '#555566'}
-          initial={false}
-          animate={{ r: isActive ? 16 : 14 }}
-        />
-        {/* Hair accent */}
-        <motion.path
-          d="M26 22 Q30 8 40 8 Q50 8 54 22"
-          fill="none" stroke={isActive ? '#EC4899' : '#555566'} strokeWidth="3" strokeLinecap="round"
-        />
-        {/* Dress body */}
-        <motion.path
-          d="M28 42 L25 80 Q25 84 32 84 L48 84 Q55 84 55 80 L52 42 Q50 38 40 38 Q30 38 28 42 Z"
-          fill={isActive ? '#EC4899' : '#555566'}
-        />
-        <motion.rect x="27" y="84" width="11" height="24" rx="5" fill={isActive ? '#DB2777' : '#444455'} />
-        <motion.rect x="42" y="84" width="11" height="24" rx="5" fill={isActive ? '#DB2777' : '#444455'} />
-        {isActive && (
-          <motion.circle
-            cx="40" cy="25" r="20"
-            fill="none" stroke="#EC4899" strokeWidth="1"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-          />
-        )}
-      </svg>
-    );
-  }
-
-  // pareja
-  return (
-    <svg viewBox="0 0 120 120" className={`w-24 h-24 ${baseClass}`}>
-      {/* Man */}
-      <motion.circle cx="42" cy="25" r="12" fill={isActive ? '#8B5CF6' : '#555566'}
-        animate={{ r: isActive ? 13 : 12 }} />
-      <motion.rect x="30" y="40" width="24" height="30" rx="5"
-        fill={isActive ? '#7C3AED' : '#555566'} />
-      <rect x="30" y="72" width="10" height="22" rx="4" fill={isActive ? '#6D28D9' : '#444455'} />
-      <rect x="44" y="72" width="10" height="22" rx="4" fill={isActive ? '#6D28D9' : '#444455'} />
-
-      {/* Woman */}
-      <motion.circle cx="78" cy="25" r="12" fill={isActive ? '#A78BFA' : '#555566'}
-        animate={{ r: isActive ? 13 : 12 }} />
-      <motion.path
-        d="M66 40 L64 72 Q64 76 70 76 L86 76 Q92 76 92 72 L90 40 Q88 36 78 36 Q68 36 66 40 Z"
-        fill={isActive ? '#A78BFA' : '#555566'}
-      />
-      <rect x="66" y="76" width="10" height="20" rx="4" fill={isActive ? '#7C3AED' : '#444455'} />
-      <rect x="80" y="76" width="10" height="20" rx="4" fill={isActive ? '#7C3AED' : '#444455'} />
-
-      {/* Heart between */}
-      {isActive && (
-        <motion.g
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: [0, 1.2, 1], opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
-          <text x="54" y="55" fontSize="16" textAnchor="middle" fill="#C9A84C">♥</text>
-        </motion.g>
-      )}
-    </svg>
-  );
-}
-
-function StepRole({ selected, onSelect }) {
-  return (
-    <div className="text-center">
-      <h2 className="font-display text-2xl font-bold text-text-primary mb-2">Soy un...</h2>
-      <p className="text-text-muted text-sm mb-8">Selecciona tu perfil</p>
-
-      <div className="flex items-end justify-center gap-4">
-        {ROLES.map((role) => {
-          const isActive = selected === role.id;
-          return (
-            <motion.button
-              key={role.id}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => onSelect(role.id)}
-              className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 border-2 ${
-                isActive
-                  ? `${role.activeBg} ${role.border}`
-                  : 'border-mansion-border/30 bg-mansion-card/50 hover:border-mansion-border'
-              }`}
-            >
-              <PersonIcon type={role.id} isActive={isActive} />
-              <span className={`mt-3 font-medium text-sm ${isActive ? 'text-text-primary' : 'text-text-muted'}`}>
-                {role.label}
-              </span>
-            </motion.button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 2: ¿Qué Buscas? ──────────────────────────────────────────
-function StepSeeking({ selected, onSelect }) {
-  return (
-    <div className="text-center">
-      <h2 className="font-display text-2xl font-bold text-text-primary mb-2">Busco...</h2>
-      <p className="text-text-muted text-sm mb-8">¿Qué tipo de conexión te interesa?</p>
-
-      <div className="flex items-end justify-center gap-4">
-        {ROLES.map((role) => {
-          const isActive = selected === role.id;
-          return (
-            <motion.button
-              key={role.id}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => onSelect(role.id)}
-              className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-300 border-2 ${
-                isActive
-                  ? `${role.activeBg} ${role.border}`
-                  : 'border-mansion-border/30 bg-mansion-card/50 hover:border-mansion-border'
-              }`}
-            >
-              <PersonIcon type={role.id} isActive={isActive} />
-              <span className={`mt-3 font-medium text-sm ${isActive ? 'text-text-primary' : 'text-text-muted'}`}>
-                {role.label}
-              </span>
-            </motion.button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 3: Intereses ──────────────────────────────────────────────
 const INTERESTS = [
   { id: 'swinger', label: 'Swinger', emoji: '🔄' },
   { id: 'trios', label: 'Tríos', emoji: '🔥' },
@@ -208,28 +57,396 @@ const INTERESTS = [
   { id: 'roleplay', label: 'Roleplay', emoji: '🎭' },
 ];
 
-function StepInterests({ selected, onToggle }) {
+// ────────────────────────────────────────────
+// Person Figure SVG
+// ────────────────────────────────────────────
+
+function PersonFigure({ type, isActive, size = 'lg' }) {
+  const dimColor = '#3A3A4A';
+  const dimColorDark = '#2A2A38';
+  const roleData = ROLES.find((r) => r.id === type);
+  const color = isActive ? roleData.color : dimColor;
+  const colorDark = isActive ? roleData.colorDark : dimColorDark;
+
+  if (type === 'hombre') {
+    return (
+      <svg
+        viewBox="0 0 80 120"
+        className={`${size === 'lg' ? 'w-20 h-28' : 'w-8 h-11'} transition-transform duration-300 ${
+          isActive ? 'scale-110' : 'scale-100'
+        }`}
+      >
+        <motion.circle
+          cx="40"
+          cy="22"
+          r="13"
+          fill={color}
+          animate={{ r: isActive ? 15 : 13 }}
+          transition={{ type: 'spring', stiffness: 300 }}
+        />
+        <motion.rect
+          x="23"
+          y="40"
+          width="34"
+          height="38"
+          rx="8"
+          fill={color}
+          animate={{ y: isActive ? 38 : 40 }}
+        />
+        <rect x="24" y="78" width="13" height="30" rx="6" fill={colorDark} />
+        <rect x="43" y="78" width="13" height="30" rx="6" fill={colorDark} />
+        {isActive && (
+          <motion.circle
+            cx="40"
+            cy="60"
+            r="45"
+            fill="none"
+            stroke={color}
+            strokeWidth="1"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: [1, 1.4], opacity: [0.4, 0] }}
+            transition={{ duration: 1.8, repeat: Infinity }}
+          />
+        )}
+      </svg>
+    );
+  }
+
+  if (type === 'mujer') {
+    return (
+      <svg
+        viewBox="0 0 80 120"
+        className={`${size === 'lg' ? 'w-20 h-28' : 'w-8 h-11'} transition-transform duration-300 ${
+          isActive ? 'scale-110' : 'scale-100'
+        }`}
+      >
+        <motion.circle
+          cx="40"
+          cy="22"
+          r="13"
+          fill={color}
+          animate={{ r: isActive ? 15 : 13 }}
+          transition={{ type: 'spring', stiffness: 300 }}
+        />
+        <motion.path
+          d="M27 19 Q31 6 40 6 Q49 6 53 19"
+          fill="none"
+          stroke={color}
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        <motion.path
+          d="M29 40 L24 84 Q24 88 32 88 L48 88 Q56 88 56 84 L51 40 Q49 36 40 36 Q31 36 29 40 Z"
+          fill={color}
+        />
+        <rect x="28" y="88" width="11" height="22" rx="5" fill={colorDark} />
+        <rect x="41" y="88" width="11" height="22" rx="5" fill={colorDark} />
+        {isActive && (
+          <motion.circle
+            cx="40"
+            cy="60"
+            r="45"
+            fill="none"
+            stroke={color}
+            strokeWidth="1"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: [1, 1.4], opacity: [0.4, 0] }}
+            transition={{ duration: 1.8, repeat: Infinity }}
+          />
+        )}
+      </svg>
+    );
+  }
+
+  // Pareja
+  return (
+    <svg
+      viewBox="0 0 120 120"
+      className={`${size === 'lg' ? 'w-28 h-28' : 'w-12 h-11'} transition-transform duration-300 ${
+        isActive ? 'scale-105' : 'scale-100'
+      }`}
+    >
+      <motion.circle cx="38" cy="22" r="11" fill={color} animate={{ r: isActive ? 12 : 11 }} />
+      <motion.rect x="27" y="38" width="22" height="30" rx="5" fill={color} />
+      <rect x="28" y="70" width="9" height="22" rx="4" fill={colorDark} />
+      <rect x="41" y="70" width="9" height="22" rx="4" fill={colorDark} />
+
+      <motion.circle cx="82" cy="22" r="11" fill={color} animate={{ r: isActive ? 12 : 11 }} />
+      <motion.path
+        d="M69 19 Q73 8 82 8 Q91 8 95 19"
+        fill="none"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <motion.path
+        d="M72 38 L70 70 Q70 74 76 74 L88 74 Q94 74 94 70 L92 38 Q90 34 82 34 Q74 34 72 38 Z"
+        fill={color}
+      />
+      <rect x="72" y="74" width="9" height="20" rx="4" fill={colorDark} />
+      <rect x="85" y="74" width="9" height="20" rx="4" fill={colorDark} />
+
+      {isActive && (
+        <motion.g
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: [0, 1.3, 1], opacity: 1 }}
+          transition={{ delay: 0.15 }}
+        >
+          <text x="60" y="52" fontSize="14" textAnchor="middle" fill="#C9A84C">
+            ♥
+          </text>
+        </motion.g>
+      )}
+      {isActive && (
+        <motion.ellipse
+          cx="60"
+          cy="55"
+          rx="50"
+          ry="45"
+          fill="none"
+          stroke={color}
+          strokeWidth="1"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: [1, 1.3], opacity: [0.3, 0] }}
+          transition={{ duration: 1.8, repeat: Infinity }}
+        />
+      )}
+    </svg>
+  );
+}
+
+// ────────────────────────────────────────────
+// Profile Card Preview ("Ficha")
+// ────────────────────────────────────────────
+
+function FichaPreview({ data, currentStep }) {
+  const { role, seeking, interests, name, age, city } = data;
+
+  if (currentStep < 1 && !role) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20, scaleY: 0.8 }}
+      animate={{ opacity: 1, y: 0, scaleY: 1 }}
+      transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+      className="mx-auto w-full max-w-[300px] mb-4"
+    >
+      <motion.div
+        layout
+        className="bg-mansion-card/90 backdrop-blur-sm rounded-2xl border border-mansion-border/40 p-3 relative overflow-hidden"
+      >
+        {/* Gold accent line */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-mansion-gold/40 to-transparent" />
+
+        {/* Figures row: Soy ♥ Busco */}
+        <AnimatePresence>
+          {(role || seeking) && (
+            <motion.div
+              layout
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center justify-center gap-3"
+            >
+              {role && (
+                <motion.div
+                  initial={{ opacity: 0, x: -20, scale: 0.5 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 300 }}
+                  className="flex flex-col items-center"
+                >
+                  <PersonFigure type={role} isActive size="sm" />
+                  <span className="text-[10px] text-text-dim mt-0.5">Soy</span>
+                </motion.div>
+              )}
+
+              {role && seeking && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'spring', delay: 0.1 }}
+                >
+                  <Heart className="w-3.5 h-3.5 text-mansion-crimson fill-mansion-crimson" />
+                </motion.div>
+              )}
+
+              {seeking && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20, scale: 0.5 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 300 }}
+                  className="flex flex-col items-center"
+                >
+                  <PersonFigure type={seeking} isActive size="sm" />
+                  <span className="text-[10px] text-text-dim mt-0.5">Busco</span>
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Name & location */}
+        <AnimatePresence>
+          {name && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center mt-2"
+            >
+              <p className="text-text-primary font-display text-sm font-semibold">
+                {name}
+                {age ? `, ${age}` : ''}
+              </p>
+              {city && (
+                <p className="text-text-dim text-[11px] flex items-center justify-center gap-1">
+                  <MapPin className="w-2.5 h-2.5" /> {city}
+                </p>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Interests */}
+        <AnimatePresence>
+          {interests && interests.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-wrap gap-1 justify-center mt-2"
+            >
+              {interests.slice(0, 4).map((intId, i) => {
+                const interest = INTERESTS.find((x) => x.id === intId);
+                return interest ? (
+                  <motion.span
+                    key={intId}
+                    initial={{ opacity: 0, scale: 0 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="text-[9px] px-1.5 py-0.5 rounded-full bg-mansion-gold/10 text-mansion-gold border border-mansion-gold/20"
+                  >
+                    {interest.emoji} {interest.label}
+                  </motion.span>
+                ) : null;
+              })}
+              {interests.length > 4 && (
+                <span className="text-[9px] px-1.5 py-0.5 text-text-dim">
+                  +{interests.length - 4}
+                </span>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Member tag */}
+        <div className="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-mansion-border/20">
+          <Sparkles className="w-2.5 h-2.5 text-mansion-gold" />
+          <span className="text-[9px] text-text-dim font-medium tracking-wider uppercase">
+            Mansión Deseo
+          </span>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ────────────────────────────────────────────
+// Step Components
+// ────────────────────────────────────────────
+
+function StepEmail({ email, password, onEmailChange, onPasswordChange }) {
   return (
     <div className="text-center">
-      <h2 className="font-display text-2xl font-bold text-text-primary mb-2">Mis intereses</h2>
-      <p className="text-text-muted text-sm mb-8">Selecciona al menos 1</p>
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: 'spring', stiffness: 200 }}
+        className="w-16 h-16 mx-auto mb-6 rounded-full bg-mansion-gold/10 border border-mansion-gold/30 flex items-center justify-center"
+      >
+        <Sparkles className="w-7 h-7 text-mansion-gold" />
+      </motion.div>
 
-      <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
-        {INTERESTS.map((item) => {
-          const isActive = selected.includes(item.id);
+      <h2 className="font-display text-2xl font-bold text-text-primary mb-2">
+        Únete a la Mansión
+      </h2>
+      <p className="text-text-muted text-sm mb-8">Crea tu cuenta para comenzar</p>
+
+      <div className="space-y-4 max-w-xs mx-auto text-left">
+        <div>
+          <label className="text-text-muted text-xs font-medium mb-1.5 block">Email</label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => onEmailChange(e.target.value)}
+              placeholder="tu@email.com"
+              className="w-full pl-10"
+              autoComplete="email"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-text-muted text-xs font-medium mb-1.5 block">
+            Contraseña
+          </label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => onPasswordChange(e.target.value)}
+              placeholder="Mínimo 6 caracteres"
+              className="w-full pl-10"
+              autoComplete="new-password"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RoleGrid({ selected, onSelect, title, subtitle }) {
+  return (
+    <div className="text-center">
+      <h2 className="font-display text-2xl font-bold text-text-primary mb-2">{title}</h2>
+      <p className="text-text-muted text-sm mb-8">{subtitle}</p>
+
+      <div className="flex items-end justify-center gap-3">
+        {ROLES.map((role) => {
+          const isActive = selected === role.id;
           return (
             <motion.button
-              key={item.id}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => onToggle(item.id)}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all border ${
-                isActive
-                  ? 'bg-mansion-gold/15 border-mansion-gold/40 text-mansion-gold'
-                  : 'bg-mansion-card border-mansion-border/40 text-text-muted hover:border-mansion-border'
-              }`}
+              key={role.id}
+              whileTap={{ scale: 0.93 }}
+              whileHover={{ scale: 1.03 }}
+              onClick={() => onSelect(role.id)}
+              className="flex flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+              style={{
+                backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
+                borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
+              }}
             >
-              <span>{item.emoji}</span>
-              <span>{item.label}</span>
+              <PersonFigure type={role.id} isActive={isActive} size="lg" />
+              <span
+                className={`mt-2 font-medium text-sm ${
+                  isActive ? 'text-text-primary' : 'text-text-muted'
+                }`}
+              >
+                {role.label}
+              </span>
+              <AnimatePresence>
+                {isActive && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center shadow-lg"
+                    style={{ backgroundColor: role.color }}
+                  >
+                    <Check className="w-3.5 h-3.5 text-white" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.button>
           );
         })}
@@ -238,7 +455,51 @@ function StepInterests({ selected, onToggle }) {
   );
 }
 
-// ─── Step 4: Info Básica ────────────────────────────────────────────
+function StepInterests({ selected, onToggle }) {
+  return (
+    <div className="text-center">
+      <h2 className="font-display text-2xl font-bold text-text-primary mb-2">Mis intereses</h2>
+      <p className="text-text-muted text-sm mb-8">Selecciona al menos 1</p>
+
+      <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
+        {INTERESTS.map((item, i) => {
+          const isActive = selected.includes(item.id);
+          return (
+            <motion.button
+              key={item.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.04 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onToggle(item.id)}
+              className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all border relative ${
+                isActive
+                  ? 'bg-mansion-gold/15 border-mansion-gold/40 text-mansion-gold'
+                  : 'bg-mansion-card border-mansion-border/40 text-text-muted hover:border-mansion-border'
+              }`}
+            >
+              <span>{item.emoji}</span>
+              <span>{item.label}</span>
+              <AnimatePresence>
+                {isActive && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    className="absolute top-1 right-1"
+                  >
+                    <Check className="w-3 h-3 text-mansion-gold" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function StepBasicInfo({ data, onChange }) {
   return (
     <div className="text-center">
@@ -247,7 +508,9 @@ function StepBasicInfo({ data, onChange }) {
 
       <div className="space-y-4 max-w-xs mx-auto text-left">
         <div>
-          <label className="text-text-muted text-xs font-medium mb-1.5 block">Nombre (o alias)</label>
+          <label className="text-text-muted text-xs font-medium mb-1.5 block">
+            Nombre (o alias)
+          </label>
           <input
             type="text"
             value={data.name}
@@ -296,17 +559,20 @@ function StepBasicInfo({ data, onChange }) {
   );
 }
 
-// ─── Step 5: Foto ───────────────────────────────────────────────────
 function StepPhoto() {
   return (
     <div className="text-center">
-      <h2 className="font-display text-2xl font-bold text-text-primary mb-2">Tu foto de perfil</h2>
-      <p className="text-text-muted text-sm mb-8">Los perfiles con foto reciben 10x más mensajes</p>
+      <h2 className="font-display text-2xl font-bold text-text-primary mb-2">
+        Tu foto de perfil
+      </h2>
+      <p className="text-text-muted text-sm mb-8">
+        Los perfiles con foto reciben 10x más mensajes
+      </p>
 
       <motion.div
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
-        className="w-40 h-40 mx-auto rounded-full border-2 border-dashed border-mansion-gold/40 
+        className="w-36 h-36 mx-auto rounded-full border-2 border-dashed border-mansion-gold/40
                    bg-mansion-card flex flex-col items-center justify-center cursor-pointer
                    hover:border-mansion-gold/60 hover:bg-mansion-gold/5 transition-all"
       >
@@ -321,16 +587,109 @@ function StepPhoto() {
   );
 }
 
-// ─── Main RegisterPage ──────────────────────────────────────────────
+// ────────────────────────────────────────────
+// Success Screen
+// ────────────────────────────────────────────
+
+function SuccessScreen({ onEnter }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex flex-col items-center justify-center text-center px-6"
+    >
+      {/* Sparkle particles */}
+      <div className="relative">
+        {[...Array(12)].map((_, i) => {
+          const angle = (i / 12) * Math.PI * 2;
+          const radius = 70 + (i % 3) * 20;
+          return (
+            <motion.div
+              key={i}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{
+                scale: [0, 1, 0],
+                opacity: [0, 0.8, 0],
+                x: Math.cos(angle) * radius,
+                y: Math.sin(angle) * radius,
+              }}
+              transition={{
+                delay: 0.3 + i * 0.06,
+                duration: 1.5,
+                repeat: Infinity,
+                repeatDelay: 2.5,
+              }}
+              className="absolute w-2 h-2 rounded-full"
+              style={{
+                backgroundColor:
+                  i % 3 === 0 ? '#C9A84C' : i % 3 === 1 ? '#D4183D' : '#8B5CF6',
+                left: '50%',
+                top: '50%',
+              }}
+            />
+          );
+        })}
+
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: [0, 1.2, 1] }}
+          transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+          className="relative z-10"
+        >
+          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-mansion-gold/20 to-mansion-crimson/20 border border-mansion-gold/30 flex items-center justify-center">
+            <Sparkles className="w-10 h-10 text-mansion-gold" />
+          </div>
+        </motion.div>
+      </div>
+
+      <motion.h2
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="font-display text-3xl font-bold text-text-primary mt-8 mb-3"
+      >
+        ¡Bienvenido/a!
+      </motion.h2>
+
+      <motion.p
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className="text-text-muted text-sm mb-10 max-w-xs"
+      >
+        Tu perfil está listo. Ahora puedes explorar la Mansión y conectar con personas afines.
+      </motion.p>
+
+      <motion.button
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={onEnter}
+        className="btn-gold text-lg font-display flex items-center gap-2"
+      >
+        Entrar a la Mansión
+        <ChevronRight className="w-5 h-5" />
+      </motion.button>
+    </motion.div>
+  );
+}
+
+// ────────────────────────────────────────────
+// Main RegisterPage
+// ────────────────────────────────────────────
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
+  const [direction, setDirection] = useState(1);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [iAm, setIAm] = useState(null);
   const [seeking, setSeeking] = useState(null);
   const [interests, setInterests] = useState([]);
   const [info, setInfo] = useState({ name: '', age: '', city: '', bio: '' });
-
-  const totalSteps = 5;
+  const [completed, setCompleted] = useState(false);
 
   const toggleInterest = (id) => {
     setInterests((prev) =>
@@ -338,18 +697,50 @@ export default function RegisterPage() {
     );
   };
 
+  // Auto-advance after first selection on role/seeking steps
+  const handleRoleSelect = useCallback(
+    (id) => {
+      const wasEmpty = !iAm;
+      setIAm(id);
+      if (wasEmpty) {
+        setTimeout(() => {
+          setDirection(1);
+          setStep((s) => s + 1);
+        }, 600);
+      }
+    },
+    [iAm]
+  );
+
+  const handleSeekingSelect = useCallback(
+    (id) => {
+      const wasEmpty = !seeking;
+      setSeeking(id);
+      if (wasEmpty) {
+        setTimeout(() => {
+          setDirection(1);
+          setStep((s) => s + 1);
+        }, 600);
+      }
+    },
+    [seeking]
+  );
+
   const canNext = () => {
-    if (step === 0) return !!iAm;
-    if (step === 1) return !!seeking;
-    if (step === 2) return interests.length > 0;
-    if (step === 3) return info.name && info.age && info.city;
+    if (step === 0) return email.includes('@') && password.length >= 6;
+    if (step === 1) return !!iAm;
+    if (step === 2) return !!seeking;
+    if (step === 3) return interests.length > 0;
+    if (step === 4) return info.name && info.age && info.city;
     return true;
   };
 
   const next = () => {
-    if (step === totalSteps - 1) {
-      navigate('/');
+    if (step === TOTAL_STEPS - 1) {
+      localStorage.setItem('mansion_registered', 'true');
+      setCompleted(true);
     } else {
+      setDirection(1);
       setStep((s) => s + 1);
     }
   };
@@ -358,18 +749,75 @@ export default function RegisterPage() {
     if (step === 0) {
       navigate('/bienvenida');
     } else {
+      setDirection(-1);
       setStep((s) => s - 1);
     }
   };
 
+  if (completed) {
+    return (
+      <div className="min-h-screen bg-mansion-base flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/3 right-0 w-72 h-72 bg-mansion-crimson/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/3 left-0 w-64 h-64 bg-mansion-gold/5 rounded-full blur-3xl" />
+        </div>
+        <SuccessScreen onEnter={() => navigate('/')} />
+      </div>
+    );
+  }
+
+  const fichaData = {
+    role: iAm,
+    seeking,
+    interests,
+    name: info.name,
+    age: info.age,
+    city: info.city,
+  };
+
+  const slideVariants = {
+    enter: (dir) => ({ x: dir > 0 ? 60 : -60, opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (dir) => ({ x: dir > 0 ? -60 : 60, opacity: 0 }),
+  };
+
   const renderStep = () => {
     switch (step) {
-      case 0: return <StepRole selected={iAm} onSelect={setIAm} />;
-      case 1: return <StepSeeking selected={seeking} onSelect={setSeeking} />;
-      case 2: return <StepInterests selected={interests} onToggle={toggleInterest} />;
-      case 3: return <StepBasicInfo data={info} onChange={setInfo} />;
-      case 4: return <StepPhoto />;
-      default: return null;
+      case 0:
+        return (
+          <StepEmail
+            email={email}
+            password={password}
+            onEmailChange={setEmail}
+            onPasswordChange={setPassword}
+          />
+        );
+      case 1:
+        return (
+          <RoleGrid
+            selected={iAm}
+            onSelect={handleRoleSelect}
+            title="Soy un..."
+            subtitle="Selecciona tu perfil"
+          />
+        );
+      case 2:
+        return (
+          <RoleGrid
+            selected={seeking}
+            onSelect={handleSeekingSelect}
+            title="Busco..."
+            subtitle="¿Qué tipo de conexión te interesa?"
+          />
+        );
+      case 3:
+        return <StepInterests selected={interests} onToggle={toggleInterest} />;
+      case 4:
+        return <StepBasicInfo data={info} onChange={setInfo} />;
+      case 5:
+        return <StepPhoto />;
+      default:
+        return null;
     }
   };
 
@@ -383,37 +831,47 @@ export default function RegisterPage() {
 
       {/* Top bar */}
       <div className="relative z-10 flex items-center justify-between p-4 pt-6">
-        <button onClick={prev} className="text-text-muted hover:text-text-primary transition-colors p-2">
+        <button
+          onClick={prev}
+          className="text-text-muted hover:text-text-primary transition-colors p-2"
+        >
           <ChevronLeft className="w-5 h-5" />
         </button>
         <span className="text-text-dim text-xs font-medium">
-          {step + 1} / {totalSteps}
+          {step + 1} / {TOTAL_STEPS}
         </span>
         <div className="w-9" />
       </div>
 
       {/* Progress bar */}
-      <div className="relative z-10 px-6 mb-6">
+      <div className="relative z-10 px-6 mb-4">
         <div className="h-1 bg-mansion-elevated rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light rounded-full"
             initial={false}
-            animate={{ width: `${((step + 1) / totalSteps) * 100}%` }}
+            animate={{ width: `${((step + 1) / TOTAL_STEPS) * 100}%` }}
             transition={{ type: 'spring', stiffness: 200, damping: 25 }}
           />
         </div>
       </div>
 
+      {/* Profile Card Preview */}
+      <div className="relative z-10 px-6">
+        <FichaPreview data={fichaData} currentStep={step} />
+      </div>
+
       {/* Content */}
       <div className="flex-1 flex items-center justify-center px-6 relative z-10">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={step}
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -40 }}
-            transition={{ duration: 0.3 }}
-            className="w-full max-w-sm"
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="w-full max-w-md"
           >
             {renderStep()}
           </motion.div>
@@ -432,9 +890,26 @@ export default function RegisterPage() {
               : 'bg-mansion-elevated text-text-dim cursor-not-allowed'
           }`}
         >
-          {step === totalSteps - 1 ? 'Entrar a la Mansión' : 'Continuar'}
+          {step === TOTAL_STEPS - 1 ? 'Completar Registro' : 'Continuar'}
           <ChevronRight className="w-5 h-5" />
         </motion.button>
+
+        {step === 0 && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="text-center mt-4"
+          >
+            <span className="text-text-dim text-xs">¿Ya tienes cuenta? </span>
+            <button
+              onClick={() => navigate('/login')}
+              className="text-mansion-gold text-xs font-medium hover:underline"
+            >
+              Iniciar sesión
+            </button>
+          </motion.p>
+        )}
       </div>
     </div>
   );

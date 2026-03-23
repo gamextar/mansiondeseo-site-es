@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAgeVerified } from './hooks/useAgeVerified';
 import AgeVerificationModal from './components/AgeVerificationModal';
@@ -38,6 +38,12 @@ function AnimatedPage({ children }) {
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/mensajes/'];
 
+function RequireRegistration({ children }) {
+  const isRegistered = localStorage.getItem('mansion_registered') === 'true';
+  if (!isRegistered) return <Navigate to="/bienvenida" replace />;
+  return children;
+}
+
 function AppLayout() {
   const location = useLocation();
   const isFullscreen =
@@ -69,45 +75,55 @@ function AppLayout() {
             }
           />
 
-          {/* Standard layout pages */}
+          {/* Standard layout pages (require registration) */}
           <Route
             path="/"
             element={
-              <AnimatedPage>
-                <FeedPage />
-              </AnimatedPage>
+              <RequireRegistration>
+                <AnimatedPage>
+                  <FeedPage />
+                </AnimatedPage>
+              </RequireRegistration>
             }
           />
           <Route
             path="/explorar"
             element={
-              <AnimatedPage>
-                <ExplorePage />
-              </AnimatedPage>
+              <RequireRegistration>
+                <AnimatedPage>
+                  <ExplorePage />
+                </AnimatedPage>
+              </RequireRegistration>
             }
           />
           <Route
             path="/perfiles/:id"
             element={
-              <AnimatedPage>
-                <ProfileDetailPage />
-              </AnimatedPage>
+              <RequireRegistration>
+                <AnimatedPage>
+                  <ProfileDetailPage />
+                </AnimatedPage>
+              </RequireRegistration>
             }
           />
           <Route
             path="/mensajes"
             element={
-              <AnimatedPage>
-                <ChatListPage />
-              </AnimatedPage>
+              <RequireRegistration>
+                <AnimatedPage>
+                  <ChatListPage />
+                </AnimatedPage>
+              </RequireRegistration>
             }
           />
           <Route
             path="/perfil"
             element={
-              <AnimatedPage>
-                <ProfilePage />
-              </AnimatedPage>
+              <RequireRegistration>
+                <AnimatedPage>
+                  <ProfilePage />
+                </AnimatedPage>
+              </RequireRegistration>
             }
           />
         </Routes>

@@ -11,6 +11,7 @@ export default function LoginPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    localStorage.setItem('mansion_registered', 'true');
     navigate('/');
   };
 
