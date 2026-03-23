@@ -197,7 +197,7 @@ export default function ProfileDetailPage() {
               <Heart className="w-5 h-5" />
             </motion.button>
             <Link
-              to={`/mensajes/conv1`}
+              to={`/mensajes/${id}`}
               className="btn-crimson flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl"
             >
               <MessageCircle className="w-5 h-5" />
