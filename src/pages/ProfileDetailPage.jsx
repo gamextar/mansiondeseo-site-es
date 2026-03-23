@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Heart, MessageCircle, Share2, Shield, Crown,
-  MapPin, ChevronLeft, Lock,
+  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn,
 } from 'lucide-react';
 import { getProfile, getToken, toggleFavorite } from '../lib/api';
 
@@ -49,6 +49,67 @@ export default function ProfileDetailPage() {
       setTogglingFav(false);
     }
   };
+
+  // ── Hero carousel state ──
+  const [heroIndex, setHeroIndex] = useState(0);
+  const heroScrollRef = useRef(null);
+
+  const handleHeroScroll = useCallback(() => {
+    const el = heroScrollRef.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollLeft / el.offsetWidth);
+    setHeroIndex(idx);
+  }, []);
+
+  const scrollToHeroPhoto = useCallback((idx) => {
+    const el = heroScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ left: idx * el.offsetWidth, behavior: 'smooth' });
+  }, []);
+
+  // ── Fullscreen lightbox state ──
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const lightboxScrollRef = useRef(null);
+
+  const openLightbox = useCallback((idx) => {
+    setLightboxIndex(idx);
+    setLightboxOpen(true);
+  }, []);
+
+  const closeLightbox = useCallback(() => {
+    setLightboxOpen(false);
+  }, []);
+
+  // Sync lightbox scroll position when opening or index changes
+  useEffect(() => {
+    if (lightboxOpen && lightboxScrollRef.current) {
+      lightboxScrollRef.current.scrollTo({ left: lightboxIndex * lightboxScrollRef.current.offsetWidth, behavior: 'instant' });
+    }
+  }, [lightboxOpen, lightboxIndex]);
+
+  const handleLightboxScroll = useCallback(() => {
+    const el = lightboxScrollRef.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollLeft / el.offsetWidth);
+    setLightboxIndex(idx);
+  }, []);
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowRight' && profile?.photos) {
+        setLightboxIndex(prev => Math.min(prev + 1, profile.photos.length - 1));
+      }
+      if (e.key === 'ArrowLeft') {
+        setLightboxIndex(prev => Math.max(prev - 1, 0));
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [lightboxOpen, closeLightbox, profile?.photos]);
 
   if (loading) {
     return (
