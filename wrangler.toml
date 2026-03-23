@@ -30,9 +30,22 @@ R2_PUBLIC_URL = ""                  # Custom domain or R2 public bucket URL
 
 # ── Production overrides ─────────────────────────────
 [env.production]
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "mansion-deseo-db"
+database_id = "22136d29-2f21-4c86-96f5-7513f88ff464"
+
+[[env.production.r2_buckets]]
+binding = "IMAGES"
+bucket_name = "mansion-deseo-images"
+
 [env.production.vars]
-CORS_ORIGIN = "https://mansiondeseo.com"
+CORS_ORIGIN = "https://mansiondeseo-site.pages.dev"
 ENVIRONMENT = "production"
+JWT_SECRET = "78b85a92c0ba6b2ca96d6ba06605371a1f4683c2fa37e7783b818d4f9b7baca7"
+TURNSTILE_SECRET = ""
+R2_PUBLIC_URL = ""
 
 # ── Routes (if using custom domain) ─────────────────
 # routes = [
