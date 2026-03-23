@@ -17,9 +17,12 @@ const ROLE_BG = {
 export default function ProfileCard({ profile, index = 0, viewerPremium = false, settings = {} }) {
   const { id, name, age, city, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const mainPhoto = photos[0] || profile.avatar_url || '';
+  const blurLevel = settings.blurLevel || 14;
 
-  // Photo is blocked if backend sent null (ghost mode)
+  // Photo is blocked if backend sent null (ghost mode — all photos null)
   const cardBlocked = !mainPhoto;
+  // For blocked cards, use avatar_url as blur placeholder
+  const blurPlaceholder = profile.avatar_url || '';
 
   return (
     <motion.div
@@ -30,17 +33,14 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
     >
       <Link to={`/perfiles/${id}`} className="block group">
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">
-          {/* Photo — only render img if we have a real URL */}
-          {cardBlocked ? (
-            <div className="absolute inset-0 bg-mansion-elevated" />
-          ) : (
-            <img
-              src={mainPhoto}
-              alt={name}
-              loading="lazy"
-              className="absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100"
-            />
-          )}
+          {/* Photo — use blur placeholder for blocked cards */}
+          <img
+            src={cardBlocked ? blurPlaceholder : mainPhoto}
+            alt={cardBlocked ? '' : name}
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100"
+            style={cardBlocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
+          />
 
           {/* Ghost mode overlay */}
           {cardBlocked && (

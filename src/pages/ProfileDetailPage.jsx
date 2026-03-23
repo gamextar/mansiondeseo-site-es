@@ -134,6 +134,9 @@ export default function ProfileDetailPage() {
 
   // A photo is blocked if the backend sent null for it
   const isPhotoBlocked = (index) => !photos[index];
+  // First visible photo to use as blur placeholder for blocked slots
+  const blurPlaceholder = photos.find(p => p) || profile.avatar_url || '';
+  const blurLevel = settings.blurLevel || 14;
 
   return (
     <div className="min-h-screen bg-mansion-base pb-28 lg:pb-8">
@@ -162,16 +165,13 @@ export default function ProfileDetailPage() {
                   className="w-full h-full flex-shrink-0 snap-center relative cursor-pointer"
                   onClick={() => !blocked && openLightbox(i)}
                 >
-                  {blocked ? (
-                    <div className="w-full h-full bg-mansion-card" />
-                  ) : (
-                    <img
-                      src={photo}
-                      alt={`${name} ${i + 1}`}
-                      className="w-full h-full object-cover"
-                      draggable={false}
-                    />
-                  )}
+                  <img
+                    src={blocked ? blurPlaceholder : photo}
+                    alt={blocked ? '' : `${name} ${i + 1}`}
+                    className="w-full h-full object-cover"
+                    style={blocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
+                    draggable={false}
+                  />
                   {blocked && (
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                       <div className="flex flex-col items-center gap-2 text-white/80">
@@ -311,13 +311,13 @@ export default function ProfileDetailPage() {
                       onClick={() => !blocked && openLightbox(i)}
                       className="aspect-square rounded-xl overflow-hidden bg-mansion-card relative group"
                     >
-                      {blocked ? (
-                        <div className="w-full h-full bg-mansion-elevated" />
-                      ) : (
-                        <img src={photo} alt="" className="w-full h-full object-cover"
-                          draggable={false}
-                        />
-                      )}
+                      <img
+                        src={blocked ? blurPlaceholder : photo}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        style={blocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
+                        draggable={false}
+                      />
                       {blocked && (
                         <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                           <Lock className="w-4 h-4 text-white/60" />
@@ -397,16 +397,13 @@ export default function ProfileDetailPage() {
                 const blocked = isPhotoBlocked(i);
                 return (
                   <div key={i} className="w-full h-full flex-shrink-0 snap-center flex items-center justify-center p-4 relative">
-                    {blocked ? (
-                      <div className="w-full h-full rounded-lg bg-mansion-elevated" />
-                    ) : (
-                      <img
-                        src={photo}
-                        alt={`${name} ${i + 1}`}
-                        className="max-w-full max-h-full object-contain rounded-lg select-none"
-                        draggable={false}
-                      />
-                    )}
+                    <img
+                      src={blocked ? blurPlaceholder : photo}
+                      alt={blocked ? '' : `${name} ${i + 1}`}
+                      className={blocked ? 'w-full h-full object-cover rounded-lg select-none' : 'max-w-full max-h-full object-contain rounded-lg select-none'}
+                      style={blocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.05)' } : undefined}
+                      draggable={false}
+                    />
                     {blocked && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <div className="flex flex-col items-center gap-2 text-white/80">
