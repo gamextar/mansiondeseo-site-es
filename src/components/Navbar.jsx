@@ -2,11 +2,22 @@ import { Link, useLocation } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
+import { useAuth } from '../App';
+
+// Coin icon as inline SVG
+const CoinIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" fill="#C9A84C" stroke="#A88A3D" strokeWidth="1.5" />
+    <circle cx="12" cy="12" r="7" fill="none" stroke="#A88A3D" strokeWidth="0.75" />
+    <text x="12" y="16" textAnchor="middle" fill="#8B7332" fontSize="10" fontWeight="bold" fontFamily="serif">$</text>
+  </svg>
+);
 
 export default function Navbar() {
   const location = useLocation();
   const isChat = location.pathname.startsWith('/mensajes');
   const { unreadCount } = useUnreadMessages();
+  const { user } = useAuth();
 
   return (
     <motion.header
@@ -33,6 +44,15 @@ export default function Navbar() {
 
           {/* Right actions */}
           <div className="flex items-center gap-1">
+            {/* Coins */}
+            <Link
+              to="/perfil"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-mansion-gold/10 border border-mansion-gold/20 hover:bg-mansion-gold/20 transition-all mr-1"
+            >
+              <CoinIcon className="w-4 h-4" />
+              <span className="text-xs font-bold text-mansion-gold tabular-nums">{user?.coins ?? 0}</span>
+            </Link>
+
             {/* Messages */}
             <Link
               to="/mensajes"

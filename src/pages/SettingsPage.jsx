@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile } from 'lucide-react';
-import { getSettings, updateSettings } from '../lib/api';
+import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2 } from 'lucide-react';
+import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift } from '../lib/api';
 import { useAuth } from '../App';
 
 export default function SettingsPage() {
@@ -33,6 +33,13 @@ export default function SettingsPage() {
   // Iconografía
   const [incognitoIconSvg, setIncognitoIconSvg] = useState('');
 
+  // Gift catalog
+  const [gifts, setGifts] = useState([]);
+  const [newGiftName, setNewGiftName] = useState('');
+  const [newGiftEmoji, setNewGiftEmoji] = useState('');
+  const [newGiftPrice, setNewGiftPrice] = useState('');
+  const [newGiftCategory, setNewGiftCategory] = useState('general');
+
   useEffect(() => {
     if (!user?.is_admin) { navigate('/'); return; }
     getSettings()
@@ -53,6 +60,7 @@ export default function SettingsPage() {
       })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
+    adminGetGifts().then(data => setGifts(data.gifts || [])).catch(() => {});
   }, [user, navigate]);
 
   const handleSave = async () => {
@@ -391,6 +399,97 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <ToggleSwitch value={hidePasswordRegister} onChange={setHidePasswordRegister} />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── CATÁLOGO DE REGALOS ── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Gift className="w-4 h-4 text-mansion-gold" />
+            <h2 className="text-xs font-bold text-text-primary uppercase tracking-wider">Catálogo de Regalos</h2>
+          </div>
+          <div className="space-y-3">
+            {/* Add new gift */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <h3 className="text-sm font-semibold text-text-primary mb-3">Agregar regalo</h3>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <input
+                  value={newGiftEmoji}
+                  onChange={(e) => setNewGiftEmoji(e.target.value)}
+                  placeholder="Emoji"
+                  className="px-3 py-2 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary text-sm focus:border-mansion-gold/50 focus:outline-none"
+                />
+                <input
+                  value={newGiftName}
+                  onChange={(e) => setNewGiftName(e.target.value)}
+                  placeholder="Nombre"
+                  className="px-3 py-2 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary text-sm focus:border-mansion-gold/50 focus:outline-none"
+                />
+                <input
+                  type="number"
+                  value={newGiftPrice}
+                  onChange={(e) => setNewGiftPrice(e.target.value)}
+                  placeholder="Precio (monedas)"
+                  className="px-3 py-2 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary text-sm focus:border-mansion-gold/50 focus:outline-none"
+                />
+                <select
+                  value={newGiftCategory}
+                  onChange={(e) => setNewGiftCategory(e.target.value)}
+                  className="px-3 py-2 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary text-sm focus:border-mansion-gold/50 focus:outline-none"
+                >
+                  <option value="general">General</option>
+                  <option value="romántico">Romántico</option>
+                  <option value="lujo">Lujo</option>
+                  <option value="pasión">Pasión</option>
+                </select>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!newGiftEmoji || !newGiftName || !newGiftPrice) return;
+                  try {
+                    const data = await adminCreateGift({ name: newGiftName, emoji: newGiftEmoji, price: Number(newGiftPrice), category: newGiftCategory });
+                    setGifts(data.gifts || []);
+                    setNewGiftEmoji('');
+                    setNewGiftName('');
+                    setNewGiftPrice('');
+                    setNewGiftCategory('general');
+                  } catch { /* Silently fail */ }
+                }}
+                className="w-full py-2 rounded-xl bg-mansion-gold/20 text-mansion-gold text-sm font-semibold hover:bg-mansion-gold/30 transition-colors flex items-center justify-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> Agregar
+              </button>
+            </div>
+
+            {/* Gift list */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <h3 className="text-sm font-semibold text-text-primary mb-3">Regalos activos</h3>
+              <div className="space-y-2">
+                {gifts.filter(g => g.active).map((g) => (
+                  <div key={g.id} className="flex items-center gap-3 py-2 px-3 rounded-xl bg-mansion-elevated/50">
+                    <span className="text-xl">{g.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-text-primary truncate">{g.name}</p>
+                      <p className="text-[10px] text-text-dim">{g.category} · {g.price} monedas</p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const data = await adminDeleteGift(g.id);
+                          setGifts(data.gifts || []);
+                        } catch { /* Silently fail */ }
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-mansion-crimson/10 text-text-dim hover:text-mansion-crimson transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+                {gifts.filter(g => g.active).length === 0 && (
+                  <p className="text-xs text-text-dim text-center py-4">No hay regalos en el catálogo</p>
+                )}
               </div>
             </div>
           </div>

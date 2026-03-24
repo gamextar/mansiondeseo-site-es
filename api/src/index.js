@@ -617,6 +617,19 @@ async function handleProfileDetail(request, env, userId) {
       ? 0
       : visibleLimit;
 
+  // Get received gifts for this profile
+  const { results: giftResults } = await env.DB.prepare(
+    `SELECT ug.id, ug.created_at,
+            gc.name as gift_name, gc.emoji as gift_emoji,
+            u.id as sender_id, u.username as sender_name, u.avatar_url as sender_avatar
+     FROM user_gifts ug
+     JOIN gift_catalog gc ON gc.id = ug.gift_id
+     JOIN users u ON u.id = ug.sender_id
+     WHERE ug.receiver_id = ?
+     ORDER BY ug.created_at DESC
+     LIMIT 20`
+  ).bind(userId).all();
+
   return json({
     profile: {
       id: user.id,
@@ -638,6 +651,7 @@ async function handleProfileDetail(request, env, userId) {
       isOwnProfile,
       lastActive: user.last_active,
       avatar_url: user.avatar_url,
+      receivedGifts: giftResults,
     },
     viewerPremium: viewerIsPremium,
     settings,
@@ -1011,6 +1025,7 @@ function sanitizeUser(user) {
     premium: !!safe.premium,
     ghost_mode: !!safe.ghost_mode,
     is_admin: !!safe.is_admin,
+    coins: safe.coins || 0,
   };
 }
 
@@ -1199,6 +1214,157 @@ async function handleCheckFavorite(request, env, targetId) {
   return json({ favorited: !!row });
 }
 
+// ══════════════════════════════════════════════════════════
+// GIFTS & COINS
+// ══════════════════════════════════════════════════════════
+
+// ── GET /api/gifts/catalog ──────────────────────────────
+async function handleGetGiftCatalog(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const { results } = await env.DB.prepare(
+    'SELECT id, name, emoji, price, category FROM gift_catalog WHERE active = 1 ORDER BY sort_order ASC'
+  ).all();
+
+  return json({ gifts: results });
+}
+
+// ── POST /api/gifts/send ────────────────────────────────
+async function handleSendGift(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const { receiver_id, gift_id, message: giftMessage } = await request.json();
+  if (!receiver_id || !gift_id) return error('receiver_id y gift_id requeridos');
+  if (receiver_id === auth.sub) return error('No puedes enviarte un regalo a ti mismo');
+
+  // Validate receiver exists
+  const receiver = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(receiver_id).first();
+  if (!receiver) return error('Destinatario no encontrado', 404);
+
+  // Get gift from catalog
+  const gift = await env.DB.prepare('SELECT * FROM gift_catalog WHERE id = ? AND active = 1').bind(gift_id).first();
+  if (!gift) return error('Regalo no encontrado', 404);
+
+  // Check sender has enough coins
+  const sender = await env.DB.prepare('SELECT coins FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!sender || sender.coins < gift.price) {
+    return error(`No tienes suficientes monedas. Necesitas ${gift.price} monedas.`, 403);
+  }
+
+  // Deduct coins from sender
+  await env.DB.prepare('UPDATE users SET coins = coins - ? WHERE id = ?').bind(gift.price, auth.sub).run();
+
+  // Create gift record
+  const giftRecordId = generateId();
+  const safeMessage = (giftMessage || '').slice(0, 200);
+  await env.DB.prepare(
+    'INSERT INTO user_gifts (id, sender_id, receiver_id, gift_id, message) VALUES (?, ?, ?, ?, ?)'
+  ).bind(giftRecordId, auth.sub, receiver_id, gift_id, safeMessage).run();
+
+  // Get updated sender coins
+  const updated = await env.DB.prepare('SELECT coins FROM users WHERE id = ?').bind(auth.sub).first();
+
+  return json({
+    success: true,
+    coins: updated.coins,
+    gift: { id: giftRecordId, gift_name: gift.name, gift_emoji: gift.emoji, price: gift.price },
+  });
+}
+
+// ── GET /api/gifts/received/:userId ─────────────────────
+async function handleGetReceivedGifts(request, env, userId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const { results } = await env.DB.prepare(
+    `SELECT ug.id, ug.message, ug.created_at,
+            gc.name as gift_name, gc.emoji as gift_emoji, gc.price as gift_price,
+            u.id as sender_id, u.username as sender_name, u.avatar_url as sender_avatar
+     FROM user_gifts ug
+     JOIN gift_catalog gc ON gc.id = ug.gift_id
+     JOIN users u ON u.id = ug.sender_id
+     WHERE ug.receiver_id = ?
+     ORDER BY ug.created_at DESC
+     LIMIT 50`
+  ).bind(userId).all();
+
+  return json({ gifts: results });
+}
+
+// ── GET /api/coins ──────────────────────────────────────
+async function handleGetCoins(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const user = await env.DB.prepare('SELECT coins FROM users WHERE id = ?').bind(auth.sub).first();
+  return json({ coins: user?.coins || 0 });
+}
+
+// ── Admin: GET /api/admin/gifts ─────────────────────────
+async function handleAdminGetGifts(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const { results } = await env.DB.prepare(
+    'SELECT * FROM gift_catalog ORDER BY sort_order ASC'
+  ).all();
+  return json({ gifts: results });
+}
+
+// ── Admin: POST /api/admin/gifts ────────────────────────
+async function handleAdminCreateGift(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const { name, emoji, price, category } = await request.json();
+  if (!name || !emoji || !price) return error('name, emoji y price requeridos');
+
+  const id = `gift-${generateId().slice(0, 8)}`;
+  const maxOrder = await env.DB.prepare('SELECT MAX(sort_order) as max_order FROM gift_catalog').first();
+  const sortOrder = (maxOrder?.max_order || 0) + 1;
+
+  await env.DB.prepare(
+    'INSERT INTO gift_catalog (id, name, emoji, price, category, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+  ).bind(id, name, emoji, Number(price), category || 'general', sortOrder).run();
+
+  const { results } = await env.DB.prepare('SELECT * FROM gift_catalog ORDER BY sort_order ASC').all();
+  return json({ gifts: results });
+}
+
+// ── Admin: DELETE /api/admin/gifts/:id ──────────────────
+async function handleAdminDeleteGift(request, env, giftId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  await env.DB.prepare('UPDATE gift_catalog SET active = 0 WHERE id = ?').bind(giftId).run();
+
+  const { results } = await env.DB.prepare('SELECT * FROM gift_catalog ORDER BY sort_order ASC').all();
+  return json({ gifts: results });
+}
+
+// ── Admin: POST /api/admin/coins ────────────────────────
+async function handleAdminAddCoins(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const { user_id, amount } = await request.json();
+  if (!user_id || !amount) return error('user_id y amount requeridos');
+
+  await env.DB.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').bind(Number(amount), user_id).run();
+  const user = await env.DB.prepare('SELECT coins FROM users WHERE id = ?').bind(user_id).first();
+  return json({ coins: user?.coins || 0 });
+}
+
 async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -1260,6 +1426,20 @@ async function handleRequest(request, env) {
 
   // ── Profile Visits
   if (path === '/api/visits' && method === 'GET') return handleGetVisits(request, env);
+
+  // ── Gifts & Coins
+  if (path === '/api/gifts/catalog' && method === 'GET') return handleGetGiftCatalog(request, env);
+  if (path === '/api/gifts/send' && method === 'POST') return handleSendGift(request, env);
+  if (path === '/api/coins' && method === 'GET') return handleGetCoins(request, env);
+  const giftsRecMatch = path.match(/^\/api\/gifts\/received\/([a-f0-9-]+)$/);
+  if (giftsRecMatch && method === 'GET') return handleGetReceivedGifts(request, env, giftsRecMatch[1]);
+
+  // ── Admin: Gifts
+  if (path === '/api/admin/gifts' && method === 'GET') return handleAdminGetGifts(request, env);
+  if (path === '/api/admin/gifts' && method === 'POST') return handleAdminCreateGift(request, env);
+  const adminGiftDelMatch = path.match(/^\/api\/admin\/gifts\/([a-zA-Z0-9-]+)$/);
+  if (adminGiftDelMatch && method === 'DELETE') return handleAdminDeleteGift(request, env, adminGiftDelMatch[1]);
+  if (path === '/api/admin/coins' && method === 'POST') return handleAdminAddCoins(request, env);
 
   // ── Serve R2 images
   if (path.startsWith('/api/images/') && method === 'GET') return handleServeImage(request, env, path);

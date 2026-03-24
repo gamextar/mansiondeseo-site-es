@@ -236,3 +236,48 @@ export async function checkFavorite(targetId) {
 export async function getVisits() {
   return apiFetch('/visits');
 }
+
+// ── Gifts & Coins ───────────────────────────────────────
+
+export async function getGiftCatalog() {
+  return apiFetch('/gifts/catalog');
+}
+
+export async function sendGift(receiverId, giftId, message = '') {
+  return apiFetch('/gifts/send', {
+    method: 'POST',
+    body: JSON.stringify({ receiver_id: receiverId, gift_id: giftId, message }),
+  });
+}
+
+export async function getReceivedGifts(userId) {
+  return apiFetch(`/gifts/received/${userId}`);
+}
+
+export async function getCoins() {
+  return apiFetch('/coins');
+}
+
+// ── Admin: Gifts ────────────────────────────────────────
+
+export async function adminGetGifts() {
+  return apiFetch('/admin/gifts');
+}
+
+export async function adminCreateGift({ name, emoji, price, category }) {
+  return apiFetch('/admin/gifts', {
+    method: 'POST',
+    body: JSON.stringify({ name, emoji, price, category }),
+  });
+}
+
+export async function adminDeleteGift(giftId) {
+  return apiFetch(`/admin/gifts/${giftId}`, { method: 'DELETE' });
+}
+
+export async function adminAddCoins(userId, amount) {
+  return apiFetch('/admin/coins', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, amount }),
+  });
+}

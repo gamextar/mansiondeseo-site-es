@@ -3,9 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Heart, MessageCircle, Shield, Crown,
-  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical,
+  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift,
 } from 'lucide-react';
-import { getProfile, getToken, toggleFavorite, updateProfile } from '../lib/api';
+import { getProfile, getToken, toggleFavorite, updateProfile, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { useAuth } from '../App';
 
 const ROLE_COLOR = {
   Pareja: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
@@ -29,6 +30,7 @@ const MaskIcon = ({ className = 'w-8 h-8', customSvg = '' }) => {
 export default function ProfileDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user, setUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [viewerPremium, setViewerPremium] = useState(false);
   const [settings, setSettings] = useState({ blurLevel: 14, blurMobile: 14, blurDesktop: 8, freeVisiblePhotos: 1, freeOwnPhotos: 3 });
@@ -38,6 +40,11 @@ export default function ProfileDetailPage() {
   const [isReordering, setIsReordering] = useState(false);
   const [orderedPhotos, setOrderedPhotos] = useState([]);
   const [savingOrder, setSavingOrder] = useState(false);
+  // Gift state
+  const [giftModalOpen, setGiftModalOpen] = useState(false);
+  const [giftCatalog, setGiftCatalog] = useState([]);
+  const [sendingGift, setSendingGift] = useState(null);
+  const [giftSent, setGiftSent] = useState(null);
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
@@ -86,6 +93,46 @@ export default function ProfileDetailPage() {
       // Silently fail
     } finally {
       setTogglingFav(false);
+    }
+  };
+
+  // Gift sending
+  const openGiftModal = async () => {
+    setGiftModalOpen(true);
+    setGiftSent(null);
+    if (giftCatalog.length === 0) {
+      try {
+        const data = await getGiftCatalog();
+        setGiftCatalog(data.gifts || []);
+      } catch {
+        // Silently fail
+      }
+    }
+  };
+
+  const handleSendGift = async (giftId) => {
+    if (sendingGift) return;
+    setSendingGift(giftId);
+    try {
+      const data = await apiSendGift(id, giftId);
+      // Update local user coins
+      if (user && data.coins !== undefined) {
+        setUser(prev => prev ? { ...prev, coins: data.coins } : prev);
+      }
+      // Update profile's received gifts
+      setProfile(prev => prev ? {
+        ...prev,
+        receivedGifts: [
+          { id: data.gift.id, gift_emoji: data.gift.gift_emoji, gift_name: data.gift.gift_name, sender_name: user?.username || '', sender_id: user?.id, created_at: new Date().toISOString() },
+          ...(prev.receivedGifts || []),
+        ],
+      } : prev);
+      setGiftSent(data.gift);
+      setTimeout(() => { setGiftModalOpen(false); setGiftSent(null); }, 1500);
+    } catch (err) {
+      alert(err.message || 'Error al enviar regalo');
+    } finally {
+      setSendingGift(null);
     }
   };
 
@@ -166,7 +213,7 @@ export default function ProfileDetailPage() {
     );
   }
 
-  const { name, age, city, role, interests, bio, photos, totalPhotos, verified, online, premium, blurred, isOwnProfile } = profile;
+  const { name, age, city, role, interests, bio, photos, totalPhotos, verified, online, premium, blurred, isOwnProfile, receivedGifts } = profile;
 
   // Incognito mode blur (whole profile)
   const isGhostBlurred = blurred;
@@ -357,6 +404,27 @@ export default function ProfileDetailPage() {
             </div>
           </div>
 
+          {/* Received Gifts */}
+          {receivedGifts && receivedGifts.length > 0 && (
+            <div className="mb-5">
+              <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2">
+                Regalos recibidos ({receivedGifts.length})
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {receivedGifts.map((g) => (
+                  <div
+                    key={g.id}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-mansion-card/60 border border-mansion-border/20"
+                    title={`${g.gift_name} de ${g.sender_name}`}
+                  >
+                    <span className="text-base">{g.gift_emoji}</span>
+                    <span className="text-[10px] text-text-dim">{g.sender_name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Photo gallery */}
           {photos.length > 1 && (
             <div className="mb-4">
@@ -443,6 +511,7 @@ export default function ProfileDetailPage() {
       </div>{/* end two-column wrapper */}
 
       {/* Floating action button — always visible */}
+      {!isOwnProfile && (
       <div className="fixed bottom-20 right-4 lg:bottom-8 lg:right-8 z-[60] flex flex-col items-end gap-3">
         <motion.button
           whileTap={{ scale: 0.9 }}
@@ -456,6 +525,13 @@ export default function ProfileDetailPage() {
         >
           <Heart className="w-5 h-5" fill={isFavorited ? 'currentColor' : 'none'} />
         </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={openGiftModal}
+          className="w-12 h-12 rounded-full backdrop-blur border bg-mansion-gold/20 border-mansion-gold/40 text-mansion-gold flex items-center justify-center transition-all shadow-lg hover:bg-mansion-gold/30"
+        >
+          <Gift className="w-5 h-5" />
+        </motion.button>
         <Link
           to={`/mensajes/${id}`}
           className="flex items-center gap-2 px-6 py-3.5 rounded-full bg-mansion-crimson text-white shadow-glow-crimson hover:bg-mansion-crimson-dark transition-all"
@@ -464,6 +540,96 @@ export default function ProfileDetailPage() {
           <span className="font-display font-semibold text-sm">Enviar Mensaje</span>
         </Link>
       </div>
+      )}
+
+      {/* ── Gift Picker Modal ── */}
+      <AnimatePresence>
+        {giftModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center"
+            onClick={() => setGiftModalOpen(false)}
+          >
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-mansion-base border border-mansion-border/30 rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[80vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-mansion-border/20">
+                <div>
+                  <h3 className="font-display text-lg font-bold text-text-primary">Enviar regalo</h3>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" fill="#C9A84C" stroke="#A88A3D" strokeWidth="1.5" />
+                      <circle cx="12" cy="12" r="7" fill="none" stroke="#A88A3D" strokeWidth="0.75" />
+                      <text x="12" y="16" textAnchor="middle" fill="#8B7332" fontSize="10" fontWeight="bold" fontFamily="serif">$</text>
+                    </svg>
+                    <span className="text-xs font-bold text-mansion-gold">{user?.coins ?? 0} monedas</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setGiftModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-mansion-elevated flex items-center justify-center text-text-muted hover:text-text-primary"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Gift sent success */}
+              {giftSent ? (
+                <div className="flex flex-col items-center justify-center py-12 px-4">
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="text-5xl mb-3"
+                  >
+                    {giftSent.gift_emoji}
+                  </motion.span>
+                  <p className="text-text-primary font-semibold">¡Regalo enviado!</p>
+                  <p className="text-text-dim text-sm mt-1">{giftSent.gift_name} para {name}</p>
+                </div>
+              ) : (
+                /* Gift grid */
+                <div className="p-4 overflow-y-auto max-h-[60vh]">
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {giftCatalog.map((gift) => {
+                      const canAfford = (user?.coins ?? 0) >= gift.price;
+                      return (
+                        <button
+                          key={gift.id}
+                          onClick={() => canAfford && handleSendGift(gift.id)}
+                          disabled={!canAfford || !!sendingGift}
+                          className={`flex flex-col items-center gap-1 p-3 rounded-2xl border transition-all ${
+                            canAfford
+                              ? 'bg-mansion-card/60 border-mansion-border/20 hover:border-mansion-gold/40 hover:bg-mansion-gold/5 active:scale-95'
+                              : 'bg-mansion-card/30 border-mansion-border/10 opacity-50'
+                          } ${sendingGift === gift.id ? 'animate-pulse' : ''}`}
+                        >
+                          <span className="text-3xl">{gift.emoji}</span>
+                          <span className="text-xs font-medium text-text-primary truncate w-full text-center">{gift.name}</span>
+                          <span className="flex items-center gap-0.5 text-[10px] text-mansion-gold font-bold">
+                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" fill="#C9A84C" stroke="#A88A3D" strokeWidth="1.5" />
+                              <text x="12" y="16" textAnchor="middle" fill="#8B7332" fontSize="10" fontWeight="bold" fontFamily="serif">$</text>
+                            </svg>
+                            {gift.price}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Fullscreen Lightbox ── */}
       <AnimatePresence>

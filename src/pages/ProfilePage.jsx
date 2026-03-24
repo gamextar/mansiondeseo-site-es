@@ -1,8 +1,8 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Bug, Users } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Bug, Users, Gift } from 'lucide-react';
 import { useAuth } from '../App';
-import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits } from '../lib/api';
+import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits, getReceivedGifts } from '../lib/api';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -26,12 +26,16 @@ export default function ProfilePage() {
   const [togglingGhost, setTogglingGhost] = useState(false);
   const [togglingPremium, setTogglingPremium] = useState(false);
   const [visitors, setVisitors] = useState([]);
+  const [receivedGifts, setReceivedGifts] = useState([]);
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
 
   useEffect(() => {
     getVisits().then(data => setVisitors(data.visitors || [])).catch(() => {});
-  }, []);
+    if (user?.id) {
+      getReceivedGifts(user.id).then(data => setReceivedGifts(data.gifts || [])).catch(() => {});
+    }
+  }, [user?.id]);
 
   // Auto-save reordered photos
   const persistOrder = useCallback(async (newPhotos) => {
@@ -246,6 +250,17 @@ export default function ProfilePage() {
 
           <h2 className="font-display text-xl font-bold text-text-primary mt-4">{displayName}</h2>
           <p className="text-text-muted text-sm">{[displayCity, displayRole].filter(Boolean).join(' · ')}</p>
+
+          {/* Coins balance */}
+          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-mansion-gold/10 border border-mansion-gold/20">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" fill="#C9A84C" stroke="#A88A3D" strokeWidth="1.5" />
+              <circle cx="12" cy="12" r="7" fill="none" stroke="#A88A3D" strokeWidth="0.75" />
+              <text x="12" y="16" textAnchor="middle" fill="#8B7332" fontSize="10" fontWeight="bold" fontFamily="serif">$</text>
+            </svg>
+            <span className="text-sm font-bold text-mansion-gold">{user?.coins ?? 0}</span>
+            <span className="text-xs text-mansion-gold/60">monedas</span>
+          </div>
         </div>
 
         {/* Gallery */}
@@ -313,6 +328,32 @@ export default function ProfilePage() {
             onChange={handleGalleryUpload}
           />
         </div>
+
+        {/* Received Gifts */}
+        {receivedGifts.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Gift className="w-4 h-4 text-mansion-gold" />
+              <h3 className="text-sm font-semibold text-text-primary">Regalos recibidos</h3>
+              <span className="text-xs text-text-dim">({receivedGifts.length})</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {receivedGifts.map((g) => (
+                <div
+                  key={g.id}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-mansion-card/50 border border-mansion-border/20"
+                  title={`De ${g.sender_name}`}
+                >
+                  <span className="text-lg">{g.gift_emoji}</span>
+                  <div className="text-xs">
+                    <p className="text-text-primary font-medium">{g.gift_name}</p>
+                    <p className="text-text-dim">de {g.sender_name}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Visitas (mobile only — desktop shows in sidebar) */}
         {visitors.length > 0 && (

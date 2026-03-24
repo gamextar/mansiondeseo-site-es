@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   ghost_mode    INTEGER NOT NULL DEFAULT 0,         -- 0 = off, 1 = on (premium only)
   verified      INTEGER NOT NULL DEFAULT 0,         -- 0 = no, 1 = verified identity
   online        INTEGER NOT NULL DEFAULT 0,
+  coins         INTEGER NOT NULL DEFAULT 100,
   last_active   TEXT DEFAULT (datetime('now')),
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -91,8 +92,46 @@ CREATE TABLE IF NOT EXISTS favorites (
 CREATE INDEX IF NOT EXISTS idx_favorites_user   ON favorites(user_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_target ON favorites(target_id);
 
+-- Profile visits
+CREATE TABLE IF NOT EXISTS profile_visits (
+  id          TEXT PRIMARY KEY,
+  visitor_id  TEXT NOT NULL REFERENCES users(id),
+  visited_id  TEXT NOT NULL REFERENCES users(id),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_profile_visits_visited ON profile_visits(visited_id, created_at);
+
 -- Site settings (key-value config)
 CREATE TABLE IF NOT EXISTS site_settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- Gift catalog (available gifts to send)
+CREATE TABLE IF NOT EXISTS gift_catalog (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  emoji       TEXT NOT NULL,
+  price       INTEGER NOT NULL,
+  category    TEXT NOT NULL DEFAULT 'general',
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  active      INTEGER NOT NULL DEFAULT 1,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_gift_catalog_category ON gift_catalog(category);
+CREATE INDEX IF NOT EXISTS idx_gift_catalog_active   ON gift_catalog(active);
+
+-- User gifts (sent/received)
+CREATE TABLE IF NOT EXISTS user_gifts (
+  id          TEXT PRIMARY KEY,
+  sender_id   TEXT NOT NULL REFERENCES users(id),
+  receiver_id TEXT NOT NULL REFERENCES users(id),
+  gift_id     TEXT NOT NULL REFERENCES gift_catalog(id),
+  message     TEXT DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_gifts_receiver ON user_gifts(receiver_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_user_gifts_sender   ON user_gifts(sender_id, created_at);
