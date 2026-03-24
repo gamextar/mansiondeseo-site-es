@@ -163,9 +163,9 @@ export default function ProfileDetailPage() {
   const isPhotoBlocked = (index) => index >= visiblePhotos;
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
   const baseBlur = isMobile ? (settings.blurMobile ?? settings.blurLevel ?? 14) : (settings.blurDesktop ?? settings.blurLevel ?? 8);
-  // Scale blur proportionally: hero gets 1.8x, thumbnails 0.5x, lightbox 2.5x
+  // Scale blur proportionally: hero gets 1.8x, thumbnails 0.6x, lightbox 2.5x
   const heroBlur = Math.round(baseBlur * 1.8);
-  const thumbBlur = Math.round(baseBlur * 0.5);
+  const thumbBlur = Math.round(baseBlur * 0.6);
   const lightboxBlur = Math.round(baseBlur * 2.5);
 
   return (
