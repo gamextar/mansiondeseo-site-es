@@ -107,6 +107,7 @@ export default function ChatPage() {
       senderId: 'me',
       text,
       timestamp: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      is_read: 0,
     };
 
     setMessages((prev) => [...prev, newMsg]);
@@ -227,8 +228,17 @@ export default function ChatPage() {
                   }`}
                 >
                   <p className="text-sm leading-relaxed">{msg.text}</p>
-                  <p className={`text-[10px] mt-1 ${isMe ? 'text-right text-white/50' : 'text-right text-text-dim'}`}>
+                  <p className={`text-[10px] mt-1 flex items-center ${isMe ? 'justify-end text-white/50 gap-1' : 'justify-end text-text-dim'}`}>
                     {msg.timestamp}
+                    {isMe && (
+                      <span className={`inline-flex ${msg.is_read ? 'text-blue-400' : 'text-white/40'}`}>
+                        {msg.is_read ? (
+                          <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M0.5 5.5L4 9L4.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3.5 5.5L7 9L15 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M8.5 5.5L12 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        ) : (
+                          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 5.5L4.5 9L10 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        )}
+                      </span>
+                    )}
                   </p>
                 </div>
               </motion.div>

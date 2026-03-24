@@ -722,6 +722,7 @@ async function handleGetMessages(request, env, otherUserId) {
     text: m.content,
     timestamp: new Date(m.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
     created_at: m.created_at,
+    is_read: m.is_read,
   }));
 
   return json({ messages });

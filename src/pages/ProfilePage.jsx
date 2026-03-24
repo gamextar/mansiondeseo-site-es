@@ -213,7 +213,10 @@ export default function ProfilePage() {
         {/* Profile header */}
         <div className="text-center mb-6">
           <div className="relative inline-block">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-mansion-gold to-mansion-gold-light p-[2px] mx-auto">
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="w-24 h-24 rounded-full bg-gradient-to-br from-mansion-gold to-mansion-gold-light p-[2px] mx-auto cursor-pointer hover:opacity-80 transition-opacity"
+            >
               <div className="w-full h-full rounded-full bg-mansion-card flex items-center justify-center overflow-hidden">
                 {avatarUrl ? (
                   <img
