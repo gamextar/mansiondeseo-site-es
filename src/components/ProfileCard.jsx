@@ -2,6 +2,16 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MapPin, Shield, Crown, Lock } from 'lucide-react';
 
+// Masquerade mask SVG icon for incognito mode
+const MaskIcon = ({ className = 'w-6 h-6' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 12c0-3.3 2.4-5.5 5.5-5.5 1.6 0 2.8.8 3.5 1.9.7-1.1 1.9-1.9 3.5-1.9C18.6 6.5 21 8.7 21 12c0 2.5-1.8 5-4.5 5-1.6 0-2.8-.8-3.5-1.9-.7 1.1-1.9 1.9-3.5 1.9C6.8 17 3 14.5 3 12z" />
+    <circle cx="9" cy="11.5" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="11.5" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M17.5 17c1.5 1.5 3.2 2 5 1.5" />
+  </svg>
+);
+
 const ROLE_COLORS = {
   Pareja: 'from-purple-500/80 to-purple-700/80',
   'Hombre Solo': 'from-blue-500/80 to-blue-700/80',
@@ -48,8 +58,10 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
           {cardBlocked && (
             <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10">
               <div className="flex flex-col items-center gap-1 text-white/70">
-                <Lock className="w-5 h-5" />
-                <span className="text-[10px] font-semibold">Modo Incógnito</span>
+                {blurred
+                  ? <MaskIcon className="w-6 h-6" />
+                  : <Lock className="w-5 h-5" />}
+                <span className="text-[10px] font-semibold">{blurred ? 'Modo Incógnito' : 'Contenido VIP'}</span>
               </div>
             </div>
           )}

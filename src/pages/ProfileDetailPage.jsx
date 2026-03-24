@@ -13,6 +13,16 @@ const ROLE_COLOR = {
   'Mujer Sola': 'bg-pink-500/20 text-pink-300 border-pink-500/30',
 };
 
+// Masquerade mask SVG icon for incognito mode
+const MaskIcon = ({ className = 'w-8 h-8' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 12c0-3.3 2.4-5.5 5.5-5.5 1.6 0 2.8.8 3.5 1.9.7-1.1 1.9-1.9 3.5-1.9C18.6 6.5 21 8.7 21 12c0 2.5-1.8 5-4.5 5-1.6 0-2.8-.8-3.5-1.9-.7 1.1-1.9 1.9-3.5 1.9C6.8 17 3 14.5 3 12z" />
+    <circle cx="9" cy="11.5" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="11.5" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M17.5 17c1.5 1.5 3.2 2 5 1.5" />
+  </svg>
+);
+
 export default function ProfileDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -206,7 +216,7 @@ export default function ProfileDetailPage() {
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                       <div className="flex flex-col items-center gap-2 text-white/80">
                         {isGhostBlurred
-                          ? <span className="text-5xl select-none">🎭</span>
+                          ? <MaskIcon className="w-9 h-9" />
                           : <Lock className="w-8 h-8" />}
                         <span className="text-sm font-semibold">{isGhostBlurred ? 'Modo Incógnito' : 'Contenido VIP'}</span>
                         <span className="text-xs text-white/60">Solo visible para usuarios VIP</span>
