@@ -18,7 +18,7 @@ export default function ProfileDetailPage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [viewerPremium, setViewerPremium] = useState(false);
-  const [settings, setSettings] = useState({ blurLevel: 14, freeVisiblePhotos: 1, freeOwnPhotos: 3 });
+  const [settings, setSettings] = useState({ blurLevel: 14, blurMobile: 14, blurDesktop: 8, freeVisiblePhotos: 1, freeOwnPhotos: 3 });
   const [isFavorited, setIsFavorited] = useState(false);
   const [togglingFav, setTogglingFav] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -161,7 +161,8 @@ export default function ProfileDetailPage() {
   // A photo is blocked if its index >= visiblePhotos count from backend
   const visiblePhotos = profile.visiblePhotos ?? photos.length;
   const isPhotoBlocked = (index) => index >= visiblePhotos;
-  const blurLevel = settings.blurLevel || 14;
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+  const blurLevel = isMobile ? (settings.blurMobile ?? settings.blurLevel ?? 14) : (settings.blurDesktop ?? settings.blurLevel ?? 8);
 
   return (
     <div className="min-h-screen bg-mansion-base pb-28 lg:pb-8">

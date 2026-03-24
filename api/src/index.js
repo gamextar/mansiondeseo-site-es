@@ -127,7 +127,16 @@ async function authenticate(request, env) {
   const token = authHeader.slice(7);
   const payload = await verifyJWT(token, env.JWT_SECRET);
   if (!payload) return null;
+  // Update last_active timestamp (fire-and-forget)
+  env.DB.prepare("UPDATE users SET last_active = datetime('now') WHERE id = ?").bind(payload.sub).run().catch(() => {});
   return payload; // { sub: userId, email, role }
+}
+
+// Returns true if last_active is within the last hour
+function isOnline(lastActive) {
+  if (!lastActive) return false;
+  const ts = new Date(lastActive.endsWith('Z') ? lastActive : lastActive + 'Z').getTime();
+  return (Date.now() - ts) < 3600000; // 1 hour
 }
 
 // ── CORS ────────────────────────────────────────────────
@@ -548,7 +557,7 @@ async function handleProfiles(request, env) {
       totalPhotos: allPhotos.length,
       visiblePhotos,
       verified: !!u.verified,
-      online: !!u.online,
+      online: isOnline(u.last_active),
       premium: profileIsPremium,
       ghost_mode: hasGhostMode,
       blurred,
@@ -621,7 +630,7 @@ async function handleProfileDetail(request, env, userId) {
       totalPhotos: allPhotos.length,
       visiblePhotos,
       verified: !!user.verified,
-      online: !!user.online,
+      online: isOnline(user.last_active),
       premium: !!user.premium,
       ghost_mode: hasGhostMode,
       blurred,
@@ -777,7 +786,7 @@ async function handleConversations(request, env) {
       lastMessage: data.lastMessage.content.slice(0, 50),
       timestamp: data.lastMessage.created_at,
       unread: data.unread,
-      online: partner.online === 1,
+      online: isOnline(partner.last_active),
     });
   }
 
@@ -1024,7 +1033,7 @@ async function handleGetVisits(request, env) {
   if (!auth) return error('No autorizado', 401);
 
   const { results } = await env.DB.prepare(
-    `SELECT u.id, u.username, u.avatar_url, u.age, u.city, u.role, u.premium, u.online,
+    `SELECT u.id, u.username, u.avatar_url, u.age, u.city, u.role, u.premium, u.last_active,
             MAX(pv.created_at) as visited_at
      FROM profile_visits pv
      JOIN users u ON u.id = pv.visitor_id
@@ -1042,7 +1051,7 @@ async function handleGetVisits(request, env) {
     city: v.city,
     role: v.role,
     premium: !!v.premium,
-    online: !!v.online,
+    online: isOnline(v.last_active),
     visited_at: v.visited_at,
   }));
 
