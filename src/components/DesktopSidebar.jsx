@@ -136,16 +136,18 @@ export default function DesktopSidebar() {
       )}
 
       {/* Bottom section */}
-      <div className="px-3 pb-4 space-y-2">
-        {/* Settings */}
-        <NavLink
-          to="/configuracion"
-          className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-text-dim hover:text-text-muted transition-colors"
-        >
-          <Settings className="w-4 h-4" />
-          <span className="text-xs">Configuración</span>
-        </NavLink>
-      </div>
+      {user?.is_admin && (
+        <div className="px-3 pb-4 space-y-2">
+          {/* Settings (admin only) */}
+          <NavLink
+            to="/configuracion"
+            className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-text-dim hover:text-text-muted transition-colors"
+          >
+            <Settings className="w-4 h-4" />
+            <span className="text-xs">Configuración</span>
+          </NavLink>
+        </div>
+      )}
     </aside>
   );
 }

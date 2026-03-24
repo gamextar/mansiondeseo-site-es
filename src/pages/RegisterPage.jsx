@@ -357,7 +357,7 @@ function FichaPreview({ data, currentStep }) {
 // ────────────────────────────────────────────
 
 function StepEmail({ email, password, onEmailChange, onPasswordChange }) {
-  const [showPassword, setShowPassword] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <div className="text-center">

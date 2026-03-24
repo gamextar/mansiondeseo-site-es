@@ -1,44 +1,85 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield } from 'lucide-react';
+import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor } from 'lucide-react';
 import { getSettings, updateSettings } from '../lib/api';
+import { useAuth } from '../App';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [blurLevel, setBlurLevel] = useState(14);
+
+  // Photo & Blur
+  const [blurMobile, setBlurMobile] = useState(14);
+  const [blurDesktop, setBlurDesktop] = useState(8);
   const [freeVisiblePhotos, setFreeVisiblePhotos] = useState(1);
   const [freeOwnPhotos, setFreeOwnPhotos] = useState(3);
+
+  // VIP
   const [showVipButton, setShowVipButton] = useState(true);
+  const [vipPriceMonthly, setVipPriceMonthly] = useState('');
+  const [vipPrice3Months, setVipPrice3Months] = useState('');
+  const [vipPrice6Months, setVipPrice6Months] = useState('');
+
+  // Messaging
+  const [dailyMessageLimit, setDailyMessageLimit] = useState(5);
+
+  // Site
+  const [siteCountry, setSiteCountry] = useState('AR');
+  const [hidePasswordRegister, setHidePasswordRegister] = useState(true);
 
   useEffect(() => {
+    if (!user?.is_admin) { navigate('/'); return; }
     getSettings()
       .then(data => {
-        setBlurLevel(data.settings.blurLevel);
-        setFreeVisiblePhotos(data.settings.freeVisiblePhotos);
-        setFreeOwnPhotos(data.settings.freeOwnPhotos);
-        setShowVipButton(data.settings.showVipButton);
+        const s = data.settings;
+        setBlurMobile(s.blurMobile);
+        setBlurDesktop(s.blurDesktop);
+        setFreeVisiblePhotos(s.freeVisiblePhotos);
+        setFreeOwnPhotos(s.freeOwnPhotos);
+        setShowVipButton(s.showVipButton);
+        setDailyMessageLimit(s.dailyMessageLimit);
+        setSiteCountry(s.siteCountry);
+        setHidePasswordRegister(s.hidePasswordRegister);
+        setVipPriceMonthly(s.vipPriceMonthly);
+        setVipPrice3Months(s.vipPrice3Months);
+        setVipPrice6Months(s.vipPrice6Months);
       })
-      .catch(() => {})
+      .catch(() => navigate('/'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [user, navigate]);
 
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
     try {
       const data = await updateSettings({
-        blur_level: blurLevel,
+        blur_mobile: blurMobile,
+        blur_desktop: blurDesktop,
         free_visible_photos: freeVisiblePhotos,
         free_own_photos: freeOwnPhotos,
         show_vip_button: showVipButton ? '1' : '0',
+        daily_message_limit: dailyMessageLimit,
+        site_country: siteCountry,
+        hide_password_register: hidePasswordRegister ? '1' : '0',
+        vip_price_monthly: vipPriceMonthly,
+        vip_price_3months: vipPrice3Months,
+        vip_price_6months: vipPrice6Months,
       });
-      setBlurLevel(data.settings.blurLevel);
-      setFreeVisiblePhotos(data.settings.freeVisiblePhotos);
-      setFreeOwnPhotos(data.settings.freeOwnPhotos);
-      setShowVipButton(data.settings.showVipButton);
+      const s = data.settings;
+      setBlurMobile(s.blurMobile);
+      setBlurDesktop(s.blurDesktop);
+      setFreeVisiblePhotos(s.freeVisiblePhotos);
+      setFreeOwnPhotos(s.freeOwnPhotos);
+      setShowVipButton(s.showVipButton);
+      setDailyMessageLimit(s.dailyMessageLimit);
+      setSiteCountry(s.siteCountry);
+      setHidePasswordRegister(s.hidePasswordRegister);
+      setVipPriceMonthly(s.vipPriceMonthly);
+      setVipPrice3Months(s.vipPrice3Months);
+      setVipPrice6Months(s.vipPrice6Months);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
@@ -56,6 +97,23 @@ export default function SettingsPage() {
     );
   }
 
+  const ToggleSwitch = ({ value, onChange }) => (
+    <button
+      onClick={() => onChange(!value)}
+      className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${value ? 'bg-mansion-gold' : 'bg-mansion-border'}`}
+    >
+      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
+    </button>
+  );
+
+  const Counter = ({ value, onChange, min = 0, max = 99 }) => (
+    <div className="flex items-center gap-3">
+      <button onClick={() => onChange(Math.max(min, value - 1))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">−</button>
+      <span className="text-xl font-bold text-mansion-gold w-10 text-center">{value}</span>
+      <button onClick={() => onChange(Math.min(max, value + 1))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">+</button>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8">
       {/* Header */}
@@ -66,137 +124,211 @@ export default function SettingsPage() {
           </button>
           <div>
             <h1 className="text-lg font-semibold text-text-primary">Panel de Administración</h1>
-            <p className="text-[11px] text-text-dim">Configuración general del sitio</p>
+            <p className="text-[11px] text-text-dim">Solo visible para administradores</p>
+          </div>
+          <div className="ml-auto">
+            <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full bg-mansion-crimson/20 text-mansion-crimson border border-mansion-crimson/30">Admin</span>
           </div>
         </div>
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-8">
 
-        {/* ── Section: Fotos & Blur ── */}
-        <div>
+        {/* ── FOTOS & BLUR ── */}
+        <section>
           <div className="flex items-center gap-2 mb-4">
             <Image className="w-4 h-4 text-mansion-gold" />
-            <h2 className="text-sm font-bold text-text-primary uppercase tracking-wider">Fotos & Blur</h2>
+            <h2 className="text-xs font-bold text-text-primary uppercase tracking-wider">Fotos & Blur</h2>
           </div>
-          <div className="space-y-4">
-            {/* Blur Level */}
-            <div className="bg-mansion-card rounded-2xl p-5 border border-white/5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Eye className="w-5 h-5 text-mansion-gold" />
+          <div className="space-y-3">
+            {/* Blur Mobile */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Smartphone className="w-4 h-4 text-mansion-gold" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Nivel de Blur</h3>
-                  <p className="text-xs text-text-dim">Intensidad del desenfoque en fotos restringidas</p>
+                  <h3 className="text-sm font-semibold text-text-primary">Blur Mobile</h3>
+                  <p className="text-[11px] text-text-dim">Desenfoque en dispositivos móviles</p>
                 </div>
               </div>
-              <div className="space-y-3">
-                <input
-                  type="range" min="0" max="30" value={blurLevel}
-                  onChange={e => setBlurLevel(Number(e.target.value))}
-                  className="w-full accent-mansion-gold"
-                />
-                <div className="flex justify-between text-xs text-text-dim">
-                  <span>Sin blur</span>
-                  <span className="text-mansion-gold font-medium">{blurLevel}px</span>
-                  <span>Máximo</span>
+              <input type="range" min="0" max="30" value={blurMobile} onChange={e => setBlurMobile(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>Sin blur</span>
+                <span className="text-mansion-gold font-medium">{blurMobile}px</span>
+                <span>Máximo</span>
+              </div>
+            </div>
+
+            {/* Blur Desktop */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Monitor className="w-4 h-4 text-mansion-gold" />
                 </div>
-                <div className="relative w-full h-20 rounded-xl overflow-hidden bg-mansion-elevated mt-2">
-                  <div className="absolute inset-0 bg-gradient-to-br from-mansion-crimson/30 to-mansion-gold/30" style={{ filter: `blur(${blurLevel}px)` }} />
-                  <p className="absolute inset-0 flex items-center justify-center text-xs text-text-dim">Vista previa</p>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Blur Desktop</h3>
+                  <p className="text-[11px] text-text-dim">Desenfoque en computadoras</p>
                 </div>
+              </div>
+              <input type="range" min="0" max="30" value={blurDesktop} onChange={e => setBlurDesktop(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>Sin blur</span>
+                <span className="text-mansion-gold font-medium">{blurDesktop}px</span>
+                <span>Máximo</span>
               </div>
             </div>
 
             {/* Free Visible Photos (Others) */}
-            <div className="bg-mansion-card rounded-2xl p-5 border border-white/5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Image className="w-5 h-5 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Fotos Visibles (Otros)</h3>
-                  <p className="text-xs text-text-dim">Fotos sin blur que un usuario free ve de cada perfil</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <button onClick={() => setFreeVisiblePhotos(Math.max(0, freeVisiblePhotos - 1))} className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">−</button>
-                <span className="text-2xl font-bold text-mansion-gold w-12 text-center">{freeVisiblePhotos}</span>
-                <button onClick={() => setFreeVisiblePhotos(Math.min(20, freeVisiblePhotos + 1))} className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">+</button>
-              </div>
-            </div>
-
-            {/* Free Own Profile Photos */}
-            <div className="bg-mansion-card rounded-2xl p-5 border border-white/5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Sliders className="w-5 h-5 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Fotos Visibles (Propio)</h3>
-                  <p className="text-xs text-text-dim">Fotos sin blur que un usuario free ve de su propio perfil</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <button onClick={() => setFreeOwnPhotos(Math.max(0, freeOwnPhotos - 1))} className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">−</button>
-                <span className="text-2xl font-bold text-mansion-gold w-12 text-center">{freeOwnPhotos}</span>
-                <button onClick={() => setFreeOwnPhotos(Math.min(20, freeOwnPhotos + 1))} className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">+</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Section: VIP & Monetización ── */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Crown className="w-4 h-4 text-mansion-gold" />
-            <h2 className="text-sm font-bold text-text-primary uppercase tracking-wider">VIP & Monetización</h2>
-          </div>
-          <div className="space-y-4">
-            {/* Show VIP Button */}
-            <div className="bg-mansion-card rounded-2xl p-5 border border-white/5">
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                    <Crown className="w-5 h-5 text-mansion-gold" />
+                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                    <Image className="w-4 h-4 text-mansion-gold" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">Fotos visibles (otros)</h3>
+                    <p className="text-[11px] text-text-dim">Fotos sin blur por perfil ajeno</p>
+                  </div>
+                </div>
+                <Counter value={freeVisiblePhotos} onChange={setFreeVisiblePhotos} max={20} />
+              </div>
+            </div>
+
+            {/* Free Own Photos */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                    <Sliders className="w-4 h-4 text-mansion-gold" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">Fotos visibles (propio)</h3>
+                    <p className="text-[11px] text-text-dim">Fotos sin blur en su propio perfil</p>
+                  </div>
+                </div>
+                <Counter value={freeOwnPhotos} onChange={setFreeOwnPhotos} max={20} />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── MENSAJERÍA ── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <MessageCircle className="w-4 h-4 text-mansion-gold" />
+            <h2 className="text-xs font-bold text-text-primary uppercase tracking-wider">Mensajería</h2>
+          </div>
+          <div className="space-y-3">
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                    <MessageCircle className="w-4 h-4 text-mansion-gold" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">Mensajes diarios (free)</h3>
+                    <p className="text-[11px] text-text-dim">Límite para usuarios no VIP</p>
+                  </div>
+                </div>
+                <Counter value={dailyMessageLimit} onChange={setDailyMessageLimit} min={1} max={50} />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── VIP & MONETIZACIÓN ── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Crown className="w-4 h-4 text-mansion-gold" />
+            <h2 className="text-xs font-bold text-text-primary uppercase tracking-wider">VIP & Monetización</h2>
+          </div>
+          <div className="space-y-3">
+            {/* Show VIP Button */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                    <Crown className="w-4 h-4 text-mansion-gold" />
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-text-primary">Botón "Hazte VIP"</h3>
-                    <p className="text-xs text-text-dim">Mostrar botón de VIP en perfiles y sidebar</p>
+                    <p className="text-[11px] text-text-dim">Mostrar opciones de suscripción</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowVipButton(!showVipButton)}
-                  className={`w-11 h-6 rounded-full transition-colors relative ${showVipButton ? 'bg-mansion-gold' : 'bg-mansion-border'}`}
-                >
-                  <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${showVipButton ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                </button>
+                <ToggleSwitch value={showVipButton} onChange={setShowVipButton} />
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* ── Section: Mensajería ── */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <MessageCircle className="w-4 h-4 text-mansion-gold" />
-            <h2 className="text-sm font-bold text-text-primary uppercase tracking-wider">Mensajería</h2>
-          </div>
-          <div className="space-y-4">
-            <div className="bg-mansion-card rounded-2xl p-5 border border-white/5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <MessageCircle className="w-5 h-5 text-text-dim" />
+            {/* VIP Prices */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5 space-y-3">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-mansion-gold" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Límite de mensajes diarios</h3>
-                  <p className="text-xs text-text-dim">5 mensajes/día para usuarios free (hardcoded)</p>
+                  <h3 className="text-sm font-semibold text-text-primary">Precios VIP</h3>
+                  <p className="text-[11px] text-text-dim">Valores de suscripción (moneda local)</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[10px] text-text-dim uppercase tracking-wider mb-1 block">1 Mes</label>
+                  <input type="text" value={vipPriceMonthly} onChange={e => setVipPriceMonthly(e.target.value)} placeholder="$4.990" className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-text-dim uppercase tracking-wider mb-1 block">3 Meses</label>
+                  <input type="text" value={vipPrice3Months} onChange={e => setVipPrice3Months(e.target.value)} placeholder="$11.990" className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-text-dim uppercase tracking-wider mb-1 block">6 Meses</label>
+                  <input type="text" value={vipPrice6Months} onChange={e => setVipPrice6Months(e.target.value)} placeholder="$19.990" className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary" />
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
+
+        {/* ── SITIO ── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Globe className="w-4 h-4 text-mansion-gold" />
+            <h2 className="text-xs font-bold text-text-primary uppercase tracking-wider">Sitio</h2>
+          </div>
+          <div className="space-y-3">
+            {/* Country */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                    <Globe className="w-4 h-4 text-mansion-gold" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">País del sitio</h3>
+                    <p className="text-[11px] text-text-dim">Código ISO (AR, CL, MX, CO...)</p>
+                  </div>
+                </div>
+                <input type="text" value={siteCountry} onChange={e => setSiteCountry(e.target.value.toUpperCase().slice(0, 2))} maxLength={2} className="w-16 text-center text-sm py-2 px-2 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-mansion-gold font-bold uppercase" />
+              </div>
+            </div>
+
+            {/* Hide Password */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                    <Lock className="w-4 h-4 text-mansion-gold" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">Ocultar contraseña</h3>
+                    <p className="text-[11px] text-text-dim">Ojito cerrado por defecto en registro</p>
+                  </div>
+                </div>
+                <ToggleSwitch value={hidePasswordRegister} onChange={setHidePasswordRegister} />
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* Save button */}
         <button

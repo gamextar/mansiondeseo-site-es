@@ -650,7 +650,7 @@ async function handleSendMessage(request, env) {
   const receiver = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(receiver_id).first();
   if (!receiver) return error('Destinatario no encontrado', 404);
 
-  // Check daily message limit (5 free per day)
+  // Check daily message limit
   const today = todayUTC();
   const limit = await env.DB.prepare(
     'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
@@ -661,8 +661,12 @@ async function handleSendMessage(request, env) {
   // Check if user is premium (unlimited)
   const sender = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
 
-  if (!sender.premium && currentCount >= 5) {
-    return error('Has alcanzado el límite de 5 mensajes diarios. Desbloquea VIP para mensajes ilimitados.', 403);
+  // Load configurable daily limit
+  const siteSettings = await loadSettings(env);
+  const dailyLimit = siteSettings.dailyMessageLimit || 5;
+
+  if (!sender.premium && currentCount >= dailyLimit) {
+    return error(`Has alcanzado el límite de ${dailyLimit} mensajes diarios. Desbloquea VIP para mensajes ilimitados.`, 403);
   }
 
   // Insert message
@@ -794,13 +798,16 @@ async function handleMessageLimit(request, env) {
   const sender = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
 
   const count = limit?.msg_count || 0;
-  const max = sender?.premium ? Infinity : 5;
+
+  // Load configurable daily limit
+  const siteSettings = await loadSettings(env);
+  const dailyLimit = siteSettings.dailyMessageLimit || 5;
 
   return json({
     sent: count,
-    remaining: sender?.premium ? 999 : Math.max(0, 5 - count),
-    canSend: sender?.premium ? true : count < 5,
-    max: sender?.premium ? 999 : 5,
+    remaining: sender?.premium ? 999 : Math.max(0, dailyLimit - count),
+    canSend: sender?.premium ? true : count < dailyLimit,
+    max: sender?.premium ? 999 : dailyLimit,
   });
 }
 
@@ -994,6 +1001,7 @@ function sanitizeUser(user) {
     online: !!safe.online,
     premium: !!safe.premium,
     ghost_mode: !!safe.ghost_mode,
+    is_admin: !!safe.is_admin,
   };
 }
 
@@ -1052,9 +1060,18 @@ async function loadSettings(env) {
   for (const r of results) settings[r.key] = r.value;
   return {
     blurLevel: parseInt(settings.blur_level || '14', 10),
+    blurMobile: parseInt(settings.blur_mobile || settings.blur_level || '14', 10),
+    blurDesktop: parseInt(settings.blur_desktop || settings.blur_level || '8', 10),
     freeVisiblePhotos: parseInt(settings.free_visible_photos || '1', 10),
     freeOwnPhotos: parseInt(settings.free_own_photos || '3', 10),
     showVipButton: settings.show_vip_button !== '0',
+    dailyMessageLimit: parseInt(settings.daily_message_limit || '5', 10),
+    siteCountry: settings.site_country || 'AR',
+    siteTimezone: settings.site_timezone || 'America/Argentina/Buenos_Aires',
+    hidePasswordRegister: settings.hide_password_register !== '0',
+    vipPriceMonthly: settings.vip_price_monthly || '',
+    vipPrice3Months: settings.vip_price_3months || '',
+    vipPrice6Months: settings.vip_price_6months || '',
   };
 }
 
@@ -1062,6 +1079,9 @@ async function loadSettings(env) {
 async function handleGetSettings(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  // Check admin
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
   const settings = await loadSettings(env);
   return json({ settings });
 }
@@ -1070,8 +1090,17 @@ async function handleGetSettings(request, env) {
 async function handleUpdateSettings(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  // Check admin
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
   const body = await request.json();
-  const allowed = ['blur_level', 'free_visible_photos', 'free_own_photos', 'show_vip_button'];
+  const allowed = [
+    'blur_level', 'blur_mobile', 'blur_desktop',
+    'free_visible_photos', 'free_own_photos', 'show_vip_button',
+    'daily_message_limit', 'site_country', 'site_timezone',
+    'hide_password_register',
+    'vip_price_monthly', 'vip_price_3months', 'vip_price_6months',
+  ];
   for (const key of allowed) {
     if (body[key] !== undefined) {
       await env.DB.prepare(
