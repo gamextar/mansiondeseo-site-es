@@ -1081,6 +1081,7 @@ async function loadSettings(env) {
     vipPriceMonthly: settings.vip_price_monthly || '',
     vipPrice3Months: settings.vip_price_3months || '',
     vipPrice6Months: settings.vip_price_6months || '',
+    incognitoIconSvg: settings.incognito_icon_svg || '',
   };
 }
 
@@ -1109,6 +1110,7 @@ async function handleUpdateSettings(request, env) {
     'daily_message_limit', 'site_country', 'site_timezone',
     'hide_password_register',
     'vip_price_monthly', 'vip_price_3months', 'vip_price_6months',
+    'incognito_icon_svg',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {

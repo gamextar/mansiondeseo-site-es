@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor } from 'lucide-react';
+import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile } from 'lucide-react';
 import { getSettings, updateSettings } from '../lib/api';
 import { useAuth } from '../App';
 
@@ -30,6 +30,9 @@ export default function SettingsPage() {
   const [siteCountry, setSiteCountry] = useState('AR');
   const [hidePasswordRegister, setHidePasswordRegister] = useState(true);
 
+  // Iconografía
+  const [incognitoIconSvg, setIncognitoIconSvg] = useState('');
+
   useEffect(() => {
     if (!user?.is_admin) { navigate('/'); return; }
     getSettings()
@@ -46,6 +49,7 @@ export default function SettingsPage() {
         setVipPriceMonthly(s.vipPriceMonthly);
         setVipPrice3Months(s.vipPrice3Months);
         setVipPrice6Months(s.vipPrice6Months);
+        setIncognitoIconSvg(s.incognitoIconSvg || '');
       })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
@@ -67,6 +71,7 @@ export default function SettingsPage() {
         vip_price_monthly: vipPriceMonthly,
         vip_price_3months: vipPrice3Months,
         vip_price_6months: vipPrice6Months,
+        incognito_icon_svg: incognitoIconSvg,
       });
       const s = data.settings;
       setBlurMobile(s.blurMobile);
@@ -80,6 +85,7 @@ export default function SettingsPage() {
       setVipPriceMonthly(s.vipPriceMonthly);
       setVipPrice3Months(s.vipPrice3Months);
       setVipPrice6Months(s.vipPrice6Months);
+      setIncognitoIconSvg(s.incognitoIconSvg || '');
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
@@ -284,6 +290,51 @@ export default function SettingsPage() {
                   <label className="text-[10px] text-text-dim uppercase tracking-wider mb-1 block">6 Meses</label>
                   <input type="text" value={vipPrice6Months} onChange={e => setVipPrice6Months(e.target.value)} placeholder="$19.990" className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary" />
                 </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── ICONOGRAFÍA ── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Smile className="w-4 h-4 text-mansion-gold" />
+            <h2 className="text-xs font-bold text-text-primary uppercase tracking-wider">Iconografía</h2>
+          </div>
+          <div className="space-y-3">
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Smile className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Ícono Modo Incógnito</h3>
+                  <p className="text-[11px] text-text-dim">Pega código SVG. Vacío = antifaz por defecto.</p>
+                </div>
+              </div>
+              <textarea
+                value={incognitoIconSvg}
+                onChange={e => setIncognitoIconSvg(e.target.value)}
+                placeholder={'<svg viewBox="0 0 24 24" ...>...</svg>'}
+                rows={4}
+                className="w-full text-xs font-mono py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-secondary resize-none focus:outline-none focus:border-mansion-gold/50"
+              />
+              {/* Preview */}
+              <div className="mt-3 flex items-center gap-4">
+                <span className="text-[11px] text-text-dim">Vista previa:</span>
+                <div className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center text-white">
+                  {incognitoIconSvg.trim()
+                    ? <span className="w-6 h-6" dangerouslySetInnerHTML={{ __html: incognitoIconSvg }} />
+                    : <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 12c0-3.3 2.4-5.5 5.5-5.5 1.6 0 2.8.8 3.5 1.9.7-1.1 1.9-1.9 3.5-1.9C18.6 6.5 21 8.7 21 12c0 2.5-1.8 5-4.5 5-1.6 0-2.8-.8-3.5-1.9-.7 1.1-1.9 1.9-3.5 1.9C6.8 17 3 14.5 3 12z" />
+                        <circle cx="9" cy="11.5" r="1.5" fill="currentColor" stroke="none" />
+                        <circle cx="15" cy="11.5" r="1.5" fill="currentColor" stroke="none" />
+                      </svg>
+                  }
+                </div>
+                {incognitoIconSvg.trim() && (
+                  <button onClick={() => setIncognitoIconSvg('')} className="text-[11px] text-mansion-crimson hover:underline">Restaurar default</button>
+                )}
               </div>
             </div>
           </div>
