@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft, Heart, MessageCircle, Share2, Shield, Crown,
+  ArrowLeft, Heart, MessageCircle, Shield, Crown,
   MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical,
 } from 'lucide-react';
 import { getProfile, getToken, toggleFavorite, updateProfile } from '../lib/api';
@@ -233,14 +233,6 @@ export default function ProfileDetailPage() {
           )}
 
           <div className="flex gap-2">
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 }}
-              className="w-10 h-10 rounded-full glass flex items-center justify-center"
-            >
-              <Share2 className="w-4 h-4 text-text-muted" />
-            </motion.button>
           </div>
         </div>
 

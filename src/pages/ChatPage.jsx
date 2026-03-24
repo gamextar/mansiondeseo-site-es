@@ -219,7 +219,7 @@ export default function ChatPage() {
               >
                 {/* Partner avatar next to received messages */}
                 {!isMe && (
-                  <div className="flex-shrink-0 w-9 h-9 rounded-full overflow-hidden mb-0.5">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden mb-0.5">
                     <img src={partner.avatar_url || partner.photos?.[0] || ''} alt="" className="w-full h-full object-cover" />
                   </div>
                 )}

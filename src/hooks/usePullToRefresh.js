@@ -47,7 +47,11 @@ export function usePullToRefresh(onRefresh, { threshold = 120 } = {}) {
     };
 
     const onTouchEnd = async () => {
-      if (!pulling.current) return;
+      if (!pulling.current) {
+        // Didn't reach threshold — reset indicator
+        reset();
+        return;
+      }
       if (indicatorRef.current) {
         // Show spinning state
         indicatorRef.current.style.transform = 'translateY(0%)';
