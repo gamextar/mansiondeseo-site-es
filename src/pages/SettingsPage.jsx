@@ -303,22 +303,37 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-3">
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-3 mb-4">
                 <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
                   <Smile className="w-4 h-4 text-mansion-gold" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Ícono Modo Incógnito</h3>
-                  <p className="text-[11px] text-text-dim">Pega código SVG. Vacío = antifaz por defecto.</p>
+                  <p className="text-[11px] text-text-dim">Sube un archivo .svg. Vacío = antifaz por defecto.</p>
                 </div>
               </div>
-              <textarea
-                value={incognitoIconSvg}
-                onChange={e => setIncognitoIconSvg(e.target.value)}
-                placeholder={'<svg viewBox="0 0 24 24" ...>...</svg>'}
-                rows={4}
-                className="w-full text-xs font-mono py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-secondary resize-none focus:outline-none focus:border-mansion-gold/50"
-              />
+
+              {/* Upload zone */}
+              <label className="flex flex-col items-center justify-center gap-2 w-full h-24 rounded-xl border-2 border-dashed border-mansion-border/40 hover:border-mansion-gold/40 cursor-pointer transition-colors bg-mansion-elevated/50">
+                <Smile className="w-5 h-5 text-text-dim" />
+                <span className="text-[11px] text-text-dim">
+                  {incognitoIconSvg.trim() ? 'Haz clic para reemplazar el SVG' : 'Haz clic para subir un archivo .svg'}
+                </span>
+                <input
+                  type="file"
+                  accept=".svg,image/svg+xml"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = ev => setIncognitoIconSvg(ev.target.result);
+                    reader.readAsText(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+
               {/* Preview */}
               <div className="mt-3 flex items-center gap-4">
                 <span className="text-[11px] text-text-dim">Vista previa:</span>
