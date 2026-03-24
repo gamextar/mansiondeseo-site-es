@@ -5,6 +5,7 @@ import { ChevronLeft, Send, Lock, ImageIcon, Smile, MessageCircle } from 'lucide
 import { useMessageLimit } from '../hooks/useMessageLimit';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
+import EmojiPicker from '../components/EmojiPicker';
 import { getMessages as apiGetMessages, sendMessage as apiSendMessage, getMessageLimit, getProfile, getToken } from '../lib/api';
 
 export default function ChatPage() {
@@ -17,6 +18,8 @@ export default function ChatPage() {
   const [apiLimit, setApiLimit] = useState(null);
   const [partner, setPartner] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showEmojis, setShowEmojis] = useState(false);
+  const inputRef = useRef(null);
   const scrollRef = useRef(null);
 
   // Extract partner ID from conversation ID (conv-{userId} format)
@@ -100,6 +103,20 @@ export default function ChatPage() {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleEmojiSelect = (emoji) => {
+    const el = inputRef.current;
+    if (!el) { setInput(prev => prev + emoji); return; }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const newVal = input.slice(0, start) + emoji + input.slice(end);
+    setInput(newVal);
+    // Restore cursor after emoji
+    requestAnimationFrame(() => {
+      el.focus();
+      el.selectionStart = el.selectionEnd = start + emoji.length;
+    });
   };
 
   return (
@@ -202,6 +219,7 @@ export default function ChatPage() {
           {/* Textarea + emoji inside a compound pill */}
           <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors overflow-hidden min-h-[44px]">
             <textarea
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -211,9 +229,21 @@ export default function ChatPage() {
               className="flex-1 resize-none bg-transparent py-3 px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50"
               style={{ minHeight: '44px' }}
             />
-            <button className="flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center text-text-dim hover:text-mansion-gold transition-colors">
-              <Smile className="w-5 h-5" />
-            </button>
+            <div className="relative flex-shrink-0 self-end pb-2.5">
+              <button
+                type="button"
+                onClick={() => setShowEmojis(v => !v)}
+                className={`w-10 flex items-center justify-center transition-colors ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
+              >
+                <Smile className="w-5 h-5" />
+              </button>
+              {showEmojis && (
+                <EmojiPicker
+                  onSelect={(emoji) => { handleEmojiSelect(emoji); }}
+                  onClose={() => setShowEmojis(false)}
+                />
+              )}
+            </div>
           </div>
 
           {/* Send */}
