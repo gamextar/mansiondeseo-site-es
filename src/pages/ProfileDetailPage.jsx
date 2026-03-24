@@ -163,9 +163,9 @@ export default function ProfileDetailPage() {
   const isPhotoBlocked = (index) => index >= visiblePhotos;
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
   const baseBlur = isMobile ? (settings.blurMobile ?? settings.blurLevel ?? 14) : (settings.blurDesktop ?? settings.blurLevel ?? 8);
-  // Scale blur proportionally: hero gets 1.8x, thumbnails 0.6x, lightbox 2.5x
+  // Scale blur proportionally: hero gets 1.8x, thumbnails 0.7x, lightbox 2.5x
   const heroBlur = Math.round(baseBlur * 1.8);
-  const thumbBlur = Math.round(baseBlur * 0.6);
+  const thumbBlur = Math.round(baseBlur * 0.7);
   const lightboxBlur = Math.round(baseBlur * 2.5);
 
   return (
@@ -205,7 +205,9 @@ export default function ProfileDetailPage() {
                   {blocked && (
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                       <div className="flex flex-col items-center gap-2 text-white/80">
-                        <Lock className="w-8 h-8" />
+                        {isGhostBlurred
+                          ? <span className="text-5xl select-none">🎭</span>
+                          : <Lock className="w-8 h-8" />}
                         <span className="text-sm font-semibold">{isGhostBlurred ? 'Modo Incógnito' : 'Contenido VIP'}</span>
                         <span className="text-xs text-white/60">Solo visible para usuarios VIP</span>
                       </div>
