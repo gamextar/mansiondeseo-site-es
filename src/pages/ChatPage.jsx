@@ -216,34 +216,37 @@ export default function ChatPage() {
             <ImageIcon className="w-5 h-5" />
           </button>
 
-          {/* Textarea + emoji inside a compound pill */}
-          <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors overflow-hidden min-h-[44px]">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
-              disabled={!effectiveCanSend}
-              rows={1}
-              className="flex-1 resize-none bg-transparent py-3 px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50"
-              style={{ minHeight: '44px' }}
-            />
-            <div className="relative flex-shrink-0 self-end pb-2.5">
+          {/* Textarea + emoji */}
+          <div className="flex-1 relative flex items-end">
+            <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors min-h-[44px]">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setShowEmojis(false)}
+                placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
+                disabled={!effectiveCanSend}
+                rows={1}
+                className="flex-1 resize-none bg-transparent py-3 px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50"
+                style={{ minHeight: '44px' }}
+              />
               <button
                 type="button"
                 onClick={() => setShowEmojis(v => !v)}
-                className={`w-10 flex items-center justify-center transition-colors ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
+                className={`flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center transition-colors ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
               >
                 <Smile className="w-5 h-5" />
               </button>
+            </div>
+            <AnimatePresence>
               {showEmojis && (
                 <EmojiPicker
                   onSelect={(emoji) => { handleEmojiSelect(emoji); }}
                   onClose={() => setShowEmojis(false)}
                 />
               )}
-            </div>
+            </AnimatePresence>
           </div>
 
           {/* Send */}

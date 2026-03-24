@@ -1,19 +1,17 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const EMOJIS = [
-  // Caritas
-  '😀','😂','🥰','😍','😘','😊','🥵','😈','🔥','💋',
-  '😏','🤭','😮','😯','🥺','😭','😤','😡','🤤','😜',
-  // Gestos
-  '👋','🤝','👀','💪','🫦','🙏','👏','🤞','✌️','🫶',
-  // Corazones
-  '❤️','🧡','💛','💚','💙','💜','🖤','🤍','💗','💦',
-  // Objetos / signos
-  '🎉','🍆','🍑','🌹','🥂','💎','👑','🔑','💌','📸',
+const CATEGORIES = [
+  { label: '😊', emojis: ['😀','😂','🥰','😍','😘','😊','🥵','😈','😏','🤭','😮','🥺','😭','😤','🤤','😜','🫣','🤪','😴','🫠'] },
+  { label: '👋', emojis: ['👋','🤝','👀','💪','🫦','🙏','👏','🤞','✌️','🫶','🤙','👆','🫰','💅','🤌','👅','💃','🕺','🧎','🫂'] },
+  { label: '❤️', emojis: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','💗','💘','💝','💖','💕','💓','💞','❤️‍🔥','💔','🫀','💋','💦'] },
+  { label: '🎉', emojis: ['🔥','🎉','🍆','🍑','🌹','🥂','💎','👑','🔑','💌','📸','🎶','⛓️','🍫','🛏️','🕯️','🧊','💣','🎭','🪩'] },
 ];
 
 export default function EmojiPicker({ onSelect, onClose }) {
   const ref = useRef(null);
+  const [activeTab, setActiveTab] = useState(0);
+  const [popping, setPopping] = useState(null);
 
   useEffect(() => {
     const handler = (e) => {
@@ -27,23 +25,54 @@ export default function EmojiPicker({ onSelect, onClose }) {
     };
   }, [onClose]);
 
+  const handleSelect = (emoji) => {
+    setPopping(emoji);
+    onSelect(emoji);
+    setTimeout(() => setPopping(null), 400);
+  };
+
   return (
-    <div
+    <motion.div
       ref={ref}
-      className="absolute bottom-full mb-2 right-0 z-50 bg-mansion-card border border-mansion-border/40 rounded-2xl shadow-xl p-3 w-64"
+      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+      transition={{ duration: 0.15 }}
+      className="absolute bottom-full mb-2 right-0 z-[100] bg-mansion-card border border-mansion-border/40 rounded-2xl shadow-2xl w-72 overflow-hidden"
     >
-      <div className="grid grid-cols-8 gap-1">
-        {EMOJIS.map((emoji) => (
+      {/* Category tabs */}
+      <div className="flex border-b border-mansion-border/30 px-1 pt-1">
+        {CATEGORIES.map((cat, i) => (
           <button
-            key={emoji}
+            key={i}
             type="button"
-            onClick={() => onSelect(emoji)}
-            className="w-8 h-8 flex items-center justify-center text-xl rounded-lg hover:bg-mansion-elevated transition-colors"
+            onClick={() => setActiveTab(i)}
+            className={`flex-1 py-1.5 text-lg rounded-t-lg transition-colors ${
+              activeTab === i ? 'bg-mansion-elevated/60' : 'hover:bg-mansion-elevated/30'
+            }`}
           >
-            {emoji}
+            {cat.label}
           </button>
         ))}
       </div>
-    </div>
+
+      {/* Emoji grid */}
+      <div className="p-2 h-44 overflow-y-auto scrollbar-thin">
+        <div className="grid grid-cols-8 gap-0.5">
+          {CATEGORIES[activeTab].emojis.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => handleSelect(emoji)}
+              className="relative w-8 h-8 flex items-center justify-center text-xl rounded-lg hover:bg-mansion-elevated active:scale-125 transition-all duration-150"
+            >
+              <span className={popping === emoji ? 'animate-bounce' : 'hover:scale-110 transition-transform'}>
+                {emoji}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </motion.div>
   );
 }
