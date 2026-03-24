@@ -8,8 +8,10 @@ import { useUnreadMessages } from '../hooks/useUnreadMessages';
 function timeAgo(dateStr) {
   if (!dateStr) return '';
   const now = new Date();
-  const date = new Date(dateStr);
+  // D1 stores UTC without Z suffix — append it so JS parses as UTC
+  const date = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
   const diffMs = now - date;
+  if (diffMs < 0) return 'ahora';
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 1) return 'ahora';
   if (diffMin < 60) return `${diffMin}min`;

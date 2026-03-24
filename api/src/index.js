@@ -720,7 +720,7 @@ async function handleGetMessages(request, env, otherUserId) {
     id: m.id,
     senderId: m.sender_id === auth.sub ? 'me' : 'them',
     text: m.content,
-    timestamp: new Date(m.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+    timestamp: new Date(m.created_at + 'Z').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
     created_at: m.created_at,
     is_read: m.is_read,
   }));
@@ -1054,6 +1054,7 @@ async function loadSettings(env) {
     blurLevel: parseInt(settings.blur_level || '14', 10),
     freeVisiblePhotos: parseInt(settings.free_visible_photos || '1', 10),
     freeOwnPhotos: parseInt(settings.free_own_photos || '3', 10),
+    showVipButton: settings.show_vip_button !== '0',
   };
 }
 
@@ -1070,7 +1071,7 @@ async function handleUpdateSettings(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const body = await request.json();
-  const allowed = ['blur_level', 'free_visible_photos', 'free_own_photos'];
+  const allowed = ['blur_level', 'free_visible_photos', 'free_own_photos', 'show_vip_button'];
   for (const key of allowed) {
     if (body[key] !== undefined) {
       await env.DB.prepare(
