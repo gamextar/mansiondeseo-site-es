@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useState, useEffect } from 'react';
 import { getVisits, getToken } from '../lib/api';
+import { useAuth } from '../App';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -29,6 +30,7 @@ export default function DesktopSidebar() {
   const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
   const [visitors, setVisitors] = useState([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!getToken()) return;
@@ -136,18 +138,28 @@ export default function DesktopSidebar() {
       {/* Bottom section */}
       <div className="px-3 pb-4 space-y-2">
         {/* VIP banner */}
-        <div className="mx-1 p-4 rounded-2xl bg-gradient-to-br from-mansion-gold/10 to-mansion-gold/5 border border-mansion-gold/20">
-          <div className="flex items-center gap-2 mb-2">
-            <Crown className="w-4 h-4 text-mansion-gold" />
-            <span className="text-xs font-semibold text-mansion-gold">Mansión VIP</span>
+        {user?.premium ? (
+          <div className="mx-1 p-4 rounded-2xl bg-gradient-to-br from-mansion-gold/10 to-mansion-gold/5 border border-mansion-gold/20">
+            <div className="flex items-center gap-2">
+              <Crown className="w-4 h-4 text-mansion-gold" />
+              <span className="text-xs font-semibold text-mansion-gold">Mansión VIP</span>
+            </div>
+            <p className="text-green-400 text-[11px] mt-1 font-medium">Miembro activo</p>
           </div>
-          <p className="text-text-dim text-[11px] mb-3 leading-relaxed">
-            Mensajes ilimitados y perfiles sin blur
-          </p>
-          <button className="btn-gold w-full py-2 rounded-lg text-xs">
-            Desbloquear
-          </button>
-        </div>
+        ) : (
+          <div className="mx-1 p-4 rounded-2xl bg-gradient-to-br from-mansion-gold/10 to-mansion-gold/5 border border-mansion-gold/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown className="w-4 h-4 text-mansion-gold" />
+              <span className="text-xs font-semibold text-mansion-gold">Mansión VIP</span>
+            </div>
+            <p className="text-text-dim text-[11px] mb-3 leading-relaxed">
+              Mensajes ilimitados y perfiles sin blur
+            </p>
+            <button className="btn-gold w-full py-2 rounded-lg text-xs">
+              Desbloquear
+            </button>
+          </div>
+        )}
 
         {/* Settings */}
         <NavLink
