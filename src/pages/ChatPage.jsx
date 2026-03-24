@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Send, Lock, ImageIcon, Smile, MessageCircle } from 'lucide-react';
@@ -24,6 +24,29 @@ export default function ChatPage() {
 
   // Extract partner ID from conversation ID (conv-{userId} format)
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
+  const wasAtBottomRef = useRef(true);
+
+  const fetchMessages = useCallback(() => {
+    if (!getToken()) return;
+    // Check if scrolled to bottom before updating
+    const el = scrollRef.current;
+    if (el) {
+      wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    }
+    apiGetMessages(partnerId)
+      .then(data => {
+        setMessages(prev => {
+          const incoming = data.messages || [];
+          if (incoming.length !== prev.length) return incoming;
+          // Quick check last message to avoid unnecessary re-render
+          const lastNew = incoming[incoming.length - 1];
+          const lastOld = prev[prev.length - 1];
+          if (lastNew?.id !== lastOld?.id || lastNew?.text !== lastOld?.text) return incoming;
+          return prev;
+        });
+      })
+      .catch(() => {});
+  }, [partnerId]);
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
@@ -37,13 +60,20 @@ export default function ChatPage() {
       getMessageLimit().then(data => setApiLimit(data)).catch(() => {}),
     ]).finally(() => {
       setLoading(false);
-      // Backend marks messages as read — refresh unread count in nav badges
       refreshUnread();
     });
-  }, [id, partnerId, navigate]);
+
+    // Poll for new messages every 4 seconds
+    const interval = setInterval(() => {
+      fetchMessages();
+      refreshUnread();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [id, partnerId, navigate, fetchMessages, refreshUnread]);
 
   useEffect(() => {
-    if (scrollRef.current) {
+    // Auto-scroll only if user was at the bottom
+    if (scrollRef.current && wasAtBottomRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);

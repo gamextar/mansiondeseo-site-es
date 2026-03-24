@@ -1,13 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, MessageCircle } from 'lucide-react';
 import { getConversations, getToken } from '../lib/api';
+import { useUnreadMessages } from '../hooks/useUnreadMessages';
 
 export default function ChatListPage() {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { refresh: refreshUnread } = useUnreadMessages();
+
+  const fetchConversations = useCallback(() => {
+    if (!getToken()) return;
+    getConversations()
+      .then(data => setConversations(data.conversations || []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
@@ -16,7 +25,14 @@ export default function ChatListPage() {
       .then(data => setConversations(data.conversations || []))
       .catch(() => setConversations([]))
       .finally(() => setLoading(false));
-  }, [navigate]);
+
+    // Poll every 8 seconds for new messages / updated previews
+    const interval = setInterval(() => {
+      fetchConversations();
+      refreshUnread();
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [navigate, fetchConversations, refreshUnread]);
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
       {/* Header */}
