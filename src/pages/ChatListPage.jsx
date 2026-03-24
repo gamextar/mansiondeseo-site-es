@@ -72,11 +72,11 @@ export default function ChatListPage() {
           >
             <Link
               to={`/mensajes/${conv.id}`}
-              className="flex items-center gap-3 px-3 py-3.5 rounded-xl hover:bg-mansion-card/50 transition-all group"
+              className="flex items-center gap-3.5 px-3 py-4 rounded-xl hover:bg-mansion-card/50 transition-all group"
             >
               {/* Avatar */}
               <div className="relative flex-shrink-0">
-                <div className={`w-14 h-14 rounded-full overflow-hidden ${
+                <div className={`w-[60px] h-[60px] rounded-full overflow-hidden ${
                   conv.unread > 0 ? 'ring-2 ring-mansion-gold/50' : ''
                 }`}>
                   <img
@@ -92,20 +92,20 @@ export default function ChatListPage() {
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-0.5">
-                  <h3 className={`font-medium text-sm truncate ${
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className={`font-medium text-[15px] truncate ${
                     conv.unread > 0 ? 'text-text-primary' : 'text-text-muted'
                   }`}>
                     {conv.name}
                   </h3>
-                  <span className={`text-[11px] flex-shrink-0 ml-2 ${
+                  <span className={`text-xs flex-shrink-0 ml-2 ${
                     conv.unread > 0 ? 'text-mansion-gold' : 'text-text-dim'
                   }`}>
                     {conv.timestamp}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className={`text-xs truncate pr-2 ${
+                  <p className={`text-[13px] truncate pr-2 ${
                     conv.unread > 0 ? 'text-text-primary font-medium' : 'text-text-dim'
                   }`}>
                     {conv.lastMessage}

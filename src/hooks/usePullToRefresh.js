@@ -5,7 +5,7 @@ import { useEffect, useRef, useCallback } from 'react';
  * @param {() => Promise<void>} onRefresh - async function to call on refresh
  * @param {{ threshold?: number, containerRef?: React.RefObject }} options
  */
-export function usePullToRefresh(onRefresh, { threshold = 70 } = {}) {
+export function usePullToRefresh(onRefresh, { threshold = 120 } = {}) {
   const startY = useRef(null);
   const pulling = useRef(false);
   const indicatorRef = useRef(null);

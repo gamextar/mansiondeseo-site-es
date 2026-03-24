@@ -42,6 +42,9 @@ export default function ChatPage() {
           const lastNew = incoming[incoming.length - 1];
           const lastOld = prev[prev.length - 1];
           if (lastNew?.id !== lastOld?.id || lastNew?.text !== lastOld?.text) return incoming;
+          // Check if any read status changed (for tick updates)
+          const readChanged = incoming.some((msg, i) => msg.is_read !== prev[i]?.is_read);
+          if (readChanged) return incoming;
           return prev;
         });
       })
@@ -195,7 +198,7 @@ export default function ChatPage() {
       {/* Messages area */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-5 space-y-4 lg:px-6 max-w-4xl lg:mx-auto w-full"
+        className="flex-1 overflow-y-auto px-4 py-5 space-y-5 lg:px-6 max-w-4xl lg:mx-auto w-full"
       >
         <div className="flex items-center justify-center">
           <span className="text-[10px] text-text-dim bg-mansion-elevated px-3 py-1 rounded-full">
@@ -216,19 +219,19 @@ export default function ChatPage() {
               >
                 {/* Partner avatar next to received messages */}
                 {!isMe && (
-                  <div className="flex-shrink-0 w-7 h-7 rounded-full overflow-hidden mb-0.5">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden mb-0.5">
                     <img src={partner.avatar_url || partner.photos?.[0] || ''} alt="" className="w-full h-full object-cover" />
                   </div>
                 )}
                 <div
-                  className={`max-w-[78%] rounded-2xl px-4 py-2.5 ${
+                  className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                     isMe
                       ? 'bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white rounded-br-sm'
                       : 'bg-mansion-elevated text-text-primary border border-mansion-border/30 rounded-bl-sm'
                   }`}
                 >
-                  <p className="text-sm leading-relaxed">{msg.text}</p>
-                  <p className={`text-[10px] mt-1 flex items-center ${isMe ? 'justify-end text-white/50 gap-1' : 'justify-end text-text-dim'}`}>
+                  <p className="text-[15px] leading-relaxed">{msg.text}</p>
+                  <p className={`text-[11px] mt-1.5 flex items-center ${isMe ? 'justify-end text-white/50 gap-1' : 'justify-end text-text-dim'}`}>
                     {msg.timestamp}
                     {isMe && (
                       <span className={`inline-flex ${msg.is_read ? 'text-blue-400' : 'text-white/40'}`}>
