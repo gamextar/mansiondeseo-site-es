@@ -1015,12 +1015,13 @@ async function handleGetVisits(request, env) {
   if (!auth) return error('No autorizado', 401);
 
   const { results } = await env.DB.prepare(
-    `SELECT DISTINCT u.id, u.username, u.avatar_url, u.age, u.city, u.role, u.premium, u.online,
-            pv.created_at as visited_at
+    `SELECT u.id, u.username, u.avatar_url, u.age, u.city, u.role, u.premium, u.online,
+            MAX(pv.created_at) as visited_at
      FROM profile_visits pv
      JOIN users u ON u.id = pv.visitor_id
      WHERE pv.visited_id = ?
-     ORDER BY pv.created_at DESC
+     GROUP BY pv.visitor_id
+     ORDER BY visited_at DESC
      LIMIT 10`
   ).bind(auth.sub).all();
 

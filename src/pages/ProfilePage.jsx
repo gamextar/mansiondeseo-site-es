@@ -4,6 +4,18 @@ import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, 
 import { useAuth } from '../App';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits } from '../lib/api';
 
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr + 'Z').getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Justo ahora';
+  if (mins < 60) return `Hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `Hace ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `Hace ${days}d`;
+}
+
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { setRegistered, setUser, user } = useAuth();
@@ -388,7 +400,7 @@ export default function ProfilePage() {
                   <div className="flex-1 text-left min-w-0">
                     <p className="text-sm font-medium text-text-primary truncate">{v.name}</p>
                     <p className="text-xs text-text-dim truncate">
-                      {[v.city, v.role].filter(Boolean).join(' · ')}
+                      Te visitó {timeAgo(v.visited_at).toLowerCase()}
                     </p>
                   </div>
                   {v.online && (

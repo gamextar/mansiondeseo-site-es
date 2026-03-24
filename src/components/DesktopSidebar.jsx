@@ -5,6 +5,18 @@ import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useState, useEffect } from 'react';
 import { getVisits, getToken } from '../lib/api';
 
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr + 'Z').getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Justo ahora';
+  if (mins < 60) return `Hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `Hace ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `Hace ${days}d`;
+}
+
 const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio' },
   { to: '/explorar', icon: Search, label: 'Explorar' },
@@ -110,6 +122,7 @@ export default function DesktopSidebar() {
                 </div>
                 <div className="flex-1 text-left min-w-0">
                   <p className="text-xs font-medium text-text-muted group-hover:text-text-primary truncate">{v.name}</p>
+                  <p className="text-[10px] text-text-dim truncate">{timeAgo(v.visited_at)}</p>
                 </div>
                 {v.online && (
                   <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
