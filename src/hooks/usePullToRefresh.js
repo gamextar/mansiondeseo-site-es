@@ -35,8 +35,11 @@ export function usePullToRefresh(onRefresh, { threshold = 120 } = {}) {
       // Don't fight native scroll
       if (window.scrollY > 0) { reset(); return; }
 
-      pulling.current = true;
       const progress = Math.min(dy / threshold, 1);
+      // Only mark as pulling once threshold is reached
+      if (dy >= threshold) {
+        pulling.current = true;
+      }
       if (indicatorRef.current) {
         indicatorRef.current.style.transform = `translateY(${-100 + progress * 100}%)`;
         indicatorRef.current.style.opacity = String(progress);

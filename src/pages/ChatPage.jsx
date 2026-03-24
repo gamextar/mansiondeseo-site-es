@@ -167,7 +167,7 @@ export default function ChatPage() {
             <ChevronLeft className="w-5 h-5" />
           </button>
 
-          <div className="relative flex-shrink-0">
+          <div className="relative flex-shrink-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`)}>
             <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-mansion-border/40">
               <img src={partner.avatar_url || partner.photos?.[0] || ''} alt={partner.name} className="w-full h-full object-cover" />
             </div>
@@ -176,7 +176,7 @@ export default function ChatPage() {
             )}
           </div>
 
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`)}>
             <h2 className="font-semibold text-sm text-text-primary truncate">{partner.name}</h2>
             <p className={`text-[11px] ${partner.online ? 'text-green-400' : 'text-text-dim'}`}>
               {partner.online ? '● En línea' : 'Desconectado'}
@@ -219,7 +219,7 @@ export default function ChatPage() {
               >
                 {/* Partner avatar next to received messages */}
                 {!isMe && (
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden mb-0.5">
+                  <div className="flex-shrink-0 w-9 h-9 rounded-full overflow-hidden mb-0.5">
                     <img src={partner.avatar_url || partner.photos?.[0] || ''} alt="" className="w-full h-full object-cover" />
                   </div>
                 )}

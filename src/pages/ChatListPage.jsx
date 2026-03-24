@@ -5,6 +5,22 @@ import { Search, MessageCircle } from 'lucide-react';
 import { getConversations, getToken } from '../lib/api';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now - date;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'ahora';
+  if (diffMin < 60) return `${diffMin}min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}h`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 7) return `${diffD}d`;
+  const diffW = Math.floor(diffD / 7);
+  return `${diffW}sem`;
+}
+
 export default function ChatListPage() {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +117,7 @@ export default function ChatListPage() {
                   <span className={`text-xs flex-shrink-0 ml-2 ${
                     conv.unread > 0 ? 'text-mansion-gold' : 'text-text-dim'
                   }`}>
-                    {conv.timestamp}
+                    {timeAgo(conv.timestamp)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
