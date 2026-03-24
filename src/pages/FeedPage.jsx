@@ -14,8 +14,8 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const loadProfiles = useCallback((filter) => {
-    setLoading(true);
+  const loadProfiles = useCallback((filter, { silent = false } = {}) => {
+    if (!silent) setLoading(true);
     return getProfiles({ filter: filter === 'all' ? undefined : filter })
       .then(data => {
         setProfiles(data.profiles || []);
@@ -32,7 +32,7 @@ export default function FeedPage() {
   }, [activeFilter, navigate, loadProfiles]);
 
   const { indicatorRef } = usePullToRefresh(
-    useCallback(() => loadProfiles(activeFilter), [loadProfiles, activeFilter])
+    useCallback(() => loadProfiles(activeFilter, { silent: true }), [loadProfiles, activeFilter])
   );
 
   return (
