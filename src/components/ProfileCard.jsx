@@ -17,7 +17,9 @@ const ROLE_BG = {
 export default function ProfileCard({ profile, index = 0, viewerPremium = false, settings = {} }) {
   const { id, name, age, city, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
-  const blurLevel = isMobile ? (settings.blurMobile ?? settings.blurLevel ?? 14) : (settings.blurDesktop ?? settings.blurLevel ?? 8);
+  const baseBlur = isMobile ? (settings.blurMobile ?? settings.blurLevel ?? 14) : (settings.blurDesktop ?? settings.blurLevel ?? 8);
+  // Profile cards are medium-sized — use base value as-is
+  const blurLevel = baseBlur;
 
   // visiblePhotos tells us how many photos are unblurred
   const visiblePhotos = profile.visiblePhotos ?? photos.length;
@@ -42,12 +44,12 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
             style={cardBlocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
           />
 
-          {/* Ghost mode overlay */}
+          {/* Incognito mode overlay */}
           {cardBlocked && (
             <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10">
               <div className="flex flex-col items-center gap-1 text-white/70">
                 <Lock className="w-5 h-5" />
-                <span className="text-[10px] font-semibold">Modo Fantasma</span>
+                <span className="text-[10px] font-semibold">Modo Incógnito</span>
               </div>
             </div>
           )}

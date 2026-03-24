@@ -155,14 +155,18 @@ export default function ProfileDetailPage() {
 
   const { name, age, city, role, interests, bio, photos, totalPhotos, verified, online, premium, blurred, isOwnProfile } = profile;
 
-  // Ghost mode blur (whole profile)
+  // Incognito mode blur (whole profile)
   const isGhostBlurred = blurred;
 
   // A photo is blocked if its index >= visiblePhotos count from backend
   const visiblePhotos = profile.visiblePhotos ?? photos.length;
   const isPhotoBlocked = (index) => index >= visiblePhotos;
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
-  const blurLevel = isMobile ? (settings.blurMobile ?? settings.blurLevel ?? 14) : (settings.blurDesktop ?? settings.blurLevel ?? 8);
+  const baseBlur = isMobile ? (settings.blurMobile ?? settings.blurLevel ?? 14) : (settings.blurDesktop ?? settings.blurLevel ?? 8);
+  // Scale blur proportionally: hero gets 1.8x, thumbnails 0.5x, lightbox 2.5x
+  const heroBlur = Math.round(baseBlur * 1.8);
+  const thumbBlur = Math.round(baseBlur * 0.5);
+  const lightboxBlur = Math.round(baseBlur * 2.5);
 
   return (
     <div className="min-h-screen bg-mansion-base pb-28 lg:pb-8">
@@ -195,14 +199,14 @@ export default function ProfileDetailPage() {
                     src={photo}
                     alt={blocked ? '' : `${name} ${i + 1}`}
                     className="w-full h-full object-cover"
-                    style={blocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
+                    style={blocked ? { filter: `blur(${heroBlur}px)`, transform: 'scale(1.1)' } : undefined}
                     draggable={false}
                   />
                   {blocked && (
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                       <div className="flex flex-col items-center gap-2 text-white/80">
                         <Lock className="w-8 h-8" />
-                        <span className="text-sm font-semibold">{isGhostBlurred ? 'Modo Fantasma' : 'Contenido VIP'}</span>
+                        <span className="text-sm font-semibold">{isGhostBlurred ? 'Modo Incógnito' : 'Contenido VIP'}</span>
                         <span className="text-xs text-white/60">Solo visible para usuarios VIP</span>
                       </div>
                     </div>
@@ -378,7 +382,7 @@ export default function ProfileDetailPage() {
                         src={photo}
                         alt=""
                         className="w-full h-full object-cover"
-                        style={blocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
+                        style={blocked ? { filter: `blur(${thumbBlur}px)`, transform: 'scale(1.1)' } : undefined}
                         draggable={false}
                       />
                       {blocked && (
@@ -486,7 +490,7 @@ export default function ProfileDetailPage() {
                       src={photo}
                       alt={blocked ? '' : `${name} ${i + 1}`}
                       className="w-full h-full object-cover select-none"
-                      style={blocked ? { filter: `blur(${blurLevel}px)` } : undefined}
+                      style={blocked ? { filter: `blur(${lightboxBlur}px)` } : undefined}
                       draggable={false}
                     />
                     {blocked && (
