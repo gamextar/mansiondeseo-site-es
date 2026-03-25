@@ -160,7 +160,7 @@ export default function SettingsPage() {
       setPaymentDescriptorVip(s.paymentDescriptorVip || 'UNICOAPPS');
       setPaymentTitleCoins(s.paymentTitleCoins || 'Servicios Digitales');
       setPaymentDescriptorCoins(s.paymentDescriptorCoins || 'UNICOAPPS');
-      setPaymentGateway(s.paymentGateway || 'mercadopago');
+      // No overriding paymentGateway from server — trust the local value the user selected
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
@@ -475,15 +475,16 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            {/* Payment Display */}
+            {/* Payment Display — only for MercadoPago (Ualá uses checkout description from bridge) */}
+            {paymentGateway === 'mercadopago' && (
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5 space-y-3">
               <div className="flex items-center gap-3 mb-1">
                 <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
                   <Shield className="w-4 h-4 text-mansion-gold" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Datos del Pago</h3>
-                  <p className="text-[11px] text-text-dim">Lo que ve el usuario en MercadoPago y en su tarjeta</p>
+                  <h3 className="text-sm font-semibold text-text-primary">Datos del Pago (MercadoPago)</h3>
+                  <p className="text-[11px] text-text-dim">Lo que ve el usuario en el checkout y su resumen de tarjeta</p>
                 </div>
               </div>
               {/* VIP */}
@@ -512,6 +513,7 @@ export default function SettingsPage() {
               </div>
               <p className="text-[10px] text-text-dim">El descriptor aparece en el resumen de la tarjeta (máx. 22 caracteres)</p>
             </div>
+            )}
           </div>
         </section>}
 
