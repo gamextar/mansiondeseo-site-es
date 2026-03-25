@@ -252,7 +252,7 @@ export default function ProfileDetailPage() {
               return (
                 <div
                   key={i}
-                  className="w-full h-full flex-shrink-0 snap-center relative cursor-pointer"
+                  className="w-full h-full flex-shrink-0 snap-start relative cursor-pointer overflow-hidden"
                   onClick={() => !blocked && openLightbox(i)}
                 >
                   <img
@@ -666,11 +666,11 @@ export default function ProfileDetailPage() {
               {photos.map((photo, i) => {
                 const blocked = isPhotoBlocked(i);
                 return (
-                  <div key={i} className="flex-shrink-0 snap-center relative overflow-hidden" style={{ width: '100%', minWidth: '100%', height: '100%' }}>
+                  <div key={i} className="flex-shrink-0 snap-start relative overflow-hidden" style={{ width: '100%', minWidth: '100%', height: '100%' }}>
                     <img
                       src={photo}
                       alt={blocked ? '' : `${name} ${i + 1}`}
-                      className="w-full h-full object-cover select-none"
+                      className="w-full h-full object-contain select-none"
                       style={blocked ? { filter: `blur(${lightboxBlur}px)` } : undefined}
                       draggable={false}
                     />

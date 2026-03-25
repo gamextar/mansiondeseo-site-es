@@ -28,9 +28,27 @@ const ROLE_BG = {
 };
 
 const ROLE_IMG_KEYS = {
-  'Hombre Solo': 'roleHombreImg',
-  'Mujer Sola': 'roleMujerImg',
-  'Pareja': 'roleParejaImg',
+  'Hombre Solo': 'galleryHombreImg',
+  'Mujer Sola': 'galleryMujerImg',
+  'Pareja': 'galleryParejaImg',
+};
+
+const RoleFallbackIcon = ({ role }) => {
+  if (role === 'Hombre Solo') return (
+    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-500/80 text-white shrink-0">
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4Z"/></svg>
+    </span>
+  );
+  if (role === 'Mujer Sola') return (
+    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-pink-500/80 text-white shrink-0">
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4Z"/></svg>
+    </span>
+  );
+  return (
+    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-purple-500/80 text-white shrink-0">
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3Zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3Zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5Zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5Z"/></svg>
+    </span>
+  );
 };
 
 export default function ProfileCard({ profile, index = 0, viewerPremium = false, settings = {} }) {
@@ -116,7 +134,7 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
 
               {roleImg
                 ? <img src={roleImg} alt={role} title={role} className="w-7 h-7 rounded-full object-contain" />
-                : <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${ROLE_BG[role]}`}>{role}</span>
+                : <RoleFallbackIcon role={role} />
               }
             </div>
           </div>

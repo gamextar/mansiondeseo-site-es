@@ -1142,6 +1142,9 @@ async function loadSettings(env) {
     roleHombreImg: settings.role_hombre_img || '',
     roleMujerImg: settings.role_mujer_img || '',
     roleParejaImg: settings.role_pareja_img || '',
+    galleryHombreImg: settings.gallery_hombre_img || '',
+    galleryMujerImg: settings.gallery_mujer_img || '',
+    galleryParejaImg: settings.gallery_pareja_img || '',
     allowedCountries: settings.allowed_countries || 'AR',
     coinPack1Coins: settings.coin_pack_1_coins || '1000',
     coinPack1Price: settings.coin_pack_1_price || '',
@@ -1188,6 +1191,9 @@ async function handleGetPublicSettings(request, env) {
       roleHombreImg: settings.roleHombreImg,
       roleMujerImg: settings.roleMujerImg,
       roleParejaImg: settings.roleParejaImg,
+      galleryHombreImg: settings.galleryHombreImg,
+      galleryMujerImg: settings.galleryMujerImg,
+      galleryParejaImg: settings.galleryParejaImg,
     },
   });
 }
@@ -1219,6 +1225,7 @@ async function handleUpdateSettings(request, env) {
     'vip_price_monthly', 'vip_price_3months', 'vip_price_6months',
     'incognito_icon_svg',
     'role_hombre_img', 'role_mujer_img', 'role_pareja_img',
+    'gallery_hombre_img', 'gallery_mujer_img', 'gallery_pareja_img',
     'allowed_countries',
     'coin_pack_1_coins', 'coin_pack_1_price',
     'coin_pack_2_coins', 'coin_pack_2_price',
