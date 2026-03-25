@@ -23,6 +23,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   // Photo & Blur
   const [blurMobile, setBlurMobile] = useState(14);
@@ -160,11 +161,14 @@ export default function SettingsPage() {
       setPaymentDescriptorVip(s.paymentDescriptorVip || 'UNICOAPPS');
       setPaymentTitleCoins(s.paymentTitleCoins || 'Servicios Digitales');
       setPaymentDescriptorCoins(s.paymentDescriptorCoins || 'UNICOAPPS');
-      // No overriding paymentGateway from server — trust the local value the user selected
+      setPaymentGateway(s.paymentGateway || 'mercadopago');
       setSaved(true);
+      setSaveError('');
       setTimeout(() => setSaved(false), 2000);
-    } catch {
-      // Silently fail
+    } catch (err) {
+      console.error('Error guardando settings:', err);
+      setSaveError(err?.message || 'Error al guardar');
+      setTimeout(() => setSaveError(''), 4000);
     } finally {
       setSaving(false);
     }
@@ -790,6 +794,9 @@ export default function SettingsPage() {
           <Save className="w-4 h-4" />
           {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar Configuración'}
         </button>
+        {saveError && (
+          <p className="text-center text-xs text-red-400 mt-2">{saveError}</p>
+        )}
       </div>
     </div>
   );
