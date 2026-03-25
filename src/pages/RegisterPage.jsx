@@ -366,8 +366,8 @@ function FichaPreview({ data, currentStep }) {
 // Step Components
 // ────────────────────────────────────────────
 
-function StepEmail({ email, password, onEmailChange, onPasswordChange }) {
-  const [showPassword, setShowPassword] = useState(false);
+function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePasswordDefault }) {
+  const [showPassword, setShowPassword] = useState(!hidePasswordDefault);
 
   return (
     <div className="text-center">
@@ -428,7 +428,7 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange }) {
   );
 }
 
-function RoleGrid({ selected, onSelect, title, subtitle }) {
+function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
   return (
     <div className="text-center">
       <h2 className="font-display text-2xl font-bold text-text-primary mb-2">{title}</h2>
@@ -437,6 +437,7 @@ function RoleGrid({ selected, onSelect, title, subtitle }) {
       <div className="flex items-end justify-center gap-3">
         {ROLES.map((role) => {
           const isActive = selected === role.id;
+          const customImg = roleImages[role.id];
           return (
             <motion.button
               key={role.id}
@@ -449,7 +450,13 @@ function RoleGrid({ selected, onSelect, title, subtitle }) {
                 borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
               }}
             >
-              <PersonFigure type={role.id} isActive={isActive} size="lg" />
+              {customImg ? (
+                <div className={`w-20 h-28 rounded-xl overflow-hidden transition-transform duration-300 ${isActive ? 'scale-110' : 'scale-100'}`}>
+                  <img src={customImg} alt={role.label} className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <PersonFigure type={role.id} isActive={isActive} size="lg" />
+              )}
               <span
                 className={`mt-2 font-medium text-sm ${
                   isActive ? 'text-text-primary' : 'text-text-muted'
@@ -520,8 +527,10 @@ function StepInterests({ selected, onToggle }) {
   );
 }
 
-function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, selectedCountry, onCountryChange }) {
+function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, selectedCountry, onCountryChange, isCouple }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [nameElla, setNameElla] = useState('');
+  const [nameEl, setNameEl] = useState('');
 
   const ARGENTINA_CITIES = [
     'Buenos Aires', 'CABA', 'Córdoba', 'Rosario', 'Mendoza', 'San Miguel de Tucumán',
@@ -547,18 +556,60 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
       <p className="text-text-muted text-sm mb-8">Cuéntanos un poco más sobre ti</p>
 
       <div className="space-y-4 max-w-xs mx-auto text-left">
-        <div>
-          <label className="text-text-muted text-xs font-medium mb-1.5 block">
-            Nombre (o alias)
-          </label>
-          <input
-            type="text"
-            value={data.name}
-            onChange={(e) => onChange({ ...data, name: e.target.value })}
-            placeholder="Tu nombre en la Mansión"
-            className="w-full"
-          />
-        </div>
+        {isCouple ? (
+          <div>
+            <label className="text-text-muted text-xs font-medium mb-1.5 block">
+              Nombres de la pareja
+            </label>
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={nameElla}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNameElla(val);
+                    onChange({ ...data, name: val && nameEl ? `${val} y ${nameEl}` : val || nameEl });
+                  }}
+                  placeholder="Ella"
+                  className="w-full text-center"
+                />
+              </div>
+              <span className="text-mansion-gold font-display font-bold text-sm">&</span>
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={nameEl}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNameEl(val);
+                    onChange({ ...data, name: nameElla && val ? `${nameElla} y ${val}` : nameElla || val });
+                  }}
+                  placeholder="Él"
+                  className="w-full text-center"
+                />
+              </div>
+            </div>
+            {nameElla && nameEl && (
+              <p className="text-[11px] text-mansion-gold mt-1.5 text-center">
+                Se mostrará como: <span className="font-semibold">{nameElla} y {nameEl}</span>
+              </p>
+            )}
+          </div>
+        ) : (
+          <div>
+            <label className="text-text-muted text-xs font-medium mb-1.5 block">
+              Nombre (o alias)
+            </label>
+            <input
+              type="text"
+              value={data.name}
+              onChange={(e) => onChange({ ...data, name: e.target.value })}
+              placeholder="Tu nombre en la Mansión"
+              className="w-full"
+            />
+          </div>
+        )}
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">Edad</label>
           <input
@@ -944,6 +995,8 @@ export default function RegisterPage() {
   const [allowedCountries, setAllowedCountries] = useState([]);
   const [selectedCountry, setSelectedCountry] = useState('');
   const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [hidePasswordDefault, setHidePasswordDefault] = useState(true);
+  const [roleImages, setRoleImages] = useState({});
 
   useEffect(() => {
     Promise.all([
@@ -954,6 +1007,12 @@ export default function RegisterPage() {
       const allowed = (settingsData.settings?.allowedCountries || 'AR').split(',').map(c => c.trim()).filter(Boolean);
       setDetectedCountry(detected);
       setAllowedCountries(allowed);
+      setHidePasswordDefault(settingsData.settings?.hidePasswordRegister !== false);
+      setRoleImages({
+        hombre: settingsData.settings?.roleHombreImg || '',
+        mujer: settingsData.settings?.roleMujerImg || '',
+        pareja: settingsData.settings?.roleParejaImg || '',
+      });
       if (detected && allowed.includes(detected)) {
         setSelectedCountry(detected);
         setShowCountryPicker(false);
@@ -1123,6 +1182,7 @@ export default function RegisterPage() {
             password={password}
             onEmailChange={setEmail}
             onPasswordChange={setPassword}
+            hidePasswordDefault={hidePasswordDefault}
           />
         );
       case 1:
@@ -1132,6 +1192,7 @@ export default function RegisterPage() {
             onSelect={handleRoleSelect}
             title="Soy un..."
             subtitle="Selecciona tu perfil"
+            roleImages={roleImages}
           />
         );
       case 2:
@@ -1141,12 +1202,13 @@ export default function RegisterPage() {
             onSelect={handleSeekingSelect}
             title="Busco..."
             subtitle="¿Qué tipo de conexión te interesa?"
+            roleImages={roleImages}
           />
         );
       case 3:
         return <StepInterests selected={interests} onToggle={toggleInterest} />;
       case 4:
-        return <StepBasicInfo data={info} onChange={setInfo} showCountryPicker={showCountryPicker} allowedCountries={allowedCountries} selectedCountry={selectedCountry} onCountryChange={setSelectedCountry} />;
+        return <StepBasicInfo data={info} onChange={setInfo} showCountryPicker={showCountryPicker} allowedCountries={allowedCountries} selectedCountry={selectedCountry} onCountryChange={setSelectedCountry} isCouple={iAm === 'pareja'} />;
       case 5:
         return <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />;
       default:

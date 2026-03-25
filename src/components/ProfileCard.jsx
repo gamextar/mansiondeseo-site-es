@@ -27,8 +27,15 @@ const ROLE_BG = {
   'Mujer Sola': 'bg-pink-500/20 text-pink-300',
 };
 
+const ROLE_IMG_KEYS = {
+  'Hombre Solo': 'roleHombreImg',
+  'Mujer Sola': 'roleMujerImg',
+  'Pareja': 'roleParejaImg',
+};
+
 export default function ProfileCard({ profile, index = 0, viewerPremium = false, settings = {} }) {
   const { id, name, age, city, role, interests, photos = [], verified, online, premium, blurred } = profile;
+  const roleImg = settings[ROLE_IMG_KEYS[role]] || null;
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
   const baseBlur = isMobile ? (settings.blurMobile ?? settings.blurLevel ?? 14) : (settings.blurDesktop ?? settings.blurLevel ?? 8);
   // Profile cards are medium-sized — use base value as-is
@@ -95,18 +102,6 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
 
           {/* Bottom info */}
           <div className="absolute bottom-0 left-0 right-0 p-3 z-20">
-            {/* Interests pills */}
-            <div className="flex flex-wrap gap-1 mb-2">
-              {interests.slice(0, 2).map((tag) => (
-                <span
-                  key={tag}
-                  className="text-[9px] font-medium px-2 py-0.5 rounded-full bg-white/10 backdrop-blur-sm text-white/80 border border-white/10"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-
             {/* Name & details */}
             <div className="flex items-end justify-between">
               <div>
@@ -119,9 +114,10 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
                 </div>
               </div>
 
-              <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${ROLE_BG[role]}`}>
-                {role}
-              </span>
+              {roleImg
+                ? <img src={roleImg} alt={role} title={role} className="w-7 h-7 rounded-full object-contain" />
+                : <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${ROLE_BG[role]}`}>{role}</span>
+              }
             </div>
           </div>
         </div>

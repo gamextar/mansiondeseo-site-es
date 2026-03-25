@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard } from 'lucide-react';
-import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins } from '../lib/api';
+import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart } from 'lucide-react';
+import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, uploadImage } from '../lib/api';
 import { useAuth } from '../App';
 
 // Section definitions for sidebar navigation
@@ -29,7 +29,6 @@ export default function SettingsPage() {
   const [blurMobile, setBlurMobile] = useState(14);
   const [blurDesktop, setBlurDesktop] = useState(8);
   const [freeVisiblePhotos, setFreeVisiblePhotos] = useState(1);
-  const [freeOwnPhotos, setFreeOwnPhotos] = useState(3);
 
   // VIP
   const [showVipButton, setShowVipButton] = useState(true);
@@ -55,6 +54,9 @@ export default function SettingsPage() {
 
   // Iconografía
   const [incognitoIconSvg, setIncognitoIconSvg] = useState('');
+  const [roleHombreImg, setRoleHombreImg] = useState('');
+  const [roleMujerImg, setRoleMujerImg] = useState('');
+  const [roleParejaImg, setRoleParejaImg] = useState('');
 
   // Payment display
   const [paymentTitleVip, setPaymentTitleVip] = useState('Servicios Digitales');
@@ -80,7 +82,6 @@ export default function SettingsPage() {
         setBlurMobile(s.blurMobile);
         setBlurDesktop(s.blurDesktop);
         setFreeVisiblePhotos(s.freeVisiblePhotos);
-        setFreeOwnPhotos(s.freeOwnPhotos);
         setShowVipButton(s.showVipButton);
         setDailyMessageLimit(s.dailyMessageLimit);
         setSiteCountry(s.siteCountry);
@@ -90,6 +91,9 @@ export default function SettingsPage() {
         setVipPrice3Months(s.vipPrice3Months);
         setVipPrice6Months(s.vipPrice6Months);
         setIncognitoIconSvg(s.incognitoIconSvg || '');
+        setRoleHombreImg(s.roleHombreImg || '');
+        setRoleMujerImg(s.roleMujerImg || '');
+        setRoleParejaImg(s.roleParejaImg || '');
         setCoinPack1Coins(s.coinPack1Coins || '1000');
         setCoinPack1Price(s.coinPack1Price || '');
         setCoinPack2Coins(s.coinPack2Coins || '2000');
@@ -115,7 +119,6 @@ export default function SettingsPage() {
         blur_mobile: blurMobile,
         blur_desktop: blurDesktop,
         free_visible_photos: freeVisiblePhotos,
-        free_own_photos: freeOwnPhotos,
         show_vip_button: showVipButton ? '1' : '0',
         daily_message_limit: dailyMessageLimit,
         site_country: siteCountry,
@@ -125,6 +128,9 @@ export default function SettingsPage() {
         vip_price_3months: vipPrice3Months,
         vip_price_6months: vipPrice6Months,
         incognito_icon_svg: incognitoIconSvg,
+        role_hombre_img: roleHombreImg,
+        role_mujer_img: roleMujerImg,
+        role_pareja_img: roleParejaImg,
         coin_pack_1_coins: coinPack1Coins,
         coin_pack_1_price: coinPack1Price,
         coin_pack_2_coins: coinPack2Coins,
@@ -141,7 +147,6 @@ export default function SettingsPage() {
       setBlurMobile(s.blurMobile);
       setBlurDesktop(s.blurDesktop);
       setFreeVisiblePhotos(s.freeVisiblePhotos);
-      setFreeOwnPhotos(s.freeOwnPhotos);
       setShowVipButton(s.showVipButton);
       setDailyMessageLimit(s.dailyMessageLimit);
       setSiteCountry(s.siteCountry);
@@ -308,21 +313,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Free Own Photos */}
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                    <Sliders className="w-4 h-4 text-mansion-gold" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-text-primary">Fotos visibles (propio)</h3>
-                    <p className="text-[11px] text-text-dim">Fotos sin blur en su propio perfil</p>
-                  </div>
-                </div>
-                <Counter value={freeOwnPhotos} onChange={setFreeOwnPhotos} max={20} />
-              </div>
-            </div>
+
           </div>
         </section>}
 
@@ -576,6 +567,57 @@ export default function SettingsPage() {
                 {incognitoIconSvg.trim() && (
                   <button onClick={() => setIncognitoIconSvg('')} className="text-[11px] text-mansion-crimson hover:underline">Restaurar default</button>
                 )}
+              </div>
+            </div>
+
+            {/* Registration Role Images */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Users className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Imágenes de Registro</h3>
+                  <p className="text-[11px] text-text-dim">Imágenes para Hombre, Mujer y Pareja en el registro. PNG/JPG/WebP recomendado.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Hombre', value: roleHombreImg, setter: setRoleHombreImg, color: '#3B82F6' },
+                  { label: 'Mujer', value: roleMujerImg, setter: setRoleMujerImg, color: '#EC4899' },
+                  { label: 'Pareja', value: roleParejaImg, setter: setRoleParejaImg, color: '#8B5CF6' },
+                ].map(({ label, value, setter, color }) => (
+                  <div key={label} className="flex flex-col items-center gap-2">
+                    <span className="text-[11px] font-medium" style={{ color }}>{label}</span>
+                    <label className="relative w-full aspect-square rounded-xl border-2 border-dashed border-mansion-border/40 hover:border-mansion-gold/40 cursor-pointer transition-colors bg-mansion-elevated/50 overflow-hidden flex items-center justify-center">
+                      {value ? (
+                        <img src={value} alt={label} className="w-full h-full object-cover" />
+                      ) : (
+                        <Upload className="w-5 h-5 text-text-dim" />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const result = await uploadImage(file);
+                            if (result.url) setter(result.url);
+                          } catch (err) {
+                            console.error('Error uploading role image:', err);
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {value && (
+                      <button onClick={() => setter('')} className="text-[10px] text-mansion-crimson hover:underline">Quitar</button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>

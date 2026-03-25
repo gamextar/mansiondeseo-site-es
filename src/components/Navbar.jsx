@@ -73,8 +73,12 @@ export default function Navbar() {
             {/* Avatar */}
             <Link to="/perfil" className="ml-1">
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-mansion-gold to-mansion-gold-light p-[2px]">
-                <div className="w-full h-full rounded-full bg-mansion-card flex items-center justify-center">
-                  <span className="text-mansion-gold text-xs font-bold">TÚ</span>
+                <div className="w-full h-full rounded-full bg-mansion-card overflow-hidden flex items-center justify-center">
+                  {user?.avatar_url ? (
+                    <img src={user.avatar_url} alt="Perfil" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-mansion-gold text-xs font-bold">TÚ</span>
+                  )}
                 </div>
               </div>
             </Link>

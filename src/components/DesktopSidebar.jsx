@@ -77,21 +77,11 @@ export default function DesktopSidebar() {
 
               <div className="relative z-10 flex items-center gap-3 w-full">
                 <div className="relative">
-                  {to === '/perfil' && user?.avatar_url ? (
-                    <img
-                      src={user.avatar_url}
-                      alt="Mi Perfil"
-                      className={`w-6 h-6 rounded-full object-cover ring-2 transition-all ${
-                        isActive ? 'ring-mansion-gold' : 'ring-transparent group-hover:ring-text-muted/30'
-                      }`}
-                    />
-                  ) : (
-                    <Icon
-                      className={`w-5 h-5 transition-colors ${
-                        isActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'
-                      }`}
-                    />
-                  )}
+                  <Icon
+                    className={`w-5 h-5 transition-colors ${
+                      isActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'
+                    }`}
+                  />
                   {to === '/mensajes' && unreadCount > 0 && (
                     <span className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] rounded-full bg-mansion-crimson text-white text-[9px] font-bold flex items-center justify-center px-1">
                       {unreadCount}

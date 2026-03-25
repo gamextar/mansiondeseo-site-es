@@ -29,7 +29,7 @@ import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
-const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin'];
+const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/'];
 
 // Auth context — exposes registered boolean + user object + setters
 const AuthContext = createContext({
@@ -51,7 +51,7 @@ function RequireRegistration({ children }) {
 function AppLayout() {
   const location = useLocation();
   const isFullscreen =
-    FULLSCREEN_PATHS.some((p) => location.pathname.startsWith(p) && p.endsWith('/')) ||
+    FULLSCREEN_PATHS.some((p) => location.pathname.startsWith(p)) ||
     FULLSCREEN_PATHS.includes(location.pathname);
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
   const showChrome = !isFullscreen && !isChatDetail;

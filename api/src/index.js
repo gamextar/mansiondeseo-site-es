@@ -621,7 +621,7 @@ async function handleProfileDetail(request, env, userId) {
 
   const allPhotos = safeParseJSON(user.photos, []);
   // Send all URLs; frontend applies CSS blur to blocked ones
-  const visibleLimit = isOwnProfile ? settings.freeOwnPhotos : settings.freeVisiblePhotos;
+  const visibleLimit = settings.freeVisiblePhotos;
   const visiblePhotos = viewerIsPremium
     ? allPhotos.length
     : blurred
@@ -1130,7 +1130,6 @@ async function loadSettings(env) {
     blurMobile: parseInt(settings.blur_mobile || settings.blur_level || '14', 10),
     blurDesktop: parseInt(settings.blur_desktop || settings.blur_level || '8', 10),
     freeVisiblePhotos: parseInt(settings.free_visible_photos || '1', 10),
-    freeOwnPhotos: parseInt(settings.free_own_photos || '3', 10),
     showVipButton: settings.show_vip_button !== '0',
     dailyMessageLimit: parseInt(settings.daily_message_limit || '5', 10),
     siteCountry: settings.site_country || 'AR',
@@ -1140,6 +1139,9 @@ async function loadSettings(env) {
     vipPrice3Months: settings.vip_price_3months || '',
     vipPrice6Months: settings.vip_price_6months || '',
     incognitoIconSvg: settings.incognito_icon_svg || '',
+    roleHombreImg: settings.role_hombre_img || '',
+    roleMujerImg: settings.role_mujer_img || '',
+    roleParejaImg: settings.role_pareja_img || '',
     allowedCountries: settings.allowed_countries || 'AR',
     coinPack1Coins: settings.coin_pack_1_coins || '1000',
     coinPack1Price: settings.coin_pack_1_price || '',
@@ -1182,6 +1184,10 @@ async function handleGetPublicSettings(request, env) {
       coinPack3Coins: settings.coinPack3Coins,
       coinPack3Price: settings.coinPack3Price,
       paymentGateway: settings.paymentGateway,
+      hidePasswordRegister: settings.hidePasswordRegister,
+      roleHombreImg: settings.roleHombreImg,
+      roleMujerImg: settings.roleMujerImg,
+      roleParejaImg: settings.roleParejaImg,
     },
   });
 }
@@ -1207,11 +1213,12 @@ async function handleUpdateSettings(request, env) {
   const body = await request.json();
   const allowed = [
     'blur_level', 'blur_mobile', 'blur_desktop',
-    'free_visible_photos', 'free_own_photos', 'show_vip_button',
+    'free_visible_photos', 'show_vip_button',
     'daily_message_limit', 'site_country', 'site_timezone',
     'hide_password_register',
     'vip_price_monthly', 'vip_price_3months', 'vip_price_6months',
     'incognito_icon_svg',
+    'role_hombre_img', 'role_mujer_img', 'role_pareja_img',
     'allowed_countries',
     'coin_pack_1_coins', 'coin_pack_1_price',
     'coin_pack_2_coins', 'coin_pack_2_price',
