@@ -1658,100 +1658,89 @@ async function bridgeHmacVerify(secret, message, expectedHex) {
 // UALÁ BIS — Payment Gateway
 // ══════════════════════════════════════════════════════════
 
-async function getUalaAccessToken(env) {
-  const authUrl = env.UALA_AUTH_URL || 'https://auth.prod.ua.la';
-  const tokenRes = await fetch(`${authUrl}/1/auth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      user_name: env.UALA_USERNAME,
-      client_id: env.UALA_CLIENT_ID,
-      client_secret: env.UALA_CLIENT_SECRET,
-      grant_type: 'client_credentials',
-    }),
-  });
-  if (!tokenRes.ok) {
-    const errText = await tokenRes.text();
-    console.error('Ualá auth error:', tokenRes.status, errText);
-    throw new Error(`Ualá auth error: ${tokenRes.status}`);
-  }
-  const data = await tokenRes.json();
-  return data.access_token;
-}
+// ── Ualá Bis vía Bridge ──────────────────────────────────
+// Todas las operaciones de Ualá Bis pasan por el bridge de UnicoApps
+// para que el merchant visible sea UnicoApps, no Mansión Deseo.
 
 async function handleUalaPaymentCreate(request, auth, env, settings, plan_id, numericAmount) {
-  if (!env.UALA_USERNAME || !env.UALA_CLIENT_ID || !env.UALA_CLIENT_SECRET) {
-    return error('Ualá Bis no configurado', 500);
+  if (!env.PAYMENT_BRIDGE_URL || !env.BRIDGE_SECRET) {
+    return error('Servicio de pagos no configurado', 500);
   }
 
   const isCoinPurchase = plan_id && plan_id.startsWith('coins_');
-  const description = isCoinPurchase ? settings.paymentTitleCoins : settings.paymentTitleVip;
   const externalRef = `${auth.sub}::${plan_id}`;
-
-  let accessToken;
-  try {
-    accessToken = await getUalaAccessToken(env);
-  } catch (err) {
-    return error('Error de autenticación con Ualá Bis', 502);
-  }
-
   const baseUrl = env.CORS_ORIGIN || 'http://localhost:5173';
   const workerUrl = new URL(request.url).origin;
-  const refParam = btoa(externalRef);
-  const checkoutBaseUrl = env.UALA_CHECKOUT_URL || 'https://checkout.prod.ua.la';
 
+  const bodyPayload = JSON.stringify({
+    user_id: auth.sub,
+    amount: numericAmount,
+    plan_id,
+    payment_title: isCoinPurchase ? settings.paymentTitleCoins : settings.paymentTitleVip,
+    payment_descriptor: isCoinPurchase ? settings.paymentDescriptorCoins : settings.paymentDescriptorVip,
+    gateway: 'uala_bis',
+    callback_success: `${baseUrl}/pago-exitoso?gateway=uala&external_reference=${encodeURIComponent(externalRef)}`,
+    callback_fail: `${baseUrl}/pago-fallido?gateway=uala`,
+    approved_callback_url: `${workerUrl}/api/payment/uala-approved`,
+  });
+
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = await bridgeHmacSign(env.BRIDGE_SECRET, `${timestamp}.${bodyPayload}`);
+
+  let bridgeData;
   try {
-    const checkoutRes = await fetch(`${checkoutBaseUrl}/1/checkout`, {
+    const bridgeRes = await fetch(`${env.PAYMENT_BRIDGE_URL}/api/uala/create-checkout`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
+        'X-Signature': signature,
+        'X-Timestamp': timestamp,
       },
-      body: JSON.stringify({
-        amount: numericAmount,
-        description,
-        userName: env.UALA_USERNAME,
-        callback_fail: `${baseUrl}/pago-fallido?gateway=uala`,
-        callback_success: `${baseUrl}/pago-exitoso?gateway=uala&external_reference=${encodeURIComponent(externalRef)}`,
-        notification_url: `${workerUrl}/api/payment/uala-webhook?ref=${encodeURIComponent(refParam)}`,
-      }),
+      body: bodyPayload,
     });
-    if (!checkoutRes.ok) {
-      const errText = await checkoutRes.text();
-      console.error('Ualá checkout error:', checkoutRes.status, errText);
-      return error('Error creando checkout en Ualá Bis', 502);
+    if (!bridgeRes.ok) {
+      const errText = await bridgeRes.text();
+      console.error('Bridge Ualá error:', bridgeRes.status, errText);
+      try {
+        const errJson = JSON.parse(errText);
+        return error(errJson.error || `bridge ${bridgeRes.status}`, 502);
+      } catch {
+        return error(`bridge ${bridgeRes.status}`, 502);
+      }
     }
-    const checkoutData = await checkoutRes.json();
-    return json({
-      redirect_url: checkoutData.links?.checkoutLink,
-      checkout_id: checkoutData.uuid,
-    });
+    bridgeData = await bridgeRes.json();
   } catch (err) {
-    console.error('Ualá checkout fetch error:', err.message);
-    return error('Ualá Bis no disponible', 502);
+    console.error('Bridge Ualá fetch error:', err.message);
+    return error('Servicio de pagos no disponible', 502);
   }
+
+  return json({
+    redirect_url: bridgeData.redirect_url,
+    checkout_id: bridgeData.checkout_id,
+  });
 }
 
 async function handleUalaPaymentConfirm(auth, env, paymentId, externalRef) {
-  if (!env.UALA_USERNAME || !env.UALA_CLIENT_ID || !env.UALA_CLIENT_SECRET) {
-    return error('Ualá Bis no configurado', 500);
+  if (!env.PAYMENT_BRIDGE_URL || !env.BRIDGE_SECRET) {
+    return error('Servicio de pagos no configurado', 500);
   }
 
-  const checkoutBaseUrl = env.UALA_CHECKOUT_URL || 'https://checkout.prod.ua.la';
-
-  let accessToken;
-  try {
-    accessToken = await getUalaAccessToken(env);
-  } catch {
-    return error('Ualá Bis no disponible', 502);
-  }
+  const bodyPayload = JSON.stringify({ checkout_id: String(paymentId) });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = await bridgeHmacSign(env.BRIDGE_SECRET, `${timestamp}.${bodyPayload}`);
 
   try {
-    const verifyRes = await fetch(`${checkoutBaseUrl}/1/checkout/${encodeURIComponent(paymentId)}`, {
-      headers: { 'Authorization': `Bearer ${accessToken}` },
+    const bridgeRes = await fetch(`${env.PAYMENT_BRIDGE_URL}/api/uala/verify-checkout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Signature': signature,
+        'X-Timestamp': timestamp,
+      },
+      body: bodyPayload,
     });
-    if (!verifyRes.ok) return error('No se pudo verificar el pago', 502);
-    const data = await verifyRes.json();
+    if (!bridgeRes.ok) return error('No se pudo verificar el pago', 502);
+    const data = await bridgeRes.json();
 
     if (data.status !== 'APPROVED' && !data.is_approved) {
       return json({ premium: false, reason: `status: ${data.status}` });
@@ -1774,7 +1763,7 @@ async function handleUalaPaymentConfirm(auth, env, paymentId, externalRef) {
       const coinsToAdd = parseInt(coinPlanMatch[1], 10);
       await env.DB.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').bind(coinsToAdd, auth.sub).run();
       await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(paymentId), auth.sub, planId, data.amount || 0).run();
-      console.log(`✅ [Ualá] Monedas confirmadas — user: ${auth.sub} | uuid: ${paymentId} | +${coinsToAdd} coins`);
+      console.log(`✅ [Ualá Bridge] Monedas confirmadas — user: ${auth.sub} | uuid: ${paymentId} | +${coinsToAdd} coins`);
       return json({ coins: true, coinsAdded: coinsToAdd });
     }
 
@@ -1782,73 +1771,45 @@ async function handleUalaPaymentConfirm(auth, env, paymentId, externalRef) {
     const newUntil = activatePremium(current?.premium_until, planId);
     await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, auth.sub).run();
     await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(paymentId), auth.sub, planId || '', data.amount || 0).run();
-    console.log(`✅ [Ualá] Premium confirmado — user: ${auth.sub} | uuid: ${paymentId} | plan: ${planId} | hasta: ${newUntil}`);
+    console.log(`✅ [Ualá Bridge] Premium confirmado — user: ${auth.sub} | uuid: ${paymentId} | plan: ${planId} | hasta: ${newUntil}`);
     return json({ premium: true, premium_until: newUntil });
   } catch (err) {
-    console.error('Ualá confirm error:', err.message);
+    console.error('Ualá Bridge confirm error:', err.message);
     return error('Error verificando pago', 502);
   }
 }
 
-// ── POST /api/payment/uala-webhook ──────────────────────
-// Ualá Bis notification webhook (server-to-server).
-// Verifica el pago con la API de Ualá antes de activar.
-async function handleUalaWebhook(request, env) {
-  if (!env.UALA_USERNAME || !env.UALA_CLIENT_ID || !env.UALA_CLIENT_SECRET) {
-    return error('Ualá Bis no configurado', 500);
-  }
+// ── POST /api/payment/uala-approved ─────────────────────
+// Recibe callback del bridge cuando el pago Ualá Bis es aprobado.
+// NO requiere JWT ni Turnstile — se autentica con HMAC del bridge.
+async function handleUalaApproved(request, env) {
+  if (!env.BRIDGE_SECRET) return error('Servicio de pagos no configurado', 500);
 
-  const url = new URL(request.url);
-  const refParam = url.searchParams.get('ref');
-  if (!refParam) return error('ref parameter missing', 400);
+  const signature = request.headers.get('X-Signature');
+  const timestamp = request.headers.get('X-Timestamp');
+  if (!signature || !timestamp) return error('Headers de autenticación faltantes', 401);
 
-  let externalRef;
-  try {
-    externalRef = atob(decodeURIComponent(refParam));
-  } catch {
-    return error('Invalid ref', 400);
-  }
+  const now = Math.floor(Date.now() / 1000);
+  const ts = parseInt(timestamp, 10);
+  if (isNaN(ts) || Math.abs(now - ts) > 300) return error('Solicitud expirada', 401);
 
-  const [userId, planId] = externalRef.split('::');
-  if (!userId || !planId) return error('Invalid reference format', 400);
+  const rawBody = await request.text();
+  const expected = await bridgeHmacSign(env.BRIDGE_SECRET, `${timestamp}.${rawBody}`);
+  if (signature !== expected) return error('Firma inválida', 401);
 
   let body;
   try {
-    body = await request.json();
+    body = JSON.parse(rawBody);
   } catch {
     return error('JSON inválido', 400);
   }
 
-  const uuid = body.uuid || body.id;
-  if (!uuid) return error('uuid requerido', 400);
-
-  const checkoutBaseUrl = env.UALA_CHECKOUT_URL || 'https://checkout.prod.ua.la';
-  let accessToken;
-  try {
-    accessToken = await getUalaAccessToken(env);
-  } catch {
-    return error('Ualá Bis no disponible', 502);
-  }
-
-  // Verify payment status with Ualá API
-  try {
-    const verifyRes = await fetch(`${checkoutBaseUrl}/1/checkout/${encodeURIComponent(uuid)}`, {
-      headers: { 'Authorization': `Bearer ${accessToken}` },
-    });
-    if (!verifyRes.ok) return error('Error verificando pago', 502);
-    const verifyData = await verifyRes.json();
-
-    if (verifyData.status !== 'APPROVED' && !verifyData.is_approved) {
-      console.log(`⚠️ [Ualá] Webhook uuid ${uuid} — status: ${verifyData.status}`);
-      return json({ success: false, reason: `status: ${verifyData.status}` });
-    }
-  } catch {
-    return error('Error verificando con Ualá', 502);
-  }
+  const { user_id: userId, plan_id: planId, checkout_id: uuid, amount } = body;
+  if (!userId || !planId || !uuid) return error('Datos incompletos', 400);
 
   const existing = await env.DB.prepare('SELECT 1 FROM processed_payments WHERE payment_id = ?').bind(String(uuid)).first();
   if (existing) {
-    console.log(`⚠️ [Ualá] Payment ${uuid} ya procesado — ignorando`);
+    console.log(`⚠️ [Ualá Bridge] Payment ${uuid} ya procesado — ignorando`);
     return json({ success: true, already_processed: true });
   }
 
@@ -1857,17 +1818,17 @@ async function handleUalaWebhook(request, env) {
     if (coinMatch) {
       const coinsToAdd = parseInt(coinMatch[1], 10);
       await env.DB.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').bind(coinsToAdd, userId).run();
-      await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(uuid), userId, planId, body.amount || 0).run();
-      console.log(`✅ [Ualá] Monedas acreditadas vía webhook — user: ${userId} | uuid: ${uuid} | +${coinsToAdd} coins`);
+      await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(uuid), userId, planId, amount || 0).run();
+      console.log(`✅ [Ualá Bridge] Monedas acreditadas vía webhook — user: ${userId} | uuid: ${uuid} | +${coinsToAdd} coins`);
     } else {
       const current = await env.DB.prepare('SELECT premium_until FROM users WHERE id = ?').bind(userId).first();
       const newUntil = activatePremium(current?.premium_until, planId);
       await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, userId).run();
-      await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(uuid), userId, planId, body.amount || 0).run();
-      console.log(`✅ [Ualá] Premium activado vía webhook — user: ${userId} | uuid: ${uuid} | plan: ${planId} | hasta: ${newUntil}`);
+      await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(uuid), userId, planId, amount || 0).run();
+      console.log(`✅ [Ualá Bridge] Premium activado vía webhook — user: ${userId} | uuid: ${uuid} | plan: ${planId} | hasta: ${newUntil}`);
     }
   } catch (err) {
-    console.error('[Ualá] DB error:', err.message);
+    console.error('[Ualá Bridge] DB error:', err.message);
     return error('Error al activar', 500);
   }
 
@@ -2102,7 +2063,7 @@ async function handleRequest(request, env) {
 
   // ── Rutas server-to-server (bypass Turnstile — autenticadas con HMAC o verificación API)
   if (path === '/api/payment/approved' && method === 'POST') return handlePaymentApproved(request, env);
-  if (path === '/api/payment/uala-webhook' && method === 'POST') return handleUalaWebhook(request, env);
+  if (path === '/api/payment/uala-approved' && method === 'POST') return handleUalaApproved(request, env);
 
   // Turnstile validation for mutations (skip for GET and dev)
   if (['POST', 'PUT', 'DELETE'].includes(method) && env.TURNSTILE_SECRET) {

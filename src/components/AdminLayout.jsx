@@ -1,13 +1,9 @@
 import { NavLink, Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { Settings, Users, Home, Shield, LogOut } from 'lucide-react';
+import { Users, Home, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../App';
 import { useEffect } from 'react';
-
-const ADMIN_NAV = [
-  { to: '/admin/usuarios', icon: Users, label: 'Usuarios' },
-  { to: '/admin/configuracion', icon: Settings, label: 'Configuración' },
-];
+import { ADMIN_SECTIONS } from '../pages/SettingsPage';
 
 export default function AdminLayout() {
   const { user } = useAuth();
@@ -19,6 +15,10 @@ export default function AdminLayout() {
   }, [user, navigate]);
 
   if (!user?.is_admin) return null;
+
+  const currentSection = new URLSearchParams(location.search).get('section') || '';
+  const isUsersActive = location.pathname.startsWith('/admin/usuarios');
+  const isConfigActive = location.pathname.startsWith('/admin/configuracion');
 
   return (
     <div className="min-h-screen flex">
@@ -38,14 +38,41 @@ export default function AdminLayout() {
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {ADMIN_NAV.map(({ to, icon: Icon, label }) => {
-            const isActive = location.pathname.startsWith(to);
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {/* Usuarios */}
+          <NavLink
+            to="/admin/usuarios"
+            className="relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all group"
+          >
+            {isUsersActive && (
+              <motion.div
+                layoutId="admin-sidebar-active"
+                className="absolute inset-0 bg-mansion-gold/10 border border-mansion-gold/20 rounded-xl"
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              />
+            )}
+            <div className="relative z-10 flex items-center gap-3 w-full">
+              <Users className={`w-5 h-5 transition-colors ${isUsersActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'}`} />
+              <span className={`text-sm transition-colors ${isUsersActive ? 'text-mansion-gold font-semibold' : 'text-text-muted group-hover:text-text-primary'}`}>
+                Usuarios
+              </span>
+            </div>
+          </NavLink>
+
+          {/* Configuración — section divider */}
+          <div className="pt-3 pb-1 px-4">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-text-dim">Configuración</span>
+          </div>
+
+          {/* Section links */}
+          {ADMIN_SECTIONS.map(({ key, label, icon: Icon }) => {
+            const to = `/admin/configuracion?section=${key}`;
+            const isActive = isConfigActive && (currentSection === key || (!currentSection && key === 'fotos'));
             return (
-              <NavLink
-                key={to}
+              <Link
+                key={key}
                 to={to}
-                className="relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all group"
+                className="relative flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all group"
               >
                 {isActive && (
                   <motion.div
@@ -55,12 +82,12 @@ export default function AdminLayout() {
                   />
                 )}
                 <div className="relative z-10 flex items-center gap-3 w-full">
-                  <Icon className={`w-5 h-5 transition-colors ${isActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'}`} />
-                  <span className={`text-sm transition-colors ${isActive ? 'text-mansion-gold font-semibold' : 'text-text-muted group-hover:text-text-primary'}`}>
+                  <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'}`} />
+                  <span className={`text-[13px] transition-colors ${isActive ? 'text-mansion-gold font-semibold' : 'text-text-muted group-hover:text-text-primary'}`}>
                     {label}
                   </span>
                 </div>
-              </NavLink>
+              </Link>
             );
           })}
         </nav>
@@ -88,18 +115,18 @@ export default function AdminLayout() {
               <span className="font-display text-lg font-semibold text-gradient-gold">Admin</span>
             </div>
             <div className="flex items-center gap-1">
-              {ADMIN_NAV.map(({ to, icon: Icon, label }) => {
-                const isActive = location.pathname.startsWith(to);
-                return (
-                  <Link
-                    key={to}
-                    to={to}
-                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isActive ? 'bg-mansion-gold/10 text-mansion-gold' : 'text-text-muted'}`}
-                  >
-                    {label}
-                  </Link>
-                );
-              })}
+              <Link
+                to="/admin/usuarios"
+                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isUsersActive ? 'bg-mansion-gold/10 text-mansion-gold' : 'text-text-muted'}`}
+              >
+                Usuarios
+              </Link>
+              <Link
+                to="/admin/configuracion"
+                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isConfigActive ? 'bg-mansion-gold/10 text-mansion-gold' : 'text-text-muted'}`}
+              >
+                Config
+              </Link>
               <Link to="/" className="ml-1 px-2 py-2 rounded-lg text-text-dim hover:text-text-muted">
                 <Home className="w-4 h-4" />
               </Link>
