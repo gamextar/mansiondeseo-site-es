@@ -12,3 +12,4 @@ export default defineConfig({
     },
   },
 })
+cd "/Users/javierasenjofuchs/LOCAL DEV/UNICOAPPS.COM/unicoapps-site" && npx wrangler pages deploy . --project-name=unicoapps-site

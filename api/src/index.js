@@ -1668,7 +1668,7 @@ async function handleUalaPaymentCreate(request, auth, env, settings, plan_id, nu
   }
 
   const isCoinPurchase = plan_id && plan_id.startsWith('coins_');
-  const externalRef = `${auth.sub}::${plan_id}`;
+  const externalRef = `${auth.sub}--${plan_id}`;
   const baseUrl = env.CORS_ORIGIN || 'http://localhost:5173';
   const workerUrl = new URL(request.url).origin;
 
@@ -1700,12 +1700,12 @@ async function handleUalaPaymentCreate(request, auth, env, settings, plan_id, nu
     });
     if (!bridgeRes.ok) {
       const errText = await bridgeRes.text();
-      console.error('Bridge Ualá error:', bridgeRes.status, errText);
+      console.error('Bridge Ualá error:', bridgeRes.status, 'headers:', JSON.stringify(Object.fromEntries(bridgeRes.headers)), 'body:', errText.substring(0, 500));
       try {
         const errJson = JSON.parse(errText);
         return error(errJson.error || `bridge ${bridgeRes.status}`, 502);
       } catch {
-        return error(`bridge ${bridgeRes.status}`, 502);
+        return error(`bridge ${bridgeRes.status}: ${errText.substring(0, 100)}`, 502);
       }
     }
     bridgeData = await bridgeRes.json();
@@ -1747,7 +1747,7 @@ async function handleUalaPaymentConfirm(auth, env, paymentId, externalRef) {
     }
 
     const ref = externalRef || '';
-    const [refUserId, planId] = ref.split('::');
+    const [refUserId, planId] = ref.split('--');
     if (refUserId !== auth.sub) {
       return error('El pago no pertenece a este usuario', 403);
     }
@@ -2016,7 +2016,7 @@ async function handlePaymentConfirm(request, env) {
     }
 
     const ref = data.external_reference || '';
-    const [refUserId, planId] = ref.split('::');
+    const [refUserId, planId] = ref.split('--');
     if (refUserId !== auth.sub) {
       return error('El pago no pertenece a este usuario', 403);
     }

@@ -24,8 +24,8 @@ export default function PagoExitosoPage() {
   const status = params.get('status') || (gateway === 'uala' ? 'approved' : '');
   const externalRef = params.get('external_reference') || '';
 
-  // Detectar si es compra de monedas desde el external_reference (formato: userId::planId)
-  const planId = externalRef.split('::')[1] || '';
+  // Detectar si es compra de monedas desde el external_reference (formato: userId--planId)
+  const planId = externalRef.split('--')[1] || '';
   const isCoinPurchase = planId.startsWith('coins_');
   const coinsAmount = isCoinPurchase ? planId.replace('coins_', '') : '';
 

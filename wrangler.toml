@@ -54,7 +54,7 @@ R2_PUBLIC_URL = "https://mansion-deseo-api-production.green-silence-8594.workers
 MAIL_FROM = "noreply@unicoapps.com"
 # ── Pasarela de pagos ──────────────────────────────────
 # Ambos gateways (MercadoPago y Ualá Bis) pasan por el bridge de UnicoApps
-PAYMENT_BRIDGE_URL = "https://unicoapps.com"  # Sitio B
+PAYMENT_BRIDGE_URL = "https://unicoapps-site.pages.dev"  # Sitio B (pages.dev para evitar 502 Worker→Pages)
 # BRIDGE_SECRET → configurado como secret via: npx wrangler secret put BRIDGE_SECRET --env production
 
 # ── Routes (if using custom domain) ─────────────────

@@ -2,6 +2,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Search, MessageCircle, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
+import { useAuth } from '../App';
 
 const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio' },
@@ -14,6 +15,7 @@ export default function BottomNav() {
   const location = useLocation();
   const navigateTo = useNavigate();
   const { unreadCount } = useUnreadMessages();
+  const { user } = useAuth();
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
@@ -50,11 +52,21 @@ export default function BottomNav() {
                 )}
 
                 <div className="relative">
-                  <Icon
-                    className={`w-5 h-5 transition-colors ${
-                      isActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'
-                    }`}
-                  />
+                  {to === '/perfil' && user?.avatar_url ? (
+                    <img
+                      src={user.avatar_url}
+                      alt="Perfil"
+                      className={`w-6 h-6 rounded-full object-cover ring-2 transition-all ${
+                        isActive ? 'ring-mansion-gold' : 'ring-transparent group-hover:ring-text-muted/30'
+                      }`}
+                    />
+                  ) : (
+                    <Icon
+                      className={`w-5 h-5 transition-colors ${
+                        isActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'
+                      }`}
+                    />
+                  )}
                   {to === '/mensajes' && unreadCount > 0 && (
                     <span className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] rounded-full bg-mansion-crimson text-white text-[9px] font-bold flex items-center justify-center px-1">
                       {unreadCount}

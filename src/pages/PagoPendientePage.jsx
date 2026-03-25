@@ -6,7 +6,7 @@ export default function PagoPendientePage() {
   const [params] = useSearchParams();
 
   const externalRef = params.get('external_reference') || '';
-  const planId = externalRef.split('::')[1] || '';
+  const planId = externalRef.split('--')[1] || '';
   const isCoinPurchase = planId.startsWith('coins_');
 
   return (
