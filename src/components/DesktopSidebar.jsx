@@ -140,11 +140,11 @@ export default function DesktopSidebar() {
         <div className="px-3 pb-4 space-y-2">
           {/* Settings (admin only) */}
           <NavLink
-            to="/configuracion"
+            to="/admin"
             className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-text-dim hover:text-text-muted transition-colors"
           >
             <Settings className="w-4 h-4" />
-            <span className="text-xs">Configuración</span>
+            <span className="text-xs">Admin Panel</span>
           </NavLink>
         </div>
       )}

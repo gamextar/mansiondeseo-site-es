@@ -46,7 +46,7 @@ export default function Navbar() {
           <div className="flex items-center gap-1">
             {/* Coins */}
             <Link
-              to="/perfil"
+              to="/monedas"
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-mansion-gold/10 border border-mansion-gold/20 hover:bg-mansion-gold/20 transition-all mr-1"
             >
               <CoinIcon className="w-4 h-4" />

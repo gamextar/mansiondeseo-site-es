@@ -28,6 +28,15 @@ JWT_SECRET = "78b85a92c0ba6b2ca96d6ba06605371a1f4683c2fa37e7783b818d4f9b7baca7"
 CORS_ORIGIN = "http://localhost:5173"
 R2_PUBLIC_URL = ""                  # Custom domain or R2 public bucket URL
 MAIL_FROM = "noreply@unicoapps.com"
+# ── Pasarela de pagos ──────────────────────────────────
+PAYMENT_BRIDGE_URL = ""             # En dev: http://localhost:8788
+# BRIDGE_SECRET → configurado como secret via: npx wrangler secret put BRIDGE_SECRET
+# ── Ualá Bis ──────────────────────────────────────────────
+UALA_AUTH_URL = "https://auth.stage.ua.la"       # Staging; producción: https://auth.prod.ua.la
+UALA_CHECKOUT_URL = "https://checkout.stage.ua.la" # Staging; producción: https://checkout.prod.ua.la
+# UALA_USERNAME → npx wrangler secret put UALA_USERNAME
+# UALA_CLIENT_ID → npx wrangler secret put UALA_CLIENT_ID
+# UALA_CLIENT_SECRET → npx wrangler secret put UALA_CLIENT_SECRET
 
 # ── Production overrides ─────────────────────────────
 [env.production]
@@ -48,6 +57,15 @@ JWT_SECRET = "78b85a92c0ba6b2ca96d6ba06605371a1f4683c2fa37e7783b818d4f9b7baca7"
 TURNSTILE_SECRET = ""
 R2_PUBLIC_URL = "https://mansion-deseo-api-production.green-silence-8594.workers.dev/api/images"
 MAIL_FROM = "noreply@unicoapps.com"
+# ── Pasarela de pagos ──────────────────────────────────
+PAYMENT_BRIDGE_URL = "https://unicoapps.com"  # Sitio B
+# BRIDGE_SECRET → configurado como secret via: npx wrangler secret put BRIDGE_SECRET --env production
+# ── Ualá Bis ──────────────────────────────────────────────
+UALA_AUTH_URL = "https://auth.prod.ua.la"
+UALA_CHECKOUT_URL = "https://checkout.prod.ua.la"
+# UALA_USERNAME → npx wrangler secret put UALA_USERNAME --env production
+# UALA_CLIENT_ID → npx wrangler secret put UALA_CLIENT_ID --env production
+# UALA_CLIENT_SECRET → npx wrangler secret put UALA_CLIENT_SECRET --env production
 
 # ── Routes (if using custom domain) ─────────────────
 # routes = [

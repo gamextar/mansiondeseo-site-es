@@ -16,12 +16,20 @@ import WelcomePage from './pages/WelcomePage';
 import ProfilePage from './pages/ProfilePage';
 import FavoritesPage from './pages/FavoritesPage';
 import SettingsPage from './pages/SettingsPage';
+import AdminLayout from './components/AdminLayout';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
+import VipPage from './pages/VipPage';
+import PagoExitosoPage from './pages/PagoExitosoPage';
+import PagoFallidoPage from './pages/PagoFallidoPage';
+import PagoPendientePage from './pages/PagoPendientePage';
+import CoinsPage from './pages/CoinsPage';
+import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getMe } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
-const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/mensajes/'];
+const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin'];
 
 // Auth context — exposes registered boolean + user object + setters
 const AuthContext = createContext({
@@ -59,6 +67,14 @@ function AppLayout() {
           <Route path="/bienvenida" element={<WelcomePage />} />
           <Route path="/registro" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
+
+          {/* Pagos */}
+          <Route path="/vip" element={<VipPage />} />
+          <Route path="/monedas" element={<CoinsPage />} />
+          <Route path="/pago-exitoso" element={<PagoExitosoPage />} />
+          <Route path="/pago-monedas-exitoso" element={<PagoMonedasExitosoPage />} />
+          <Route path="/pago-fallido" element={<PagoFallidoPage />} />
+          <Route path="/pago-pendiente" element={<PagoPendientePage />} />
 
           {/* Chat detail (full-screen but with custom header) */}
           <Route
@@ -123,6 +139,13 @@ function AppLayout() {
               </RequireRegistration>
             }
           />
+
+          {/* Admin standalone layout */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to="/admin/usuarios" replace />} />
+            <Route path="usuarios" element={<AdminUsersPage />} />
+            <Route path="configuracion" element={<SettingsPage />} />
+          </Route>
         </Routes>
       </div>
 
@@ -175,6 +198,9 @@ export default function App() {
         clearAuth();
         setRegisteredState(false);
       });
+    } else if (getToken() && user) {
+      // Refresh user data to keep coins/premium in sync
+      getMe().then(data => { if (data?.user) setUser(data.user); }).catch(() => {});
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

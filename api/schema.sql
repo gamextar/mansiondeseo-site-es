@@ -19,12 +19,23 @@ CREATE TABLE IF NOT EXISTS users (
   photos        TEXT DEFAULT '[]',                  -- JSON array of R2 URLs
   status        TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','verified')),
   premium       INTEGER NOT NULL DEFAULT 0,         -- 0 = free, 1 = VIP
+  premium_until TEXT DEFAULT NULL,                  -- ISO datetime of subscription expiry
   ghost_mode    INTEGER NOT NULL DEFAULT 0,         -- 0 = off, 1 = on (premium only)
   verified      INTEGER NOT NULL DEFAULT 0,         -- 0 = no, 1 = verified identity
   online        INTEGER NOT NULL DEFAULT 0,
-  coins         INTEGER NOT NULL DEFAULT 100,
+  coins         INTEGER NOT NULL DEFAULT 0,
+  account_status TEXT NOT NULL DEFAULT 'active' CHECK(account_status IN ('active','under_review','suspended')),
   last_active   TEXT DEFAULT (datetime('now')),
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Processed payments (prevent payment_id reuse)
+CREATE TABLE IF NOT EXISTS processed_payments (
+  payment_id  TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  plan_id     TEXT NOT NULL,
+  amount      REAL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email    ON users(email);

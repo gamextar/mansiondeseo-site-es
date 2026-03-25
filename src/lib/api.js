@@ -86,10 +86,10 @@ async function apiFetch(path, options = {}) {
 
 // ── Auth ────────────────────────────────────────────────
 
-export async function register({ email, password, username, role, seeking, interests, age, city, bio }) {
+export async function register({ email, password, username, role, seeking, interests, age, city, bio, country }) {
   const data = await apiFetch('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password, username, role, seeking, interests, age: Number(age), city, bio }),
+    body: JSON.stringify({ email, password, username, role, seeking, interests, age: Number(age), city, bio, country }),
   });
   // Registration now returns needsVerification instead of token
   return data;
@@ -210,6 +210,14 @@ export async function getSettings() {
   return apiFetch('/settings');
 }
 
+export async function getPublicSettings() {
+  return apiFetch('/settings/public');
+}
+
+export async function detectCountry() {
+  return apiFetch('/detect-country');
+}
+
 export async function updateSettings(fields) {
   return apiFetch('/settings', {
     method: 'PUT',
@@ -280,4 +288,53 @@ export async function adminAddCoins(userId, amount) {
     method: 'POST',
     body: JSON.stringify({ user_id: userId, amount }),
   });
+}
+
+// ── Pagos ───────────────────────────────────────────────
+
+export async function createPayment({ plan_id, amount }) {
+  return apiFetch('/payment/create', {
+    method: 'POST',
+    body: JSON.stringify({ plan_id, amount }),
+  });
+}
+
+export async function confirmPayment(payment_id, { gateway, external_reference } = {}) {
+  return apiFetch('/payment/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ payment_id, gateway, external_reference }),
+  });
+}
+
+// ── Admin ─────────────────────────────────────────────
+
+export async function adminRemoveAllVip() {
+  return apiFetch('/admin/remove-all-vip', { method: 'POST', body: '{}' });
+}
+
+export async function adminResetAllCoins() {
+  return apiFetch('/admin/reset-all-coins', { method: 'POST', body: '{}' });
+}
+
+// ── Admin: Users ────────────────────────────────────────
+
+export async function adminGetUsers({ page = 1, limit = 20, q = '' } = {}) {
+  const params = new URLSearchParams({ page, limit });
+  if (q) params.set('q', q);
+  return apiFetch(`/admin/users?${params}`);
+}
+
+export async function adminGetUser(userId) {
+  return apiFetch(`/admin/users/${userId}`);
+}
+
+export async function adminUpdateUser(userId, fields) {
+  return apiFetch(`/admin/users/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify(fields),
+  });
+}
+
+export async function adminDeleteUser(userId) {
+  return apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
 }

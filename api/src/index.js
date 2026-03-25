@@ -127,8 +127,12 @@ async function authenticate(request, env) {
   const token = authHeader.slice(7);
   const payload = await verifyJWT(token, env.JWT_SECRET);
   if (!payload) return null;
-  // Update last_active timestamp (fire-and-forget)
-  env.DB.prepare("UPDATE users SET last_active = datetime('now') WHERE id = ?").bind(payload.sub).run().catch(() => {});
+  // Update last_active + IP (fire-and-forget)
+  const ip = request.headers.get('CF-Connecting-IP') || '';
+  env.DB.prepare("UPDATE users SET last_active = datetime('now'), last_ip = ? WHERE id = ?").bind(ip, payload.sub).run().catch(() => {});
+  // Check account status (suspended users are blocked)
+  const userStatus = await env.DB.prepare('SELECT account_status FROM users WHERE id = ?').bind(payload.sub).first();
+  if (userStatus?.account_status === 'suspended') return null;
   return payload; // { sub: userId, email, role }
 }
 
@@ -253,11 +257,14 @@ async function handleRegister(request, env) {
 
   const userId = generateId();
   const passwordHash = await hashPassword(password);
-  const country = request.headers.get('cf-ipcountry') || '';
+
+  // Country: use body.country if provided (user picked from allowed list), else CF header
+  const detectedCountry = request.headers.get('cf-ipcountry') || '';
+  const country = body.country || detectedCountry;
 
   await env.DB.prepare(`
-    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, city, country, bio, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, city, country, bio, status, coins)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0)
   `).bind(
     userId,
     email.toLowerCase(),
@@ -320,13 +327,14 @@ async function handleVerifyCode(request, env) {
     .bind(record.id).run();
 
   // Verify the user
-  await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now') WHERE id = ?")
-    .bind(record.user_id).run();
+  const ipVer = request.headers.get('CF-Connecting-IP') || '';
+  await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now'), last_ip = ? WHERE id = ?")
+    .bind(ipVer, record.user_id).run();
 
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
   const token = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
 
-  return json({ token, user: sanitizeUser(user) });
+  return json({ token, user: sanitizeUser(user, env) });
 }
 
 // ── POST /api/auth/resend-code ──────────────────────────
@@ -394,13 +402,14 @@ async function handleLogin(request, env) {
     return error('Credenciales inválidas', 401);
   }
 
-  // Update online status
-  await env.DB.prepare("UPDATE users SET online = 1, last_active = datetime('now') WHERE id = ?")
-    .bind(user.id).run();
+  // Update online status + IP
+  const ipLogin = request.headers.get('CF-Connecting-IP') || '';
+  await env.DB.prepare("UPDATE users SET online = 1, last_active = datetime('now'), last_ip = ? WHERE id = ?")
+    .bind(ipLogin, user.id).run();
 
   const token = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
 
-  return json({ token, user: sanitizeUser(user) });
+  return json({ token, user: sanitizeUser(user, env) });
 }
 
 // ── POST /api/auth/magic-link ───────────────────────────
@@ -450,8 +459,9 @@ async function handleVerifyToken(request, env) {
   let user;
   if (record.user_id) {
     user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
-    await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now') WHERE id = ?")
-      .bind(user.id).run();
+    const ipMagic = request.headers.get('CF-Connecting-IP') || '';
+    await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now'), last_ip = ? WHERE id = ?")
+      .bind(ipMagic, user.id).run();
   } else {
     // New user via magic link — create minimal account
     const userId = generateId();
@@ -478,7 +488,7 @@ async function handleMe(request, env) {
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first();
   if (!user) return error('Usuario no encontrado', 404);
 
-  return json({ user: sanitizeUser(user) });
+  return json({ user: sanitizeUser(user, env) });
 }
 
 // ── GET /api/profiles ───────────────────────────────────
@@ -488,8 +498,8 @@ async function handleProfiles(request, env) {
   if (!auth) return error('No autorizado', 401);
 
   // Get viewer info + settings + viewer's favorites
-  const viewer = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
-  const viewerIsPremium = viewer && !!viewer.premium;
+  const viewer = await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
+  const viewerIsPremium = viewer && isPremiumActive(viewer);
   const settings = await loadSettings(env);
   const { results: favRows } = await env.DB.prepare('SELECT target_id FROM favorites WHERE user_id = ?').bind(auth.sub).all();
   const viewerFavorites = new Set(favRows.map(r => r.target_id));
@@ -534,8 +544,8 @@ async function handleProfiles(request, env) {
 
   // Map to frontend shape with new blur logic
   const profiles = results.map(u => {
-    const hasGhostMode = !!u.ghost_mode;
-    const profileIsPremium = !!u.premium;
+    const profileIsPremium = isPremiumActive(u);
+    const hasGhostMode = profileIsPremium && !!u.ghost_mode;
     // Ghost mode blur: blurred unless viewer is premium OR the ghost-mode user has favorited the viewer
     const blurred = hasGhostMode && !viewerIsPremium && !favoritedBySet.has(u.id);
     const allPhotos = safeParseJSON(u.photos, []);
@@ -559,6 +569,7 @@ async function handleProfiles(request, env) {
       verified: !!u.verified,
       online: isOnline(u.last_active),
       premium: profileIsPremium,
+      premium_until: u.premium_until || null,
       ghost_mode: hasGhostMode,
       blurred,
       isFavorited: viewerFavorites.has(u.id),
@@ -580,8 +591,8 @@ async function handleProfileDetail(request, env, userId) {
   if (!user) return error('Perfil no encontrado', 404);
 
   // Get viewer info + settings
-  const viewer = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
-  const viewerIsPremium = viewer && !!viewer.premium;
+  const viewer = await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
+  const viewerIsPremium = viewer && isPremiumActive(viewer);
   const settings = await loadSettings(env);
 
   // Check if viewer has favorited this profile
@@ -592,7 +603,7 @@ async function handleProfileDetail(request, env, userId) {
   const favByRow = await env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(userId, auth.sub).first();
   const profileFavoritedViewer = !!favByRow;
 
-  const hasGhostMode = !!user.ghost_mode;
+  const hasGhostMode = isPremiumActive(user) && !!user.ghost_mode;
   const isOwnProfile = auth.sub === userId;
   // Ghost mode blur: blurred unless viewer is premium, OR profile owner favorited viewer
   const blurred = hasGhostMode && !viewerIsPremium && !profileFavoritedViewer;
@@ -644,7 +655,8 @@ async function handleProfileDetail(request, env, userId) {
       visiblePhotos,
       verified: !!user.verified,
       online: isOnline(user.last_active),
-      premium: !!user.premium,
+      premium: isPremiumActive(user),
+      premium_until: user.premium_until || null,
       ghost_mode: hasGhostMode,
       blurred,
       isFavorited,
@@ -682,13 +694,13 @@ async function handleSendMessage(request, env) {
   const currentCount = limit?.msg_count || 0;
 
   // Check if user is premium (unlimited)
-  const sender = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
+  const sender = await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
 
   // Load configurable daily limit
   const siteSettings = await loadSettings(env);
   const dailyLimit = siteSettings.dailyMessageLimit || 5;
 
-  if (!sender.premium && currentCount >= dailyLimit) {
+  if (!isPremiumActive(sender) && currentCount >= dailyLimit) {
     return error(`Has alcanzado el límite de ${dailyLimit} mensajes diarios. Desbloquea VIP para mensajes ilimitados.`, 403);
   }
 
@@ -699,7 +711,7 @@ async function handleSendMessage(request, env) {
   `).bind(msgId, auth.sub, receiver_id, content.trim()).run();
 
   // Update message counter
-  if (!sender.premium) {
+  if (!isPremiumActive(sender)) {
     if (limit) {
       await env.DB.prepare(
         'UPDATE message_limits SET msg_count = msg_count + 1 WHERE user_id = ? AND date_utc = ?'
@@ -818,19 +830,20 @@ async function handleMessageLimit(request, env) {
     'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
   ).bind(auth.sub, today).first();
 
-  const sender = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
+  const sender = await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
 
   const count = limit?.msg_count || 0;
 
   // Load configurable daily limit
   const siteSettings = await loadSettings(env);
   const dailyLimit = siteSettings.dailyMessageLimit || 5;
+  const senderPremium = isPremiumActive(sender);
 
   return json({
     sent: count,
-    remaining: sender?.premium ? 999 : Math.max(0, dailyLimit - count),
-    canSend: sender?.premium ? true : count < dailyLimit,
-    max: sender?.premium ? 999 : dailyLimit,
+    remaining: senderPremium ? 999 : Math.max(0, dailyLimit - count),
+    canSend: senderPremium ? true : count < dailyLimit,
+    max: senderPremium ? 999 : dailyLimit,
   });
 }
 
@@ -966,9 +979,9 @@ async function handleUpdateProfile(request, env) {
   }
 
   // ghost_mode is only allowed for premium users
-  const currentUser = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
-  const isPremium = body.premium !== undefined ? (body.premium ? 1 : 0) : currentUser?.premium;
-  if (!!isPremium) {
+  const currentUser = await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
+  const isPremium = isPremiumActive(currentUser);
+  if (isPremium) {
     allowedFields.push('ghost_mode');
   }
 
@@ -997,7 +1010,7 @@ async function handleUpdateProfile(request, env) {
     .bind(...values).run();
 
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first();
-  return json({ user: sanitizeUser(user) });
+  return json({ user: sanitizeUser(user, env) });
 }
 
 // ── POST /api/auth/logout ───────────────────────────────
@@ -1013,17 +1026,47 @@ async function handleLogout(request, env) {
 
 // ── Utility functions ───────────────────────────────────
 
-function sanitizeUser(user) {
+// ── Plan durations (days) ────────────────────────────────
+const PLAN_DAYS = {
+  premium_mensual: 30,
+  premium_3meses: 90,
+  premium_6meses: 180,
+};
+
+function isPremiumActive(user) {
+  if (!user.premium_until) return false;
+  return new Date(user.premium_until + 'Z') > new Date();
+}
+
+function activatePremium(currentPremiumUntil, planId) {
+  const days = PLAN_DAYS[planId] || 30;
+  const now = new Date();
+  // Si la suscripción actual aún es válida, extender desde premium_until
+  const base = (currentPremiumUntil && new Date(currentPremiumUntil + 'Z') > now)
+    ? new Date(currentPremiumUntil + 'Z')
+    : now;
+  base.setDate(base.getDate() + days);
+  return base.toISOString().replace('Z', '').split('.')[0]; // datetime format for D1
+}
+
+function sanitizeUser(user, env) {
   if (!user) return null;
   const { password_hash, ...safe } = user;
+  const premiumActive = isPremiumActive(safe);
+  // Auto-disable ghost_mode if premium has expired
+  const ghostMode = premiumActive ? !!safe.ghost_mode : false;
+  if (!premiumActive && safe.ghost_mode && env) {
+    env.DB.prepare('UPDATE users SET ghost_mode = 0 WHERE id = ?').bind(safe.id).run().catch(() => {});
+  }
   return {
     ...safe,
     interests: safeParseJSON(safe.interests, []),
     photos: safeParseJSON(safe.photos, []),
     verified: !!safe.verified,
     online: !!safe.online,
-    premium: !!safe.premium,
-    ghost_mode: !!safe.ghost_mode,
+    premium: premiumActive,
+    premium_until: safe.premium_until || null,
+    ghost_mode: ghostMode,
     is_admin: !!safe.is_admin,
     coins: safe.coins || 0,
   };
@@ -1097,7 +1140,50 @@ async function loadSettings(env) {
     vipPrice3Months: settings.vip_price_3months || '',
     vipPrice6Months: settings.vip_price_6months || '',
     incognitoIconSvg: settings.incognito_icon_svg || '',
+    allowedCountries: settings.allowed_countries || 'AR',
+    coinPack1Coins: settings.coin_pack_1_coins || '1000',
+    coinPack1Price: settings.coin_pack_1_price || '',
+    coinPack2Coins: settings.coin_pack_2_coins || '2000',
+    coinPack2Price: settings.coin_pack_2_price || '',
+    coinPack3Coins: settings.coin_pack_3_coins || '3000',
+    coinPack3Price: settings.coin_pack_3_price || '',
+    paymentTitleVip: settings.payment_title_vip || 'Servicios Digitales',
+    paymentDescriptorVip: settings.payment_descriptor_vip || 'UNICOAPPS',
+    paymentTitleCoins: settings.payment_title_coins || 'Servicios Digitales',
+    paymentDescriptorCoins: settings.payment_descriptor_coins || 'UNICOAPPS',
+    paymentGateway: settings.payment_gateway || 'mercadopago',
   };
+}
+
+// ── GET /api/detect-country ──────────────────────────────
+async function handleDetectCountry(request) {
+  const country = request.headers.get('cf-ipcountry') || '';
+  return json({ country });
+}
+
+// ── GET /api/settings/public ─────────────────────────────
+// Returns non-sensitive settings (VIP prices, blur, etc.)
+async function handleGetPublicSettings(request, env) {
+  const settings = await loadSettings(env);
+  return json({
+    settings: {
+      vipPriceMonthly: settings.vipPriceMonthly,
+      vipPrice3Months: settings.vipPrice3Months,
+      vipPrice6Months: settings.vipPrice6Months,
+      showVipButton: settings.showVipButton,
+      blurMobile: settings.blurMobile,
+      blurDesktop: settings.blurDesktop,
+      freeVisiblePhotos: settings.freeVisiblePhotos,
+      allowedCountries: settings.allowedCountries,
+      coinPack1Coins: settings.coinPack1Coins,
+      coinPack1Price: settings.coinPack1Price,
+      coinPack2Coins: settings.coinPack2Coins,
+      coinPack2Price: settings.coinPack2Price,
+      coinPack3Coins: settings.coinPack3Coins,
+      coinPack3Price: settings.coinPack3Price,
+      paymentGateway: settings.paymentGateway,
+    },
+  });
 }
 
 // ── GET /api/settings ───────────────────────────────────
@@ -1126,6 +1212,13 @@ async function handleUpdateSettings(request, env) {
     'hide_password_register',
     'vip_price_monthly', 'vip_price_3months', 'vip_price_6months',
     'incognito_icon_svg',
+    'allowed_countries',
+    'coin_pack_1_coins', 'coin_pack_1_price',
+    'coin_pack_2_coins', 'coin_pack_2_price',
+    'coin_pack_3_coins', 'coin_pack_3_price',
+    'payment_title_vip', 'payment_descriptor_vip',
+    'payment_title_coins', 'payment_descriptor_coins',
+    'payment_gateway',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {
@@ -1177,7 +1270,7 @@ async function handleGetFavorites(request, env) {
   ).bind(auth.sub).all();
 
   const profiles = results.map(u => {
-    const hasGhostMode = !!u.ghost_mode;
+    const hasGhostMode = isPremiumActive(u) && !!u.ghost_mode;
     const blurred = hasGhostMode && !viewerIsPremium && !favoritedBySet.has(u.id);
     const allPhotos = safeParseJSON(u.photos, []);
     const visiblePhotos = viewerIsPremium
@@ -1365,6 +1458,640 @@ async function handleAdminAddCoins(request, env) {
   return json({ coins: user?.coins || 0 });
 }
 
+// ── Admin: POST /api/admin/remove-all-vip ──────────────
+async function handleAdminRemoveAllVip(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const { meta } = await env.DB.prepare('UPDATE users SET premium = 0, premium_until = NULL, ghost_mode = 0 WHERE premium = 1 OR premium_until IS NOT NULL').run();
+  console.log(`🔧 Admin removió VIP de todos los usuarios — ${meta.changes} afectados`);
+  return json({ success: true, affected: meta.changes });
+}
+
+// ── Admin: POST /api/admin/reset-all-coins ──────────────
+async function handleAdminResetAllCoins(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const { meta } = await env.DB.prepare('UPDATE users SET coins = 0').run();
+  console.log(`🔧 Admin reseteó monedas de todos los usuarios — ${meta.changes} afectados`);
+  return json({ success: true, affected: meta.changes });
+}
+
+// ── Admin: GET /api/admin/users ─────────────────────────
+async function handleAdminGetUsers(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const url = new URL(request.url);
+  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
+  const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
+  const q = (url.searchParams.get('q') || '').trim();
+  const offset = (page - 1) * limit;
+
+  let countQuery = 'SELECT COUNT(*) as total FROM users';
+  let dataQuery = `SELECT id, email, username, role, seeking, age, city, country, avatar_url, status,
+    premium, premium_until, ghost_mode, verified, online, coins, is_admin, account_status, last_active, last_ip, created_at
+    FROM users`;
+  const bindings = [];
+
+  if (q) {
+    const filter = ` WHERE email LIKE ? OR username LIKE ? OR id = ?`;
+    countQuery += filter;
+    dataQuery += filter;
+    bindings.push(`%${q}%`, `%${q}%`, q);
+  }
+
+  dataQuery += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+
+  const countStmt = q
+    ? env.DB.prepare(countQuery).bind(...bindings)
+    : env.DB.prepare(countQuery);
+  const dataStmt = q
+    ? env.DB.prepare(dataQuery).bind(...bindings, limit, offset)
+    : env.DB.prepare(dataQuery).bind(limit, offset);
+
+  const [countRes, dataRes] = await Promise.all([countStmt.first(), dataStmt.all()]);
+
+  return json({
+    users: dataRes.results.map(u => ({
+      ...u,
+      premium: isPremiumActive(u),
+      online: isOnline(u.last_active),
+      is_admin: !!u.is_admin,
+      interests: undefined,
+      photos: undefined,
+    })),
+    total: countRes.total,
+    page,
+    pages: Math.ceil(countRes.total / limit),
+  });
+}
+
+// ── Admin: GET /api/admin/users/:id ─────────────────────
+async function handleAdminGetUser(request, env, userId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  if (!user) return error('Usuario no encontrado', 404);
+
+  const { password_hash, ...safe } = user;
+  return json({
+    user: {
+      ...safe,
+      interests: safeParseJSON(safe.interests, []),
+      photos: safeParseJSON(safe.photos, []),
+      premium: isPremiumActive(safe),
+      online: isOnline(safe.last_active),
+      is_admin: !!safe.is_admin,
+    }
+  });
+}
+
+// ── Admin: PUT /api/admin/users/:id ─────────────────────
+async function handleAdminUpdateUser(request, env, userId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const user = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+  if (!user) return error('Usuario no encontrado', 404);
+
+  const body = await request.json();
+  const updates = [];
+  const vals = [];
+
+  if (body.premium !== undefined) { updates.push('premium = ?'); vals.push(body.premium ? 1 : 0); }
+  if (body.premium_until !== undefined) { updates.push('premium_until = ?'); vals.push(body.premium_until || null); }
+  if (body.is_admin !== undefined) {
+    if (userId === auth.sub) return error('No puedes cambiar tu propio rol de admin', 400);
+    updates.push('is_admin = ?'); vals.push(body.is_admin ? 1 : 0);
+  }
+  if (body.coins !== undefined) { updates.push('coins = ?'); vals.push(Math.max(0, Number(body.coins))); }
+  if (body.verified !== undefined) { updates.push('verified = ?'); vals.push(body.verified ? 1 : 0); }
+  if (body.ghost_mode !== undefined) { updates.push('ghost_mode = ?'); vals.push(body.ghost_mode ? 1 : 0); }
+  if (body.status !== undefined && ['pending', 'verified'].includes(body.status)) { updates.push('status = ?'); vals.push(body.status); }
+  if (body.account_status !== undefined && ['active', 'under_review', 'suspended'].includes(body.account_status)) {
+    updates.push('account_status = ?'); vals.push(body.account_status);
+  }
+
+  if (updates.length === 0) return error('Nada que actualizar');
+
+  vals.push(userId);
+  await env.DB.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...vals).run();
+
+  const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  const { password_hash, ...safe } = updated;
+  return json({
+    user: {
+      ...safe,
+      interests: safeParseJSON(safe.interests, []),
+      photos: safeParseJSON(safe.photos, []),
+      premium: isPremiumActive(safe),
+      online: isOnline(safe.last_active),
+      is_admin: !!safe.is_admin,
+    }
+  });
+}
+
+// ── Admin: DELETE /api/admin/users/:id ───────────────────
+async function handleAdminDeleteUser(request, env, userId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  if (userId === auth.sub) return error('No puedes eliminarte a ti mismo', 400);
+
+  const user = await env.DB.prepare('SELECT id, email FROM users WHERE id = ?').bind(userId).first();
+  if (!user) return error('Usuario no encontrado', 404);
+
+  // Delete related data
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM favorites WHERE user_id = ? OR target_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM profile_visits WHERE visitor_id = ? OR visited_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM user_gifts WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM verification_tokens WHERE user_id = ? OR email = ?').bind(userId, user.email),
+    env.DB.prepare('DELETE FROM processed_payments WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
+  ]);
+
+  console.log(`🗑️ Admin eliminó usuario ${userId} (${user.email})`);
+  return json({ success: true });
+}
+
+// ══════════════════════════════════════════════════════════
+// PASARELA DE PAGOS — MercadoPago vía Unico Apps Bridge
+// ══════════════════════════════════════════════════════════
+
+async function bridgeHmacSign(secret, message) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
+  return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function bridgeHmacVerify(secret, message, expectedHex) {
+  const computed = await bridgeHmacSign(secret, message);
+  if (computed.length !== expectedHex.length) return false;
+  let diff = 0;
+  for (let i = 0; i < computed.length; i++) {
+    diff |= computed.charCodeAt(i) ^ expectedHex.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+// ══════════════════════════════════════════════════════════
+// UALÁ BIS — Payment Gateway
+// ══════════════════════════════════════════════════════════
+
+async function getUalaAccessToken(env) {
+  const authUrl = env.UALA_AUTH_URL || 'https://auth.prod.ua.la';
+  const tokenRes = await fetch(`${authUrl}/1/auth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      user_name: env.UALA_USERNAME,
+      client_id: env.UALA_CLIENT_ID,
+      client_secret: env.UALA_CLIENT_SECRET,
+      grant_type: 'client_credentials',
+    }),
+  });
+  if (!tokenRes.ok) {
+    const errText = await tokenRes.text();
+    console.error('Ualá auth error:', tokenRes.status, errText);
+    throw new Error(`Ualá auth error: ${tokenRes.status}`);
+  }
+  const data = await tokenRes.json();
+  return data.access_token;
+}
+
+async function handleUalaPaymentCreate(request, auth, env, settings, plan_id, numericAmount) {
+  if (!env.UALA_USERNAME || !env.UALA_CLIENT_ID || !env.UALA_CLIENT_SECRET) {
+    return error('Ualá Bis no configurado', 500);
+  }
+
+  const isCoinPurchase = plan_id && plan_id.startsWith('coins_');
+  const description = isCoinPurchase ? settings.paymentTitleCoins : settings.paymentTitleVip;
+  const externalRef = `${auth.sub}::${plan_id}`;
+
+  let accessToken;
+  try {
+    accessToken = await getUalaAccessToken(env);
+  } catch (err) {
+    return error('Error de autenticación con Ualá Bis', 502);
+  }
+
+  const baseUrl = env.CORS_ORIGIN || 'http://localhost:5173';
+  const workerUrl = new URL(request.url).origin;
+  const refParam = btoa(externalRef);
+  const checkoutBaseUrl = env.UALA_CHECKOUT_URL || 'https://checkout.prod.ua.la';
+
+  try {
+    const checkoutRes = await fetch(`${checkoutBaseUrl}/1/checkout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        amount: numericAmount,
+        description,
+        userName: env.UALA_USERNAME,
+        callback_fail: `${baseUrl}/pago-fallido?gateway=uala`,
+        callback_success: `${baseUrl}/pago-exitoso?gateway=uala&external_reference=${encodeURIComponent(externalRef)}`,
+        notification_url: `${workerUrl}/api/payment/uala-webhook?ref=${encodeURIComponent(refParam)}`,
+      }),
+    });
+    if (!checkoutRes.ok) {
+      const errText = await checkoutRes.text();
+      console.error('Ualá checkout error:', checkoutRes.status, errText);
+      return error('Error creando checkout en Ualá Bis', 502);
+    }
+    const checkoutData = await checkoutRes.json();
+    return json({
+      redirect_url: checkoutData.links?.checkoutLink,
+      checkout_id: checkoutData.uuid,
+    });
+  } catch (err) {
+    console.error('Ualá checkout fetch error:', err.message);
+    return error('Ualá Bis no disponible', 502);
+  }
+}
+
+async function handleUalaPaymentConfirm(auth, env, paymentId, externalRef) {
+  if (!env.UALA_USERNAME || !env.UALA_CLIENT_ID || !env.UALA_CLIENT_SECRET) {
+    return error('Ualá Bis no configurado', 500);
+  }
+
+  const checkoutBaseUrl = env.UALA_CHECKOUT_URL || 'https://checkout.prod.ua.la';
+
+  let accessToken;
+  try {
+    accessToken = await getUalaAccessToken(env);
+  } catch {
+    return error('Ualá Bis no disponible', 502);
+  }
+
+  try {
+    const verifyRes = await fetch(`${checkoutBaseUrl}/1/checkout/${encodeURIComponent(paymentId)}`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    if (!verifyRes.ok) return error('No se pudo verificar el pago', 502);
+    const data = await verifyRes.json();
+
+    if (data.status !== 'APPROVED' && !data.is_approved) {
+      return json({ premium: false, reason: `status: ${data.status}` });
+    }
+
+    const ref = externalRef || '';
+    const [refUserId, planId] = ref.split('::');
+    if (refUserId !== auth.sub) {
+      return error('El pago no pertenece a este usuario', 403);
+    }
+
+    const existing = await env.DB.prepare('SELECT 1 FROM processed_payments WHERE payment_id = ?').bind(String(paymentId)).first();
+    if (existing) {
+      const isCoin = planId && planId.includes('coins_');
+      return json({ premium: !isCoin, coins: !!isCoin, already_processed: true });
+    }
+
+    const coinPlanMatch = planId && planId.match(/^coins_(\d+)$/);
+    if (coinPlanMatch) {
+      const coinsToAdd = parseInt(coinPlanMatch[1], 10);
+      await env.DB.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').bind(coinsToAdd, auth.sub).run();
+      await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(paymentId), auth.sub, planId, data.amount || 0).run();
+      console.log(`✅ [Ualá] Monedas confirmadas — user: ${auth.sub} | uuid: ${paymentId} | +${coinsToAdd} coins`);
+      return json({ coins: true, coinsAdded: coinsToAdd });
+    }
+
+    const current = await env.DB.prepare('SELECT premium_until FROM users WHERE id = ?').bind(auth.sub).first();
+    const newUntil = activatePremium(current?.premium_until, planId);
+    await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, auth.sub).run();
+    await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(paymentId), auth.sub, planId || '', data.amount || 0).run();
+    console.log(`✅ [Ualá] Premium confirmado — user: ${auth.sub} | uuid: ${paymentId} | plan: ${planId} | hasta: ${newUntil}`);
+    return json({ premium: true, premium_until: newUntil });
+  } catch (err) {
+    console.error('Ualá confirm error:', err.message);
+    return error('Error verificando pago', 502);
+  }
+}
+
+// ── POST /api/payment/uala-webhook ──────────────────────
+// Ualá Bis notification webhook (server-to-server).
+// Verifica el pago con la API de Ualá antes de activar.
+async function handleUalaWebhook(request, env) {
+  if (!env.UALA_USERNAME || !env.UALA_CLIENT_ID || !env.UALA_CLIENT_SECRET) {
+    return error('Ualá Bis no configurado', 500);
+  }
+
+  const url = new URL(request.url);
+  const refParam = url.searchParams.get('ref');
+  if (!refParam) return error('ref parameter missing', 400);
+
+  let externalRef;
+  try {
+    externalRef = atob(decodeURIComponent(refParam));
+  } catch {
+    return error('Invalid ref', 400);
+  }
+
+  const [userId, planId] = externalRef.split('::');
+  if (!userId || !planId) return error('Invalid reference format', 400);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return error('JSON inválido', 400);
+  }
+
+  const uuid = body.uuid || body.id;
+  if (!uuid) return error('uuid requerido', 400);
+
+  const checkoutBaseUrl = env.UALA_CHECKOUT_URL || 'https://checkout.prod.ua.la';
+  let accessToken;
+  try {
+    accessToken = await getUalaAccessToken(env);
+  } catch {
+    return error('Ualá Bis no disponible', 502);
+  }
+
+  // Verify payment status with Ualá API
+  try {
+    const verifyRes = await fetch(`${checkoutBaseUrl}/1/checkout/${encodeURIComponent(uuid)}`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    if (!verifyRes.ok) return error('Error verificando pago', 502);
+    const verifyData = await verifyRes.json();
+
+    if (verifyData.status !== 'APPROVED' && !verifyData.is_approved) {
+      console.log(`⚠️ [Ualá] Webhook uuid ${uuid} — status: ${verifyData.status}`);
+      return json({ success: false, reason: `status: ${verifyData.status}` });
+    }
+  } catch {
+    return error('Error verificando con Ualá', 502);
+  }
+
+  const existing = await env.DB.prepare('SELECT 1 FROM processed_payments WHERE payment_id = ?').bind(String(uuid)).first();
+  if (existing) {
+    console.log(`⚠️ [Ualá] Payment ${uuid} ya procesado — ignorando`);
+    return json({ success: true, already_processed: true });
+  }
+
+  try {
+    const coinMatch = planId && planId.match(/^coins_(\d+)$/);
+    if (coinMatch) {
+      const coinsToAdd = parseInt(coinMatch[1], 10);
+      await env.DB.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').bind(coinsToAdd, userId).run();
+      await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(uuid), userId, planId, body.amount || 0).run();
+      console.log(`✅ [Ualá] Monedas acreditadas vía webhook — user: ${userId} | uuid: ${uuid} | +${coinsToAdd} coins`);
+    } else {
+      const current = await env.DB.prepare('SELECT premium_until FROM users WHERE id = ?').bind(userId).first();
+      const newUntil = activatePremium(current?.premium_until, planId);
+      await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, userId).run();
+      await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(uuid), userId, planId, body.amount || 0).run();
+      console.log(`✅ [Ualá] Premium activado vía webhook — user: ${userId} | uuid: ${uuid} | plan: ${planId} | hasta: ${newUntil}`);
+    }
+  } catch (err) {
+    console.error('[Ualá] DB error:', err.message);
+    return error('Error al activar', 500);
+  }
+
+  return json({ success: true });
+}
+
+// ── POST /api/payment/create ─────────────────────────────
+// Requiere JWT del usuario. Crea preferencia de pago en el gateway activo.
+async function handlePaymentCreate(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autenticado', 401);
+
+  let plan_id, amount;
+  try {
+    ({ plan_id, amount } = await request.json());
+  } catch {
+    return error('JSON inválido');
+  }
+
+  if (!plan_id || !amount) return error('plan_id y amount son requeridos');
+  const numericAmount = parseFloat(amount);
+  if (isNaN(numericAmount) || numericAmount <= 0) return error('amount inválido');
+
+  const settings = await loadSettings(env);
+
+  // Route to active payment gateway
+  if (settings.paymentGateway === 'uala_bis') {
+    return handleUalaPaymentCreate(request, auth, env, settings, plan_id, numericAmount);
+  }
+
+  // ── MercadoPago via Bridge (default) ──
+  if (!env.PAYMENT_BRIDGE_URL || !env.BRIDGE_SECRET) {
+    return error('Servicio de pagos no configurado', 500);
+  }
+
+  const isCoinPurchase = plan_id && plan_id.startsWith('coins_');
+  const bodyPayload = JSON.stringify({
+    user_id: auth.sub,
+    amount: numericAmount,
+    plan_id,
+    payment_title: isCoinPurchase ? settings.paymentTitleCoins : settings.paymentTitleVip,
+    payment_descriptor: isCoinPurchase ? settings.paymentDescriptorCoins : settings.paymentDescriptorVip,
+  });
+
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = await bridgeHmacSign(env.BRIDGE_SECRET, `${timestamp}.${bodyPayload}`);
+
+  let bridgeData;
+  try {
+    const bridgeRes = await fetch(`${env.PAYMENT_BRIDGE_URL}/api/create-preference`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Signature': signature,
+        'X-Timestamp': timestamp,
+      },
+      body: bodyPayload,
+    });
+    if (!bridgeRes.ok) {
+      const errText = await bridgeRes.text();
+      console.error('Bridge error:', bridgeRes.status, errText);
+      try {
+        const errJson = JSON.parse(errText);
+        return error(errJson.error || `bridge ${bridgeRes.status}`, 502);
+      } catch {
+        return error(`bridge ${bridgeRes.status}`, 502);
+      }
+    }
+    bridgeData = await bridgeRes.json();
+  } catch (err) {
+    console.error('Bridge fetch error:', err.message);
+    return error('Servicio de pagos no disponible', 502);
+  }
+
+  return json({ init_point: bridgeData.init_point, preference_id: bridgeData.preference_id });
+}
+
+// ── POST /api/payment/approved ───────────────────────────
+// Recibe callback del bridge cuando el pago es aprobado.
+// NO requiere JWT ni Turnstile — se autentica con HMAC del bridge.
+async function handlePaymentApproved(request, env) {
+  if (!env.BRIDGE_SECRET) return error('Servicio de pagos no configurado', 500);
+
+  const signature = request.headers.get('X-Signature');
+  const timestamp  = request.headers.get('X-Timestamp');
+  if (!signature || !timestamp) return error('Headers de autenticación faltantes', 401);
+
+  const now = Math.floor(Date.now() / 1000);
+  const ts  = parseInt(timestamp, 10);
+  if (isNaN(ts) || Math.abs(now - ts) > 300) return error('Solicitud expirada', 401);
+
+  const rawBody = await request.text();
+  const valid = await bridgeHmacVerify(env.BRIDGE_SECRET, `${timestamp}.${rawBody}`, signature);
+  if (!valid) return error('Firma inválida', 401);
+
+  let body;
+  try { body = JSON.parse(rawBody); } catch { return error('JSON inválido'); }
+
+  const { user_id, plan_id, payment_id, amount, status } = body;
+  if (!user_id || status !== 'approved') return error('Datos inválidos');
+
+  try {
+    // Prevenir re-uso del mismo payment_id
+    const existing = await env.DB.prepare('SELECT 1 FROM processed_payments WHERE payment_id = ?').bind(String(payment_id)).first();
+    if (existing) {
+      console.log(`⚠️ Payment ${payment_id} ya procesado — ignorando`);
+      return json({ success: true, already_processed: true });
+    }
+
+    const current = await env.DB.prepare('SELECT premium_until FROM users WHERE id = ?').bind(user_id).first();
+
+    // Check if this is a coin purchase
+    const coinMatch = plan_id && plan_id.match(/^coins_(\d+)$/);
+    if (coinMatch) {
+      const coinsToAdd = parseInt(coinMatch[1], 10);
+      await env.DB.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').bind(coinsToAdd, user_id).run();
+      await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(payment_id), user_id, plan_id, amount || 0).run();
+      console.log(`✅ Monedas acreditadas — user: ${user_id} | payment: ${payment_id} | +${coinsToAdd} coins`);
+    } else {
+      const newUntil = activatePremium(current?.premium_until, plan_id);
+      await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, user_id).run();
+      await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(payment_id), user_id, plan_id || '', amount || 0).run();
+      console.log(`✅ Premium activado — user: ${user_id} | payment: ${payment_id} | plan: ${plan_id} | hasta: ${newUntil} | +100 coins`);
+    }
+  } catch (err) {
+    console.error('DB error activando premium:', err.message);
+    return error('Error al activar suscripción', 500);
+  }
+
+  return json({ success: true });
+}
+
+// ── POST /api/payment/confirm ────────────────────────────
+// El frontend llama después del redirect del gateway.
+// Verifica el pago y activa premium/monedas si corresponde.
+// Requiere JWT (usuario autenticado).
+async function handlePaymentConfirm(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autenticado', 401);
+
+  let payment_id, gateway, external_reference;
+  try {
+    const body = await request.json();
+    payment_id = body.payment_id;
+    gateway = body.gateway;
+    external_reference = body.external_reference;
+  } catch {
+    return error('JSON inválido');
+  }
+  if (!payment_id) return error('payment_id requerido');
+
+  // Route to Ualá Bis confirm
+  if (gateway === 'uala') {
+    return handleUalaPaymentConfirm(auth, env, payment_id, external_reference);
+  }
+
+  // ── MercadoPago via Bridge (default) ──
+  if (!env.PAYMENT_BRIDGE_URL || !env.BRIDGE_SECRET) {
+    return error('Servicio de pagos no configurado', 500);
+  }
+
+  // Verificar con bridge
+  const bodyPayload = JSON.stringify({ payment_id: String(payment_id) });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = await bridgeHmacSign(env.BRIDGE_SECRET, `${timestamp}.${bodyPayload}`);
+
+  try {
+    const bridgeRes = await fetch(`${env.PAYMENT_BRIDGE_URL}/api/verify-payment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Signature': signature,
+        'X-Timestamp': timestamp,
+      },
+      body: bodyPayload,
+    });
+
+    if (!bridgeRes.ok) return error('No se pudo verificar el pago', 502);
+
+    const data = await bridgeRes.json();
+
+    // Verificar que el pago sea approved y pertenezca a este usuario
+    if (data.status !== 'approved') {
+      return json({ premium: false, reason: `status: ${data.status}` });
+    }
+
+    const ref = data.external_reference || '';
+    const [refUserId, planId] = ref.split('::');
+    if (refUserId !== auth.sub) {
+      return error('El pago no pertenece a este usuario', 403);
+    }
+
+    // Prevenir re-uso del mismo payment_id
+    const existing = await env.DB.prepare('SELECT 1 FROM processed_payments WHERE payment_id = ?').bind(String(payment_id)).first();
+    if (existing) {
+      console.log(`⚠️ Payment ${payment_id} ya procesado vía confirm — ignorando`);
+      const coinMatch = ref.includes('coins_');
+      return json({ premium: !coinMatch, coins: coinMatch, already_processed: true });
+    }
+
+    // Check if this is a coin purchase
+    const coinPlanMatch = planId && planId.match(/^coins_(\d+)$/);
+    if (coinPlanMatch) {
+      const coinsToAdd = parseInt(coinPlanMatch[1], 10);
+      await env.DB.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').bind(coinsToAdd, auth.sub).run();
+      await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(payment_id), auth.sub, planId, data.amount || 0).run();
+      console.log(`✅ Monedas confirmadas vía confirm — user: ${auth.sub} | payment: ${payment_id} | +${coinsToAdd} coins`);
+      return json({ coins: true, coinsAdded: coinsToAdd });
+    }
+
+    // Activar premium con duración según plan + 100 coins de regalo
+    const current = await env.DB.prepare('SELECT premium_until FROM users WHERE id = ?').bind(auth.sub).first();
+    const newUntil = activatePremium(current?.premium_until, planId);
+    await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, auth.sub).run();
+    await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(payment_id), auth.sub, planId || '', data.amount || 0).run();
+    console.log(`✅ Premium confirmado vía confirm — user: ${auth.sub} | payment: ${payment_id} | plan: ${planId} | hasta: ${newUntil} | +100 coins`);
+
+    return json({ premium: true, premium_until: newUntil });
+  } catch (err) {
+    console.error('Payment confirm error:', err.message);
+    return error('Error verificando pago', 502);
+  }
+}
+
 async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -1372,6 +2099,10 @@ async function handleRequest(request, env) {
 
   // CORS preflight
   if (method === 'OPTIONS') return handleOptions(env);
+
+  // ── Rutas server-to-server (bypass Turnstile — autenticadas con HMAC o verificación API)
+  if (path === '/api/payment/approved' && method === 'POST') return handlePaymentApproved(request, env);
+  if (path === '/api/payment/uala-webhook' && method === 'POST') return handleUalaWebhook(request, env);
 
   // Turnstile validation for mutations (skip for GET and dev)
   if (['POST', 'PUT', 'DELETE'].includes(method) && env.TURNSTILE_SECRET) {
@@ -1414,6 +2145,8 @@ async function handleRequest(request, env) {
   if (path === '/api/photos' && method === 'DELETE') return handleDeletePhoto(request, env);
 
   // ── Settings
+  if (path === '/api/detect-country' && method === 'GET') return handleDetectCountry(request);
+  if (path === '/api/settings/public' && method === 'GET') return handleGetPublicSettings(request, env);
   if (path === '/api/settings' && method === 'GET') return handleGetSettings(request, env);
   if (path === '/api/settings' && method === 'PUT') return handleUpdateSettings(request, env);
 
@@ -1440,6 +2173,19 @@ async function handleRequest(request, env) {
   const adminGiftDelMatch = path.match(/^\/api\/admin\/gifts\/([a-zA-Z0-9-]+)$/);
   if (adminGiftDelMatch && method === 'DELETE') return handleAdminDeleteGift(request, env, adminGiftDelMatch[1]);
   if (path === '/api/admin/coins' && method === 'POST') return handleAdminAddCoins(request, env);
+  if (path === '/api/admin/remove-all-vip' && method === 'POST') return handleAdminRemoveAllVip(request, env);
+  if (path === '/api/admin/reset-all-coins' && method === 'POST') return handleAdminResetAllCoins(request, env);
+
+  // ── Admin: Users
+  if (path === '/api/admin/users' && method === 'GET') return handleAdminGetUsers(request, env);
+  const adminUserMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)$/);
+  if (adminUserMatch && method === 'GET') return handleAdminGetUser(request, env, adminUserMatch[1]);
+  if (adminUserMatch && method === 'PUT') return handleAdminUpdateUser(request, env, adminUserMatch[1]);
+  if (adminUserMatch && method === 'DELETE') return handleAdminDeleteUser(request, env, adminUserMatch[1]);
+
+  // ── Pagos
+  if (path === '/api/payment/create' && method === 'POST') return handlePaymentCreate(request, env);
+  if (path === '/api/payment/confirm' && method === 'POST') return handlePaymentConfirm(request, env);
 
   // ── Serve R2 images
   if (path.startsWith('/api/images/') && method === 'GET') return handleServeImage(request, env, path);

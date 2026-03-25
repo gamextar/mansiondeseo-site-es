@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -13,9 +13,10 @@ import {
   Sparkles,
   Check,
   Heart,
+  Globe,
 } from 'lucide-react';
 import { useAuth } from '../App';
-import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode } from '../lib/api';
+import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings } from '../lib/api';
 
 // ────────────────────────────────────────────
 // Constants
@@ -60,6 +61,15 @@ const INTERESTS = [
   { id: 'exhib', label: 'Exhibicionismo', emoji: '✨' },
   { id: 'roleplay', label: 'Roleplay', emoji: '🎭' },
 ];
+
+const COUNTRY_NAMES = {
+  AR: 'Argentina', CL: 'Chile', MX: 'México', CO: 'Colombia',
+  PE: 'Perú', UY: 'Uruguay', EC: 'Ecuador', VE: 'Venezuela',
+  BO: 'Bolivia', PY: 'Paraguay', BR: 'Brasil', PA: 'Panamá',
+  CR: 'Costa Rica', DO: 'Rep. Dominicana', GT: 'Guatemala',
+  HN: 'Honduras', SV: 'El Salvador', NI: 'Nicaragua', CU: 'Cuba',
+  PR: 'Puerto Rico', ES: 'España', US: 'Estados Unidos',
+};
 
 // ────────────────────────────────────────────
 // Person Figure SVG
@@ -510,7 +520,7 @@ function StepInterests({ selected, onToggle }) {
   );
 }
 
-function StepBasicInfo({ data, onChange }) {
+function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, selectedCountry, onCountryChange }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const ARGENTINA_CITIES = [
@@ -607,6 +617,34 @@ function StepBasicInfo({ data, onChange }) {
             className="w-full resize-none"
           />
         </div>
+
+        {showCountryPicker && (
+          <div>
+            <label className="text-text-muted text-xs font-medium mb-1.5 block">
+              <Globe className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
+              País
+            </label>
+            <p className="text-[11px] text-mansion-gold/70 mb-2">
+              No pudimos detectar tu país automáticamente. Seleccioná uno:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {allowedCountries.map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => onCountryChange(code)}
+                  className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                    selectedCountry === code
+                      ? 'bg-mansion-gold/20 border-mansion-gold text-mansion-gold border'
+                      : 'bg-mansion-elevated border border-mansion-border/30 text-text-muted hover:border-mansion-gold/40'
+                  }`}
+                >
+                  {COUNTRY_NAMES[code] || code}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -901,6 +939,31 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
 
+  // Country detection
+  const [detectedCountry, setDetectedCountry] = useState('');
+  const [allowedCountries, setAllowedCountries] = useState([]);
+  const [selectedCountry, setSelectedCountry] = useState('');
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      apiDetectCountry().catch(() => ({ country: '' })),
+      getPublicSettings().catch(() => ({ settings: {} })),
+    ]).then(([detectData, settingsData]) => {
+      const detected = detectData.country || '';
+      const allowed = (settingsData.settings?.allowedCountries || 'AR').split(',').map(c => c.trim()).filter(Boolean);
+      setDetectedCountry(detected);
+      setAllowedCountries(allowed);
+      if (detected && allowed.includes(detected)) {
+        setSelectedCountry(detected);
+        setShowCountryPicker(false);
+      } else {
+        setSelectedCountry(allowed[0] || '');
+        setShowCountryPicker(true);
+      }
+    });
+  }, []);
+
   const toggleInterest = (id) => {
     setInterests((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -941,7 +1004,7 @@ export default function RegisterPage() {
     if (step === 1) return !!iAm;
     if (step === 2) return !!seeking;
     if (step === 3) return interests.length > 0;
-    if (step === 4) return info.name && info.age && info.city;
+    if (step === 4) return info.name && info.age && info.city && (!showCountryPicker || selectedCountry);
     return true;
   };
 
@@ -960,6 +1023,7 @@ export default function RegisterPage() {
           age: info.age,
           city: info.city,
           bio: info.bio,
+          country: selectedCountry || undefined,
         });
 
         // Show verification screen
@@ -1082,7 +1146,7 @@ export default function RegisterPage() {
       case 3:
         return <StepInterests selected={interests} onToggle={toggleInterest} />;
       case 4:
-        return <StepBasicInfo data={info} onChange={setInfo} />;
+        return <StepBasicInfo data={info} onChange={setInfo} showCountryPicker={showCountryPicker} allowedCountries={allowedCountries} selectedCountry={selectedCountry} onCountryChange={setSelectedCountry} />;
       case 5:
         return <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />;
       default:

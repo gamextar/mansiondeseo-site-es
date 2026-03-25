@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2 } from 'lucide-react';
-import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift } from '../lib/api';
+import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins } from '../lib/api';
 import { useAuth } from '../App';
 
 export default function SettingsPage() {
@@ -28,10 +28,28 @@ export default function SettingsPage() {
 
   // Site
   const [siteCountry, setSiteCountry] = useState('AR');
+  const [allowedCountries, setAllowedCountries] = useState('AR');
   const [hidePasswordRegister, setHidePasswordRegister] = useState(true);
+
+  // Coin packs
+  const [coinPack1Coins, setCoinPack1Coins] = useState('1000');
+  const [coinPack1Price, setCoinPack1Price] = useState('');
+  const [coinPack2Coins, setCoinPack2Coins] = useState('2000');
+  const [coinPack2Price, setCoinPack2Price] = useState('');
+  const [coinPack3Coins, setCoinPack3Coins] = useState('3000');
+  const [coinPack3Price, setCoinPack3Price] = useState('');
 
   // Iconografía
   const [incognitoIconSvg, setIncognitoIconSvg] = useState('');
+
+  // Payment display
+  const [paymentTitleVip, setPaymentTitleVip] = useState('Servicios Digitales');
+  const [paymentDescriptorVip, setPaymentDescriptorVip] = useState('UNICOAPPS');
+  const [paymentTitleCoins, setPaymentTitleCoins] = useState('Servicios Digitales');
+  const [paymentDescriptorCoins, setPaymentDescriptorCoins] = useState('UNICOAPPS');
+
+  // Payment gateway
+  const [paymentGateway, setPaymentGateway] = useState('mercadopago');
 
   // Gift catalog
   const [gifts, setGifts] = useState([]);
@@ -52,11 +70,23 @@ export default function SettingsPage() {
         setShowVipButton(s.showVipButton);
         setDailyMessageLimit(s.dailyMessageLimit);
         setSiteCountry(s.siteCountry);
+        setAllowedCountries(s.allowedCountries || 'AR');
         setHidePasswordRegister(s.hidePasswordRegister);
         setVipPriceMonthly(s.vipPriceMonthly);
         setVipPrice3Months(s.vipPrice3Months);
         setVipPrice6Months(s.vipPrice6Months);
         setIncognitoIconSvg(s.incognitoIconSvg || '');
+        setCoinPack1Coins(s.coinPack1Coins || '1000');
+        setCoinPack1Price(s.coinPack1Price || '');
+        setCoinPack2Coins(s.coinPack2Coins || '2000');
+        setCoinPack2Price(s.coinPack2Price || '');
+        setCoinPack3Coins(s.coinPack3Coins || '3000');
+        setCoinPack3Price(s.coinPack3Price || '');
+        setPaymentTitleVip(s.paymentTitleVip || 'Servicios Digitales');
+        setPaymentDescriptorVip(s.paymentDescriptorVip || 'UNICOAPPS');
+        setPaymentTitleCoins(s.paymentTitleCoins || 'Servicios Digitales');
+        setPaymentDescriptorCoins(s.paymentDescriptorCoins || 'UNICOAPPS');
+        setPaymentGateway(s.paymentGateway || 'mercadopago');
       })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
@@ -75,11 +105,23 @@ export default function SettingsPage() {
         show_vip_button: showVipButton ? '1' : '0',
         daily_message_limit: dailyMessageLimit,
         site_country: siteCountry,
+        allowed_countries: allowedCountries,
         hide_password_register: hidePasswordRegister ? '1' : '0',
         vip_price_monthly: vipPriceMonthly,
         vip_price_3months: vipPrice3Months,
         vip_price_6months: vipPrice6Months,
         incognito_icon_svg: incognitoIconSvg,
+        coin_pack_1_coins: coinPack1Coins,
+        coin_pack_1_price: coinPack1Price,
+        coin_pack_2_coins: coinPack2Coins,
+        coin_pack_2_price: coinPack2Price,
+        coin_pack_3_coins: coinPack3Coins,
+        coin_pack_3_price: coinPack3Price,
+        payment_title_vip: paymentTitleVip,
+        payment_descriptor_vip: paymentDescriptorVip,
+        payment_title_coins: paymentTitleCoins,
+        payment_descriptor_coins: paymentDescriptorCoins,
+        payment_gateway: paymentGateway,
       });
       const s = data.settings;
       setBlurMobile(s.blurMobile);
@@ -89,11 +131,23 @@ export default function SettingsPage() {
       setShowVipButton(s.showVipButton);
       setDailyMessageLimit(s.dailyMessageLimit);
       setSiteCountry(s.siteCountry);
+      setAllowedCountries(s.allowedCountries || 'AR');
       setHidePasswordRegister(s.hidePasswordRegister);
       setVipPriceMonthly(s.vipPriceMonthly);
       setVipPrice3Months(s.vipPrice3Months);
       setVipPrice6Months(s.vipPrice6Months);
       setIncognitoIconSvg(s.incognitoIconSvg || '');
+      setCoinPack1Coins(s.coinPack1Coins || '1000');
+      setCoinPack1Price(s.coinPack1Price || '');
+      setCoinPack2Coins(s.coinPack2Coins || '2000');
+      setCoinPack2Price(s.coinPack2Price || '');
+      setCoinPack3Coins(s.coinPack3Coins || '3000');
+      setCoinPack3Price(s.coinPack3Price || '');
+      setPaymentTitleVip(s.paymentTitleVip || 'Servicios Digitales');
+      setPaymentDescriptorVip(s.paymentDescriptorVip || 'UNICOAPPS');
+      setPaymentTitleCoins(s.paymentTitleCoins || 'Servicios Digitales');
+      setPaymentDescriptorCoins(s.paymentDescriptorCoins || 'UNICOAPPS');
+      setPaymentGateway(s.paymentGateway || 'mercadopago');
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
@@ -300,6 +354,113 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Coin Packs */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5 space-y-3">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Paquetes de Monedas</h3>
+                  <p className="text-[11px] text-text-dim">Cantidad de monedas y precio de cada paquete</p>
+                </div>
+              </div>
+              {[
+                { label: 'Pack 1', coins: coinPack1Coins, setCoins: setCoinPack1Coins, price: coinPack1Price, setPrice: setCoinPack1Price },
+                { label: 'Pack 2', coins: coinPack2Coins, setCoins: setCoinPack2Coins, price: coinPack2Price, setPrice: setCoinPack2Price },
+                { label: 'Pack 3', coins: coinPack3Coins, setCoins: setCoinPack3Coins, price: coinPack3Price, setPrice: setCoinPack3Price },
+              ].map(pk => (
+                <div key={pk.label} className="grid grid-cols-3 gap-2 items-end">
+                  <div>
+                    <label className="text-[10px] text-text-dim uppercase tracking-wider mb-1 block">{pk.label}</label>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-text-dim uppercase tracking-wider mb-1 block">Monedas</label>
+                    <input type="text" value={pk.coins} onChange={e => pk.setCoins(e.target.value)} placeholder="1000" className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-text-dim uppercase tracking-wider mb-1 block">Precio $</label>
+                    <input type="text" value={pk.price} onChange={e => pk.setPrice(e.target.value)} placeholder="999" className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary" />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Payment Gateway Selector */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5 space-y-3">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Pasarela de Pago</h3>
+                  <p className="text-[11px] text-text-dim">Seleccioná el gateway activo para cobros</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: 'mercadopago', label: 'MercadoPago', desc: 'Vía Bridge' },
+                  { value: 'uala_bis', label: 'Ualá Bis', desc: 'Directo' },
+                ].map(gw => (
+                  <button
+                    key={gw.value}
+                    onClick={() => setPaymentGateway(gw.value)}
+                    className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
+                      paymentGateway === gw.value
+                        ? 'border-mansion-gold bg-mansion-gold/10'
+                        : 'border-white/10 bg-mansion-elevated hover:border-white/30'
+                    }`}
+                  >
+                    <span className="font-bold text-sm text-text-primary">{gw.label}</span>
+                    <span className="text-[10px] text-text-dim">{gw.desc}</span>
+                  </button>
+                ))}
+              </div>
+              {paymentGateway === 'uala_bis' && (
+                <p className="text-[10px] text-text-dim mt-1">
+                  Las credenciales de Ualá Bis (username, client_id, client_secret) se configuran como secrets en Cloudflare Workers.
+                </p>
+              )}
+            </div>
+
+            {/* Payment Display */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5 space-y-3">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Shield className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Datos del Pago</h3>
+                  <p className="text-[11px] text-text-dim">Lo que ve el usuario en MercadoPago y en su tarjeta</p>
+                </div>
+              </div>
+              {/* VIP */}
+              <p className="text-[10px] text-mansion-gold font-semibold uppercase tracking-wider">Suscripción VIP</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-text-dim uppercase tracking-wider mb-1 block">Título del pago</label>
+                  <input type="text" value={paymentTitleVip} onChange={e => setPaymentTitleVip(e.target.value)} placeholder="Servicios Digitales" className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-text-dim uppercase tracking-wider mb-1 block">Descriptor tarjeta</label>
+                  <input type="text" value={paymentDescriptorVip} onChange={e => setPaymentDescriptorVip(e.target.value)} placeholder="UNICOAPPS" maxLength={22} className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary" />
+                </div>
+              </div>
+              {/* Coins */}
+              <p className="text-[10px] text-mansion-gold font-semibold uppercase tracking-wider mt-2">Compra de Monedas</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-text-dim uppercase tracking-wider mb-1 block">Título del pago</label>
+                  <input type="text" value={paymentTitleCoins} onChange={e => setPaymentTitleCoins(e.target.value)} placeholder="Servicios Digitales" className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-text-dim uppercase tracking-wider mb-1 block">Descriptor tarjeta</label>
+                  <input type="text" value={paymentDescriptorCoins} onChange={e => setPaymentDescriptorCoins(e.target.value)} placeholder="UNICOAPPS" maxLength={22} className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary" />
+                </div>
+              </div>
+              <p className="text-[10px] text-text-dim">El descriptor aparece en el resumen de la tarjeta (máx. 22 caracteres)</p>
+            </div>
           </div>
         </section>
 
@@ -384,6 +545,26 @@ export default function SettingsPage() {
                 </div>
                 <input type="text" value={siteCountry} onChange={e => setSiteCountry(e.target.value.toUpperCase().slice(0, 2))} maxLength={2} className="w-16 text-center text-sm py-2 px-2 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-mansion-gold font-bold uppercase" />
               </div>
+            </div>
+
+            {/* Allowed Countries */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Globe className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Países permitidos</h3>
+                  <p className="text-[11px] text-text-dim">Códigos ISO separados por comas (AR,CL,MX...). Si el país detectado no está en la lista, se muestra un selector al registrarse.</p>
+                </div>
+              </div>
+              <input
+                type="text"
+                value={allowedCountries}
+                onChange={e => setAllowedCountries(e.target.value.toUpperCase())}
+                placeholder="AR,CL,MX"
+                className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-mansion-gold font-mono"
+              />
             </div>
 
             {/* Hide Password */}
@@ -490,6 +671,56 @@ export default function SettingsPage() {
                 {gifts.filter(g => g.active).length === 0 && (
                   <p className="text-xs text-text-dim text-center py-4">No hay regalos en el catálogo</p>
                 )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── DEBUG ── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Shield className="w-4 h-4 text-red-400" />
+            <h2 className="text-xs font-bold text-red-400 uppercase tracking-wider">Debug / Zona peligrosa</h2>
+          </div>
+          <div className="space-y-3">
+            <div className="bg-mansion-card rounded-2xl p-4 border border-red-500/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Quitar VIP a todos</h3>
+                  <p className="text-[11px] text-text-dim">Resetea premium y premium_until de todos los usuarios</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!confirm('¿Seguro? Esto quitará VIP a TODOS los usuarios.')) return;
+                    try {
+                      const data = await adminRemoveAllVip();
+                      alert(`VIP removido de ${data.affected} usuarios`);
+                    } catch { alert('Error al quitar VIP'); }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-red-900/30 border border-red-500/30 text-red-400 text-sm font-semibold hover:bg-red-900/50 transition-colors"
+                >
+                  Ejecutar
+                </button>
+              </div>
+            </div>
+            <div className="bg-mansion-card rounded-2xl p-4 border border-red-500/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Resetear monedas</h3>
+                  <p className="text-[11px] text-text-dim">Pone a 0 las monedas de todos los usuarios</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!confirm('¿Seguro? Esto pondrá a 0 las monedas de TODOS los usuarios.')) return;
+                    try {
+                      const data = await adminResetAllCoins();
+                      alert(`Monedas reseteadas en ${data.affected} usuarios`);
+                    } catch { alert('Error al resetear monedas'); }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-red-900/30 border border-red-500/30 text-red-400 text-sm font-semibold hover:bg-red-900/50 transition-colors"
+                >
+                  Ejecutar
+                </button>
               </div>
             </div>
           </div>
