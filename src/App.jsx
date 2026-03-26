@@ -24,7 +24,7 @@ import PagoFallidoPage from './pages/PagoFallidoPage';
 import PagoPendientePage from './pages/PagoPendientePage';
 import CoinsPage from './pages/CoinsPage';
 import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getMe } from './lib/api';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getMe, getPublicSettings } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 
@@ -35,8 +35,10 @@ const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/mensajes/', '/
 const AuthContext = createContext({
   registered: false,
   user: null,
+  siteSettings: {},
   setRegistered: () => {},
   setUser: () => {},
+  setSiteSettings: () => {},
 });
 export function useAuth() {
   return useContext(AuthContext);
@@ -160,6 +162,9 @@ export default function App() {
     () => !!getToken() || localStorage.getItem('mansion_registered') === 'true'
   );
   const [user, setUserState] = useState(() => getStoredUser());
+  const [siteSettings, setSiteSettings] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('mansion_site_settings') || '{}'); } catch { return {}; }
+  });
 
   const setRegistered = useCallback((val) => {
     if (val) {
@@ -208,9 +213,19 @@ export default function App() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fetch public settings once on mount for global access (e.g. Navbar coin icon)
+  useEffect(() => {
+    getPublicSettings().then(data => {
+      if (data?.settings) {
+        setSiteSettings(data.settings);
+        try { sessionStorage.setItem('mansion_site_settings', JSON.stringify(data.settings)); } catch {}
+      }
+    }).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <BrowserRouter>
-      <AuthContext.Provider value={{ registered, setRegistered, user, setUser }}>
+      <AuthContext.Provider value={{ registered, setRegistered, user, setUser, siteSettings, setSiteSettings }}>
       <UnreadProvider>
       <div className="relative min-h-screen">
         {!verified && <AgeVerificationModal onVerify={verify} />}

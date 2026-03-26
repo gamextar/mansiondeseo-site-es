@@ -85,6 +85,7 @@ export default function FeedPage() {
             const isOnline = p.online;
             const size = settings.storyCircleSize || 88;
             const border = settings.storyCircleBorder ?? 4;
+            const innerGap = settings.storyCircleInnerGap ?? 3;
             const innerSize = size - border * 2;
             return (
               <Link
@@ -99,7 +100,7 @@ export default function FeedPage() {
                     ? 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson'
                     : 'bg-gradient-to-tr from-mansion-border/60 to-mansion-border/40'
                 }`} style={{ width: size, height: size, padding: border }}>
-                  <div className="w-full h-full rounded-full bg-mansion-base p-[2px]">
+                  <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: innerGap }}>
                     <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
                       {photo ? (
                         <img src={photo} alt={p.name} className="w-full h-full object-cover" />

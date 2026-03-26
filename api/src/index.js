@@ -1302,6 +1302,9 @@ async function loadSettings(env) {
     storyCircleSize: parseInt(settings.story_circle_size || '88', 10),
     storyCircleGap: parseInt(settings.story_circle_gap || '8', 10),
     storyCircleBorder: parseInt(settings.story_circle_border || '4', 10),
+    storyCircleInnerGap: parseInt(settings.story_circle_inner_gap || '3', 10),
+    coinIconUrl: settings.coin_icon_url || '',
+    coinIconSize: parseInt(settings.coin_icon_size || '18', 10),
   };
 }
 
@@ -1339,6 +1342,8 @@ async function handleGetPublicSettings(request, env) {
       galleryHombreImg: settings.galleryHombreImg,
       galleryMujerImg: settings.galleryMujerImg,
       galleryParejaImg: settings.galleryParejaImg,
+      coinIconUrl: settings.coinIconUrl,
+      coinIconSize: settings.coinIconSize,
     },
   });
 }
@@ -1381,6 +1386,9 @@ async function handleUpdateSettings(request, env) {
     'story_circle_size',
     'story_circle_gap',
     'story_circle_border',
+    'story_circle_inner_gap',
+    'coin_icon_url',
+    'coin_icon_size',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {
