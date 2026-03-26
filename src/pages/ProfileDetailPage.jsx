@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Heart, MessageCircle, Shield, Crown,
@@ -30,15 +30,17 @@ const MaskIcon = ({ className = 'w-8 h-8', customSvg = '' }) => {
 export default function ProfileDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, setUser } = useAuth();
-  const [profile, setProfile] = useState(null);
+  const preview = location.state?.preview || null;
+  const [profile, setProfile] = useState(preview ? { ...preview, interests: [], bio: '', totalPhotos: preview.photos?.length || 0, visiblePhotos: preview.photos?.length || 0, blurred: false, isOwnProfile: false, receivedGifts: [] } : null);
   const [viewerPremium, setViewerPremium] = useState(false);
   const [settings, setSettings] = useState({ blurLevel: 14, blurMobile: 14, blurDesktop: 8, freeVisiblePhotos: 1, freeOwnPhotos: 3 });
   const [isFavorited, setIsFavorited] = useState(false);
   const [togglingFav, setTogglingFav] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!preview);
   const [isReordering, setIsReordering] = useState(false);
-  const [orderedPhotos, setOrderedPhotos] = useState([]);
+  const [orderedPhotos, setOrderedPhotos] = useState(preview?.photos || []);
   const [savingOrder, setSavingOrder] = useState(false);
   // Gift state
   const [giftModalOpen, setGiftModalOpen] = useState(false);
