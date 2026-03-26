@@ -27,6 +27,9 @@ export default function AvatarImg({ src, crop, className = '', alt = '' }) {
           height: `${h}%`,
           left: `${left}%`,
           top: `${top}%`,
+          maxWidth: 'none',
+          maxHeight: 'none',
+          display: 'block',
         }}
       />
     </div>
