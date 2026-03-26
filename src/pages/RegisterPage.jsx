@@ -369,15 +369,10 @@ function FichaPreview({ data, currentStep }) {
 function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePasswordDefault }) {
   const [showPassword, setShowPassword] = useState(!hidePasswordDefault);
 
-  // When password is hidden, generate a random one automatically
+  // Sync with server setting once it arrives (useState only reads initial value once)
   useEffect(() => {
-    if (hidePasswordDefault && !password) {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
-      let auto = '';
-      for (let i = 0; i < 16; i++) auto += chars[Math.floor(Math.random() * chars.length)];
-      onPasswordChange(auto);
-    }
-  }, [hidePasswordDefault]); // eslint-disable-line react-hooks/exhaustive-deps
+    setShowPassword(!hidePasswordDefault);
+  }, [hidePasswordDefault]);
 
   return (
     <div className="text-center">
@@ -410,7 +405,6 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
             />
           </div>
         </div>
-        {!hidePasswordDefault && (
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">
             Contraseña
@@ -434,7 +428,6 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
             </button>
           </div>
         </div>
-        )}
       </div>
     </div>
   );
