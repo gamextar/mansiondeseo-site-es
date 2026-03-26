@@ -222,15 +222,30 @@ export class ChatRoom {
       } catch { /* socket might be closed */ }
     }
 
-    // Async: write to D1 (source of truth)
+    // Async: write to D1 (source of truth) + notify UserNotification DOs
     if (receiverId) {
-      this.state.waitUntil(
-        this.env.DB.prepare(
+      const chatId = [senderId, receiverId].sort().join('-');
+      this.state.waitUntil((async () => {
+        // Write to D1
+        await this.env.DB.prepare(
           'INSERT INTO messages (id, sender_id, receiver_id, content, created_at) VALUES (?, ?, ?, ?, ?)'
         ).bind(msgId, senderId, receiverId, content, now).run().catch(err => {
           console.error('D1 message write error:', err.message);
-        })
-      );
+        });
+        // Notify UserNotification DOs so ChatListPage updates in real-time
+        const notifyPayload = JSON.stringify({ type: 'new_message', chatId });
+        for (const userId of [senderId, receiverId]) {
+          try {
+            const doId = this.env.USER_NOTIFICATIONS.idFromName(userId);
+            const stub = this.env.USER_NOTIFICATIONS.get(doId);
+            await stub.fetch('https://do/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: notifyPayload,
+            });
+          } catch { /* ignore notification errors */ }
+        }
+      })());
     }
   }
 
