@@ -18,6 +18,9 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
   const [imgNatural, setImgNatural] = useState({ w: 0, h: 0 });
   const containerRef = useRef(null);
   const imgRef = useRef(null);
+  const zoomRef = useRef(1);
+  const offsetRef = useRef({ x: 0, y: 0 });
+  const touchDragStart = useRef(null);
 
   // Viewport size (the visible circle area in CSS px)
   const viewportSize = 280;
@@ -32,6 +35,14 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
     setImageUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [file, externalUrl]);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  useEffect(() => {
+    offsetRef.current = offset;
+  }, [offset]);
 
   const handleImageLoad = useCallback((e) => {
     const { naturalWidth: w, naturalHeight: h } = e.target;
@@ -60,11 +71,15 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
     const maxY = 0;
     const minY = viewportSize - scaledH;
 
-    setZoom(nextZoom);
-    setOffset({
+    const clampedOffset = {
       x: Math.min(maxX, Math.max(minX, nextOffset.x)),
       y: Math.min(maxY, Math.max(minY, nextOffset.y)),
-    });
+    };
+
+    zoomRef.current = nextZoom;
+    offsetRef.current = clampedOffset;
+    setZoom(nextZoom);
+    setOffset(clampedOffset);
   }, [initialPosition, positionOnly]);
 
   // Clamp offset so image always covers the viewport
@@ -83,6 +98,7 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
 
   // ── Mouse drag ──
   const onPointerDown = (e) => {
+    if (e.pointerType === 'touch') return;
     e.preventDefault();
     setDragging(true);
     setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
@@ -90,6 +106,7 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
   };
 
   const onPointerMove = (e) => {
+    if (e.pointerType === 'touch') return;
     if (!dragging) return;
     const nx = e.clientX - dragStart.x;
     const ny = e.clientY - dragStart.y;
@@ -97,6 +114,7 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
   };
 
   const onPointerUp = (e) => {
+    if (e.pointerType === 'touch') return;
     setDragging(false);
     containerRef.current?.releasePointerCapture(e.pointerId);
   };
@@ -105,14 +123,38 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
   const lastTouchDist = useRef(null);
 
   const onTouchStart = (e) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      touchDragStart.current = {
+        x: touch.clientX - offsetRef.current.x,
+        y: touch.clientY - offsetRef.current.y,
+      };
+      lastTouchDist.current = null;
+      setDragging(false);
+      return;
+    }
+
     if (e.touches.length === 2) {
+      touchDragStart.current = null;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       lastTouchDist.current = Math.sqrt(dx * dx + dy * dy);
+      setDragging(false);
     }
   };
 
   const onTouchMove = (e) => {
+    if (e.touches.length === 1 && touchDragStart.current && !lastTouchDist.current) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const nx = touch.clientX - touchDragStart.current.x;
+      const ny = touch.clientY - touchDragStart.current.y;
+      const nextOffset = clampOffset(nx, ny, zoomRef.current);
+      offsetRef.current = nextOffset;
+      setOffset(nextOffset);
+      return;
+    }
+
     if (e.touches.length === 2 && lastTouchDist.current) {
       e.preventDefault();
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -121,22 +163,37 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
       const ratio = dist / lastTouchDist.current;
       lastTouchDist.current = dist;
 
-      setZoom((prev) => {
-        const minZoom = viewportSize / Math.min(imgNatural.w, imgNatural.h);
-        const newZ = Math.min(Math.max(prev * ratio, minZoom), minZoom * 5);
-        // Re-center around viewport center
-        const cx = viewportSize / 2;
-        const cy = viewportSize / 2;
-        const nx = cx - ((cx - offset.x) / prev) * newZ;
-        const ny = cy - ((cy - offset.y) / prev) * newZ;
-        setOffset(clampOffset(nx, ny, newZ));
-        return newZ;
-      });
+      const minZoom = viewportSize / Math.min(imgNatural.w, imgNatural.h);
+      const prevZoom = zoomRef.current;
+      const newZ = Math.min(Math.max(prevZoom * ratio, minZoom), minZoom * 5);
+      const rect = containerRef.current?.getBoundingClientRect();
+      const cx = rect ? ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left : viewportSize / 2;
+      const cy = rect ? ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top : viewportSize / 2;
+      const currentOffset = offsetRef.current;
+      const nx = cx - ((cx - currentOffset.x) / prevZoom) * newZ;
+      const ny = cy - ((cy - currentOffset.y) / prevZoom) * newZ;
+      const nextOffset = clampOffset(nx, ny, newZ);
+
+      zoomRef.current = newZ;
+      offsetRef.current = nextOffset;
+      setZoom(newZ);
+      setOffset(nextOffset);
     }
   };
 
-  const onTouchEnd = () => {
+  const onTouchEnd = (e) => {
+    if (e.touches.length === 1) {
+      lastTouchDist.current = null;
+      const touch = e.touches[0];
+      touchDragStart.current = {
+        x: touch.clientX - offsetRef.current.x,
+        y: touch.clientY - offsetRef.current.y,
+      };
+      return;
+    }
+
     lastTouchDist.current = null;
+    touchDragStart.current = null;
   };
 
   // ── Scroll zoom ──
@@ -315,7 +372,7 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
             <button
               type="button"
               onClick={onCancel}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors"
+              className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-white/10 text-white text-base font-medium hover:bg-white/20 transition-colors"
             >
               <X className="w-4 h-4" />
               Cancelar
@@ -323,7 +380,7 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
             <button
               type="button"
               onClick={handleConfirm}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-mansion-gold text-black text-sm font-bold hover:bg-mansion-gold-light transition-colors"
+              className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-mansion-gold text-black text-base font-bold hover:bg-mansion-gold-light transition-colors"
             >
               <Check className="w-4 h-4" />
               Confirmar
