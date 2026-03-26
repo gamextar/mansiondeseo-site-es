@@ -1790,7 +1790,7 @@ async function handleAdminDeleteUser(request, env, userId) {
   const user = await env.DB.prepare('SELECT id, email FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
 
-  // Delete related data
+  // Delete related data (all FK-referencing tables must be cleaned before users row)
   await env.DB.batch([
     env.DB.prepare('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM favorites WHERE user_id = ? OR target_id = ?').bind(userId, userId),
@@ -1798,6 +1798,8 @@ async function handleAdminDeleteUser(request, env, userId) {
     env.DB.prepare('DELETE FROM user_gifts WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM verification_tokens WHERE user_id = ? OR email = ?').bind(userId, user.email),
     env.DB.prepare('DELETE FROM processed_payments WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM message_limits WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
 
