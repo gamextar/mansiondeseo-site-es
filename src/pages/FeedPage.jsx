@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Radio } from 'lucide-react';
 import ProfileCard from '../components/ProfileCard';
 import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
@@ -69,13 +70,47 @@ export default function FeedPage() {
       >
         <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
-      {/* Hero greeting */}
-      <div className="px-4 lg:px-8 pt-4 lg:pt-6 pb-2">
-        <div>
-          <p className="text-text-muted text-sm lg:text-base">Buenas noches 🌙</p>
-          <h1 className="font-display text-2xl lg:text-4xl font-bold text-text-primary">
-            Descubre la <span className="text-gradient-gold">Mansión</span>
-          </h1>
+      {/* Stories section */}
+      <div className="px-4 lg:px-8 pt-4 lg:pt-6 pb-1">
+        <div className="flex items-center gap-1.5 mb-3">
+          <Radio className="w-4 h-4 text-mansion-crimson" />
+          <p className="text-text-muted text-sm lg:text-base font-medium">Transmitiendo</p>
+        </div>
+        <div
+          className="flex gap-3 overflow-x-auto scrollbar-hide pb-2"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {profiles.slice(0, 15).map((p) => {
+            const photo = (p.photos && p.photos[0]) || p.avatar_url || '';
+            const isOnline = p.online;
+            return (
+              <Link
+                key={`story-${p.id}`}
+                to={`/perfiles/${p.id}`}
+                state={{ preview: { id: p.id, name: p.name, age: p.age, city: p.city, role: p.role, photos: p.photos || [], avatar_url: p.avatar_url, online: p.online, premium: p.premium, verified: p.verified, blurred: p.blurred, visiblePhotos: p.visiblePhotos, ghost_mode: p.ghost_mode } }}
+                className="flex flex-col items-center gap-1 flex-shrink-0 w-[72px]"
+              >
+                <div className={`w-[66px] h-[66px] rounded-full p-[2.5px] ${
+                  isOnline
+                    ? 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson'
+                    : 'bg-gradient-to-tr from-mansion-border/60 to-mansion-border/40'
+                }`}>
+                  <div className="w-full h-full rounded-full bg-mansion-base p-[2px]">
+                    <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
+                      {photo ? (
+                        <img src={photo} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
+                          {p.name?.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[10px] text-text-muted truncate w-full text-center leading-tight">{p.name?.split(' ')[0]}</span>
+              </Link>
+            );
+          })}
         </div>
       </div>
 
