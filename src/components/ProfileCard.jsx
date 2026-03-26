@@ -66,9 +66,9 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: Math.min(index * 0.03, 0.15), duration: 0.25 }}
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
     >
       <Link to={`/perfiles/${id}`} state={{ preview: { id, name, age, city, role, photos, avatar_url: profile.avatar_url, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode } }} className="block group">
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">
