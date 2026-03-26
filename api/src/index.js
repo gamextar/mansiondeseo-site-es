@@ -896,11 +896,8 @@ async function handleChatWebSocket(request, env, chatId) {
   const doId = env.CHAT_ROOMS.idFromName(chatId);
   const stub = env.CHAT_ROOMS.get(doId);
 
-  // Forward the request to the DO (it handles the WS upgrade)
-  const doUrl = new URL(request.url);
-  doUrl.pathname = '/ws';
-  doUrl.searchParams.set('chatId', chatId);
-  return stub.fetch(new Request(doUrl.toString(), request));
+  // Pass the original request directly — recommended pattern for WS proxying to DOs
+  return stub.fetch(request);
 }
 
 // ── Notify UserNotification DO ──────────────────────────
@@ -931,13 +928,12 @@ async function handleNotificationWebSocket(request, env) {
   const payload = await verifyJWT(token, env.JWT_SECRET);
   if (!payload) return error('Token inválido', 401);
 
+  console.log('[handleNotificationWebSocket] userId:', payload.sub);
   const doId = env.USER_NOTIFICATIONS.idFromName(payload.sub);
   const stub = env.USER_NOTIFICATIONS.get(doId);
 
-  // Must create a new Request to avoid immutable headers error
-  const doUrl = new URL(request.url);
-  doUrl.pathname = '/ws';
-  return stub.fetch(new Request(doUrl.toString(), request));
+  // Pass the original request directly — recommended pattern for WS proxying to DOs
+  return stub.fetch(request);
 }
 
 // ── GET /api/unread-count ───────────────────────────────

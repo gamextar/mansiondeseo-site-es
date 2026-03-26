@@ -13,7 +13,7 @@ export default function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
-  const { refresh: refreshUnread } = useUnreadMessages();
+  const { refresh: refreshUnread, subscribe } = useUnreadMessages();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [apiLimit, setApiLimit] = useState(null);
@@ -134,6 +134,29 @@ export default function ChatPage() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Real-time message delivery: when UserNotification WS fires for this chat, refetch from D1
+  useEffect(() => {
+    const unsubscribe = subscribe((event) => {
+      const myId = myUserIdRef.current;
+      if (!myId) return;
+      const thisChatId = [myId, partnerId].sort().join('-');
+      if (event?.chatId === thisChatId) {
+        apiGetMessages(partnerId)
+          .then(data => {
+            setMessages(prev => {
+              const incoming = data.messages || [];
+              // Merge: keep existing messages, add any new ones by id
+              const existingIds = new Set(prev.map(m => m.id));
+              const newMsgs = incoming.filter(m => !existingIds.has(m.id));
+              return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev;
+            });
+          })
+          .catch(() => {});
+      }
+    });
+    return unsubscribe;
+  }, [partnerId, subscribe]);
 
   if (!partner && !loading) {
     return (

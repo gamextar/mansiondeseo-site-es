@@ -50,8 +50,8 @@ export class ChatRoom {
       return new Response('Missing userId', { status: 400 });
     }
 
-    // Store chatId for receiverId derivation (survives hibernation)
-    const chatId = url.searchParams.get('chatId');
+    // Extract chatId: may be in query params (old) or in URL path (new: /api/chat/ws/{chatId})
+    const chatId = url.searchParams.get('chatId') || url.pathname.split('/').pop();
     if (chatId) {
       await this.state.storage.put('chatId', chatId);
     }
@@ -294,11 +294,12 @@ export class ChatRoom {
   }
 
   async webSocketClose(ws, code, reason) {
-    ws.close(code, reason);
+    // Code 1006 is reserved (abnormal closure) and cannot be sent by app code
+    try { ws.close(1000, 'Connection closed'); } catch { /* already closed */ }
   }
 
   async webSocketError(ws, error) {
     console.error('WebSocket error:', error);
-    ws.close(1011, 'WebSocket error');
+    try { ws.close(1011, 'WebSocket error'); } catch { /* already closed */ }
   }
 }

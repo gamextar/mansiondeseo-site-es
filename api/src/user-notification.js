@@ -33,6 +33,10 @@ export class UserNotification {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     this.state.acceptWebSocket(server);
+    // Send immediate connected confirmation
+    this.state.waitUntil(Promise.resolve().then(() => {
+      try { server.send(JSON.stringify({ type: 'connected' })); } catch { /* ignore */ }
+    }));
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -48,10 +52,10 @@ export class UserNotification {
   }
 
   async webSocketClose(ws, code, reason) {
-    ws.close(code, reason);
+    try { ws.close(1000, 'Connection closed'); } catch { /* already closed */ }
   }
 
   async webSocketError(ws, error) {
-    ws.close(1011, 'WebSocket error');
+    try { ws.close(1011, 'WebSocket error'); } catch { /* already closed */ }
   }
 }
