@@ -179,9 +179,11 @@ export default function ProfilePage() {
     setTogglingGhost(true);
     try {
       const data = await updateProfile({ ghost_mode: !user.ghost_mode });
-      setUser(prev => prev ? { ...prev, ghost_mode: data.user.ghost_mode } : prev);
-    } catch {
-      // Silently fail
+      if (data?.user) {
+        setUser({ ...user, ...data.user });
+      }
+    } catch (err) {
+      console.error('Ghost mode toggle error:', err);
     } finally {
       setTogglingGhost(false);
     }

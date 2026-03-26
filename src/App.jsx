@@ -171,8 +171,16 @@ export default function App() {
   }, []);
 
   const setUser = useCallback((u) => {
-    setStoredUser(u);
-    setUserState(u);
+    if (typeof u === 'function') {
+      setUserState(prev => {
+        const next = u(prev);
+        setStoredUser(next);
+        return next;
+      });
+    } else {
+      setStoredUser(u);
+      setUserState(u);
+    }
   }, []);
 
   // Check for magic-link token in URL
