@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Users, Gift } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Users, Gift, Filter } from 'lucide-react';
 import { useAuth } from '../App';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits, getReceivedGifts } from '../lib/api';
 
@@ -26,6 +26,7 @@ export default function ProfilePage() {
   const [togglingGhost, setTogglingGhost] = useState(false);
   const [visitors, setVisitors] = useState([]);
   const [receivedGifts, setReceivedGifts] = useState([]);
+  const [feedFilter, setFeedFilter] = useState(() => localStorage.getItem('mansion_feed_filter') || 'all');
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
 
@@ -383,6 +384,43 @@ export default function ProfilePage() {
 
         {/* Menu items */}
         <div className="space-y-1.5">
+
+          {/* Feed filter preference */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2.5 px-1">
+              <Filter className="w-4 h-4 text-mansion-gold" />
+              <h3 className="text-sm font-semibold text-text-primary">Mostrar en inicio</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: 'all', label: 'Todos', emoji: '✨' },
+                { id: 'swinger', label: 'Swinger', emoji: '🔄' },
+                { id: 'trios', label: 'Tríos', emoji: '🔥' },
+                { id: 'cuckold', label: 'Cuckold', emoji: '👀' },
+                { id: 'fetiche', label: 'Fetiche', emoji: '⛓️' },
+                { id: 'pareja', label: 'Parejas', emoji: '💑' },
+                { id: 'mujer', label: 'Mujeres', emoji: '👩' },
+                { id: 'hombre', label: 'Hombres', emoji: '👨' },
+              ].map(f => {
+                const isActive = feedFilter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => { setFeedFilter(f.id); localStorage.setItem('mansion_feed_filter', f.id); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      isActive
+                        ? 'bg-mansion-gold/15 text-mansion-gold border border-mansion-gold/40'
+                        : 'bg-mansion-card border border-mansion-border/50 text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    <span>{f.emoji}</span>
+                    <span>{f.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {[
             { icon: Settings, label: 'Configuración', sublabel: 'Privacidad, notificaciones', path: '/configuracion' },
             { icon: Heart, label: 'Mis favoritos', sublabel: 'Perfiles guardados', path: '/favoritos' },

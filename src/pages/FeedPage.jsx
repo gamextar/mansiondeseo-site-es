@@ -1,12 +1,15 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import FilterBar from '../components/FilterBar';
 import ProfileCard from '../components/ProfileCard';
 import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 
 const FEED_CACHE_KEY = 'mansion_feed_';
+
+function getSavedFilter() {
+  return localStorage.getItem('mansion_feed_filter') || 'all';
+}
 
 function getCachedFeed(filter) {
   try {
@@ -20,8 +23,8 @@ function setCachedFeed(filter, data) {
 }
 
 export default function FeedPage() {
-  const [activeFilter, setActiveFilter] = useState('all');
-  const cached = getCachedFeed('all');
+  const savedFilter = getSavedFilter();
+  const cached = getCachedFeed(savedFilter);
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
@@ -49,11 +52,11 @@ export default function FeedPage() {
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
-    loadProfiles(activeFilter);
-  }, [activeFilter, navigate, loadProfiles]);
+    loadProfiles(savedFilter);
+  }, [navigate, loadProfiles, savedFilter]);
 
   const { indicatorRef } = usePullToRefresh(
-    useCallback(() => loadProfiles(activeFilter, { silent: true }), [loadProfiles, activeFilter])
+    useCallback(() => loadProfiles(savedFilter, { silent: true }), [loadProfiles, savedFilter])
   );
 
   return (
@@ -75,9 +78,6 @@ export default function FeedPage() {
           </h1>
         </div>
       </div>
-
-      {/* Filter bar */}
-      <FilterBar activeFilter={activeFilter} onFilterChange={setActiveFilter} />
 
       {/* Results count */}
       <div className="px-4 lg:px-8 pb-3">
