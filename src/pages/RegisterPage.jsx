@@ -532,10 +532,8 @@ function StepInterests({ selected, onToggle }) {
   );
 }
 
-function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, selectedCountry, onCountryChange, isCouple }) {
+function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, selectedCountry, onCountryChange }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [nameElla, setNameElla] = useState('');
-  const [nameEl, setNameEl] = useState('');
 
   const ARGENTINA_CITIES = [
     'Buenos Aires', 'CABA', 'Córdoba', 'Rosario', 'Mendoza', 'San Miguel de Tucumán',
@@ -561,71 +559,38 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
       <p className="text-text-muted text-sm mb-8">Cuéntanos un poco más sobre ti</p>
 
       <div className="space-y-4 max-w-xs mx-auto text-left">
-        {isCouple ? (
-          <div>
-            <label className="text-text-muted text-xs font-medium mb-1.5 block">
-              Nombres de la pareja
-            </label>
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <input
-                  type="text"
-                  value={nameElla}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setNameElla(val);
-                    onChange({ ...data, name: val && nameEl ? `${val} y ${nameEl}` : val || nameEl });
-                  }}
-                  placeholder="Ella"
-                  className="w-full text-center"
-                />
-              </div>
-              <span className="text-mansion-gold font-display font-bold text-sm">&</span>
-              <div className="flex-1">
-                <input
-                  type="text"
-                  value={nameEl}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setNameEl(val);
-                    onChange({ ...data, name: nameElla && val ? `${nameElla} y ${val}` : nameElla || val });
-                  }}
-                  placeholder="Él"
-                  className="w-full text-center"
-                />
-              </div>
-            </div>
-            {nameElla && nameEl && (
-              <p className="text-[11px] text-mansion-gold mt-1.5 text-center">
-                Se mostrará como: <span className="font-semibold">{nameElla} y {nameEl}</span>
-              </p>
-            )}
-          </div>
-        ) : (
-          <div>
-            <label className="text-text-muted text-xs font-medium mb-1.5 block">
-              Nombre (o alias)
-            </label>
-            <input
-              type="text"
-              value={data.name}
-              onChange={(e) => onChange({ ...data, name: e.target.value })}
-              placeholder="Tu nombre en la Mansión"
-              className="w-full"
-            />
-          </div>
-        )}
+        <div>
+          <label className="text-text-muted text-xs font-medium mb-1.5 block">
+            Nombre (o alias)
+          </label>
+          <input
+            type="text"
+            value={data.name}
+            onChange={(e) => onChange({ ...data, name: e.target.value.slice(0, 30) })}
+            placeholder="Tu nombre en la Mansión"
+            maxLength={30}
+            className="w-full"
+          />
+          <p className="text-[10px] text-text-dim text-right mt-0.5">{data.name.length}/30</p>
+        </div>
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">Edad</label>
           <input
             type="number"
             value={data.age}
-            onChange={(e) => onChange({ ...data, age: e.target.value })}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+              onChange({ ...data, age: val });
+            }}
             placeholder="25"
             min="18"
             max="99"
+            inputMode="numeric"
             className="w-full"
           />
+          {data.age && Number(data.age) < 18 && (
+            <p className="text-[10px] text-mansion-crimson mt-0.5">Debes ser mayor de 18 años</p>
+          )}
         </div>
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">Ciudad</label>
@@ -635,12 +600,13 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
               type="text"
               value={data.city}
               onChange={(e) => {
-                onChange({ ...data, city: e.target.value });
+                onChange({ ...data, city: e.target.value.slice(0, 40) });
                 setShowSuggestions(true);
               }}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               placeholder="Buenos Aires"
+              maxLength={40}
               className="w-full pl-10"
             />
             {showSuggestions && filtered.length > 0 && (
@@ -667,11 +633,13 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
           <label className="text-text-muted text-xs font-medium mb-1.5 block">Bio corta</label>
           <textarea
             value={data.bio}
-            onChange={(e) => onChange({ ...data, bio: e.target.value })}
+            onChange={(e) => onChange({ ...data, bio: e.target.value.slice(0, 200) })}
             placeholder="Cuéntanos qué te trae a la Mansión..."
             rows={3}
+            maxLength={200}
             className="w-full resize-none"
           />
+          <p className="text-[10px] text-text-dim text-right mt-0.5">{data.bio.length}/200</p>
         </div>
 
         {showCountryPicker && (
@@ -1068,7 +1036,7 @@ export default function RegisterPage() {
     if (step === 1) return !!iAm;
     if (step === 2) return !!seeking;
     if (step === 3) return interests.length > 0;
-    if (step === 4) return info.name && info.age && info.city && (!showCountryPicker || selectedCountry);
+    if (step === 4) return info.name && info.age && Number(info.age) >= 18 && info.city && (!showCountryPicker || selectedCountry);
     return true;
   };
 
@@ -1213,7 +1181,7 @@ export default function RegisterPage() {
       case 3:
         return <StepInterests selected={interests} onToggle={toggleInterest} />;
       case 4:
-        return <StepBasicInfo data={info} onChange={setInfo} showCountryPicker={showCountryPicker} allowedCountries={allowedCountries} selectedCountry={selectedCountry} onCountryChange={setSelectedCountry} isCouple={iAm === 'pareja'} />;
+        return <StepBasicInfo data={info} onChange={setInfo} showCountryPicker={showCountryPicker} allowedCountries={allowedCountries} selectedCountry={selectedCountry} onCountryChange={setSelectedCountry} />;
       case 5:
         return <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />;
       default:
