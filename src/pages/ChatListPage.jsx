@@ -44,18 +44,11 @@ export default function ChatListPage() {
       .catch(() => setConversations([]))
       .finally(() => setLoading(false));
 
-    // Poll every 15 seconds for new messages / updated previews
-    const interval = setInterval(() => {
-      fetchConversations();
-      refreshUnread();
-    }, 15_000);
-
-    // Also refresh when tab/window gets focus
+    // Refresh when tab/window gets focus (e.g. returning from another app)
     const onFocus = () => { fetchConversations(); refreshUnread(); };
     window.addEventListener('focus', onFocus);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener('focus', onFocus);
     };
   }, [navigate, fetchConversations, refreshUnread]);
