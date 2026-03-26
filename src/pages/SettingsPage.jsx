@@ -31,6 +31,7 @@ export default function SettingsPage() {
   const [freeVisiblePhotos, setFreeVisiblePhotos] = useState(1);
   const [storyCircleSize, setStoryCircleSize] = useState(88);
   const [storyCircleGap, setStoryCircleGap] = useState(8);
+  const [storyCircleBorder, setStoryCircleBorder] = useState(4);
 
   // VIP
   const [showVipButton, setShowVipButton] = useState(true);
@@ -89,6 +90,7 @@ export default function SettingsPage() {
         setFreeVisiblePhotos(s.freeVisiblePhotos);
         setStoryCircleSize(s.storyCircleSize || 88);
         setStoryCircleGap(s.storyCircleGap || 8);
+        setStoryCircleBorder(s.storyCircleBorder ?? 4);
         setShowVipButton(s.showVipButton);
         setDailyMessageLimit(s.dailyMessageLimit);
         setSiteCountry(s.siteCountry);
@@ -131,6 +133,7 @@ export default function SettingsPage() {
         free_visible_photos: freeVisiblePhotos,
         story_circle_size: storyCircleSize,
         story_circle_gap: storyCircleGap,
+        story_circle_border: storyCircleBorder,
         show_vip_button: showVipButton ? '1' : '0',
         daily_message_limit: dailyMessageLimit,
         site_country: siteCountry,
@@ -164,6 +167,7 @@ export default function SettingsPage() {
       setFreeVisiblePhotos(s.freeVisiblePhotos);
       setStoryCircleSize(s.storyCircleSize || 88);
       setStoryCircleGap(s.storyCircleGap || 8);
+      setStoryCircleBorder(s.storyCircleBorder ?? 4);
       setShowVipButton(s.showVipButton);
       setDailyMessageLimit(s.dailyMessageLimit);
       setSiteCountry(s.siteCountry);
@@ -368,6 +372,25 @@ export default function SettingsPage() {
                 <span>0px</span>
                 <span className="text-mansion-gold font-medium">{storyCircleGap}px</span>
                 <span>24px</span>
+              </div>
+            </div>
+
+            {/* Story Circle Border */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Globe className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Borde Historias</h3>
+                  <p className="text-[11px] text-text-dim">Grosor del anillo en px</p>
+                </div>
+              </div>
+              <input type="range" min="1" max="8" value={storyCircleBorder} onChange={e => setStoryCircleBorder(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>1px</span>
+                <span className="text-mansion-gold font-medium">{storyCircleBorder}px</span>
+                <span>8px</span>
               </div>
             </div>
 

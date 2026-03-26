@@ -1301,6 +1301,7 @@ async function loadSettings(env) {
     paymentGateway: settings.payment_gateway || 'mercadopago',
     storyCircleSize: parseInt(settings.story_circle_size || '88', 10),
     storyCircleGap: parseInt(settings.story_circle_gap || '8', 10),
+    storyCircleBorder: parseInt(settings.story_circle_border || '4', 10),
   };
 }
 
@@ -1379,6 +1380,7 @@ async function handleUpdateSettings(request, env) {
     'payment_gateway',
     'story_circle_size',
     'story_circle_gap',
+    'story_circle_border',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {
