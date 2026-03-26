@@ -27,7 +27,7 @@ export default function ChatListPage() {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { refresh: refreshUnread } = useUnreadMessages();
+  const { refresh: refreshUnread, subscribe } = useUnreadMessages();
 
   const fetchConversations = useCallback(() => {
     if (!getToken()) return;
@@ -48,10 +48,16 @@ export default function ChatListPage() {
     const onFocus = () => { fetchConversations(); refreshUnread(); };
     window.addEventListener('focus', onFocus);
 
+    // Real-time: refresh when a new message arrives via notification WebSocket
+    const unsubscribe = subscribe(() => {
+      fetchConversations();
+    });
+
     return () => {
       window.removeEventListener('focus', onFocus);
+      unsubscribe();
     };
-  }, [navigate, fetchConversations, refreshUnread]);
+  }, [navigate, fetchConversations, refreshUnread, subscribe]);
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
       {/* Header */}

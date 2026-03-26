@@ -1,15 +1,21 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback } from 'react';
 import { getUnreadCount, getToken } from '../lib/api';
 
-const UnreadContext = createContext({ unreadCount: 0, refresh: () => {} });
+const UnreadContext = createContext({ unreadCount: 0, refresh: () => {}, subscribe: () => () => {} });
 
-const POLL_INTERVAL = 30_000; // 30 seconds
+const WS_BASE = import.meta.env.PROD
+  ? 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev'
+  : `ws://${window.location.hostname}:8787`;
 
 export function UnreadProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [toast, setToast] = useState(null);
   const prevCountRef = useRef(-1); // -1 = not yet loaded
   const timerRef = useRef(null);
+  const listenersRef = useRef(new Set());
+  const wsRef = useRef(null);
+  const wsRetryRef = useRef(0);
+  const wsClosedRef = useRef(false);
 
   const fetchUnread = useCallback(() => {
     const token = getToken();
@@ -32,12 +38,79 @@ export function UnreadProvider({ children }) {
       .catch(() => {});
   }, []);
 
-  // Initial fetch + polling
+  // Notify all subscribers (e.g. ChatListPage) of a new event
+  const notifyListeners = useCallback((event) => {
+    listenersRef.current.forEach(cb => cb(event));
+  }, []);
+
+  // Subscribe to real-time notification events. Returns unsubscribe function.
+  const subscribe = useCallback((callback) => {
+    listenersRef.current.add(callback);
+    return () => listenersRef.current.delete(callback);
+  }, []);
+
+  // Connect notification WebSocket
+  const connectWs = useCallback(() => {
+    const token = getToken();
+    if (!token || wsClosedRef.current) return;
+
+    const url = `${WS_BASE}/api/notifications/ws?token=${encodeURIComponent(token)}`;
+    try {
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        wsRetryRef.current = 0;
+        // Keep-alive ping every 25s
+        ws._pingTimer = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 25_000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'new_message') {
+            fetchUnread();
+            notifyListeners(data);
+          }
+        } catch { /* ignore */ }
+      };
+
+      ws.onclose = () => {
+        clearInterval(ws._pingTimer);
+        if (!wsClosedRef.current) {
+          const delay = Math.min(1000 * Math.pow(2, wsRetryRef.current), 30_000);
+          wsRetryRef.current++;
+          setTimeout(connectWs, delay);
+        }
+      };
+
+      ws.onerror = () => { /* onclose will fire */ };
+    } catch {
+      const delay = Math.min(1000 * Math.pow(2, wsRetryRef.current), 30_000);
+      wsRetryRef.current++;
+      setTimeout(connectWs, delay);
+    }
+  }, [fetchUnread, notifyListeners]);
+
+  // Initial fetch + polling fallback + WebSocket
   useEffect(() => {
     fetchUnread();
-    timerRef.current = setInterval(fetchUnread, POLL_INTERVAL);
-    return () => clearInterval(timerRef.current);
-  }, [fetchUnread]);
+    timerRef.current = setInterval(fetchUnread, 30_000);
+    wsClosedRef.current = false;
+    connectWs();
+    return () => {
+      clearInterval(timerRef.current);
+      wsClosedRef.current = true;
+      if (wsRef.current) {
+        wsRef.current.onclose = null;
+        wsRef.current.close();
+      }
+    };
+  }, [fetchUnread, connectWs]);
 
   // Also refetch on window focus
   useEffect(() => {
@@ -47,7 +120,7 @@ export function UnreadProvider({ children }) {
   }, [fetchUnread]);
 
   return (
-    <UnreadContext.Provider value={{ unreadCount, refresh: fetchUnread }}>
+    <UnreadContext.Provider value={{ unreadCount, refresh: fetchUnread, subscribe }}>
       {children}
       {/* Toast notification */}
       {toast && (

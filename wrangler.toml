@@ -24,12 +24,17 @@ bucket_name = "mansion-deseo-images"
 # ── Durable Objects ─────────────────────────────────
 [durable_objects]
 bindings = [
-  { name = "CHAT_ROOMS", class_name = "ChatRoom" }
+  { name = "CHAT_ROOMS", class_name = "ChatRoom" },
+  { name = "USER_NOTIFICATIONS", class_name = "UserNotification" }
 ]
 
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["ChatRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["UserNotification"]
 
 # ── Environment Variables ────────────────────────────
 [vars]
@@ -57,7 +62,8 @@ bucket_name = "mansion-deseo-images"
 
 [env.production.durable_objects]
 bindings = [
-  { name = "CHAT_ROOMS", class_name = "ChatRoom" }
+  { name = "CHAT_ROOMS", class_name = "ChatRoom" },
+  { name = "USER_NOTIFICATIONS", class_name = "UserNotification" }
 ]
 
 [env.production.vars]

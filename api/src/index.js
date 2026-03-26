@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════
 
 export { ChatRoom } from './chat-room.js';
+export { UserNotification } from './user-notification.js';
 
 // ── Helpers ─────────────────────────────────────────────
 
@@ -738,6 +739,11 @@ async function handleSendMessage(request, env) {
   // Notify ChatRoom DO so it broadcasts to connected receivers via WebSocket
   notifyChatRoom(env, auth.sub, receiver_id, msg).catch(() => {});
 
+  // Notify receiver's notification channel (updates ChatListPage in real-time)
+  notifyUser(env, receiver_id, { type: 'new_message', chatId: [auth.sub, receiver_id].sort().join('-') }).catch(() => {});
+  // Also notify sender (so their own ChatListPage updates if open in another tab)
+  notifyUser(env, auth.sub, { type: 'new_message', chatId: [auth.sub, receiver_id].sort().join('-') }).catch(() => {});
+
   return json({ message: msg }, 201);
 }
 
@@ -892,6 +898,37 @@ async function handleChatWebSocket(request, env, chatId) {
   doUrl.pathname = '/ws';
   doUrl.searchParams.set('chatId', chatId);
   return stub.fetch(new Request(doUrl.toString(), request));
+}
+
+// ── Notify UserNotification DO ──────────────────────────
+
+async function notifyUser(env, userId, data) {
+  try {
+    const doId = env.USER_NOTIFICATIONS.idFromName(userId);
+    const stub = env.USER_NOTIFICATIONS.get(doId);
+    await stub.fetch('https://do/notify', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  } catch (err) {
+    console.error('UserNotification notify error:', err.message);
+  }
+}
+
+// ── GET /api/notifications/ws — User notification WebSocket ─
+
+async function handleNotificationWebSocket(request, env) {
+  const url = new URL(request.url);
+  const token = url.searchParams.get('token');
+  if (!token) return error('Token requerido', 401);
+
+  const payload = await verifyJWT(token, env.JWT_SECRET);
+  if (!payload) return error('Token inválido', 401);
+
+  const doId = env.USER_NOTIFICATIONS.idFromName(payload.sub);
+  const stub = env.USER_NOTIFICATIONS.get(doId);
+
+  return stub.fetch(request);
 }
 
 // ── GET /api/unread-count ───────────────────────────────
@@ -2152,10 +2189,13 @@ async function handleRequest(request, env) {
   // CORS preflight
   if (method === 'OPTIONS') return handleOptions(env);
 
-  // ── WebSocket chat upgrade (before Turnstile check) ──
+  // ── WebSocket upgrades (before Turnstile check) ──
   const chatWsMatch = path.match(/^\/api\/chat\/ws\/([a-f0-9-]+)$/);
   if (chatWsMatch && request.headers.get('Upgrade') === 'websocket') {
     return handleChatWebSocket(request, env, chatWsMatch[1]);
+  }
+  if (path === '/api/notifications/ws' && request.headers.get('Upgrade') === 'websocket') {
+    return handleNotificationWebSocket(request, env);
   }
 
   // ── Rutas server-to-server (bypass Turnstile) — autenticadas con HMAC o verificación API)
