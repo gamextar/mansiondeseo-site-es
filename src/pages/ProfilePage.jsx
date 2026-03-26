@@ -243,6 +243,7 @@ export default function ProfilePage() {
     blurred: false,
     visiblePhotos: user.photos?.length || 0,
     ghost_mode: user.ghost_mode,
+    isOwnProfile: true,
   } : null;
 
   return (

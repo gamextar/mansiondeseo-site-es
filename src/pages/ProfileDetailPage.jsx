@@ -33,7 +33,7 @@ export default function ProfileDetailPage() {
   const location = useLocation();
   const { user, setUser } = useAuth();
   const preview = location.state?.preview || null;
-  const [profile, setProfile] = useState(preview ? { ...preview, interests: [], bio: '', totalPhotos: preview.photos?.length || 0, visiblePhotos: preview.visiblePhotos ?? preview.photos?.length ?? 0, blurred: !!preview.blurred, isOwnProfile: false, receivedGifts: [] } : null);
+  const [profile, setProfile] = useState(preview ? { ...preview, interests: [], bio: '', totalPhotos: preview.photos?.length || 0, visiblePhotos: preview.visiblePhotos ?? preview.photos?.length ?? 0, blurred: !!preview.blurred, isOwnProfile: !!preview.isOwnProfile, receivedGifts: [] } : null);
   const [viewerPremium, setViewerPremium] = useState(false);
   const [settings, setSettings] = useState({ blurLevel: 14, blurMobile: 14, blurDesktop: 8, freeVisiblePhotos: 1, freeOwnPhotos: 3 });
   const [isFavorited, setIsFavorited] = useState(false);
