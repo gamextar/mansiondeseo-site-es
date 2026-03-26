@@ -6,6 +6,14 @@
 export { ChatRoom } from './chat-room.js';
 export { UserNotification } from './user-notification.js';
 
+// ── In-memory edge cache (persists across requests in same isolate) ──
+const _cache = new Map();
+function cached(key, ttlMs, fetcher) {
+  const entry = _cache.get(key);
+  if (entry && Date.now() < entry.exp) return Promise.resolve(entry.val);
+  return fetcher().then(val => { _cache.set(key, { val, exp: Date.now() + ttlMs }); return val; });
+}
+
 // ── Helpers ─────────────────────────────────────────────
 
 function generateId() {
@@ -511,50 +519,39 @@ async function handleProfiles(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
-  // Parallel fetch: viewer info + settings + favorites (all independent)
-  const [viewer, settings, { results: favRows }, { results: favByRows }] = await Promise.all([
+  const url = new URL(request.url);
+  const filter = url.searchParams.get('filter') || 'all';
+  const search = url.searchParams.get('q') || '';
+  const country = request.headers.get('cf-ipcountry') || '';
+
+  // Build profiles query
+  let query = `SELECT * FROM users WHERE id != ? AND status = 'verified'`;
+  const params = [auth.sub];
+  if (country) { query += ` AND country = ?`; params.push(country); }
+  if (filter === 'hombre') query += ` AND role = 'hombre'`;
+  else if (filter === 'mujer') query += ` AND role = 'mujer'`;
+  else if (filter === 'pareja') query += ` AND role = 'pareja'`;
+  if (search) {
+    query += ` AND (username LIKE ? OR city LIKE ? OR bio LIKE ?)`;
+    const term = `%${search}%`;
+    params.push(term, term, term);
+  }
+  query += ` ORDER BY last_active DESC LIMIT 50`;
+
+  // Cache key for profiles query (same filter+country = same list for all users)
+  const profilesCacheKey = `profiles:${filter}:${country}:${search}`;
+
+  // Parallel: cached settings + cached profiles + per-user data (always fresh)
+  const [settings, results, viewer, { results: favRows }, { results: favByRows }] = await Promise.all([
+    cached('settings', 300_000, () => loadSettings(env)),  // 5 min
+    cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results)),  // 30s
     env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
-    loadSettings(env),
     env.DB.prepare('SELECT target_id FROM favorites WHERE user_id = ?').bind(auth.sub).all(),
     env.DB.prepare('SELECT user_id FROM favorites WHERE target_id = ?').bind(auth.sub).all(),
   ]);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
   const viewerFavorites = new Set(favRows.map(r => r.target_id));
   const favoritedBySet = new Set(favByRows.map(r => r.user_id));
-
-  const url = new URL(request.url);
-  const filter = url.searchParams.get('filter') || 'all';
-  const search = url.searchParams.get('q') || '';
-  const country = request.headers.get('cf-ipcountry') || '';
-
-  let query = `SELECT * FROM users WHERE id != ? AND status = 'verified'`;
-  const params = [auth.sub];
-
-  // Geo-filter: prioritize same country
-  if (country) {
-    query += ` AND country = ?`;
-    params.push(country);
-  }
-
-  // Role filter
-  if (filter === 'hombre') {
-    query += ` AND role = 'hombre'`;
-  } else if (filter === 'mujer') {
-    query += ` AND role = 'mujer'`;
-  } else if (filter === 'pareja') {
-    query += ` AND role = 'pareja'`;
-  }
-
-  // Search
-  if (search) {
-    query += ` AND (username LIKE ? OR city LIKE ? OR bio LIKE ?)`;
-    const term = `%${search}%`;
-    params.push(term, term, term);
-  }
-
-  query += ` ORDER BY last_active DESC LIMIT 50`;
-
-  const { results } = await env.DB.prepare(query).bind(...params).all();
 
   // Map to frontend shape with new blur logic
   const profiles = results.map(u => {
@@ -601,11 +598,11 @@ async function handleProfileDetail(request, env, userId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
-  // Parallel fetch: profile + viewer info + settings + favorites (all independent)
+  // Parallel fetch: profile + viewer info + cached settings + favorites (all independent)
   const [user, viewer, settings, favRow, favByRow] = await Promise.all([
     env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first(),
     env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
-    loadSettings(env),
+    cached('settings', 300_000, () => loadSettings(env)),
     env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(auth.sub, userId).first(),
     env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(userId, auth.sub).first(),
   ]);
