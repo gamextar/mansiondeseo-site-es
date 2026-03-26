@@ -26,13 +26,13 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 lg:px-8 h-14 flex items-center justify-between">
           {/* Logo — hidden on desktop (sidebar has its own) */}
           <Link to="/" reloadDocument className="flex items-center gap-2 lg:hidden">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
-              <span className="font-display text-white text-sm font-bold">M</span>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
+              <span className="font-display text-white text-base font-bold">M</span>
             </div>
-            <span className="font-display text-lg font-semibold text-gradient-gold hidden sm:inline">
+            <span className="font-display text-xl font-semibold text-gradient-gold hidden sm:inline">
               Mansión Deseo
             </span>
-            <span className="font-display text-lg font-semibold text-gradient-gold sm:hidden">
+            <span className="font-display text-xl font-semibold text-gradient-gold sm:hidden">
               Mansión
             </span>
           </Link>

@@ -71,7 +71,7 @@ export default function FeedPage() {
         <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
       {/* Stories section */}
-      <div className="px-4 lg:px-8 pt-2 lg:pt-4 pb-1">
+      <div className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0">
         <div className="flex items-center gap-1.5 mb-3">
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="text-text-muted text-sm lg:text-base font-medium">Transmitiendo</p>
@@ -120,9 +120,9 @@ export default function FeedPage() {
       </div>
 
       {/* Results count */}
-      <div className="px-4 lg:px-8 pb-3">
+      <div className="px-4 lg:px-8 pb-2">
         <p className="text-text-dim text-xs">
-          {profiles.length} {profiles.length === 1 ? 'perfil' : 'perfiles'} encontrados
+          {profiles.length} {profiles.length === 1 ? 'usuario' : 'usuarios'} conectados
         </p>
       </div>
 
