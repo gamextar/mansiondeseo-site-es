@@ -416,7 +416,7 @@ export default function ProfilePage() {
 
           {/* VIP Status / Hacerse VIP */}
           {user?.premium ? (
-            <div className="pt-6 border-t border-mansion-border/20 mt-4">
+            <div className="pt-6 border-t border-mansion-border/20 mt-4 space-y-2">
               <button
                 onClick={() => navigate('/vip')}
                 className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-mansion-gold/10 border border-mansion-gold/30 transition-all"
@@ -427,6 +427,24 @@ export default function ProfilePage() {
                 <div className="flex-1 text-left">
                   <p className="text-sm font-medium text-mansion-gold">VIP activo</p>
                   <p className="text-xs text-text-dim">Disfrutás de todos los beneficios</p>
+                </div>
+              </button>
+
+              {/* Ghost / Incognito mode toggle */}
+              <button
+                onClick={handleToggleGhostMode}
+                disabled={togglingGhost}
+                className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-mansion-card/50 hover:bg-mansion-card border border-mansion-border/20 transition-all"
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${user.ghost_mode ? 'bg-purple-500/20 text-purple-400' : 'bg-mansion-elevated text-text-muted'}`}>
+                  {user.ghost_mode ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </div>
+                <div className="flex-1 text-left">
+                  <p className={`text-sm font-medium ${user.ghost_mode ? 'text-purple-400' : 'text-text-primary'}`}>Modo Incógnito</p>
+                  <p className="text-xs text-text-dim">{user.ghost_mode ? 'Tu perfil está oculto' : 'Visitá perfiles sin ser visto'}</p>
+                </div>
+                <div className={`w-11 h-6 rounded-full p-0.5 transition-colors ${user.ghost_mode ? 'bg-purple-500' : 'bg-mansion-border/40'}`}>
+                  <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${user.ghost_mode ? 'translate-x-5' : 'translate-x-0'}`} />
                 </div>
               </button>
             </div>
