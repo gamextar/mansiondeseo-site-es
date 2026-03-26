@@ -104,7 +104,7 @@ export default function FeedPage() {
                   <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: innerGap }}>
                     <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
                       {photo ? (
-                        <AvatarImg src={photo} crop={p.avatar_crop} alt={p.name} className="w-full h-full" />
+                        <AvatarImg src={photo} crop={photo === p.avatar_url ? p.avatar_crop : null} alt={p.name} className="w-full h-full" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
                           {p.name?.charAt(0)}

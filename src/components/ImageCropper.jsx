@@ -163,6 +163,7 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
         x: Math.round((centerImgX / w) * 1000) / 10,
         y: Math.round((centerImgY / h) * 1000) / 10,
         s: Math.round((zoom / fitZoom) * 100) / 100,
+        r: Math.round((w / h) * 1000) / 1000,
       });
       return;
     }
