@@ -522,7 +522,10 @@ async function handleProfiles(request, env) {
   const url = new URL(request.url);
   const filter = url.searchParams.get('filter') || 'all';
   const search = url.searchParams.get('q') || '';
-  const country = request.headers.get('cf-ipcountry') || '';
+
+  // Use the authenticated user's registered country (not cf-ipcountry which changes with VPN)
+  const viewer = await env.DB.prepare('SELECT premium, premium_until, country FROM users WHERE id = ?').bind(auth.sub).first();
+  const country = viewer?.country || '';
 
   // Build profiles query (don't exclude current user — cache is shared, filter later)
   let query = `SELECT * FROM users WHERE status = 'verified'`;
@@ -542,10 +545,9 @@ async function handleProfiles(request, env) {
   const profilesCacheKey = `profiles:${filter}:${country}:${search}`;
 
   // Parallel: cached settings + cached profiles + per-user data (always fresh)
-  const [settings, results, viewer, { results: favRows }, { results: favByRows }] = await Promise.all([
+  const [settings, results, { results: favRows }, { results: favByRows }] = await Promise.all([
     cached('settings', 300_000, () => loadSettings(env)),  // 5 min
     cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results)),  // 30s
-    env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
     env.DB.prepare('SELECT target_id FROM favorites WHERE user_id = ?').bind(auth.sub).all(),
     env.DB.prepare('SELECT user_id FROM favorites WHERE target_id = ?').bind(auth.sub).all(),
   ]);
