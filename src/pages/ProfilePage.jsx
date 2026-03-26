@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Users, Gift, Filter, Move } from 'lucide-react';
 import { useAuth } from '../App';
-import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits, getReceivedGifts } from '../lib/api';
+import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits, getReceivedGifts, getToken } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 
 function timeAgo(dateStr) {
@@ -24,8 +24,8 @@ export default function ProfilePage() {
   const galleryInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [cropFile, setCropFile] = useState(null);
-  const [cropUrl, setCropUrl] = useState(null);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
+  const [loadingAdjust, setLoadingAdjust] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [togglingGhost, setTogglingGhost] = useState(false);
   const [visitors, setVisitors] = useState([]);
@@ -146,7 +146,6 @@ export default function ProfilePage() {
 
   const handleCroppedAvatar = async (croppedFile) => {
     setCropFile(null);
-    setCropUrl(null);
     try {
       const data = await uploadImage(croppedFile);
       setUser(prev => prev ? { ...prev, avatar_url: data.url, photos: [...(prev.photos || []), data.url] } : prev);
@@ -218,12 +217,11 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
-      {(cropFile || cropUrl) && (
+      {cropFile && (
         <ImageCropper
           file={cropFile}
-          imageUrl={cropUrl}
           onCrop={handleCroppedAvatar}
-          onCancel={() => { setCropFile(null); setCropUrl(null); }}
+          onCancel={() => setCropFile(null)}
         />
       )}
 
@@ -248,14 +246,33 @@ export default function ProfilePage() {
               </button>
               <div className="h-px bg-mansion-border/20 mx-4" />
               <button
-                onClick={() => {
-                  setShowAvatarMenu(false);
-                  setCropUrl(avatarUrl);
+                disabled={loadingAdjust}
+                onClick={async () => {
+                  setLoadingAdjust(true);
+                  try {
+                    const API_BASE = import.meta.env.PROD
+                      ? 'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api'
+                      : '/api';
+                    const res = await fetch(`${API_BASE}/image-proxy?url=${encodeURIComponent(avatarUrl)}`, {
+                      headers: { Authorization: `Bearer ${getToken()}` },
+                    });
+                    const blob = await res.blob();
+                    const file = new File([blob], 'avatar.jpg', { type: blob.type || 'image/jpeg' });
+                    setShowAvatarMenu(false);
+                    setCropFile(file);
+                  } catch {
+                    setShowAvatarMenu(false);
+                    fileInputRef.current?.click();
+                  } finally {
+                    setLoadingAdjust(false);
+                  }
                 }}
                 className="w-full flex items-center gap-3 px-5 py-3.5 text-text-primary hover:bg-mansion-elevated/50 transition-colors"
               >
                 <Move className="w-4.5 h-4.5 text-mansion-gold" />
-                <span className="text-sm font-medium">Ajustar posición</span>
+                <span className="text-sm font-medium">
+                  {loadingAdjust ? 'Cargando...' : 'Ajustar posición'}
+                </span>
               </button>
             </div>
             <button

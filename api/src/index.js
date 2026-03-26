@@ -1056,6 +1056,29 @@ async function handleUpload(request, env) {
   return json({ url: publicUrl, key }, 201);
 }
 
+// ── GET /api/image-proxy?url=... ─────────────────────────
+async function handleImageProxy(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const url = new URL(request.url).searchParams.get('url');
+  if (!url) return error('URL requerida', 400);
+
+  // Only allow proxying our own R2 bucket
+  const r2Base = env.R2_PUBLIC_URL || '';
+  if (!r2Base || !url.startsWith(r2Base)) return error('URL no permitida', 403);
+
+  const res = await fetch(url);
+  if (!res.ok) return error('Imagen no encontrada', 404);
+
+  return new Response(res.body, {
+    headers: {
+      'Content-Type': res.headers.get('Content-Type') || 'image/jpeg',
+      'Cache-Control': 'private, max-age=300',
+    },
+  });
+}
+
 // ── DELETE /api/photos ───────────────────────────────────
 
 async function handleDeletePhoto(request, env) {
@@ -2290,6 +2313,7 @@ async function handleRequest(request, env) {
   // ── Upload & Photos
   if (path === '/api/upload' && method === 'POST') return handleUpload(request, env);
   if (path === '/api/photos' && method === 'DELETE') return handleDeletePhoto(request, env);
+  if (path === '/api/image-proxy' && method === 'GET') return handleImageProxy(request, env);
 
   // ── Settings
   if (path === '/api/detect-country' && method === 'GET') return handleDetectCountry(request);

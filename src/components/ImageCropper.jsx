@@ -212,7 +212,6 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
           ref={imgRef}
           src={imageUrl}
           alt=""
-          crossOrigin="anonymous"
           onLoad={handleImageLoad}
           className="absolute pointer-events-none"
           style={{
