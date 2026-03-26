@@ -54,7 +54,9 @@ export default function ChatListPage() {
         setConversations(convs);
         setCachedConversations(convs);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('Conversations fetch error:', err);
+      });
   }, []);
 
   useEffect(() => {
@@ -66,7 +68,9 @@ export default function ChatListPage() {
         setConversations(convs);
         setCachedConversations(convs);
       })
-      .catch(() => setConversations([]))
+      .catch((err) => {
+        console.error('Initial conversations fetch error:', err);
+      })
       .finally(() => setLoading(false));
 
     // Refresh when tab/window gets focus (e.g. returning from another app)
@@ -139,7 +143,7 @@ export default function ChatListPage() {
             transition={{ delay: index * 0.05 }}
           >
             <Link
-              to={`/mensajes/${conv.id}`}
+              to={`/mensajes/${conv.profileId}`}
               className="flex items-center gap-3.5 px-3 py-4 rounded-xl hover:bg-mansion-card/50 transition-all group"
             >
               {/* Avatar */}

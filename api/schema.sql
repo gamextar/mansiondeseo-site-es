@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
   country       TEXT DEFAULT '',                    -- Populated from cf-ipcountry
   bio           TEXT DEFAULT '',
   avatar_url    TEXT DEFAULT '',
+  avatar_crop   TEXT DEFAULT NULL,                 -- JSON object for avatar focal position/scale
   photos        TEXT DEFAULT '[]',                  -- JSON array of R2 URLs
   status        TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','verified')),
   premium       INTEGER NOT NULL DEFAULT 0,         -- 0 = free, 1 = VIP
