@@ -3,9 +3,9 @@ import { useEffect, useRef, useCallback } from 'react';
 /**
  * Pull-to-refresh hook.
  * @param {() => Promise<void>} onRefresh - async function to call on refresh
- * @param {{ threshold?: number, containerRef?: React.RefObject }} options
+ * @param {{ threshold?: number, containerRef?: React.RefObject<HTMLElement | null> }} options
  */
-export function usePullToRefresh(onRefresh, { threshold = 120 } = {}) {
+export function usePullToRefresh(onRefresh, { threshold = 120, containerRef } = {}) {
   const startY = useRef(null);
   const pulling = useRef(false);
   const indicatorRef = useRef(null);
@@ -20,11 +20,21 @@ export function usePullToRefresh(onRefresh, { threshold = 120 } = {}) {
   }, []);
 
   useEffect(() => {
-    const el = document.documentElement;
+    const scrollEl = containerRef?.current || document.documentElement;
+    const touchEl = containerRef?.current || document.documentElement;
+
+    if (!scrollEl || !touchEl) return undefined;
+
+    const isAtTop = () => {
+      if (containerRef?.current) {
+        return containerRef.current.scrollTop <= 0;
+      }
+      return window.scrollY <= 0;
+    };
 
     const onTouchStart = (e) => {
       // Only trigger when scrolled to the very top
-      if (window.scrollY > 0) return;
+      if (!isAtTop()) return;
       startY.current = e.touches[0].clientY;
     };
 
@@ -33,7 +43,7 @@ export function usePullToRefresh(onRefresh, { threshold = 120 } = {}) {
       const dy = e.touches[0].clientY - startY.current;
       if (dy <= 0) { reset(); return; }
       // Don't fight native scroll
-      if (window.scrollY > 0) { reset(); return; }
+      if (!isAtTop()) { reset(); return; }
 
       const progress = Math.min(dy / threshold, 1);
       // Only mark as pulling once threshold is reached
@@ -47,6 +57,7 @@ export function usePullToRefresh(onRefresh, { threshold = 120 } = {}) {
     };
 
     const onTouchEnd = async () => {
+      startY.current = null;
       if (!pulling.current) {
         // Didn't reach threshold — reset indicator
         reset();
@@ -68,16 +79,16 @@ export function usePullToRefresh(onRefresh, { threshold = 120 } = {}) {
       }
     };
 
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-    el.addEventListener('touchmove', onTouchMove, { passive: true });
-    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    touchEl.addEventListener('touchstart', onTouchStart, { passive: true });
+    touchEl.addEventListener('touchmove', onTouchMove, { passive: true });
+    touchEl.addEventListener('touchend', onTouchEnd, { passive: true });
 
     return () => {
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('touchend', onTouchEnd);
+      touchEl.removeEventListener('touchstart', onTouchStart);
+      touchEl.removeEventListener('touchmove', onTouchMove);
+      touchEl.removeEventListener('touchend', onTouchEnd);
     };
-  }, [onRefresh, threshold, reset]);
+  }, [containerRef, onRefresh, threshold, reset]);
 
   return { indicatorRef };
 }

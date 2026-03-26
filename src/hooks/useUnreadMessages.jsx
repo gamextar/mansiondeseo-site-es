@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback } from 'react';
 import { getUnreadCount, getToken } from '../lib/api';
 
-const UnreadContext = createContext({ unreadCount: 0, refresh: () => {}, subscribe: () => () => {} });
+const UnreadContext = createContext({
+  unreadCount: 0,
+  refresh: () => {},
+  subscribe: () => () => {},
+  setActiveChatId: () => {},
+});
 
 const WS_BASE = import.meta.env.PROD
   ? 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev'
@@ -15,27 +20,32 @@ export function UnreadProvider({ children }) {
   const wsRef = useRef(null);
   const wsRetryRef = useRef(0);
   const wsClosedRef = useRef(false);
+  const activeChatIdRef = useRef(null);
+
+  const applyUnreadCount = useCallback((total, { showToast = false } = {}) => {
+    const nextTotal = Math.max(0, Number(total) || 0);
+    if (showToast && prevCountRef.current >= 0 && nextTotal > prevCountRef.current) {
+      const diff = nextTotal - prevCountRef.current;
+      setToast(`${diff} nuevo${diff > 1 ? 's' : ''} mensaje${diff > 1 ? 's' : ''}`);
+      setTimeout(() => setToast(null), 4000);
+    }
+    prevCountRef.current = nextTotal;
+    setUnreadCount(nextTotal);
+  }, []);
 
   const fetchUnread = useCallback(() => {
     const token = getToken();
     if (!token) {
+      prevCountRef.current = 0;
       setUnreadCount(0);
       return;
     }
     getUnreadCount()
       .then((data) => {
-        const total = data.unread || 0;
-        // Show toast if count increased (skip first load)
-        if (prevCountRef.current >= 0 && total > prevCountRef.current) {
-          const diff = total - prevCountRef.current;
-          setToast(`${diff} nuevo${diff > 1 ? 's' : ''} mensaje${diff > 1 ? 's' : ''}`);
-          setTimeout(() => setToast(null), 4000);
-        }
-        prevCountRef.current = total;
-        setUnreadCount(total);
+        applyUnreadCount(data.unread || 0, { showToast: true });
       })
       .catch(() => {});
-  }, []);
+  }, [applyUnreadCount]);
 
   // Notify all subscribers (e.g. ChatListPage) of a new event
   const notifyListeners = useCallback((event) => {
@@ -72,7 +82,22 @@ export function UnreadProvider({ children }) {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'new_message') {
-            fetchUnread();
+            const isActiveChat = !!activeChatIdRef.current && data.chatId === activeChatIdRef.current;
+            if (typeof data.unreadCount === 'number') {
+              applyUnreadCount(
+                isActiveChat ? Math.max(0, data.unreadCount - 1) : data.unreadCount,
+                { showToast: !isActiveChat }
+              );
+            } else if (!isActiveChat) {
+              fetchUnread();
+            }
+            notifyListeners(data);
+          } else if (data.type === 'conversation_deleted') {
+            if (typeof data.unreadCount === 'number') {
+              applyUnreadCount(data.unreadCount);
+            } else {
+              fetchUnread();
+            }
             notifyListeners(data);
           } else if (data.type === 'typing') {
             notifyListeners(data);
@@ -118,8 +143,12 @@ export function UnreadProvider({ children }) {
     return () => window.removeEventListener('focus', onFocus);
   }, [fetchUnread]);
 
+  const setActiveChatId = useCallback((chatId) => {
+    activeChatIdRef.current = chatId || null;
+  }, []);
+
   return (
-    <UnreadContext.Provider value={{ unreadCount, refresh: fetchUnread, subscribe }}>
+    <UnreadContext.Provider value={{ unreadCount, refresh: fetchUnread, subscribe, setActiveChatId }}>
       {children}
       {/* Toast notification */}
       {toast && (

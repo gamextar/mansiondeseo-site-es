@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Send, Lock, ImageIcon, Smile } from 'lucide-react';
 import { useMessageLimit } from '../hooks/useMessageLimit';
@@ -9,30 +9,89 @@ import EmojiPicker from '../components/EmojiPicker';
 import AvatarImg from '../components/AvatarImg';
 import { getMessageLimit, getProfile, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
+
+const CHAT_CACHE_PREFIX = 'mansion_chat_';
+const CHAT_CACHE_TTL_MS = 120_000;
+const CHAT_CACHE_MESSAGE_LIMIT = 60;
+const INITIAL_CHAT_PAGE_SIZE = 30;
+const OLDER_CHAT_PAGE_SIZE = 30;
+
+function getChatCacheKey(partnerId) {
+  return `${CHAT_CACHE_PREFIX}${partnerId}`;
+}
+
+function normalizeMessages(messages = []) {
+  return messages.map((message) => ({
+    ...message,
+    createdAt: message.createdAt || message.created_at || null,
+  }));
+}
+
+function readChatCache(partnerId) {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(getChatCacheKey(partnerId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.cachedAt || Date.now() - parsed.cachedAt > CHAT_CACHE_TTL_MS) {
+      sessionStorage.removeItem(getChatCacheKey(partnerId));
+      return null;
+    }
+    return {
+      ...parsed,
+      messages: normalizeMessages(parsed.messages || []),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeChatCache(partnerId, payload) {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(getChatCacheKey(partnerId), JSON.stringify({
+      ...payload,
+      messages: normalizeMessages(payload.messages || []).slice(-CHAT_CACHE_MESSAGE_LIMIT),
+      cachedAt: Date.now(),
+    }));
+  } catch {
+    // Silently fail
+  }
+}
 
 export default function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
-  const { refresh: refreshUnread, subscribe } = useUnreadMessages();
+  const { refresh: refreshUnread, setActiveChatId } = useUnreadMessages();
+  const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
+  const cachedChat = readChatCache(partnerId);
+  const partnerPreview = location.state?.partnerPreview || null;
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState([]);
-  const [apiLimit, setApiLimit] = useState(null);
-  const [partner, setPartner] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [messages, setMessages] = useState(cachedChat?.messages || []);
+  const [apiLimit, setApiLimit] = useState(cachedChat?.apiLimit || null);
+  const [partner, setPartner] = useState(cachedChat?.partner || partnerPreview || null);
+  const [loading, setLoading] = useState(!cachedChat && !partnerPreview);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(cachedChat?.hasOlderMessages || false);
   const [showEmojis, setShowEmojis] = useState(false);
   const [wsState, setWsState] = useState('disconnected');
   const [partnerTyping, setPartnerTyping] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
+  const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
+  const messagesEndRef = useRef(null);
   const chatRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const lastTypingSentRef = useRef(0);
-
-  // Extract partner ID from conversation ID (conv-{userId} format)
-  const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
   const wasAtBottomRef = useRef(true);
   const myUserIdRef = useRef(null);
+  const pendingScrollBehaviorRef = useRef(null);
+  const restoreScrollAfterPrependRef = useRef(null);
+  const httpHistoryLoadedRef = useRef(false);
 
   // Format DO message to UI format
   function formatMsg(msg) {
@@ -45,31 +104,92 @@ export default function ChatPage() {
         ? new Date(msg.created_at.endsWith('Z') ? msg.created_at : msg.created_at + 'Z')
             .toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
         : '',
+      createdAt: msg.created_at || null,
       is_read: msg.is_read,
     };
   }
+
+  const scrollToBottom = useCallback((behavior = 'auto') => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ block: 'end', behavior });
+      return;
+    }
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, []);
+
+  const requestScrollToBottom = useCallback((behavior = 'auto') => {
+    pendingScrollBehaviorRef.current = behavior;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateViewport = () => {
+      const vv = window.visualViewport;
+      setViewportHeight(Math.round(vv?.height || window.innerHeight));
+      setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
+    };
+
+    updateViewport();
+
+    const vv = window.visualViewport;
+    window.addEventListener('resize', updateViewport);
+    vv?.addEventListener('resize', updateViewport);
+    vv?.addEventListener('scroll', updateViewport);
+
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('scroll', updateViewport);
+    };
+  }, []);
 
   useEffect(() => {
     const token = getToken();
     const user = getStoredUser();
     if (!token || !user) { navigate('/login'); return; }
 
+    const nextCachedChat = readChatCache(partnerId);
+    const nextPartnerPreview = location.state?.partnerPreview || null;
+    httpHistoryLoadedRef.current = false;
     myUserIdRef.current = String(user.id);
-    setLoading(true);
+    setActiveChatId([String(user.id), partnerId].sort().join('-'));
+    setPartner(nextCachedChat?.partner || nextPartnerPreview || null);
+    setMessages(nextCachedChat?.messages || []);
+    setApiLimit(nextCachedChat?.apiLimit || null);
+    setHasOlderMessages(nextCachedChat?.hasOlderMessages || false);
+    setLoading(!nextCachedChat && !nextPartnerPreview);
+    if ((nextCachedChat?.messages || []).length > 0) {
+      wasAtBottomRef.current = true;
+      requestScrollToBottom('auto');
+    }
 
-    // Fetch partner profile, messages (HTTP fallback), and limit in parallel
+    let cancelled = false;
     Promise.all([
-      getProfile(partnerId).then(data => setPartner(data.profile)).catch(() => null),
-      apiGetMessages(partnerId).then(data => setMessages(data.messages || [])).catch(() => setMessages([])),
-      getMessageLimit().then(data => setApiLimit(data)).catch(() => {}),
-    ]).finally(() => {
-      setLoading(false);
-      // Scroll to bottom after initial load
-      requestAnimationFrame(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-      });
+      getProfile(partnerId).then(data => data.profile).catch(() => null),
+      apiGetMessages(partnerId, { limit: INITIAL_CHAT_PAGE_SIZE }).then(data => ({
+        messages: normalizeMessages(data.messages || []),
+        hasMore: !!data.hasMore,
+      })).catch(() => ({ messages: [], hasMore: false })),
+      getMessageLimit().then(data => data).catch(() => null),
+    ]).then(([partnerData, messageData, limitData]) => {
+      if (cancelled) return;
+
+      if (partnerData) {
+        setPartner(partnerData);
+      }
+      setMessages(messageData.messages);
+      setHasOlderMessages(messageData.hasMore);
+      httpHistoryLoadedRef.current = true;
+      if (limitData) {
+        setApiLimit(limitData);
+      }
+      wasAtBottomRef.current = true;
+      requestScrollToBottom('auto');
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
     });
 
     // Open WebSocket connection for real-time messages
@@ -77,7 +197,9 @@ export default function ChatPage() {
       onHistory(msgs) {
         // Only use DO history if HTTP returned no messages (fresh conversation or migration gap)
         setMessages(prev => {
-          if (prev.length === 0 && msgs.length > 0) {
+          if (!httpHistoryLoadedRef.current && prev.length === 0 && msgs.length > 0) {
+            wasAtBottomRef.current = true;
+            requestScrollToBottom('auto');
             return msgs.map(m => formatMsg(m));
           }
           // Otherwise just update read status from DO
@@ -91,19 +213,19 @@ export default function ChatPage() {
         const unread = msgs.filter(m => m.sender_id !== String(user.id) && !m.is_read);
         if (unread.length > 0) {
           chatRef.current?.markRead(unread.map(m => m.id));
+          refreshUnread();
         }
-        refreshUnread();
       },
       onMessage(msg) {
         // Deduplicate: skip if message already exists
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
+          if (wasAtBottomRef.current) requestScrollToBottom('auto');
           return [...prev, formatMsg(msg)];
         });
         setPartnerTyping(false);
         // Auto mark as read since we're viewing the chat
         chatRef.current?.markRead([msg.id]);
-        refreshUnread();
       },
       onAck(msg) {
         // Replace optimistic temp message with real one from DO
@@ -143,37 +265,87 @@ export default function ChatPage() {
     });
 
     return () => {
+      cancelled = true;
+      setActiveChatId(null);
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [id, partnerId, navigate]);
+  }, [id, partnerId, navigate, refreshUnread, requestScrollToBottom, setActiveChatId, location.state]);
 
   useEffect(() => {
-    // Auto-scroll to bottom when messages change (if user was at bottom)
-    if (scrollRef.current && wasAtBottomRef.current) {
+    if (!partner && messages.length === 0 && !apiLimit) return;
+    writeChatCache(partnerId, {
+      partner,
+      messages,
+      apiLimit,
+      hasOlderMessages,
+    });
+  }, [partnerId, partner, messages, apiLimit, hasOlderMessages]);
+
+  useLayoutEffect(() => {
+    if (restoreScrollAfterPrependRef.current && scrollRef.current) {
+      const el = scrollRef.current;
+      const restore = restoreScrollAfterPrependRef.current;
+      el.scrollTop = restore.previousScrollTop + (el.scrollHeight - restore.previousScrollHeight);
+      restoreScrollAfterPrependRef.current = null;
+      return;
+    }
+
+    if (pendingScrollBehaviorRef.current) {
+      const behavior = pendingScrollBehaviorRef.current;
+      pendingScrollBehaviorRef.current = null;
       requestAnimationFrame(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
+        scrollToBottom(behavior);
       });
     }
-  }, [messages]);
+  }, [messages, partnerTyping, scrollToBottom]);
 
-  // Real-time message delivery: when UserNotification WS fires for this chat, mark as read
+  const handleLoadOlderMessages = async () => {
+    if (loadingOlder || messages.length === 0) return;
+    const oldestMessage = messages.find((message) => message.createdAt);
+    if (!oldestMessage?.createdAt) return;
+
+    const el = scrollRef.current;
+    if (el) {
+      restoreScrollAfterPrependRef.current = {
+        previousScrollHeight: el.scrollHeight,
+        previousScrollTop: el.scrollTop,
+      };
+    }
+
+    setLoadingOlder(true);
+    try {
+      const data = await apiGetMessages(partnerId, {
+        before: oldestMessage.createdAt,
+        limit: OLDER_CHAT_PAGE_SIZE,
+      });
+      const olderMessages = normalizeMessages(data.messages || []);
+      setMessages((prev) => {
+        const existingIds = new Set(prev.map((message) => message.id));
+        return [
+          ...olderMessages.filter((message) => !existingIds.has(message.id)),
+          ...prev,
+        ];
+      });
+      setHasOlderMessages(!!data.hasMore);
+    } catch {
+      restoreScrollAfterPrependRef.current = null;
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
+
+  const { indicatorRef } = usePullToRefresh(
+    useCallback(async () => {
+      await handleLoadOlderMessages();
+    }, [handleLoadOlderMessages]),
+    { threshold: 90, containerRef: scrollRef }
+  );
+
   useEffect(() => {
-    const unsubscribe = subscribe((event) => {
-      if (event?.type === 'new_message') {
-        const myId = myUserIdRef.current;
-        if (!myId) return;
-        const thisChatId = [myId, partnerId].sort().join('-');
-        if (event.chatId === thisChatId) {
-          // Messages already arrive via ChatRoom WS - just refresh unread count
-          refreshUnread();
-        }
-      }
-    });
-    return unsubscribe;
-  }, [partnerId, subscribe, refreshUnread]);
+    if (!partnerTyping || !wasAtBottomRef.current) return;
+    requestScrollToBottom('smooth');
+  }, [partnerTyping, requestScrollToBottom]);
 
   if (!partner && !loading) {
     return (
@@ -205,9 +377,12 @@ export default function ChatPage() {
       senderId: 'me',
       text,
       timestamp: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString(),
       is_read: 0,
     };
 
+    wasAtBottomRef.current = true;
+    requestScrollToBottom('auto');
     setMessages((prev) => [...prev, newMsg]);
     setInput('');
     setPartnerTyping(false);
@@ -254,9 +429,15 @@ export default function ChatPage() {
   return (
     <>
     <DesktopSidebar />
-    <div className="h-screen bg-mansion-base flex flex-col lg:pl-64 xl:pl-72">
+    <div
+      className="min-h-screen h-[100dvh] bg-mansion-base flex flex-col overflow-hidden lg:pl-64 xl:pl-72"
+      style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
+    >
       {/* Header */}
-      <div className="glass border-b border-mansion-border/30 safe-top z-20">
+      <div
+        className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
+        style={viewportOffsetTop ? { transform: `translateY(${viewportOffsetTop}px)` } : undefined}
+      >
         <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
           <button
             onClick={() => navigate('/mensajes')}
@@ -305,13 +486,40 @@ export default function ChatPage() {
           const el = scrollRef.current;
           if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
-        className="flex-1 overflow-y-auto px-4 py-5 space-y-5 lg:px-6 max-w-4xl lg:mx-auto w-full"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-4 pt-24 pb-5 space-y-5 lg:px-6 lg:pt-24 max-w-4xl lg:mx-auto w-full"
       >
+        <div
+          ref={indicatorRef}
+          className="sticky top-0 z-10 flex justify-center py-2 pointer-events-none"
+          style={{ transform: 'translateY(-100%)', opacity: 0, transition: 'transform 0.2s, opacity 0.2s' }}
+        >
+          <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+        </div>
+
+        {hasOlderMessages && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleLoadOlderMessages}
+              disabled={loadingOlder}
+              className="text-xs px-3 py-1.5 rounded-full border border-mansion-border/40 text-text-muted hover:text-text-primary hover:border-mansion-gold/30 transition-colors disabled:opacity-60"
+            >
+              {loadingOlder ? 'Cargando...' : 'Cargar mensajes anteriores'}
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center justify-center">
           <span className="text-[10px] text-text-dim bg-mansion-elevated px-3 py-1 rounded-full">
             Hoy
           </span>
         </div>
+
+        {loading && messages.length === 0 && (
+          <div className="flex items-center justify-center py-10">
+            <div className="w-6 h-6 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+          </div>
+        )}
 
         <AnimatePresence initial={false}>
           {messages.map((msg) => {
@@ -363,7 +571,7 @@ export default function ChatPage() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
-              className="flex items-end gap-2 justify-start"
+              className="flex items-end gap-2 justify-start pb-3"
             >
               <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
                 <AvatarImg src={partner.avatar_url || partner.photos?.[0] || ''} crop={partner.avatar_crop} alt="" className="w-full h-full" />
@@ -378,10 +586,15 @@ export default function ChatPage() {
             </motion.div>
           )}
         </AnimatePresence>
+        <div
+          ref={messagesEndRef}
+          className={partnerTyping ? 'h-24 lg:h-10' : 'h-12 lg:h-6'}
+          style={{ scrollMarginBottom: '24px' }}
+        />
       </div>
 
       {/* Input area */}
-      <div className="safe-bottom border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl">
+      <div className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
         <div className="flex items-end gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
 
           {/* Attach photo */}

@@ -58,6 +58,17 @@ CREATE INDEX IF NOT EXISTS idx_messages_sender   ON messages(sender_id, created_
 CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_conv     ON messages(sender_id, receiver_id, created_at);
 
+-- Hidden conversations (soft delete per user)
+CREATE TABLE IF NOT EXISTS hidden_conversations (
+  user_id       TEXT NOT NULL REFERENCES users(id),
+  partner_id    TEXT NOT NULL REFERENCES users(id),
+  hidden_before TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, partner_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hidden_conversations_user ON hidden_conversations(user_id, hidden_before);
+
 -- Daily message counter (enforces 5-message free limit)
 CREATE TABLE IF NOT EXISTS message_limits (
   user_id    TEXT NOT NULL REFERENCES users(id),

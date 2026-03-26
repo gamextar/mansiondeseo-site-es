@@ -135,6 +135,14 @@ export async function getMe() {
   return data;
 }
 
+export async function getAppBootstrap() {
+  const data = await apiFetch('/app/bootstrap');
+  if (data?.user) {
+    setStoredUser(data.user);
+  }
+  return data;
+}
+
 export async function logout() {
   try {
     await apiFetch('/auth/logout', { method: 'POST' });
@@ -175,8 +183,18 @@ export async function getConversations() {
   return apiFetch('/messages');
 }
 
-export async function getMessages(otherUserId) {
-  return apiFetch(`/messages/${otherUserId}`);
+export async function getMessages(otherUserId, { before, limit } = {}) {
+  const params = new URLSearchParams();
+  if (before) params.set('before', before);
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  return apiFetch(`/messages/${otherUserId}${qs ? `?${qs}` : ''}`);
+}
+
+export async function deleteConversation(otherUserId) {
+  return apiFetch(`/messages/${otherUserId}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function sendMessage(receiverId, content) {

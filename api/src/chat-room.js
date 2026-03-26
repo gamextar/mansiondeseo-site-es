@@ -9,6 +9,139 @@ export class ChatRoom {
     this.env = env;
     this.sql = state.storage.sql;
     this.initPromise = this.init();
+    this.hiddenConversationsReady = null;
+  }
+
+  debug(...args) {
+    if (this.env?.DEBUG_LOGS === '1' || this.env?.ENVIRONMENT !== 'production') {
+      console.log(...args);
+    }
+  }
+
+  safeParseJSON(value, fallback) {
+    try {
+      return value ? JSON.parse(value) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  isOnline(lastActive) {
+    if (!lastActive) return false;
+    const ts = new Date(lastActive.endsWith('Z') ? lastActive : `${lastActive}Z`).getTime();
+    return (Date.now() - ts) < 3600000;
+  }
+
+  buildConversationPreview(partner, msg, unread) {
+    if (!partner) return null;
+
+    return {
+      id: `conv-${partner.id}`,
+      profileId: partner.id,
+      name: partner.username,
+      avatar: partner.avatar_url || '',
+      avatarCrop: this.safeParseJSON(partner.avatar_crop, null),
+      lastMessage: (msg.content || '').slice(0, 50),
+      timestamp: msg.created_at,
+      unread,
+      online: this.isOnline(partner.last_active),
+    };
+  }
+
+  async ensureHiddenConversationsTable() {
+    if (!this.hiddenConversationsReady) {
+      this.hiddenConversationsReady = Promise.all([
+        this.env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS hidden_conversations (
+            user_id TEXT NOT NULL REFERENCES users(id),
+            partner_id TEXT NOT NULL REFERENCES users(id),
+            hidden_before TEXT NOT NULL DEFAULT (datetime('now')),
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (user_id, partner_id)
+          )
+        `).run(),
+        this.env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_hidden_conversations_user ON hidden_conversations(user_id, hidden_before)'
+        ).run(),
+      ]).catch((err) => {
+        this.hiddenConversationsReady = null;
+        throw err;
+      });
+    }
+
+    return this.hiddenConversationsReady;
+  }
+
+  async buildNewMessageEvents(senderId, receiverId, msg) {
+    await this.ensureHiddenConversationsTable();
+    const chatId = [senderId, receiverId].sort().join('-');
+    let senderConversation = null;
+    let receiverConversation = null;
+    let receiverUnreadCount = 0;
+    let receiverConversationUnread = 1;
+
+    try {
+      const { results: users } = await this.env.DB.prepare(
+        'SELECT id, username, avatar_url, avatar_crop, last_active FROM users WHERE id IN (?, ?)'
+      ).bind(senderId, receiverId).all();
+
+      const userMap = new Map(users.map((user) => [user.id, user]));
+      senderConversation = this.buildConversationPreview(userMap.get(receiverId), msg, 0);
+      receiverConversation = this.buildConversationPreview(userMap.get(senderId), msg, 0);
+    } catch (err) {
+      console.error('[ChatRoom.buildNewMessageEvents] users query error:', err.message);
+    }
+
+    try {
+      const [totalRow, conversationRow] = await Promise.all([
+        this.env.DB.prepare(
+          `SELECT COUNT(*) as unread
+           FROM messages m
+           LEFT JOIN hidden_conversations hc
+             ON hc.user_id = ?
+            AND hc.partner_id = m.sender_id
+           WHERE m.receiver_id = ?
+             AND m.is_read = 0
+             AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)`
+        ).bind(receiverId, receiverId).first(),
+        this.env.DB.prepare(
+          `SELECT COUNT(*) as unread
+           FROM messages m
+           LEFT JOIN hidden_conversations hc
+             ON hc.user_id = ?
+            AND hc.partner_id = ?
+           WHERE m.sender_id = ?
+             AND m.receiver_id = ?
+             AND m.is_read = 0
+             AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)`
+        ).bind(receiverId, senderId, senderId, receiverId).first(),
+      ]);
+
+      receiverUnreadCount = Number(totalRow?.unread || 0);
+      receiverConversationUnread = Number(conversationRow?.unread || 0);
+    } catch (err) {
+      console.error('[ChatRoom.buildNewMessageEvents] unread query error:', err.message);
+    }
+
+    if (receiverConversation) {
+      receiverConversation.unread = receiverConversationUnread;
+    }
+
+    return {
+      sender: {
+        type: 'new_message',
+        chatId,
+        partnerId: receiverId,
+        conversation: senderConversation,
+      },
+      receiver: {
+        type: 'new_message',
+        chatId,
+        partnerId: senderId,
+        unreadCount: receiverUnreadCount,
+        conversation: receiverConversation,
+      },
+    };
   }
 
   async init() {
@@ -247,35 +380,35 @@ export class ChatRoom {
     if (receiverId) {
       const chatId = [senderId, receiverId].sort().join('-');
       this.state.waitUntil((async () => {
-        console.log('[ChatRoom.handleMessage] waitUntil started, chatId:', chatId, 'sender:', senderId, 'receiver:', receiverId);
+        this.debug('[ChatRoom.handleMessage] waitUntil started, chatId:', chatId, 'sender:', senderId, 'receiver:', receiverId);
         // Write to D1
         await this.env.DB.prepare(
           'INSERT INTO messages (id, sender_id, receiver_id, content, created_at) VALUES (?, ?, ?, ?, ?)'
         ).bind(msgId, senderId, receiverId, content, now).run().catch(err => {
           console.error('D1 message write error:', err.message);
         });
-        console.log('[ChatRoom.handleMessage] D1 write done');
+        this.debug('[ChatRoom.handleMessage] D1 write done');
         // Notify UserNotification DOs so ChatListPage updates in real-time
-        const notifyPayload = JSON.stringify({ type: 'new_message', chatId });
+        const events = await this.buildNewMessageEvents(senderId, receiverId, msg);
         for (const userId of [senderId, receiverId]) {
           try {
-            console.log('[ChatRoom.handleMessage] notifying UserNotification for:', userId);
+            this.debug('[ChatRoom.handleMessage] notifying UserNotification for:', userId);
             const doId = this.env.USER_NOTIFICATIONS.idFromName(userId);
             const stub = this.env.USER_NOTIFICATIONS.get(doId);
             const res = await stub.fetch('https://do/notify', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: notifyPayload,
+              body: JSON.stringify(userId === senderId ? events.sender : events.receiver),
             });
-            console.log('[ChatRoom.handleMessage] UserNotification response:', res.status, 'for:', userId);
+            this.debug('[ChatRoom.handleMessage] UserNotification response:', res.status, 'for:', userId);
           } catch (err) {
             console.error('[ChatRoom.handleMessage] UserNotification error for', userId, ':', err.message);
           }
         }
-        console.log('[ChatRoom.handleMessage] waitUntil done');
+        this.debug('[ChatRoom.handleMessage] waitUntil done');
       })());
     } else {
-      console.log('[ChatRoom.handleMessage] NO receiverId - skipping D1 write and notifications');
+      this.debug('[ChatRoom.handleMessage] NO receiverId - skipping D1 write and notifications');
     }
   }
 
@@ -311,14 +444,14 @@ export class ChatRoom {
     try {
       const msg = await request.json();
       const sockets = this.state.getWebSockets();
-      console.log('[ChatRoom.handleNotify] sockets:', sockets.length, 'sender:', msg.sender_id);
+      this.debug('[ChatRoom.handleNotify] sockets:', sockets.length, 'sender:', msg.sender_id);
       // Broadcast to all connected sockets except the sender
       for (const sock of sockets) {
         const [tag] = this.state.getTags(sock);
         if (tag !== msg.sender_id) {
           try {
             sock.send(JSON.stringify({ type: 'message', message: msg }));
-            console.log('[ChatRoom.handleNotify] sent to:', tag);
+            this.debug('[ChatRoom.handleNotify] sent to:', tag);
           } catch { /* socket might be closed */ }
         }
       }

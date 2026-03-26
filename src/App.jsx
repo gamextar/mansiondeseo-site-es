@@ -24,7 +24,7 @@ import PagoFallidoPage from './pages/PagoFallidoPage';
 import PagoPendientePage from './pages/PagoPendientePage';
 import CoinsPage from './pages/CoinsPage';
 import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getMe, getPublicSettings } from './lib/api';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 
@@ -188,7 +188,6 @@ export default function App() {
     }
   }, []);
 
-  // Check for magic-link token in URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
@@ -196,32 +195,34 @@ export default function App() {
       setToken(token);
       localStorage.setItem('mansion_registered', 'true');
       setRegisteredState(true);
-      // Clean URL
       window.history.replaceState({}, '', '/');
-      // Fetch user data
-      getMe().then(data => setUser(data.user)).catch(() => {});
     }
-  }, [setUser]);
 
-  // Rehydrate user on mount if token exists
-  useEffect(() => {
-    if (getToken()) {
-      getMe().then(data => { if (data?.user) setUser(data.user); }).catch(() => {
-        clearAuth();
-        setRegisteredState(false);
-      });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    let cancelled = false;
 
-  // Fetch public settings once on mount for global access (e.g. Navbar coin icon)
-  useEffect(() => {
-    getPublicSettings().then(data => {
+    getAppBootstrap().then(data => {
+      if (cancelled) return;
+
+      if (data?.user) {
+        setUser(data.user);
+        setRegisteredState(true);
+      }
+
       if (data?.settings) {
         setSiteSettings(data.settings);
         try { sessionStorage.setItem('mansion_site_settings', JSON.stringify(data.settings)); } catch {}
       }
-    }).catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }).catch(() => {
+      if (cancelled || !getToken()) return;
+      clearAuth();
+      setUserState(null);
+      setRegisteredState(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setUser]);
 
   return (
     <BrowserRouter>

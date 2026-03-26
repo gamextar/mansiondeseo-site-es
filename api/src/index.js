@@ -14,6 +14,11 @@ function cached(key, ttlMs, fetcher) {
   return fetcher().then(val => { _cache.set(key, { val, exp: Date.now() + ttlMs }); return val; });
 }
 
+const _routeMetrics = new Map();
+let _metricsWindowStartedAt = Date.now();
+let _metricsRequestCount = 0;
+let _hiddenConversationsReady = null;
+
 // ── Helpers ─────────────────────────────────────────────
 
 function generateId() {
@@ -29,6 +34,115 @@ function json(data, status = 200, headers = {}) {
 
 function error(message, status = 400) {
   return json({ error: message }, status);
+}
+
+async function ensureHiddenConversationsTable(env) {
+  if (!_hiddenConversationsReady) {
+    _hiddenConversationsReady = Promise.all([
+      env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS hidden_conversations (
+          user_id TEXT NOT NULL REFERENCES users(id),
+          partner_id TEXT NOT NULL REFERENCES users(id),
+          hidden_before TEXT NOT NULL DEFAULT (datetime('now')),
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (user_id, partner_id)
+        )
+      `).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_hidden_conversations_user ON hidden_conversations(user_id, hidden_before)'
+      ).run(),
+    ]).catch((err) => {
+      _hiddenConversationsReady = null;
+      throw err;
+    });
+  }
+
+  return _hiddenConversationsReady;
+}
+
+function getProfileVisitDedupeWindowMinutes(env) {
+  const raw = Number(env?.PROFILE_VISIT_DEDUPE_MINUTES || 30);
+  if (!Number.isFinite(raw) || raw < 1) return 30;
+  return Math.floor(raw);
+}
+
+function isDebugLoggingEnabled(env) {
+  return env?.DEBUG_LOGS === '1' || env?.ENVIRONMENT !== 'production';
+}
+
+function debugLog(env, ...args) {
+  if (isDebugLoggingEnabled(env)) {
+    console.log(...args);
+  }
+}
+
+function isMetricsLoggingEnabled(env) {
+  return env?.METRICS_LOGS === '1';
+}
+
+function normalizeMetricRoute(path) {
+  if (/^\/api\/chat\/ws\/[a-f0-9-]+$/.test(path)) return '/api/chat/ws/:chatId';
+  if (/^\/api\/profiles\/[a-f0-9-]+$/.test(path)) return '/api/profiles/:id';
+  if (/^\/api\/messages\/[a-f0-9-]+$/.test(path)) return '/api/messages/:userId';
+  if (/^\/api\/favorites\/check\/[a-f0-9-]+$/.test(path)) return '/api/favorites/check/:id';
+  if (/^\/api\/favorites\/[a-f0-9-]+$/.test(path)) return '/api/favorites/:id';
+  if (/^\/api\/gifts\/received\/[a-f0-9-]+$/.test(path)) return '/api/gifts/received/:userId';
+  if (/^\/api\/admin\/gifts\/[a-zA-Z0-9-]+$/.test(path)) return '/api/admin/gifts/:id';
+  if (/^\/api\/admin\/users\/[a-f0-9-]+$/.test(path)) return '/api/admin/users/:id';
+  return path;
+}
+
+function recordRouteMetric(env, request, response, durationMs) {
+  if (!isMetricsLoggingEnabled(env)) return;
+
+  const route = normalizeMetricRoute(new URL(request.url).pathname);
+  const key = `${request.method} ${route}`;
+  const status = String(response.status);
+
+  const entry = _routeMetrics.get(key) || {
+    route,
+    method: request.method,
+    count: 0,
+    totalMs: 0,
+    maxMs: 0,
+    statusCounts: {},
+  };
+
+  entry.count += 1;
+  entry.totalMs += durationMs;
+  entry.maxMs = Math.max(entry.maxMs, durationMs);
+  entry.statusCounts[status] = (entry.statusCounts[status] || 0) + 1;
+  _routeMetrics.set(key, entry);
+  _metricsRequestCount += 1;
+
+  const flushEveryMs = Number(env.METRICS_FLUSH_MS || 60000);
+  const flushEveryRequests = Number(env.METRICS_FLUSH_REQUESTS || 50);
+  const now = Date.now();
+
+  if (_metricsRequestCount < flushEveryRequests && now - _metricsWindowStartedAt < flushEveryMs) {
+    return;
+  }
+
+  const routes = [..._routeMetrics.values()]
+    .sort((a, b) => b.count - a.count)
+    .map((item) => ({
+      method: item.method,
+      route: item.route,
+      count: item.count,
+      avgMs: Math.round(item.totalMs / item.count),
+      maxMs: Math.round(item.maxMs),
+      statusCounts: item.statusCounts,
+    }));
+
+  console.log('[route-metrics]', JSON.stringify({
+    windowMs: now - _metricsWindowStartedAt,
+    requestCount: _metricsRequestCount,
+    routes,
+  }));
+
+  _routeMetrics.clear();
+  _metricsRequestCount = 0;
+  _metricsWindowStartedAt = now;
 }
 
 function todayUTC() {
@@ -314,7 +428,7 @@ async function handleRegister(request, env) {
   if (env.ENVIRONMENT === 'production') {
     await sendVerificationEmail(env, email.toLowerCase(), code);
   } else {
-    console.log(`📧 VERIFICATION CODE for ${email}: ${code}`);
+    debugLog(env, `📧 VERIFICATION CODE for ${email}: ${code}`);
   }
 
   return json({
@@ -390,7 +504,7 @@ async function handleResendCode(request, env) {
   if (env.ENVIRONMENT === 'production') {
     await sendVerificationEmail(env, email.toLowerCase(), code);
   } else {
-    console.log(`📧 RESEND CODE for ${email}: ${code}`);
+    debugLog(env, `📧 RESEND CODE for ${email}: ${code}`);
   }
 
   return json({
@@ -454,7 +568,7 @@ async function handleMagicLink(request, env) {
   `).bind(generateId(), user?.id || null, email.toLowerCase(), token, expiresAt).run();
 
   // TODO: Replace console.log with actual email service (Resend, SendGrid, etc.)
-  console.log(`🔗 MAGIC LINK for ${email}: /api/auth/verify?token=${token}`);
+  debugLog(env, `🔗 MAGIC LINK for ${email}: /api/auth/verify?token=${token}`);
 
   return json({ message: 'Si el email existe, recibirás un enlace de acceso.' });
 }
@@ -511,6 +625,27 @@ async function handleMe(request, env) {
   if (!user) return error('Usuario no encontrado', 404);
 
   return json({ user: sanitizeUser(user, env) });
+}
+
+async function handleAppBootstrap(request, env) {
+  const settingsPromise = cached('settings', 300_000, () => loadSettings(env));
+  const authHeader = request.headers.get('Authorization');
+  let user = null;
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const auth = await authenticate(request, env);
+    if (!auth) return error('No autorizado', 401);
+
+    const dbUser = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first();
+    if (!dbUser) return error('Usuario no encontrado', 404);
+    user = sanitizeUser(dbUser, env);
+  }
+
+  const settings = await settingsPromise;
+  return json({
+    user,
+    settings: getPublicSettingsPayload(settings),
+  });
 }
 
 // ── GET /api/profiles ───────────────────────────────────
@@ -621,9 +756,18 @@ async function handleProfileDetail(request, env, userId) {
   // Record visit (skip own profile)
   if (!isOwnProfile) {
     try {
+      const dedupeWindow = `-${getProfileVisitDedupeWindowMinutes(env)} minutes`;
       await env.DB.prepare(
-        'INSERT INTO profile_visits (id, visitor_id, visited_id) VALUES (?, ?, ?)'
-      ).bind(crypto.randomUUID(), auth.sub, userId).run();
+        `INSERT INTO profile_visits (id, visitor_id, visited_id)
+         SELECT ?, ?, ?
+         WHERE NOT EXISTS (
+           SELECT 1
+           FROM profile_visits
+           WHERE visitor_id = ?
+             AND visited_id = ?
+             AND created_at >= datetime('now', ?)
+         )`
+      ).bind(crypto.randomUUID(), auth.sub, userId, auth.sub, userId, dedupeWindow).run();
     } catch {
       // Silently fail — duplicate or DB issue
     }
@@ -746,10 +890,12 @@ async function handleSendMessage(request, env) {
   // Notify ChatRoom DO so it broadcasts to connected receivers via WebSocket
   notifyChatRoom(env, auth.sub, receiver_id, msg).catch(() => {});
 
+  const events = await buildNewMessageEvents(env, auth.sub, receiver_id, msg);
+
   // Notify receiver's notification channel (updates ChatListPage in real-time)
-  notifyUser(env, receiver_id, { type: 'new_message', chatId: [auth.sub, receiver_id].sort().join('-') }).catch(() => {});
+  notifyUser(env, receiver_id, events.receiver).catch(() => {});
   // Also notify sender (so their own ChatListPage updates if open in another tab)
-  notifyUser(env, auth.sub, { type: 'new_message', chatId: [auth.sub, receiver_id].sort().join('-') }).catch(() => {});
+  notifyUser(env, auth.sub, events.sender).catch(() => {});
 
   return json({ message: msg }, 201);
 }
@@ -759,7 +905,7 @@ async function handleSendMessage(request, env) {
 async function notifyChatRoom(env, senderId, receiverId, msg) {
   try {
     const chatId = [senderId, receiverId].sort().join('-');
-    console.log('[notifyChatRoom] chatId:', chatId);
+    debugLog(env, '[notifyChatRoom] chatId:', chatId);
     const doId = env.CHAT_ROOMS.idFromName(chatId);
     const stub = env.CHAT_ROOMS.get(doId);
     const res = await stub.fetch('https://do/notify', {
@@ -767,7 +913,7 @@ async function notifyChatRoom(env, senderId, receiverId, msg) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(msg),
     });
-    console.log('[notifyChatRoom] DO response:', res.status);
+    debugLog(env, '[notifyChatRoom] DO response:', res.status);
   } catch (err) {
     console.error('[notifyChatRoom] error:', err.message);
   }
@@ -778,20 +924,74 @@ async function notifyChatRoom(env, senderId, receiverId, msg) {
 async function handleGetMessages(request, env, otherUserId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  await ensureHiddenConversationsTable(env);
+  const url = new URL(request.url);
+  const before = url.searchParams.get('before');
+  const rawLimit = Number(url.searchParams.get('limit') || 40);
+  const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 40, 1), 100);
+  const hiddenRow = await env.DB.prepare(
+    'SELECT hidden_before FROM hidden_conversations WHERE user_id = ? AND partner_id = ?'
+  ).bind(auth.sub, otherUserId).first();
+  const hiddenBefore = hiddenRow?.hidden_before || null;
 
-  const { results } = await env.DB.prepare(`
-    SELECT * FROM messages
-    WHERE (sender_id = ? AND receiver_id = ?)
-       OR (sender_id = ? AND receiver_id = ?)
-    ORDER BY created_at ASC
-    LIMIT 100
-  `).bind(auth.sub, otherUserId, otherUserId, auth.sub).all();
+  const query = before
+    ? `
+      SELECT * FROM (
+        SELECT * FROM messages
+        WHERE (
+          (sender_id = ? AND receiver_id = ?)
+          OR (sender_id = ? AND receiver_id = ?)
+        )
+          AND (? IS NULL OR created_at > ?)
+          AND created_at < ?
+        ORDER BY created_at DESC
+        LIMIT ?
+      )
+      ORDER BY created_at ASC
+    `
+    : `
+      SELECT * FROM (
+        SELECT * FROM messages
+        WHERE (
+          (sender_id = ? AND receiver_id = ?)
+          OR (sender_id = ? AND receiver_id = ?)
+        )
+          AND (? IS NULL OR created_at > ?)
+        ORDER BY created_at DESC
+        LIMIT ?
+      )
+      ORDER BY created_at ASC
+    `;
+
+  const bindings = before
+    ? [auth.sub, otherUserId, otherUserId, auth.sub, hiddenBefore, hiddenBefore, before, limit]
+    : [auth.sub, otherUserId, otherUserId, auth.sub, hiddenBefore, hiddenBefore, limit];
+
+  const { results } = await env.DB.prepare(query).bind(...bindings).all();
 
   // Mark as read
   await env.DB.prepare(`
     UPDATE messages SET is_read = 1
     WHERE sender_id = ? AND receiver_id = ? AND is_read = 0
-  `).bind(otherUserId, auth.sub).run();
+      AND (? IS NULL OR created_at > ?)
+  `).bind(otherUserId, auth.sub, hiddenBefore, hiddenBefore).run();
+
+  let hasMore = false;
+  if (results.length > 0) {
+    const oldestCreatedAt = results[0].created_at;
+    const olderRow = await env.DB.prepare(`
+      SELECT 1
+      FROM messages
+      WHERE (
+        (sender_id = ? AND receiver_id = ?)
+        OR (sender_id = ? AND receiver_id = ?)
+      )
+        AND (? IS NULL OR created_at > ?)
+        AND created_at < ?
+      LIMIT 1
+    `).bind(auth.sub, otherUserId, otherUserId, auth.sub, hiddenBefore, hiddenBefore, oldestCreatedAt).first();
+    hasMore = !!olderRow;
+  }
 
   const messages = results.map(m => ({
     id: m.id,
@@ -802,7 +1002,7 @@ async function handleGetMessages(request, env, otherUserId) {
     is_read: m.is_read,
   }));
 
-  return json({ messages });
+  return json({ messages, hasMore });
 }
 
 // ── GET /api/messages (conversations list) ──────────────
@@ -810,6 +1010,7 @@ async function handleGetMessages(request, env, otherUserId) {
 async function handleConversations(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  await ensureHiddenConversationsTable(env);
 
   // 1) Get latest message per conversation partner + unread count in a single query
   const { results } = await env.DB.prepare(`
@@ -818,13 +1019,19 @@ async function handleConversations(request, env) {
       MAX(created_at) AS last_at,
       SUM(CASE WHEN receiver_id = ? AND is_read = 0 THEN 1 ELSE 0 END) AS unread
     FROM (
-      SELECT *, CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS partner_id
-      FROM messages
-      WHERE sender_id = ? OR receiver_id = ?
+      SELECT
+        m.*,
+        CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AS partner_id
+      FROM messages m
+      LEFT JOIN hidden_conversations hc
+        ON hc.user_id = ?
+       AND hc.partner_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END
+      WHERE (m.sender_id = ? OR m.receiver_id = ?)
+        AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)
     )
     GROUP BY partner_id
     ORDER BY last_at DESC
-  `).bind(auth.sub, auth.sub, auth.sub, auth.sub).all();
+  `).bind(auth.sub, auth.sub, auth.sub, auth.sub, auth.sub, auth.sub).all();
 
   if (!results.length) return json({ conversations: [] });
 
@@ -839,27 +1046,25 @@ async function handleConversations(request, env) {
   // 3) Fetch the actual last message content for each conversation in one query
   // Build: SELECT * FROM messages WHERE (id = ?) OR (id = ?) ...
   // Use a subquery approach instead
-  const msgConds = partnerIds.map(() =>
-    `(sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)`
-  );
-  const msgParams = [];
-  for (const pid of partnerIds) {
-    msgParams.push(auth.sub, pid, pid, auth.sub);
-  }
   const { results: lastMsgs } = await env.DB.prepare(`
     SELECT m.* FROM messages m
     INNER JOIN (
       SELECT
-        CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS pid,
-        MAX(created_at) AS max_at
-      FROM messages WHERE sender_id = ? OR receiver_id = ?
+        CASE WHEN m2.sender_id = ? THEN m2.receiver_id ELSE m2.sender_id END AS pid,
+        MAX(m2.created_at) AS max_at
+      FROM messages m2
+      LEFT JOIN hidden_conversations hc
+        ON hc.user_id = ?
+       AND hc.partner_id = CASE WHEN m2.sender_id = ? THEN m2.receiver_id ELSE m2.sender_id END
+      WHERE (m2.sender_id = ? OR m2.receiver_id = ?)
+        AND (hc.hidden_before IS NULL OR m2.created_at > hc.hidden_before)
       GROUP BY pid
     ) latest ON (
       CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END = latest.pid
       AND m.created_at = latest.max_at
     )
     WHERE m.sender_id = ? OR m.receiver_id = ?
-  `).bind(auth.sub, auth.sub, auth.sub, auth.sub, auth.sub, auth.sub).all();
+  `).bind(auth.sub, auth.sub, auth.sub, auth.sub, auth.sub, auth.sub, auth.sub, auth.sub).all();
   const msgMap = new Map();
   for (const m of lastMsgs) {
     const pid = m.sender_id === auth.sub ? m.receiver_id : m.sender_id;
@@ -886,6 +1091,41 @@ async function handleConversations(request, env) {
   }
 
   return json({ conversations });
+}
+
+async function handleDeleteConversation(request, env, otherUserId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  await ensureHiddenConversationsTable(env);
+
+  const hiddenBefore = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+  await env.DB.prepare(`
+    INSERT INTO hidden_conversations (user_id, partner_id, hidden_before, created_at)
+    VALUES (?, ?, ?, datetime('now'))
+    ON CONFLICT(user_id, partner_id)
+    DO UPDATE SET hidden_before = excluded.hidden_before
+  `).bind(auth.sub, otherUserId, hiddenBefore).run();
+
+  const unreadRow = await env.DB.prepare(`
+    SELECT COUNT(*) as unread
+    FROM messages m
+    LEFT JOIN hidden_conversations hc
+      ON hc.user_id = ?
+     AND hc.partner_id = m.sender_id
+    WHERE m.receiver_id = ?
+      AND m.is_read = 0
+      AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)
+  `).bind(auth.sub, auth.sub).first();
+
+  notifyUser(env, auth.sub, {
+    type: 'conversation_deleted',
+    partnerId: otherUserId,
+    chatId: [auth.sub, otherUserId].sort().join('-'),
+    unreadCount: Number(unreadRow?.unread || 0),
+  }).catch(() => {});
+
+  return json({ deleted: true, partnerId: otherUserId, unreadCount: Number(unreadRow?.unread || 0) });
 }
 
 // ── GET /api/messages/limit ─────────────────────────────
@@ -942,7 +1182,7 @@ async function handleChatWebSocket(request, env, chatId) {
 
 async function notifyUser(env, userId, data) {
   try {
-    console.log('[notifyUser] userId:', userId, 'data:', JSON.stringify(data));
+    debugLog(env, '[notifyUser] userId:', userId, 'data:', JSON.stringify(data));
     const doId = env.USER_NOTIFICATIONS.idFromName(userId);
     const stub = env.USER_NOTIFICATIONS.get(doId);
     const res = await stub.fetch('https://do/notify', {
@@ -950,10 +1190,99 @@ async function notifyUser(env, userId, data) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    console.log('[notifyUser] DO response:', res.status);
+    debugLog(env, '[notifyUser] DO response:', res.status);
   } catch (err) {
     console.error('[notifyUser] error:', err.message);
   }
+}
+
+function buildConversationPreview(partner, msg, unread) {
+  if (!partner) return null;
+
+  return {
+    id: `conv-${partner.id}`,
+    profileId: partner.id,
+    name: partner.username,
+    avatar: partner.avatar_url || '',
+    avatarCrop: safeParseJSON(partner.avatar_crop, null),
+    lastMessage: (msg.content || '').slice(0, 50),
+    timestamp: msg.created_at,
+    unread,
+    online: isOnline(partner.last_active),
+  };
+}
+
+async function buildNewMessageEvents(env, senderId, receiverId, msg) {
+  await ensureHiddenConversationsTable(env);
+  const chatId = [senderId, receiverId].sort().join('-');
+
+  let senderConversation = null;
+  let receiverConversation = null;
+  let receiverUnreadCount = 0;
+  let receiverConversationUnread = 1;
+
+  try {
+    const { results: users } = await env.DB.prepare(
+      'SELECT id, username, avatar_url, avatar_crop, last_active FROM users WHERE id IN (?, ?)'
+    ).bind(senderId, receiverId).all();
+
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    senderConversation = buildConversationPreview(userMap.get(receiverId), msg, 0);
+    receiverConversation = buildConversationPreview(userMap.get(senderId), msg, 0);
+  } catch (err) {
+    console.error('[buildNewMessageEvents] users query error:', err.message);
+  }
+
+  try {
+    const [totalRow, conversationRow] = await Promise.all([
+      env.DB.prepare(
+        `SELECT COUNT(*) as unread
+         FROM messages m
+         LEFT JOIN hidden_conversations hc
+           ON hc.user_id = ?
+          AND hc.partner_id = m.sender_id
+         WHERE m.receiver_id = ?
+           AND m.is_read = 0
+           AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)`
+      ).bind(receiverId, receiverId).first(),
+      env.DB.prepare(
+        `SELECT COUNT(*) as unread
+         FROM messages m
+         LEFT JOIN hidden_conversations hc
+           ON hc.user_id = ?
+          AND hc.partner_id = ?
+         WHERE m.sender_id = ?
+           AND m.receiver_id = ?
+           AND m.is_read = 0
+           AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)`
+      ).bind(receiverId, senderId, senderId, receiverId).first(),
+    ]);
+
+    receiverUnreadCount = Number(totalRow?.unread || 0);
+    receiverConversationUnread = Number(conversationRow?.unread || 0);
+  } catch (err) {
+    console.error('[buildNewMessageEvents] unread query error:', err.message);
+  }
+
+  if (receiverConversation) {
+    receiverConversation.unread = receiverConversationUnread;
+  }
+
+  return {
+    sender: {
+      type: 'new_message',
+      chatId,
+      partnerId: receiverId,
+      conversation: senderConversation,
+    },
+    receiver: {
+      type: 'new_message',
+      chatId,
+      partnerId: senderId,
+      unreadCount: receiverUnreadCount,
+      conversation: receiverConversation,
+    },
+  };
 }
 
 // ── GET /api/notifications/ws — User notification WebSocket ─
@@ -966,7 +1295,7 @@ async function handleNotificationWebSocket(request, env) {
   const payload = await verifyJWT(token, env.JWT_SECRET);
   if (!payload) return error('Token inválido', 401);
 
-  console.log('[handleNotificationWebSocket] userId:', payload.sub);
+  debugLog(env, '[handleNotificationWebSocket] userId:', payload.sub);
   const doId = env.USER_NOTIFICATIONS.idFromName(payload.sub);
   const stub = env.USER_NOTIFICATIONS.get(doId);
 
@@ -979,10 +1308,18 @@ async function handleNotificationWebSocket(request, env) {
 async function handleUnreadCount(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  await ensureHiddenConversationsTable(env);
 
-  const row = await env.DB.prepare(
-    'SELECT COUNT(*) as unread FROM messages WHERE receiver_id = ? AND is_read = 0'
-  ).bind(auth.sub).first();
+  const row = await env.DB.prepare(`
+    SELECT COUNT(*) as unread
+    FROM messages m
+    LEFT JOIN hidden_conversations hc
+      ON hc.user_id = ?
+     AND hc.partner_id = m.sender_id
+    WHERE m.receiver_id = ?
+      AND m.is_read = 0
+      AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)
+  `).bind(auth.sub, auth.sub).first();
 
   return json({ unread: row?.unread || 0 });
 }
@@ -1345,34 +1682,36 @@ async function handleDetectCountry(request) {
 // Returns non-sensitive settings (VIP prices, blur, etc.)
 async function handleGetPublicSettings(request, env) {
   const settings = await loadSettings(env);
-  return json({
-    settings: {
-      vipPriceMonthly: settings.vipPriceMonthly,
-      vipPrice3Months: settings.vipPrice3Months,
-      vipPrice6Months: settings.vipPrice6Months,
-      showVipButton: settings.showVipButton,
-      blurMobile: settings.blurMobile,
-      blurDesktop: settings.blurDesktop,
-      freeVisiblePhotos: settings.freeVisiblePhotos,
-      allowedCountries: settings.allowedCountries,
-      coinPack1Coins: settings.coinPack1Coins,
-      coinPack1Price: settings.coinPack1Price,
-      coinPack2Coins: settings.coinPack2Coins,
-      coinPack2Price: settings.coinPack2Price,
-      coinPack3Coins: settings.coinPack3Coins,
-      coinPack3Price: settings.coinPack3Price,
-      paymentGateway: settings.paymentGateway,
-      hidePasswordRegister: settings.hidePasswordRegister,
-      roleHombreImg: settings.roleHombreImg,
-      roleMujerImg: settings.roleMujerImg,
-      roleParejaImg: settings.roleParejaImg,
-      galleryHombreImg: settings.galleryHombreImg,
-      galleryMujerImg: settings.galleryMujerImg,
-      galleryParejaImg: settings.galleryParejaImg,
-      coinIconUrl: settings.coinIconUrl,
-      coinIconSize: settings.coinIconSize,
-    },
-  });
+  return json({ settings: getPublicSettingsPayload(settings) });
+}
+
+function getPublicSettingsPayload(settings) {
+  return {
+    vipPriceMonthly: settings.vipPriceMonthly,
+    vipPrice3Months: settings.vipPrice3Months,
+    vipPrice6Months: settings.vipPrice6Months,
+    showVipButton: settings.showVipButton,
+    blurMobile: settings.blurMobile,
+    blurDesktop: settings.blurDesktop,
+    freeVisiblePhotos: settings.freeVisiblePhotos,
+    allowedCountries: settings.allowedCountries,
+    coinPack1Coins: settings.coinPack1Coins,
+    coinPack1Price: settings.coinPack1Price,
+    coinPack2Coins: settings.coinPack2Coins,
+    coinPack2Price: settings.coinPack2Price,
+    coinPack3Coins: settings.coinPack3Coins,
+    coinPack3Price: settings.coinPack3Price,
+    paymentGateway: settings.paymentGateway,
+    hidePasswordRegister: settings.hidePasswordRegister,
+    roleHombreImg: settings.roleHombreImg,
+    roleMujerImg: settings.roleMujerImg,
+    roleParejaImg: settings.roleParejaImg,
+    galleryHombreImg: settings.galleryHombreImg,
+    galleryMujerImg: settings.galleryMujerImg,
+    galleryParejaImg: settings.galleryParejaImg,
+    coinIconUrl: settings.coinIconUrl,
+    coinIconSize: settings.coinIconSize,
+  };
 }
 
 // ── GET /api/settings ───────────────────────────────────
@@ -2297,6 +2636,7 @@ async function handleRequest(request, env) {
   if (path === '/api/auth/verify' && method === 'GET') return handleVerifyToken(request, env);
   if (path === '/api/auth/me' && method === 'GET') return handleMe(request, env);
   if (path === '/api/auth/logout' && method === 'POST') return handleLogout(request, env);
+  if (path === '/api/app/bootstrap' && method === 'GET') return handleAppBootstrap(request, env);
 
   // ── Profile routes
   if (path === '/api/profiles' && method === 'GET') return handleProfiles(request, env);
@@ -2311,6 +2651,7 @@ async function handleRequest(request, env) {
   if (path === '/api/unread-count' && method === 'GET') return handleUnreadCount(request, env);
   const msgMatch = path.match(/^\/api\/messages\/([a-f0-9-]+)$/);
   if (msgMatch && method === 'GET') return handleGetMessages(request, env, msgMatch[1]);
+  if (msgMatch && method === 'DELETE') return handleDeleteConversation(request, env, msgMatch[1]);
 
   // ── Upload & Photos
   if (path === '/api/upload' && method === 'POST') return handleUpload(request, env);
@@ -2370,8 +2711,10 @@ async function handleRequest(request, env) {
 
 export default {
   async fetch(request, env, ctx) {
+    const startedAt = Date.now();
     try {
       const response = await handleRequest(request, env);
+      recordRouteMetric(env, request, response, Date.now() - startedAt);
       // WebSocket upgrade responses (101) have immutable headers — skip CORS
       if (response.status === 101) {
         return response;
@@ -2383,6 +2726,7 @@ export default {
       }
       return response;
     } catch (err) {
+      recordRouteMetric(env, request, new Response(null, { status: 500 }), Date.now() - startedAt);
       console.error('Worker error:', err.message, err.stack);
       const errRes = json({ error: 'Error interno del servidor' }, 500);
       const cors = corsHeaders(env, request);

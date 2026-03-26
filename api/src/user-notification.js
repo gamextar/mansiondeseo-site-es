@@ -9,15 +9,21 @@ export class UserNotification {
     this.env = env;
   }
 
+  debug(...args) {
+    if (this.env?.DEBUG_LOGS === '1' || this.env?.ENVIRONMENT !== 'production') {
+      console.log(...args);
+    }
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
-    console.log('[UserNotification.fetch] pathname:', url.pathname, 'method:', request.method);
+    this.debug('[UserNotification.fetch] pathname:', url.pathname, 'method:', request.method);
 
     // POST /notify — broadcast event to all connected tabs/devices
     if (url.pathname === '/notify' && request.method === 'POST') {
       const data = await request.json();
       const sockets = this.state.getWebSockets();
-      console.log('[UserNotification.notify] sockets:', sockets.length, 'data:', JSON.stringify(data));
+      this.debug('[UserNotification.notify] sockets:', sockets.length, 'data:', JSON.stringify(data));
       const payload = JSON.stringify(data);
       for (const ws of sockets) {
         try { ws.send(payload); } catch { /* dead socket */ }

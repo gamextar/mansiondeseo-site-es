@@ -43,6 +43,11 @@ JWT_SECRET = "78b85a92c0ba6b2ca96d6ba06605371a1f4683c2fa37e7783b818d4f9b7baca7"
 CORS_ORIGIN = "http://localhost:5173"
 R2_PUBLIC_URL = ""                  # Custom domain or R2 public bucket URL
 MAIL_FROM = "noreply@unicoapps.com"
+DEBUG_LOGS = "0"                   # Set to "1" to re-enable verbose worker/DO logs
+METRICS_LOGS = "0"                 # Set to "1" to emit aggregated per-route summaries
+METRICS_FLUSH_MS = "60000"         # Summary window in milliseconds
+METRICS_FLUSH_REQUESTS = "50"      # Or flush sooner after this many requests
+PROFILE_VISIT_DEDUPE_MINUTES = "30" # Avoid duplicate visit writes during short back-and-forth navigation
 # ── Pasarela de pagos ──────────────────────────────────
 # Ambos gateways (MercadoPago y Ualá Bis) pasan por el bridge de UnicoApps
 PAYMENT_BRIDGE_URL = ""             # En dev: http://localhost:8788
@@ -73,6 +78,11 @@ JWT_SECRET = "78b85a92c0ba6b2ca96d6ba06605371a1f4683c2fa37e7783b818d4f9b7baca7"
 TURNSTILE_SECRET = ""
 R2_PUBLIC_URL = "https://pub-c0bc1ab6fb294cc1bb2e231bb55b4afb.r2.dev"
 MAIL_FROM = "noreply@unicoapps.com"
+DEBUG_LOGS = "0"                   # Set to "1" temporarily when debugging production
+METRICS_LOGS = "1"                 # Enabled temporarily to inspect production route usage
+METRICS_FLUSH_MS = "60000"         # Summary window in milliseconds
+METRICS_FLUSH_REQUESTS = "50"      # Or flush sooner after this many requests
+PROFILE_VISIT_DEDUPE_MINUTES = "30" # Avoid duplicate visit writes during short back-and-forth navigation
 # ── Pasarela de pagos ──────────────────────────────────
 # Ambos gateways (MercadoPago y Ualá Bis) pasan por el bridge de UnicoApps
 PAYMENT_BRIDGE_URL = "https://unicoapps-site.pages.dev"  # Sitio B (pages.dev para evitar 502 Worker→Pages)
