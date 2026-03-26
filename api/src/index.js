@@ -870,6 +870,7 @@ async function handleChatWebSocket(request, env, chatId) {
   // Forward the request to the DO (it handles the WS upgrade)
   const doUrl = new URL(request.url);
   doUrl.pathname = '/ws';
+  doUrl.searchParams.set('chatId', chatId);
   return stub.fetch(new Request(doUrl.toString(), request));
 }
 

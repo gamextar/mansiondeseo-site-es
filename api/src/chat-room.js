@@ -45,6 +45,12 @@ export class ChatRoom {
       return new Response('Missing userId', { status: 400 });
     }
 
+    // Store chatId for receiverId derivation (survives hibernation)
+    const chatId = url.searchParams.get('chatId');
+    if (chatId) {
+      await this.state.storage.put('chatId', chatId);
+    }
+
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
@@ -96,8 +102,7 @@ export class ChatRoom {
     const content = data.content?.trim();
     if (!content) return;
 
-    // Determine receiver from chatId (URL has both user IDs sorted)
-    // All connected sockets that are NOT the sender are the receiver
+    // Collect other connected sockets for broadcast
     const allSockets = this.state.getWebSockets();
     const otherSockets = [];
     let receiverId = null;
@@ -107,6 +112,15 @@ export class ChatRoom {
       if (tag !== senderId) {
         otherSockets.push(sock);
         receiverId = tag;
+      }
+    }
+
+    // Derive receiverId from stored chatId if receiver is not connected
+    if (!receiverId) {
+      const chatId = await this.state.storage.get('chatId');
+      if (chatId) {
+        const ids = chatId.split('-');
+        receiverId = ids.find(id => id !== senderId) || null;
       }
     }
 

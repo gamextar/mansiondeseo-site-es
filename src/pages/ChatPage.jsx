@@ -6,7 +6,7 @@ import { useMessageLimit } from '../hooks/useMessageLimit';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import EmojiPicker from '../components/EmojiPicker';
-import { getMessageLimit, getProfile, getToken, getStoredUser, getMessages as apiGetMessages } from '../lib/api';
+import { getMessageLimit, getProfile, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 
 export default function ChatPage() {
@@ -63,10 +63,21 @@ export default function ChatPage() {
       refreshUnread();
     });
 
-    // Open WebSocket connection — will replace HTTP messages with real-time data
+    // Open WebSocket connection for real-time messages
     chatRef.current = createChatSocket(String(user.id), partnerId, token, {
       onHistory(msgs) {
-        setMessages(msgs.map(m => formatMsg(m)));
+        // Only use DO history if HTTP returned no messages (fresh conversation or migration gap)
+        setMessages(prev => {
+          if (prev.length === 0 && msgs.length > 0) {
+            return msgs.map(m => formatMsg(m));
+          }
+          // Otherwise just update read status from DO
+          if (msgs.length > 0) {
+            const doMap = new Map(msgs.map(m => [m.id, m.is_read]));
+            return prev.map(m => doMap.has(m.id) ? { ...m, is_read: doMap.get(m.id) } : m);
+          }
+          return prev;
+        });
         // Mark unread incoming messages as read
         const unread = msgs.filter(m => m.sender_id !== String(user.id) && !m.is_read);
         if (unread.length > 0) {
@@ -116,6 +127,19 @@ export default function ChatPage() {
     };
   }, [id, partnerId, navigate]);
 
+  // Poll fallback — only active when WebSocket is not connected
+  useEffect(() => {
+    if (wsState === 'connected' || loading) return;
+    const poll = () => {
+      apiGetMessages(partnerId)
+        .then(data => { if (data.messages) setMessages(data.messages); })
+        .catch(() => {});
+      refreshUnread();
+    };
+    const interval = setInterval(poll, 8000);
+    return () => clearInterval(interval);
+  }, [wsState, partnerId, loading, refreshUnread]);
+
   useEffect(() => {
     // Auto-scroll only if user was at the bottom
     if (scrollRef.current && wasAtBottomRef.current) {
@@ -143,7 +167,7 @@ export default function ChatPage() {
   const effectiveCanSend = apiLimit ? apiLimit.canSend : canSend;
   const effectiveMax = apiLimit ? apiLimit.max : max;
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim() || !effectiveCanSend) return;
 
     const text = input.trim();
@@ -160,8 +184,19 @@ export default function ChatPage() {
     setInput('');
     localSendMessage();
 
-    // Send via WebSocket
-    chatRef.current?.send(text);
+    // Send via WebSocket if connected, otherwise fall back to HTTP
+    if (chatRef.current?.getState() === 'connected') {
+      chatRef.current.send(text);
+    } else {
+      try {
+        await apiSendMessage(partnerId, text);
+        getMessageLimit().then(data => setApiLimit(data)).catch(() => {});
+      } catch (err) {
+        if (err.status === 403) {
+          setApiLimit({ remaining: 0, canSend: false, max: 5 });
+        }
+      }
+    }
   };
 
   const handleKeyDown = (e) => {
