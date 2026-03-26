@@ -49,7 +49,15 @@ export default function ChatListPage() {
       fetchConversations();
       refreshUnread();
     }, 15_000);
-    return () => clearInterval(interval);
+
+    // Also refresh when tab/window gets focus
+    const onFocus = () => { fetchConversations(); refreshUnread(); };
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [navigate, fetchConversations, refreshUnread]);
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
