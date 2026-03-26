@@ -159,10 +159,14 @@ export async function getProfile(id) {
 }
 
 export async function updateProfile(fields) {
-  return apiFetch('/profile', {
+  const data = await apiFetch('/profile', {
     method: 'PUT',
     body: JSON.stringify(fields),
   });
+  if (data?.user) {
+    setStoredUser(data.user);
+  }
+  return data;
 }
 
 // ── Messages ────────────────────────────────────────────

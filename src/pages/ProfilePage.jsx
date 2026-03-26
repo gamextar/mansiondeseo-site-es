@@ -156,12 +156,16 @@ export default function ProfilePage() {
   };
 
   const handleAvatarPosition = async (crop) => {
-    setAdjustUrl(null);
     try {
-      await updateProfile({ avatar_crop: crop });
-      setUser(prev => prev ? { ...prev, avatar_crop: crop } : prev);
-    } catch {
-      // Silently fail
+      const data = await updateProfile({ avatar_crop: crop });
+      if (data?.user) {
+        setUser(data.user);
+      } else {
+        setUser(prev => prev ? { ...prev, avatar_crop: crop } : prev);
+      }
+      setAdjustUrl(null);
+    } catch (err) {
+      console.error('Avatar position save error:', err);
     }
   };
 
