@@ -132,8 +132,11 @@ export class ChatRoom {
     if (!receiverId) {
       const chatId = await this.state.storage.get('chatId');
       if (chatId) {
-        const ids = chatId.split('-');
-        receiverId = ids.find(id => id !== senderId) || null;
+        // chatId = "uuid1-uuid2" where each UUID is 36 chars (8-4-4-4-12)
+        // Split at position 36 (the separator hyphen between the two UUIDs)
+        const id1 = chatId.slice(0, 36);
+        const id2 = chatId.slice(37);
+        receiverId = id1 !== senderId ? id1 : id2;
       }
     }
 
@@ -226,26 +229,35 @@ export class ChatRoom {
     if (receiverId) {
       const chatId = [senderId, receiverId].sort().join('-');
       this.state.waitUntil((async () => {
+        console.log('[ChatRoom.handleMessage] waitUntil started, chatId:', chatId, 'sender:', senderId, 'receiver:', receiverId);
         // Write to D1
         await this.env.DB.prepare(
           'INSERT INTO messages (id, sender_id, receiver_id, content, created_at) VALUES (?, ?, ?, ?, ?)'
         ).bind(msgId, senderId, receiverId, content, now).run().catch(err => {
           console.error('D1 message write error:', err.message);
         });
+        console.log('[ChatRoom.handleMessage] D1 write done');
         // Notify UserNotification DOs so ChatListPage updates in real-time
         const notifyPayload = JSON.stringify({ type: 'new_message', chatId });
         for (const userId of [senderId, receiverId]) {
           try {
+            console.log('[ChatRoom.handleMessage] notifying UserNotification for:', userId);
             const doId = this.env.USER_NOTIFICATIONS.idFromName(userId);
             const stub = this.env.USER_NOTIFICATIONS.get(doId);
-            await stub.fetch('https://do/notify', {
+            const res = await stub.fetch('https://do/notify', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: notifyPayload,
             });
-          } catch { /* ignore notification errors */ }
+            console.log('[ChatRoom.handleMessage] UserNotification response:', res.status, 'for:', userId);
+          } catch (err) {
+            console.error('[ChatRoom.handleMessage] UserNotification error for', userId, ':', err.message);
+          }
         }
+        console.log('[ChatRoom.handleMessage] waitUntil done');
       })());
+    } else {
+      console.log('[ChatRoom.handleMessage] NO receiverId - skipping D1 write and notifications');
     }
   }
 
