@@ -29,7 +29,8 @@ export default function SettingsPage() {
   const [blurMobile, setBlurMobile] = useState(14);
   const [blurDesktop, setBlurDesktop] = useState(8);
   const [freeVisiblePhotos, setFreeVisiblePhotos] = useState(1);
-  const [storyCircleSize, setStoryCircleSize] = useState(78);
+  const [storyCircleSize, setStoryCircleSize] = useState(88);
+  const [storyCircleGap, setStoryCircleGap] = useState(8);
 
   // VIP
   const [showVipButton, setShowVipButton] = useState(true);
@@ -86,7 +87,8 @@ export default function SettingsPage() {
         setBlurMobile(s.blurMobile);
         setBlurDesktop(s.blurDesktop);
         setFreeVisiblePhotos(s.freeVisiblePhotos);
-        setStoryCircleSize(s.storyCircleSize || 78);
+        setStoryCircleSize(s.storyCircleSize || 88);
+        setStoryCircleGap(s.storyCircleGap || 8);
         setShowVipButton(s.showVipButton);
         setDailyMessageLimit(s.dailyMessageLimit);
         setSiteCountry(s.siteCountry);
@@ -128,6 +130,7 @@ export default function SettingsPage() {
         blur_desktop: blurDesktop,
         free_visible_photos: freeVisiblePhotos,
         story_circle_size: storyCircleSize,
+        story_circle_gap: storyCircleGap,
         show_vip_button: showVipButton ? '1' : '0',
         daily_message_limit: dailyMessageLimit,
         site_country: siteCountry,
@@ -159,7 +162,8 @@ export default function SettingsPage() {
       setBlurMobile(s.blurMobile);
       setBlurDesktop(s.blurDesktop);
       setFreeVisiblePhotos(s.freeVisiblePhotos);
-      setStoryCircleSize(s.storyCircleSize || 78);
+      setStoryCircleSize(s.storyCircleSize || 88);
+      setStoryCircleGap(s.storyCircleGap || 8);
       setShowVipButton(s.showVipButton);
       setDailyMessageLimit(s.dailyMessageLimit);
       setSiteCountry(s.siteCountry);
@@ -345,6 +349,25 @@ export default function SettingsPage() {
                 <span>50px</span>
                 <span className="text-mansion-gold font-medium">{storyCircleSize}px</span>
                 <span>120px</span>
+              </div>
+            </div>
+
+            {/* Story Circle Gap */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Globe className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Espaciado Historias</h3>
+                  <p className="text-[11px] text-text-dim">Separación entre círculos en px</p>
+                </div>
+              </div>
+              <input type="range" min="0" max="24" value={storyCircleGap} onChange={e => setStoryCircleGap(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>0px</span>
+                <span className="text-mansion-gold font-medium">{storyCircleGap}px</span>
+                <span>24px</span>
               </div>
             </div>
 

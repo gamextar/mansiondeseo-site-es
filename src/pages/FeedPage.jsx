@@ -77,13 +77,13 @@ export default function FeedPage() {
           <p className="text-text-muted text-sm lg:text-base font-medium">Transmitiendo</p>
         </div>
         <div
-          className="flex gap-3 overflow-x-auto scrollbar-hide pb-2"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          className="flex overflow-x-auto scrollbar-hide pb-2"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', gap: `${settings.storyCircleGap || 8}px` }}
         >
           {profiles.slice(0, 15).map((p) => {
             const photo = (p.photos && p.photos[0]) || p.avatar_url || '';
             const isOnline = p.online;
-            const size = settings.storyCircleSize || 78;
+            const size = settings.storyCircleSize || 88;
             const innerSize = size - 5;
             return (
               <Link
