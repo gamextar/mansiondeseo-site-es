@@ -66,10 +66,9 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: Math.min(index * 0.06, 0.4), duration: 0.35 }}
-      style={{ willChange: 'opacity, transform' }}
+      transition={{ delay: Math.min(index * 0.03, 0.15), duration: 0.25 }}
     >
       <Link to={`/perfiles/${id}`} className="block group">
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">
@@ -77,7 +76,9 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
           <img
             src={mainPhoto}
             alt={cardBlocked ? '' : name}
-            loading="lazy"
+            loading={index < 6 ? 'eager' : 'lazy'}
+            fetchPriority={index < 4 ? 'high' : 'auto'}
+            decoding="async"
             className="absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100"
             style={cardBlocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
           />
