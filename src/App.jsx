@@ -1,5 +1,6 @@
 import { useState, createContext, useContext, useCallback, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useAgeVerified } from './hooks/useAgeVerified';
 import AgeVerificationModal from './components/AgeVerificationModal';
 import Navbar from './components/Navbar';
@@ -64,6 +65,14 @@ function AppLayout() {
       {showChrome && <Navbar />}
 
       <div className={showChrome ? 'lg:pl-64 xl:pl-72' : ''}>
+        <AnimatePresence mode="wait">
+        <motion.div
+          key={location.pathname}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15, ease: 'easeInOut' }}
+        >
         <Routes location={location}>
           {/* Full-screen flows */}
           <Route path="/bienvenida" element={<WelcomePage />} />
@@ -149,6 +158,8 @@ function AppLayout() {
             <Route path="configuracion" element={<SettingsPage />} />
           </Route>
         </Routes>
+        </motion.div>
+        </AnimatePresence>
       </div>
 
       {showChrome && <BottomNav />}
