@@ -990,9 +990,9 @@ async function handleUpload(request, env) {
     return error('La imagen no puede superar 5MB');
   }
 
-  // Generate obfuscated path
+  // Generate UUID-only key (no userId in path for VIP privacy)
   const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
-  const key = `profiles/${auth.sub}/${generateId()}.${ext}`;
+  const key = `${generateId()}.${ext}`;
 
   await env.IMAGES.put(key, imageData, {
     httpMetadata: { contentType },
@@ -1047,11 +1047,14 @@ async function handleDeletePhoto(request, env) {
 
   // Try to delete from R2 (extract key from URL)
   try {
+    const r2Base = env.R2_PUBLIC_URL || '';
     let key = '';
-    if (url.includes('/api/images/')) {
-      key = url.split('/api/images/')[1];
+    if (r2Base && url.startsWith(r2Base)) {
+      key = url.slice(r2Base.length + 1); // strip base + '/'
+    } else if (url.includes('/api/images/')) {
+      key = url.split('/api/images/')[1]; // legacy format
     }
-    if (key && key.startsWith('profiles/')) {
+    if (key) {
       await env.IMAGES.delete(key);
     }
   } catch {
@@ -1061,23 +1064,7 @@ async function handleDeletePhoto(request, env) {
   return json({ photos, avatar_url: newAvatar });
 }
 
-// ── GET /api/images/* ───────────────────────────────────
-
-async function handleServeImage(request, env, path) {
-  const key = path.replace('/api/images/', '');
-  if (!key || key.includes('..')) return error('Ruta inválida', 400);
-
-  const object = await env.IMAGES.get(key);
-  if (!object) return error('Imagen no encontrada', 404);
-
-  return new Response(object.body, {
-    headers: {
-      'Content-Type': object.httpMetadata?.contentType || 'image/jpeg',
-      'Cache-Control': 'public, max-age=31536000, immutable',
-      'Access-Control-Allow-Origin': '*',
-    },
-  });
-}
+// handleServeImage removed — images now served directly from R2 public bucket
 
 // ── PUT /api/profile ────────────────────────────────────
 
@@ -1092,7 +1079,8 @@ async function handleUpdateProfile(request, env) {
   if (body.photos !== undefined) {
     if (!Array.isArray(body.photos)) return error('photos debe ser un arreglo', 400);
     const r2Base = env.R2_PUBLIC_URL || '';
-    const allValid = body.photos.every(url => typeof url === 'string' && url.startsWith(r2Base));
+    const legacyBase = 'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api/images';
+    const allValid = body.photos.every(url => typeof url === 'string' && (url.startsWith(r2Base) || url.startsWith(legacyBase)));
     if (!allValid) return error('URL de foto inválida', 400);
     allowedFields.push('photos');
   }
@@ -2291,9 +2279,6 @@ async function handleRequest(request, env) {
   // ── Pagos
   if (path === '/api/payment/create' && method === 'POST') return handlePaymentCreate(request, env);
   if (path === '/api/payment/confirm' && method === 'POST') return handlePaymentConfirm(request, env);
-
-  // ── Serve R2 images
-  if (path.startsWith('/api/images/') && method === 'GET') return handleServeImage(request, env, path);
 
   return error('Ruta no encontrada', 404);
 }
