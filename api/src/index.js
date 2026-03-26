@@ -524,9 +524,9 @@ async function handleProfiles(request, env) {
   const search = url.searchParams.get('q') || '';
   const country = request.headers.get('cf-ipcountry') || '';
 
-  // Build profiles query
-  let query = `SELECT * FROM users WHERE id != ? AND status = 'verified'`;
-  const params = [auth.sub];
+  // Build profiles query (don't exclude current user — cache is shared, filter later)
+  let query = `SELECT * FROM users WHERE status = 'verified'`;
+  const params = [];
   if (country) { query += ` AND country = ?`; params.push(country); }
   if (filter === 'hombre') query += ` AND role = 'hombre'`;
   else if (filter === 'mujer') query += ` AND role = 'mujer'`;
@@ -536,9 +536,9 @@ async function handleProfiles(request, env) {
     const term = `%${search}%`;
     params.push(term, term, term);
   }
-  query += ` ORDER BY last_active DESC LIMIT 50`;
+  query += ` ORDER BY last_active DESC LIMIT 51`;
 
-  // Cache key for profiles query (same filter+country = same list for all users)
+  // Cache key for profiles query (shared across all users)
   const profilesCacheKey = `profiles:${filter}:${country}:${search}`;
 
   // Parallel: cached settings + cached profiles + per-user data (always fresh)
@@ -553,8 +553,8 @@ async function handleProfiles(request, env) {
   const viewerFavorites = new Set(favRows.map(r => r.target_id));
   const favoritedBySet = new Set(favByRows.map(r => r.user_id));
 
-  // Map to frontend shape with new blur logic
-  const profiles = results.map(u => {
+  // Filter out current user (cached query includes everyone) + map to frontend shape
+  const profiles = results.filter(u => u.id !== auth.sub).slice(0, 50).map(u => {
     const profileIsPremium = isPremiumActive(u);
     const hasGhostMode = profileIsPremium && !!u.ghost_mode;
     // Ghost mode blur: blurred unless viewer is premium OR the ghost-mode user has favorited the viewer
