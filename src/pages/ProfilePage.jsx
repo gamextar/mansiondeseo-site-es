@@ -229,6 +229,21 @@ export default function ProfilePage() {
   const displayRole = user?.role || '';
   const avatarUrl = user?.avatar_url || '';
   const photos = user?.photos || [];
+  const ownProfilePreview = user ? {
+    id: user.id,
+    name: user.username,
+    age: user.age,
+    city: user.city,
+    role: user.role,
+    photos: user.photos || [],
+    avatar_url: user.avatar_url || '',
+    online: user.online,
+    premium: user.premium,
+    verified: user.verified,
+    blurred: false,
+    visiblePhotos: user.photos?.length || 0,
+    ghost_mode: user.ghost_mode,
+  } : null;
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
@@ -328,7 +343,7 @@ export default function ProfilePage() {
 
           <h2
             className="font-display text-xl font-bold text-text-primary mt-4 cursor-pointer hover:underline"
-            onClick={() => user?.id && navigate(`/perfiles/${user.id}`)}
+            onClick={() => user?.id && navigate(`/perfiles/${user.id}`, { state: ownProfilePreview ? { preview: ownProfilePreview } : undefined })}
           >
             {displayName}
           </h2>
