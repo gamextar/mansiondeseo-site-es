@@ -500,15 +500,15 @@ async function handleProfiles(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
-  // Get viewer info + settings + viewer's favorites
-  const viewer = await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
+  // Parallel fetch: viewer info + settings + favorites (all independent)
+  const [viewer, settings, { results: favRows }, { results: favByRows }] = await Promise.all([
+    env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
+    loadSettings(env),
+    env.DB.prepare('SELECT target_id FROM favorites WHERE user_id = ?').bind(auth.sub).all(),
+    env.DB.prepare('SELECT user_id FROM favorites WHERE target_id = ?').bind(auth.sub).all(),
+  ]);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
-  const settings = await loadSettings(env);
-  const { results: favRows } = await env.DB.prepare('SELECT target_id FROM favorites WHERE user_id = ?').bind(auth.sub).all();
   const viewerFavorites = new Set(favRows.map(r => r.target_id));
-
-  // Also get who has favorited the viewer (for ghost mode exception)
-  const { results: favByRows } = await env.DB.prepare('SELECT user_id FROM favorites WHERE target_id = ?').bind(auth.sub).all();
   const favoritedBySet = new Set(favByRows.map(r => r.user_id));
 
   const url = new URL(request.url);
@@ -590,20 +590,17 @@ async function handleProfileDetail(request, env, userId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
-  const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  // Parallel fetch: profile + viewer info + settings + favorites (all independent)
+  const [user, viewer, settings, favRow, favByRow] = await Promise.all([
+    env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first(),
+    env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
+    loadSettings(env),
+    env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(auth.sub, userId).first(),
+    env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(userId, auth.sub).first(),
+  ]);
   if (!user) return error('Perfil no encontrado', 404);
-
-  // Get viewer info + settings
-  const viewer = await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
   const viewerIsPremium = viewer && isPremiumActive(viewer);
-  const settings = await loadSettings(env);
-
-  // Check if viewer has favorited this profile
-  const favRow = await env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(auth.sub, userId).first();
   const isFavorited = !!favRow;
-
-  // Check if this profile's owner has favorited the viewer (ghost mode exception)
-  const favByRow = await env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(userId, auth.sub).first();
   const profileFavoritedViewer = !!favByRow;
 
   const hasGhostMode = isPremiumActive(user) && !!user.ghost_mode;
