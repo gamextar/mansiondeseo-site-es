@@ -70,7 +70,7 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index * 0.03, 0.15), duration: 0.25 }}
     >
-      <Link to={`/perfiles/${id}`} state={{ preview: { id, name, age, city, role, photos, avatar_url: profile.avatar_url, online, premium, verified } }} className="block group">
+      <Link to={`/perfiles/${id}`} state={{ preview: { id, name, age, city, role, photos, avatar_url: profile.avatar_url, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode } }} className="block group">
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">
           {/* Photo — use actual photo with blur for blocked cards */}
           <img
