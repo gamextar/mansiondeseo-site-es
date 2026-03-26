@@ -353,7 +353,7 @@ export default function ProfilePage() {
               {visitors.map((v) => (
                 <button
                   key={v.id}
-                  onClick={() => navigate(`/perfiles/${v.id}`)}
+                  onClick={() => navigate(`/perfiles/${v.id}`, { state: { preview: { id: v.id, name: v.name, age: v.age, city: v.city, role: v.role, photos: [], avatar_url: v.avatar_url, online: v.online, premium: v.premium } } })}
                   className="w-full flex items-center gap-3 p-3 rounded-xl bg-mansion-card/50 hover:bg-mansion-card transition-all group"
                 >
                   <div className="w-10 h-10 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0">
