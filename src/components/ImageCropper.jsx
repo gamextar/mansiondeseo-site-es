@@ -224,16 +224,16 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
   return (
     <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col p-4 sm:p-6">
       <div className="w-full text-center pt-2 sm:pt-4">
-        <h3 className="text-white font-display text-lg font-bold">Ajustá tu foto</h3>
-        <p className="text-white/60 text-xs flex items-center justify-center gap-1 mt-1">
-          <Move className="w-3 h-3" /> Arrastrá para mover · Pellizcá para zoom
+        <h3 className="text-white font-display text-3xl sm:text-4xl font-bold">Ajustá tu foto</h3>
+        <p className="text-white/75 text-base sm:text-lg flex items-center justify-center gap-2 mt-2">
+          <Move className="w-4 h-4 sm:w-5 sm:h-5" /> Arrastrá para mover · Pellizcá para zoom
         </p>
       </div>
 
       <div className="flex-1 flex items-center justify-center min-h-0 py-4 sm:py-6">
         <div
           ref={containerRef}
-          className="relative cursor-grab active:cursor-grabbing touch-none select-none overflow-hidden rounded-[28px] border border-white/10 bg-black/30 shadow-2xl"
+          className="relative cursor-grab active:cursor-grabbing touch-none select-none"
           style={{ width: viewportSize, height: viewportSize }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -244,28 +244,33 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
         >
-          <img
-            ref={imgRef}
-            src={imageUrl}
-            alt=""
-            onLoad={handleImageLoad}
-            className="absolute pointer-events-none"
-            style={{
-              left: offset.x,
-              top: offset.y,
-              width: imgNatural.w * zoom,
-              height: imgNatural.h * zoom,
-              maxWidth: 'none',
-              maxHeight: 'none',
-              display: 'block',
-            }}
-            draggable={false}
-          />
+          <div
+            className="absolute inset-0 overflow-hidden pointer-events-none"
+            style={{ borderRadius: '50%' }}
+          >
+            <img
+              ref={imgRef}
+              src={imageUrl}
+              alt=""
+              onLoad={handleImageLoad}
+              className="absolute"
+              style={{
+                left: offset.x,
+                top: offset.y,
+                width: imgNatural.w * zoom,
+                height: imgNatural.h * zoom,
+                maxWidth: 'none',
+                maxHeight: 'none',
+                display: 'block',
+              }}
+              draggable={false}
+            />
+          </div>
 
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              boxShadow: 'inset 0 0 0 9999px rgba(0, 0, 0, 0.42)',
+              boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.42)',
               borderRadius: '50%',
             }}
           />
