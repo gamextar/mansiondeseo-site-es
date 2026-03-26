@@ -190,17 +190,13 @@ export default function App() {
     }
   }, [setUser]);
 
-  // Rehydrate user on mount if token exists but no user
+  // Rehydrate user on mount if token exists
   useEffect(() => {
-    if (getToken() && !user) {
-      getMe().then(data => setUser(data.user)).catch(() => {
-        // Token invalid
+    if (getToken()) {
+      getMe().then(data => { if (data?.user) setUser(data.user); }).catch(() => {
         clearAuth();
         setRegisteredState(false);
       });
-    } else if (getToken() && user) {
-      // Refresh user data to keep coins/premium in sync
-      getMe().then(data => { if (data?.user) setUser(data.user); }).catch(() => {});
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

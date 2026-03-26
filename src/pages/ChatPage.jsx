@@ -63,7 +63,12 @@ export default function ChatPage() {
       getMessageLimit().then(data => setApiLimit(data)).catch(() => {}),
     ]).finally(() => {
       setLoading(false);
-      refreshUnread();
+      // Scroll to bottom after initial load
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      });
     });
 
     // Open WebSocket connection for real-time messages
@@ -143,34 +148,31 @@ export default function ChatPage() {
   }, [id, partnerId, navigate]);
 
   useEffect(() => {
-    // Auto-scroll only if user was at the bottom
+    // Auto-scroll to bottom when messages change (if user was at bottom)
     if (scrollRef.current && wasAtBottomRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      });
     }
   }, [messages]);
 
-  // Real-time message delivery: when UserNotification WS fires for this chat, refetch from D1
+  // Real-time message delivery: when UserNotification WS fires for this chat, mark as read
   useEffect(() => {
     const unsubscribe = subscribe((event) => {
-      const myId = myUserIdRef.current;
-      if (!myId) return;
-      const thisChatId = [myId, partnerId].sort().join('-');
-      if (event?.chatId === thisChatId) {
-        apiGetMessages(partnerId)
-          .then(data => {
-            setMessages(prev => {
-              const incoming = data.messages || [];
-              // Merge: keep existing messages, add any new ones by id
-              const existingIds = new Set(prev.map(m => m.id));
-              const newMsgs = incoming.filter(m => !existingIds.has(m.id));
-              return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev;
-            });
-          })
-          .catch(() => {});
+      if (event?.type === 'new_message') {
+        const myId = myUserIdRef.current;
+        if (!myId) return;
+        const thisChatId = [myId, partnerId].sort().join('-');
+        if (event.chatId === thisChatId) {
+          // Messages already arrive via ChatRoom WS - just refresh unread count
+          refreshUnread();
+        }
       }
     });
     return unsubscribe;
-  }, [partnerId, subscribe]);
+  }, [partnerId, subscribe, refreshUnread]);
 
   if (!partner && !loading) {
     return (
