@@ -3,9 +3,10 @@ import { ZoomIn, ZoomOut, Check, X, Move } from 'lucide-react';
 
 /**
  * Circular image cropper with drag + pinch/scroll zoom.
+ * Accepts either a File (file prop) or a URL string (imageUrl prop).
  * Returns a cropped square File via onCrop(file).
  */
-export default function ImageCropper({ file, onCrop, onCancel, cropSize = 400 }) {
+export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCancel, cropSize = 400 }) {
   const [imageUrl, setImageUrl] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -19,11 +20,15 @@ export default function ImageCropper({ file, onCrop, onCancel, cropSize = 400 })
   const viewportSize = 280;
 
   useEffect(() => {
+    if (externalUrl) {
+      setImageUrl(externalUrl);
+      return;
+    }
     if (!file) return;
     const url = URL.createObjectURL(file);
     setImageUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [file]);
+  }, [file, externalUrl]);
 
   const handleImageLoad = useCallback((e) => {
     const { naturalWidth: w, naturalHeight: h } = e.target;
@@ -164,7 +169,7 @@ export default function ImageCropper({ file, onCrop, onCancel, cropSize = 400 })
     canvas.toBlob(
       (blob) => {
         if (blob) {
-          const croppedFile = new File([blob], file.name || 'avatar.jpg', {
+          const croppedFile = new File([blob], file?.name || 'avatar.jpg', {
             type: 'image/jpeg',
             lastModified: Date.now(),
           });
@@ -207,6 +212,7 @@ export default function ImageCropper({ file, onCrop, onCancel, cropSize = 400 })
           ref={imgRef}
           src={imageUrl}
           alt=""
+          crossOrigin="anonymous"
           onLoad={handleImageLoad}
           className="absolute pointer-events-none"
           style={{

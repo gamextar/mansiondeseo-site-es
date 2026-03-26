@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Users, Gift, Filter } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Users, Gift, Filter, Move } from 'lucide-react';
 import { useAuth } from '../App';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits, getReceivedGifts } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
@@ -24,6 +24,8 @@ export default function ProfilePage() {
   const galleryInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [cropFile, setCropFile] = useState(null);
+  const [cropUrl, setCropUrl] = useState(null);
+  const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [togglingGhost, setTogglingGhost] = useState(false);
   const [visitors, setVisitors] = useState([]);
@@ -144,11 +146,20 @@ export default function ProfilePage() {
 
   const handleCroppedAvatar = async (croppedFile) => {
     setCropFile(null);
+    setCropUrl(null);
     try {
       const data = await uploadImage(croppedFile);
       setUser(prev => prev ? { ...prev, avatar_url: data.url, photos: [...(prev.photos || []), data.url] } : prev);
     } catch {
       // Silently fail — user can retry
+    }
+  };
+
+  const handleAvatarTap = () => {
+    if (avatarUrl) {
+      setShowAvatarMenu(true);
+    } else {
+      fileInputRef.current?.click();
     }
   };
 
@@ -207,19 +218,61 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
-      {cropFile && (
+      {(cropFile || cropUrl) && (
         <ImageCropper
           file={cropFile}
+          imageUrl={cropUrl}
           onCrop={handleCroppedAvatar}
-          onCancel={() => setCropFile(null)}
+          onCancel={() => { setCropFile(null); setCropUrl(null); }}
         />
+      )}
+
+      {/* Avatar action menu */}
+      {showAvatarMenu && (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center" onClick={() => setShowAvatarMenu(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div
+            className="relative w-full max-w-sm mx-4 mb-8 rounded-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-mansion-card/95 backdrop-blur-xl border border-mansion-border/30 rounded-2xl overflow-hidden">
+              <button
+                onClick={() => {
+                  setShowAvatarMenu(false);
+                  fileInputRef.current?.click();
+                }}
+                className="w-full flex items-center gap-3 px-5 py-3.5 text-text-primary hover:bg-mansion-elevated/50 transition-colors"
+              >
+                <Camera className="w-4.5 h-4.5 text-mansion-gold" />
+                <span className="text-sm font-medium">Cambiar foto</span>
+              </button>
+              <div className="h-px bg-mansion-border/20 mx-4" />
+              <button
+                onClick={() => {
+                  setShowAvatarMenu(false);
+                  setCropUrl(avatarUrl);
+                }}
+                className="w-full flex items-center gap-3 px-5 py-3.5 text-text-primary hover:bg-mansion-elevated/50 transition-colors"
+              >
+                <Move className="w-4.5 h-4.5 text-mansion-gold" />
+                <span className="text-sm font-medium">Ajustar posición</span>
+              </button>
+            </div>
+            <button
+              onClick={() => setShowAvatarMenu(false)}
+              className="w-full mt-2 py-3.5 rounded-2xl bg-mansion-card/95 backdrop-blur-xl border border-mansion-border/30 text-sm font-semibold text-text-muted hover:bg-mansion-elevated/50 transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       )}
       <div className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-2xl lg:mx-auto">
         {/* Profile header */}
         <div className="text-center mb-6">
           <div className="relative inline-block">
             <div
-              onClick={() => fileInputRef.current?.click()}
+              onClick={handleAvatarTap}
               className="w-24 h-24 rounded-full bg-gradient-to-br from-mansion-gold to-mansion-gold-light p-[2px] mx-auto cursor-pointer hover:opacity-80 transition-opacity"
             >
               <div className="w-full h-full rounded-full bg-mansion-card flex items-center justify-center overflow-hidden">
@@ -235,7 +288,7 @@ export default function ProfilePage() {
               </div>
             </div>
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={handleAvatarTap}
               className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-mansion-crimson text-white flex items-center justify-center"
             >
               <Camera className="w-4 h-4" />
