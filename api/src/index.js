@@ -2304,7 +2304,11 @@ export default {
   async fetch(request, env, ctx) {
     try {
       const response = await handleRequest(request, env);
-      // Add CORS headers to all responses
+      // WebSocket upgrade responses (101) have immutable headers — skip CORS
+      if (response.status === 101) {
+        return response;
+      }
+      // Add CORS headers to all other responses
       const cors = corsHeaders(env);
       for (const [key, value] of Object.entries(cors)) {
         response.headers.set(key, value);
