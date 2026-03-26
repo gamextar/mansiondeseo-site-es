@@ -244,6 +244,7 @@ export default function ProfilePage() {
         <ImageCropper
           imageUrl={adjustUrl}
           positionOnly
+          initialPosition={user?.avatar_crop}
           onPosition={handleAvatarPosition}
           onCancel={() => setAdjustUrl(null)}
         />

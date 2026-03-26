@@ -9,7 +9,7 @@ import { ZoomIn, ZoomOut, Check, X, Move } from 'lucide-react';
  * - Default: crops to a square File via onCrop(file)
  * - positionOnly: returns {x, y, s} via onPosition(crop) for CSS object-position + scale
  */
-export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCancel, onPosition, positionOnly, cropSize = 400 }) {
+export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCancel, onPosition, positionOnly, initialPosition = null, cropSize = 400 }) {
   const [imageUrl, setImageUrl] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -36,16 +36,36 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
   const handleImageLoad = useCallback((e) => {
     const { naturalWidth: w, naturalHeight: h } = e.target;
     setImgNatural({ w, h });
+
     // Fit so the shorter side fills the viewport
-    const minDim = Math.min(w, h);
-    const initialZoom = viewportSize / minDim;
-    setZoom(initialZoom);
-    // Center the image
+    const fitZoom = viewportSize / Math.min(w, h);
+    const nextZoom = positionOnly && initialPosition?.s
+      ? fitZoom * initialPosition.s
+      : fitZoom;
+
+    const nextOffset = positionOnly && initialPosition
+      ? {
+          x: viewportSize / 2 - ((initialPosition.x ?? 50) / 100) * w * nextZoom,
+          y: viewportSize / 2 - ((initialPosition.y ?? 50) / 100) * h * nextZoom,
+        }
+      : {
+          x: (viewportSize - w * nextZoom) / 2,
+          y: (viewportSize - h * nextZoom) / 2,
+        };
+
+    const scaledW = w * nextZoom;
+    const scaledH = h * nextZoom;
+    const maxX = 0;
+    const minX = viewportSize - scaledW;
+    const maxY = 0;
+    const minY = viewportSize - scaledH;
+
+    setZoom(nextZoom);
     setOffset({
-      x: (viewportSize - w * initialZoom) / 2,
-      y: (viewportSize - h * initialZoom) / 2,
+      x: Math.min(maxX, Math.max(minX, nextOffset.x)),
+      y: Math.min(maxY, Math.max(minY, nextOffset.y)),
     });
-  }, []);
+  }, [initialPosition, positionOnly]);
 
   // Clamp offset so image always covers the viewport
   const clampOffset = useCallback((ox, oy, z) => {
@@ -202,108 +222,109 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
   if (!imageUrl) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
-      {/* Header */}
-      <div className="text-center mb-4">
+    <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col p-4 sm:p-6">
+      <div className="w-full text-center pt-2 sm:pt-4">
         <h3 className="text-white font-display text-lg font-bold">Ajustá tu foto</h3>
-        <p className="text-white/50 text-xs flex items-center justify-center gap-1 mt-1">
+        <p className="text-white/60 text-xs flex items-center justify-center gap-1 mt-1">
           <Move className="w-3 h-3" /> Arrastrá para mover · Pellizcá para zoom
         </p>
       </div>
 
-      {/* Crop viewport */}
-      <div
-        ref={containerRef}
-        className="relative cursor-grab active:cursor-grabbing touch-none select-none"
-        style={{ width: viewportSize, height: viewportSize }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onWheel={onWheel}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      >
-        {/* Image layer */}
-        <img
-          ref={imgRef}
-          src={imageUrl}
-          alt=""
-          onLoad={handleImageLoad}
-          className="absolute pointer-events-none"
-          style={{
-            left: offset.x,
-            top: offset.y,
-            width: imgNatural.w * zoom,
-            height: imgNatural.h * zoom,
-            maxWidth: 'none',
-          }}
-          draggable={false}
-        />
-
-        {/* Circular mask overlay */}
+      <div className="flex-1 flex items-center justify-center min-h-0 py-4 sm:py-6">
         <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)',
-            borderRadius: '50%',
-          }}
-        />
-
-        {/* Circle border */}
-        <div
-          className="absolute inset-0 rounded-full pointer-events-none"
-          style={{
-            border: '2px solid rgba(212, 175, 55, 0.6)',
-          }}
-        />
-      </div>
-
-      {/* Zoom controls */}
-      <div className="flex items-center gap-4 mt-4">
-        <button
-          type="button"
-          onClick={() => adjustZoom(-1)}
-          className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+          ref={containerRef}
+          className="relative cursor-grab active:cursor-grabbing touch-none select-none overflow-hidden rounded-[28px] border border-white/10 bg-black/30 shadow-2xl"
+          style={{ width: viewportSize, height: viewportSize }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onWheel={onWheel}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
         >
-          <ZoomOut className="w-5 h-5" />
-        </button>
-        <div className="w-24 h-1 bg-white/20 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-mansion-gold rounded-full transition-all"
+          <img
+            ref={imgRef}
+            src={imageUrl}
+            alt=""
+            onLoad={handleImageLoad}
+            className="absolute pointer-events-none"
             style={{
-              width: `${Math.min(((zoom / (viewportSize / Math.min(imgNatural.w || 1, imgNatural.h || 1))) - 1) / 4 * 100, 100)}%`,
+              left: offset.x,
+              top: offset.y,
+              width: imgNatural.w * zoom,
+              height: imgNatural.h * zoom,
+              maxWidth: 'none',
+              maxHeight: 'none',
+              display: 'block',
+            }}
+            draggable={false}
+          />
+
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              boxShadow: 'inset 0 0 0 9999px rgba(0, 0, 0, 0.42)',
+              borderRadius: '50%',
+            }}
+          />
+
+          <div
+            className="absolute inset-0 rounded-full pointer-events-none"
+            style={{
+              border: '2px solid rgba(212, 175, 55, 0.7)',
             }}
           />
         </div>
-        <button
-          type="button"
-          onClick={() => adjustZoom(1)}
-          className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-        >
-          <ZoomIn className="w-5 h-5" />
-        </button>
       </div>
 
-      {/* Action buttons */}
-      <div className="flex gap-4 mt-6">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors"
-        >
-          <X className="w-4 h-4" />
-          Cancelar
-        </button>
-        <button
-          type="button"
-          onClick={handleConfirm}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-mansion-gold text-black text-sm font-bold hover:bg-mansion-gold-light transition-colors"
-        >
-          <Check className="w-4 h-4" />
-          Confirmar
-        </button>
+      <div className="w-full flex justify-center pb-[calc(env(safe-area-inset-bottom)+8px)]">
+        <div className="w-full max-w-sm rounded-[28px] border border-white/10 bg-black/55 backdrop-blur-xl px-4 py-4 shadow-2xl">
+          <div className="flex items-center gap-4 mb-4">
+            <button
+              type="button"
+              onClick={() => adjustZoom(-1)}
+              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+            >
+              <ZoomOut className="w-5 h-5" />
+            </button>
+            <div className="flex-1 h-1 bg-white/15 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-mansion-gold rounded-full transition-all"
+                style={{
+                  width: `${Math.min(((zoom / (viewportSize / Math.min(imgNatural.w || 1, imgNatural.h || 1))) - 1) / 4 * 100, 100)}%`,
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => adjustZoom(1)}
+              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+            >
+              <ZoomIn className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors"
+            >
+              <X className="w-4 h-4" />
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirm}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-mansion-gold text-black text-sm font-bold hover:bg-mansion-gold-light transition-colors"
+            >
+              <Check className="w-4 h-4" />
+              Confirmar
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
