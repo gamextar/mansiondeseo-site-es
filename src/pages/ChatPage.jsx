@@ -1,12 +1,13 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Send, Lock, ImageIcon, Smile, MessageCircle } from 'lucide-react';
+import { ChevronLeft, Send, Lock, ImageIcon, Smile } from 'lucide-react';
 import { useMessageLimit } from '../hooks/useMessageLimit';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import EmojiPicker from '../components/EmojiPicker';
-import { getMessages as apiGetMessages, sendMessage as apiSendMessage, getMessageLimit, getProfile, getToken } from '../lib/api';
+import { getMessageLimit, getProfile, getToken, getStoredUser } from '../lib/api';
+import { createChatSocket } from '../lib/chatSocket';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -19,60 +20,104 @@ export default function ChatPage() {
   const [partner, setPartner] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showEmojis, setShowEmojis] = useState(false);
+  const [wsState, setWsState] = useState('disconnected');
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
+  const chatRef = useRef(null);
 
   // Extract partner ID from conversation ID (conv-{userId} format)
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
   const wasAtBottomRef = useRef(true);
+  const myUserIdRef = useRef(null);
 
-  const fetchMessages = useCallback(() => {
-    if (!getToken()) return;
-    // Check if scrolled to bottom before updating
-    const el = scrollRef.current;
-    if (el) {
-      wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    }
-    apiGetMessages(partnerId)
-      .then(data => {
-        setMessages(prev => {
-          const incoming = data.messages || [];
-          if (incoming.length !== prev.length) return incoming;
-          // Quick check last message to avoid unnecessary re-render
-          const lastNew = incoming[incoming.length - 1];
-          const lastOld = prev[prev.length - 1];
-          if (lastNew?.id !== lastOld?.id || lastNew?.text !== lastOld?.text) return incoming;
-          // Check if any read status changed (for tick updates)
-          const readChanged = incoming.some((msg, i) => msg.is_read !== prev[i]?.is_read);
-          if (readChanged) return incoming;
-          return prev;
-        });
-      })
-      .catch(() => {});
-  }, [partnerId]);
+  // Format DO message to UI format
+  function formatMsg(msg) {
+    const myId = myUserIdRef.current;
+    return {
+      id: msg.id,
+      senderId: msg.sender_id === myId ? 'me' : 'them',
+      text: msg.content,
+      timestamp: msg.created_at
+        ? new Date(msg.created_at.endsWith('Z') ? msg.created_at : msg.created_at + 'Z')
+            .toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        : '',
+      is_read: msg.is_read,
+    };
+  }
 
   useEffect(() => {
-    if (!getToken()) { navigate('/login'); return; }
+    const token = getToken();
+    const user = getStoredUser();
+    if (!token || !user) { navigate('/login'); return; }
 
+    myUserIdRef.current = String(user.id);
     setLoading(true);
 
-    // Fetch partner profile and messages in parallel
+    // Fetch partner profile + initial limit in parallel
     Promise.all([
       getProfile(partnerId).then(data => setPartner(data.profile)).catch(() => null),
-      apiGetMessages(partnerId).then(data => setMessages(data.messages || [])).catch(() => setMessages([])),
       getMessageLimit().then(data => setApiLimit(data)).catch(() => {}),
     ]).finally(() => {
-      setLoading(false);
-      refreshUnread();
+      // Loading will be turned off when history arrives via WS
     });
 
-    // Poll for new messages every 4 seconds
-    const interval = setInterval(() => {
-      fetchMessages();
-      refreshUnread();
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [id, partnerId, navigate, fetchMessages, refreshUnread]);
+    // Open WebSocket connection
+    chatRef.current = createChatSocket(String(user.id), partnerId, token, {
+      onHistory(msgs) {
+        setMessages(msgs.map(m => formatMsg(m)));
+        setLoading(false);
+        // Mark unread incoming messages as read
+        const unread = msgs.filter(m => m.sender_id !== String(user.id) && !m.is_read);
+        if (unread.length > 0) {
+          chatRef.current?.markRead(unread.map(m => m.id));
+        }
+        refreshUnread();
+      },
+      onMessage(msg) {
+        setMessages(prev => [...prev, formatMsg(msg)]);
+        // Auto mark as read since we're viewing the chat
+        chatRef.current?.markRead([msg.id]);
+        refreshUnread();
+      },
+      onAck(msg) {
+        // Replace the first optimistic (temp-*) message with the confirmed one
+        setMessages(prev => {
+          const idx = prev.findIndex(m => typeof m.id === 'string' && m.id.startsWith('temp-'));
+          if (idx !== -1) {
+            const updated = [...prev];
+            updated[idx] = formatMsg(msg);
+            return updated;
+          }
+          return prev;
+        });
+      },
+      onRead(messageIds) {
+        setMessages(prev => prev.map(m =>
+          messageIds.includes(m.id) ? { ...m, is_read: 1 } : m
+        ));
+      },
+      onLimit(data) {
+        setApiLimit({ remaining: data.remaining, max: data.max, canSend: data.canSend });
+      },
+      onError(data) {
+        if (data.code === 'LIMIT_REACHED') {
+          setApiLimit({ remaining: 0, canSend: false, max: data.max || 5 });
+        }
+      },
+      onStateChange(state) {
+        setWsState(state);
+        // If WS connects but we still have loading, trigger a timeout fallback
+        if (state === 'connected' && loading) {
+          setTimeout(() => setLoading(prev => prev ? false : prev), 3000);
+        }
+      },
+    });
+
+    return () => {
+      chatRef.current?.close();
+      chatRef.current = null;
+    };
+  }, [id, partnerId, navigate]);
 
   useEffect(() => {
     // Auto-scroll only if user was at the bottom
@@ -101,12 +146,13 @@ export default function ChatPage() {
   const effectiveCanSend = apiLimit ? apiLimit.canSend : canSend;
   const effectiveMax = apiLimit ? apiLimit.max : max;
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!input.trim() || !effectiveCanSend) return;
 
     const text = input.trim();
+    const tempId = `temp-${Date.now()}`;
     const newMsg = {
-      id: `m${messages.length + 1}`,
+      id: tempId,
       senderId: 'me',
       text,
       timestamp: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
@@ -117,19 +163,8 @@ export default function ChatPage() {
     setInput('');
     localSendMessage();
 
-    // Send via API
-    if (getToken()) {
-      try {
-        await apiSendMessage(partnerId, text);
-        // Refresh limit
-        getMessageLimit().then(data => setApiLimit(data)).catch(() => {});
-      } catch (err) {
-        // If limit exceeded, show error
-        if (err.status === 403) {
-          setApiLimit({ remaining: 0, canSend: false, max: 5, sent: 5 });
-        }
-      }
-    }
+    // Send via WebSocket
+    chatRef.current?.send(text);
   };
 
   const handleKeyDown = (e) => {
@@ -183,14 +218,19 @@ export default function ChatPage() {
             </p>
           </div>
 
-          {/* Limit pill in header */}
-          <div className={`flex-shrink-0 flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border ${
-            effectiveRemaining <= 2
-              ? 'bg-mansion-crimson/10 border-mansion-crimson/30 text-mansion-crimson'
-              : 'bg-mansion-gold/5 border-mansion-gold/20 text-mansion-gold'
-          }`}>
-            <Lock className="w-3 h-3" />
-            <span>{effectiveRemaining}/{effectiveMax}</span>
+          {/* Connection status + Limit pill */}
+          <div className="flex-shrink-0 flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${
+              wsState === 'connected' ? 'bg-green-400' : wsState === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
+            }`} title={wsState === 'connected' ? 'Conectado' : wsState === 'connecting' ? 'Conectando...' : 'Desconectado'} />
+            <div className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border ${
+              effectiveRemaining <= 2
+                ? 'bg-mansion-crimson/10 border-mansion-crimson/30 text-mansion-crimson'
+                : 'bg-mansion-gold/5 border-mansion-gold/20 text-mansion-gold'
+            }`}>
+              <Lock className="w-3 h-3" />
+              <span>{effectiveRemaining}/{effectiveMax}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -198,6 +238,10 @@ export default function ChatPage() {
       {/* Messages area */}
       <div
         ref={scrollRef}
+        onScroll={() => {
+          const el = scrollRef.current;
+          if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
         className="flex-1 overflow-y-auto px-4 py-5 space-y-5 lg:px-6 max-w-4xl lg:mx-auto w-full"
       >
         <div className="flex items-center justify-center">

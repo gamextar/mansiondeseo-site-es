@@ -186,6 +186,14 @@ export async function getMessageLimit() {
   return apiFetch('/messages/limit');
 }
 
+export async function getUnreadCount() {
+  return apiFetch('/unread-count');
+}
+
+export async function adminChatCleanup() {
+  return apiFetch('/admin/chat-cleanup', { method: 'POST' });
+}
+
 // ── Upload ──────────────────────────────────────────────
 
 export async function uploadImage(file) {

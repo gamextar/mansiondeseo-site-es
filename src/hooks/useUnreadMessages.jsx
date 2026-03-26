@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback } from 'react';
-import { getConversations, getToken } from '../lib/api';
+import { getUnreadCount, getToken } from '../lib/api';
 
 const UnreadContext = createContext({ unreadCount: 0, refresh: () => {} });
 
-const POLL_INTERVAL = 15_000; // 15 seconds
+const POLL_INTERVAL = 30_000; // 30 seconds
 
 export function UnreadProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -17,13 +17,9 @@ export function UnreadProvider({ children }) {
       setUnreadCount(0);
       return;
     }
-    getConversations()
+    getUnreadCount()
       .then((data) => {
-        const convos = data.conversations || data || [];
-        const total = (Array.isArray(convos) ? convos : []).reduce(
-          (sum, c) => sum + (c.unread || 0),
-          0
-        );
+        const total = data.unread || 0;
         // Show toast if count increased (skip first load)
         if (prevCountRef.current >= 0 && total > prevCountRef.current) {
           const diff = total - prevCountRef.current;

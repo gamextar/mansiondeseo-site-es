@@ -3,6 +3,8 @@
 // ES Modules syntax
 // ═══════════════════════════════════════════════════════
 
+export { ChatRoom } from './chat-room.js';
+
 // ── Helpers ─────────────────────────────────────────────
 
 function generateId() {
@@ -845,6 +847,60 @@ async function handleMessageLimit(request, env) {
     canSend: senderPremium ? true : count < dailyLimit,
     max: senderPremium ? 999 : dailyLimit,
   });
+}
+
+// ── GET /api/chat/ws/:chatId — WebSocket upgrade ────────
+
+async function handleChatWebSocket(request, env, chatId) {
+  const url = new URL(request.url);
+  const token = url.searchParams.get('token');
+  if (!token) return error('Token requerido', 401);
+
+  // Verify JWT
+  const payload = await verifyJWT(token, env.JWT_SECRET);
+  if (!payload) return error('Token inválido', 401);
+
+  const userId = url.searchParams.get('userId');
+  if (!userId || userId !== payload.sub) return error('userId no coincide', 403);
+
+  // Get Durable Object stub by chatId name
+  const doId = env.CHAT_ROOMS.idFromName(chatId);
+  const stub = env.CHAT_ROOMS.get(doId);
+
+  // Forward the request to the DO (it handles the WS upgrade)
+  const doUrl = new URL(request.url);
+  doUrl.pathname = '/ws';
+  return stub.fetch(new Request(doUrl.toString(), request));
+}
+
+// ── GET /api/unread-count ───────────────────────────────
+
+async function handleUnreadCount(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const row = await env.DB.prepare(
+    'SELECT COUNT(*) as unread FROM messages WHERE receiver_id = ? AND is_read = 0'
+  ).bind(auth.sub).first();
+
+  return json({ unread: row?.unread || 0 });
+}
+
+// ── POST /api/admin/chat-cleanup ────────────────────────
+
+async function handleAdminChatCleanup(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  // Clean D1 messages older than 30 days
+  await env.DB.prepare(
+    "DELETE FROM messages WHERE created_at < datetime('now', '-30 days')"
+  ).run();
+
+  return json({ cleaned: true, message: 'Mensajes de más de 30 días eliminados' });
 }
 
 // ── POST /api/upload ────────────────────────────────────
@@ -2075,7 +2131,13 @@ async function handleRequest(request, env) {
   // CORS preflight
   if (method === 'OPTIONS') return handleOptions(env);
 
-  // ── Rutas server-to-server (bypass Turnstile — autenticadas con HMAC o verificación API)
+  // ── WebSocket chat upgrade (before Turnstile check) ──
+  const chatWsMatch = path.match(/^\/api\/chat\/ws\/([a-f0-9-]+)$/);
+  if (chatWsMatch && request.headers.get('Upgrade') === 'websocket') {
+    return handleChatWebSocket(request, env, chatWsMatch[1]);
+  }
+
+  // ── Rutas server-to-server (bypass Turnstile) — autenticadas con HMAC o verificación API)
   if (path === '/api/payment/approved' && method === 'POST') return handlePaymentApproved(request, env);
   if (path === '/api/payment/uala-approved' && method === 'POST') return handleUalaApproved(request, env);
 
@@ -2112,6 +2174,7 @@ async function handleRequest(request, env) {
   if (path === '/api/messages' && method === 'GET') return handleConversations(request, env);
   if (path === '/api/messages/send' && method === 'POST') return handleSendMessage(request, env);
   if (path === '/api/messages/limit' && method === 'GET') return handleMessageLimit(request, env);
+  if (path === '/api/unread-count' && method === 'GET') return handleUnreadCount(request, env);
   const msgMatch = path.match(/^\/api\/messages\/([a-f0-9-]+)$/);
   if (msgMatch && method === 'GET') return handleGetMessages(request, env, msgMatch[1]);
 
@@ -2150,6 +2213,7 @@ async function handleRequest(request, env) {
   if (path === '/api/admin/coins' && method === 'POST') return handleAdminAddCoins(request, env);
   if (path === '/api/admin/remove-all-vip' && method === 'POST') return handleAdminRemoveAllVip(request, env);
   if (path === '/api/admin/reset-all-coins' && method === 'POST') return handleAdminResetAllCoins(request, env);
+  if (path === '/api/admin/chat-cleanup' && method === 'POST') return handleAdminChatCleanup(request, env);
 
   // ── Admin: Users
   if (path === '/api/admin/users' && method === 'GET') return handleAdminGetUsers(request, env);

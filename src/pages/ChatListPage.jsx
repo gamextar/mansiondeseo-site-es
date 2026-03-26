@@ -44,11 +44,11 @@ export default function ChatListPage() {
       .catch(() => setConversations([]))
       .finally(() => setLoading(false));
 
-    // Poll every 8 seconds for new messages / updated previews
+    // Poll every 15 seconds for new messages / updated previews
     const interval = setInterval(() => {
       fetchConversations();
       refreshUnread();
-    }, 8000);
+    }, 15_000);
     return () => clearInterval(interval);
   }, [navigate, fetchConversations, refreshUnread]);
   return (

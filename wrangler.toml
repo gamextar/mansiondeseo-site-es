@@ -21,6 +21,16 @@ binding = "IMAGES"
 bucket_name = "mansion-deseo-images"
 # Create with: wrangler r2 bucket create mansion-deseo-images
 
+# ── Durable Objects ─────────────────────────────────
+[durable_objects]
+bindings = [
+  { name = "CHAT_ROOMS", class_name = "ChatRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatRoom"]
+
 # ── Environment Variables ────────────────────────────
 [vars]
 TURNSTILE_SECRET = ""               # Get from Cloudflare Dashboard → Turnstile
@@ -44,6 +54,11 @@ database_id = "22136d29-2f21-4c86-96f5-7513f88ff464"
 [[env.production.r2_buckets]]
 binding = "IMAGES"
 bucket_name = "mansion-deseo-images"
+
+[env.production.durable_objects]
+bindings = [
+  { name = "CHAT_ROOMS", class_name = "ChatRoom" }
+]
 
 [env.production.vars]
 CORS_ORIGIN = "https://mansiondeseo-site.pages.dev"
