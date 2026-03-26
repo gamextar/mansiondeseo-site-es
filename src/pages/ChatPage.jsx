@@ -99,6 +99,20 @@ export default function ChatPage() {
         chatRef.current?.markRead([msg.id]);
         refreshUnread();
       },
+      onAck(msg) {
+        // Replace optimistic temp message with real one from DO
+        setMessages(prev => {
+          const tempIdx = prev.findIndex(m => m.id?.startsWith('temp-') && m.senderId === 'me');
+          if (tempIdx !== -1) {
+            const updated = [...prev];
+            updated[tempIdx] = formatMsg(msg);
+            return updated;
+          }
+          // If no temp found, just add (deduplicated)
+          if (prev.some(m => m.id === msg.id)) return prev;
+          return [...prev, formatMsg(msg)];
+        });
+      },
       onRead(messageIds) {
         setMessages(prev => prev.map(m =>
           messageIds.includes(m.id) ? { ...m, is_read: 1 } : m
@@ -196,13 +210,19 @@ export default function ChatPage() {
     setPartnerTyping(false);
     localSendMessage();
 
-    // Send via HTTP — writes to D1 + notifies DO for instant WebSocket broadcast
-    try {
-      await apiSendMessage(partnerId, text);
-      getMessageLimit().then(data => setApiLimit(data)).catch(() => {});
-    } catch (err) {
-      if (err.status === 403) {
-        setApiLimit({ remaining: 0, canSend: false, max: 5 });
+    // Send via WebSocket (same channel as typing — proven real-time)
+    // The DO handles: save to SQLite + D1, limit check, broadcast to receiver, ack to sender
+    if (chatRef.current?.getState() === 'connected') {
+      chatRef.current.send(text);
+    } else {
+      // Fallback: HTTP when WS is disconnected
+      try {
+        await apiSendMessage(partnerId, text);
+        getMessageLimit().then(data => setApiLimit(data)).catch(() => {});
+      } catch (err) {
+        if (err.status === 403) {
+          setApiLimit({ remaining: 0, canSend: false, max: 5 });
+        }
       }
     }
   };
