@@ -752,14 +752,17 @@ async function handleSendMessage(request, env) {
 async function notifyChatRoom(env, senderId, receiverId, msg) {
   try {
     const chatId = [senderId, receiverId].sort().join('-');
+    console.log('[notifyChatRoom] chatId:', chatId);
     const doId = env.CHAT_ROOMS.idFromName(chatId);
     const stub = env.CHAT_ROOMS.get(doId);
-    await stub.fetch(new URL('https://do/notify').toString(), {
+    const res = await stub.fetch('https://do/notify', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(msg),
     });
+    console.log('[notifyChatRoom] DO response:', res.status);
   } catch (err) {
-    console.error('DO notify error:', err.message);
+    console.error('[notifyChatRoom] error:', err.message);
   }
 }
 
@@ -904,14 +907,17 @@ async function handleChatWebSocket(request, env, chatId) {
 
 async function notifyUser(env, userId, data) {
   try {
+    console.log('[notifyUser] userId:', userId, 'data:', JSON.stringify(data));
     const doId = env.USER_NOTIFICATIONS.idFromName(userId);
     const stub = env.USER_NOTIFICATIONS.get(doId);
-    await stub.fetch('https://do/notify', {
+    const res = await stub.fetch('https://do/notify', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    console.log('[notifyUser] DO response:', res.status);
   } catch (err) {
-    console.error('UserNotification notify error:', err.message);
+    console.error('[notifyUser] error:', err.message);
   }
 }
 

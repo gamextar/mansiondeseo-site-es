@@ -265,17 +265,21 @@ export class ChatRoom {
   async handleNotify(request) {
     try {
       const msg = await request.json();
+      const sockets = this.state.getWebSockets();
+      console.log('[ChatRoom.handleNotify] sockets:', sockets.length, 'sender:', msg.sender_id);
       // Broadcast to all connected sockets except the sender
-      for (const sock of this.state.getWebSockets()) {
+      for (const sock of sockets) {
         const [tag] = this.state.getTags(sock);
         if (tag !== msg.sender_id) {
           try {
             sock.send(JSON.stringify({ type: 'message', message: msg }));
+            console.log('[ChatRoom.handleNotify] sent to:', tag);
           } catch { /* socket might be closed */ }
         }
       }
       return new Response('ok', { status: 200 });
-    } catch {
+    } catch (e) {
+      console.error('[ChatRoom.handleNotify] error:', e.message);
       return new Response('error', { status: 500 });
     }
   }

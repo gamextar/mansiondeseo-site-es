@@ -11,12 +11,15 @@ export class UserNotification {
 
   async fetch(request) {
     const url = new URL(request.url);
+    console.log('[UserNotification.fetch] pathname:', url.pathname, 'method:', request.method);
 
     // POST /notify — broadcast event to all connected tabs/devices
     if (url.pathname === '/notify' && request.method === 'POST') {
       const data = await request.json();
+      const sockets = this.state.getWebSockets();
+      console.log('[UserNotification.notify] sockets:', sockets.length, 'data:', JSON.stringify(data));
       const payload = JSON.stringify(data);
-      for (const ws of this.state.getWebSockets()) {
+      for (const ws of sockets) {
         try { ws.send(payload); } catch { /* dead socket */ }
       }
       return new Response('ok');
