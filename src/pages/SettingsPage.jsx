@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const [blurMobile, setBlurMobile] = useState(14);
   const [blurDesktop, setBlurDesktop] = useState(8);
   const [freeVisiblePhotos, setFreeVisiblePhotos] = useState(1);
+  const [storyCircleSize, setStoryCircleSize] = useState(78);
 
   // VIP
   const [showVipButton, setShowVipButton] = useState(true);
@@ -85,6 +86,7 @@ export default function SettingsPage() {
         setBlurMobile(s.blurMobile);
         setBlurDesktop(s.blurDesktop);
         setFreeVisiblePhotos(s.freeVisiblePhotos);
+        setStoryCircleSize(s.storyCircleSize || 78);
         setShowVipButton(s.showVipButton);
         setDailyMessageLimit(s.dailyMessageLimit);
         setSiteCountry(s.siteCountry);
@@ -125,6 +127,7 @@ export default function SettingsPage() {
         blur_mobile: blurMobile,
         blur_desktop: blurDesktop,
         free_visible_photos: freeVisiblePhotos,
+        story_circle_size: storyCircleSize,
         show_vip_button: showVipButton ? '1' : '0',
         daily_message_limit: dailyMessageLimit,
         site_country: siteCountry,
@@ -156,6 +159,7 @@ export default function SettingsPage() {
       setBlurMobile(s.blurMobile);
       setBlurDesktop(s.blurDesktop);
       setFreeVisiblePhotos(s.freeVisiblePhotos);
+      setStoryCircleSize(s.storyCircleSize || 78);
       setShowVipButton(s.showVipButton);
       setDailyMessageLimit(s.dailyMessageLimit);
       setSiteCountry(s.siteCountry);
@@ -322,6 +326,25 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <Counter value={freeVisiblePhotos} onChange={setFreeVisiblePhotos} max={20} />
+              </div>
+            </div>
+
+            {/* Story Circle Size */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Globe className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Tamaño Historias</h3>
+                  <p className="text-[11px] text-text-dim">Diámetro del círculo en px</p>
+                </div>
+              </div>
+              <input type="range" min="50" max="120" value={storyCircleSize} onChange={e => setStoryCircleSize(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>50px</span>
+                <span className="text-mansion-gold font-medium">{storyCircleSize}px</span>
+                <span>120px</span>
               </div>
             </div>
 

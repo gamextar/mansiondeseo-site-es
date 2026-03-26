@@ -1299,6 +1299,7 @@ async function loadSettings(env) {
     paymentTitleCoins: settings.payment_title_coins || 'Servicios Digitales',
     paymentDescriptorCoins: settings.payment_descriptor_coins || 'UNICOAPPS',
     paymentGateway: settings.payment_gateway || 'mercadopago',
+    storyCircleSize: parseInt(settings.story_circle_size || '78', 10),
   };
 }
 
@@ -1375,6 +1376,7 @@ async function handleUpdateSettings(request, env) {
     'payment_title_vip', 'payment_descriptor_vip',
     'payment_title_coins', 'payment_descriptor_coins',
     'payment_gateway',
+    'story_circle_size',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {
@@ -1383,6 +1385,8 @@ async function handleUpdateSettings(request, env) {
       ).bind(key, String(body[key]), String(body[key])).run();
     }
   }
+  // Invalidate settings cache so new values take effect immediately
+  _cache.delete('settings');
   const settings = await loadSettings(env);
   return json({ settings });
 }

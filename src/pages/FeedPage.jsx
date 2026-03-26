@@ -83,18 +83,21 @@ export default function FeedPage() {
           {profiles.slice(0, 15).map((p) => {
             const photo = (p.photos && p.photos[0]) || p.avatar_url || '';
             const isOnline = p.online;
+            const size = settings.storyCircleSize || 78;
+            const innerSize = size - 5;
             return (
               <Link
                 key={`story-${p.id}`}
                 to={`/perfiles/${p.id}`}
                 state={{ preview: { id: p.id, name: p.name, age: p.age, city: p.city, role: p.role, photos: p.photos || [], avatar_url: p.avatar_url, online: p.online, premium: p.premium, verified: p.verified, blurred: p.blurred, visiblePhotos: p.visiblePhotos, ghost_mode: p.ghost_mode } }}
-                className="flex flex-col items-center gap-1 flex-shrink-0 w-[72px]"
+                className="flex flex-col items-center gap-1 flex-shrink-0"
+                style={{ width: size + 6 }}
               >
-                <div className={`w-[66px] h-[66px] rounded-full p-[2.5px] ${
+                <div className={`rounded-full p-[2.5px] ${
                   isOnline
                     ? 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson'
                     : 'bg-gradient-to-tr from-mansion-border/60 to-mansion-border/40'
-                }`}>
+                }`} style={{ width: size, height: size }}>
                   <div className="w-full h-full rounded-full bg-mansion-base p-[2px]">
                     <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
                       {photo ? (
