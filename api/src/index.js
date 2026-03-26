@@ -708,9 +708,10 @@ async function handleSendMessage(request, env) {
 
   // Insert message
   const msgId = generateId();
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
   await env.DB.prepare(`
-    INSERT INTO messages (id, sender_id, receiver_id, content) VALUES (?, ?, ?, ?)
-  `).bind(msgId, auth.sub, receiver_id, content.trim()).run();
+    INSERT INTO messages (id, sender_id, receiver_id, content, created_at) VALUES (?, ?, ?, ?, ?)
+  `).bind(msgId, auth.sub, receiver_id, content.trim(), now).run();
 
   // Update message counter
   if (!isPremiumActive(sender)) {
@@ -725,16 +726,35 @@ async function handleSendMessage(request, env) {
     }
   }
 
-  return json({
-    message: {
-      id: msgId,
-      sender_id: auth.sub,
-      receiver_id,
-      content: content.trim(),
-      is_read: 0,
-      created_at: new Date().toISOString(),
-    },
-  }, 201);
+  const msg = {
+    id: msgId,
+    sender_id: auth.sub,
+    receiver_id,
+    content: content.trim(),
+    is_read: 0,
+    created_at: now,
+  };
+
+  // Notify ChatRoom DO so it broadcasts to connected receivers via WebSocket
+  notifyChatRoom(env, auth.sub, receiver_id, msg).catch(() => {});
+
+  return json({ message: msg }, 201);
+}
+
+// ── Notify ChatRoom DO of new HTTP message ──────────────
+
+async function notifyChatRoom(env, senderId, receiverId, msg) {
+  try {
+    const chatId = [senderId, receiverId].sort().join('-');
+    const doId = env.CHAT_ROOMS.idFromName(chatId);
+    const stub = env.CHAT_ROOMS.get(doId);
+    await stub.fetch(new URL('https://do/notify').toString(), {
+      method: 'POST',
+      body: JSON.stringify(msg),
+    });
+  } catch (err) {
+    console.error('DO notify error:', err.message);
+  }
 }
 
 // ── GET /api/messages/:userId ───────────────────────────

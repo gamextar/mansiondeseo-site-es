@@ -82,6 +82,9 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
         case 'read':
           callbacks.onRead?.(data.messageIds);
           break;
+        case 'typing':
+          callbacks.onTyping?.();
+          break;
         case 'limit':
           callbacks.onLimit?.(data);
           break;
@@ -119,6 +122,12 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     }
   }
 
+  function sendTyping() {
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'typing' }));
+    }
+  }
+
   function markRead(messageIds) {
     if (ws?.readyState === WebSocket.OPEN && messageIds.length > 0) {
       ws.send(JSON.stringify({ type: 'read', messageIds }));
@@ -144,5 +153,5 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   // Start connection
   connect();
 
-  return { send, markRead, close, getState };
+  return { send, sendTyping, markRead, close, getState };
 }

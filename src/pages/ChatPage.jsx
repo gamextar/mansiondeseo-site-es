@@ -21,9 +21,12 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [showEmojis, setShowEmojis] = useState(false);
   const [wsState, setWsState] = useState('disconnected');
+  const [partnerTyping, setPartnerTyping] = useState(false);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const chatRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+  const lastTypingSentRef = useRef(0);
 
   // Extract partner ID from conversation ID (conv-{userId} format)
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
@@ -86,22 +89,15 @@ export default function ChatPage() {
         refreshUnread();
       },
       onMessage(msg) {
-        setMessages(prev => [...prev, formatMsg(msg)]);
+        // Deduplicate: skip if message already exists
+        setMessages(prev => {
+          if (prev.some(m => m.id === msg.id)) return prev;
+          return [...prev, formatMsg(msg)];
+        });
+        setPartnerTyping(false);
         // Auto mark as read since we're viewing the chat
         chatRef.current?.markRead([msg.id]);
         refreshUnread();
-      },
-      onAck(msg) {
-        // Replace the first optimistic (temp-*) message with the confirmed one
-        setMessages(prev => {
-          const idx = prev.findIndex(m => typeof m.id === 'string' && m.id.startsWith('temp-'));
-          if (idx !== -1) {
-            const updated = [...prev];
-            updated[idx] = formatMsg(msg);
-            return updated;
-          }
-          return prev;
-        });
       },
       onRead(messageIds) {
         setMessages(prev => prev.map(m =>
@@ -119,6 +115,11 @@ export default function ChatPage() {
       onStateChange(state) {
         setWsState(state);
       },
+      onTyping() {
+        setPartnerTyping(true);
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 3000);
+      },
     });
 
     return () => {
@@ -126,19 +127,6 @@ export default function ChatPage() {
       chatRef.current = null;
     };
   }, [id, partnerId, navigate]);
-
-  // Poll fallback — only active when WebSocket is not connected
-  useEffect(() => {
-    if (wsState === 'connected' || loading) return;
-    const poll = () => {
-      apiGetMessages(partnerId)
-        .then(data => { if (data.messages) setMessages(data.messages); })
-        .catch(() => {});
-      refreshUnread();
-    };
-    const interval = setInterval(poll, 8000);
-    return () => clearInterval(interval);
-  }, [wsState, partnerId, loading, refreshUnread]);
 
   useEffect(() => {
     // Auto-scroll only if user was at the bottom
@@ -182,19 +170,16 @@ export default function ChatPage() {
 
     setMessages((prev) => [...prev, newMsg]);
     setInput('');
+    setPartnerTyping(false);
     localSendMessage();
 
-    // Send via WebSocket if connected, otherwise fall back to HTTP
-    if (chatRef.current?.getState() === 'connected') {
-      chatRef.current.send(text);
-    } else {
-      try {
-        await apiSendMessage(partnerId, text);
-        getMessageLimit().then(data => setApiLimit(data)).catch(() => {});
-      } catch (err) {
-        if (err.status === 403) {
-          setApiLimit({ remaining: 0, canSend: false, max: 5 });
-        }
+    // Send via HTTP — writes to D1 + notifies DO for instant WebSocket broadcast
+    try {
+      await apiSendMessage(partnerId, text);
+      getMessageLimit().then(data => setApiLimit(data)).catch(() => {});
+    } catch (err) {
+      if (err.status === 403) {
+        setApiLimit({ remaining: 0, canSend: false, max: 5 });
       }
     }
   };
@@ -245,8 +230,8 @@ export default function ChatPage() {
 
           <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`)}>
             <h2 className="font-semibold text-sm text-text-primary truncate">{partner.name}</h2>
-            <p className={`text-[11px] ${partner.online ? 'text-green-400' : 'text-text-dim'}`}>
-              {partner.online ? '● En línea' : 'Desconectado'}
+            <p className={`text-[11px] ${partnerTyping ? 'text-mansion-gold' : partner.online ? 'text-green-400' : 'text-text-dim'}`}>
+              {partnerTyping ? 'Escribiendo...' : partner.online ? '● En línea' : 'Desconectado'}
             </p>
           </div>
 
@@ -324,6 +309,29 @@ export default function ChatPage() {
             );
           })}
         </AnimatePresence>
+
+        {/* Typing indicator bubble */}
+        <AnimatePresence>
+          {partnerTyping && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              className="flex items-end gap-2 justify-start"
+            >
+              <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
+                <img src={partner.avatar_url || partner.photos?.[0] || ''} alt="" className="w-full h-full object-cover" />
+              </div>
+              <div className="bg-mansion-elevated border border-mansion-border/30 rounded-2xl rounded-bl-sm px-4 py-3">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Input area */}
@@ -341,7 +349,15 @@ export default function ChatPage() {
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  // Send typing indicator (throttled to once per 2s)
+                  const now = Date.now();
+                  if (now - lastTypingSentRef.current > 2000) {
+                    lastTypingSentRef.current = now;
+                    chatRef.current?.sendTyping();
+                  }
+                }}
                 onKeyDown={handleKeyDown}
                 onFocus={() => setShowEmojis(false)}
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}

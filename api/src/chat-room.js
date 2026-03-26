@@ -34,6 +34,11 @@ export class ChatRoom {
       return this.handleCleanup();
     }
 
+    // Handle notify — broadcast a new message to connected sockets (from HTTP send)
+    if (url.pathname === '/notify') {
+      return this.handleNotify(request);
+    }
+
     // WebSocket upgrade
     const upgrade = request.headers.get('Upgrade');
     if (!upgrade || upgrade !== 'websocket') {
@@ -93,6 +98,14 @@ export class ChatRoom {
       await this.handleMessage(ws, senderId, data);
     } else if (data.type === 'read') {
       await this.handleRead(ws, senderId, data);
+    } else if (data.type === 'typing') {
+      // Broadcast typing indicator to other sockets
+      for (const sock of this.state.getWebSockets()) {
+        const [tag] = this.state.getTags(sock);
+        if (tag !== senderId) {
+          try { sock.send(JSON.stringify({ type: 'typing', userId: senderId })); } catch {}
+        }
+      }
     } else if (data.type === 'ping') {
       ws.send(JSON.stringify({ type: 'pong' }));
     }
@@ -247,6 +260,24 @@ export class ChatRoom {
         await this.env.DB.prepare('UPDATE messages SET is_read = 1 WHERE id = ?').bind(mid).run().catch(() => {});
       }
     })());
+  }
+
+  async handleNotify(request) {
+    try {
+      const msg = await request.json();
+      // Broadcast to all connected sockets except the sender
+      for (const sock of this.state.getWebSockets()) {
+        const [tag] = this.state.getTags(sock);
+        if (tag !== msg.sender_id) {
+          try {
+            sock.send(JSON.stringify({ type: 'message', message: msg }));
+          } catch { /* socket might be closed */ }
+        }
+      }
+      return new Response('ok', { status: 200 });
+    } catch {
+      return new Response('error', { status: 500 });
+    }
   }
 
   async handleCleanup() {
