@@ -1,10 +1,23 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Users, Gift, Filter, Move } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink } from 'lucide-react';
 import { useAuth } from '../App';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits, getReceivedGifts } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
+
+const ROLE_COLOR = {
+  Pareja: 'bg-purple-500/15 text-purple-300 border-purple-500/25',
+  'Hombre Solo': 'bg-blue-500/15 text-blue-300 border-blue-500/25',
+  'Mujer Sola': 'bg-pink-500/15 text-pink-300 border-pink-500/25',
+};
+
+const stagger = { animate: { transition: { staggerChildren: 0.06 } } };
+const fadeUp = {
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [.25,.46,.45,.94] } },
+};
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -270,16 +283,16 @@ export default function ProfilePage() {
       {showAvatarMenu && (
         <div className="fixed inset-0 z-[90] flex items-end justify-center" onClick={() => setShowAvatarMenu(false)}>
           <div className="absolute inset-0 bg-black/60" />
-          <div
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="relative w-full max-w-sm mx-4 mb-8 rounded-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-mansion-card/95 backdrop-blur-xl border border-mansion-border/30 rounded-2xl overflow-hidden">
               <button
-                onClick={() => {
-                  setShowAvatarMenu(false);
-                  fileInputRef.current?.click();
-                }}
+                onClick={() => { setShowAvatarMenu(false); fileInputRef.current?.click(); }}
                 className="w-full flex items-center gap-3 px-5 py-3.5 text-text-primary hover:bg-mansion-elevated/50 transition-colors"
               >
                 <Camera className="w-4.5 h-4.5 text-mansion-gold" />
@@ -287,10 +300,7 @@ export default function ProfilePage() {
               </button>
               <div className="h-px bg-mansion-border/20 mx-4" />
               <button
-                onClick={() => {
-                  setShowAvatarMenu(false);
-                  setAdjustUrl(avatarUrl);
-                }}
+                onClick={() => { setShowAvatarMenu(false); setAdjustUrl(avatarUrl); }}
                 className="w-full flex items-center gap-3 px-5 py-3.5 text-text-primary hover:bg-mansion-elevated/50 transition-colors"
               >
                 <Move className="w-4.5 h-4.5 text-mansion-gold" />
@@ -303,55 +313,66 @@ export default function ProfilePage() {
             >
               Cancelar
             </button>
-          </div>
+          </motion.div>
         </div>
       )}
-      <div className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-2xl lg:mx-auto">
-        {/* Profile header */}
-        <div className="text-center mb-6">
-          <div className="relative inline-block">
-            <div
+
+      <motion.div
+        initial="initial"
+        animate="animate"
+        variants={stagger}
+        className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-2xl lg:mx-auto"
+      >
+        {/* ── Hero Section ── */}
+        <motion.div variants={fadeUp} className="flex flex-col items-center mb-8">
+          <div className="relative">
+            <motion.div
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', damping: 15, stiffness: 200, delay: 0.1 }}
               onClick={handleAvatarTap}
-              className="w-24 h-24 rounded-full bg-gradient-to-br from-mansion-gold to-mansion-gold-light p-[2px] mx-auto cursor-pointer hover:opacity-80 transition-opacity"
+              className="w-28 h-28 rounded-full bg-gradient-to-br from-mansion-gold to-mansion-gold-light p-[2.5px] cursor-pointer hover:shadow-glow-gold transition-shadow"
             >
               <div className="w-full h-full rounded-full bg-mansion-card flex items-center justify-center overflow-hidden">
                 {avatarUrl ? (
-                  <AvatarImg
-                    src={avatarUrl}
-                    crop={user?.avatar_crop}
-                    alt="Mi perfil"
-                    className="w-full h-full"
-                  />
+                  <AvatarImg src={avatarUrl} crop={user?.avatar_crop} alt="Mi perfil" className="w-full h-full" />
                 ) : (
-                  <Camera className="w-8 h-8 text-text-dim" />
+                  <Camera className="w-9 h-9 text-text-dim" />
                 )}
               </div>
-            </div>
+            </motion.div>
             <button
               onClick={handleAvatarTap}
-              className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-mansion-crimson text-white flex items-center justify-center"
+              className="absolute -bottom-0.5 -right-0.5 w-9 h-9 rounded-full bg-mansion-crimson text-white flex items-center justify-center shadow-lg ring-4 ring-mansion-base"
             >
               <Camera className="w-4 h-4" />
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={handleAvatarSelect}
-            />
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarSelect} />
           </div>
 
-          <h2
-            className="font-display text-xl font-bold text-text-primary mt-4 cursor-pointer hover:underline"
+          <motion.h2
+            variants={fadeUp}
+            className="font-display text-2xl font-bold text-text-primary mt-5 cursor-pointer hover:text-mansion-gold transition-colors"
             onClick={() => user?.id && navigate(`/perfiles/${user.id}`, { state: ownProfilePreview ? { preview: ownProfilePreview } : undefined })}
           >
             {displayName}
-          </h2>
-          <p className="text-text-muted text-sm">{[displayCity, displayRole].filter(Boolean).join(' · ')}</p>
+          </motion.h2>
 
-          {/* Coins balance */}
-          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-mansion-gold/10 border border-mansion-gold/20">
+          <motion.div variants={fadeUp} className="flex items-center gap-2 mt-1.5">
+            {displayCity && (
+              <span className="flex items-center gap-1 text-sm text-text-muted">
+                <MapPin className="w-3.5 h-3.5" /> {displayCity}
+              </span>
+            )}
+            {displayRole && (
+              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${ROLE_COLOR[displayRole] || 'bg-mansion-card text-text-muted border-mansion-border/30'}`}>
+                {displayRole}
+              </span>
+            )}
+          </motion.div>
+
+          {/* Coins pill */}
+          <motion.div variants={fadeUp} className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-mansion-gold/10 border border-mansion-gold/20">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" fill="#C9A84C" stroke="#A88A3D" strokeWidth="1.5" />
               <circle cx="12" cy="12" r="7" fill="none" stroke="#A88A3D" strokeWidth="0.75" />
@@ -359,17 +380,38 @@ export default function ProfilePage() {
             </svg>
             <span className="text-sm font-bold text-mansion-gold">{user?.coins ?? 0}</span>
             <span className="text-xs text-mansion-gold/60">monedas</span>
-          </div>
-        </div>
+          </motion.div>
 
-        {/* Gallery */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Image className="w-4 h-4 text-mansion-gold" />
-              <h3 className="text-sm font-semibold text-text-primary">Mi Galería</h3>
-              <span className="text-xs text-text-dim">({photos.length})</span>
+          {/* View public profile link */}
+          <motion.button
+            variants={fadeUp}
+            onClick={() => user?.id && navigate(`/perfiles/${user.id}`, { state: ownProfilePreview ? { preview: ownProfilePreview } : undefined })}
+            className="mt-3 flex items-center gap-1.5 text-xs text-text-dim hover:text-mansion-gold transition-colors"
+          >
+            <ExternalLink className="w-3 h-3" />
+            Ver perfil público
+          </motion.button>
+        </motion.div>
+
+        {/* ── Stats Row ── */}
+        <motion.div variants={fadeUp} className="grid grid-cols-3 gap-px mb-8 rounded-2xl overflow-hidden bg-mansion-border/10">
+          {[
+            { value: photos.length, label: 'Fotos', icon: Image },
+            { value: receivedGifts.length, label: 'Regalos', icon: Gift },
+            { value: visitors.length, label: 'Visitas', icon: Users },
+          ].map(({ value, label, icon: Icon }) => (
+            <div key={label} className="flex flex-col items-center py-4 bg-mansion-card/40">
+              <Icon className="w-4 h-4 text-mansion-gold/60 mb-1" />
+              <span className="text-xl font-bold text-text-primary font-display">{value}</span>
+              <span className="text-[10px] uppercase tracking-wider text-text-dim mt-0.5">{label}</span>
             </div>
+          ))}
+        </motion.div>
+
+        {/* ── Gallery ── */}
+        <motion.div variants={fadeUp} className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">Mi Galería</h3>
             <button
               onClick={() => galleryInputRef.current?.click()}
               disabled={uploading}
@@ -380,9 +422,9 @@ export default function ProfilePage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2.5">
             {photos.map((url, i) => (
-              <div
+              <motion.div
                 key={url}
                 data-drag-idx={i}
                 draggable={photos.length > 1}
@@ -392,9 +434,13 @@ export default function ProfilePage() {
                 onTouchStart={(e) => handleTouchStart(i, e)}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
-                className="relative group aspect-square rounded-xl overflow-hidden bg-mansion-card border border-mansion-border/30 cursor-grab active:cursor-grabbing"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.04 }}
+                className="relative group aspect-square rounded-2xl overflow-hidden bg-mansion-card border border-mansion-border/20 cursor-grab active:cursor-grabbing"
               >
-                <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover pointer-events-none" />
+                <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover pointer-events-none transition-transform duration-300 group-hover:scale-105" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                 <button
                   onClick={() => handleDeletePhoto(url)}
                   disabled={deleting === url}
@@ -406,68 +452,63 @@ export default function ProfilePage() {
                     <X className="w-4 h-4" />
                   )}
                 </button>
-              </div>
+              </motion.div>
             ))}
             <button
               onClick={() => galleryInputRef.current?.click()}
               disabled={uploading}
-              className="aspect-square rounded-xl border-2 border-dashed border-mansion-border/40 hover:border-mansion-gold/40 flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-50"
+              className="aspect-square rounded-2xl border-2 border-dashed border-mansion-border/30 hover:border-mansion-gold/40 flex flex-col items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
             >
               <Plus className="w-5 h-5 text-text-dim" />
               <span className="text-[10px] text-text-dim">Foto</span>
             </button>
           </div>
 
-          <input
-            ref={galleryInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            className="hidden"
-            onChange={handleGalleryUpload}
-          />
-        </div>
+          <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleGalleryUpload} />
+        </motion.div>
 
-        {/* Received Gifts */}
+        {/* ── Received Gifts ── */}
         {receivedGifts.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Gift className="w-4 h-4 text-mansion-gold" />
-              <h3 className="text-sm font-semibold text-text-primary">Regalos recibidos</h3>
-              <span className="text-xs text-text-dim">({receivedGifts.length})</span>
-            </div>
+          <motion.div variants={fadeUp} className="mb-8">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+              Regalos recibidos
+            </h3>
             <div className="flex flex-wrap gap-2">
-              {receivedGifts.map((g) => (
-                <div
+              {receivedGifts.map((g, i) => (
+                <motion.div
                   key={g.id}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-mansion-card/50 border border-mansion-border/20"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.04 }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-mansion-card/40 border border-mansion-border/15"
                   title={`De ${g.sender_name}`}
                 >
-                  <span className="text-lg">{g.gift_emoji}</span>
+                  <span className="text-xl">{g.gift_emoji}</span>
                   <div className="text-xs">
                     <p className="text-text-primary font-medium">{g.gift_name}</p>
                     <p className="text-text-dim">de {g.sender_name}</p>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </motion.div>
         )}
 
-        {/* Visitas (mobile only — desktop shows in sidebar) */}
+        {/* ── Recent Visitors (mobile only) ── */}
         {visitors.length > 0 && (
-          <div className="mb-6 lg:hidden">
-            <div className="flex items-center gap-2 mb-3">
-              <Users className="w-4 h-4 text-mansion-gold" />
-              <h3 className="text-sm font-semibold text-text-primary">Visitas recientes</h3>
-              <span className="text-xs text-text-dim">({visitors.length})</span>
-            </div>
-            <div className="space-y-2">
-              {visitors.map((v) => (
-                <button
+          <motion.div variants={fadeUp} className="mb-8 lg:hidden">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+              Visitas recientes
+            </h3>
+            <div className="space-y-1.5">
+              {visitors.map((v, i) => (
+                <motion.button
                   key={v.id}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
                   onClick={() => navigate(`/perfiles/${v.id}`, { state: { preview: { id: v.id, name: v.name, age: v.age, city: v.city, role: v.role, photos: [], avatar_url: v.avatar_url, online: v.online, premium: v.premium } } })}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-mansion-card/50 hover:bg-mansion-card transition-all group"
+                  className="w-full flex items-center gap-3 p-3 rounded-2xl bg-mansion-card/30 hover:bg-mansion-card/60 transition-all group"
                 >
                   <div className="w-10 h-10 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0">
                     {v.avatar_url ? (
@@ -480,59 +521,55 @@ export default function ProfilePage() {
                   </div>
                   <div className="flex-1 text-left min-w-0">
                     <p className="text-sm font-medium text-text-primary truncate">{v.name}</p>
-                    <p className="text-xs text-text-dim truncate">
-                      Te visitó {timeAgo(v.visited_at).toLowerCase()}
-                    </p>
+                    <p className="text-xs text-text-dim truncate">Te visitó {timeAgo(v.visited_at).toLowerCase()}</p>
                   </div>
-                  {v.online && (
-                    <span className="w-2.5 h-2.5 rounded-full bg-green-400 flex-shrink-0" />
-                  )}
+                  {v.online && <span className="w-2.5 h-2.5 rounded-full bg-green-400 flex-shrink-0 animate-pulse-slow" />}
                   <ChevronRight className="w-4 h-4 text-text-dim flex-shrink-0" />
-                </button>
+                </motion.button>
               ))}
             </div>
-          </div>
+          </motion.div>
         )}
 
-        {/* Menu items */}
-        <div className="space-y-1.5">
-
-          {/* Feed filter preference */}
-          <div className="mb-4">
-            <div className="flex items-center gap-2 mb-2.5 px-1">
-              <Filter className="w-4 h-4 text-mansion-gold" />
-              <h3 className="text-sm font-semibold text-text-primary">Mostrar en inicio</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: 'all', label: 'Todos', emoji: '✨' },
-                { id: 'swinger', label: 'Swinger', emoji: '🔄' },
-                { id: 'trios', label: 'Tríos', emoji: '🔥' },
-                { id: 'cuckold', label: 'Cuckold', emoji: '👀' },
-                { id: 'fetiche', label: 'Fetiche', emoji: '⛓️' },
-                { id: 'pareja', label: 'Parejas', emoji: '💑' },
-                { id: 'mujer', label: 'Mujeres', emoji: '👩' },
-                { id: 'hombre', label: 'Hombres', emoji: '👨' },
-              ].map(f => {
-                const isActive = feedFilter === f.id;
-                return (
-                  <button
-                    key={f.id}
-                    onClick={() => { setFeedFilter(f.id); localStorage.setItem('mansion_feed_filter', f.id); }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      isActive
-                        ? 'bg-mansion-gold/15 text-mansion-gold border border-mansion-gold/40'
-                        : 'bg-mansion-card border border-mansion-border/50 text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    <span>{f.emoji}</span>
-                    <span>{f.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+        {/* ── Feed Filter ── */}
+        <motion.div variants={fadeUp} className="mb-8 glass-elevated rounded-3xl p-5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3 flex items-center gap-2">
+            <Filter className="w-3.5 h-3.5 text-mansion-gold" />
+            Mostrar en inicio
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'all', label: 'Todos', emoji: '✨' },
+              { id: 'swinger', label: 'Swinger', emoji: '🔄' },
+              { id: 'trios', label: 'Tríos', emoji: '🔥' },
+              { id: 'cuckold', label: 'Cuckold', emoji: '👀' },
+              { id: 'fetiche', label: 'Fetiche', emoji: '⛓️' },
+              { id: 'pareja', label: 'Parejas', emoji: '💑' },
+              { id: 'mujer', label: 'Mujeres', emoji: '👩' },
+              { id: 'hombre', label: 'Hombres', emoji: '👨' },
+            ].map(f => {
+              const isActive = feedFilter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => { setFeedFilter(f.id); localStorage.setItem('mansion_feed_filter', f.id); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    isActive
+                      ? 'bg-mansion-gold/15 text-mansion-gold border border-mansion-gold/40'
+                      : 'bg-mansion-card/60 border border-mansion-border/30 text-text-muted hover:text-text-primary hover:border-mansion-border/50'
+                  }`}
+                >
+                  <span>{f.emoji}</span>
+                  <span>{f.label}</span>
+                </button>
+              );
+            })}
           </div>
+        </motion.div>
 
+        {/* ── Account Section ── */}
+        <motion.div variants={fadeUp} className="glass-elevated rounded-3xl p-4 mb-4 space-y-1">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 px-1">Mi Cuenta</h3>
           {[
             { icon: Settings, label: 'Configuración', sublabel: 'Privacidad, notificaciones', path: '/configuracion' },
             { icon: Heart, label: 'Mis favoritos', sublabel: 'Perfiles guardados', path: '/favoritos' },
@@ -541,39 +578,30 @@ export default function ProfilePage() {
             <button
               key={label}
               onClick={() => path && navigate(path)}
-              className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-mansion-card/50 hover:bg-mansion-card transition-all group"
+              className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/[0.03] transition-all group"
             >
-              <div className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-muted group-hover:text-mansion-gold transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-mansion-elevated/60 flex items-center justify-center text-text-muted group-hover:text-mansion-gold transition-colors">
                 <Icon className="w-5 h-5" />
               </div>
               <div className="flex-1 text-left">
                 <p className="text-sm font-medium text-text-primary">{label}</p>
                 <p className="text-xs text-text-dim">{sublabel}</p>
               </div>
-              <ChevronRight className="w-4 h-4 text-text-dim" />
+              <ChevronRight className="w-4 h-4 text-text-dim group-hover:text-text-muted transition-colors" />
             </button>
           ))}
+        </motion.div>
 
-          <div className="pt-4">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 p-3.5 rounded-xl hover:bg-mansion-crimson/5 transition-all group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-mansion-crimson/10 flex items-center justify-center text-mansion-crimson">
-                <LogOut className="w-5 h-5" />
-              </div>
-              <span className="text-sm font-medium text-mansion-crimson">Cerrar sesión</span>
-            </button>
-          </div>
-
-          {/* VIP Status / Hacerse VIP */}
+        {/* ── VIP Section ── */}
+        <motion.div variants={fadeUp} className="glass-elevated rounded-3xl p-4 mb-4 space-y-1.5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 px-1">Membresía</h3>
           {user?.premium ? (
-            <div className="pt-6 border-t border-mansion-border/20 mt-4 space-y-2">
+            <>
               <button
                 onClick={() => navigate('/vip')}
-                className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-mansion-gold/10 border border-mansion-gold/30 transition-all"
+                className="w-full flex items-center gap-3 p-3 rounded-2xl bg-mansion-gold/8 border border-mansion-gold/20 transition-all hover:bg-mansion-gold/12"
               >
-                <div className="w-10 h-10 rounded-xl bg-mansion-gold/20 text-mansion-gold flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-mansion-gold/15 text-mansion-gold flex items-center justify-center">
                   <Crown className="w-5 h-5" />
                 </div>
                 <div className="flex-1 text-left">
@@ -582,13 +610,12 @@ export default function ProfilePage() {
                 </div>
               </button>
 
-              {/* Ghost / Incognito mode toggle */}
               <button
                 onClick={handleToggleGhostMode}
                 disabled={togglingGhost}
-                className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-mansion-card/50 hover:bg-mansion-card border border-mansion-border/20 transition-all"
+                className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/[0.03] transition-all"
               >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${user.ghost_mode ? 'bg-purple-500/20 text-purple-400' : 'bg-mansion-elevated text-text-muted'}`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${user.ghost_mode ? 'bg-purple-500/15 text-purple-400' : 'bg-mansion-elevated/60 text-text-muted'}`}>
                   {user.ghost_mode ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </div>
                 <div className="flex-1 text-left">
@@ -599,26 +626,35 @@ export default function ProfilePage() {
                   <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${user.ghost_mode ? 'translate-x-5' : 'translate-x-0'}`} />
                 </div>
               </button>
-            </div>
+            </>
           ) : (
-            <div className="pt-6 border-t border-mansion-border/20 mt-4">
-              <button
-                onClick={() => navigate('/vip')}
-                className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-gradient-to-r from-mansion-gold/20 to-mansion-gold/10 border border-mansion-gold/30 hover:from-mansion-gold/30 hover:to-mansion-gold/20 transition-all group"
-              >
-                <div className="w-10 h-10 rounded-xl bg-mansion-gold/20 text-mansion-gold flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Crown className="w-5 h-5" />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-bold text-mansion-gold">Hacete VIP</p>
-                  <p className="text-xs text-text-dim">Mensajes ilimitados, fotos y más</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-mansion-gold" />
-              </button>
-            </div>
+            <button
+              onClick={() => navigate('/vip')}
+              className="w-full flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-r from-mansion-gold/15 to-mansion-gold/5 border border-mansion-gold/25 hover:from-mansion-gold/25 hover:to-mansion-gold/10 transition-all group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-mansion-gold/15 text-mansion-gold flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Crown className="w-5 h-5" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-bold text-mansion-gold">Hacete VIP</p>
+                <p className="text-xs text-text-dim">Mensajes ilimitados, fotos y más</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-mansion-gold" />
+            </button>
           )}
-        </div>
-      </div>
+        </motion.div>
+
+        {/* ── Logout ── */}
+        <motion.div variants={fadeUp} className="pt-2 pb-4">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl text-mansion-crimson/70 hover:text-mansion-crimson hover:bg-mansion-crimson/5 transition-all"
+          >
+            <LogOut className="w-4.5 h-4.5" />
+            <span className="text-sm font-medium">Cerrar sesión</span>
+          </button>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

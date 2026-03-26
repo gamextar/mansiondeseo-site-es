@@ -14,6 +14,56 @@ const ROLE_COLOR = {
   'Mujer Sola': 'bg-pink-500/20 text-pink-300 border-pink-500/30',
 };
 
+const PROFILE_DETAIL_CACHE_PREFIX = 'mansion_profile_detail_';
+const PROFILE_DETAIL_CACHE_TTL_MS = 30_000;
+const DEFAULT_PROFILE_SETTINGS = { blurLevel: 14, blurMobile: 14, blurDesktop: 8, freeVisiblePhotos: 1, freeOwnPhotos: 3 };
+
+function buildPreviewProfile(preview) {
+  if (!preview) return null;
+  return {
+    ...preview,
+    interests: [],
+    bio: '',
+    totalPhotos: preview.photos?.length || 0,
+    visiblePhotos: preview.visiblePhotos ?? preview.photos?.length ?? 0,
+    blurred: !!preview.blurred,
+    isOwnProfile: !!preview.isOwnProfile,
+    receivedGifts: [],
+  };
+}
+
+function getProfileDetailCacheKey(id) {
+  return `${PROFILE_DETAIL_CACHE_PREFIX}${id}`;
+}
+
+function readProfileDetailCache(id) {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(getProfileDetailCacheKey(id));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.cachedAt || Date.now() - parsed.cachedAt > PROFILE_DETAIL_CACHE_TTL_MS) {
+      sessionStorage.removeItem(getProfileDetailCacheKey(id));
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeProfileDetailCache(id, payload) {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(getProfileDetailCacheKey(id), JSON.stringify({
+      ...payload,
+      cachedAt: Date.now(),
+    }));
+  } catch {
+    // Silently fail
+  }
+}
+
 // Masquerade mask SVG icon for incognito mode
 const MaskIcon = ({ className = 'w-8 h-8', customSvg = '' }) => {
   if (customSvg) return <span className={className} dangerouslySetInnerHTML={{ __html: customSvg }} />;
@@ -33,14 +83,17 @@ export default function ProfileDetailPage() {
   const location = useLocation();
   const { user, setUser } = useAuth();
   const preview = location.state?.preview || null;
-  const [profile, setProfile] = useState(preview ? { ...preview, interests: [], bio: '', totalPhotos: preview.photos?.length || 0, visiblePhotos: preview.visiblePhotos ?? preview.photos?.length ?? 0, blurred: !!preview.blurred, isOwnProfile: !!preview.isOwnProfile, receivedGifts: [] } : null);
-  const [viewerPremium, setViewerPremium] = useState(false);
-  const [settings, setSettings] = useState({ blurLevel: 14, blurMobile: 14, blurDesktop: 8, freeVisiblePhotos: 1, freeOwnPhotos: 3 });
-  const [isFavorited, setIsFavorited] = useState(false);
+  const cachedDetail = readProfileDetailCache(id);
+  const previewProfile = buildPreviewProfile(preview);
+  const initialProfile = cachedDetail?.profile || previewProfile;
+  const [profile, setProfile] = useState(initialProfile);
+  const [viewerPremium, setViewerPremium] = useState(cachedDetail?.viewerPremium || false);
+  const [settings, setSettings] = useState(cachedDetail?.settings || DEFAULT_PROFILE_SETTINGS);
+  const [isFavorited, setIsFavorited] = useState(initialProfile?.isFavorited ?? false);
   const [togglingFav, setTogglingFav] = useState(false);
-  const [loading, setLoading] = useState(!preview);
+  const [loading, setLoading] = useState(!initialProfile);
   const [isReordering, setIsReordering] = useState(false);
-  const [orderedPhotos, setOrderedPhotos] = useState(preview?.photos || []);
+  const [orderedPhotos, setOrderedPhotos] = useState(initialProfile?.photos || []);
   const [savingOrder, setSavingOrder] = useState(false);
   // Gift state
   const [giftModalOpen, setGiftModalOpen] = useState(false);
@@ -50,18 +103,36 @@ export default function ProfileDetailPage() {
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
-    if (!preview) setLoading(true);
+    const nextCachedDetail = readProfileDetailCache(id);
+    const nextPreviewProfile = buildPreviewProfile(location.state?.preview || null);
+    const nextInitialProfile = nextCachedDetail?.profile || nextPreviewProfile;
+
+    setProfile(nextInitialProfile);
+    setOrderedPhotos(nextInitialProfile?.photos || []);
+    setViewerPremium(nextCachedDetail?.viewerPremium || false);
+    setSettings(nextCachedDetail?.settings || DEFAULT_PROFILE_SETTINGS);
+    setIsFavorited(nextInitialProfile?.isFavorited ?? false);
+    setLoading(!nextInitialProfile);
+
+    if (nextCachedDetail) return;
+
     getProfile(id)
       .then(data => {
+        const nextSettings = data.settings || DEFAULT_PROFILE_SETTINGS;
         setProfile(data.profile);
         setOrderedPhotos(data.profile.photos || []);
         setViewerPremium(data.viewerPremium || false);
-        if (data.settings) setSettings(data.settings);
+        setSettings(nextSettings);
         if (data.profile.isFavorited !== undefined) setIsFavorited(data.profile.isFavorited);
+        writeProfileDetailCache(id, {
+          profile: data.profile,
+          viewerPremium: data.viewerPremium || false,
+          settings: nextSettings,
+        });
       })
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
-  }, [id, navigate]);
+  }, [id, navigate, location.state]);
 
   const movePhoto = useCallback((from, dir) => {
     const to = from + dir;
@@ -77,6 +148,16 @@ export default function ProfileDetailPage() {
     setSavingOrder(true);
     try {
       await updateProfile({ photos: orderedPhotos });
+      setProfile(prev => {
+        if (!prev) return prev;
+        const nextProfile = { ...prev, photos: orderedPhotos, totalPhotos: orderedPhotos.length };
+        writeProfileDetailCache(id, {
+          profile: nextProfile,
+          viewerPremium,
+          settings,
+        });
+        return nextProfile;
+      });
       setIsReordering(false);
     } catch {
       // Silently fail
@@ -91,6 +172,16 @@ export default function ProfileDetailPage() {
     try {
       const data = await toggleFavorite(id);
       setIsFavorited(data.favorited);
+      setProfile(prev => {
+        if (!prev) return prev;
+        const nextProfile = { ...prev, isFavorited: data.favorited };
+        writeProfileDetailCache(id, {
+          profile: nextProfile,
+          viewerPremium,
+          settings,
+        });
+        return nextProfile;
+      });
     } catch {
       // Silently fail
     } finally {
@@ -117,18 +208,35 @@ export default function ProfileDetailPage() {
     setSendingGift(giftId);
     try {
       const data = await apiSendGift(id, giftId);
+      const nextGift = {
+        id: data.gift.id,
+        gift_emoji: data.gift.gift_emoji,
+        gift_name: data.gift.gift_name,
+        sender_name: user?.username || '',
+        sender_id: user?.id,
+        created_at: new Date().toISOString(),
+      };
       // Update local user coins
       if (user && data.coins !== undefined) {
         setUser(prev => prev ? { ...prev, coins: data.coins } : prev);
       }
       // Update profile's received gifts
-      setProfile(prev => prev ? {
-        ...prev,
-        receivedGifts: [
-          { id: data.gift.id, gift_emoji: data.gift.gift_emoji, gift_name: data.gift.gift_name, sender_name: user?.username || '', sender_id: user?.id, created_at: new Date().toISOString() },
-          ...(prev.receivedGifts || []),
-        ],
-      } : prev);
+      setProfile(prev => {
+        if (!prev) return prev;
+        const nextProfile = {
+          ...prev,
+          receivedGifts: [
+            nextGift,
+            ...(prev.receivedGifts || []),
+          ],
+        };
+        writeProfileDetailCache(id, {
+          profile: nextProfile,
+          viewerPremium,
+          settings,
+        });
+        return nextProfile;
+      });
       setGiftSent(data.gift);
       setTimeout(() => { setGiftModalOpen(false); setGiftSent(null); }, 1500);
     } catch (err) {
@@ -279,8 +387,8 @@ export default function ProfileDetailPage() {
               );
             })}
           </div>
-          {/* Bottom gradient */}
-          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-mansion-base via-mansion-base/40 to-transparent pointer-events-none" />
+          {/* Bottom gradient — extended for smooth overlap */}
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-mansion-base via-mansion-base/60 to-transparent pointer-events-none" />
         </motion.div>
 
         {/* Top nav overlay */}
@@ -347,27 +455,29 @@ export default function ProfileDetailPage() {
 
       {/* Profile info */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="relative -mt-16 px-4 z-10 lg:mt-0 lg:px-0 lg:flex-1"
+        transition={{ delay: 0.15, duration: 0.5, ease: [.25,.46,.45,.94] }}
+        className="relative -mt-20 px-4 z-10 lg:mt-0 lg:px-0 lg:flex-1"
       >
-        <div className="glass-elevated rounded-3xl p-5">
+        <div className="glass-elevated rounded-[2rem] p-6 shadow-elevated">
           {/* Name row */}
-          <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start justify-between mb-4">
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h1 className="font-display text-2xl font-bold text-text-primary">
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <h1 className="font-display text-3xl font-bold text-text-primary">
                   {name}
                 </h1>
-                <span className="text-text-muted text-lg">{age}</span>
-                {verified && <Shield className="w-4 h-4 text-green-400" />}
-                {premium && <Crown className="w-4 h-4 text-mansion-gold" />}
+                <span className="text-text-muted text-xl font-light">{age}</span>
               </div>
-              <div className="flex items-center gap-3 text-sm text-text-muted">
-                <span className="flex items-center gap-1">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1 text-sm text-text-muted">
                   <MapPin className="w-3.5 h-3.5" /> {city}
                 </span>
+                <div className="flex items-center gap-1.5">
+                  {verified && <Shield className="w-4 h-4 text-green-400" />}
+                  {premium && <Crown className="w-4 h-4 text-mansion-gold" />}
+                </div>
               </div>
             </div>
             {online && (
@@ -379,58 +489,91 @@ export default function ProfileDetailPage() {
           </div>
 
           {/* Role badge */}
-          <span className={`inline-flex items-center text-xs font-semibold px-3 py-1 rounded-full border ${ROLE_COLOR[role]}`}>
+          <motion.span
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 }}
+            className={`inline-flex items-center text-xs font-semibold px-3 py-1 rounded-full border ${ROLE_COLOR[role]}`}
+          >
             {role}
-          </span>
+          </motion.span>
 
           {/* Bio */}
-          <div className="mt-5 mb-5">
-            <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2">Sobre {name.split(' ')[0]}</h3>
-            <p className="text-text-primary text-sm leading-relaxed font-display italic">
-              "{bio}"
-            </p>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="mt-6 mb-6"
+          >
+            <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Sobre {name.split(' ')[0]}</h3>
+            <div className="border-l-2 border-mansion-gold/40 pl-4">
+              <p className="text-text-primary text-sm leading-relaxed font-display italic">
+                "{bio}"
+              </p>
+            </div>
+          </motion.div>
 
           {/* Interests */}
-          <div className="mb-5">
-            <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2">Intereses</h3>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="mb-6"
+          >
+            <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Intereses</h3>
             <div className="flex flex-wrap gap-2">
-              {interests.map((tag) => (
-                <span
+              {interests.map((tag, idx) => (
+                <motion.span
                   key={tag}
-                  className="text-xs font-medium px-3 py-1.5 rounded-full bg-mansion-gold/10 text-mansion-gold border border-mansion-gold/20"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.45 + idx * 0.04 }}
+                  className="text-xs font-medium px-3 py-1.5 rounded-full bg-mansion-gold/10 text-mansion-gold border border-mansion-gold/20 hover:bg-mansion-gold/15 transition-colors"
                 >
                   {tag}
-                </span>
+                </motion.span>
               ))}
             </div>
-          </div>
+          </motion.div>
 
           {/* Received Gifts */}
           {receivedGifts && receivedGifts.length > 0 && (
-            <div className="mb-5">
-              <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="mb-6"
+            >
+              <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">
                 Regalos recibidos ({receivedGifts.length})
               </h3>
               <div className="flex flex-wrap gap-1.5">
-                {receivedGifts.map((g) => (
-                  <div
+                {receivedGifts.map((g, idx) => (
+                  <motion.div
                     key={g.id}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-mansion-card/60 border border-mansion-border/20"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.55 + idx * 0.03 }}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-mansion-card/40 border border-mansion-border/15"
                     title={`${g.gift_name} de ${g.sender_name}`}
                   >
-                    <span className="text-base">{g.gift_emoji}</span>
+                    <span className="text-lg">{g.gift_emoji}</span>
                     <span className="text-[10px] text-text-dim">{g.sender_name}</span>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           )}
 
           {/* Photo gallery */}
           {photos.length > 1 && (
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55 }}
+              className="mb-4"
+            >
+              <div className="flex items-center justify-between mb-2.5">
                 <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider">Galería</h3>
                 {isOwnProfile && !isReordering && (
                   <button
@@ -458,15 +601,21 @@ export default function ProfileDetailPage() {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2.5">
                 {(isReordering ? orderedPhotos : photos).map((photo, i) => {
                   const blocked = !isReordering && isPhotoBlocked(i);
                   return (
-                    <div key={isReordering ? photo : i} className="aspect-square rounded-xl overflow-hidden bg-mansion-card relative group">
+                    <motion.div
+                      key={isReordering ? photo : i}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.6 + i * 0.04 }}
+                      className="aspect-square rounded-2xl overflow-hidden bg-mansion-card relative group"
+                    >
                       <img
                         src={photo}
                         alt=""
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         style={blocked ? { filter: `blur(${thumbBlur}px)`, transform: 'scale(1.1)' } : undefined}
                         draggable={false}
                       />
@@ -501,47 +650,65 @@ export default function ProfileDetailPage() {
                           <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-70 transition-opacity" />
                         </div>
                       )}
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>
-            </div>
+            </motion.div>
           )}
         </div>
       </motion.div>
 
       </div>{/* end two-column wrapper */}
 
-      {/* Floating action button — always visible */}
+      {/* Floating action bar — horizontal bottom */}
       {!isOwnProfile && (
-      <div className="fixed bottom-20 right-4 lg:bottom-8 lg:right-8 z-[60] flex flex-col items-end gap-3">
+      <motion.div
+        initial={{ y: 40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.5, type: 'spring', damping: 20, stiffness: 200 }}
+        className="fixed bottom-20 left-4 right-4 lg:bottom-8 lg:left-auto lg:right-8 lg:w-auto z-[60] flex items-center justify-center gap-3"
+      >
         <motion.button
-          whileTap={{ scale: 0.9 }}
+          whileTap={{ scale: 0.85 }}
           onClick={handleToggleFavorite}
           disabled={togglingFav}
-          className={`w-12 h-12 rounded-full backdrop-blur border flex items-center justify-center transition-all shadow-lg ${
+          className={`w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-lg ${
             isFavorited
               ? 'bg-mansion-crimson/20 border-mansion-crimson/40 text-mansion-crimson'
-              : 'bg-mansion-card/80 border-mansion-border/40 text-text-muted hover:text-mansion-crimson hover:border-mansion-crimson/40'
+              : 'glass border-mansion-border/30 text-text-muted hover:text-mansion-crimson hover:border-mansion-crimson/30'
           }`}
         >
-          <Heart className="w-5 h-5" fill={isFavorited ? 'currentColor' : 'none'} />
+          <Heart
+            className={`w-5 h-5 transition-transform ${isFavorited ? 'scale-110' : ''}`}
+            fill={isFavorited ? 'currentColor' : 'none'}
+          />
         </motion.button>
         <motion.button
-          whileTap={{ scale: 0.9 }}
+          whileTap={{ scale: 0.85 }}
           onClick={openGiftModal}
-          className="w-12 h-12 rounded-full backdrop-blur border bg-mansion-gold/20 border-mansion-gold/40 text-mansion-gold flex items-center justify-center transition-all shadow-lg hover:bg-mansion-gold/30"
+          className="w-12 h-12 rounded-full backdrop-blur-md glass border border-mansion-gold/30 text-mansion-gold flex items-center justify-center transition-all shadow-lg hover:bg-mansion-gold/10"
         >
           <Gift className="w-5 h-5" />
         </motion.button>
         <Link
           to={`/mensajes/${id}`}
-          className="flex items-center gap-2 px-6 py-3.5 rounded-full bg-mansion-crimson text-white shadow-glow-crimson hover:bg-mansion-crimson-dark transition-all"
+          state={{
+            partnerPreview: {
+              id,
+              name,
+              avatar_url: profile.avatar_url || '',
+              avatar_crop: profile.avatar_crop || null,
+              photos: profile.photos || [],
+              online: profile.online,
+            },
+          }}
+          className="flex items-center gap-2 px-7 py-3.5 rounded-full bg-mansion-crimson text-white shadow-glow-crimson hover:bg-mansion-crimson-dark transition-all active:scale-95"
         >
           <MessageCircle className="w-5 h-5" />
-          <span className="font-display font-semibold text-sm">Enviar Mensaje</span>
+          <span className="font-display font-semibold text-sm">Mensaje</span>
         </Link>
-      </div>
+      </motion.div>
       )}
 
       {/* ── Gift Picker Modal ── */}
