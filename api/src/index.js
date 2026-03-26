@@ -809,45 +809,75 @@ async function handleConversations(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
-  // Get latest message per conversation partner
+  // 1) Get latest message per conversation partner + unread count in a single query
   const { results } = await env.DB.prepare(`
     SELECT
-      m.*,
-      CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AS partner_id
-    FROM messages m
-    WHERE m.sender_id = ? OR m.receiver_id = ?
-    ORDER BY m.created_at DESC
-  `).bind(auth.sub, auth.sub, auth.sub).all();
+      partner_id,
+      MAX(created_at) AS last_at,
+      SUM(CASE WHEN receiver_id = ? AND is_read = 0 THEN 1 ELSE 0 END) AS unread
+    FROM (
+      SELECT *, CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS partner_id
+      FROM messages
+      WHERE sender_id = ? OR receiver_id = ?
+    )
+    GROUP BY partner_id
+    ORDER BY last_at DESC
+  `).bind(auth.sub, auth.sub, auth.sub, auth.sub).all();
 
-  // Group by partner, keep latest
-  const convMap = new Map();
-  for (const m of results) {
-    const partnerId = m.sender_id === auth.sub ? m.receiver_id : m.sender_id;
-    if (!convMap.has(partnerId)) {
-      convMap.set(partnerId, {
-        lastMessage: m,
-        unread: 0,
-      });
-    }
-    if (m.receiver_id === auth.sub && !m.is_read) {
-      const entry = convMap.get(partnerId);
-      entry.unread++;
-    }
+  if (!results.length) return json({ conversations: [] });
+
+  // 2) Fetch all partner profiles in one query
+  const partnerIds = results.map(r => r.partner_id);
+  const placeholders = partnerIds.map(() => '?').join(',');
+  const { results: partners } = await env.DB.prepare(
+    `SELECT id, username, avatar_url, last_active FROM users WHERE id IN (${placeholders})`
+  ).bind(...partnerIds).all();
+  const partnerMap = new Map(partners.map(p => [p.id, p]));
+
+  // 3) Fetch the actual last message content for each conversation in one query
+  // Build: SELECT * FROM messages WHERE (id = ?) OR (id = ?) ...
+  // Use a subquery approach instead
+  const msgConds = partnerIds.map(() =>
+    `(sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)`
+  );
+  const msgParams = [];
+  for (const pid of partnerIds) {
+    msgParams.push(auth.sub, pid, pid, auth.sub);
+  }
+  const { results: lastMsgs } = await env.DB.prepare(`
+    SELECT m.* FROM messages m
+    INNER JOIN (
+      SELECT
+        CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS pid,
+        MAX(created_at) AS max_at
+      FROM messages WHERE sender_id = ? OR receiver_id = ?
+      GROUP BY pid
+    ) latest ON (
+      CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END = latest.pid
+      AND m.created_at = latest.max_at
+    )
+    WHERE m.sender_id = ? OR m.receiver_id = ?
+  `).bind(auth.sub, auth.sub, auth.sub, auth.sub, auth.sub, auth.sub).all();
+  const msgMap = new Map();
+  for (const m of lastMsgs) {
+    const pid = m.sender_id === auth.sub ? m.receiver_id : m.sender_id;
+    if (!msgMap.has(pid)) msgMap.set(pid, m);
   }
 
-  // Fetch partner profiles
+  // 4) Build response
   const conversations = [];
-  for (const [partnerId, data] of convMap) {
-    const partner = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(partnerId).first();
+  for (const r of results) {
+    const partner = partnerMap.get(r.partner_id);
     if (!partner) continue;
+    const msg = msgMap.get(r.partner_id);
     conversations.push({
-      id: `conv-${partnerId}`,
-      profileId: partnerId,
+      id: `conv-${r.partner_id}`,
+      profileId: r.partner_id,
       name: partner.username,
       avatar: partner.avatar_url || '',
-      lastMessage: data.lastMessage.content.slice(0, 50),
-      timestamp: data.lastMessage.created_at,
-      unread: data.unread,
+      lastMessage: msg ? msg.content.slice(0, 50) : '',
+      timestamp: r.last_at,
+      unread: r.unread,
       online: isOnline(partner.last_active),
     });
   }

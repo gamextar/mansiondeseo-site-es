@@ -23,9 +23,23 @@ function timeAgo(dateStr) {
   return `${diffW}sem`;
 }
 
+const CONV_CACHE_KEY = 'mansion_conversations';
+
+function getCachedConversations() {
+  try {
+    const raw = sessionStorage.getItem(CONV_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function setCachedConversations(convs) {
+  try { sessionStorage.setItem(CONV_CACHE_KEY, JSON.stringify(convs)); } catch {}
+}
+
 export default function ChatListPage() {
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cached = getCachedConversations();
+  const [conversations, setConversations] = useState(cached);
+  const [loading, setLoading] = useState(cached.length === 0);
   const [typingChats, setTypingChats] = useState({});
   const typingTimersRef = useRef({});
   const navigate = useNavigate();
@@ -34,15 +48,23 @@ export default function ChatListPage() {
   const fetchConversations = useCallback(() => {
     if (!getToken()) return;
     getConversations()
-      .then(data => setConversations(data.conversations || []))
+      .then(data => {
+        const convs = data.conversations || [];
+        setConversations(convs);
+        setCachedConversations(convs);
+      })
       .catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
-    setLoading(true);
+    if (!cached.length) setLoading(true);
     getConversations()
-      .then(data => setConversations(data.conversations || []))
+      .then(data => {
+        const convs = data.conversations || [];
+        setConversations(convs);
+        setCachedConversations(convs);
+      })
       .catch(() => setConversations([]))
       .finally(() => setLoading(false));
 
