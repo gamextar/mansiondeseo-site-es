@@ -2358,7 +2358,12 @@ export default {
       return response;
     } catch (err) {
       console.error('Worker error:', err.message, err.stack);
-      return json({ error: 'Error interno del servidor' }, 500);
+      const errRes = json({ error: 'Error interno del servidor' }, 500);
+      const cors = corsHeaders(env, request);
+      for (const [key, value] of Object.entries(cors)) {
+        errRes.headers.set(key, value);
+      }
+      return errRes;
     }
   },
 };
