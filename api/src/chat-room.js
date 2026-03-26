@@ -99,11 +99,29 @@ export class ChatRoom {
     } else if (data.type === 'read') {
       await this.handleRead(ws, senderId, data);
     } else if (data.type === 'typing') {
-      // Broadcast typing indicator to other sockets
+      // Broadcast typing indicator to other sockets in this ChatRoom
       for (const sock of this.state.getWebSockets()) {
         const [tag] = this.state.getTags(sock);
         if (tag !== senderId) {
           try { sock.send(JSON.stringify({ type: 'typing', userId: senderId })); } catch {}
+        }
+      }
+      // Also notify UserNotification DO so ChatListPage can show typing
+      const chatId = await this.state.storage.get('chatId');
+      if (chatId) {
+        const id1 = chatId.slice(0, 36);
+        const id2 = chatId.slice(37);
+        const receiverId = id1 !== senderId ? id1 : id2;
+        if (receiverId) {
+          try {
+            const doId = this.env.USER_NOTIFICATIONS.idFromName(receiverId);
+            const stub = this.env.USER_NOTIFICATIONS.get(doId);
+            stub.fetch('https://do/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'typing', chatId, userId: senderId }),
+            }).catch(() => {});
+          } catch { /* ignore */ }
         }
       }
     } else if (data.type === 'ping') {

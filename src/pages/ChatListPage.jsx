@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, MessageCircle } from 'lucide-react';
-import { getConversations, getToken } from '../lib/api';
+import { getConversations, getToken, getStoredUser } from '../lib/api';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 
 function timeAgo(dateStr) {
@@ -26,6 +26,8 @@ function timeAgo(dateStr) {
 export default function ChatListPage() {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [typingChats, setTypingChats] = useState({});
+  const typingTimersRef = useRef({});
   const navigate = useNavigate();
   const { refresh: refreshUnread, subscribe } = useUnreadMessages();
 
@@ -49,8 +51,26 @@ export default function ChatListPage() {
     window.addEventListener('focus', onFocus);
 
     // Real-time: refresh when a new message arrives via notification WebSocket
-    const unsubscribe = subscribe(() => {
-      fetchConversations();
+    const myId = getStoredUser()?.id;
+    const unsubscribe = subscribe((event) => {
+      if (event?.type === 'new_message') {
+        fetchConversations();
+      } else if (event?.type === 'typing' && event.chatId && myId) {
+        // Derive partnerId from chatId: "uuid1-uuid2" sorted, each 36 chars
+        const id1 = event.chatId.slice(0, 36);
+        const id2 = event.chatId.slice(37);
+        const partnerId = id1 !== String(myId) ? id1 : id2;
+        // Show typing indicator for this conversation
+        setTypingChats(prev => ({ ...prev, [partnerId]: true }));
+        clearTimeout(typingTimersRef.current[partnerId]);
+        typingTimersRef.current[partnerId] = setTimeout(() => {
+          setTypingChats(prev => {
+            const next = { ...prev };
+            delete next[partnerId];
+            return next;
+          });
+        }, 3000);
+      }
     });
 
     return () => {
@@ -131,9 +151,11 @@ export default function ChatListPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <p className={`text-[13px] truncate pr-2 ${
-                    conv.unread > 0 ? 'text-text-primary font-medium' : 'text-text-dim'
+                    typingChats[conv.profileId] 
+                      ? 'text-mansion-gold italic' 
+                      : conv.unread > 0 ? 'text-text-primary font-medium' : 'text-text-dim'
                   }`}>
-                    {conv.lastMessage}
+                    {typingChats[conv.profileId] ? 'escribiendo...' : conv.lastMessage}
                   </p>
                   {conv.unread > 0 && (
                     <span className="flex-shrink-0 w-5 h-5 rounded-full bg-mansion-crimson text-white text-[10px] font-bold flex items-center justify-center">

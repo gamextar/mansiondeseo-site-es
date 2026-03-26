@@ -11,7 +11,6 @@ export function UnreadProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [toast, setToast] = useState(null);
   const prevCountRef = useRef(-1); // -1 = not yet loaded
-  const timerRef = useRef(null);
   const listenersRef = useRef(new Set());
   const wsRef = useRef(null);
   const wsRetryRef = useRef(0);
@@ -75,6 +74,8 @@ export function UnreadProvider({ children }) {
           if (data.type === 'new_message') {
             fetchUnread();
             notifyListeners(data);
+          } else if (data.type === 'typing') {
+            notifyListeners(data);
           }
         } catch { /* ignore */ }
       };
@@ -96,14 +97,12 @@ export function UnreadProvider({ children }) {
     }
   }, [fetchUnread, notifyListeners]);
 
-  // Initial fetch + polling fallback + WebSocket
+  // Initial fetch + WebSocket (no polling — real-time only)
   useEffect(() => {
     fetchUnread();
-    timerRef.current = setInterval(fetchUnread, 30_000);
     wsClosedRef.current = false;
     connectWs();
     return () => {
-      clearInterval(timerRef.current);
       wsClosedRef.current = true;
       if (wsRef.current) {
         wsRef.current.onclose = null;
