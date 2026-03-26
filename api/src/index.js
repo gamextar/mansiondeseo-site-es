@@ -148,17 +148,28 @@ function isOnline(lastActive) {
 
 // ── CORS ────────────────────────────────────────────────
 
-function corsHeaders(env) {
+function corsHeaders(env, request) {
+  const origin = request?.headers?.get('Origin') || '';
+  // Allow production origin, localhost, and any Pages preview subdomain
+  const allowed = env.CORS_ORIGIN || '*';
+  let acao = allowed;
+  if (origin && (
+    origin === allowed ||
+    origin === 'http://localhost:5173' ||
+    origin.endsWith('.mansiondeseo-site.pages.dev')
+  )) {
+    acao = origin;
+  }
   return {
-    'Access-Control-Allow-Origin': env.CORS_ORIGIN || '*',
+    'Access-Control-Allow-Origin': acao,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Turnstile-Token',
     'Access-Control-Max-Age': '86400',
   };
 }
 
-function handleOptions(env) {
-  return new Response(null, { status: 204, headers: corsHeaders(env) });
+function handleOptions(env, request) {
+  return new Response(null, { status: 204, headers: corsHeaders(env, request) });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2177,7 +2188,7 @@ async function handleRequest(request, env) {
   const method = request.method;
 
   // CORS preflight
-  if (method === 'OPTIONS') return handleOptions(env);
+  if (method === 'OPTIONS') return handleOptions(env, request);
 
   // ── WebSocket upgrades (before Turnstile check) ──
   const chatWsMatch = path.match(/^\/api\/chat\/ws\/([a-f0-9-]+)$/);
@@ -2293,7 +2304,7 @@ export default {
         return response;
       }
       // Add CORS headers to all other responses
-      const cors = corsHeaders(env);
+      const cors = corsHeaders(env, request);
       for (const [key, value] of Object.entries(cors)) {
         response.headers.set(key, value);
       }
