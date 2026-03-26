@@ -6,7 +6,7 @@ import { useMessageLimit } from '../hooks/useMessageLimit';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import EmojiPicker from '../components/EmojiPicker';
-import { getMessageLimit, getProfile, getToken, getStoredUser } from '../lib/api';
+import { getMessageLimit, getProfile, getToken, getStoredUser, getMessages as apiGetMessages } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 
 export default function ChatPage() {
@@ -53,19 +53,20 @@ export default function ChatPage() {
     myUserIdRef.current = String(user.id);
     setLoading(true);
 
-    // Fetch partner profile + initial limit in parallel
+    // Fetch partner profile, messages (HTTP fallback), and limit in parallel
     Promise.all([
       getProfile(partnerId).then(data => setPartner(data.profile)).catch(() => null),
+      apiGetMessages(partnerId).then(data => setMessages(data.messages || [])).catch(() => setMessages([])),
       getMessageLimit().then(data => setApiLimit(data)).catch(() => {}),
     ]).finally(() => {
-      // Loading will be turned off when history arrives via WS
+      setLoading(false);
+      refreshUnread();
     });
 
-    // Open WebSocket connection
+    // Open WebSocket connection — will replace HTTP messages with real-time data
     chatRef.current = createChatSocket(String(user.id), partnerId, token, {
       onHistory(msgs) {
         setMessages(msgs.map(m => formatMsg(m)));
-        setLoading(false);
         // Mark unread incoming messages as read
         const unread = msgs.filter(m => m.sender_id !== String(user.id) && !m.is_read);
         if (unread.length > 0) {
@@ -106,10 +107,6 @@ export default function ChatPage() {
       },
       onStateChange(state) {
         setWsState(state);
-        // If WS connects but we still have loading, trigger a timeout fallback
-        if (state === 'connected' && loading) {
-          setTimeout(() => setLoading(prev => prev ? false : prev), 3000);
-        }
       },
     });
 
