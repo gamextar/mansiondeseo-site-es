@@ -50,7 +50,7 @@ export default function ProfileDetailPage() {
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
-    setLoading(true);
+    if (!preview) setLoading(true);
     getProfile(id)
       .then(data => {
         setProfile(data.profile);
