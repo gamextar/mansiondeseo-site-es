@@ -995,7 +995,7 @@ async function handleUpload(request, env) {
   const key = `${generateId()}.${ext}`;
 
   await env.IMAGES.put(key, imageData, {
-    httpMetadata: { contentType },
+    httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
   });
 
   const publicUrl = env.R2_PUBLIC_URL
