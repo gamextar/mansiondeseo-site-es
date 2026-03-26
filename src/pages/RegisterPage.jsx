@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../App';
 import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings } from '../lib/api';
+import ImageCropper from '../components/ImageCropper';
 
 // ────────────────────────────────────────────
 // Constants
@@ -676,6 +677,7 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
 
 function StepPhoto({ photoFile, onPhotoSelect }) {
   const previewUrl = photoFile ? URL.createObjectURL(photoFile) : null;
+  const [rawFile, setRawFile] = useState(null);
 
   return (
     <div className="text-center">
@@ -711,9 +713,21 @@ function StepPhoto({ photoFile, onPhotoSelect }) {
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) onPhotoSelect(file);
+          if (file) setRawFile(file);
+          e.target.value = '';
         }}
       />
+
+      {rawFile && (
+        <ImageCropper
+          file={rawFile}
+          onCrop={(cropped) => {
+            onPhotoSelect(cropped);
+            setRawFile(null);
+          }}
+          onCancel={() => setRawFile(null)}
+        />
+      )}
 
       <p className="text-text-dim text-xs mt-6">
         Puedes subir tu foto más tarde desde tu perfil

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Users, Gift, Filter } from 'lucide-react';
 import { useAuth } from '../App';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits, getReceivedGifts } from '../lib/api';
+import ImageCropper from '../components/ImageCropper';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -22,6 +23,7 @@ export default function ProfilePage() {
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
+  const [cropFile, setCropFile] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [togglingGhost, setTogglingGhost] = useState(false);
   const [visitors, setVisitors] = useState([]);
@@ -134,11 +136,16 @@ export default function ProfilePage() {
     navigate('/bienvenida');
   };
 
-  const handleAvatarUpload = async (e) => {
+  const handleAvatarSelect = (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) setCropFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleCroppedAvatar = async (croppedFile) => {
+    setCropFile(null);
     try {
-      const data = await uploadImage(file);
+      const data = await uploadImage(croppedFile);
       setUser(prev => prev ? { ...prev, avatar_url: data.url, photos: [...(prev.photos || []), data.url] } : prev);
     } catch {
       // Silently fail — user can retry
@@ -200,6 +207,13 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
+      {cropFile && (
+        <ImageCropper
+          file={cropFile}
+          onCrop={handleCroppedAvatar}
+          onCancel={() => setCropFile(null)}
+        />
+      )}
       <div className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-2xl lg:mx-auto">
         {/* Profile header */}
         <div className="text-center mb-6">
@@ -231,7 +245,7 @@ export default function ProfilePage() {
               type="file"
               accept="image/jpeg,image/png,image/webp"
               className="hidden"
-              onChange={handleAvatarUpload}
+              onChange={handleAvatarSelect}
             />
           </div>
 
