@@ -928,7 +928,10 @@ async function handleNotificationWebSocket(request, env) {
   const doId = env.USER_NOTIFICATIONS.idFromName(payload.sub);
   const stub = env.USER_NOTIFICATIONS.get(doId);
 
-  return stub.fetch(request);
+  // Must create a new Request to avoid immutable headers error
+  const doUrl = new URL(request.url);
+  doUrl.pathname = '/ws';
+  return stub.fetch(new Request(doUrl.toString(), request));
 }
 
 // ── GET /api/unread-count ───────────────────────────────
