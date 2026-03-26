@@ -6,6 +6,7 @@ import { useMessageLimit } from '../hooks/useMessageLimit';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import EmojiPicker from '../components/EmojiPicker';
+import AvatarImg from '../components/AvatarImg';
 import { getMessageLimit, getProfile, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 
@@ -266,7 +267,7 @@ export default function ChatPage() {
 
           <div className="relative flex-shrink-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`)}>
             <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-mansion-border/40">
-              <img src={partner.avatar_url || partner.photos?.[0] || ''} alt={partner.name} className="w-full h-full object-cover" />
+              <AvatarImg src={partner.avatar_url || partner.photos?.[0] || ''} crop={partner.avatar_crop} alt={partner.name} className="w-full h-full" />
             </div>
             {partner.online && (
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-mansion-card" />
@@ -326,7 +327,7 @@ export default function ChatPage() {
                 {/* Partner avatar next to received messages */}
                 {!isMe && (
                   <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
-                    <img src={partner.avatar_url || partner.photos?.[0] || ''} alt="" className="w-full h-full object-cover" />
+                    <AvatarImg src={partner.avatar_url || partner.photos?.[0] || ''} crop={partner.avatar_crop} alt="" className="w-full h-full" />
                   </div>
                 )}
                 <div
@@ -365,7 +366,7 @@ export default function ChatPage() {
               className="flex items-end gap-2 justify-start"
             >
               <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
-                <img src={partner.avatar_url || partner.photos?.[0] || ''} alt="" className="w-full h-full object-cover" />
+                <AvatarImg src={partner.avatar_url || partner.photos?.[0] || ''} crop={partner.avatar_crop} alt="" className="w-full h-full" />
               </div>
               <div className="bg-mansion-elevated border border-mansion-border/30 rounded-2xl rounded-bl-sm px-4 py-3">
                 <div className="flex gap-1">

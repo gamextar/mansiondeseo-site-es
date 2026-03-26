@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../App';
+import AvatarImg from './AvatarImg';
 
 // Fallback coin icon as inline SVG
 const DefaultCoinIcon = ({ size = 18 }) => (
@@ -58,7 +59,7 @@ export default function Navbar() {
               <div className="w-11 h-11 rounded-full bg-gradient-to-br from-mansion-gold to-mansion-gold-light p-[2px]">
                 <div className="w-full h-full rounded-full bg-mansion-card overflow-hidden flex items-center justify-center">
                   {user?.avatar_url ? (
-                    <img src={user.avatar_url} alt="Perfil" className="w-full h-full object-cover" />
+                    <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt="Perfil" className="w-full h-full" />
                   ) : (
                     <span className="text-mansion-gold text-xs font-bold">TÚ</span>
                   )}

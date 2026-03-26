@@ -2,8 +2,9 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Ghost, Eye, EyeOff, Users, Gift, Filter, Move } from 'lucide-react';
 import { useAuth } from '../App';
-import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits, getReceivedGifts, getToken } from '../lib/api';
+import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits, getReceivedGifts } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
+import AvatarImg from '../components/AvatarImg';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -25,7 +26,7 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [cropFile, setCropFile] = useState(null);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
-  const [loadingAdjust, setLoadingAdjust] = useState(false);
+  const [adjustUrl, setAdjustUrl] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [togglingGhost, setTogglingGhost] = useState(false);
   const [visitors, setVisitors] = useState([]);
@@ -148,9 +149,19 @@ export default function ProfilePage() {
     setCropFile(null);
     try {
       const data = await uploadImage(croppedFile);
-      setUser(prev => prev ? { ...prev, avatar_url: data.url, photos: [...(prev.photos || []), data.url] } : prev);
+      setUser(prev => prev ? { ...prev, avatar_url: data.url, avatar_crop: null, photos: [...(prev.photos || []), data.url] } : prev);
     } catch {
       // Silently fail — user can retry
+    }
+  };
+
+  const handleAvatarPosition = async (crop) => {
+    setAdjustUrl(null);
+    try {
+      await updateProfile({ avatar_crop: crop });
+      setUser(prev => prev ? { ...prev, avatar_crop: crop } : prev);
+    } catch {
+      // Silently fail
     }
   };
 
@@ -225,6 +236,15 @@ export default function ProfilePage() {
         />
       )}
 
+      {adjustUrl && (
+        <ImageCropper
+          imageUrl={adjustUrl}
+          positionOnly
+          onPosition={handleAvatarPosition}
+          onCancel={() => setAdjustUrl(null)}
+        />
+      )}
+
       {/* Avatar action menu */}
       {showAvatarMenu && (
         <div className="fixed inset-0 z-[90] flex items-end justify-center" onClick={() => setShowAvatarMenu(false)}>
@@ -246,33 +266,14 @@ export default function ProfilePage() {
               </button>
               <div className="h-px bg-mansion-border/20 mx-4" />
               <button
-                disabled={loadingAdjust}
-                onClick={async () => {
-                  setLoadingAdjust(true);
-                  try {
-                    const API_BASE = import.meta.env.PROD
-                      ? 'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api'
-                      : '/api';
-                    const res = await fetch(`${API_BASE}/image-proxy?url=${encodeURIComponent(avatarUrl)}`, {
-                      headers: { Authorization: `Bearer ${getToken()}` },
-                    });
-                    const blob = await res.blob();
-                    const file = new File([blob], 'avatar.jpg', { type: blob.type || 'image/jpeg' });
-                    setShowAvatarMenu(false);
-                    setCropFile(file);
-                  } catch {
-                    setShowAvatarMenu(false);
-                    fileInputRef.current?.click();
-                  } finally {
-                    setLoadingAdjust(false);
-                  }
+                onClick={() => {
+                  setShowAvatarMenu(false);
+                  setAdjustUrl(avatarUrl);
                 }}
                 className="w-full flex items-center gap-3 px-5 py-3.5 text-text-primary hover:bg-mansion-elevated/50 transition-colors"
               >
                 <Move className="w-4.5 h-4.5 text-mansion-gold" />
-                <span className="text-sm font-medium">
-                  {loadingAdjust ? 'Cargando...' : 'Ajustar posición'}
-                </span>
+                <span className="text-sm font-medium">Ajustar posición</span>
               </button>
             </div>
             <button
@@ -294,10 +295,11 @@ export default function ProfilePage() {
             >
               <div className="w-full h-full rounded-full bg-mansion-card flex items-center justify-center overflow-hidden">
                 {avatarUrl ? (
-                  <img
+                  <AvatarImg
                     src={avatarUrl}
+                    crop={user?.avatar_crop}
                     alt="Mi perfil"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full"
                   />
                 ) : (
                   <Camera className="w-8 h-8 text-text-dim" />
@@ -319,7 +321,12 @@ export default function ProfilePage() {
             />
           </div>
 
-          <h2 className="font-display text-xl font-bold text-text-primary mt-4">{displayName}</h2>
+          <h2
+            className="font-display text-xl font-bold text-text-primary mt-4 cursor-pointer hover:underline"
+            onClick={() => user?.id && navigate(`/perfiles/${user.id}`)}
+          >
+            {displayName}
+          </h2>
           <p className="text-text-muted text-sm">{[displayCity, displayRole].filter(Boolean).join(' · ')}</p>
 
           {/* Coins balance */}

@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Radio } from 'lucide-react';
 import ProfileCard from '../components/ProfileCard';
+import AvatarImg from '../components/AvatarImg';
 import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 
@@ -103,7 +104,7 @@ export default function FeedPage() {
                   <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: innerGap }}>
                     <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
                       {photo ? (
-                        <img src={photo} alt={p.name} className="w-full h-full object-cover" />
+                        <AvatarImg src={photo} crop={p.avatar_crop} alt={p.name} className="w-full h-full" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
                           {p.name?.charAt(0)}

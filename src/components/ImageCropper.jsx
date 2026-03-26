@@ -4,9 +4,12 @@ import { ZoomIn, ZoomOut, Check, X, Move } from 'lucide-react';
 /**
  * Circular image cropper with drag + pinch/scroll zoom.
  * Accepts either a File (file prop) or a URL string (imageUrl prop).
- * Returns a cropped square File via onCrop(file).
+ * 
+ * Modes:
+ * - Default: crops to a square File via onCrop(file)
+ * - positionOnly: returns {x, y, s} via onPosition(crop) for CSS object-position + scale
  */
-export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCancel, cropSize = 400 }) {
+export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCancel, onPosition, positionOnly, cropSize = 400 }) {
   const [imageUrl, setImageUrl] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -148,8 +151,22 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
     });
   };
 
-  // ── Crop & output ──
-  const handleCrop = () => {
+  // ── Confirm ──
+  const handleConfirm = () => {
+    if (positionOnly) {
+      // Calculate object-position percentages + relative scale
+      const { w, h } = imgNatural;
+      const centerImgX = (viewportSize / 2 - offset.x) / zoom;
+      const centerImgY = (viewportSize / 2 - offset.y) / zoom;
+      const fitZoom = viewportSize / Math.min(w, h);
+      onPosition({
+        x: Math.round((centerImgX / w) * 1000) / 10,
+        y: Math.round((centerImgY / h) * 1000) / 10,
+        s: Math.round((zoom / fitZoom) * 100) / 100,
+      });
+      return;
+    }
+
     const canvas = document.createElement('canvas');
     canvas.width = cropSize;
     canvas.height = cropSize;
@@ -280,7 +297,7 @@ export default function ImageCropper({ file, imageUrl: externalUrl, onCrop, onCa
         </button>
         <button
           type="button"
-          onClick={handleCrop}
+          onClick={handleConfirm}
           className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-mansion-gold text-black text-sm font-bold hover:bg-mansion-gold-light transition-colors"
         >
           <Check className="w-4 h-4" />

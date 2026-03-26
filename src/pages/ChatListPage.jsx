@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, MessageCircle } from 'lucide-react';
 import { getConversations, getToken, getStoredUser } from '../lib/api';
+import AvatarImg from '../components/AvatarImg';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 
 function timeAgo(dateStr) {
@@ -146,10 +147,11 @@ export default function ChatListPage() {
                 <div className={`w-[60px] h-[60px] rounded-full overflow-hidden ${
                   conv.unread > 0 ? 'ring-2 ring-mansion-gold/50' : ''
                 }`}>
-                  <img
+                  <AvatarImg
                     src={conv.avatar}
+                    crop={conv.avatarCrop}
                     alt={conv.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full"
                   />
                 </div>
                 {conv.online && (

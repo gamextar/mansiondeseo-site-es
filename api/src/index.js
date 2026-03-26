@@ -832,7 +832,7 @@ async function handleConversations(request, env) {
   const partnerIds = results.map(r => r.partner_id);
   const placeholders = partnerIds.map(() => '?').join(',');
   const { results: partners } = await env.DB.prepare(
-    `SELECT id, username, avatar_url, last_active FROM users WHERE id IN (${placeholders})`
+    `SELECT id, username, avatar_url, avatar_crop, last_active FROM users WHERE id IN (${placeholders})`
   ).bind(...partnerIds).all();
   const partnerMap = new Map(partners.map(p => [p.id, p]));
 
@@ -877,6 +877,7 @@ async function handleConversations(request, env) {
       profileId: r.partner_id,
       name: partner.username,
       avatar: partner.avatar_url || '',
+      avatarCrop: safeParseJSON(partner.avatar_crop, null),
       lastMessage: msg ? msg.content.slice(0, 50) : '',
       timestamp: r.last_at,
       unread: r.unread,
@@ -1133,7 +1134,7 @@ async function handleUpdateProfile(request, env) {
   if (!auth) return error('No autorizado', 401);
 
   const body = await request.json();
-  const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'city', 'bio', 'avatar_url', 'premium'];
+  const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'city', 'bio', 'avatar_url', 'avatar_crop', 'premium'];
 
   // Validate and allow photos reorder (all URLs must originate from our R2 bucket)
   if (body.photos !== undefined) {
@@ -1157,7 +1158,7 @@ async function handleUpdateProfile(request, env) {
 
   for (const field of allowedFields) {
     if (body[field] !== undefined) {
-      if (field === 'interests' || field === 'photos') {
+      if (field === 'interests' || field === 'photos' || field === 'avatar_crop') {
         updates.push(`${field} = ?`);
         values.push(JSON.stringify(body[field]));
       } else if (field === 'ghost_mode' || field === 'premium') {
@@ -1229,6 +1230,7 @@ function sanitizeUser(user, env) {
     ...safe,
     interests: safeParseJSON(safe.interests, []),
     photos: safeParseJSON(safe.photos, []),
+    avatar_crop: safeParseJSON(safe.avatar_crop, null),
     verified: !!safe.verified,
     online: !!safe.online,
     premium: premiumActive,
