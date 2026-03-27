@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Download, Film, LoaderCircle, Play, RefreshCw, Scissors, Upload, Wand2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, Download, Film, LoaderCircle, Play, RefreshCw, Scissors, SlidersHorizontal, Upload, Wand2 } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 
@@ -227,6 +227,8 @@ export default function VideoLabPage() {
     if (typeof window === 'undefined') return VIDEO_PRESETS[0].id;
     return window.localStorage.getItem(VIDEO_PRESET_STORAGE_KEY) || VIDEO_PRESETS[0].id;
   });
+  const [showCustomParams, setShowCustomParams] = useState(false);
+  const [customOverrides, setCustomOverrides] = useState({});
 
   const maxStart = Math.max(0, sourceDuration - MAX_CLIP_SECONDS);
   const selectedDuration = sourceDuration > 0 ? Math.min(MAX_CLIP_SECONDS, sourceDuration - clipStart || MAX_CLIP_SECONDS) : 0;
@@ -237,7 +239,16 @@ export default function VideoLabPage() {
   const overallProgress = processing ? processingProgress : engineProgress;
   const outputProfile = getOutputProfile(sourceResolution);
   const selectedPreset = VIDEO_PRESETS.find((preset) => preset.id === selectedPresetId) || VIDEO_PRESETS[0];
-  const outputEstimateLabel = getEstimatedOutputSizeLabel(MAX_CLIP_SECONDS, selectedPreset);
+  // Merge preset with any user overrides
+  const activeParams = {
+    crf: customOverrides.crf ?? selectedPreset.crf,
+    maxrate: customOverrides.maxrate ?? selectedPreset.maxrate,
+    bufsize: customOverrides.bufsize ?? selectedPreset.bufsize,
+    preset: customOverrides.preset ?? selectedPreset.preset,
+    audioBitrate: customOverrides.audioBitrate ?? selectedPreset.audioBitrate,
+    estimatedVideoBitrate: selectedPreset.estimatedVideoBitrate,
+  };
+  const outputEstimateLabel = getEstimatedOutputSizeLabel(MAX_CLIP_SECONDS, activeParams);
 
   if (!ffmpegRef.current) {
     ffmpegRef.current = new FFmpeg();
@@ -465,13 +476,13 @@ export default function VideoLabPage() {
         '-c:v', 'libx264',
         '-threads', '4',
         '-x264-params', 'sliced-threads=1:threads=4',
-        '-crf', selectedPreset.crf,
-        '-maxrate', selectedPreset.maxrate,
-        '-bufsize', selectedPreset.bufsize,
-        '-preset', selectedPreset.preset,
+        '-crf', activeParams.crf,
+        '-maxrate', activeParams.maxrate,
+        '-bufsize', activeParams.bufsize,
+        '-preset', activeParams.preset,
         '-pix_fmt', 'yuv420p',
         '-c:a', 'aac',
-        '-b:a', selectedPreset.audioBitrate,
+        '-b:a', activeParams.audioBitrate,
         outputFileName,
       ]);
 
@@ -625,7 +636,7 @@ export default function VideoLabPage() {
                     <span className="sr-only">Preset de conversión</span>
                     <select
                       value={selectedPreset.id}
-                      onChange={(event) => setSelectedPresetId(event.target.value)}
+                      onChange={(event) => { setSelectedPresetId(event.target.value); setCustomOverrides({}); }}
                       className="w-full rounded-2xl bg-mansion-elevated/85 border border-mansion-border/30 px-4 py-3 text-text-primary focus:outline-none focus:border-mansion-gold/40"
                     >
                       {VIDEO_PRESETS.map((preset) => (
@@ -636,6 +647,118 @@ export default function VideoLabPage() {
                     </select>
                   </label>
                 </div>
+
+                {/* Custom parameter controls */}
+                <button
+                  type="button"
+                  onClick={() => setShowCustomParams((v) => !v)}
+                  className="flex items-center gap-2 text-sm text-text-muted hover:text-text-primary transition-colors mb-3"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  Personalizar parámetros
+                  {showCustomParams ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  {Object.keys(customOverrides).length > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-mansion-gold/20 text-mansion-gold font-semibold">
+                      {Object.keys(customOverrides).length} cambio{Object.keys(customOverrides).length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </button>
+
+                {showCustomParams && (
+                  <div className="rounded-2xl bg-black/20 border border-white/[0.06] p-4 mb-5 space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {/* CRF */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-[11px] uppercase tracking-[0.18em] text-text-dim font-semibold">CRF</label>
+                          <span className="text-sm font-semibold text-mansion-gold tabular-nums">{activeParams.crf}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="18"
+                          max="32"
+                          step="1"
+                          value={activeParams.crf}
+                          onChange={(e) => setCustomOverrides((prev) => ({ ...prev, crf: e.target.value }))}
+                          className="w-full accent-mansion-gold"
+                        />
+                        <p className="text-[10px] text-text-dim mt-1">Calidad constante. Menor = más calidad y peso. 18–22 alta, 23–25 buena, 26+ liviana.</p>
+                      </div>
+
+                      {/* Maxrate */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-[11px] uppercase tracking-[0.18em] text-text-dim font-semibold">Cap (maxrate)</label>
+                          <span className="text-sm font-semibold text-mansion-gold tabular-nums">{activeParams.maxrate}</span>
+                        </div>
+                        <select
+                          value={activeParams.maxrate}
+                          onChange={(e) => {
+                            const mr = e.target.value;
+                            const bs = String(parseInt(mr) * 2) + (mr.includes('M') ? 'M' : 'k');
+                            setCustomOverrides((prev) => ({ ...prev, maxrate: mr, bufsize: bs }));
+                          }}
+                          className="w-full rounded-xl bg-mansion-elevated/85 border border-mansion-border/30 px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-mansion-gold/40"
+                        >
+                          {['1500k', '2000k', '2500k', '3000k', '3500k', '4000k', '4500k', '5000k', '5500k', '6000k'].map((v) => (
+                            <option key={v} value={v}>{v}</option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-text-dim mt-1">Techo de bitrate. Limita picos para controlar tamaño. Bufsize se ajusta auto a 2×.</p>
+                      </div>
+
+                      {/* Preset (speed) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-[11px] uppercase tracking-[0.18em] text-text-dim font-semibold">Velocidad (preset)</label>
+                          <span className="text-sm font-semibold text-mansion-gold">{activeParams.preset}</span>
+                        </div>
+                        <select
+                          value={activeParams.preset}
+                          onChange={(e) => setCustomOverrides((prev) => ({ ...prev, preset: e.target.value }))}
+                          className="w-full rounded-xl bg-mansion-elevated/85 border border-mansion-border/30 px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-mansion-gold/40"
+                        >
+                          {['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium'].map((v) => (
+                            <option key={v} value={v}>{v}</option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-text-dim mt-1">Más rápido = encode más veloz pero peor compresión. ultrafast ideal para iPhone/WASM.</p>
+                      </div>
+
+                      {/* Audio bitrate */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-[11px] uppercase tracking-[0.18em] text-text-dim font-semibold">Audio bitrate</label>
+                          <span className="text-sm font-semibold text-mansion-gold">{activeParams.audioBitrate}</span>
+                        </div>
+                        <select
+                          value={activeParams.audioBitrate}
+                          onChange={(e) => setCustomOverrides((prev) => ({ ...prev, audioBitrate: e.target.value }))}
+                          className="w-full rounded-xl bg-mansion-elevated/85 border border-mansion-border/30 px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-mansion-gold/40"
+                        >
+                          {['16k', '24k', '32k', '48k', '64k', '96k', '128k'].map((v) => (
+                            <option key={v} value={v}>{v}</option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-text-dim mt-1">Para voces 32k basta. Para música 64k–128k.</p>
+                      </div>
+                    </div>
+
+                    {/* Bufsize info */}
+                    <div className="flex items-center justify-between text-xs text-text-dim px-1">
+                      <span>Bufsize: {activeParams.bufsize}</span>
+                      {Object.keys(customOverrides).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomOverrides({})}
+                          className="text-mansion-crimson hover:text-mansion-crimson-dark transition-colors"
+                        >
+                          Restaurar preset
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <div>
@@ -762,7 +885,7 @@ export default function VideoLabPage() {
               <div className="grid gap-3 mt-5 sm:grid-cols-2 xl:grid-cols-1">
                 <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Salida objetivo</p>
-                  <p className="text-sm text-text-primary mt-1">{`MP4 · ${outputProfile.label} · ${selectedPreset.codecLabel} · ${outputEstimateLabel}`}</p>
+                  <p className="text-sm text-text-primary mt-1">{`MP4 · ${outputProfile.label} · CRF ${activeParams.crf} · ${activeParams.maxrate} cap · ${activeParams.preset} · ${outputEstimateLabel}`}</p>
                 </div>
                 <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Motor</p>
