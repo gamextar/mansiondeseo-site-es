@@ -78,6 +78,19 @@ const VIDEO_PRESETS = [
     preset: 'superfast',
     estimatedVideoBitrate: '3.2M',
   },
+  {
+    id: 'iphone-fast',
+    label: 'iPhone Rápido',
+    description: 'Optimizado para encode rápido en iPhone: ultrafast + CRF 26 + cap 2.5M. Tamaño mínimo, calidad aceptable a 720p.',
+    statusLabel: 'modo iPhone rápido',
+    codecLabel: 'H.264 CRF 26 + cap 2.5M + AAC 24k',
+    crf: '26',
+    maxrate: '2500k',
+    bufsize: '5000k',
+    audioBitrate: '24k',
+    preset: 'ultrafast',
+    estimatedVideoBitrate: '1.8M',
+  },
 ];
 
 function formatTime(totalSeconds) {
