@@ -704,9 +704,7 @@ export default function VideoLabPage() {
                         <select
                           value={activeParams.maxrate}
                           onChange={(e) => {
-                            const mr = e.target.value;
-                            const bs = String(parseInt(mr) * 2) + (mr.includes('M') ? 'M' : 'k');
-                            setCustomOverrides((prev) => ({ ...prev, maxrate: mr, bufsize: bs }));
+                            setCustomOverrides((prev) => ({ ...prev, maxrate: e.target.value }));
                           }}
                           className="w-full rounded-xl bg-mansion-elevated/85 border border-mansion-border/30 px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-mansion-gold/40"
                         >
@@ -754,18 +752,35 @@ export default function VideoLabPage() {
                       </div>
                     </div>
 
-                    {/* Bufsize info */}
-                    <div className="flex items-center justify-between text-xs text-text-dim px-1">
-                      <span>Bufsize: {activeParams.bufsize}</span>
-                      {Object.keys(customOverrides).length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setCustomOverrides({})}
-                          className="text-mansion-crimson hover:text-mansion-crimson-dark transition-colors"
+                    {/* Bufsize */}
+                    <div className="grid gap-4 sm:grid-cols-2 mt-4 pt-4 border-t border-white/[0.06]">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-[11px] uppercase tracking-[0.18em] text-text-dim font-semibold">Bufsize</label>
+                          <span className="text-sm font-semibold text-mansion-gold tabular-nums">{activeParams.bufsize}</span>
+                        </div>
+                        <select
+                          value={activeParams.bufsize}
+                          onChange={(e) => setCustomOverrides((prev) => ({ ...prev, bufsize: e.target.value }))}
+                          className="w-full rounded-xl bg-mansion-elevated/85 border border-mansion-border/30 px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-mansion-gold/40"
                         >
-                          Restaurar preset
-                        </button>
-                      )}
+                          {['3000k', '4000k', '5000k', '6000k', '7000k', '8000k', '10000k', '12000k'].map((v) => (
+                            <option key={v} value={v}>{v}</option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-text-dim mt-1">Ventana del rate control. Mayor = picos más altos pero promedio estable. Menor = bitrate más parejo frame a frame. Típico: 1.5× a 2× del maxrate.</p>
+                      </div>
+                      <div className="flex items-end">
+                        {Object.keys(customOverrides).length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setCustomOverrides({})}
+                            className="text-xs text-mansion-crimson hover:text-mansion-crimson-dark transition-colors"
+                          >
+                            Restaurar preset
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
