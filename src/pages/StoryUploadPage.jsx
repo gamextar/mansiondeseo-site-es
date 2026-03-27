@@ -133,6 +133,7 @@ export default function StoryUploadPage() {
   const ffmpegRef = useRef(null);
   const loadPromiseRef = useRef(null);
   const videoRef = useRef(null);
+  const pendingSourceUrlRef = useRef('');
   const resultUrlRef = useRef('');
   const activeSegmentDurationRef = useRef(0);
   const isTranscodingRef = useRef(false);
@@ -191,14 +192,18 @@ export default function StoryUploadPage() {
       ffmpeg.off('progress', handleProgress);
       ffmpeg.off('log', handleLog);
       ffmpeg.terminate();
-      if (pendingSourceUrl) URL.revokeObjectURL(pendingSourceUrl);
+      if (pendingSourceUrlRef.current) URL.revokeObjectURL(pendingSourceUrlRef.current);
       if (resultUrlRef.current) URL.revokeObjectURL(resultUrlRef.current);
     };
-  }, [pendingSourceUrl]);
+  }, []);
 
   useEffect(() => {
     resultUrlRef.current = result?.url || '';
   }, [result]);
+
+  useEffect(() => {
+    pendingSourceUrlRef.current = pendingSourceUrl;
+  }, [pendingSourceUrl]);
 
   /* Preload engine on mount */
   useEffect(() => {
