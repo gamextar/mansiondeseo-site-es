@@ -150,7 +150,8 @@ export default function StoryUploadPage() {
   useEffect(() => { sourceUrlRef.current = sourceUrl; }, [sourceUrl]);
   useEffect(() => { resultUrlRef.current = resultUrl; }, [resultUrl]);
 
-  /* ── Thumbnail extraction ── */
+  /* ── Thumbnail extraction — DISABLED for perf testing ── */
+  /*
   useEffect(() => {
     if (!sourceUrl || sourceDuration <= 0) { setThumbnails([]); return; }
     let cancelled = false;
@@ -173,10 +174,12 @@ export default function StoryUploadPage() {
         ctx.drawImage(vid, 0, 0, 80, 56);
         arr.push(canvas.toDataURL('image/jpeg', 0.4));
       }
+      }
       if (!cancelled) setThumbnails(arr);
     };
     return () => { cancelled = true; };
   }, [sourceUrl, sourceDuration]);
+  */
 
   /* ── Engine loader ── */
   const ensureEngine = async () => {
