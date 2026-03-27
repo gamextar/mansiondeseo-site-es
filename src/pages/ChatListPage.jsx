@@ -37,7 +37,7 @@ function setCachedConversations(convs) {
   try { sessionStorage.setItem(CONV_CACHE_KEY, JSON.stringify(convs)); } catch {}
 }
 
-function ConversationRow({ conv, index, typing, onDelete, deleting }) {
+function ConversationRow({ conv, typing, onDelete, deleting }) {
   const navigate = useNavigate();
   const [dragX, setDragX] = useState(0);
   const [revealed, setRevealed] = useState(false);
@@ -70,10 +70,7 @@ function ConversationRow({ conv, index, typing, onDelete, deleting }) {
   }, [conv, deleting, navigate]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+    <div
       className="relative overflow-hidden rounded-xl bg-mansion-base"
     >
       <div className="absolute inset-y-0 right-0 z-0 flex items-center gap-2 pr-3">
@@ -164,7 +161,7 @@ function ConversationRow({ conv, index, typing, onDelete, deleting }) {
           </div>
         </button>
       </motion.div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -303,7 +300,12 @@ export default function ChatListPage() {
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
       {/* Header */}
-      <div className="px-4 lg:px-8 pt-4 lg:pt-6 pb-3">
+      <motion.div
+        className="px-4 lg:px-8 pt-4 lg:pt-6 pb-3"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+      >
         <h1 className="font-display text-2xl font-bold text-text-primary mb-4">Mensajes</h1>
 
         {/* Search bar */}
@@ -315,10 +317,15 @@ export default function ChatListPage() {
             className="w-full pl-10 py-2.5 text-sm"
           />
         </div>
-      </div>
+      </motion.div>
 
       {/* Conversation list */}
-      <div className="px-2 lg:px-6 lg:max-w-3xl">
+      <motion.div
+        className="px-2 lg:px-6 lg:max-w-3xl"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
+      >
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
@@ -334,14 +341,13 @@ export default function ChatListPage() {
           <ConversationRow
             key={conv.id}
             conv={conv}
-            index={index}
             typing={!!typingChats[conv.profileId]}
             deleting={deletingId === conv.id}
             onDelete={handleDeleteConversation}
           />
         ))
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }
