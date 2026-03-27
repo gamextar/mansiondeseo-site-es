@@ -125,13 +125,18 @@ export default function StoryUploadPage() {
   /* ── FFmpeg lifecycle ── */
   useEffect(() => {
     const ff = ffmpegRef.current;
+    const onProgress = () => {
+      // Suppress built-in progress event — rely only on log-based time= parsing
+    };
     const onLog = ({ message }) => {
       if (!isTranscodingRef.current) return;
       const t = parseFfmpegTime(message);
       if (t !== null && activeSegRef.current > 0) setProgress(clamp(t / activeSegRef.current, 0, 0.99));
     };
+    ff.on('progress', onProgress);
     ff.on('log', onLog);
     return () => {
+      ff.off('progress', onProgress);
       ff.off('log', onLog);
       ff.terminate();
       if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
@@ -517,14 +522,12 @@ export default function StoryUploadPage() {
               <h2 className="font-display text-2xl font-bold mb-2">Procesando tu historia…</h2>
               <p className="text-text-muted text-sm mb-8">Esto puede tomar unos segundos.</p>
 
-              {/* Minimal progress bar */}
+              {/* Minimal progress bar — plain CSS transition to avoid competing with WASM for CPU */}
               <div className="w-full max-w-xs">
                 <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.round(progress * 100)}%` }}
-                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300"
+                    style={{ width: `${Math.round(progress * 100)}%` }}
                   />
                 </div>
                 <p className="text-sm text-text-dim mt-2 tabular-nums">{Math.round(progress * 100)}%</p>
