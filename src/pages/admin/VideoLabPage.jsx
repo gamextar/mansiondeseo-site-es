@@ -16,12 +16,12 @@ const VIDEO_PRESETS = [
   {
     id: 'normal',
     label: 'Normal Quality',
-    description: 'CRF 29 + cap 2700k + superfast + buffer 8000k + audio mono 64k. Buen balance entre velocidad, tamaño y calidad.',
+    description: 'CRF 29 + cap 3000k + superfast + buffer 9000k + audio mono 64k. Buen balance entre velocidad, tamaño y calidad.',
     statusLabel: 'modo normal',
-    codecLabel: 'H.264 CRF 29 + cap 2.7M + AAC 64k mono',
+    codecLabel: 'H.264 CRF 29 + cap 3M + AAC 64k mono',
     crf: '29',
-    maxrate: '2700k',
-    bufsize: '8000k',
+    maxrate: '3000k',
+    bufsize: '9000k',
     audioBitrate: '64k',
     audioMono: true,
     preset: 'superfast',
@@ -156,10 +156,6 @@ export default function VideoLabPage() {
   const [sourceDuration, setSourceDuration] = useState(0);
   const [sourceResolution, setSourceResolution] = useState(null);
   const [clipStart, setClipStart] = useState(0);
-  const [clipEnd, setClipEnd] = useState(0);
-  const [thumbnails, setThumbnails] = useState([]);
-  const trimmerRef = useRef(null);
-  const draggingRef = useRef(null);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -173,8 +169,10 @@ export default function VideoLabPage() {
   const [showCustomParams, setShowCustomParams] = useState(false);
   const [customOverrides, setCustomOverrides] = useState({});
 
-  const selectedDuration = clipEnd > clipStart ? clipEnd - clipStart : 0;
-  const segmentWidth = sourceDuration > 0 ? ((clipEnd - clipStart) / sourceDuration) * 100 : 0;
+  const maxStart = Math.max(0, sourceDuration - MAX_CLIP_SECONDS);
+  const selectedDuration = sourceDuration > 0 ? Math.min(MAX_CLIP_SECONDS, sourceDuration - clipStart || MAX_CLIP_SECONDS) : 0;
+  const clipEnd = sourceDuration > 0 ? Math.min(sourceDuration, clipStart + MAX_CLIP_SECONDS) : 0;
+  const segmentWidth = sourceDuration > 0 ? Math.min((Math.min(MAX_CLIP_SECONDS, sourceDuration) / sourceDuration) * 100, 100) : 0;
   const segmentOffset = sourceDuration > 0 ? (clipStart / sourceDuration) * 100 : 0;
   const engineReady = engineState === 'ready';
   const overallProgress = processing ? processingProgress : engineProgress;
@@ -238,54 +236,6 @@ export default function VideoLabPage() {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(VIDEO_PRESET_STORAGE_KEY, selectedPreset.id);
   }, [selectedPreset]);
-
-  // Extract thumbnails for the filmstrip trimmer (uses the existing DOM video)
-  const extractThumbnails = () => {
-    const video = videoRef.current;
-    if (!video || sourceDuration <= 0) return;
-    const count = Math.min(12, Math.max(6, Math.ceil(sourceDuration / 2.5)));
-    const step = sourceDuration / count;
-    const canvas = document.createElement('canvas');
-    canvas.width = 60;
-    canvas.height = 40;
-    const ctx = canvas.getContext('2d');
-    let i = 0;
-    let cancelled = false;
-    const savedTime = video.currentTime;
-
-    const captureNext = () => {
-      if (cancelled || i >= count) {
-        video.removeEventListener('seeked', onSeeked);
-        video.currentTime = savedTime;
-        return;
-      }
-      video.currentTime = Math.min(i * step + 0.01, sourceDuration - 0.01);
-    };
-
-    const onSeeked = () => {
-      if (cancelled || i >= count) return;
-      ctx.drawImage(video, 0, 0, 60, 40);
-      setThumbnails((prev) => [...prev, canvas.toDataURL('image/jpeg', 0.3)]);
-      i++;
-      captureNext();
-    };
-
-    video.addEventListener('seeked', onSeeked);
-    setThumbnails([]);
-    captureNext();
-
-    // Timeout safety
-    const timeout = setTimeout(() => {
-      cancelled = true;
-      video.removeEventListener('seeked', onSeeked);
-    }, 10000);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-      video.removeEventListener('seeked', onSeeked);
-    };
-  };
 
   const ensureEngineLoaded = async () => {
     const ffmpeg = ffmpegRef.current;
@@ -364,7 +314,6 @@ export default function VideoLabPage() {
     setErrorMessage('');
     setStatusText('Archivo cargado. Ajusta el inicio del clip.');
     setClipStart(0);
-    setClipEnd(0);
     setSourceDuration(0);
     setSourceResolution(null);
     setSourceFile(file);
@@ -380,13 +329,9 @@ export default function VideoLabPage() {
   const handleLoadedMetadata = () => {
     const video = videoRef.current;
     if (!video) return;
-    const dur = video.duration || 0;
-    setSourceDuration(dur);
+    setSourceDuration(video.duration || 0);
     setSourceResolution(video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : null);
     setClipStart(0);
-    setClipEnd(Math.min(dur, MAX_CLIP_SECONDS));
-    // Trigger thumbnail extraction once metadata is ready
-    setTimeout(() => extractThumbnails(), 100);
   };
 
   const syncPreviewToSelection = (nextStart) => {
@@ -396,10 +341,8 @@ export default function VideoLabPage() {
   };
 
   const handleStartChange = (nextValue) => {
-    const nextStart = clamp(Number(nextValue), 0, Math.max(0, sourceDuration - 1));
-    const nextEnd = Math.min(sourceDuration, nextStart + MAX_CLIP_SECONDS);
+    const nextStart = clamp(Number(nextValue), 0, maxStart);
     setClipStart(nextStart);
-    setClipEnd(nextEnd);
     syncPreviewToSelection(nextStart);
   };
 
@@ -429,37 +372,6 @@ export default function VideoLabPage() {
         video.play().catch(() => {});
       }
     }
-  };
-
-  const onHandlePointerDown = (e, handle) => {
-    e.preventDefault();
-    draggingRef.current = handle;
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const onHandlePointerMove = (e) => {
-    const handle = draggingRef.current;
-    if (!handle) return;
-    const el = trimmerRef.current;
-    if (!el || sourceDuration <= 0) return;
-    const rect = el.getBoundingClientRect();
-    const frac = clamp((e.clientX - rect.left) / rect.width, 0, 1);
-    const time = frac * sourceDuration;
-    if (handle === 'left') {
-      const minStart = Math.max(0, clipEnd - MAX_CLIP_SECONDS);
-      const newStart = clamp(time, minStart, clipEnd - 0.5);
-      setClipStart(newStart);
-      syncPreviewToSelection(newStart);
-    } else {
-      const maxEnd = Math.min(sourceDuration, clipStart + MAX_CLIP_SECONDS);
-      const newEnd = clamp(time, clipStart + 0.5, maxEnd);
-      setClipEnd(newEnd);
-      if (videoRef.current) videoRef.current.currentTime = newEnd;
-    }
-  };
-
-  const onHandlePointerUp = () => {
-    draggingRef.current = null;
   };
 
   const transcodeVideo = async () => {
@@ -822,8 +734,8 @@ export default function VideoLabPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-text-dim font-semibold">2. Segmento</p>
-                    <h3 className="font-display text-xl mt-1">Recorta hasta {MAX_CLIP_SECONDS}s</h3>
-                    <p className="text-sm text-text-dim mt-1">Arrastra las manijas doradas para elegir el fragmento. Máximo {MAX_CLIP_SECONDS} segundos.</p>
+                    <h3 className="font-display text-xl mt-1">Elige el inicio del clip</h3>
+                    <p className="text-sm text-text-dim mt-1">La salida dura hasta 15 segundos. Si el video es más corto, se usa completo.</p>
                   </div>
                   <button
                     type="button"
@@ -836,68 +748,28 @@ export default function VideoLabPage() {
                   </button>
                 </div>
 
-                {/* iPhone-style filmstrip trimmer */}
-                <div ref={trimmerRef} className="relative h-[60px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
-                  {/* Filmstrip thumbnails or simple gradient bar */}
-                  <div className="absolute inset-0 flex">
-                    {thumbnails.length > 0
-                      ? thumbnails.map((src, i) => (
-                          <img key={i} src={src} alt="" className="h-full flex-1 object-cover" draggable={false} />
-                        ))
-                      : (
-                          <div className="flex-1 bg-gradient-to-r from-white/[0.04] via-white/[0.08] to-white/[0.04]" />
-                        )}
-                  </div>
-
-                  {/* Left dimmed overlay */}
+                <div className="relative h-4 rounded-full bg-black/30 overflow-hidden mb-4">
                   <div
-                    className="absolute inset-y-0 left-0 bg-black/60 pointer-events-none"
-                    style={{ width: `${segmentOffset}%` }}
+                    className="absolute inset-y-0 rounded-full bg-gradient-to-r from-mansion-crimson via-mansion-gold to-mansion-gold-light"
+                    style={{
+                      left: `${segmentOffset}%`,
+                      width: `${segmentWidth}%`,
+                    }}
                   />
-                  {/* Right dimmed overlay */}
-                  <div
-                    className="absolute inset-y-0 right-0 bg-black/60 pointer-events-none"
-                    style={{ width: `${Math.max(0, 100 - segmentOffset - segmentWidth)}%` }}
-                  />
-
-                  {/* Selection frame (top/bottom borders) */}
-                  <div
-                    className="absolute inset-y-0 pointer-events-none"
-                    style={{ left: `${segmentOffset}%`, width: `${segmentWidth}%` }}
-                  >
-                    <div className="absolute top-0 left-3.5 right-3.5 h-[3px] bg-mansion-gold" />
-                    <div className="absolute bottom-0 left-3.5 right-3.5 h-[3px] bg-mansion-gold" />
-                  </div>
-
-                  {/* Left handle */}
-                  <div
-                    className="absolute inset-y-0 z-10 cursor-ew-resize"
-                    style={{ left: `calc(${segmentOffset}% - 6px)`, width: '20px' }}
-                    onPointerDown={(e) => onHandlePointerDown(e, 'left')}
-                    onPointerMove={onHandlePointerMove}
-                    onPointerUp={onHandlePointerUp}
-                  >
-                    <div className="absolute inset-y-0 right-0 w-3.5 bg-mansion-gold rounded-l-lg flex items-center justify-center">
-                      <div className="w-[2px] h-5 rounded-full bg-mansion-base/40" />
-                    </div>
-                  </div>
-
-                  {/* Right handle */}
-                  <div
-                    className="absolute inset-y-0 z-10 cursor-ew-resize"
-                    style={{ left: `calc(${segmentOffset + segmentWidth}% - 14px)`, width: '20px' }}
-                    onPointerDown={(e) => onHandlePointerDown(e, 'right')}
-                    onPointerMove={onHandlePointerMove}
-                    onPointerUp={onHandlePointerUp}
-                  >
-                    <div className="absolute inset-y-0 left-0 w-3.5 bg-mansion-gold rounded-r-lg flex items-center justify-center">
-                      <div className="w-[2px] h-5 rounded-full bg-mansion-base/40" />
-                    </div>
-                  </div>
                 </div>
 
-                {/* Time labels */}
-                <div className="flex flex-wrap items-center justify-between gap-3 mt-3 text-sm">
+                <input
+                  type="range"
+                  min="0"
+                  max={maxStart || 0}
+                  step="0.1"
+                  value={clipStart}
+                  onChange={(event) => handleStartChange(event.target.value)}
+                  disabled={!sourceUrl || maxStart <= 0}
+                  className="w-full accent-mansion-gold"
+                />
+
+                <div className="flex flex-wrap items-center justify-between gap-3 mt-4 text-sm">
                   <div className="flex items-center gap-2">
                     <span className="text-text-dim">Inicio</span>
                     <span className="px-3 py-1.5 rounded-full bg-black/25 border border-white/10 font-medium">{formatTime(clipStart)}</span>
@@ -907,9 +779,9 @@ export default function VideoLabPage() {
                     <span className="px-3 py-1.5 rounded-full bg-black/25 border border-white/10 font-medium">{formatTime(clipEnd)}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-text-dim">Duración</span>
+                    <span className="text-text-dim">Duración seleccionada</span>
                     <span className="px-3 py-1.5 rounded-full bg-mansion-gold/10 border border-mansion-gold/20 text-mansion-gold font-semibold">
-                      {selectedDuration > 0 ? `${selectedDuration.toFixed(1)}s` : '—'}
+                      {selectedDuration ? `${selectedDuration.toFixed(1)}s` : '—'}
                     </span>
                   </div>
                 </div>
