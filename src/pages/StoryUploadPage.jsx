@@ -133,6 +133,7 @@ export default function StoryUploadPage() {
   const ffmpegRef = useRef(null);
   const loadPromiseRef = useRef(null);
   const videoRef = useRef(null);
+  const metadataStartRef = useRef(0);
   const pendingSourceUrlRef = useRef('');
   const resultUrlRef = useRef('');
   const activeSegmentDurationRef = useRef(0);
@@ -301,38 +302,34 @@ export default function StoryUploadPage() {
     setPendingFile(null);
     setPendingResolution(null);
     setPendingClipEnd(0);
+    metadataStartRef.current = performance.now();
+    setPendingFile(file);
+    setPendingSourceUrl(URL.createObjectURL(file));
+    setStatusText('Archivo cargado. Leyendo metadata...');
+    setStep('ready');
+  };
 
-    /* Read metadata via temp video element */
-    const metadataStartedAt = performance.now();
-    const url = URL.createObjectURL(file);
-    const tempVid = document.createElement('video');
-    tempVid.muted = true;
-    tempVid.preload = 'metadata';
-    tempVid.src = url;
-    const meta = await new Promise((resolve) => {
-      tempVid.onloadedmetadata = () => {
-        resolve({ duration: tempVid.duration || 0, width: tempVid.videoWidth || 0, height: tempVid.videoHeight || 0 });
-      };
-      tempVid.onerror = () => resolve({ duration: 0, width: 0, height: 0 });
-    });
-    tempVid.src = '';
-    URL.revokeObjectURL(url);
-    setProfileTimings((prev) => ({ ...prev, metadata: performance.now() - metadataStartedAt }));
+  const handleReadyLoadedMetadata = () => {
+    const video = videoRef.current;
+    if (!video) return;
 
-    const sourceResolution = meta.width && meta.height ? { width: meta.width, height: meta.height } : null;
-    const clipEnd = Math.min(meta.duration || 0, MAX_CLIP_SECONDS);
+    const duration = video.duration || 0;
+    const resolution = video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : null;
+    const clipEnd = Math.min(duration, MAX_CLIP_SECONDS);
+
+    if (metadataStartRef.current > 0) {
+      setProfileTimings((prev) => ({ ...prev, metadata: performance.now() - metadataStartRef.current }));
+      metadataStartRef.current = 0;
+    }
 
     if (clipEnd <= 0) {
       setErrorMessage('No se pudo leer el video.');
       return;
     }
 
-    setPendingFile(file);
-    setPendingResolution(sourceResolution);
+    setPendingResolution(resolution);
     setPendingClipEnd(clipEnd);
-    setPendingSourceUrl(URL.createObjectURL(file));
     setStatusText('Archivo listo. Continúa para convertir.');
-    setStep('ready');
   };
 
   const handleContinue = async () => {
@@ -637,7 +634,7 @@ export default function StoryUploadPage() {
                   muted
                   playsInline
                   className="w-full h-full object-contain bg-black"
-                  onLoadedData={() => setStatusText('Video precargado. Continúa para convertir.')}
+                  onLoadedMetadata={handleReadyLoadedMetadata}
                 />
               </div>
             )}
@@ -649,7 +646,8 @@ export default function StoryUploadPage() {
               <button
                 type="button"
                 onClick={handleContinue}
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-mansion-crimson text-white font-semibold hover:bg-mansion-crimson-dark transition-colors"
+                disabled={!pendingFile || pendingClipEnd <= 0}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-mansion-crimson text-white font-semibold hover:bg-mansion-crimson-dark disabled:opacity-60 transition-colors"
               >
                 <Play className="w-4 h-4" />
                 Continuar
