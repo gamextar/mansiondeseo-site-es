@@ -29,10 +29,6 @@ export default function SettingsPage() {
   const [blurMobile, setBlurMobile] = useState(14);
   const [blurDesktop, setBlurDesktop] = useState(8);
   const [freeVisiblePhotos, setFreeVisiblePhotos] = useState(1);
-  const [storyCircleSize, setStoryCircleSize] = useState(88);
-  const [storyCircleGap, setStoryCircleGap] = useState(8);
-  const [storyCircleBorder, setStoryCircleBorder] = useState(4);
-  const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
 
   // VIP
   const [showVipButton, setShowVipButton] = useState(true);
@@ -58,8 +54,6 @@ export default function SettingsPage() {
 
   // Iconografía
   const [incognitoIconSvg, setIncognitoIconSvg] = useState('');
-  const [coinIconUrl, setCoinIconUrl] = useState('');
-  const [coinIconSize, setCoinIconSize] = useState(18);
   const [roleHombreImg, setRoleHombreImg] = useState('');
   const [roleMujerImg, setRoleMujerImg] = useState('');
   const [roleParejaImg, setRoleParejaImg] = useState('');
@@ -91,10 +85,6 @@ export default function SettingsPage() {
         setBlurMobile(s.blurMobile);
         setBlurDesktop(s.blurDesktop);
         setFreeVisiblePhotos(s.freeVisiblePhotos);
-        setStoryCircleSize(s.storyCircleSize || 88);
-        setStoryCircleGap(s.storyCircleGap || 8);
-        setStoryCircleBorder(s.storyCircleBorder ?? 4);
-        setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
         setShowVipButton(s.showVipButton);
         setDailyMessageLimit(s.dailyMessageLimit);
         setSiteCountry(s.siteCountry);
@@ -104,8 +94,6 @@ export default function SettingsPage() {
         setVipPrice3Months(s.vipPrice3Months);
         setVipPrice6Months(s.vipPrice6Months);
         setIncognitoIconSvg(s.incognitoIconSvg || '');
-        setCoinIconUrl(s.coinIconUrl || '');
-        setCoinIconSize(s.coinIconSize || 18);
         setRoleHombreImg(s.roleHombreImg || '');
         setRoleMujerImg(s.roleMujerImg || '');
         setRoleParejaImg(s.roleParejaImg || '');
@@ -137,10 +125,6 @@ export default function SettingsPage() {
         blur_mobile: blurMobile,
         blur_desktop: blurDesktop,
         free_visible_photos: freeVisiblePhotos,
-        story_circle_size: storyCircleSize,
-        story_circle_gap: storyCircleGap,
-        story_circle_border: storyCircleBorder,
-        story_circle_inner_gap: storyCircleInnerGap,
         show_vip_button: showVipButton ? '1' : '0',
         daily_message_limit: dailyMessageLimit,
         site_country: siteCountry,
@@ -150,8 +134,6 @@ export default function SettingsPage() {
         vip_price_3months: vipPrice3Months,
         vip_price_6months: vipPrice6Months,
         incognito_icon_svg: incognitoIconSvg,
-        coin_icon_url: coinIconUrl,
-        coin_icon_size: coinIconSize,
         role_hombre_img: roleHombreImg,
         role_mujer_img: roleMujerImg,
         role_pareja_img: roleParejaImg,
@@ -174,10 +156,6 @@ export default function SettingsPage() {
       setBlurMobile(s.blurMobile);
       setBlurDesktop(s.blurDesktop);
       setFreeVisiblePhotos(s.freeVisiblePhotos);
-      setStoryCircleSize(s.storyCircleSize || 88);
-      setStoryCircleGap(s.storyCircleGap || 8);
-      setStoryCircleBorder(s.storyCircleBorder ?? 4);
-      setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
       setShowVipButton(s.showVipButton);
       setDailyMessageLimit(s.dailyMessageLimit);
       setSiteCountry(s.siteCountry);
@@ -187,8 +165,6 @@ export default function SettingsPage() {
       setVipPrice3Months(s.vipPrice3Months);
       setVipPrice6Months(s.vipPrice6Months);
       setIncognitoIconSvg(s.incognitoIconSvg || '');
-      setCoinIconUrl(s.coinIconUrl || '');
-      setCoinIconSize(s.coinIconSize || 18);
       setGalleryHombreImg(s.galleryHombreImg || '');
       setGalleryMujerImg(s.galleryMujerImg || '');
       setGalleryParejaImg(s.galleryParejaImg || '');
@@ -346,82 +322,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <Counter value={freeVisiblePhotos} onChange={setFreeVisiblePhotos} max={20} />
-              </div>
-            </div>
-
-            {/* Story Circle Size */}
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Globe className="w-4 h-4 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Tamaño Historias</h3>
-                  <p className="text-[11px] text-text-dim">Diámetro del círculo en px</p>
-                </div>
-              </div>
-              <input type="range" min="50" max="120" value={storyCircleSize} onChange={e => setStoryCircleSize(Number(e.target.value))} className="w-full accent-mansion-gold" />
-              <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>50px</span>
-                <span className="text-mansion-gold font-medium">{storyCircleSize}px</span>
-                <span>120px</span>
-              </div>
-            </div>
-
-            {/* Story Circle Gap */}
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Globe className="w-4 h-4 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Espaciado Historias</h3>
-                  <p className="text-[11px] text-text-dim">Separación entre círculos en px</p>
-                </div>
-              </div>
-              <input type="range" min="0" max="24" value={storyCircleGap} onChange={e => setStoryCircleGap(Number(e.target.value))} className="w-full accent-mansion-gold" />
-              <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>0px</span>
-                <span className="text-mansion-gold font-medium">{storyCircleGap}px</span>
-                <span>24px</span>
-              </div>
-            </div>
-
-            {/* Story Circle Border */}
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Globe className="w-4 h-4 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Borde Historias</h3>
-                  <p className="text-[11px] text-text-dim">Grosor del anillo en px</p>
-                </div>
-              </div>
-              <input type="range" min="1" max="8" value={storyCircleBorder} onChange={e => setStoryCircleBorder(Number(e.target.value))} className="w-full accent-mansion-gold" />
-              <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>1px</span>
-                <span className="text-mansion-gold font-medium">{storyCircleBorder}px</span>
-                <span>8px</span>
-              </div>
-            </div>
-
-            {/* Story Circle Inner Gap */}
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Globe className="w-4 h-4 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Espacio Interior Historias</h3>
-                  <p className="text-[11px] text-text-dim">Separación entre anillo y foto en px</p>
-                </div>
-              </div>
-              <input type="range" min="0" max="10" value={storyCircleInnerGap} onChange={e => setStoryCircleInnerGap(Number(e.target.value))} className="w-full accent-mansion-gold" />
-              <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>0px</span>
-                <span className="text-mansion-gold font-medium">{storyCircleInnerGap}px</span>
-                <span>10px</span>
               </div>
             </div>
 
@@ -631,55 +531,6 @@ export default function SettingsPage() {
             <h2 className="text-xs font-bold text-text-primary uppercase tracking-wider">Iconografía</h2>
           </div>
           <div className="space-y-3">
-
-            {/* Coin Icon */}
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <DollarSign className="w-4 h-4 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Ícono de Monedas</h3>
-                  <p className="text-[11px] text-text-dim">Aparece en la barra superior junto al contador. PNG/WebP recomendado.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <label className="flex flex-col items-center justify-center gap-2 w-24 h-24 rounded-xl border-2 border-dashed border-mansion-border/40 hover:border-mansion-gold/40 cursor-pointer transition-colors bg-mansion-elevated/50 flex-shrink-0">
-                  {coinIconUrl ? (
-                    <img src={coinIconUrl} alt="coin icon" style={{ width: coinIconSize, height: coinIconSize }} className="object-contain" />
-                  ) : (
-                    <Upload className="w-5 h-5 text-text-dim" />
-                  )}
-                  <span className="text-[10px] text-text-dim">{coinIconUrl ? 'Reemplazar' : 'Subir'}</span>
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      try {
-                        const result = await uploadImage(file);
-                        if (result.url) setCoinIconUrl(result.url);
-                      } catch (err) { console.error('Error uploading coin icon:', err); }
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
-                <div className="flex-1">
-                  <label className="text-[11px] text-text-dim mb-2 block">Tamaño del ícono: <span className="text-mansion-gold font-medium">{coinIconSize}px</span></label>
-                  <input type="range" min="12" max="40" value={coinIconSize} onChange={e => setCoinIconSize(Number(e.target.value))} className="w-full accent-mansion-gold" />
-                  <div className="flex justify-between text-[10px] text-text-dim mt-1">
-                    <span>12px</span>
-                    <span>40px</span>
-                  </div>
-                  {coinIconUrl && (
-                    <button onClick={() => setCoinIconUrl('')} className="text-[11px] text-mansion-crimson hover:underline mt-2 block">Quitar icono personalizado</button>
-                  )}
-                </div>
-              </div>
-            </div>
-
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">

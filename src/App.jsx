@@ -25,6 +25,7 @@ import PagoFallidoPage from './pages/PagoFallidoPage';
 import PagoPendientePage from './pages/PagoPendientePage';
 import CoinsPage from './pages/CoinsPage';
 import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
+import StoryUploadPage from './pages/StoryUploadPage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
@@ -159,7 +160,7 @@ function AppLayout() {
           />
 
           {/* Story upload (fullscreen onboarding flow) */}
-          <Route path="/historia/nueva" element={<VideoLabPage variant="story" />} />
+          <Route path="/historia/nueva" element={<StoryUploadPage />} />
 
           {/* Admin standalone layout */}
           <Route path="/admin" element={<AdminLayout />}>
