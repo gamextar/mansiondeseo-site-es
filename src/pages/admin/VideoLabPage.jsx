@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ArrowLeft, ChevronDown, ChevronUp, Clock, Download, Film, LoaderCircle, Play, RefreshCw, Scissors, SlidersHorizontal, Upload, Wand2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Clock, Download, Film, LoaderCircle, Play, RefreshCw, Scissors, SlidersHorizontal, Upload, Wand2 } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 
@@ -644,6 +644,8 @@ export default function VideoLabPage({ variant = 'admin' }) {
   };
 
   if (isStoryVariant) {
+    const storyStep = result?.url ? 'done' : sourceFile ? 'trim' : 'pick';
+
     return (
       <div className="min-h-screen bg-mansion-base text-text-primary relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
@@ -651,93 +653,220 @@ export default function VideoLabPage({ variant = 'admin' }) {
           <div className="absolute bottom-[-12%] left-[-6%] w-[460px] h-[460px] rounded-full bg-mansion-gold/10 blur-3xl" />
         </div>
 
-        <div className="relative max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-10 min-h-screen flex items-center justify-center">
-          <motion.section
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 overflow-hidden"
-          >
-            <div className="p-8 sm:p-10 flex flex-col items-center justify-center text-center min-h-[420px]">
-              {sourceUrl && (
-                <div className="absolute w-px h-px overflow-hidden opacity-0 pointer-events-none" aria-hidden="true">
-                  <video
-                    ref={videoRef}
-                    src={sourceUrl}
-                    controls
-                    playsInline
-                    onLoadedMetadata={handleLoadedMetadata}
-                  />
-                </div>
-              )}
-
-              {!sourceFile && !processing && !result?.url && (
-                <label className="inline-flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-mansion-crimson text-white font-semibold text-lg hover:bg-mansion-crimson-dark transition-colors cursor-pointer min-w-[240px]">
-                  <Upload className="w-5 h-5" />
-                  SUBIR HISTORIA
-                  <input
-                    type="file"
-                    accept="video/*"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                </label>
-              )}
-
-              {sourceFile && !processing && !result?.url && (
-                <button
-                  type="button"
-                  onClick={transcodeVideo}
-                  disabled={!selectedDuration}
-                  className="inline-flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-mansion-crimson text-white font-semibold text-lg hover:bg-mansion-crimson-dark disabled:opacity-60 transition-colors min-w-[240px]"
+        <div className="relative max-w-lg mx-auto px-4 sm:px-6 py-8 sm:py-10 min-h-screen flex items-center justify-center">
+          <AnimatePresence mode="wait">
+            {/* ── STEP 1: Select video ── */}
+            {storyStep === 'pick' && (
+              <motion.section
+                key="pick"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+                className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 p-8 sm:p-10 flex flex-col items-center text-center"
+              >
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.1, duration: 0.4, ease: 'easeOut' }}
+                  className="w-20 h-20 rounded-[1.25rem] bg-mansion-gold/10 border border-mansion-gold/20 flex items-center justify-center mb-6"
                 >
-                  <Wand2 className="w-5 h-5" />
-                  SUBIR HISTORIA
-                </button>
-              )}
+                  <Film className="w-9 h-9 text-mansion-gold" />
+                </motion.div>
+                <h1 className="font-display text-2xl sm:text-3xl font-bold text-text-primary">Nueva Historia</h1>
+                <p className="text-text-muted mt-2 mb-8 max-w-sm">Por favor seleccioná tu video para crear una historia.</p>
+                <label className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-crimson text-white font-semibold text-lg hover:bg-mansion-crimson-dark transition-colors cursor-pointer">
+                  <Upload className="w-5 h-5" />
+                  Seleccionar video
+                  <input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
+                </label>
+              </motion.section>
+            )}
 
-              {processing && (
-                <div className="w-full max-w-md">
-                  <div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
-                    <div className="h-3 bg-white/5">
-                      <div
-                        className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300"
-                        style={{ width: `${Math.round(overallProgress * 100)}%` }}
-                      />
+            {/* ── STEP 2: Trim + Convert ── */}
+            {storyStep === 'trim' && (
+              <motion.section
+                key="trim"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+                className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 overflow-hidden"
+              >
+                {/* Video preview */}
+                <div className="aspect-video bg-black">
+                  {sourceUrl && (
+                    <video
+                      ref={videoRef}
+                      src={sourceUrl}
+                      controls
+                      playsInline
+                      className="w-full h-full object-contain"
+                      onLoadedMetadata={handleLoadedMetadata}
+                      onTimeUpdate={handlePreviewTimeUpdate}
+                    />
+                  )}
+                </div>
+
+                <div className="p-6 sm:p-8">
+                  {/* Trimmer */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15, duration: 0.35, ease: 'easeOut' }}
+                  >
+                    <div className="flex items-start gap-2 mb-4">
+                      <Scissors className="w-4 h-4 text-mansion-gold mt-0.5 shrink-0" />
+                      <p className="text-sm text-text-muted">
+                        Podés seleccionar la parte del video que deseas publicar <span className="text-text-dim">(opcional)</span>
+                      </p>
                     </div>
+
+                    {/* Filmstrip trimmer */}
+                    <div ref={trimmerRef} className="relative h-[56px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
+                      <div className="absolute inset-0 flex">
+                        {thumbnails.length > 0
+                          ? thumbnails.map((src, i) => (
+                              <img key={i} src={src} alt="" className="h-full flex-1 object-cover" draggable={false} />
+                            ))
+                          : sourceUrl && (
+                              <div className="flex-1 flex items-center justify-center text-text-dim text-xs">
+                                <LoaderCircle className="w-4 h-4 animate-spin mr-2" />
+                                Generando vista previa…
+                              </div>
+                            )}
+                      </div>
+                      <div className="absolute inset-y-0 left-0 bg-black/60 pointer-events-none" style={{ width: `${segmentOffset}%` }} />
+                      <div className="absolute inset-y-0 right-0 bg-black/60 pointer-events-none" style={{ width: `${Math.max(0, 100 - segmentOffset - segmentWidth)}%` }} />
+                      <div className="absolute inset-y-0 pointer-events-none" style={{ left: `${segmentOffset}%`, width: `${segmentWidth}%` }}>
+                        <div className="absolute top-0 left-3.5 right-3.5 h-[3px] bg-mansion-gold" />
+                        <div className="absolute bottom-0 left-3.5 right-3.5 h-[3px] bg-mansion-gold" />
+                      </div>
+                      <div
+                        className="absolute inset-y-0 z-10 cursor-ew-resize"
+                        style={{ left: `calc(${segmentOffset}% - 6px)`, width: '20px' }}
+                        onPointerDown={(e) => onHandlePointerDown(e, 'left')}
+                        onPointerMove={onHandlePointerMove}
+                        onPointerUp={onHandlePointerUp}
+                      >
+                        <div className="absolute inset-y-0 right-0 w-3.5 bg-mansion-gold rounded-l-lg flex items-center justify-center">
+                          <div className="w-[2px] h-5 rounded-full bg-mansion-base/40" />
+                        </div>
+                      </div>
+                      <div
+                        className="absolute inset-y-0 z-10 cursor-ew-resize"
+                        style={{ left: `calc(${segmentOffset + segmentWidth}% - 14px)`, width: '20px' }}
+                        onPointerDown={(e) => onHandlePointerDown(e, 'right')}
+                        onPointerMove={onHandlePointerMove}
+                        onPointerUp={onHandlePointerUp}
+                      >
+                        <div className="absolute inset-y-0 left-0 w-3.5 bg-mansion-gold rounded-r-lg flex items-center justify-center">
+                          <div className="w-[2px] h-5 rounded-full bg-mansion-base/40" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Time labels */}
+                    <div className="flex items-center justify-between gap-3 mt-3 text-xs">
+                      <span className="text-text-dim">{formatTime(clipStart)}</span>
+                      <span className="px-2.5 py-1 rounded-full bg-mansion-gold/10 border border-mansion-gold/20 text-mansion-gold font-semibold">
+                        {selectedDuration > 0 ? `${selectedDuration.toFixed(1)}s` : '—'}
+                      </span>
+                      <span className="text-text-dim">{formatTime(clipEnd)}</span>
+                    </div>
+                  </motion.div>
+
+                  {/* Action area */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25, duration: 0.35, ease: 'easeOut' }}
+                    className="mt-6"
+                  >
+                    {!processing ? (
+                      <button
+                        type="button"
+                        onClick={transcodeVideo}
+                        disabled={!selectedDuration}
+                        className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-crimson text-white font-semibold text-lg hover:bg-mansion-crimson-dark disabled:opacity-60 transition-colors"
+                      >
+                        <Wand2 className="w-5 h-5" />
+                        Crear historia
+                      </button>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
+                          <div className="h-3 bg-white/5">
+                            <div
+                              className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300"
+                              style={{ width: `${Math.round(overallProgress * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-text-muted">Creando tu historia…</span>
+                          <span className="font-semibold text-mansion-gold tabular-nums">{Math.round(overallProgress * 100)}%</span>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+
+                  {errorMessage && !processing && (
+                    <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                      {errorMessage}
+                    </div>
+                  )}
+                </div>
+              </motion.section>
+            )}
+
+            {/* ── STEP 3: Done ── */}
+            {storyStep === 'done' && (
+              <motion.section
+                key="done"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+                className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 overflow-hidden"
+              >
+                <div className="aspect-video bg-black">
+                  <video src={result.url} controls playsInline className="w-full h-full object-contain" />
+                </div>
+
+                <div className="p-6 sm:p-8 text-center">
+                  <motion.div
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 15 }}
+                    className="w-14 h-14 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-4"
+                  >
+                    <CheckCircle2 className="w-7 h-7 text-green-400" />
+                  </motion.div>
+                  <h2 className="font-display text-2xl font-bold text-text-primary">¡Tu historia está lista!</h2>
+                  <p className="text-text-muted mt-1 mb-6 text-sm">
+                    {result.sizeLabel} · {result.duration.toFixed(1)}s · procesado en {result.processingTimeLabel}
+                  </p>
+
+                  <div className="flex flex-col gap-3">
+                    <a
+                      href={result.url}
+                      download={result.fileName}
+                      className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors"
+                    >
+                      <Download className="w-5 h-5" />
+                      Descargar historia
+                    </a>
+                    <label className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-medium hover:bg-white/10 transition-colors cursor-pointer">
+                      <Upload className="w-5 h-5" />
+                      Subir otra historia
+                      <input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
+                    </label>
                   </div>
                 </div>
-              )}
-
-              {!processing && result?.url && (
-                <div className="flex flex-col items-center gap-4">
-                  <a
-                    href={result.url}
-                    download={result.fileName}
-                    className="inline-flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors min-w-[240px]"
-                  >
-                    <Download className="w-5 h-5" />
-                    DESCARGAR HISTORIA
-                  </a>
-                  <label className="inline-flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-semibold text-lg hover:bg-white/10 transition-colors cursor-pointer min-w-[240px]">
-                    <Upload className="w-5 h-5" />
-                    SUBIR OTRA
-                    <input
-                      type="file"
-                      accept="video/*"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                  </label>
-                </div>
-              )}
-
-              {errorMessage && !processing && (
-                <div className="mt-6 w-full max-w-md rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                  {errorMessage}
-                </div>
-              )}
-            </div>
-          </motion.section>
+              </motion.section>
+            )}
+          </AnimatePresence>
         </div>
 
         {processing && (
