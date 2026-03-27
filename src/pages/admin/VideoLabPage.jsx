@@ -180,6 +180,7 @@ export default function VideoLabPage({ variant = 'admin' }) {
   const [customOverrides, setCustomOverrides] = useState({});
   const [profileTimings, setProfileTimings] = useState({ metadata: 0, fetchFile: 0, writeFile: 0, exec: 0, readFile: 0 });
   const [debugInfo, setDebugInfo] = useState(null);
+  const [useCompactStoryTrimmer, setUseCompactStoryTrimmer] = useState(false);
 
   const selectedDuration = clipEnd > clipStart ? clipEnd - clipStart : 0;
   const segmentWidth = sourceDuration > 0 ? ((clipEnd - clipStart) / sourceDuration) * 100 : 0;
@@ -305,6 +306,45 @@ export default function VideoLabPage({ variant = 'admin' }) {
     window.localStorage.setItem(VIDEO_PRESET_STORAGE_KEY, selectedPreset.id);
   }, [selectedPreset]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
+    const smallViewportQuery = window.matchMedia('(max-width: 767px)');
+    const standaloneQuery = window.matchMedia('(display-mode: standalone)');
+
+    const syncCompactStoryTrimmer = () => {
+      setUseCompactStoryTrimmer(
+        coarsePointerQuery.matches ||
+        smallViewportQuery.matches ||
+        standaloneQuery.matches ||
+        window.navigator.standalone === true
+      );
+    };
+
+    syncCompactStoryTrimmer();
+
+    const subscribe = (query) => {
+      if (typeof query.addEventListener === 'function') {
+        query.addEventListener('change', syncCompactStoryTrimmer);
+        return () => query.removeEventListener('change', syncCompactStoryTrimmer);
+      }
+
+      query.addListener(syncCompactStoryTrimmer);
+      return () => query.removeListener(syncCompactStoryTrimmer);
+    };
+
+    const unsubscribers = [
+      subscribe(coarsePointerQuery),
+      subscribe(smallViewportQuery),
+      subscribe(standaloneQuery),
+    ];
+
+    return () => {
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    };
+  }, []);
+
   // Extract thumbnails for the filmstrip trimmer
   useEffect(() => {
     if (!sourceUrl || sourceDuration <= 0) {
@@ -402,6 +442,26 @@ export default function VideoLabPage({ variant = 'admin' }) {
       resultUrlRef.current = '';
     }
     setResult(null);
+  };
+
+  const resetStoryFlow = () => {
+    resetResult();
+    if (sourceUrlRef.current) {
+      URL.revokeObjectURL(sourceUrlRef.current);
+      sourceUrlRef.current = '';
+    }
+    setSourceFile(null);
+    setSourceUrl('');
+    setSourceDuration(0);
+    setSourceResolution(null);
+    setClipStart(0);
+    setClipEnd(0);
+    setThumbnails([]);
+    setProcessingProgress(0);
+    setErrorMessage('');
+    setStatusText('Listo para cargar FFmpeg.');
+    setProfileTimings({ metadata: 0, fetchFile: 0, writeFile: 0, exec: 0, readFile: 0 });
+    setDebugInfo(null);
   };
 
   const handleFileChange = async (event) => {
@@ -750,6 +810,7 @@ export default function VideoLabPage({ variant = 'admin' }) {
                       src={sourceUrl}
                       controls
                       playsInline
+                      preload="metadata"
                       className="w-full h-full object-contain"
                       onLoadedMetadata={handleLoadedMetadata}
                       onTimeUpdate={handlePreviewTimeUpdate}
@@ -793,51 +854,89 @@ export default function VideoLabPage({ variant = 'admin' }) {
                       </button>
                     </div>
 
-                    {/* Filmstrip trimmer */}
-                    <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-3">
-                      <div ref={trimmerRef} className="relative h-[64px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
-                      <div className="absolute inset-0 flex">
-                        {thumbnails.length > 0
-                          ? thumbnails.map((src, i) => (
-                              <img key={i} src={src} alt="" className="h-full flex-1 object-cover" draggable={false} />
-                            ))
-                          : sourceUrl && (
-                              <div className="flex-1 flex items-center justify-center text-text-dim text-xs">
-                                <LoaderCircle className="w-4 h-4 animate-spin mr-2" />
-                                Generando vista previa…
-                              </div>
-                            )}
+                    {useCompactStoryTrimmer ? (
+                      <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+                        <div className="flex items-center justify-between gap-3 mb-3 text-xs">
+                          <span className="text-text-dim">Arrastrá para elegir el inicio</span>
+                          <button
+                            type="button"
+                            onClick={handleUseCurrentTime}
+                            disabled={!sourceUrl}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 border border-white/10 text-text-primary hover:border-mansion-gold/30 disabled:opacity-50 transition-colors"
+                          >
+                            <Scissors className="w-3.5 h-3.5" />
+                            Usar tiempo actual
+                          </button>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max={Math.max(0, sourceDuration - Math.min(MAX_CLIP_SECONDS, sourceDuration))}
+                          step="0.1"
+                          value={clipStart}
+                          onChange={(event) => handleStartChange(event.target.value)}
+                          className="w-full accent-mansion-gold"
+                        />
+                        <div className="mt-4 rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
+                          <div className="flex items-center justify-between gap-3 text-xs text-text-dim">
+                            <span>Inicio {formatTime(clipStart)}</span>
+                            <span>Fin {formatTime(clipEnd)}</span>
+                          </div>
+                          <div className="mt-3 h-2 rounded-full bg-black/30 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light"
+                              style={{ marginLeft: `${segmentOffset}%`, width: `${Math.max(segmentWidth, 8)}%` }}
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-text-dim mt-3">En móvil/PWA usamos un recorte compacto para evitar problemas con previews y thumbnails.</p>
                       </div>
-                      <div className="absolute inset-y-0 left-0 bg-black/60 pointer-events-none" style={{ width: `${segmentOffset}%` }} />
-                      <div className="absolute inset-y-0 right-0 bg-black/60 pointer-events-none" style={{ width: `${Math.max(0, 100 - segmentOffset - segmentWidth)}%` }} />
-                      <div className="absolute inset-y-0 pointer-events-none" style={{ left: `${segmentOffset}%`, width: `${segmentWidth}%` }}>
-                        <div className="absolute top-0 left-3.5 right-3.5 h-[3px] bg-mansion-gold" />
-                        <div className="absolute bottom-0 left-3.5 right-3.5 h-[3px] bg-mansion-gold" />
-                      </div>
-                      <div
-                        className="absolute inset-y-0 z-10 cursor-ew-resize"
-                        style={{ left: `calc(${segmentOffset}% - 6px)`, width: '20px' }}
-                        onPointerDown={(e) => onHandlePointerDown(e, 'left')}
-                        onPointerMove={onHandlePointerMove}
-                        onPointerUp={onHandlePointerUp}
-                      >
-                        <div className="absolute inset-y-0 right-0 w-3.5 bg-mansion-gold rounded-l-lg flex items-center justify-center">
-                          <div className="w-[2px] h-5 rounded-full bg-mansion-base/40" />
+                    ) : (
+                      <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-3">
+                        <div ref={trimmerRef} className="relative h-[64px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
+                          <div className="absolute inset-0 flex">
+                            {thumbnails.length > 0
+                              ? thumbnails.map((src, i) => (
+                                  <img key={i} src={src} alt="" className="h-full flex-1 object-cover" draggable={false} />
+                                ))
+                              : sourceUrl && (
+                                  <div className="flex-1 flex items-center justify-center text-text-dim text-xs">
+                                    <LoaderCircle className="w-4 h-4 animate-spin mr-2" />
+                                    Generando vista previa…
+                                  </div>
+                                )}
+                          </div>
+                          <div className="absolute inset-y-0 left-0 bg-black/60 pointer-events-none" style={{ width: `${segmentOffset}%` }} />
+                          <div className="absolute inset-y-0 right-0 bg-black/60 pointer-events-none" style={{ width: `${Math.max(0, 100 - segmentOffset - segmentWidth)}%` }} />
+                          <div className="absolute inset-y-0 pointer-events-none" style={{ left: `${segmentOffset}%`, width: `${segmentWidth}%` }}>
+                            <div className="absolute top-0 left-3.5 right-3.5 h-[3px] bg-mansion-gold" />
+                            <div className="absolute bottom-0 left-3.5 right-3.5 h-[3px] bg-mansion-gold" />
+                          </div>
+                          <div
+                            className="absolute inset-y-0 z-10 cursor-ew-resize"
+                            style={{ left: `calc(${segmentOffset}% - 6px)`, width: '20px' }}
+                            onPointerDown={(e) => onHandlePointerDown(e, 'left')}
+                            onPointerMove={onHandlePointerMove}
+                            onPointerUp={onHandlePointerUp}
+                          >
+                            <div className="absolute inset-y-0 right-0 w-3.5 bg-mansion-gold rounded-l-lg flex items-center justify-center">
+                              <div className="w-[2px] h-5 rounded-full bg-mansion-base/40" />
+                            </div>
+                          </div>
+                          <div
+                            className="absolute inset-y-0 z-10 cursor-ew-resize"
+                            style={{ left: `calc(${segmentOffset + segmentWidth}% - 14px)`, width: '20px' }}
+                            onPointerDown={(e) => onHandlePointerDown(e, 'right')}
+                            onPointerMove={onHandlePointerMove}
+                            onPointerUp={onHandlePointerUp}
+                          >
+                            <div className="absolute inset-y-0 left-0 w-3.5 bg-mansion-gold rounded-r-lg flex items-center justify-center">
+                              <div className="w-[2px] h-5 rounded-full bg-mansion-base/40" />
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div
-                        className="absolute inset-y-0 z-10 cursor-ew-resize"
-                        style={{ left: `calc(${segmentOffset + segmentWidth}% - 14px)`, width: '20px' }}
-                        onPointerDown={(e) => onHandlePointerDown(e, 'right')}
-                        onPointerMove={onHandlePointerMove}
-                        onPointerUp={onHandlePointerUp}
-                      >
-                        <div className="absolute inset-y-0 left-0 w-3.5 bg-mansion-gold rounded-r-lg flex items-center justify-center">
-                          <div className="w-[2px] h-5 rounded-full bg-mansion-base/40" />
-                        </div>
-                      </div>
-                    </div>
-                    </div>
+                    )}
 
                     {/* Time labels */}
                     <div className="grid grid-cols-3 gap-3 mt-3 text-xs">
@@ -956,11 +1055,14 @@ export default function VideoLabPage({ variant = 'admin' }) {
                       <Download className="w-5 h-5" />
                       Descargar historia
                     </a>
-                    <label className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-medium hover:bg-white/10 transition-colors cursor-pointer">
+                    <button
+                      type="button"
+                      onClick={resetStoryFlow}
+                      className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-medium hover:bg-white/10 transition-colors"
+                    >
                       <Upload className="w-5 h-5" />
                       Subir otra historia
-                      <input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
-                    </label>
+                    </button>
                   </div>
                 </div>
               </motion.section>
