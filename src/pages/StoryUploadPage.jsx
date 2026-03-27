@@ -158,6 +158,7 @@ export default function StoryUploadPage() {
   const [step, setStep] = useState('pick');
 
   const engineReady = engineState === 'ready';
+  const hasProfileTimings = Object.values(profileTimings).some((value) => value > 0);
 
   if (!ffmpegRef.current) {
     ffmpegRef.current = new FFmpeg();
@@ -476,6 +477,34 @@ export default function StoryUploadPage() {
     setStep('pick');
   };
 
+  const profilePanel = hasProfileTimings ? (
+    <div className="w-full rounded-2xl bg-black/25 border border-white/10 px-4 py-4 mb-6">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim mb-3">Perfilado</p>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-left">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Metadata</p>
+          <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.metadata)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">fetchFile</p>
+          <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.fetchFile)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">writeFile</p>
+          <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.writeFile)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">ff.exec</p>
+          <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.exec)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">readFile</p>
+          <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.readFile)}</p>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   /* ====================================================================
      Render -- simple 3-step UI, no trimmer / presets / sidebar
      ==================================================================== */
@@ -569,6 +598,8 @@ export default function StoryUploadPage() {
               </div>
             )}
 
+            {profilePanel}
+
             <div className="flex flex-wrap gap-3 justify-center">
               <button
                 type="button"
@@ -615,6 +646,10 @@ export default function StoryUploadPage() {
                 <span className="font-semibold text-text-primary tabular-nums">{Math.round(processingProgress * 100)}%</span>
               </div>
             </div>
+
+            <div className="w-full mt-6">
+              {profilePanel}
+            </div>
           </div>
         )}
 
@@ -652,31 +687,7 @@ export default function StoryUploadPage() {
               </div>
             </motion.div>
 
-            <motion.div variants={childFade} className="w-full rounded-2xl bg-black/25 border border-white/10 px-4 py-4 mb-6">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim mb-3">Perfilado</p>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-left">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Metadata</p>
-                  <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.metadata)}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">fetchFile</p>
-                  <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.fetchFile)}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">writeFile</p>
-                  <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.writeFile)}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">ff.exec</p>
-                  <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.exec)}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">readFile</p>
-                  <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.readFile)}</p>
-                </div>
-              </div>
-            </motion.div>
+            {profilePanel}
 
             {result.url && (
               <motion.div variants={childFade} className="w-full aspect-video rounded-2xl overflow-hidden bg-black/50 border border-white/10 mb-6">

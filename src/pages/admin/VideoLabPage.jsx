@@ -187,6 +187,7 @@ export default function VideoLabPage() {
   const overallProgress = processing ? processingProgress : engineProgress;
   const outputProfile = getOutputProfile(sourceResolution);
   const selectedPreset = VIDEO_PRESETS.find((preset) => preset.id === selectedPresetId) || VIDEO_PRESETS[0];
+  const hasProfileTimings = Object.values(profileTimings).some((value) => value > 0);
   // Merge preset with any user overrides
   const activeParams = {
     crf: customOverrides.crf ?? selectedPreset.crf,
@@ -198,6 +199,34 @@ export default function VideoLabPage() {
     estimatedVideoBitrate: selectedPreset.estimatedVideoBitrate,
   };
   const outputEstimateLabel = getEstimatedOutputSizeLabel(MAX_CLIP_SECONDS, activeParams);
+
+  const profilePanel = hasProfileTimings ? (
+    <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-4">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim mb-3">Perfilado</p>
+      <div className="grid gap-3 sm:grid-cols-5">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Metadata</p>
+          <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.metadata)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">fetchFile</p>
+          <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.fetchFile)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">writeFile</p>
+          <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.writeFile)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">ff.exec</p>
+          <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.exec)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">readFile</p>
+          <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.readFile)}</p>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   if (!ffmpegRef.current) {
     ffmpegRef.current = new FFmpeg();
@@ -1005,6 +1034,7 @@ export default function VideoLabPage() {
                   <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Motor</p>
                   <p className="text-sm text-text-primary mt-1">`@ffmpeg/ffmpeg` 0.12.15</p>
                 </div>
+                {profilePanel}
               </div>
             </section>
 
@@ -1047,31 +1077,6 @@ export default function VideoLabPage() {
                     <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Tiempo</p>
                       <p className="text-sm text-text-primary mt-1">{result.processingTimeLabel}</p>
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim mb-3">Perfilado</p>
-                    <div className="grid gap-3 sm:grid-cols-5">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Metadata</p>
-                        <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.metadata)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">fetchFile</p>
-                        <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.fetchFile)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">writeFile</p>
-                        <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.writeFile)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">ff.exec</p>
-                        <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.exec)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">readFile</p>
-                        <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.readFile)}</p>
-                      </div>
                     </div>
                   </div>
                 </div>
