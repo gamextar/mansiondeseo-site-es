@@ -645,6 +645,12 @@ export default function VideoLabPage({ variant = 'admin' }) {
 
   if (isStoryVariant) {
     const storyStep = result?.url ? 'done' : sourceFile ? 'trim' : 'pick';
+    const storyStepIndex = storyStep === 'pick' ? 0 : storyStep === 'trim' ? 1 : 2;
+    const storySteps = [
+      { id: 'pick', label: 'Elegir' },
+      { id: 'trim', label: 'Recortar' },
+      { id: 'done', label: 'Lista' },
+    ];
 
     return (
       <div className="min-h-screen bg-mansion-base text-text-primary relative overflow-hidden">
@@ -653,7 +659,7 @@ export default function VideoLabPage({ variant = 'admin' }) {
           <div className="absolute bottom-[-12%] left-[-6%] w-[460px] h-[460px] rounded-full bg-mansion-gold/10 blur-3xl" />
         </div>
 
-        <div className="relative max-w-lg mx-auto px-4 sm:px-6 py-8 sm:py-10 min-h-screen flex items-center justify-center">
+        <div className="relative max-w-xl mx-auto px-4 sm:px-6 py-8 sm:py-10 min-h-screen flex items-center justify-center">
           <AnimatePresence mode="wait">
             {/* ── STEP 1: Select video ── */}
             {storyStep === 'pick' && (
@@ -662,20 +668,40 @@ export default function VideoLabPage({ variant = 'admin' }) {
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.35, ease: 'easeOut' }}
+                transition={{ duration: 0.28, ease: 'easeOut' }}
+                style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
                 className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 p-8 sm:p-10 flex flex-col items-center text-center"
               >
+                <div className="w-full flex items-center justify-center gap-2 mb-8">
+                  {storySteps.map((step, index) => {
+                    const active = storyStepIndex === index;
+                    const complete = storyStepIndex > index;
+
+                    return (
+                      <div key={step.id} className="flex items-center gap-2">
+                        <div className={`w-9 h-9 rounded-full border flex items-center justify-center text-xs font-semibold transition-transform duration-300 ${active || complete ? 'bg-mansion-gold text-mansion-base border-mansion-gold scale-100' : 'bg-white/5 text-text-dim border-white/10 scale-95'}`}>
+                          {index + 1}
+                        </div>
+                        <span className={`text-xs uppercase tracking-[0.2em] ${active || complete ? 'text-mansion-gold' : 'text-text-dim'}`}>{step.label}</span>
+                        {index < storySteps.length - 1 && <div className={`w-8 sm:w-12 h-px ${storyStepIndex > index ? 'bg-mansion-gold/70' : 'bg-white/10'}`} />}
+                      </div>
+                    );
+                  })}
+                </div>
+
                 <motion.div
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.1, duration: 0.4, ease: 'easeOut' }}
-                  className="w-20 h-20 rounded-[1.25rem] bg-mansion-gold/10 border border-mansion-gold/20 flex items-center justify-center mb-6"
+                  transition={{ delay: 0.08, duration: 0.28, ease: 'easeOut' }}
+                  style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+                  className="w-20 h-20 rounded-[1.25rem] bg-mansion-gold/10 border border-mansion-gold/20 flex items-center justify-center mb-6 shadow-[0_0_0_1px_rgba(212,175,55,0.06)]"
                 >
                   <Film className="w-9 h-9 text-mansion-gold" />
                 </motion.div>
                 <h1 className="font-display text-2xl sm:text-3xl font-bold text-text-primary">Nueva Historia</h1>
-                <p className="text-text-muted mt-2 mb-8 max-w-sm">Por favor seleccioná tu video para crear una historia.</p>
-                <label className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-crimson text-white font-semibold text-lg hover:bg-mansion-crimson-dark transition-colors cursor-pointer">
+                <p className="text-text-muted mt-2 mb-4 max-w-sm">Por favor seleccioná tu video para crear una historia.</p>
+                <p className="text-sm text-text-dim max-w-md mb-8">Después vas a poder elegir qué tramo de hasta 15 segundos querés publicar.</p>
+                <label className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors cursor-pointer shadow-[0_12px_30px_rgba(212,175,55,0.18)]">
                   <Upload className="w-5 h-5" />
                   Seleccionar video
                   <input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
@@ -690,11 +716,34 @@ export default function VideoLabPage({ variant = 'admin' }) {
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.35, ease: 'easeOut' }}
+                transition={{ duration: 0.28, ease: 'easeOut' }}
+                style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
                 className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 overflow-hidden"
               >
+                <div className="px-6 sm:px-8 pt-6 sm:pt-7 pb-4 border-b border-white/10 bg-white/[0.02]">
+                  <div className="flex items-center justify-center gap-2 mb-5">
+                    {storySteps.map((step, index) => {
+                      const active = storyStepIndex === index;
+                      const complete = storyStepIndex > index;
+
+                      return (
+                        <div key={step.id} className="flex items-center gap-2">
+                          <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold ${active || complete ? 'bg-mansion-gold text-mansion-base border-mansion-gold' : 'bg-white/5 text-text-dim border-white/10'}`}>
+                            {index + 1}
+                          </div>
+                          {index < storySteps.length - 1 && <div className={`w-8 sm:w-10 h-px ${storyStepIndex > index ? 'bg-mansion-gold/70' : 'bg-white/10'}`} />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="text-center">
+                    <h2 className="font-display text-2xl font-semibold text-text-primary">Ajustá tu historia</h2>
+                    <p className="text-sm text-text-muted mt-1">Elegí el tramo que querés publicar y después convertí.</p>
+                  </div>
+                </div>
+
                 {/* Video preview */}
-                <div className="aspect-video bg-black">
+                <div className="aspect-video bg-black relative">
                   {sourceUrl && (
                     <video
                       ref={videoRef}
@@ -706,6 +755,16 @@ export default function VideoLabPage({ variant = 'admin' }) {
                       onTimeUpdate={handlePreviewTimeUpdate}
                     />
                   )}
+                  <div className="absolute left-4 bottom-4 right-4 flex items-center justify-between gap-3 pointer-events-none">
+                    <div className="px-3 py-2 rounded-2xl bg-black/55 border border-white/10 text-left">
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Video</p>
+                      <p className="text-sm text-text-primary truncate max-w-[180px] sm:max-w-[260px]">{sourceFile?.name || 'Sin archivo'}</p>
+                    </div>
+                    <div className="px-3 py-2 rounded-2xl bg-black/55 border border-white/10 text-right shrink-0">
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Duración</p>
+                      <p className="text-sm text-mansion-gold font-semibold">{sourceDuration ? formatTime(sourceDuration) : '—'}</p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="p-6 sm:p-8">
@@ -713,17 +772,30 @@ export default function VideoLabPage({ variant = 'admin' }) {
                   <motion.div
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15, duration: 0.35, ease: 'easeOut' }}
+                    transition={{ delay: 0.08, duration: 0.28, ease: 'easeOut' }}
+                    style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
                   >
-                    <div className="flex items-start gap-2 mb-4">
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <div className="flex items-start gap-2">
                       <Scissors className="w-4 h-4 text-mansion-gold mt-0.5 shrink-0" />
-                      <p className="text-sm text-text-muted">
-                        Podés seleccionar la parte del video que deseas publicar <span className="text-text-dim">(opcional)</span>
-                      </p>
+                        <p className="text-sm text-text-muted">
+                          Podés seleccionar la parte del video que deseas publicar <span className="text-text-dim">(opcional)</span>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handlePreviewSegment}
+                        disabled={!sourceUrl}
+                        className="shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 border border-white/10 text-text-primary hover:border-mansion-gold/30 disabled:opacity-50 transition-colors"
+                      >
+                        <Play className="w-4 h-4" />
+                        Ver
+                      </button>
                     </div>
 
                     {/* Filmstrip trimmer */}
-                    <div ref={trimmerRef} className="relative h-[56px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
+                    <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-3">
+                      <div ref={trimmerRef} className="relative h-[64px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
                       <div className="absolute inset-0 flex">
                         {thumbnails.length > 0
                           ? thumbnails.map((src, i) => (
@@ -765,14 +837,22 @@ export default function VideoLabPage({ variant = 'admin' }) {
                         </div>
                       </div>
                     </div>
+                    </div>
 
                     {/* Time labels */}
-                    <div className="flex items-center justify-between gap-3 mt-3 text-xs">
-                      <span className="text-text-dim">{formatTime(clipStart)}</span>
-                      <span className="px-2.5 py-1 rounded-full bg-mansion-gold/10 border border-mansion-gold/20 text-mansion-gold font-semibold">
-                        {selectedDuration > 0 ? `${selectedDuration.toFixed(1)}s` : '—'}
-                      </span>
-                      <span className="text-text-dim">{formatTime(clipEnd)}</span>
+                    <div className="grid grid-cols-3 gap-3 mt-3 text-xs">
+                      <div className="rounded-2xl bg-white/5 border border-white/10 px-3 py-2 text-left">
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Inicio</p>
+                        <p className="text-text-primary mt-1">{formatTime(clipStart)}</p>
+                      </div>
+                      <div className="rounded-2xl bg-mansion-gold/10 border border-mansion-gold/20 px-3 py-2 text-center">
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-mansion-gold/80">Clip</p>
+                        <p className="text-mansion-gold font-semibold mt-1">{selectedDuration > 0 ? `${selectedDuration.toFixed(1)}s` : '—'}</p>
+                      </div>
+                      <div className="rounded-2xl bg-white/5 border border-white/10 px-3 py-2 text-right">
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Fin</p>
+                        <p className="text-text-primary mt-1">{formatTime(clipEnd)}</p>
+                      </div>
                     </div>
                   </motion.div>
 
@@ -780,25 +860,29 @@ export default function VideoLabPage({ variant = 'admin' }) {
                   <motion.div
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25, duration: 0.35, ease: 'easeOut' }}
+                    transition={{ delay: 0.14, duration: 0.28, ease: 'easeOut' }}
+                    style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
                     className="mt-6"
                   >
                     {!processing ? (
-                      <button
-                        type="button"
-                        onClick={transcodeVideo}
-                        disabled={!selectedDuration}
-                        className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-crimson text-white font-semibold text-lg hover:bg-mansion-crimson-dark disabled:opacity-60 transition-colors"
-                      >
-                        <Wand2 className="w-5 h-5" />
-                        Crear historia
-                      </button>
-                    ) : (
                       <div className="space-y-3">
+                        <button
+                          type="button"
+                          onClick={transcodeVideo}
+                          disabled={!selectedDuration}
+                          className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light disabled:opacity-60 transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
+                        >
+                          <Wand2 className="w-5 h-5" />
+                          Crear historia
+                        </button>
+                        <p className="text-xs text-text-dim text-center">La conversión ocurre en tu navegador. No se sube el video al servidor.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-4">
                         <div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
                           <div className="h-3 bg-white/5">
                             <div
-                              className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300"
+                              className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300"
                               style={{ width: `${Math.round(overallProgress * 100)}%` }}
                             />
                           </div>
@@ -807,6 +891,7 @@ export default function VideoLabPage({ variant = 'admin' }) {
                           <span className="text-text-muted">Creando tu historia…</span>
                           <span className="font-semibold text-mansion-gold tabular-nums">{Math.round(overallProgress * 100)}%</span>
                         </div>
+                        <p className="text-xs text-text-dim">Mientras se procesa mantenemos las animaciones al mínimo para no competir con el encode.</p>
                       </div>
                     )}
                   </motion.div>
@@ -827,9 +912,22 @@ export default function VideoLabPage({ variant = 'admin' }) {
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.4, ease: 'easeOut' }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
                 className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 overflow-hidden"
               >
+                <div className="px-6 sm:px-8 pt-6 pb-4 border-b border-white/10 bg-white/[0.02]">
+                  <div className="flex items-center justify-center gap-2">
+                    {storySteps.map((step, index) => (
+                      <div key={step.id} className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold bg-mansion-gold text-mansion-base border-mansion-gold">
+                          {index + 1}
+                        </div>
+                        {index < storySteps.length - 1 && <div className="w-8 sm:w-10 h-px bg-mansion-gold/70" />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 <div className="aspect-video bg-black">
                   <video src={result.url} controls playsInline className="w-full h-full object-contain" />
                 </div>
@@ -838,7 +936,8 @@ export default function VideoLabPage({ variant = 'admin' }) {
                   <motion.div
                     initial={{ scale: 0.5, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 15 }}
+                    transition={{ delay: 0.08, duration: 0.24, ease: 'easeOut' }}
+                    style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
                     className="w-14 h-14 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-4"
                   >
                     <CheckCircle2 className="w-7 h-7 text-green-400" />
@@ -852,7 +951,7 @@ export default function VideoLabPage({ variant = 'admin' }) {
                     <a
                       href={result.url}
                       download={result.fileName}
-                      className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors"
+                      className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
                     >
                       <Download className="w-5 h-5" />
                       Descargar historia
@@ -870,8 +969,8 @@ export default function VideoLabPage({ variant = 'admin' }) {
         </div>
 
         {processing && (
-          <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl bg-black/80 backdrop-blur-lg border border-white/10 shadow-2xl">
-            <Clock className="w-5 h-5 text-mansion-gold animate-pulse" />
+          <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl bg-black/88 border border-white/10 shadow-2xl">
+            <Clock className="w-5 h-5 text-mansion-gold" />
             <div>
               <p className="text-[10px] uppercase tracking-[0.2em] text-text-dim">Tiempo de conversión</p>
               <p className="text-2xl font-display font-bold text-text-primary tabular-nums">
