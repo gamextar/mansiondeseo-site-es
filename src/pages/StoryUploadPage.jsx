@@ -264,6 +264,10 @@ export default function StoryUploadPage() {
   /* ── Transcode ── */
   const transcode = async () => {
     if (!sourceFile) return;
+    // Pause video to free CPU for encoding
+    if (videoRef.current && !videoRef.current.paused) {
+      videoRef.current.pause();
+    }
     setStep('encoding');
     setProgress(0);
     setErrorMessage('');
@@ -369,8 +373,8 @@ export default function StoryUploadPage() {
         <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-mansion-gold/[0.06] blur-[120px]" />
       </div>
 
-      {/* Hidden video for metadata + preview */}
-      {sourceUrl && (
+      {/* Hidden video for metadata + preview — unmount during encoding to free resources */}
+      {sourceUrl && step !== 'encoding' && step !== 'done' && (
         <video
           ref={videoRef}
           src={sourceUrl}
@@ -383,7 +387,7 @@ export default function StoryUploadPage() {
       )}
 
       <div className="relative w-full max-w-lg z-10">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
 
           {/* ───── STEP 1: PICK ───── */}
           {step === 'pick' && (
