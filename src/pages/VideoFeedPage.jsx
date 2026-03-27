@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Play, Film, ChevronUp, ChevronDown } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Play, Film, ChevronUp, ChevronDown, Gift } from 'lucide-react';
 import { getStories, toggleFavorite } from '../lib/api';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
@@ -100,17 +100,17 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute }) {
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
 
       {/* Right side actions */}
-      <div className="absolute right-3 bottom-24 lg:bottom-8 flex flex-col items-center gap-5 z-20">
+      <div className="absolute right-3 bottom-28 lg:bottom-10 flex flex-col items-center gap-6 z-20">
         {/* Profile photo */}
         <button
           onClick={() => navigate(`/perfiles/${story.user_id}`)}
-          className="flex flex-col items-center gap-1"
+          className="flex flex-col items-center"
         >
-          <div className="w-12 h-12 rounded-full border-2 border-white/70 overflow-hidden bg-mansion-elevated">
+          <div className="w-14 h-14 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
             {story.avatar_url ? (
               <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-white/60 text-sm font-bold">{(story.username || '?')[0]}</div>
+              <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
             )}
           </div>
         </button>
@@ -118,27 +118,37 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute }) {
         {/* Favorite */}
         <button
           onClick={() => onFavorite(story.user_id)}
-          className="flex flex-col items-center gap-1"
+          className="flex flex-col items-center"
         >
-          <div className={`w-11 h-11 rounded-full flex items-center justify-center ${story.favorited ? 'bg-mansion-crimson/20' : 'bg-black/30 backdrop-blur-sm'}`}>
-            <Heart className={`w-6 h-6 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
+          <div className={`w-13 h-13 rounded-full flex items-center justify-center ${story.favorited ? 'bg-mansion-crimson/25' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
+            <Heart className={`w-7 h-7 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
           </div>
         </button>
 
         {/* Send message */}
         <button
           onClick={() => navigate(`/mensajes/${story.user_id}`)}
-          className="flex flex-col items-center gap-1"
+          className="flex flex-col items-center"
         >
-          <div className="w-11 h-11 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center">
-            <Send className="w-5 h-5 text-white" />
+          <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+            <Send className="w-6 h-6 text-white" />
+          </div>
+        </button>
+
+        {/* Send gift */}
+        <button
+          onClick={() => navigate(`/perfiles/${story.user_id}`)}
+          className="flex flex-col items-center"
+        >
+          <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+            <Gift className="w-6 h-6 text-mansion-gold" />
           </div>
         </button>
 
         {/* Mute toggle */}
-        <button onClick={onToggleMute} className="flex flex-col items-center gap-1">
-          <div className="w-11 h-11 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center">
-            {isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+        <button onClick={onToggleMute} className="flex flex-col items-center">
+          <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+            {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
           </div>
         </button>
       </div>

@@ -20,9 +20,9 @@ export default function BottomNav() {
   if (hiddenPaths.some((p) => location.pathname.startsWith(p))) return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom lg:hidden">
-      <div className="glass border-t border-mansion-border/30">
-        <div className="max-w-lg mx-auto flex items-center justify-around h-16 px-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom lg:hidden flex justify-center pb-2.5 px-4 pointer-events-none">
+      <div className="pointer-events-auto w-full max-w-sm rounded-[2rem] bg-black/40 backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+        <div className="flex items-center justify-around h-14 px-3">
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
             const isActive =
               to === '/' || to === '/perfil'
@@ -39,32 +39,32 @@ export default function BottomNav() {
                     navigateTo('/perfil');
                   }
                 }}
-                className="relative flex flex-col items-center justify-center w-16 h-full group"
+                className="relative flex flex-col items-center justify-center w-14 h-full group"
               >
                 {isActive && (
                   <motion.div
                     layoutId="bottomnav-indicator"
-                    className="absolute -top-px inset-x-0 mx-auto w-8 h-[2px] bg-mansion-gold rounded-full"
+                    className="absolute inset-0 mx-auto rounded-2xl bg-white/[0.08]"
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                   />
                 )}
 
-                <div className="relative">
+                <div className="relative z-10">
                   <Icon
-                    className={`w-5 h-5 transition-colors ${
-                      isActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'
+                    className={`w-[22px] h-[22px] transition-colors ${
+                      isActive ? 'text-white' : 'text-white/50 group-hover:text-white/80'
                     }`}
                   />
                   {to === '/mensajes' && unreadCount > 0 && (
-                    <span className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] rounded-full bg-mansion-crimson text-white text-[9px] font-bold flex items-center justify-center px-1">
+                    <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] rounded-full bg-mansion-crimson text-white text-[9px] font-bold flex items-center justify-center px-1">
                       {unreadCount}
                     </span>
                   )}
                 </div>
 
                 <span
-                  className={`text-[10px] mt-1 transition-colors ${
-                    isActive ? 'text-mansion-gold font-medium' : 'text-text-dim'
+                  className={`text-[9px] mt-0.5 transition-colors relative z-10 ${
+                    isActive ? 'text-white font-medium' : 'text-white/40'
                   }`}
                 >
                   {label}
