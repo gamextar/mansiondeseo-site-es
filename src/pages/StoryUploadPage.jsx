@@ -118,6 +118,9 @@ export default function StoryUploadPage() {
 
   useEffect(() => { resultUrlRef.current = resultUrl; }, [resultUrl]);
 
+  /* Preload FFmpeg engine on mount so it's ready when user picks a file */
+  useEffect(() => { ensureEngine().catch(() => {}); }, []);
+
   const ensureEngine = async () => {
     const ff = ffmpegRef.current;
     if (ff.loaded) return ff;
@@ -170,16 +173,18 @@ export default function StoryUploadPage() {
     setProgress(0);
     setErrorMessage('');
     setElapsedSeconds(0);
-    timerStartRef.current = performance.now();
-    timerIntervalRef.current = setInterval(() => {
-      setElapsedSeconds(Math.floor((performance.now() - timerStartRef.current) / 1000));
-    }, 500);
 
     const profile = getOutputProfile(resolution);
 
     try {
       const ff = await ensureEngine();
       isTranscodingRef.current = true;
+
+      /* Start timer AFTER engine is loaded — only count actual encoding time */
+      timerStartRef.current = performance.now();
+      timerIntervalRef.current = setInterval(() => {
+        setElapsedSeconds(Math.floor((performance.now() - timerStartRef.current) / 1000));
+      }, 500);
 
       const inputExtension = file.name.split('.').pop()?.toLowerCase() || 'mp4';
       const inputFileName = `input.${inputExtension}`;
