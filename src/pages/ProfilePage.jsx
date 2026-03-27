@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film } from 'lucide-react';
 import { useAuth } from '../App';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits, getReceivedGifts } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
@@ -393,6 +393,16 @@ export default function ProfilePage() {
           >
             <ExternalLink className="w-3 h-3" />
             Ver perfil público
+          </motion.button>
+
+          {/* Upload story button */}
+          <motion.button
+            variants={fadeUp}
+            onClick={() => navigate('/historia/nueva')}
+            className="mt-4 inline-flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-mansion-crimson/10 border border-mansion-crimson/25 text-mansion-crimson font-semibold text-sm hover:bg-mansion-crimson/20 transition-colors"
+          >
+            <Film className="w-4 h-4" />
+            Subir Historia
           </motion.button>
         </motion.div>
 

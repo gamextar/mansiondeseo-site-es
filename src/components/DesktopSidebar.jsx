@@ -1,5 +1,5 @@
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Search, MessageCircle, User, Crown, Settings, Camera } from 'lucide-react';
+import { Home, Film, MessageCircle, User, Crown, Settings, Camera } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useState, useEffect } from 'react';
@@ -21,7 +21,7 @@ function timeAgo(dateStr) {
 
 const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio' },
-  { to: '/explorar', icon: Search, label: 'Explorar' },
+  { to: '/videos', icon: Film, label: 'Videos' },
   { to: '/mensajes', icon: MessageCircle, label: 'Mensajes' },
   { to: '/perfil', icon: User, label: 'Mi Perfil' },
 ];

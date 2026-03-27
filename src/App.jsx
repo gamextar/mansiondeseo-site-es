@@ -26,6 +26,7 @@ import PagoPendientePage from './pages/PagoPendientePage';
 import CoinsPage from './pages/CoinsPage';
 import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
 import StoryUploadPage from './pages/StoryUploadPage';
+import VideoFeedPage from './pages/VideoFeedPage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
@@ -115,6 +116,14 @@ function AppLayout() {
             element={
               <RequireRegistration>
                 <ExplorePage />
+              </RequireRegistration>
+            }
+          />
+          <Route
+            path="/videos"
+            element={
+              <RequireRegistration>
+                <VideoFeedPage />
               </RequireRegistration>
             }
           />

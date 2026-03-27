@@ -369,3 +369,36 @@ export async function adminUpdateUser(userId, fields) {
 export async function adminDeleteUser(userId) {
   return apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
 }
+
+// ── Stories ─────────────────────────────────────────────
+
+export async function getStories({ page = 1, limit = 20 } = {}) {
+  const params = new URLSearchParams({ page, limit });
+  return apiFetch(`/stories?${params}`);
+}
+
+export async function uploadStory(file, { caption = '', userId } = {}) {
+  const params = new URLSearchParams();
+  params.set('purpose', 'story');
+  if (caption) params.set('caption', caption);
+  if (userId) params.set('user_id', userId);
+  const data = await apiFetch(`/upload?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type },
+    body: await file.arrayBuffer(),
+  });
+  return data;
+}
+
+export async function adminUploadStoryForUser(userId, file, { caption = '' } = {}) {
+  const params = new URLSearchParams();
+  params.set('purpose', 'story');
+  params.set('user_id', userId);
+  if (caption) params.set('caption', caption);
+  const data = await apiFetch(`/admin/upload-story?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type },
+    body: await file.arrayBuffer(),
+  });
+  return data;
+}

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, Ghost, Ban, AlertTriangle, Pause, Play } from 'lucide-react';
-import { adminGetUsers, adminUpdateUser, adminDeleteUser } from '../../lib/api';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, Ghost, Ban, AlertTriangle, Pause, Play, Film } from 'lucide-react';
+import { adminGetUsers, adminUpdateUser, adminDeleteUser, adminUploadStoryForUser } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 
 function timeAgo(dateStr) {
@@ -31,6 +31,8 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [storyUploading, setStoryUploading] = useState(false);
+  const storyInputRef = useRef(null);
 
   const fetchUsers = useCallback(async (p = page, q = query) => {
     setLoading(true);
@@ -79,6 +81,21 @@ export default function AdminUsersPage() {
       alert(err.message);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleStoryUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (storyInputRef.current) storyInputRef.current.value = '';
+    if (!file || !selected) return;
+    setStoryUploading(true);
+    try {
+      await adminUploadStoryForUser(selected.id, file);
+      alert(`Historia subida exitosamente para ${selected.username}`);
+    } catch (err) {
+      alert(err.message || 'Error al subir historia');
+    } finally {
+      setStoryUploading(false);
     }
   };
 
@@ -414,6 +431,26 @@ export default function AdminUsersPage() {
                   <Trash2 className="w-4 h-4 text-red-400" />
                   <span className="text-xs text-red-400 font-semibold">Eliminar usuario</span>
                 </button>
+
+                {/* Upload story for user */}
+                <div className="space-y-2 pt-2 border-t border-mansion-border/20">
+                  <p className="text-[10px] text-text-dim uppercase tracking-wider">Historias</p>
+                  <button
+                    disabled={storyUploading}
+                    onClick={() => storyInputRef.current?.click()}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-mansion-elevated hover:bg-mansion-crimson/10 transition-colors text-left"
+                  >
+                    <Film className={`w-4 h-4 ${storyUploading ? 'text-text-dim animate-pulse' : 'text-mansion-crimson'}`} />
+                    <span className="text-xs text-text-primary">{storyUploading ? 'Subiendo historia...' : 'Subir historia para este usuario'}</span>
+                  </button>
+                  <input
+                    ref={storyInputRef}
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={handleStoryUpload}
+                  />
+                </div>
               </div>
             </div>
           </div>

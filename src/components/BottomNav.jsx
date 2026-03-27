@@ -1,11 +1,11 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Search, MessageCircle, User } from 'lucide-react';
+import { Home, Film, MessageCircle, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 
 const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio' },
-  { to: '/explorar', icon: Search, label: 'Explorar' },
+  { to: '/videos', icon: Film, label: 'Videos' },
   { to: '/mensajes', icon: MessageCircle, label: 'Mensajes' },
   { to: '/perfil', icon: User, label: 'Perfil' },
 ];
