@@ -651,27 +651,29 @@ export default function VideoLabPage({ variant = 'admin' }) {
           <div className="absolute bottom-[-12%] left-[-6%] w-[460px] h-[460px] rounded-full bg-mansion-gold/10 blur-3xl" />
         </div>
 
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+        <div className="relative max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-10 min-h-screen flex items-center justify-center">
           <motion.section
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-elevated rounded-[2rem] border border-mansion-border/20 overflow-hidden"
+            className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 overflow-hidden"
           >
-            <div className="p-6 sm:p-7 border-b border-mansion-border/20">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-mansion-gold/10 border border-mansion-gold/20 text-mansion-gold text-xs font-semibold tracking-[0.18em] uppercase mb-3">
-                    <Film className="w-3.5 h-3.5" />
-                    Historia
-                  </div>
-                  <h1 className="font-display text-3xl sm:text-4xl font-bold text-text-primary">Nueva historia</h1>
-                  <p className="text-text-muted mt-2 max-w-2xl">
-                    Sube tu video y exporta automáticamente los primeros 15 segundos en MP4 vertical optimizado.
-                  </p>
+            <div className="p-8 sm:p-10 flex flex-col items-center justify-center text-center min-h-[420px]">
+              {sourceUrl && (
+                <div className="absolute w-px h-px overflow-hidden opacity-0 pointer-events-none" aria-hidden="true">
+                  <video
+                    ref={videoRef}
+                    src={sourceUrl}
+                    controls
+                    playsInline
+                    onLoadedMetadata={handleLoadedMetadata}
+                  />
                 </div>
-                <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-mansion-crimson text-white font-medium hover:bg-mansion-crimson-dark transition-colors cursor-pointer">
-                  <Upload className="w-4 h-4" />
-                  Elegir archivo
+              )}
+
+              {!sourceFile && !processing && !result?.url && (
+                <label className="inline-flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-mansion-crimson text-white font-semibold text-lg hover:bg-mansion-crimson-dark transition-colors cursor-pointer min-w-[240px]">
+                  <Upload className="w-5 h-5" />
+                  SUBIR HISTORIA
                   <input
                     type="file"
                     accept="video/*"
@@ -679,168 +681,61 @@ export default function VideoLabPage({ variant = 'admin' }) {
                     onChange={handleFileChange}
                   />
                 </label>
-              </div>
-            </div>
+              )}
 
-            <div className="p-6 sm:p-7 grid gap-6">
-              <div className="aspect-video rounded-[1.5rem] overflow-hidden bg-black/50 border border-white/10 relative">
-                {sourceUrl ? (
-                  <video
-                    ref={videoRef}
-                    src={sourceUrl}
-                    controls
-                    playsInline
-                    className="w-full h-full object-contain bg-black"
-                    onLoadedMetadata={handleLoadedMetadata}
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6">
-                    <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center">
-                      <Film className="w-7 h-7 text-mansion-gold" />
+              {sourceFile && !processing && !result?.url && (
+                <button
+                  type="button"
+                  onClick={transcodeVideo}
+                  disabled={!selectedDuration}
+                  className="inline-flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-mansion-crimson text-white font-semibold text-lg hover:bg-mansion-crimson-dark disabled:opacity-60 transition-colors min-w-[240px]"
+                >
+                  <Wand2 className="w-5 h-5" />
+                  SUBIR HISTORIA
+                </button>
+              )}
+
+              {processing && (
+                <div className="w-full max-w-md">
+                  <div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
+                    <div className="h-3 bg-white/5">
+                      <div
+                        className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300"
+                        style={{ width: `${Math.round(overallProgress * 100)}%` }}
+                      />
                     </div>
-                    <div>
-                      <p className="font-display text-xl text-text-primary">Selecciona un video para tu historia</p>
-                      <p className="text-sm text-text-dim mt-1">Se convertirá localmente en el navegador, sin subirlo al servidor.</p>
-                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-text-dim">Archivo</p>
-                  <p className="text-sm text-text-primary mt-1 truncate">{sourceFile?.name || 'Sin video cargado'}</p>
-                </div>
-                <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-text-dim">Clip</p>
-                  <p className="text-sm text-text-primary mt-1">{selectedDuration > 0 ? `${selectedDuration.toFixed(1)}s` : 'Primeros 15s'}</p>
-                </div>
-                <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-text-dim">Salida</p>
-                  <p className="text-sm text-text-primary mt-1">MP4 · {outputProfile.label}</p>
-                </div>
-              </div>
-
-              <div className="rounded-[1.75rem] border border-mansion-border/20 bg-mansion-card/40 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-text-dim font-semibold">Conversión</p>
-                    <h2 className="font-display text-xl mt-1">Versión simple para historias</h2>
-                    <p className="text-sm text-text-dim mt-1">Usa el mismo motor y parámetros que Video Lab, pero sin trimmer ni controles avanzados.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={transcodeVideo}
-                    disabled={!sourceFile || !selectedDuration || processing}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-mansion-crimson text-white font-semibold hover:bg-mansion-crimson-dark disabled:opacity-60 transition-colors"
+              {!processing && result?.url && (
+                <div className="flex flex-col items-center gap-4">
+                  <a
+                    href={result.url}
+                    download={result.fileName}
+                    className="inline-flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors min-w-[240px]"
                   >
-                    {processing ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                    Convertir historia
-                  </button>
-                </div>
-              </div>
-
-              <section className="rounded-[1.75rem] border border-mansion-border/20 bg-mansion-card/40 p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-text-dim font-semibold">Progreso</p>
-                    <h2 className="font-display text-xl mt-1">Carga y conversión</h2>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => ensureEngineLoaded().catch(() => {})}
-                    disabled={engineState === 'loading' || engineReady}
-                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-mansion-card/70 border border-mansion-border/30 text-text-muted hover:text-text-primary disabled:opacity-50 transition-colors"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${engineState === 'loading' ? 'animate-spin' : ''}`} />
-                    {engineReady ? 'Listo' : 'Cargar motor'}
-                  </button>
-                </div>
-
-                <div className="mt-5 rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
-                  <div className="h-3 bg-white/5">
-                    <div
-                      className={`h-full transition-all duration-300 ${processing ? 'bg-gradient-to-r from-mansion-crimson to-mansion-gold' : 'bg-gradient-to-r from-mansion-gold/70 to-mansion-gold-light/90'}`}
-                      style={{ width: `${Math.round(overallProgress * 100)}%` }}
+                    <Download className="w-5 h-5" />
+                    DESCARGAR HISTORIA
+                  </a>
+                  <label className="inline-flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-semibold text-lg hover:bg-white/10 transition-colors cursor-pointer min-w-[240px]">
+                    <Upload className="w-5 h-5" />
+                    SUBIR OTRA
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={handleFileChange}
                     />
-                  </div>
-                  <div className="px-4 py-3 flex items-center justify-between text-sm">
-                    <span className="text-text-muted">{processing ? 'Procesando video...' : engineReady ? 'Motor cargado' : 'Preparando FFmpeg...'}</span>
-                    <span className="font-semibold text-text-primary">{Math.round(overallProgress * 100)}%</span>
-                  </div>
+                  </label>
                 </div>
+              )}
 
-                <p className="text-sm text-text-dim mt-4 min-h-[2.75rem]">{statusText}</p>
-                {errorMessage && (
-                  <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                    {errorMessage}
-                  </div>
-                )}
-
-                <div className="grid gap-3 mt-5">
-                  <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Salida objetivo</p>
-                    <p className="text-sm text-text-primary mt-1">{`MP4 · ${outputProfile.label} · CRF ${activeParams.crf} · ${activeParams.maxrate} cap · ${activeParams.preset} · ${outputEstimateLabel}`}</p>
-                  </div>
-                  <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Motor</p>
-                    <p className="text-sm text-text-primary mt-1">`@ffmpeg/ffmpeg` 0.12.15</p>
-                  </div>
+              {errorMessage && !processing && (
+                <div className="mt-6 w-full max-w-md rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                  {errorMessage}
                 </div>
-              </section>
-
-              <section className="rounded-[1.75rem] border border-mansion-border/20 bg-mansion-card/40 p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-text-dim font-semibold">Resultado</p>
-                    <h2 className="font-display text-xl mt-1">Descarga el clip</h2>
-                  </div>
-                  {result?.url && (
-                    <a
-                      href={result.url}
-                      download={result.fileName}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-mansion-gold text-mansion-base font-semibold hover:bg-mansion-gold-light transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                      Descargar
-                    </a>
-                  )}
-                </div>
-
-                {result?.url ? (
-                  <div className="mt-5 space-y-4">
-                    <div className="aspect-video rounded-[1.5rem] overflow-hidden bg-black/50 border border-white/10">
-                      <video src={result.url} controls playsInline className="w-full h-full object-contain bg-black" />
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-4">
-                      <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Archivo</p>
-                        <p className="text-sm text-text-primary mt-1 truncate">{result.fileName}</p>
-                      </div>
-                      <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Tamaño</p>
-                        <p className="text-sm text-text-primary mt-1">{result.sizeLabel}</p>
-                      </div>
-                      <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Clip</p>
-                        <p className="text-sm text-text-primary mt-1">{result.duration.toFixed(1)}s</p>
-                      </div>
-                      <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Tiempo</p>
-                        <p className="text-sm text-text-primary mt-1">{result.processingTimeLabel}</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-5 rounded-[1.5rem] border border-dashed border-mansion-border/30 bg-mansion-card/30 p-6 text-center">
-                    <div className="w-14 h-14 rounded-3xl bg-black/20 border border-white/10 flex items-center justify-center mx-auto">
-                      <Download className="w-6 h-6 text-mansion-gold" />
-                    </div>
-                    <p className="font-display text-lg mt-4">Todavía no hay salida</p>
-                    <p className="text-sm text-text-dim mt-1">Cuando termine la conversión, vas a poder previsualizar y descargar el MP4 desde acá.</p>
-                  </div>
-                )}
-              </section>
+              )}
             </div>
           </motion.section>
         </div>
