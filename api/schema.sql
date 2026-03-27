@@ -158,3 +158,18 @@ CREATE TABLE IF NOT EXISTS user_gifts (
 
 CREATE INDEX IF NOT EXISTS idx_user_gifts_receiver ON user_gifts(receiver_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_user_gifts_sender   ON user_gifts(sender_id, created_at);
+
+-- Stories (TikTok-style video feed)
+CREATE TABLE IF NOT EXISTS stories (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL REFERENCES users(id),
+  video_url   TEXT NOT NULL,
+  caption     TEXT DEFAULT '',
+  likes       INTEGER NOT NULL DEFAULT 0,
+  comments    INTEGER NOT NULL DEFAULT 0,
+  active      INTEGER NOT NULL DEFAULT 1,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_stories_user   ON stories(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_stories_active ON stories(active, created_at);

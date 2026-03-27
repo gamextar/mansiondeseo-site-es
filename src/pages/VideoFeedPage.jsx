@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, Share2, Plus, Volume2, VolumeX, Play, Film, ChevronUp, ChevronDown } from 'lucide-react';
-import { getStories } from '../lib/api';
+import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Play, Film, ChevronUp, ChevronDown } from 'lucide-react';
+import { getStories, toggleFavorite } from '../lib/api';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
 
@@ -18,7 +18,7 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function StoryCard({ story, isActive, onLike, isMuted, onToggleMute }) {
+function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
@@ -100,32 +100,39 @@ function StoryCard({ story, isActive, onLike, isMuted, onToggleMute }) {
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
 
       {/* Right side actions */}
-      <div className="absolute right-3 bottom-28 flex flex-col items-center gap-5 z-20">
-        {/* Like */}
+      <div className="absolute right-3 bottom-24 lg:bottom-8 flex flex-col items-center gap-5 z-20">
+        {/* Profile photo */}
         <button
-          onClick={() => onLike(story.id)}
+          onClick={() => navigate(`/perfiles/${story.user_id}`)}
           className="flex flex-col items-center gap-1"
         >
-          <div className={`w-11 h-11 rounded-full flex items-center justify-center ${story.liked ? 'bg-mansion-crimson/20' : 'bg-black/30 backdrop-blur-sm'}`}>
-            <Heart className={`w-6 h-6 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
+          <div className="w-12 h-12 rounded-full border-2 border-white/70 overflow-hidden bg-mansion-elevated">
+            {story.avatar_url ? (
+              <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white/60 text-sm font-bold">{(story.username || '?')[0]}</div>
+            )}
           </div>
-          <span className="text-white text-[11px] font-semibold">{story.likes || 0}</span>
         </button>
 
-        {/* Comment */}
-        <button className="flex flex-col items-center gap-1">
-          <div className="w-11 h-11 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center">
-            <MessageCircle className="w-6 h-6 text-white" />
+        {/* Favorite */}
+        <button
+          onClick={() => onFavorite(story.user_id)}
+          className="flex flex-col items-center gap-1"
+        >
+          <div className={`w-11 h-11 rounded-full flex items-center justify-center ${story.favorited ? 'bg-mansion-crimson/20' : 'bg-black/30 backdrop-blur-sm'}`}>
+            <Heart className={`w-6 h-6 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
           </div>
-          <span className="text-white text-[11px] font-semibold">{story.comments || 0}</span>
         </button>
 
-        {/* Share */}
-        <button className="flex flex-col items-center gap-1">
+        {/* Send message */}
+        <button
+          onClick={() => navigate(`/mensajes/${story.user_id}`)}
+          className="flex flex-col items-center gap-1"
+        >
           <div className="w-11 h-11 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center">
-            <Share2 className="w-6 h-6 text-white" />
+            <Send className="w-5 h-5 text-white" />
           </div>
-          <span className="text-white text-[11px] font-semibold">Enviar</span>
         </button>
 
         {/* Mute toggle */}
@@ -136,28 +143,20 @@ function StoryCard({ story, isActive, onLike, isMuted, onToggleMute }) {
         </button>
       </div>
 
-      {/* Bottom user info */}
-      <div className="absolute left-4 right-20 bottom-6 z-20">
+      {/* Bottom user info + caption */}
+      <div className="absolute left-4 right-20 bottom-20 lg:bottom-6 z-20">
         <button
           onClick={() => navigate(`/perfiles/${story.user_id}`)}
-          className="flex items-center gap-2.5 mb-3"
+          className="block text-left mb-1"
         >
-          <div className="w-10 h-10 rounded-full border-2 border-white/60 overflow-hidden bg-mansion-elevated flex-shrink-0">
-            {story.avatar_url ? (
-              <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-white/60 text-xs font-bold">{(story.username || '?')[0]}</div>
-            )}
-          </div>
-          <div className="text-left">
-            <p className="text-white font-semibold text-sm leading-tight">{story.username}</p>
-            <p className="text-white/50 text-[11px]">{timeAgo(story.created_at)}</p>
-          </div>
+          <p className="text-white font-bold text-[15px] leading-tight drop-shadow-lg">@{story.username}</p>
         </button>
 
         {story.caption && (
-          <p className="text-white/90 text-sm leading-relaxed line-clamp-2">{story.caption}</p>
+          <p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
         )}
+
+        <p className="text-white/40 text-[11px] mt-1.5">{timeAgo(story.created_at)}</p>
       </div>
 
       {/* Progress bar at top */}
@@ -210,12 +209,15 @@ export default function VideoFeedPage() {
     }
   }, [activeIndex, stories.length]);
 
-  const handleLike = useCallback((storyId) => {
-    setStories(prev => prev.map(s =>
-      s.id === storyId
-        ? { ...s, liked: !s.liked, likes: s.liked ? (s.likes || 1) - 1 : (s.likes || 0) + 1 }
-        : s
-    ));
+  const handleFavorite = useCallback(async (userId) => {
+    try {
+      const data = await toggleFavorite(userId);
+      setStories(prev => prev.map(s =>
+        s.user_id === userId ? { ...s, favorited: data.favorited } : s
+      ));
+    } catch {
+      // Silently fail
+    }
   }, []);
 
   const scrollToIndex = useCallback((index) => {
@@ -298,7 +300,7 @@ export default function VideoFeedPage() {
             <StoryCard
               story={story}
               isActive={index === activeIndex}
-              onLike={handleLike}
+              onFavorite={handleFavorite}
               isMuted={isMuted}
               onToggleMute={() => setIsMuted(m => !m)}
             />
@@ -306,9 +308,9 @@ export default function VideoFeedPage() {
         ))}
       </div>
 
-      {/* Scroll hints */}
+      {/* Scroll hints — desktop only */}
       {stories.length > 1 && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-30">
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex-col gap-2 z-30 hidden lg:flex">
           {activeIndex > 0 && (
             <button
               onClick={() => scrollToIndex(activeIndex - 1)}
@@ -346,7 +348,7 @@ export default function VideoFeedPage() {
       </div>
 
       {/* Bottom safe area for nav */}
-      <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/60 to-transparent pointer-events-none z-20 lg:hidden" />
+      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/70 to-transparent pointer-events-none z-10 lg:hidden" />
     </div>
   );
 }

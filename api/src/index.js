@@ -2639,6 +2639,158 @@ async function handlePaymentConfirm(request, env) {
   }
 }
 
+// ── Stories ─────────────────────────────────────────────
+
+let _storiesTableReady = null;
+async function ensureStoriesTable(env) {
+  if (!_storiesTableReady) {
+    _storiesTableReady = env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS stories (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id),
+        video_url   TEXT NOT NULL,
+        caption     TEXT DEFAULT '',
+        likes       INTEGER NOT NULL DEFAULT 0,
+        comments    INTEGER NOT NULL DEFAULT 0,
+        active      INTEGER NOT NULL DEFAULT 1,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `).run().then(() =>
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_active ON stories(active, created_at)').run()
+    ).catch((err) => {
+      _storiesTableReady = null;
+      throw err;
+    });
+  }
+  return _storiesTableReady;
+}
+
+// GET /api/stories
+async function handleGetStories(request, env) {
+  await ensureStoriesTable(env);
+  const url = new URL(request.url);
+  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
+  const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
+  const offset = (page - 1) * limit;
+
+  const { results } = await env.DB.prepare(`
+    SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
+           u.username, u.avatar_url, u.avatar_crop
+    FROM stories s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.active = 1
+    ORDER BY s.created_at DESC
+    LIMIT ? OFFSET ?
+  `).bind(limit, offset).all();
+
+  const stories = (results || []).map(r => ({
+    id: r.id,
+    user_id: r.user_id,
+    video_url: r.video_url,
+    caption: r.caption || '',
+    likes: r.likes || 0,
+    comments: r.comments || 0,
+    created_at: r.created_at,
+    username: r.username,
+    avatar_url: r.avatar_url || '',
+    avatar_crop: safeParseJSON(r.avatar_crop, null),
+  }));
+
+  return json({ stories });
+}
+
+// POST /api/admin/upload-story — admin uploads a video story for any user
+async function handleAdminUploadStory(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  await ensureStoriesTable(env);
+
+  const url = new URL(request.url);
+  const userId = url.searchParams.get('user_id');
+  const caption = url.searchParams.get('caption') || '';
+
+  if (!userId) return error('user_id requerido', 400);
+
+  // Verify target user exists
+  const targetUser = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+  if (!targetUser) return error('Usuario no encontrado', 404);
+
+  const contentType = request.headers.get('Content-Type') || '';
+  if (!contentType.startsWith('video/')) {
+    return error('Solo se permiten videos (video/mp4, video/webm, video/quicktime)');
+  }
+
+  const videoData = await request.arrayBuffer();
+
+  // Max 50MB for videos
+  if (videoData.byteLength > 50 * 1024 * 1024) {
+    return error('El video no puede superar 50MB');
+  }
+
+  const ext = contentType === 'video/webm' ? 'webm' : contentType === 'video/quicktime' ? 'mov' : 'mp4';
+  const key = `stories/${generateId()}.${ext}`;
+
+  await env.IMAGES.put(key, videoData, {
+    httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
+  });
+
+  const videoUrl = env.R2_PUBLIC_URL
+    ? `${env.R2_PUBLIC_URL}/${key}`
+    : `/api/images/${key}`;
+
+  const storyId = generateId();
+  await env.DB.prepare(`
+    INSERT INTO stories (id, user_id, video_url, caption) VALUES (?, ?, ?, ?)
+  `).bind(storyId, userId, videoUrl, caption).run();
+
+  return json({ id: storyId, video_url: videoUrl, user_id: userId, caption }, 201);
+}
+
+// POST /api/stories — authenticated user uploads their own story
+async function handleUploadStory(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  await ensureStoriesTable(env);
+
+  const url = new URL(request.url);
+  const caption = url.searchParams.get('caption') || '';
+
+  const contentType = request.headers.get('Content-Type') || '';
+  if (!contentType.startsWith('video/')) {
+    return error('Solo se permiten videos (video/mp4, video/webm, video/quicktime)');
+  }
+
+  const videoData = await request.arrayBuffer();
+
+  // Max 50MB for videos
+  if (videoData.byteLength > 50 * 1024 * 1024) {
+    return error('El video no puede superar 50MB');
+  }
+
+  const ext = contentType === 'video/webm' ? 'webm' : contentType === 'video/quicktime' ? 'mov' : 'mp4';
+  const key = `stories/${generateId()}.${ext}`;
+
+  await env.IMAGES.put(key, videoData, {
+    httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
+  });
+
+  const videoUrl = env.R2_PUBLIC_URL
+    ? `${env.R2_PUBLIC_URL}/${key}`
+    : `/api/images/${key}`;
+
+  const storyId = generateId();
+  await env.DB.prepare(`
+    INSERT INTO stories (id, user_id, video_url, caption) VALUES (?, ?, ?, ?)
+  `).bind(storyId, auth.sub, videoUrl, caption).run();
+
+  return json({ id: storyId, video_url: videoUrl, caption }, 201);
+}
+
 async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -2747,6 +2899,11 @@ async function handleRequest(request, env) {
   // ── Pagos
   if (path === '/api/payment/create' && method === 'POST') return handlePaymentCreate(request, env);
   if (path === '/api/payment/confirm' && method === 'POST') return handlePaymentConfirm(request, env);
+
+  // ── Stories
+  if (path === '/api/stories' && method === 'GET') return handleGetStories(request, env);
+  if (path === '/api/stories' && method === 'POST') return handleUploadStory(request, env);
+  if (path === '/api/admin/upload-story' && method === 'POST') return handleAdminUploadStory(request, env);
 
   return error('Ruta no encontrada', 404);
 }

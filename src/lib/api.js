@@ -377,12 +377,11 @@ export async function getStories({ page = 1, limit = 20 } = {}) {
   return apiFetch(`/stories?${params}`);
 }
 
-export async function uploadStory(file, { caption = '', userId } = {}) {
+export async function uploadStory(file, { caption = '' } = {}) {
   const params = new URLSearchParams();
-  params.set('purpose', 'story');
   if (caption) params.set('caption', caption);
-  if (userId) params.set('user_id', userId);
-  const data = await apiFetch(`/upload?${params}`, {
+  const qs = params.toString();
+  const data = await apiFetch(`/stories${qs ? `?${qs}` : ''}`, {
     method: 'POST',
     headers: { 'Content-Type': file.type },
     body: await file.arrayBuffer(),
@@ -392,7 +391,6 @@ export async function uploadStory(file, { caption = '', userId } = {}) {
 
 export async function adminUploadStoryForUser(userId, file, { caption = '' } = {}) {
   const params = new URLSearchParams();
-  params.set('purpose', 'story');
   params.set('user_id', userId);
   if (caption) params.set('caption', caption);
   const data = await apiFetch(`/admin/upload-story?${params}`, {

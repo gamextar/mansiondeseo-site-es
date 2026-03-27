@@ -32,6 +32,7 @@ export default function AdminUsersPage() {
   const [selected, setSelected] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [storyUploading, setStoryUploading] = useState(false);
+  const [storyCaption, setStoryCaption] = useState('');
   const storyInputRef = useRef(null);
 
   const fetchUsers = useCallback(async (p = page, q = query) => {
@@ -90,8 +91,9 @@ export default function AdminUsersPage() {
     if (!file || !selected) return;
     setStoryUploading(true);
     try {
-      await adminUploadStoryForUser(selected.id, file);
+      await adminUploadStoryForUser(selected.id, file, { caption: storyCaption });
       alert(`Historia subida exitosamente para ${selected.username}`);
+      setStoryCaption('');
     } catch (err) {
       alert(err.message || 'Error al subir historia');
     } finally {
@@ -435,6 +437,13 @@ export default function AdminUsersPage() {
                 {/* Upload story for user */}
                 <div className="space-y-2 pt-2 border-t border-mansion-border/20">
                   <p className="text-[10px] text-text-dim uppercase tracking-wider">Historias</p>
+                  <input
+                    type="text"
+                    value={storyCaption}
+                    onChange={e => setStoryCaption(e.target.value)}
+                    placeholder="Texto de la historia (opcional)..."
+                    className="w-full px-4 py-2 rounded-xl bg-mansion-elevated border border-mansion-border/20 text-sm text-text-primary placeholder:text-text-dim focus:outline-none focus:border-mansion-gold/40"
+                  />
                   <button
                     disabled={storyUploading}
                     onClick={() => storyInputRef.current?.click()}
