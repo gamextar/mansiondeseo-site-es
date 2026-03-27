@@ -127,6 +127,7 @@ export default function StoryUploadPage() {
   /* -- Refs (same names as VideoLabPage) -- */
   const ffmpegRef = useRef(null);
   const loadPromiseRef = useRef(null);
+  const videoRef = useRef(null);
   const resultUrlRef = useRef('');
   const activeSegmentDurationRef = useRef(0);
   const isTranscodingRef = useRef(false);
@@ -145,6 +146,7 @@ export default function StoryUploadPage() {
   const [pendingFile, setPendingFile] = useState(null);
   const [pendingResolution, setPendingResolution] = useState(null);
   const [pendingClipEnd, setPendingClipEnd] = useState(0);
+  const [pendingSourceUrl, setPendingSourceUrl] = useState('');
 
   /* UI step for the simple flow */
   const [step, setStep] = useState('pick');
@@ -181,9 +183,10 @@ export default function StoryUploadPage() {
       ffmpeg.off('progress', handleProgress);
       ffmpeg.off('log', handleLog);
       ffmpeg.terminate();
+      if (pendingSourceUrl) URL.revokeObjectURL(pendingSourceUrl);
       if (resultUrlRef.current) URL.revokeObjectURL(resultUrlRef.current);
     };
-  }, []);
+  }, [pendingSourceUrl]);
 
   useEffect(() => {
     resultUrlRef.current = result?.url || '';
@@ -263,6 +266,13 @@ export default function StoryUploadPage() {
     setResult(null);
   };
 
+  const resetPendingSource = () => {
+    if (pendingSourceUrl) {
+      URL.revokeObjectURL(pendingSourceUrl);
+    }
+    setPendingSourceUrl('');
+  };
+
   /* -- handleFileChange: pick file -> read metadata -> start transcode -- */
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0];
@@ -270,6 +280,7 @@ export default function StoryUploadPage() {
     if (!file) return;
 
     resetResult();
+    resetPendingSource();
     setErrorMessage('');
     setProcessingProgress(0);
     setPendingFile(null);
@@ -302,6 +313,7 @@ export default function StoryUploadPage() {
     setPendingFile(file);
     setPendingResolution(sourceResolution);
     setPendingClipEnd(clipEnd);
+    setPendingSourceUrl(URL.createObjectURL(file));
     setStatusText('Archivo listo. Continúa para convertir.');
     setStep('ready');
   };
@@ -425,6 +437,7 @@ export default function StoryUploadPage() {
 
   const startOver = () => {
     resetResult();
+    resetPendingSource();
     setProcessingProgress(0);
     setElapsedSeconds(0);
     setErrorMessage('');
@@ -512,6 +525,19 @@ export default function StoryUploadPage() {
                 </>
               )}
             </div>
+
+            {pendingSourceUrl && (
+              <div className="absolute w-px h-px overflow-hidden opacity-0 pointer-events-none" aria-hidden="true">
+                <video
+                  ref={videoRef}
+                  src={pendingSourceUrl}
+                  preload="auto"
+                  muted
+                  playsInline
+                  onLoadedData={() => setStatusText('Video precargado. Continúa para convertir.')}
+                />
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-3 justify-center">
               <button
