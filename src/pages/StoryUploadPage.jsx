@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Film, Play, Upload } from 'lucide-react';
+import { CheckCircle2, Clock, Film, Play, Upload } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 
@@ -92,6 +92,9 @@ export default function StoryUploadPage() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [resultUrl, setResultUrl] = useState('');
   const [resultName, setResultName] = useState('');
+  const [resultSize, setResultSize] = useState('');
+  const [resultDuration, setResultDuration] = useState(0);
+  const [processingTime, setProcessingTime] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
   if (!ffmpegRef.current) ffmpegRef.current = new FFmpeg();
@@ -234,11 +237,15 @@ export default function StoryUploadPage() {
       const data = await ff.readFile(outputFileName);
       const outputBlob = new Blob([data], { type: 'video/mp4' });
       const outputUrl = URL.createObjectURL(outputBlob);
+      const processingElapsedSeconds = (performance.now() - timerStartRef.current) / 1000;
       if (resultUrlRef.current) URL.revokeObjectURL(resultUrlRef.current);
 
       setProgress(1);
       setResultUrl(outputUrl);
       setResultName(outputFileName);
+      setResultSize(`${(outputBlob.size / (1024 * 1024)).toFixed(2)} MB`);
+      setResultDuration(segmentDuration);
+      setProcessingTime(`${processingElapsedSeconds.toFixed(1)}s`);
 
       try { await ff.deleteFile(inputFileName); } catch {}
       try { await ff.deleteFile(outputFileName); } catch {}
@@ -262,6 +269,9 @@ export default function StoryUploadPage() {
     setElapsedSeconds(0);
     setResultUrl('');
     setResultName('');
+    setResultSize('');
+    setResultDuration(0);
+    setProcessingTime('');
     setErrorMessage('');
     setStep('pick');
   };
@@ -345,6 +355,22 @@ export default function StoryUploadPage() {
                 Podés previsualizarla antes de publicar.
               </motion.p>
 
+              {/* Result stats — same as VideoLabPage */}
+              <motion.div variants={childFade} className="grid grid-cols-3 gap-3 w-full mb-6">
+                <div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Tamaño</p>
+                  <p className="text-sm text-text-primary mt-1">{resultSize}</p>
+                </div>
+                <div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Clip</p>
+                  <p className="text-sm text-text-primary mt-1">{resultDuration.toFixed(1)}s</p>
+                </div>
+                <div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Tiempo</p>
+                  <p className="text-sm text-text-primary mt-1">{processingTime}</p>
+                </div>
+              </motion.div>
+
               {resultUrl && (
                 <motion.div variants={childFade} className="w-full aspect-video rounded-2xl overflow-hidden bg-black/50 border border-white/10 mb-6">
                   <video src={resultUrl} controls playsInline className="w-full h-full object-contain bg-black" />
@@ -375,6 +401,22 @@ export default function StoryUploadPage() {
 
         </AnimatePresence>
       </div>
+
+      {/* Elapsed timer overlay — same as VideoLabPage */}
+      {step === 'encoding' && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl bg-black/80 backdrop-blur-lg border border-white/10 shadow-2xl">
+          <Clock className="w-5 h-5 text-mansion-gold animate-pulse" />
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-text-dim">Tiempo de conversión</p>
+            <p className="text-2xl font-display font-bold text-text-primary tabular-nums">
+              {String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}
+            </p>
+          </div>
+          <div className="ml-2 text-right">
+            <p className="text-lg font-bold text-mansion-gold tabular-nums">{Math.round(progress * 100)}%</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
