@@ -249,6 +249,7 @@ export default function VideoLabPage() {
     bufsize: customOverrides.bufsize ?? selectedPreset.bufsize,
     preset: customOverrides.preset ?? selectedPreset.preset,
     audioBitrate: customOverrides.audioBitrate ?? selectedPreset.audioBitrate,
+    audioMono: customOverrides.audioMono ?? false,
     estimatedVideoBitrate: selectedPreset.estimatedVideoBitrate,
   };
   const outputEstimateLabel = getEstimatedOutputSizeLabel(MAX_CLIP_SECONDS, activeParams);
@@ -489,7 +490,7 @@ export default function VideoLabPage() {
         '-bufsize', activeParams.bufsize,
         '-preset', activeParams.preset,
         '-pix_fmt', 'yuv420p',
-        ...(activeParams.audioBitrate === 'none' ? ['-an'] : ['-c:a', 'aac', '-b:a', activeParams.audioBitrate]),
+        ...(activeParams.audioBitrate === 'none' ? ['-an'] : ['-c:a', 'aac', '-b:a', activeParams.audioBitrate, ...(activeParams.audioMono ? ['-ac', '1'] : [])]),
         outputFileName,
       ]);
 
@@ -500,7 +501,7 @@ export default function VideoLabPage() {
           ...sharedArgs,
           '-c:v', 'mpeg4',
           '-q:v', '4',
-          ...(activeParams.audioBitrate === 'none' ? ['-an'] : ['-c:a', 'aac', '-b:a', activeParams.audioBitrate]),
+          ...(activeParams.audioBitrate === 'none' ? ['-an'] : ['-c:a', 'aac', '-b:a', activeParams.audioBitrate, ...(activeParams.audioMono ? ['-ac', '1'] : [])]),
           outputFileName,
         ]);
       }
@@ -747,6 +748,17 @@ export default function VideoLabPage() {
                           ))}
                         </select>
                         <p className="text-[10px] text-text-dim mt-1">Para voces 32k basta. Para música 64k–128k.</p>
+                        {activeParams.audioBitrate !== 'none' && (
+                          <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={activeParams.audioMono}
+                              onChange={(e) => setCustomOverrides((prev) => ({ ...prev, audioMono: e.target.checked }))}
+                              className="w-4 h-4 rounded border-mansion-border/30 bg-mansion-elevated accent-mansion-gold"
+                            />
+                            <span className="text-xs text-text-muted">Mono (1 canal — más liviano)</span>
+                          </label>
+                        )}
                       </div>
                     </div>
 
