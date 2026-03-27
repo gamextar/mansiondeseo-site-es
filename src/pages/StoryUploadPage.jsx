@@ -142,6 +142,9 @@ export default function StoryUploadPage() {
   const [result, setResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [pendingFile, setPendingFile] = useState(null);
+  const [pendingResolution, setPendingResolution] = useState(null);
+  const [pendingClipEnd, setPendingClipEnd] = useState(0);
 
   /* UI step for the simple flow */
   const [step, setStep] = useState('pick');
@@ -269,6 +272,9 @@ export default function StoryUploadPage() {
     resetResult();
     setErrorMessage('');
     setProcessingProgress(0);
+    setPendingFile(null);
+    setPendingResolution(null);
+    setPendingClipEnd(0);
 
     /* Read metadata via temp video element */
     const url = URL.createObjectURL(file);
@@ -293,8 +299,20 @@ export default function StoryUploadPage() {
       return;
     }
 
-    /* Go straight to encoding */
-    await transcodeVideo(file, sourceResolution, 0, clipEnd);
+    setPendingFile(file);
+    setPendingResolution(sourceResolution);
+    setPendingClipEnd(clipEnd);
+    setStatusText('Archivo listo. Continúa para convertir.');
+    setStep('ready');
+  };
+
+  const handleContinue = async () => {
+    if (!pendingFile || pendingClipEnd <= 0) {
+      setErrorMessage('Primero sube un video.');
+      return;
+    }
+
+    await transcodeVideo(pendingFile, pendingResolution, 0, pendingClipEnd);
   };
 
   /* -- transcodeVideo (EXACT copy from VideoLabPage.transcodeVideo) -- */
@@ -411,6 +429,9 @@ export default function StoryUploadPage() {
     setElapsedSeconds(0);
     setErrorMessage('');
     setStatusText('FFmpeg listo para convertir.');
+    setPendingFile(null);
+    setPendingResolution(null);
+    setPendingClipEnd(0);
     setStep('pick');
   };
 
@@ -454,6 +475,61 @@ export default function StoryUploadPage() {
               )}
               <input type="file" accept="video/*" className="hidden" onChange={handleFileChange} disabled={!engineReady} />
             </label>
+
+            {errorMessage && (
+              <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {errorMessage}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {step === 'ready' && pendingFile && (
+          <motion.div {...fadeSlide} className="flex flex-col items-center text-center py-16">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 20 }}
+              className="w-20 h-20 rounded-3xl bg-white/[0.04] border border-white/10 flex items-center justify-center mb-8"
+            >
+              <Film className="w-9 h-9 text-mansion-gold" />
+            </motion.div>
+
+            <h2 className="font-display text-3xl sm:text-4xl font-bold mb-3">Video listo</h2>
+            <p className="text-text-muted text-lg max-w-sm mb-8">
+              El motor ya está cargado y el archivo ya está preparado. Continúa para convertir con el mismo flujo de VideoLab.
+            </p>
+
+            <div className="w-full rounded-2xl bg-black/25 border border-white/10 px-4 py-4 mb-8 text-left">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Archivo</p>
+              <p className="text-sm text-text-primary mt-1 truncate">{pendingFile.name}</p>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim mt-4">Clip</p>
+              <p className="text-sm text-text-primary mt-1">0.0s - {pendingClipEnd.toFixed(1)}s</p>
+              {pendingResolution && (
+                <>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim mt-4">Resolución</p>
+                  <p className="text-sm text-text-primary mt-1">{pendingResolution.width}x{pendingResolution.height}</p>
+                </>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-3 justify-center">
+              <button
+                type="button"
+                onClick={handleContinue}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-mansion-crimson text-white font-semibold hover:bg-mansion-crimson-dark transition-colors"
+              >
+                <Play className="w-4 h-4" />
+                Continuar
+              </button>
+              <button
+                type="button"
+                onClick={startOver}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/10 text-text-primary hover:bg-white/[0.1] transition-colors"
+              >
+                Elegir otro
+              </button>
+            </div>
 
             {errorMessage && (
               <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
