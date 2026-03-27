@@ -239,53 +239,36 @@ export default function VideoLabPage() {
     window.localStorage.setItem(VIDEO_PRESET_STORAGE_KEY, selectedPreset.id);
   }, [selectedPreset]);
 
-  // Extract thumbnails for the filmstrip trimmer (uses the existing DOM video)
-  const extractThumbnails = () => {
-    const video = videoRef.current;
-    if (!video || sourceDuration <= 0) return;
-    const count = Math.min(12, Math.max(6, Math.ceil(sourceDuration / 2.5)));
+  // Extract thumbnails for the filmstrip trimmer
+  useEffect(() => {
+    if (!sourceUrl || sourceDuration <= 0) {
+      setThumbnails([]);
+      return;
+    }
+    let cancelled = false;
+    const video = document.createElement('video');
+    video.muted = true;
+    video.preload = 'auto';
+    video.src = sourceUrl;
+    const count = Math.min(20, Math.max(10, Math.ceil(sourceDuration / 1.5)));
     const step = sourceDuration / count;
     const canvas = document.createElement('canvas');
-    canvas.width = 60;
-    canvas.height = 40;
+    canvas.width = 80;
+    canvas.height = 56;
     const ctx = canvas.getContext('2d');
-    let i = 0;
-    let cancelled = false;
-    const savedTime = video.currentTime;
-
-    const captureNext = () => {
-      if (cancelled || i >= count) {
-        video.removeEventListener('seeked', onSeeked);
-        video.currentTime = savedTime;
-        return;
+    video.onloadeddata = async () => {
+      const thumbs = [];
+      for (let i = 0; i < count; i++) {
+        if (cancelled) return;
+        video.currentTime = Math.min(i * step + 0.01, sourceDuration - 0.01);
+        await new Promise((r) => { video.onseeked = r; });
+        ctx.drawImage(video, 0, 0, 80, 56);
+        thumbs.push(canvas.toDataURL('image/jpeg', 0.4));
       }
-      video.currentTime = Math.min(i * step + 0.01, sourceDuration - 0.01);
+      if (!cancelled) setThumbnails(thumbs);
     };
-
-    const onSeeked = () => {
-      if (cancelled || i >= count) return;
-      ctx.drawImage(video, 0, 0, 60, 40);
-      setThumbnails((prev) => [...prev, canvas.toDataURL('image/jpeg', 0.3)]);
-      i++;
-      captureNext();
-    };
-
-    video.addEventListener('seeked', onSeeked);
-    setThumbnails([]);
-    captureNext();
-
-    // Timeout safety
-    const timeout = setTimeout(() => {
-      cancelled = true;
-      video.removeEventListener('seeked', onSeeked);
-    }, 10000);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-      video.removeEventListener('seeked', onSeeked);
-    };
-  };
+    return () => { cancelled = true; };
+  }, [sourceUrl, sourceDuration]);
 
   const ensureEngineLoaded = async () => {
     const ffmpeg = ffmpegRef.current;
@@ -385,8 +368,6 @@ export default function VideoLabPage() {
     setSourceResolution(video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : null);
     setClipStart(0);
     setClipEnd(Math.min(dur, MAX_CLIP_SECONDS));
-    // Trigger thumbnail extraction once metadata is ready
-    setTimeout(() => extractThumbnails(), 100);
   };
 
   const syncPreviewToSelection = (nextStart) => {
@@ -837,15 +818,18 @@ export default function VideoLabPage() {
                 </div>
 
                 {/* iPhone-style filmstrip trimmer */}
-                <div ref={trimmerRef} className="relative h-[60px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
-                  {/* Filmstrip thumbnails or simple gradient bar */}
+                <div ref={trimmerRef} className="relative h-[56px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
+                  {/* Filmstrip thumbnails */}
                   <div className="absolute inset-0 flex">
                     {thumbnails.length > 0
                       ? thumbnails.map((src, i) => (
                           <img key={i} src={src} alt="" className="h-full flex-1 object-cover" draggable={false} />
                         ))
-                      : (
-                          <div className="flex-1 bg-gradient-to-r from-white/[0.04] via-white/[0.08] to-white/[0.04]" />
+                      : sourceUrl && (
+                          <div className="flex-1 flex items-center justify-center text-text-dim text-xs">
+                            <LoaderCircle className="w-4 h-4 animate-spin mr-2" />
+                            Generando vista previa…
+                          </div>
                         )}
                   </div>
 
