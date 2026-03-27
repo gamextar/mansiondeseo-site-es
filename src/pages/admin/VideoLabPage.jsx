@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ChevronDown, ChevronUp, Download, Film, LoaderCircle, Play, RefreshCw, Scissors, SlidersHorizontal, Upload, Wand2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, Clock, Download, Film, LoaderCircle, Play, RefreshCw, Scissors, SlidersHorizontal, Upload, Wand2 } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 
@@ -223,6 +223,9 @@ export default function VideoLabPage() {
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerIntervalRef = useRef(null);
+  const timerStartRef = useRef(0);
   const [selectedPresetId, setSelectedPresetId] = useState(() => {
     if (typeof window === 'undefined') return VIDEO_PRESETS[0].id;
     return window.localStorage.getItem(VIDEO_PRESET_STORAGE_KEY) || VIDEO_PRESETS[0].id;
@@ -257,16 +260,16 @@ export default function VideoLabPage() {
   useEffect(() => {
     const ffmpeg = ffmpegRef.current;
 
-    const handleProgress = ({ progress }) => {
-      if (!isTranscodingRef.current) return;
-      setProcessingProgress((current) => Math.max(current, clamp(progress, 0, 0.98)));
+    const handleProgress = () => {
+      // We rely on log-based time= parsing for accurate progress — ignore the built-in progress event
     };
 
     const handleLog = ({ message }) => {
       if (isTranscodingRef.current) {
         const elapsed = parseFfmpegTime(message);
         if (elapsed !== null && activeSegmentDurationRef.current > 0) {
-          setProcessingProgress((current) => Math.max(current, clamp(elapsed / activeSegmentDurationRef.current, 0, 0.99)));
+          const pct = clamp(elapsed / activeSegmentDurationRef.current, 0, 0.99);
+          setProcessingProgress(pct);
         }
       }
       setStatusText(message || 'Procesando...');
@@ -448,7 +451,12 @@ export default function VideoLabPage() {
       setErrorMessage('');
       setProcessing(true);
       isTranscodingRef.current = true;
-      setProcessingProgress(0.02);
+      setProcessingProgress(0);
+      setElapsedSeconds(0);
+      timerStartRef.current = performance.now();
+      timerIntervalRef.current = setInterval(() => {
+        setElapsedSeconds(Math.floor((performance.now() - timerStartRef.current) / 1000));
+      }, 500);
       setStatusText('Preparando el clip...');
 
       const inputExtension = sourceFile.name.split('.').pop()?.toLowerCase() || 'mp4';
@@ -524,6 +532,8 @@ export default function VideoLabPage() {
       setErrorMessage(error?.message || 'No se pudo convertir el video.');
       setStatusText('Conversión interrumpida.');
     } finally {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
       setProcessing(false);
       isTranscodingRef.current = false;
       activeSegmentDurationRef.current = 0;
@@ -700,7 +710,7 @@ export default function VideoLabPage() {
                           }}
                           className="w-full rounded-xl bg-mansion-elevated/85 border border-mansion-border/30 px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-mansion-gold/40"
                         >
-                          {['1500k', '2000k', '2500k', '3000k', '3500k', '4000k', '4500k', '5000k', '5500k', '6000k'].map((v) => (
+                          {['1500k', '2000k', '2500k', '2600k', '2700k', '2800k', '2900k', '3000k', '3500k', '4000k', '4500k', '5000k', '5500k', '6000k'].map((v) => (
                             <option key={v} value={v}>{v}</option>
                           ))}
                         </select>
@@ -949,6 +959,22 @@ export default function VideoLabPage() {
           </motion.aside>
         </div>
       </div>
+
+      {/* Elapsed timer overlay */}
+      {processing && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl bg-black/80 backdrop-blur-lg border border-white/10 shadow-2xl">
+          <Clock className="w-5 h-5 text-mansion-gold animate-pulse" />
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-text-dim">Tiempo de conversión</p>
+            <p className="text-2xl font-display font-bold text-text-primary tabular-nums">
+              {String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}
+            </p>
+          </div>
+          <div className="ml-2 text-right">
+            <p className="text-lg font-bold text-mansion-gold tabular-nums">{Math.round(processingProgress * 100)}%</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
