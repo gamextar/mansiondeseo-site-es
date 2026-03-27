@@ -489,8 +489,7 @@ export default function VideoLabPage() {
         '-bufsize', activeParams.bufsize,
         '-preset', activeParams.preset,
         '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac',
-        '-b:a', activeParams.audioBitrate,
+        ...(activeParams.audioBitrate === 'none' ? ['-an'] : ['-c:a', 'aac', '-b:a', activeParams.audioBitrate]),
         outputFileName,
       ]);
 
@@ -501,8 +500,7 @@ export default function VideoLabPage() {
           ...sharedArgs,
           '-c:v', 'mpeg4',
           '-q:v', '4',
-          '-c:a', 'aac',
-          '-b:a', selectedPreset.audioBitrate,
+          ...(activeParams.audioBitrate === 'none' ? ['-an'] : ['-c:a', 'aac', '-b:a', activeParams.audioBitrate]),
           outputFileName,
         ]);
       }
@@ -744,8 +742,8 @@ export default function VideoLabPage() {
                           onChange={(e) => setCustomOverrides((prev) => ({ ...prev, audioBitrate: e.target.value }))}
                           className="w-full rounded-xl bg-mansion-elevated/85 border border-mansion-border/30 px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-mansion-gold/40"
                         >
-                          {['16k', '24k', '32k', '48k', '64k', '96k', '128k'].map((v) => (
-                            <option key={v} value={v}>{v}</option>
+                          {['none', '16k', '24k', '32k', '48k', '64k', '96k', '128k'].map((v) => (
+                            <option key={v} value={v}>{v === 'none' ? 'Sin audio' : v}</option>
                           ))}
                         </select>
                         <p className="text-[10px] text-text-dim mt-1">Para voces 32k basta. Para música 64k–128k.</p>
@@ -764,7 +762,7 @@ export default function VideoLabPage() {
                           onChange={(e) => setCustomOverrides((prev) => ({ ...prev, bufsize: e.target.value }))}
                           className="w-full rounded-xl bg-mansion-elevated/85 border border-mansion-border/30 px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-mansion-gold/40"
                         >
-                          {['3000k', '4000k', '5000k', '6000k', '7000k', '8000k', '10000k', '12000k'].map((v) => (
+                          {['3000k', '4000k', '5000k', '6000k', '7000k', '8000k', '9000k', '10000k', '12000k'].map((v) => (
                             <option key={v} value={v}>{v}</option>
                           ))}
                         </select>
