@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Film, LoaderCircle, Play, Upload, Wand2 } from 'lucide-react';
+import { CheckCircle2, Clock, Film, LoaderCircle, Play, Upload, Wand2 } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 
@@ -114,6 +114,9 @@ export default function StoryUploadPage() {
   const [resultUrl, setResultUrl] = useState('');
   const [resultName, setResultName] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerIntervalRef = useRef(null);
+  const timerStartRef = useRef(0);
 
   const selectedDuration = clipEnd > clipStart ? clipEnd - clipStart : 0;
   const segmentWidth = sourceDuration > 0 ? ((clipEnd - clipStart) / sourceDuration) * 100 : 0;
@@ -264,6 +267,11 @@ export default function StoryUploadPage() {
     setStep('encoding');
     setProgress(0);
     setErrorMessage('');
+    setElapsedSeconds(0);
+    timerStartRef.current = performance.now();
+    timerIntervalRef.current = setInterval(() => {
+      setElapsedSeconds(Math.floor((performance.now() - timerStartRef.current) / 1000));
+    }, 500);
 
     try {
       const ff = await ensureEngine();
@@ -328,6 +336,8 @@ export default function StoryUploadPage() {
       setErrorMessage(err?.message || 'Error al convertir el video.');
       setStep('trim');
     } finally {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
       isTranscodingRef.current = false;
       activeSegRef.current = 0;
     }
@@ -530,7 +540,10 @@ export default function StoryUploadPage() {
                     style={{ width: `${Math.round(progress * 100)}%` }}
                   />
                 </div>
-                <p className="text-sm text-text-dim mt-2 tabular-nums">{Math.round(progress * 100)}%</p>
+                <div className="flex items-center justify-between mt-2 text-sm tabular-nums">
+                  <span className="text-text-dim">{String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}</span>
+                  <span className="text-text-dim">{Math.round(progress * 100)}%</span>
+                </div>
               </div>
             </motion.div>
           )}
