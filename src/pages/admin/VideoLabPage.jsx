@@ -239,53 +239,44 @@ export default function VideoLabPage() {
     window.localStorage.setItem(VIDEO_PRESET_STORAGE_KEY, selectedPreset.id);
   }, [selectedPreset]);
 
-  // Extract thumbnails for the filmstrip trimmer (uses the existing DOM video)
-  const extractThumbnails = () => {
-    const video = videoRef.current;
-    if (!video || sourceDuration <= 0) return;
+  // Extract thumbnails for the filmstrip trimmer (optimized for mobile)
+  useEffect(() => {
+    if (!sourceUrl || sourceDuration <= 0) {
+      setThumbnails([]);
+      return;
+    }
+    let cancelled = false;
     const count = Math.min(12, Math.max(6, Math.ceil(sourceDuration / 2.5)));
     const step = sourceDuration / count;
     const canvas = document.createElement('canvas');
     canvas.width = 60;
     canvas.height = 40;
     const ctx = canvas.getContext('2d');
-    let i = 0;
-    let cancelled = false;
-    const savedTime = video.currentTime;
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+    video.src = sourceUrl;
 
-    const captureNext = () => {
-      if (cancelled || i >= count) {
-        video.removeEventListener('seeked', onSeeked);
-        video.currentTime = savedTime;
-        return;
+    // Timeout: if thumbnails take too long just skip them
+    const timeout = setTimeout(() => { cancelled = true; }, 8000);
+
+    video.onloadeddata = async () => {
+      for (let i = 0; i < count; i++) {
+        if (cancelled) break;
+        video.currentTime = Math.min(i * step + 0.01, sourceDuration - 0.01);
+        await new Promise((r) => {
+          video.onseeked = r;
+          setTimeout(r, 1500); // safety: don't hang if onseeked never fires
+        });
+        if (cancelled) break;
+        ctx.drawImage(video, 0, 0, 60, 40);
+        // Render progressively
+        setThumbnails((prev) => [...prev, canvas.toDataURL('image/jpeg', 0.3)]);
       }
-      video.currentTime = Math.min(i * step + 0.01, sourceDuration - 0.01);
     };
-
-    const onSeeked = () => {
-      if (cancelled || i >= count) return;
-      ctx.drawImage(video, 0, 0, 60, 40);
-      setThumbnails((prev) => [...prev, canvas.toDataURL('image/jpeg', 0.3)]);
-      i++;
-      captureNext();
-    };
-
-    video.addEventListener('seeked', onSeeked);
-    setThumbnails([]);
-    captureNext();
-
-    // Timeout safety
-    const timeout = setTimeout(() => {
-      cancelled = true;
-      video.removeEventListener('seeked', onSeeked);
-    }, 10000);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-      video.removeEventListener('seeked', onSeeked);
-    };
-  };
+    return () => { cancelled = true; clearTimeout(timeout); };
+  }, [sourceUrl, sourceDuration]);
 
   const ensureEngineLoaded = async () => {
     const ffmpeg = ffmpegRef.current;
@@ -385,8 +376,6 @@ export default function VideoLabPage() {
     setSourceResolution(video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : null);
     setClipStart(0);
     setClipEnd(Math.min(dur, MAX_CLIP_SECONDS));
-    // Trigger thumbnail extraction once metadata is ready
-    setTimeout(() => extractThumbnails(), 100);
   };
 
   const syncPreviewToSelection = (nextStart) => {
@@ -837,7 +826,7 @@ export default function VideoLabPage() {
                 </div>
 
                 {/* iPhone-style filmstrip trimmer */}
-                <div ref={trimmerRef} className="relative h-[60px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
+                <div ref={trimmerRef} className="relative h-[44px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
                   {/* Filmstrip thumbnails or simple gradient bar */}
                   <div className="absolute inset-0 flex">
                     {thumbnails.length > 0
