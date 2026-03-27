@@ -239,35 +239,43 @@ export default function VideoLabPage() {
     window.localStorage.setItem(VIDEO_PRESET_STORAGE_KEY, selectedPreset.id);
   }, [selectedPreset]);
 
-  // Extract thumbnails for the filmstrip trimmer
+  // Extract thumbnails for the filmstrip trimmer (optimized for mobile)
   useEffect(() => {
     if (!sourceUrl || sourceDuration <= 0) {
       setThumbnails([]);
       return;
     }
     let cancelled = false;
-    const video = document.createElement('video');
-    video.muted = true;
-    video.preload = 'auto';
-    video.src = sourceUrl;
-    const count = Math.min(20, Math.max(10, Math.ceil(sourceDuration / 1.5)));
+    const count = Math.min(12, Math.max(6, Math.ceil(sourceDuration / 2.5)));
     const step = sourceDuration / count;
     const canvas = document.createElement('canvas');
-    canvas.width = 80;
-    canvas.height = 56;
+    canvas.width = 60;
+    canvas.height = 40;
     const ctx = canvas.getContext('2d');
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+    video.src = sourceUrl;
+
+    // Timeout: if thumbnails take too long just skip them
+    const timeout = setTimeout(() => { cancelled = true; }, 8000);
+
     video.onloadeddata = async () => {
-      const thumbs = [];
       for (let i = 0; i < count; i++) {
-        if (cancelled) return;
+        if (cancelled) break;
         video.currentTime = Math.min(i * step + 0.01, sourceDuration - 0.01);
-        await new Promise((r) => { video.onseeked = r; });
-        ctx.drawImage(video, 0, 0, 80, 56);
-        thumbs.push(canvas.toDataURL('image/jpeg', 0.4));
+        await new Promise((r) => {
+          video.onseeked = r;
+          setTimeout(r, 1500); // safety: don't hang if onseeked never fires
+        });
+        if (cancelled) break;
+        ctx.drawImage(video, 0, 0, 60, 40);
+        // Render progressively
+        setThumbnails((prev) => [...prev, canvas.toDataURL('image/jpeg', 0.3)]);
       }
-      if (!cancelled) setThumbnails(thumbs);
     };
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(timeout); };
   }, [sourceUrl, sourceDuration]);
 
   const ensureEngineLoaded = async () => {
@@ -818,18 +826,15 @@ export default function VideoLabPage() {
                 </div>
 
                 {/* iPhone-style filmstrip trimmer */}
-                <div ref={trimmerRef} className="relative h-[56px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
-                  {/* Filmstrip thumbnails */}
+                <div ref={trimmerRef} className="relative h-[44px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
+                  {/* Filmstrip thumbnails or simple gradient bar */}
                   <div className="absolute inset-0 flex">
                     {thumbnails.length > 0
                       ? thumbnails.map((src, i) => (
                           <img key={i} src={src} alt="" className="h-full flex-1 object-cover" draggable={false} />
                         ))
-                      : sourceUrl && (
-                          <div className="flex-1 flex items-center justify-center text-text-dim text-xs">
-                            <LoaderCircle className="w-4 h-4 animate-spin mr-2" />
-                            Generando vista previa…
-                          </div>
+                      : (
+                          <div className="flex-1 bg-gradient-to-r from-white/[0.04] via-white/[0.08] to-white/[0.04]" />
                         )}
                   </div>
 
