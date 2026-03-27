@@ -179,6 +179,7 @@ export default function VideoLabPage() {
   const [showCustomParams, setShowCustomParams] = useState(false);
   const [customOverrides, setCustomOverrides] = useState({});
   const [profileTimings, setProfileTimings] = useState({ metadata: 0, fetchFile: 0, writeFile: 0, exec: 0, readFile: 0 });
+  const [debugInfo, setDebugInfo] = useState(null);
 
   const selectedDuration = clipEnd > clipStart ? clipEnd - clipStart : 0;
   const segmentWidth = sourceDuration > 0 ? ((clipEnd - clipStart) / sourceDuration) * 100 : 0;
@@ -224,6 +225,34 @@ export default function VideoLabPage() {
           <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">readFile</p>
           <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.readFile)}</p>
         </div>
+      </div>
+    </div>
+  ) : null;
+
+  const debugPanel = debugInfo ? (
+    <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-4">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim mb-3">Diagnostico</p>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Clip</p>
+          <p className="text-sm text-text-primary mt-1">{debugInfo.clipStart.toFixed(1)}s - {debugInfo.clipEnd.toFixed(1)}s</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Duracion</p>
+          <p className="text-sm text-text-primary mt-1">{debugInfo.segmentDuration.toFixed(1)}s</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Origen</p>
+          <p className="text-sm text-text-primary mt-1">{debugInfo.sourceResolution}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Salida</p>
+          <p className="text-sm text-text-primary mt-1">{debugInfo.outputResolution}</p>
+        </div>
+      </div>
+      <div className="mt-3">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Parametros</p>
+        <p className="text-sm text-text-primary mt-1">{debugInfo.params}</p>
       </div>
     </div>
   ) : null;
@@ -389,6 +418,7 @@ export default function VideoLabPage() {
     setSourceFile(file);
     setProcessingProgress(0);
     setProfileTimings({ metadata: 0, fetchFile: 0, writeFile: 0, exec: 0, readFile: 0 });
+    setDebugInfo(null);
     metadataStartRef.current = performance.now();
 
     const nextSourceUrl = URL.createObjectURL(file);
@@ -492,6 +522,14 @@ export default function VideoLabPage() {
     }
 
     const startedAt = performance.now();
+    setDebugInfo({
+      clipStart,
+      clipEnd,
+      segmentDuration: Math.max(0.1, clipEnd - clipStart),
+      sourceResolution: sourceResolution ? `${sourceResolution.width}x${sourceResolution.height}` : '—',
+      outputResolution: outputProfile.label,
+      params: `CRF ${activeParams.crf} · ${activeParams.maxrate} · ${activeParams.bufsize} · ${activeParams.preset} · ${activeParams.audioBitrate === 'none' ? 'sin audio' : `AAC ${activeParams.audioBitrate}${activeParams.audioMono ? ' mono' : ''}`}`,
+    });
 
     try {
       const ffmpeg = await ensureEngineLoaded();
@@ -1035,6 +1073,7 @@ export default function VideoLabPage() {
                   <p className="text-sm text-text-primary mt-1">`@ffmpeg/ffmpeg` 0.12.15</p>
                 </div>
                 {profilePanel}
+                {debugPanel}
               </div>
             </section>
 

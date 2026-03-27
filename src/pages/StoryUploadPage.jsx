@@ -153,6 +153,7 @@ export default function StoryUploadPage() {
   const [pendingClipEnd, setPendingClipEnd] = useState(0);
   const [pendingSourceUrl, setPendingSourceUrl] = useState('');
   const [profileTimings, setProfileTimings] = useState({ metadata: 0, fetchFile: 0, writeFile: 0, exec: 0, readFile: 0 });
+  const [debugInfo, setDebugInfo] = useState(null);
 
   /* UI step for the simple flow */
   const [step, setStep] = useState('pick');
@@ -291,6 +292,7 @@ export default function StoryUploadPage() {
     setErrorMessage('');
     setProcessingProgress(0);
     setProfileTimings({ metadata: 0, fetchFile: 0, writeFile: 0, exec: 0, readFile: 0 });
+    setDebugInfo(null);
     setPendingFile(null);
     setPendingResolution(null);
     setPendingClipEnd(0);
@@ -347,6 +349,14 @@ export default function StoryUploadPage() {
     setStep('encoding');
     const startedAt = performance.now();
     const outputProfile = getOutputProfile(sourceResolution);
+    setDebugInfo({
+      clipStart,
+      clipEnd,
+      segmentDuration: Math.max(0.1, clipEnd - clipStart),
+      sourceResolution: sourceResolution ? `${sourceResolution.width}x${sourceResolution.height}` : '—',
+      outputResolution: outputProfile.label,
+      params: `CRF ${activeParams.crf} · ${activeParams.maxrate} · ${activeParams.bufsize} · ${activeParams.preset} · AAC ${activeParams.audioBitrate} mono`,
+    });
 
     try {
       const ffmpeg = await ensureEngineLoaded();
@@ -471,6 +481,7 @@ export default function StoryUploadPage() {
     setErrorMessage('');
     setStatusText('FFmpeg listo para convertir.');
     setProfileTimings({ metadata: 0, fetchFile: 0, writeFile: 0, exec: 0, readFile: 0 });
+    setDebugInfo(null);
     setPendingFile(null);
     setPendingResolution(null);
     setPendingClipEnd(0);
@@ -501,6 +512,34 @@ export default function StoryUploadPage() {
           <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">readFile</p>
           <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.readFile)}</p>
         </div>
+      </div>
+    </div>
+  ) : null;
+
+  const debugPanel = debugInfo ? (
+    <div className="w-full rounded-2xl bg-black/25 border border-white/10 px-4 py-4 mb-6">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim mb-3">Diagnostico</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-left">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Clip</p>
+          <p className="text-sm text-text-primary mt-1">{debugInfo.clipStart.toFixed(1)}s - {debugInfo.clipEnd.toFixed(1)}s</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Duracion</p>
+          <p className="text-sm text-text-primary mt-1">{debugInfo.segmentDuration.toFixed(1)}s</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Origen</p>
+          <p className="text-sm text-text-primary mt-1">{debugInfo.sourceResolution}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Salida</p>
+          <p className="text-sm text-text-primary mt-1">{debugInfo.outputResolution}</p>
+        </div>
+      </div>
+      <div className="mt-3">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Parametros</p>
+        <p className="text-sm text-text-primary mt-1">{debugInfo.params}</p>
       </div>
     </div>
   ) : null;
@@ -599,6 +638,7 @@ export default function StoryUploadPage() {
             )}
 
             {profilePanel}
+            {debugPanel}
 
             <div className="flex flex-wrap gap-3 justify-center">
               <button
@@ -649,6 +689,7 @@ export default function StoryUploadPage() {
 
             <div className="w-full mt-6">
               {profilePanel}
+              {debugPanel}
             </div>
           </div>
         )}
@@ -688,6 +729,7 @@ export default function StoryUploadPage() {
             </motion.div>
 
             {profilePanel}
+            {debugPanel}
 
             {result.url && (
               <motion.div variants={childFade} className="w-full aspect-video rounded-2xl overflow-hidden bg-black/50 border border-white/10 mb-6">
