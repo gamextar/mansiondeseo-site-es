@@ -786,8 +786,6 @@ export default function VideoLabPage({ variant = 'admin' }) {
                     <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Motor</p>
                     <p className="text-sm text-text-primary mt-1">`@ffmpeg/ffmpeg` 0.12.15</p>
                   </div>
-                  {profilePanel}
-                  {debugPanel}
                 </div>
               </section>
 
