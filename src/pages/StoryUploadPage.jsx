@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Clock, Film, Play, Upload } from 'lucide-react';
+import { CheckCircle2, Clock, Film, Loader2, Play, Upload } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 
@@ -96,6 +96,7 @@ export default function StoryUploadPage() {
   const [resultDuration, setResultDuration] = useState(0);
   const [processingTime, setProcessingTime] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [engineReady, setEngineReady] = useState(false);
 
   if (!ffmpegRef.current) ffmpegRef.current = new FFmpeg();
 
@@ -121,8 +122,8 @@ export default function StoryUploadPage() {
 
   useEffect(() => { resultUrlRef.current = resultUrl; }, [resultUrl]);
 
-  /* Preload FFmpeg engine on mount so it's ready when user picks a file */
-  useEffect(() => { ensureEngine().catch(() => {}); }, []);
+  /* Preload FFmpeg engine on mount — button stays disabled until ready */
+  useEffect(() => { ensureEngine().then(() => setEngineReady(true)).catch(() => {}); }, []);
 
   const ensureEngine = async () => {
     const ff = ffmpegRef.current;
@@ -301,10 +302,17 @@ export default function StoryUploadPage() {
               Selecciona tu video para comenzar.
             </p>
 
-            <label className="inline-flex items-center gap-3 px-7 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg cursor-pointer hover:bg-mansion-gold-light transition-colors">
-              <Upload className="w-5 h-5" />
-              Elegir video
-              <input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
+            <label className={`inline-flex items-center gap-3 px-7 py-4 rounded-2xl font-semibold text-lg transition-colors ${
+              engineReady
+                ? 'bg-mansion-gold text-mansion-base cursor-pointer hover:bg-mansion-gold-light'
+                : 'bg-white/[0.06] text-text-muted cursor-not-allowed'
+            }`}>
+              {engineReady ? (
+                <><Upload className="w-5 h-5" />Elegir video</>
+              ) : (
+                <><Loader2 className="w-5 h-5 animate-spin" />Cargando motor…</>
+              )}
+              <input type="file" accept="video/*" className="hidden" onChange={handleFileChange} disabled={!engineReady} />
             </label>
 
             {errorMessage && (
