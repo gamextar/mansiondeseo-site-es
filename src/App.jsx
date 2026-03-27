@@ -159,7 +159,7 @@ function AppLayout() {
           />
 
           {/* Story upload (fullscreen onboarding flow) */}
-          <Route path="/historia/nueva" element={<VideoLabPage />} />
+          <Route path="/historia/nueva" element={<VideoLabPage variant="story" />} />
 
           {/* Admin standalone layout */}
           <Route path="/admin" element={<AdminLayout />}>
