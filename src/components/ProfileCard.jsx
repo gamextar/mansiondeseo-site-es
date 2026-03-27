@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { MapPin, Shield, Crown, Lock } from 'lucide-react';
 
 // Masquerade mask SVG icon for incognito mode
@@ -65,11 +64,7 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
   const mainPhoto = photos[0] || profile.avatar_url || '';
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-    >
+    <div>
       <Link to={`/perfiles/${id}`} state={{ preview: { id, name, age, city, role, photos, avatar_url: profile.avatar_url, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode } }} className="block group">
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">
           {/* Photo — use actual photo with blur for blocked cards */}
@@ -141,6 +136,6 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
           </div>
         </div>
       </Link>
-    </motion.div>
+    </div>
   );
 }
