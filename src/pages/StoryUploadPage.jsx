@@ -527,13 +527,15 @@ export default function StoryUploadPage() {
             </div>
 
             {pendingSourceUrl && (
-              <div className="absolute w-px h-px overflow-hidden opacity-0 pointer-events-none" aria-hidden="true">
+              <div className="w-full aspect-video rounded-2xl overflow-hidden bg-black/50 border border-white/10 mb-8">
                 <video
                   ref={videoRef}
                   src={pendingSourceUrl}
                   preload="auto"
+                  controls
                   muted
                   playsInline
+                  className="w-full h-full object-contain bg-black"
                   onLoadedData={() => setStatusText('Video precargado. Continúa para convertir.')}
                 />
               </div>
