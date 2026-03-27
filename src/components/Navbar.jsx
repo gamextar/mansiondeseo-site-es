@@ -56,31 +56,30 @@ export default function Navbar() {
           {/* Desktop left spacer when logo hidden */}
           <div className="hidden lg:block" />
 
-          {/* Right actions */}
-          <div className="flex items-center gap-2">
+          {/* Right actions — unified pill */}
+          <div className="flex items-center bg-white/[0.06] backdrop-blur-md border border-white/[0.08] rounded-full px-1 py-1 gap-0.5">
             {/* Coins */}
             <Link
               to="/monedas"
-              className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-white/[0.06] transition-colors"
             >
               {coinIconUrl
-                ? <img src={coinIconUrl} alt="monedas" style={{ width: coinSize, height: coinSize }} className="object-contain" />
-                : <DefaultCoinIcon size={coinSize} />
+                ? <img src={coinIconUrl} alt="monedas" style={{ width: 16, height: 16 }} className="object-contain" />
+                : <DefaultCoinIcon size={16} />
               }
-              <span className="text-sm font-bold text-mansion-gold tabular-nums">{user?.coins ?? 0}</span>
+              <span className="text-[13px] font-semibold text-mansion-gold tabular-nums">{user?.coins ?? 0}</span>
             </Link>
+
+            {/* Divider */}
+            <div className="w-px h-4 bg-white/10" />
 
             {/* Favorites */}
             <Link
               to="/favoritos"
-              className="relative flex items-center justify-center w-11 h-11 rounded-full bg-mansion-card hover:bg-mansion-elevated transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-white/[0.06] transition-colors"
             >
-              <Heart className="w-5 h-5 text-mansion-crimson" />
-              {favCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-mansion-crimson text-white text-[10px] font-bold flex items-center justify-center px-1">
-                  {favCount > 99 ? '99+' : favCount}
-                </span>
-              )}
+              <Heart className="w-4 h-4 text-mansion-crimson" />
+              <span className="text-[13px] font-semibold text-mansion-crimson tabular-nums">{favCount}</span>
             </Link>
           </div>
         </div>

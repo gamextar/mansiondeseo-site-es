@@ -5,6 +5,7 @@ import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useState, useEffect } from 'react';
 import { getVisits, getToken } from '../lib/api';
 import { useAuth } from '../App';
+import AvatarImg from './AvatarImg';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -52,6 +53,27 @@ export default function DesktopSidebar() {
           Mansión Deseo
         </span>
       </Link>
+
+      {/* Profile avatar + name */}
+      {user && (
+        <Link to="/perfil" className="flex flex-col items-center py-6 border-b border-mansion-border/20 hover:opacity-90 transition-opacity">
+          <div className="w-[60%] aspect-square rounded-full bg-gradient-to-br from-mansion-gold/60 to-mansion-gold-light/40 p-[3px]">
+            <div className="w-full h-full rounded-full bg-mansion-card overflow-hidden">
+              {user.avatar_url ? (
+                <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-text-dim">
+                  <User className="w-8 h-8" />
+                </div>
+              )}
+            </div>
+          </div>
+          <p className="mt-3 text-sm font-semibold text-text-primary truncate max-w-[80%] text-center">{user.username || user.name}</p>
+          {user.role && (
+            <span className="mt-1 text-[11px] text-text-dim">{user.role}</span>
+          )}
+        </Link>
+      )}
 
       {/* Nav items */}
       <nav className="flex-1 px-3 py-4 space-y-1">
