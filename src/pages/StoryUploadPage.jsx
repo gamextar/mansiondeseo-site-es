@@ -531,25 +531,26 @@ export default function StoryUploadPage() {
 
           {/* ───── STEP 3: ENCODING ───── */}
           {step === 'encoding' && (
-            <motion.div key="encoding" {...fadeSlide} className="flex flex-col items-center text-center py-16">
-              <LoaderCircle className="w-10 h-10 text-mansion-gold animate-spin mb-6" />
+            <div key="encoding" className="flex flex-col items-center text-center py-16">
               <h2 className="font-display text-2xl font-bold mb-2">Procesando tu historia…</h2>
-              <p className="text-text-muted text-sm mb-8">Esto puede tomar unos segundos.</p>
+              <p className="text-text-muted text-sm mb-6">Esto puede tomar unos segundos.</p>
 
-              {/* Minimal progress bar — plain CSS transition to avoid competing with WASM for CPU */}
-              <div className="w-full max-w-xs">
-                <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+              {/* Same progress bar as VideoLabPage — plain div, CSS transition, no animations */}
+              <div className="w-full max-w-xs rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
+                <div className="h-3 bg-white/5">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300"
+                    className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300"
                     style={{ width: `${Math.round(progress * 100)}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between mt-2 text-sm tabular-nums">
-                  <span className="text-text-dim">{String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}</span>
-                  <span className="text-text-dim">{Math.round(progress * 100)}%</span>
+                <div className="px-4 py-3 flex items-center justify-between text-sm">
+                  <span className="text-text-muted tabular-nums">
+                    {String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}
+                  </span>
+                  <span className="font-semibold text-text-primary tabular-nums">{Math.round(progress * 100)}%</span>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
 
           {/* ───── STEP 4: DONE ───── */}
