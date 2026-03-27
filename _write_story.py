@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+#!/usr/bin/env python3
+"""Generate StoryUploadPage.jsx from exact VideoLabPage logic with simplified UI."""
+
+content = r'''import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Clock, Film, Loader2, Play, Upload } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
@@ -566,3 +569,8 @@ export default function StoryUploadPage() {
     </div>
   );
 }
+'''
+
+with open('src/pages/StoryUploadPage.jsx', 'w') as f:
+    f.write(content.lstrip('\n'))
+print(f'Done: {len(content.strip())} bytes')
