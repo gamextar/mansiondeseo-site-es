@@ -41,6 +41,11 @@ function formatElapsedSeconds(totalSeconds) {
   return `${safeSeconds.toFixed(1)}s`;
 }
 
+function formatMs(value) {
+  const safeValue = Math.max(0, Number.isFinite(value) ? value : 0);
+  return `${Math.round(safeValue)} ms`;
+}
+
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
@@ -142,6 +147,7 @@ export default function VideoLabPage() {
   const ffmpegRef = useRef(null);
   const loadPromiseRef = useRef(null);
   const videoRef = useRef(null);
+  const metadataStartRef = useRef(0);
   const sourceUrlRef = useRef('');
   const resultUrlRef = useRef('');
   const activeSegmentDurationRef = useRef(0);
@@ -172,6 +178,7 @@ export default function VideoLabPage() {
   });
   const [showCustomParams, setShowCustomParams] = useState(false);
   const [customOverrides, setCustomOverrides] = useState({});
+  const [profileTimings, setProfileTimings] = useState({ metadata: 0, fetchFile: 0, writeFile: 0, exec: 0, readFile: 0 });
 
   const selectedDuration = clipEnd > clipStart ? clipEnd - clipStart : 0;
   const segmentWidth = sourceDuration > 0 ? ((clipEnd - clipStart) / sourceDuration) * 100 : 0;
@@ -352,6 +359,8 @@ export default function VideoLabPage() {
     setSourceResolution(null);
     setSourceFile(file);
     setProcessingProgress(0);
+    setProfileTimings({ metadata: 0, fetchFile: 0, writeFile: 0, exec: 0, readFile: 0 });
+    metadataStartRef.current = performance.now();
 
     const nextSourceUrl = URL.createObjectURL(file);
     if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
@@ -368,6 +377,10 @@ export default function VideoLabPage() {
     setSourceResolution(video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : null);
     setClipStart(0);
     setClipEnd(Math.min(dur, MAX_CLIP_SECONDS));
+    if (metadataStartRef.current > 0) {
+      setProfileTimings((prev) => ({ ...prev, metadata: performance.now() - metadataStartRef.current }));
+      metadataStartRef.current = 0;
+    }
   };
 
   const syncPreviewToSelection = (nextStart) => {
@@ -474,7 +487,13 @@ export default function VideoLabPage() {
       try { await ffmpeg.deleteFile(inputFileName); } catch {}
       try { await ffmpeg.deleteFile(outputFileName); } catch {}
 
-      await ffmpeg.writeFile(inputFileName, await fetchFile(sourceFile));
+      const fetchFileStartedAt = performance.now();
+      const inputData = await fetchFile(sourceFile);
+      const fetchFileElapsed = performance.now() - fetchFileStartedAt;
+
+      const writeFileStartedAt = performance.now();
+      await ffmpeg.writeFile(inputFileName, inputData);
+      const writeFileElapsed = performance.now() - writeFileStartedAt;
 
       const sharedArgs = [
         '-ss', clipStart.toFixed(2),
@@ -485,6 +504,7 @@ export default function VideoLabPage() {
       ];
 
       setStatusText(`Convirtiendo en ${selectedPreset.statusLabel} (${outputProfile.label})...`);
+      const execStartedAt = performance.now();
       let exitCode = await ffmpeg.exec([
         ...sharedArgs,
         '-c:v', 'libx264',
@@ -511,17 +531,28 @@ export default function VideoLabPage() {
         ]);
       }
 
+      const execElapsed = performance.now() - execStartedAt;
+
       if (exitCode !== 0) {
         throw new Error('FFmpeg no pudo generar el MP4 final.');
       }
 
+      const readFileStartedAt = performance.now();
       const data = await ffmpeg.readFile(outputFileName);
+      const readFileElapsed = performance.now() - readFileStartedAt;
       const outputBlob = new Blob([data], { type: 'video/mp4' });
       const outputUrl = URL.createObjectURL(outputBlob);
       const processingElapsedSeconds = (performance.now() - startedAt) / 1000;
 
       setProcessingProgress(1);
       setStatusText('Clip listo para descargar.');
+      setProfileTimings((prev) => ({
+        ...prev,
+        fetchFile: fetchFileElapsed,
+        writeFile: writeFileElapsed,
+        exec: execElapsed,
+        readFile: readFileElapsed,
+      }));
       setResult({
         url: outputUrl,
         fileName: outputFileName,
@@ -1016,6 +1047,31 @@ export default function VideoLabPage() {
                     <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Tiempo</p>
                       <p className="text-sm text-text-primary mt-1">{result.processingTimeLabel}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim mb-3">Perfilado</p>
+                    <div className="grid gap-3 sm:grid-cols-5">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Metadata</p>
+                        <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.metadata)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">fetchFile</p>
+                        <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.fetchFile)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">writeFile</p>
+                        <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.writeFile)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">ff.exec</p>
+                        <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.exec)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">readFile</p>
+                        <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.readFile)}</p>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -29,6 +29,11 @@ function formatElapsedSeconds(totalSeconds) {
   return `${safeSeconds.toFixed(1)}s`;
 }
 
+function formatMs(value) {
+  const safeValue = Math.max(0, Number.isFinite(value) ? value : 0);
+  return `${Math.round(safeValue)} ms`;
+}
+
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
@@ -147,6 +152,7 @@ export default function StoryUploadPage() {
   const [pendingResolution, setPendingResolution] = useState(null);
   const [pendingClipEnd, setPendingClipEnd] = useState(0);
   const [pendingSourceUrl, setPendingSourceUrl] = useState('');
+  const [profileTimings, setProfileTimings] = useState({ metadata: 0, fetchFile: 0, writeFile: 0, exec: 0, readFile: 0 });
 
   /* UI step for the simple flow */
   const [step, setStep] = useState('pick');
@@ -283,11 +289,13 @@ export default function StoryUploadPage() {
     resetPendingSource();
     setErrorMessage('');
     setProcessingProgress(0);
+    setProfileTimings({ metadata: 0, fetchFile: 0, writeFile: 0, exec: 0, readFile: 0 });
     setPendingFile(null);
     setPendingResolution(null);
     setPendingClipEnd(0);
 
     /* Read metadata via temp video element */
+    const metadataStartedAt = performance.now();
     const url = URL.createObjectURL(file);
     const tempVid = document.createElement('video');
     tempVid.muted = true;
@@ -301,6 +309,7 @@ export default function StoryUploadPage() {
     });
     tempVid.src = '';
     URL.revokeObjectURL(url);
+    setProfileTimings((prev) => ({ ...prev, metadata: performance.now() - metadataStartedAt }));
 
     const sourceResolution = meta.width && meta.height ? { width: meta.width, height: meta.height } : null;
     const clipEnd = Math.min(meta.duration || 0, MAX_CLIP_SECONDS);
@@ -361,7 +370,13 @@ export default function StoryUploadPage() {
       try { await ffmpeg.deleteFile(inputFileName); } catch {}
       try { await ffmpeg.deleteFile(outputFileName); } catch {}
 
-      await ffmpeg.writeFile(inputFileName, await fetchFile(sourceFile));
+      const fetchFileStartedAt = performance.now();
+      const inputData = await fetchFile(sourceFile);
+      const fetchFileElapsed = performance.now() - fetchFileStartedAt;
+
+      const writeFileStartedAt = performance.now();
+      await ffmpeg.writeFile(inputFileName, inputData);
+      const writeFileElapsed = performance.now() - writeFileStartedAt;
 
       const sharedArgs = [
         '-ss', clipStart.toFixed(2),
@@ -372,6 +387,7 @@ export default function StoryUploadPage() {
       ];
 
       setStatusText(`Convirtiendo (${outputProfile.label})...`);
+      const execStartedAt = performance.now();
       let exitCode = await ffmpeg.exec([
         ...sharedArgs,
         '-c:v', 'libx264',
@@ -398,17 +414,28 @@ export default function StoryUploadPage() {
         ]);
       }
 
+      const execElapsed = performance.now() - execStartedAt;
+
       if (exitCode !== 0) {
         throw new Error('FFmpeg no pudo generar el MP4 final.');
       }
 
+      const readFileStartedAt = performance.now();
       const data = await ffmpeg.readFile(outputFileName);
+      const readFileElapsed = performance.now() - readFileStartedAt;
       const outputBlob = new Blob([data], { type: 'video/mp4' });
       const outputUrl = URL.createObjectURL(outputBlob);
       const processingElapsedSeconds = (performance.now() - startedAt) / 1000;
 
       setProcessingProgress(1);
       setStatusText('Clip listo para descargar.');
+      setProfileTimings((prev) => ({
+        ...prev,
+        fetchFile: fetchFileElapsed,
+        writeFile: writeFileElapsed,
+        exec: execElapsed,
+        readFile: readFileElapsed,
+      }));
       setResult({
         url: outputUrl,
         fileName: outputFileName,
@@ -442,6 +469,7 @@ export default function StoryUploadPage() {
     setElapsedSeconds(0);
     setErrorMessage('');
     setStatusText('FFmpeg listo para convertir.');
+    setProfileTimings({ metadata: 0, fetchFile: 0, writeFile: 0, exec: 0, readFile: 0 });
     setPendingFile(null);
     setPendingResolution(null);
     setPendingClipEnd(0);
@@ -621,6 +649,32 @@ export default function StoryUploadPage() {
               <div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Tiempo</p>
                 <p className="text-sm text-text-primary mt-1">{result.processingTimeLabel}</p>
+              </div>
+            </motion.div>
+
+            <motion.div variants={childFade} className="w-full rounded-2xl bg-black/25 border border-white/10 px-4 py-4 mb-6">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim mb-3">Perfilado</p>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-left">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Metadata</p>
+                  <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.metadata)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">fetchFile</p>
+                  <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.fetchFile)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">writeFile</p>
+                  <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.writeFile)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">ff.exec</p>
+                  <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.exec)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">readFile</p>
+                  <p className="text-sm text-text-primary mt-1">{formatMs(profileTimings.readFile)}</p>
+                </div>
               </div>
             </motion.div>
 
