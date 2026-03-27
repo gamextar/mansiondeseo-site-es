@@ -14,82 +14,18 @@ const FFMPEG_BASE_URL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/
 const VIDEO_PRESET_STORAGE_KEY = 'video-lab-selected-preset';
 const VIDEO_PRESETS = [
   {
-    id: 'balanceado',
-    label: 'Actual',
-    description: 'El perfil actual que venías usando: buena calidad, tamaño razonable y velocidad decente.',
-    statusLabel: 'modo balanceado',
-    codecLabel: 'H.264 CRF 23 + AAC 32k',
-    crf: '23',
-    maxrate: '5M',
-    bufsize: '8M',
-    audioBitrate: '32k',
-    preset: 'superfast',
-    estimatedVideoBitrate: '3.8M',
-  },
-  {
-    id: 'capped-crf',
-    label: 'CRF cap 3.5M',
-    description: 'Parecido a tu propuesta: CRF 23 con techo de bitrate más bajo para bajar un poco más el tamaño.',
-    statusLabel: 'modo CRF cap',
-    codecLabel: 'H.264 CRF 23 + cap 3.5M + AAC 32k',
-    crf: '23',
-    maxrate: '3500k',
-    bufsize: '7000k',
-    audioBitrate: '32k',
-    preset: 'faster',
-    estimatedVideoBitrate: '3.3M',
-  },
-  {
-    id: 'capped-crf-lite',
-    label: 'CRF cap 3.0M',
-    description: 'Una variante un poco más compacta: sube apenas la compresión y baja el techo para recortar más tamaño.',
-    statusLabel: 'modo CRF cap liviano',
-    codecLabel: 'H.264 CRF 24 + cap 3.0M + AAC 32k',
-    crf: '24',
+    id: 'normal',
+    label: 'Normal Quality',
+    description: 'CRF 29 + cap 3000k + superfast + buffer 9000k + audio mono 64k. Buen balance entre velocidad, tamaño y calidad.',
+    statusLabel: 'modo normal',
+    codecLabel: 'H.264 CRF 29 + cap 3M + AAC 64k mono',
+    crf: '29',
     maxrate: '3000k',
-    bufsize: '6000k',
-    audioBitrate: '32k',
-    preset: 'faster',
-    estimatedVideoBitrate: '2.8M',
-  },
-  {
-    id: 'calidad',
-    label: 'Calidad',
-    description: 'Algo más de detalle visual y audio un poco mejor, a costa de peso y tiempo.',
-    statusLabel: 'modo calidad',
-    codecLabel: 'H.264 CRF 22 + AAC 48k',
-    crf: '22',
-    maxrate: '5.5M',
-    bufsize: '10M',
-    audioBitrate: '48k',
-    preset: 'veryfast',
-    estimatedVideoBitrate: '4.6M',
-  },
-  {
-    id: 'turbo',
-    label: 'Turbo',
-    description: 'Más rápido y liviano para pruebas rápidas, manteniendo 720p.',
-    statusLabel: 'modo turbo',
-    codecLabel: 'H.264 CRF 24 + AAC 32k',
-    crf: '24',
-    maxrate: '4M',
-    bufsize: '6M',
-    audioBitrate: '32k',
+    bufsize: '9000k',
+    audioBitrate: '64k',
+    audioMono: true,
     preset: 'superfast',
-    estimatedVideoBitrate: '3.2M',
-  },
-  {
-    id: 'iphone-fast',
-    label: 'iPhone Rápido',
-    description: 'Optimizado para encode rápido en iPhone: ultrafast + CRF 25 + cap 2.5M + multithreading. Tamaño pequeño, calidad buena a 720p.',
-    statusLabel: 'modo iPhone rápido',
-    codecLabel: 'H.264 CRF 25 + cap 2.5M + AAC 24k',
-    crf: '25',
-    maxrate: '2500k',
-    bufsize: '5000k',
-    audioBitrate: '24k',
-    preset: 'ultrafast',
-    estimatedVideoBitrate: '2.0M',
+    estimatedVideoBitrate: '1.6M',
   },
 ];
 
@@ -249,7 +185,7 @@ export default function VideoLabPage() {
     bufsize: customOverrides.bufsize ?? selectedPreset.bufsize,
     preset: customOverrides.preset ?? selectedPreset.preset,
     audioBitrate: customOverrides.audioBitrate ?? selectedPreset.audioBitrate,
-    audioMono: customOverrides.audioMono ?? false,
+    audioMono: customOverrides.audioMono ?? selectedPreset.audioMono ?? false,
     estimatedVideoBitrate: selectedPreset.estimatedVideoBitrate,
   };
   const outputEstimateLabel = getEstimatedOutputSizeLabel(MAX_CLIP_SECONDS, activeParams);
@@ -707,7 +643,7 @@ export default function VideoLabPage() {
                           }}
                           className="w-full rounded-xl bg-mansion-elevated/85 border border-mansion-border/30 px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-mansion-gold/40"
                         >
-                          {['1500k', '2000k', '2500k', '2600k', '2700k', '2800k', '2900k', '3000k', '3500k', '4000k', '4500k', '5000k', '5500k', '6000k'].map((v) => (
+                          {['1500k', '2000k', '2500k', '2600k', '2700k', '2800k', '2900k', '3000k', '3100k', '3200k', '3300k', '3400k', '3500k', '4000k', '4500k', '5000k', '5500k', '6000k'].map((v) => (
                             <option key={v} value={v}>{v}</option>
                           ))}
                         </select>
