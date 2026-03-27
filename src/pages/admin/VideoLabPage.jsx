@@ -1,0 +1,816 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { ArrowLeft, Download, Film, LoaderCircle, Play, RefreshCw, Scissors, Upload, Wand2 } from 'lucide-react';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile } from '@ffmpeg/util';
+
+const MAX_CLIP_SECONDS = 15;
+const LANDSCAPE_WIDTH = 1280;
+const LANDSCAPE_HEIGHT = 720;
+const PORTRAIT_WIDTH = 720;
+const PORTRAIT_HEIGHT = 1280;
+const FFMPEG_BASE_URL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
+const VIDEO_PRESET_STORAGE_KEY = 'video-lab-selected-preset';
+const VIDEO_PRESETS = [
+  {
+    id: 'balanceado',
+    label: 'Actual',
+    description: 'El perfil actual que venías usando: buena calidad, tamaño razonable y velocidad decente.',
+    statusLabel: 'modo balanceado',
+    codecLabel: 'H.264 CRF 23 + AAC 32k',
+    crf: '23',
+    maxrate: '5M',
+    bufsize: '8M',
+    audioBitrate: '32k',
+    preset: 'superfast',
+    estimatedVideoBitrate: '3.8M',
+  },
+  {
+    id: 'capped-crf',
+    label: 'CRF cap 3.5M',
+    description: 'Parecido a tu propuesta: CRF 23 con techo de bitrate más bajo para bajar un poco más el tamaño.',
+    statusLabel: 'modo CRF cap',
+    codecLabel: 'H.264 CRF 23 + cap 3.5M + AAC 32k',
+    crf: '23',
+    maxrate: '3500k',
+    bufsize: '7000k',
+    audioBitrate: '32k',
+    preset: 'faster',
+    estimatedVideoBitrate: '3.3M',
+  },
+  {
+    id: 'capped-crf-lite',
+    label: 'CRF cap 3.0M',
+    description: 'Una variante un poco más compacta: sube apenas la compresión y baja el techo para recortar más tamaño.',
+    statusLabel: 'modo CRF cap liviano',
+    codecLabel: 'H.264 CRF 24 + cap 3.0M + AAC 32k',
+    crf: '24',
+    maxrate: '3000k',
+    bufsize: '6000k',
+    audioBitrate: '32k',
+    preset: 'faster',
+    estimatedVideoBitrate: '2.8M',
+  },
+  {
+    id: 'calidad',
+    label: 'Calidad',
+    description: 'Algo más de detalle visual y audio un poco mejor, a costa de peso y tiempo.',
+    statusLabel: 'modo calidad',
+    codecLabel: 'H.264 CRF 22 + AAC 48k',
+    crf: '22',
+    maxrate: '5.5M',
+    bufsize: '10M',
+    audioBitrate: '48k',
+    preset: 'veryfast',
+    estimatedVideoBitrate: '4.6M',
+  },
+  {
+    id: 'turbo',
+    label: 'Turbo',
+    description: 'Más rápido y liviano para pruebas rápidas, manteniendo 720p.',
+    statusLabel: 'modo turbo',
+    codecLabel: 'H.264 CRF 24 + AAC 32k',
+    crf: '24',
+    maxrate: '4M',
+    bufsize: '6M',
+    audioBitrate: '32k',
+    preset: 'superfast',
+    estimatedVideoBitrate: '3.2M',
+  },
+];
+
+function formatTime(totalSeconds) {
+  const safeSeconds = Math.max(0, Number.isFinite(totalSeconds) ? totalSeconds : 0);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds - minutes * 60;
+  return `${String(minutes).padStart(2, '0')}:${seconds.toFixed(1).padStart(4, '0')}`;
+}
+
+function formatElapsedSeconds(totalSeconds) {
+  const safeSeconds = Math.max(0, Number.isFinite(totalSeconds) ? totalSeconds : 0);
+  return `${safeSeconds.toFixed(1)}s`;
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function roundToEven(value) {
+  const rounded = Math.round(value);
+  return rounded % 2 === 0 ? rounded : rounded + 1;
+}
+
+function parseBitrateToBps(value) {
+  if (typeof value !== 'string') return 0;
+  const match = value.trim().match(/^(\d+(?:\.\d+)?)([kKmM])$/);
+  if (!match) return Number(value) || 0;
+  const [, amount, unit] = match;
+  const multiplier = unit.toLowerCase() === 'm' ? 1_000_000 : 1_000;
+  return Number(amount) * multiplier;
+}
+
+function getEstimatedOutputSizeLabel(seconds, preset) {
+  const estimatedVideoBitrate = parseBitrateToBps(preset.estimatedVideoBitrate);
+  const totalBitrate = estimatedVideoBitrate + parseBitrateToBps(preset.audioBitrate);
+  const estimatedBytes = (totalBitrate / 8) * seconds;
+  const estimatedMegabytes = estimatedBytes / (1024 * 1024);
+  return `~${estimatedMegabytes.toFixed(1)} MB/${seconds}s`;
+}
+
+function getOutputProfile(sourceResolution) {
+  const safeWidth = sourceResolution?.width || LANDSCAPE_WIDTH;
+  const safeHeight = sourceResolution?.height || LANDSCAPE_HEIGHT;
+  const isPortrait = safeHeight > safeWidth;
+
+  if (isPortrait) {
+    const scaledHeight = roundToEven((safeHeight / safeWidth) * PORTRAIT_WIDTH);
+    const clampedHeight = Math.min(Math.max(scaledHeight, PORTRAIT_WIDTH), PORTRAIT_HEIGHT);
+    return {
+      width: PORTRAIT_WIDTH,
+      height: clampedHeight,
+      label: `${PORTRAIT_WIDTH}x${clampedHeight}`,
+      orientation: 'portrait',
+      scaleFilter: `scale=${PORTRAIT_WIDTH}:-2:flags=bicubic`,
+    };
+  }
+
+  const scaledWidth = roundToEven((safeWidth / safeHeight) * LANDSCAPE_HEIGHT);
+  const clampedWidth = Math.min(Math.max(scaledWidth, LANDSCAPE_HEIGHT), LANDSCAPE_WIDTH);
+  return {
+    width: clampedWidth,
+    height: LANDSCAPE_HEIGHT,
+    label: `${clampedWidth}x${LANDSCAPE_HEIGHT}`,
+    orientation: 'landscape',
+    scaleFilter: `scale=-2:${LANDSCAPE_HEIGHT}:flags=bicubic`,
+  };
+}
+
+function getFileStem(filename = 'clip') {
+  return filename.replace(/\.[^/.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '') || 'clip';
+}
+
+function parseFfmpegTime(message) {
+  const match = message.match(/time=(\d+):(\d+):([\d.]+)/);
+  if (!match) return null;
+  const [, hh, mm, ss] = match;
+  return Number(hh) * 3600 + Number(mm) * 60 + Number(ss);
+}
+
+async function downloadBlobUrl(url, mimeType, onProgress) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`No se pudo descargar ${url}`);
+  }
+
+  const total = Number(response.headers.get('content-length') || 0);
+  if (!response.body) {
+    const buffer = await response.arrayBuffer();
+    onProgress?.(1);
+    return URL.createObjectURL(new Blob([buffer], { type: mimeType }));
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let received = 0;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    chunks.push(value);
+    received += value.length;
+    if (total > 0) {
+      onProgress?.(received / total);
+    }
+  }
+
+  onProgress?.(1);
+  return URL.createObjectURL(new Blob(chunks, { type: mimeType }));
+}
+
+export default function VideoLabPage() {
+  const ffmpegRef = useRef(null);
+  const loadPromiseRef = useRef(null);
+  const videoRef = useRef(null);
+  const sourceUrlRef = useRef('');
+  const resultUrlRef = useRef('');
+  const activeSegmentDurationRef = useRef(0);
+  const isTranscodingRef = useRef(false);
+
+  const [engineState, setEngineState] = useState('idle');
+  const [engineProgress, setEngineProgress] = useState(0);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [statusText, setStatusText] = useState('Listo para cargar FFmpeg.');
+  const [sourceFile, setSourceFile] = useState(null);
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [sourceDuration, setSourceDuration] = useState(0);
+  const [sourceResolution, setSourceResolution] = useState(null);
+  const [clipStart, setClipStart] = useState(0);
+  const [processing, setProcessing] = useState(false);
+  const [result, setResult] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [selectedPresetId, setSelectedPresetId] = useState(() => {
+    if (typeof window === 'undefined') return VIDEO_PRESETS[0].id;
+    return window.localStorage.getItem(VIDEO_PRESET_STORAGE_KEY) || VIDEO_PRESETS[0].id;
+  });
+
+  const maxStart = Math.max(0, sourceDuration - MAX_CLIP_SECONDS);
+  const selectedDuration = sourceDuration > 0 ? Math.min(MAX_CLIP_SECONDS, sourceDuration - clipStart || MAX_CLIP_SECONDS) : 0;
+  const clipEnd = sourceDuration > 0 ? Math.min(sourceDuration, clipStart + MAX_CLIP_SECONDS) : 0;
+  const segmentWidth = sourceDuration > 0 ? Math.min((Math.min(MAX_CLIP_SECONDS, sourceDuration) / sourceDuration) * 100, 100) : 0;
+  const segmentOffset = sourceDuration > 0 ? (clipStart / sourceDuration) * 100 : 0;
+  const engineReady = engineState === 'ready';
+  const overallProgress = processing ? processingProgress : engineProgress;
+  const outputProfile = getOutputProfile(sourceResolution);
+  const selectedPreset = VIDEO_PRESETS.find((preset) => preset.id === selectedPresetId) || VIDEO_PRESETS[0];
+  const outputEstimateLabel = getEstimatedOutputSizeLabel(MAX_CLIP_SECONDS, selectedPreset);
+
+  if (!ffmpegRef.current) {
+    ffmpegRef.current = new FFmpeg();
+  }
+
+  useEffect(() => {
+    const ffmpeg = ffmpegRef.current;
+
+    const handleProgress = ({ progress }) => {
+      if (!isTranscodingRef.current) return;
+      setProcessingProgress((current) => Math.max(current, clamp(progress, 0, 0.98)));
+    };
+
+    const handleLog = ({ message }) => {
+      if (isTranscodingRef.current) {
+        const elapsed = parseFfmpegTime(message);
+        if (elapsed !== null && activeSegmentDurationRef.current > 0) {
+          setProcessingProgress((current) => Math.max(current, clamp(elapsed / activeSegmentDurationRef.current, 0, 0.99)));
+        }
+      }
+      setStatusText(message || 'Procesando...');
+    };
+
+    ffmpeg.on('progress', handleProgress);
+    ffmpeg.on('log', handleLog);
+
+    return () => {
+      ffmpeg.off('progress', handleProgress);
+      ffmpeg.off('log', handleLog);
+      ffmpeg.terminate();
+      if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
+      if (resultUrlRef.current) URL.revokeObjectURL(resultUrlRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    sourceUrlRef.current = sourceUrl;
+  }, [sourceUrl]);
+
+  useEffect(() => {
+    resultUrlRef.current = result?.url || '';
+  }, [result]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(VIDEO_PRESET_STORAGE_KEY, selectedPreset.id);
+  }, [selectedPreset]);
+
+  const ensureEngineLoaded = async () => {
+    const ffmpeg = ffmpegRef.current;
+    if (ffmpeg.loaded) return ffmpeg;
+    if (loadPromiseRef.current) {
+      await loadPromiseRef.current;
+      return ffmpeg;
+    }
+
+    loadPromiseRef.current = (async () => {
+      setErrorMessage('');
+      setEngineState('loading');
+      setEngineProgress(0.02);
+      setStatusText('Descargando el motor de FFmpeg...');
+
+      let coreJsProgress = 0;
+      let wasmProgress = 0;
+
+      const syncProgress = () => {
+        setEngineProgress(clamp(coreJsProgress * 0.2 + wasmProgress * 0.8, 0.02, 0.92));
+      };
+
+      const coreURL = await downloadBlobUrl(
+        `${FFMPEG_BASE_URL}/ffmpeg-core.js`,
+        'text/javascript',
+        (progress) => {
+          coreJsProgress = progress;
+          syncProgress();
+        }
+      );
+
+      const wasmURL = await downloadBlobUrl(
+        `${FFMPEG_BASE_URL}/ffmpeg-core.wasm`,
+        'application/wasm',
+        (progress) => {
+          wasmProgress = progress;
+          syncProgress();
+        }
+      );
+
+      setStatusText('Inicializando WebAssembly...');
+      await ffmpeg.load({ coreURL, wasmURL });
+      setEngineProgress(1);
+      setEngineState('ready');
+      setStatusText('FFmpeg listo para convertir.');
+    })();
+
+    try {
+      await loadPromiseRef.current;
+    } catch (error) {
+      setEngineState('error');
+      setStatusText('No se pudo cargar FFmpeg.');
+      setErrorMessage(error?.message || 'Error al cargar FFmpeg.');
+      throw error;
+    } finally {
+      loadPromiseRef.current = null;
+    }
+
+    return ffmpeg;
+  };
+
+  const resetResult = () => {
+    if (resultUrlRef.current) {
+      URL.revokeObjectURL(resultUrlRef.current);
+      resultUrlRef.current = '';
+    }
+    setResult(null);
+  };
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    resetResult();
+    setErrorMessage('');
+    setStatusText('Archivo cargado. Ajusta el inicio del clip.');
+    setClipStart(0);
+    setSourceDuration(0);
+    setSourceResolution(null);
+    setSourceFile(file);
+    setProcessingProgress(0);
+
+    const nextSourceUrl = URL.createObjectURL(file);
+    if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
+    setSourceUrl(nextSourceUrl);
+
+    await ensureEngineLoaded().catch(() => {});
+  };
+
+  const handleLoadedMetadata = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    setSourceDuration(video.duration || 0);
+    setSourceResolution(video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : null);
+    setClipStart(0);
+  };
+
+  const syncPreviewToSelection = (nextStart) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = nextStart;
+  };
+
+  const handleStartChange = (nextValue) => {
+    const nextStart = clamp(Number(nextValue), 0, maxStart);
+    setClipStart(nextStart);
+    syncPreviewToSelection(nextStart);
+  };
+
+  const handleUseCurrentTime = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    handleStartChange(video.currentTime || 0);
+  };
+
+  const handlePreviewSegment = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = clipStart;
+    try {
+      await video.play();
+    } catch {
+      // Ignore autoplay restrictions; controls remain available.
+    }
+  };
+
+  const handlePreviewTimeUpdate = () => {
+    const video = videoRef.current;
+    if (!video || clipEnd <= clipStart) return;
+    if (video.currentTime >= clipEnd) {
+      video.currentTime = clipStart;
+      if (!video.paused) {
+        video.play().catch(() => {});
+      }
+    }
+  };
+
+  const transcodeVideo = async () => {
+    if (!sourceFile) {
+      setErrorMessage('Primero sube un video.');
+      return;
+    }
+
+    const startedAt = performance.now();
+
+    try {
+      const ffmpeg = await ensureEngineLoaded();
+      resetResult();
+      setErrorMessage('');
+      setProcessing(true);
+      isTranscodingRef.current = true;
+      setProcessingProgress(0.02);
+      setStatusText('Preparando el clip...');
+
+      const inputExtension = sourceFile.name.split('.').pop()?.toLowerCase() || 'mp4';
+      const inputFileName = `input.${inputExtension}`;
+      const outputFileName = `${getFileStem(sourceFile.name)}-720p-15s.mp4`;
+      const segmentDuration = Math.max(0.1, clipEnd - clipStart);
+      activeSegmentDurationRef.current = segmentDuration;
+
+      try { await ffmpeg.deleteFile(inputFileName); } catch {}
+      try { await ffmpeg.deleteFile(outputFileName); } catch {}
+
+      await ffmpeg.writeFile(inputFileName, await fetchFile(sourceFile));
+
+      const sharedArgs = [
+        '-ss', clipStart.toFixed(2),
+        '-t', segmentDuration.toFixed(2),
+        '-i', inputFileName,
+        '-vf', `${outputProfile.scaleFilter},setsar=1`,
+        '-movflags', '+faststart',
+      ];
+
+      setStatusText(`Convirtiendo en ${selectedPreset.statusLabel} (${outputProfile.label})...`);
+      let exitCode = await ffmpeg.exec([
+        ...sharedArgs,
+        '-c:v', 'libx264',
+        '-crf', selectedPreset.crf,
+        '-maxrate', selectedPreset.maxrate,
+        '-bufsize', selectedPreset.bufsize,
+        '-preset', selectedPreset.preset,
+        '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac',
+        '-b:a', selectedPreset.audioBitrate,
+        outputFileName,
+      ]);
+
+      if (exitCode !== 0) {
+        setStatusText('Fallback a códec compatible...');
+        try { await ffmpeg.deleteFile(outputFileName); } catch {}
+        exitCode = await ffmpeg.exec([
+          ...sharedArgs,
+          '-c:v', 'mpeg4',
+          '-q:v', '4',
+          '-c:a', 'aac',
+          '-b:a', selectedPreset.audioBitrate,
+          outputFileName,
+        ]);
+      }
+
+      if (exitCode !== 0) {
+        throw new Error('FFmpeg no pudo generar el MP4 final.');
+      }
+
+      const data = await ffmpeg.readFile(outputFileName);
+      const outputBlob = new Blob([data], { type: 'video/mp4' });
+      const outputUrl = URL.createObjectURL(outputBlob);
+      const processingElapsedSeconds = (performance.now() - startedAt) / 1000;
+
+      setProcessingProgress(1);
+      setStatusText('Clip listo para descargar.');
+      setResult({
+        url: outputUrl,
+        fileName: outputFileName,
+        sizeLabel: `${(outputBlob.size / (1024 * 1024)).toFixed(2)} MB`,
+        duration: segmentDuration,
+        processingTimeLabel: formatElapsedSeconds(processingElapsedSeconds),
+      });
+
+      try { await ffmpeg.deleteFile(inputFileName); } catch {}
+      try { await ffmpeg.deleteFile(outputFileName); } catch {}
+    } catch (error) {
+      setErrorMessage(error?.message || 'No se pudo convertir el video.');
+      setStatusText('Conversión interrumpida.');
+    } finally {
+      setProcessing(false);
+      isTranscodingRef.current = false;
+      activeSegmentDurationRef.current = 0;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-mansion-base text-text-primary relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-32 right-[-10%] w-[520px] h-[520px] rounded-full bg-mansion-crimson/10 blur-3xl" />
+        <div className="absolute bottom-[-12%] left-[-6%] w-[460px] h-[460px] rounded-full bg-mansion-gold/10 blur-3xl" />
+      </div>
+
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10">
+        <div className="flex items-center justify-between gap-4 mb-8">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-mansion-gold/10 border border-mansion-gold/20 text-mansion-gold text-xs font-semibold tracking-[0.18em] uppercase mb-3">
+              <Film className="w-3.5 h-3.5" />
+              Laboratorio
+            </div>
+            <h1 className="font-display text-3xl sm:text-4xl font-bold text-text-primary">Video Lab FFmpeg.wasm</h1>
+            <p className="text-text-muted mt-2 max-w-2xl">
+              Prueba local para recortar un segmento de hasta 15 segundos y exportarlo a 720p en MP4, sin subir el archivo al servidor.
+            </p>
+          </div>
+          <Link
+            to="/admin/usuarios"
+            className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-mansion-card/70 border border-mansion-border/30 text-text-muted hover:text-text-primary transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Volver
+          </Link>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          <motion.section
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-elevated rounded-[2rem] border border-mansion-border/20 overflow-hidden"
+          >
+            <div className="p-6 sm:p-7 border-b border-mansion-border/20">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.22em] text-text-dim font-semibold">1. Carga local</p>
+                  <h2 className="font-display text-2xl font-semibold mt-1">Sube un video de prueba</h2>
+                </div>
+                <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-mansion-crimson text-white font-medium hover:bg-mansion-crimson-dark transition-colors cursor-pointer">
+                  <Upload className="w-4 h-4" />
+                  Elegir archivo
+                  <input
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="p-6 sm:p-7">
+              <div className="aspect-video rounded-[1.5rem] overflow-hidden bg-black/50 border border-white/10 relative">
+                {sourceUrl ? (
+                  <video
+                    ref={videoRef}
+                    src={sourceUrl}
+                    controls
+                    playsInline
+                    className="w-full h-full object-contain bg-black"
+                    onLoadedMetadata={handleLoadedMetadata}
+                    onTimeUpdate={handlePreviewTimeUpdate}
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6">
+                    <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center">
+                      <Film className="w-7 h-7 text-mansion-gold" />
+                    </div>
+                    <div>
+                      <p className="font-display text-xl text-text-primary">Arranca con cualquier MP4, MOV o WebM</p>
+                      <p className="text-sm text-text-dim mt-1">La conversión ocurre en el navegador usando WebAssembly.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-text-dim">Archivo</p>
+                  <p className="text-sm text-text-primary mt-1 truncate">{sourceFile?.name || 'Sin video cargado'}</p>
+                </div>
+                <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-text-dim">Duración</p>
+                  <p className="text-sm text-text-primary mt-1">{sourceDuration ? formatTime(sourceDuration) : '—'}</p>
+                </div>
+                <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-text-dim">Resolución origen</p>
+                  <p className="text-sm text-text-primary mt-1">
+                    {sourceResolution ? `${sourceResolution.width}×${sourceResolution.height}` : '—'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-[1.75rem] border border-mansion-border/20 bg-mansion-card/40 p-5">
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-end mb-5">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-text-dim font-semibold">Preset</p>
+                    <h3 className="font-display text-xl mt-1">Elige un perfil de conversión</h3>
+                    <p className="text-sm text-text-dim mt-1">{selectedPreset.description}</p>
+                  </div>
+                  <label className="block">
+                    <span className="sr-only">Preset de conversión</span>
+                    <select
+                      value={selectedPreset.id}
+                      onChange={(event) => setSelectedPresetId(event.target.value)}
+                      className="w-full rounded-2xl bg-mansion-elevated/85 border border-mansion-border/30 px-4 py-3 text-text-primary focus:outline-none focus:border-mansion-gold/40"
+                    >
+                      {VIDEO_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-text-dim font-semibold">2. Segmento</p>
+                    <h3 className="font-display text-xl mt-1">Elige el inicio del clip</h3>
+                    <p className="text-sm text-text-dim mt-1">La salida dura hasta 15 segundos. Si el video es más corto, se usa completo.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentTime}
+                    disabled={!sourceUrl}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-mansion-elevated/80 border border-mansion-border/30 text-text-muted hover:text-text-primary disabled:opacity-50 transition-colors"
+                  >
+                    <Scissors className="w-4 h-4" />
+                    Usar tiempo actual
+                  </button>
+                </div>
+
+                <div className="relative h-4 rounded-full bg-black/30 overflow-hidden mb-4">
+                  <div
+                    className="absolute inset-y-0 rounded-full bg-gradient-to-r from-mansion-crimson via-mansion-gold to-mansion-gold-light"
+                    style={{
+                      left: `${segmentOffset}%`,
+                      width: `${segmentWidth}%`,
+                    }}
+                  />
+                </div>
+
+                <input
+                  type="range"
+                  min="0"
+                  max={maxStart || 0}
+                  step="0.1"
+                  value={clipStart}
+                  onChange={(event) => handleStartChange(event.target.value)}
+                  disabled={!sourceUrl || maxStart <= 0}
+                  className="w-full accent-mansion-gold"
+                />
+
+                <div className="flex flex-wrap items-center justify-between gap-3 mt-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-text-dim">Inicio</span>
+                    <span className="px-3 py-1.5 rounded-full bg-black/25 border border-white/10 font-medium">{formatTime(clipStart)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-text-dim">Fin</span>
+                    <span className="px-3 py-1.5 rounded-full bg-black/25 border border-white/10 font-medium">{formatTime(clipEnd)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-text-dim">Duración seleccionada</span>
+                    <span className="px-3 py-1.5 rounded-full bg-mansion-gold/10 border border-mansion-gold/20 text-mansion-gold font-semibold">
+                      {selectedDuration ? `${selectedDuration.toFixed(1)}s` : '—'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3 mt-5">
+                  <button
+                    type="button"
+                    onClick={handlePreviewSegment}
+                    disabled={!sourceUrl}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-mansion-card/80 border border-mansion-border/30 text-text-primary hover:border-mansion-gold/30 disabled:opacity-50 transition-colors"
+                  >
+                    <Play className="w-4 h-4" />
+                    Previsualizar recorte
+                  </button>
+                  <button
+                    type="button"
+                    onClick={transcodeVideo}
+                    disabled={!sourceFile || processing}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-mansion-crimson text-white font-semibold hover:bg-mansion-crimson-dark disabled:opacity-60 transition-colors"
+                  >
+                    {processing ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                    Convertir a 720p
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.section>
+
+          <motion.aside
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.06 }}
+            className="space-y-6"
+          >
+            <section className="glass-elevated rounded-[2rem] border border-mansion-border/20 p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-text-dim font-semibold">3. Progreso</p>
+                  <h2 className="font-display text-xl mt-1">Carga y conversión</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => ensureEngineLoaded().catch(() => {})}
+                  disabled={engineState === 'loading' || engineReady}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-mansion-card/70 border border-mansion-border/30 text-text-muted hover:text-text-primary disabled:opacity-50 transition-colors"
+                >
+                  <RefreshCw className={`w-4 h-4 ${engineState === 'loading' ? 'animate-spin' : ''}`} />
+                  {engineReady ? 'Listo' : 'Cargar motor'}
+                </button>
+              </div>
+
+              <div className="mt-5 rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
+                <div className="h-3 bg-white/5">
+                  <div
+                    className={`h-full transition-all duration-300 ${processing ? 'bg-gradient-to-r from-mansion-crimson to-mansion-gold' : 'bg-gradient-to-r from-mansion-gold/70 to-mansion-gold-light/90'}`}
+                    style={{ width: `${Math.round(overallProgress * 100)}%` }}
+                  />
+                </div>
+                <div className="px-4 py-3 flex items-center justify-between text-sm">
+                  <span className="text-text-muted">{processing ? 'Procesando video...' : engineReady ? 'Motor cargado' : 'Preparando FFmpeg...'}</span>
+                  <span className="font-semibold text-text-primary">{Math.round(overallProgress * 100)}%</span>
+                </div>
+              </div>
+
+              <p className="text-sm text-text-dim mt-4 min-h-[2.75rem]">{statusText}</p>
+              {errorMessage && (
+                <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                  {errorMessage}
+                </div>
+              )}
+
+              <div className="grid gap-3 mt-5 sm:grid-cols-2 xl:grid-cols-1">
+                <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Salida objetivo</p>
+                  <p className="text-sm text-text-primary mt-1">{`MP4 · ${outputProfile.label} · ${selectedPreset.codecLabel} · ${outputEstimateLabel}`}</p>
+                </div>
+                <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Motor</p>
+                  <p className="text-sm text-text-primary mt-1">`@ffmpeg/ffmpeg` 0.12.15</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="glass-elevated rounded-[2rem] border border-mansion-border/20 p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-text-dim font-semibold">4. Resultado</p>
+                  <h2 className="font-display text-xl mt-1">Descarga el clip</h2>
+                </div>
+                {result?.url && (
+                  <a
+                    href={result.url}
+                    download={result.fileName}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-mansion-gold text-mansion-base font-semibold hover:bg-mansion-gold-light transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Descargar
+                  </a>
+                )}
+              </div>
+
+              {result?.url ? (
+                <div className="mt-5 space-y-4">
+                  <div className="aspect-video rounded-[1.5rem] overflow-hidden bg-black/50 border border-white/10">
+                    <video src={result.url} controls playsInline className="w-full h-full object-contain bg-black" />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Archivo</p>
+                      <p className="text-sm text-text-primary mt-1 truncate">{result.fileName}</p>
+                    </div>
+                    <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Tamaño</p>
+                      <p className="text-sm text-text-primary mt-1">{result.sizeLabel}</p>
+                    </div>
+                    <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Clip</p>
+                      <p className="text-sm text-text-primary mt-1">{result.duration.toFixed(1)}s</p>
+                    </div>
+                    <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Tiempo</p>
+                      <p className="text-sm text-text-primary mt-1">{result.processingTimeLabel}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-[1.5rem] border border-dashed border-mansion-border/30 bg-mansion-card/30 p-6 text-center">
+                  <div className="w-14 h-14 rounded-3xl bg-black/20 border border-white/10 flex items-center justify-center mx-auto">
+                    <Download className="w-6 h-6 text-mansion-gold" />
+                  </div>
+                  <p className="font-display text-lg mt-4">Todavía no hay salida</p>
+                  <p className="text-sm text-text-dim mt-1">Cuando termine la conversión, vas a poder previsualizar y descargar el MP4 desde acá.</p>
+                </div>
+              )}
+            </section>
+          </motion.aside>
+        </div>
+      </div>
+    </div>
+  );
+}

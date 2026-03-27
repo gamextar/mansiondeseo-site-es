@@ -12,6 +12,7 @@ import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
 import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 
 const FEED_CACHE_KEY = 'mansion_feed_';
 
@@ -96,7 +97,8 @@ export default function FeedPage() {
           animate="visible"
         >
           {profiles.slice(0, 15).map((p) => {
-            const photo = (p.photos && p.photos[0]) || p.avatar_url || '';
+            const photo = getPrimaryProfilePhoto(p);
+            const photoCrop = getPrimaryProfileCrop(p);
             const isOnline = p.online;
             const size = settings.storyCircleSize || 88;
             const border = settings.storyCircleBorder ?? 4;
@@ -106,7 +108,7 @@ export default function FeedPage() {
               <motion.div key={`story-${p.id}`} variants={storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
               <Link
                 to={`/perfiles/${p.id}`}
-                state={{ preview: { id: p.id, name: p.name, age: p.age, city: p.city, role: p.role, photos: p.photos || [], avatar_url: p.avatar_url, online: p.online, premium: p.premium, verified: p.verified, blurred: p.blurred, visiblePhotos: p.visiblePhotos, ghost_mode: p.ghost_mode } }}
+                state={{ preview: { id: p.id, name: p.name, age: p.age, city: p.city, role: p.role, photos: p.photos || [], avatar_url: p.avatar_url, avatar_crop: p.avatar_crop || null, online: p.online, premium: p.premium, verified: p.verified, blurred: p.blurred, visiblePhotos: p.visiblePhotos, ghost_mode: p.ghost_mode } }}
                 className="flex flex-col items-center gap-1"
               >
                 <div className={`rounded-full ${
@@ -117,7 +119,7 @@ export default function FeedPage() {
                   <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: innerGap }}>
                     <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
                       {photo ? (
-                        <AvatarImg src={photo} crop={photo === p.avatar_url ? p.avatar_crop : null} alt={p.name} className="w-full h-full" />
+                        <AvatarImg src={photo} crop={photoCrop} alt={p.name} className="w-full h-full" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
                           {p.name?.charAt(0)}

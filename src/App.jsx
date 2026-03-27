@@ -1,4 +1,4 @@
-import { useState, createContext, useContext, useCallback, useEffect } from 'react';
+import { useState, createContext, useContext, useCallback, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAgeVerified } from './hooks/useAgeVerified';
@@ -28,6 +28,8 @@ import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
+
+const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/'];
@@ -70,6 +72,13 @@ function AppLayout() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+        >
+        <Suspense
+          fallback={(
+            <div className="min-h-screen bg-mansion-base flex items-center justify-center">
+              <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+            </div>
+          )}
         >
         <Routes location={location}>
           {/* Full-screen flows */}
@@ -154,8 +163,10 @@ function AppLayout() {
             <Route index element={<Navigate to="/admin/usuarios" replace />} />
             <Route path="usuarios" element={<AdminUsersPage />} />
             <Route path="configuracion" element={<SettingsPage />} />
+            <Route path="video-lab" element={<VideoLabPage />} />
           </Route>
         </Routes>
+        </Suspense>
         </motion.div>
       </div>
 

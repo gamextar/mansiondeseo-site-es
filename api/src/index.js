@@ -66,6 +66,25 @@ function getProfileVisitDedupeWindowMinutes(env) {
   return Math.floor(raw);
 }
 
+function normalizeGalleryPhotos(rawPhotos, avatarUrl = '') {
+  const photos = Array.isArray(rawPhotos) ? rawPhotos : [];
+  const seen = new Set();
+  const gallery = [];
+
+  for (const url of photos) {
+    if (typeof url !== 'string' || !url || url === avatarUrl || seen.has(url)) continue;
+    seen.add(url);
+    gallery.push(url);
+  }
+
+  return gallery;
+}
+
+function buildDisplayPhotos(avatarUrl = '', rawPhotos = []) {
+  const gallery = normalizeGalleryPhotos(rawPhotos, avatarUrl);
+  return avatarUrl ? [avatarUrl, ...gallery] : gallery;
+}
+
 function isDebugLoggingEnabled(env) {
   return env?.DEBUG_LOGS === '1' || env?.ENVIRONMENT !== 'production';
 }
@@ -696,13 +715,14 @@ async function handleProfiles(request, env) {
     const hasGhostMode = profileIsPremium && !!u.ghost_mode;
     // Ghost mode blur: blurred unless viewer is premium OR the ghost-mode user has favorited the viewer
     const blurred = hasGhostMode && !viewerIsPremium && !favoritedBySet.has(u.id);
-    const allPhotos = safeParseJSON(u.photos, []);
-    // Send all URLs; frontend applies CSS blur to blocked ones
+    const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(u.photos, []), u.avatar_url);
+    const displayPhotos = buildDisplayPhotos(u.avatar_url, galleryPhotos);
+    // Keep avatar separate from gallery; frontend can merge both when it needs a full media carousel.
     const visiblePhotos = viewerIsPremium
-      ? allPhotos.length
+      ? displayPhotos.length
       : blurred
         ? 0
-        : settings.freeVisiblePhotos;
+        : Math.min(displayPhotos.length, settings.freeVisiblePhotos);
     return {
       id: u.id,
       name: u.username,
@@ -711,8 +731,8 @@ async function handleProfiles(request, env) {
       role: mapRoleToDisplay(u.role),
       interests: safeParseJSON(u.interests, []),
       bio: u.bio,
-      photos: allPhotos,
-      totalPhotos: allPhotos.length,
+      photos: galleryPhotos,
+      totalPhotos: displayPhotos.length,
       visiblePhotos,
       verified: !!u.verified,
       online: isOnline(u.last_active),
@@ -723,6 +743,7 @@ async function handleProfiles(request, env) {
       isFavorited: viewerFavorites.has(u.id),
       lastActive: u.last_active,
       avatar_url: u.avatar_url,
+      avatar_crop: safeParseJSON(u.avatar_crop, null),
     };
   });
 
@@ -773,14 +794,15 @@ async function handleProfileDetail(request, env, userId) {
     }
   }
 
-  const allPhotos = safeParseJSON(user.photos, []);
-  // Send all URLs; frontend applies CSS blur to blocked ones
+  const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
+  const displayPhotos = buildDisplayPhotos(user.avatar_url, galleryPhotos);
+  // Keep avatar separate from gallery; frontend can merge both when it needs a full media carousel.
   const visibleLimit = settings.freeVisiblePhotos;
   const visiblePhotos = viewerIsPremium
-    ? allPhotos.length
+    ? displayPhotos.length
     : blurred
       ? 0
-      : visibleLimit;
+      : Math.min(displayPhotos.length, visibleLimit);
 
   // Get received gifts for this profile
   const { results: giftResults } = await env.DB.prepare(
@@ -804,8 +826,8 @@ async function handleProfileDetail(request, env, userId) {
       role: mapRoleToDisplay(user.role),
       interests: safeParseJSON(user.interests, []),
       bio: user.bio,
-      photos: allPhotos,
-      totalPhotos: allPhotos.length,
+      photos: galleryPhotos,
+      totalPhotos: displayPhotos.length,
       visiblePhotos,
       verified: !!user.verified,
       online: isOnline(user.last_active),
@@ -817,6 +839,7 @@ async function handleProfileDetail(request, env, userId) {
       isOwnProfile,
       lastActive: user.last_active,
       avatar_url: user.avatar_url,
+      avatar_crop: safeParseJSON(user.avatar_crop, null),
       receivedGifts: giftResults,
     },
     viewerPremium: viewerIsPremium,
@@ -1346,6 +1369,12 @@ async function handleAdminChatCleanup(request, env) {
 async function handleUpload(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  const uploadUrl = new URL(request.url);
+  const purpose = uploadUrl.searchParams.get('purpose') || 'asset';
+
+  if (!['asset', 'avatar', 'gallery'].includes(purpose)) {
+    return error('purpose inválido', 400);
+  }
 
   const contentType = request.headers.get('Content-Type') || '';
   if (!contentType.startsWith('image/')) {
@@ -1377,19 +1406,27 @@ async function handleUpload(request, env) {
     ? `${env.R2_PUBLIC_URL}/${key}`
     : `/api/images/${key}`; // Serve via Worker in dev
 
-  // Update user photos array
   const user = await env.DB.prepare('SELECT photos, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
-  const photos = safeParseJSON(user.photos, []);
-  photos.push(publicUrl);
+  if (!user) return error('Usuario no encontrado', 404);
 
-  const updates = { photos: JSON.stringify(photos) };
-  if (!user.avatar_url) {
-    updates.avatar_url = publicUrl;
+  const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
+
+  if (purpose === 'avatar') {
+    await env.DB.prepare(`
+      UPDATE users SET avatar_url = ?, avatar_crop = NULL WHERE id = ?
+    `).bind(publicUrl, auth.sub).run();
+
+    return json({ url: publicUrl, key, avatar_url: publicUrl, photos: galleryPhotos }, 201);
   }
 
-  await env.DB.prepare(`
-    UPDATE users SET photos = ?, avatar_url = COALESCE(NULLIF(avatar_url, ''), ?) WHERE id = ?
-  `).bind(JSON.stringify(photos), publicUrl, auth.sub).run();
+  if (purpose === 'gallery') {
+    const nextPhotos = [...galleryPhotos, publicUrl];
+    await env.DB.prepare(`
+      UPDATE users SET photos = ? WHERE id = ?
+    `).bind(JSON.stringify(nextPhotos), auth.sub).run();
+
+    return json({ url: publicUrl, key, avatar_url: user.avatar_url || '', photos: nextPhotos }, 201);
+  }
 
   return json({ url: publicUrl, key }, 201);
 }
@@ -1429,19 +1466,17 @@ async function handleDeletePhoto(request, env) {
   // Get user's current photos
   const user = await env.DB.prepare('SELECT photos, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
   if (!user) return error('Usuario no encontrado', 404);
+  if (user.avatar_url === url) return error('La foto de perfil se gestiona por separado', 400);
 
-  const photos = safeParseJSON(user.photos, []);
+  const photos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
   const index = photos.indexOf(url);
   if (index === -1) return error('Foto no encontrada', 404);
 
   // Remove from array
   photos.splice(index, 1);
 
-  // If deleted photo was avatar, set next photo or empty
-  const newAvatar = user.avatar_url === url ? (photos[0] || '') : user.avatar_url;
-
-  await env.DB.prepare('UPDATE users SET photos = ?, avatar_url = ? WHERE id = ?')
-    .bind(JSON.stringify(photos), newAvatar, auth.sub).run();
+  await env.DB.prepare('UPDATE users SET photos = ? WHERE id = ?')
+    .bind(JSON.stringify(photos), auth.sub).run();
 
   // Try to delete from R2 (extract key from URL)
   try {
@@ -1459,7 +1494,7 @@ async function handleDeletePhoto(request, env) {
     // R2 delete is best-effort
   }
 
-  return json({ photos, avatar_url: newAvatar });
+  return json({ photos, avatar_url: user.avatar_url || '' });
 }
 
 // handleServeImage removed — images now served directly from R2 public bucket
@@ -1472,6 +1507,8 @@ async function handleUpdateProfile(request, env) {
 
   const body = await request.json();
   const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'city', 'bio', 'avatar_url', 'avatar_crop', 'premium'];
+  const currentUser = await env.DB.prepare('SELECT premium, premium_until, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!currentUser) return error('Usuario no encontrado', 404);
 
   // Validate and allow photos reorder (all URLs must originate from our R2 bucket)
   if (body.photos !== undefined) {
@@ -1484,7 +1521,6 @@ async function handleUpdateProfile(request, env) {
   }
 
   // ghost_mode is only allowed for premium users
-  const currentUser = await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
   const isPremium = isPremiumActive(currentUser);
   if (isPremium) {
     allowedFields.push('ghost_mode');
@@ -1497,7 +1533,12 @@ async function handleUpdateProfile(request, env) {
     if (body[field] !== undefined) {
       if (field === 'interests' || field === 'photos' || field === 'avatar_crop') {
         updates.push(`${field} = ?`);
-        values.push(JSON.stringify(body[field]));
+        if (field === 'photos') {
+          const effectiveAvatarUrl = body.avatar_url !== undefined ? body.avatar_url : currentUser.avatar_url;
+          values.push(JSON.stringify(normalizeGalleryPhotos(body[field], effectiveAvatarUrl)));
+        } else {
+          values.push(JSON.stringify(body[field]));
+        }
       } else if (field === 'ghost_mode' || field === 'premium') {
         updates.push(`${field} = ?`);
         values.push(body[field] ? 1 : 0);
@@ -1566,7 +1607,7 @@ function sanitizeUser(user, env) {
   return {
     ...safe,
     interests: safeParseJSON(safe.interests, []),
-    photos: safeParseJSON(safe.photos, []),
+    photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
     avatar_crop: safeParseJSON(safe.avatar_crop, null),
     verified: !!safe.verified,
     online: !!safe.online,
@@ -1597,7 +1638,7 @@ async function handleGetVisits(request, env) {
   if (!auth) return error('No autorizado', 401);
 
   const { results } = await env.DB.prepare(
-    `SELECT u.id, u.username, u.avatar_url, u.age, u.city, u.role, u.premium, u.last_active,
+    `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.city, u.role, u.premium, u.last_active,
             MAX(pv.created_at) as visited_at
      FROM profile_visits pv
      JOIN users u ON u.id = pv.visitor_id
@@ -1611,6 +1652,7 @@ async function handleGetVisits(request, env) {
     id: v.id,
     name: v.username,
     avatar_url: v.avatar_url,
+    avatar_crop: safeParseJSON(v.avatar_crop, null),
     age: v.age,
     city: v.city,
     role: v.role,
@@ -1810,10 +1852,11 @@ async function handleGetFavorites(request, env) {
   const profiles = results.map(u => {
     const hasGhostMode = isPremiumActive(u) && !!u.ghost_mode;
     const blurred = hasGhostMode && !viewerIsPremium && !favoritedBySet.has(u.id);
-    const allPhotos = safeParseJSON(u.photos, []);
+    const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(u.photos, []), u.avatar_url);
+    const displayPhotos = buildDisplayPhotos(u.avatar_url, galleryPhotos);
     const visiblePhotos = viewerIsPremium
-      ? allPhotos.length
-      : blurred ? 0 : settings.freeVisiblePhotos;
+      ? displayPhotos.length
+      : blurred ? 0 : Math.min(displayPhotos.length, settings.freeVisiblePhotos);
     return {
       id: u.id,
       name: u.username,
@@ -1821,14 +1864,15 @@ async function handleGetFavorites(request, env) {
       city: u.city,
       role: mapRoleToDisplay(u.role),
       interests: safeParseJSON(u.interests, []),
-      photos: allPhotos,
-      totalPhotos: allPhotos.length,
+      photos: galleryPhotos,
+      totalPhotos: displayPhotos.length,
       visiblePhotos,
       verified: !!u.verified,
       online: !!u.online,
       premium: !!u.premium,
       blurred,
       avatar_url: u.avatar_url,
+      avatar_crop: safeParseJSON(u.avatar_crop, null),
     };
   });
 
@@ -2087,7 +2131,8 @@ async function handleAdminGetUser(request, env, userId) {
     user: {
       ...safe,
       interests: safeParseJSON(safe.interests, []),
-      photos: safeParseJSON(safe.photos, []),
+      photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
+      avatar_crop: safeParseJSON(safe.avatar_crop, null),
       premium: isPremiumActive(safe),
       online: isOnline(safe.last_active),
       is_admin: !!safe.is_admin,
@@ -2134,7 +2179,8 @@ async function handleAdminUpdateUser(request, env, userId) {
     user: {
       ...safe,
       interests: safeParseJSON(safe.interests, []),
-      photos: safeParseJSON(safe.photos, []),
+      photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
+      avatar_crop: safeParseJSON(safe.avatar_crop, null),
       premium: isPremiumActive(safe),
       online: isOnline(safe.last_active),
       is_admin: !!safe.is_admin,

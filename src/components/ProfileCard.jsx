@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { MapPin, Shield, Crown, Lock } from 'lucide-react';
+import { getDisplayPhotos, getPrimaryProfilePhoto } from '../lib/profileMedia';
 
 // Masquerade mask SVG icon for incognito mode
 const MaskIcon = ({ className = 'w-6 h-6', customSvg = '' }) => {
@@ -59,24 +60,27 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
   const blurLevel = baseBlur;
 
   // visiblePhotos tells us how many photos are unblurred
-  const visiblePhotos = profile.visiblePhotos ?? photos.length;
+  const displayPhotos = getDisplayPhotos(profile);
+  const visiblePhotos = profile.visiblePhotos ?? displayPhotos.length;
   const cardBlocked = blurred || visiblePhotos === 0;
-  const mainPhoto = photos[0] || profile.avatar_url || '';
+  const mainPhoto = getPrimaryProfilePhoto(profile);
 
   return (
     <div>
-      <Link to={`/perfiles/${id}`} state={{ preview: { id, name, age, city, role, photos, avatar_url: profile.avatar_url, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode } }} className="block group">
+      <Link to={`/perfiles/${id}`} state={{ preview: { id, name, age, city, role, photos, avatar_url: profile.avatar_url, avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode } }} className="block group">
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">
           {/* Photo — use actual photo with blur for blocked cards */}
-          <img
-            src={mainPhoto}
-            alt={cardBlocked ? '' : name}
-            loading={index < 6 ? 'eager' : 'lazy'}
-            fetchPriority={index < 4 ? 'high' : 'auto'}
-            decoding="async"
-            className="absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100"
-            style={cardBlocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
-          />
+          {mainPhoto ? (
+            <img
+              src={mainPhoto}
+              alt={cardBlocked ? '' : name}
+              loading={index < 6 ? 'eager' : 'lazy'}
+              fetchPriority={index < 4 ? 'high' : 'auto'}
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100"
+              style={cardBlocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
+            />
+          ) : null}
 
           {/* Incognito mode overlay */}
           {cardBlocked && (

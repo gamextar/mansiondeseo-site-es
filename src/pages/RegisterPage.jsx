@@ -1093,9 +1093,8 @@ export default function RegisterPage() {
     // Upload photo if selected (now that we have a token)
     if (photoFile) {
       try {
-        const uploadResult = await uploadImage(photoFile);
-        // Update user state with the new avatar_url
-        setUser(prev => prev ? { ...prev, avatar_url: uploadResult.url, photos: [...(prev.photos || []), uploadResult.url] } : prev);
+        const uploadResult = await uploadImage(photoFile, { purpose: 'avatar' });
+        setUser(prev => prev ? { ...prev, avatar_url: uploadResult.url, avatar_crop: null } : prev);
       } catch {
         // Photo upload failed silently — user can retry later
       }

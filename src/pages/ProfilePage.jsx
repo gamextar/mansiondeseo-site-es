@@ -6,6 +6,7 @@ import { useAuth } from '../App';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits, getReceivedGifts } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
+import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
 
 const ROLE_COLOR = {
   Pareja: 'bg-purple-500/15 text-purple-300 border-purple-500/25',
@@ -82,11 +83,11 @@ export default function ProfilePage() {
     dragItem.current = null;
     dragOverItem.current = null;
     if (from === null || to === null || from === to) return;
-    const next = [...(user?.photos || [])];
+    const next = [...getGalleryPhotos(user)];
     const [removed] = next.splice(from, 1);
     next.splice(to, 0, removed);
     persistOrder(next);
-  }, [user?.photos, persistOrder]);
+  }, [user, persistOrder]);
 
   // Touch drag support
   const touchState = useRef({ index: null, el: null, clone: null, moved: false });
@@ -136,14 +137,14 @@ export default function ProfilePage() {
       const to = dragOverItem.current;
       dragOverItem.current = null;
       if (from !== null && to !== null && from !== to) {
-        const next = [...(user?.photos || [])];
+        const next = [...getGalleryPhotos(user)];
         const [removed] = next.splice(from, 1);
         next.splice(to, 0, removed);
         persistOrder(next);
       }
     }
     touchState.current = { index: null, el: null, clone: null, moved: false };
-  }, [user?.photos, persistOrder]);
+  }, [user, persistOrder]);
 
   const handleLogout = async () => {
     await apiLogout();
@@ -161,8 +162,8 @@ export default function ProfilePage() {
   const handleCroppedAvatar = async (croppedFile) => {
     setCropFile(null);
     try {
-      const data = await uploadImage(croppedFile);
-      setUser(prev => prev ? { ...prev, avatar_url: data.url, avatar_crop: null, photos: [...(prev.photos || []), data.url] } : prev);
+      const data = await uploadImage(croppedFile, { purpose: 'avatar' });
+      setUser(prev => prev ? { ...prev, avatar_url: data.url, avatar_crop: null } : prev);
     } catch {
       // Silently fail — user can retry
     }
@@ -196,8 +197,8 @@ export default function ProfilePage() {
     setUploading(true);
     try {
       for (const file of files) {
-        const data = await uploadImage(file);
-        setUser(prev => prev ? { ...prev, photos: [...(prev.photos || []), data.url] } : prev);
+        const data = await uploadImage(file, { purpose: 'gallery' });
+        setUser(prev => prev ? { ...prev, photos: [...getGalleryPhotos(prev), data.url] } : prev);
       }
     } catch {
       // Partial upload ok
@@ -241,20 +242,22 @@ export default function ProfilePage() {
   const displayCity = user?.city || '';
   const displayRole = user?.role || '';
   const avatarUrl = user?.avatar_url || '';
-  const photos = user?.photos || [];
+  const photos = getGalleryPhotos(user);
+  const displayPhotos = getDisplayPhotos(user);
   const ownProfilePreview = user ? {
     id: user.id,
     name: user.username,
     age: user.age,
     city: user.city,
     role: user.role,
-    photos: user.photos || [],
+    photos,
     avatar_url: user.avatar_url || '',
+    avatar_crop: user.avatar_crop || null,
     online: user.online,
     premium: user.premium,
     verified: user.verified,
     blurred: false,
-    visiblePhotos: user.photos?.length || 0,
+    visiblePhotos: displayPhotos.length,
     ghost_mode: user.ghost_mode,
     isOwnProfile: true,
   } : null;
@@ -507,12 +510,12 @@ export default function ProfilePage() {
                   initial={{ opacity: 0, x: -12 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  onClick={() => navigate(`/perfiles/${v.id}`, { state: { preview: { id: v.id, name: v.name, age: v.age, city: v.city, role: v.role, photos: [], avatar_url: v.avatar_url, online: v.online, premium: v.premium } } })}
+                  onClick={() => navigate(`/perfiles/${v.id}`, { state: { preview: { id: v.id, name: v.name, age: v.age, city: v.city, role: v.role, photos: [], avatar_url: v.avatar_url, avatar_crop: v.avatar_crop || null, online: v.online, premium: v.premium } } })}
                   className="w-full flex items-center gap-3 p-3 rounded-2xl bg-mansion-card/30 hover:bg-mansion-card/60 transition-all group"
                 >
                   <div className="w-10 h-10 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0">
                     {v.avatar_url ? (
-                      <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
+                      <AvatarImg src={v.avatar_url} crop={v.avatar_crop} alt={v.name} className="w-full h-full" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-text-dim">
                         <Camera className="w-4 h-4" />

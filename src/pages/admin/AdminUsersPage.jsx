@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, Ghost, Ban, AlertTriangle, Pause, Play } from 'lucide-react';
 import { adminGetUsers, adminUpdateUser, adminDeleteUser } from '../../lib/api';
+import AvatarImg from '../../components/AvatarImg';
 
 function timeAgo(dateStr) {
   if (!dateStr) return 'Nunca';
@@ -143,7 +144,7 @@ export default function AdminUsersPage() {
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0 flex items-center justify-center">
                             {u.avatar_url ? (
-                              <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                              <AvatarImg src={u.avatar_url} crop={u.avatar_crop} alt="" className="w-full h-full" />
                             ) : (
                               <span className="text-text-dim text-xs">{roleBadge(u.role)}</span>
                             )}
@@ -222,7 +223,7 @@ export default function AdminUsersPage() {
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0 flex items-center justify-center">
                   {selected.avatar_url ? (
-                    <img src={selected.avatar_url} alt="" className="w-full h-full object-cover" />
+                    <AvatarImg src={selected.avatar_url} crop={selected.avatar_crop} alt="" className="w-full h-full" />
                   ) : (
                     <span className="text-text-dim text-sm">{roleBadge(selected.role)}</span>
                   )}

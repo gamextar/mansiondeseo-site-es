@@ -10,6 +10,7 @@ import AvatarImg from '../components/AvatarImg';
 import { getMessageLimit, getProfile, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const CHAT_CACHE_TTL_MS = 120_000;
@@ -92,6 +93,8 @@ export default function ChatPage() {
   const pendingScrollBehaviorRef = useRef(null);
   const restoreScrollAfterPrependRef = useRef(null);
   const httpHistoryLoadedRef = useRef(false);
+  const partnerPhoto = getPrimaryProfilePhoto(partner);
+  const partnerPhotoCrop = getPrimaryProfileCrop(partner);
 
   // Format DO message to UI format
   function formatMsg(msg) {
@@ -448,7 +451,7 @@ export default function ChatPage() {
 
           <div className="relative flex-shrink-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`)}>
             <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-mansion-border/40">
-              <AvatarImg src={partner.avatar_url || partner.photos?.[0] || ''} crop={partner.avatar_crop} alt={partner.name} className="w-full h-full" />
+              <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt={partner.name} className="w-full h-full" />
             </div>
             {partner.online && (
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-mansion-card" />
@@ -535,7 +538,7 @@ export default function ChatPage() {
                 {/* Partner avatar next to received messages */}
                 {!isMe && (
                   <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
-                    <AvatarImg src={partner.avatar_url || partner.photos?.[0] || ''} crop={partner.avatar_crop} alt="" className="w-full h-full" />
+                    <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
                   </div>
                 )}
                 <div
@@ -574,7 +577,7 @@ export default function ChatPage() {
               className="flex items-end gap-2 justify-start pb-3"
             >
               <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
-                <AvatarImg src={partner.avatar_url || partner.photos?.[0] || ''} crop={partner.avatar_crop} alt="" className="w-full h-full" />
+                <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
               </div>
               <div className="bg-mansion-elevated border border-mansion-border/30 rounded-2xl rounded-bl-sm px-4 py-3">
                 <div className="flex gap-1">

@@ -2,11 +2,20 @@
  * Avatar image with optional crop positioning.
  * crop: { x: number (%), y: number (%), s: number (scale), r: number (aspect ratio w/h) } | null
  */
-export default function AvatarImg({ src, crop, className = '', alt = '' }) {
+export default function AvatarImg({
+  src,
+  crop,
+  className = '',
+  imgClassName = '',
+  alt = '',
+  style,
+  imgStyle,
+  ...imgProps
+}) {
   if (!src) return null;
 
   if (!crop || !crop.r) {
-    return <img src={src} alt={alt} className={`${className} object-cover`} />;
+    return <img src={src} alt={alt} className={`${className} ${imgClassName} object-cover`.trim()} style={imgStyle || style} {...imgProps} />;
   }
 
   const { x, y, s, r } = crop;
@@ -17,10 +26,11 @@ export default function AvatarImg({ src, crop, className = '', alt = '' }) {
   const top = 50 - (y / 100) * h;
 
   return (
-    <div className={className} style={{ position: 'relative', overflow: 'hidden' }}>
+    <div className={className} style={{ position: 'relative', overflow: 'hidden', ...style }}>
       <img
         src={src}
         alt={alt}
+        className={imgClassName}
         style={{
           position: 'absolute',
           width: `${w}%`,
@@ -30,7 +40,9 @@ export default function AvatarImg({ src, crop, className = '', alt = '' }) {
           maxWidth: 'none',
           maxHeight: 'none',
           display: 'block',
+          ...imgStyle,
         }}
+        {...imgProps}
       />
     </div>
   );

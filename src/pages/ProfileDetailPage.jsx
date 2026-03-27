@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getProfile, getToken, toggleFavorite, updateProfile, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../App';
+import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
 
 const ROLE_COLOR = {
   Pareja: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
@@ -20,12 +21,13 @@ const DEFAULT_PROFILE_SETTINGS = { blurLevel: 14, blurMobile: 14, blurDesktop: 8
 
 function buildPreviewProfile(preview) {
   if (!preview) return null;
+  const displayPhotos = getDisplayPhotos(preview);
   return {
     ...preview,
     interests: [],
     bio: '',
-    totalPhotos: preview.photos?.length || 0,
-    visiblePhotos: preview.visiblePhotos ?? preview.photos?.length ?? 0,
+    totalPhotos: displayPhotos.length,
+    visiblePhotos: preview.visiblePhotos ?? displayPhotos.length,
     blurred: !!preview.blurred,
     isOwnProfile: !!preview.isOwnProfile,
     receivedGifts: [],
@@ -150,7 +152,7 @@ export default function ProfileDetailPage() {
       await updateProfile({ photos: orderedPhotos });
       setProfile(prev => {
         if (!prev) return prev;
-        const nextProfile = { ...prev, photos: orderedPhotos, totalPhotos: orderedPhotos.length };
+        const nextProfile = { ...prev, photos: orderedPhotos, totalPhotos: getDisplayPhotos({ ...prev, photos: orderedPhotos }).length };
         writeProfileDetailCache(id, {
           profile: nextProfile,
           viewerPremium,
@@ -294,10 +296,11 @@ export default function ProfileDetailPage() {
   // Keyboard navigation for lightbox
   useEffect(() => {
     if (!lightboxOpen) return;
+    const totalDisplayPhotos = getDisplayPhotos(profile);
     const handleKey = (e) => {
       if (e.key === 'Escape') closeLightbox();
-      if (e.key === 'ArrowRight' && profile?.photos) {
-        setLightboxIndex(prev => Math.min(prev + 1, profile.photos.length - 1));
+      if (e.key === 'ArrowRight' && totalDisplayPhotos.length > 0) {
+        setLightboxIndex(prev => Math.min(prev + 1, totalDisplayPhotos.length - 1));
       }
       if (e.key === 'ArrowLeft') {
         setLightboxIndex(prev => Math.max(prev - 1, 0));
@@ -305,7 +308,7 @@ export default function ProfileDetailPage() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [lightboxOpen, closeLightbox, profile?.photos]);
+  }, [lightboxOpen, closeLightbox, profile]);
 
   if (loading) {
     return (
@@ -323,13 +326,16 @@ export default function ProfileDetailPage() {
     );
   }
 
-  const { name, age, city, role, interests, bio, photos, totalPhotos, verified, online, premium, blurred, isOwnProfile, receivedGifts } = profile;
+  const { name, age, city, role, interests, bio, totalPhotos, verified, online, premium, blurred, isOwnProfile, receivedGifts } = profile;
+  const galleryPhotos = getGalleryPhotos(profile);
+  const displayPhotos = getDisplayPhotos(profile);
+  const avatarDisplayOffset = profile.avatar_url ? 1 : 0;
 
   // Incognito mode blur (whole profile)
   const isGhostBlurred = blurred;
 
-  // A photo is blocked if its index >= visiblePhotos count from backend
-  const visiblePhotos = profile.visiblePhotos ?? photos.length;
+  // A photo is blocked if its display index >= visiblePhotos count from backend.
+  const visiblePhotos = profile.visiblePhotos ?? displayPhotos.length;
   const isPhotoBlocked = (index) => index >= visiblePhotos;
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
   const baseBlur = isMobile ? (settings.blurMobile ?? settings.blurLevel ?? 14) : (settings.blurDesktop ?? settings.blurLevel ?? 8);
@@ -357,7 +363,7 @@ export default function ProfileDetailPage() {
             className="flex w-full h-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide"
             style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
           >
-            {photos.map((photo, i) => {
+            {displayPhotos.map((photo, i) => {
               const blocked = isPhotoBlocked(i);
               return (
                 <div
@@ -403,9 +409,9 @@ export default function ProfileDetailPage() {
           </motion.button>
 
           {/* Photo counter */}
-          {photos.length > 1 && (
+          {displayPhotos.length > 1 && (
             <span className="text-xs font-medium text-white/80 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1">
-              {heroIndex + 1} / {totalPhotos || photos.length}
+              {heroIndex + 1} / {totalPhotos || displayPhotos.length}
             </span>
           )}
 
@@ -414,7 +420,7 @@ export default function ProfileDetailPage() {
         </div>
 
         {/* Desktop arrow buttons */}
-        {photos.length > 1 && (
+        {displayPhotos.length > 1 && (
           <>
             {heroIndex > 0 && (
               <button
@@ -424,7 +430,7 @@ export default function ProfileDetailPage() {
                 <ChevronLeft className="w-5 h-5 text-white" />
               </button>
             )}
-            {heroIndex < photos.length - 1 && (
+            {heroIndex < displayPhotos.length - 1 && (
               <button
                 onClick={() => scrollToHeroPhoto(heroIndex + 1)}
                 className="hidden lg:flex absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 items-center justify-center transition-colors z-20"
@@ -436,9 +442,9 @@ export default function ProfileDetailPage() {
         )}
 
         {/* Interactive dots */}
-        {photos.length > 1 && (
+        {displayPhotos.length > 1 && (
           <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex gap-1.5 lg:bottom-6 z-20">
-            {photos.map((_, i) => (
+            {displayPhotos.map((_, i) => (
               <button
                 key={i}
                 onClick={() => scrollToHeroPhoto(i)}
@@ -566,7 +572,7 @@ export default function ProfileDetailPage() {
           )}
 
           {/* Photo gallery */}
-          {photos.length > 1 && (
+          {galleryPhotos.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -577,7 +583,7 @@ export default function ProfileDetailPage() {
                 <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider">Galería</h3>
                 {isOwnProfile && !isReordering && (
                   <button
-                    onClick={() => { setOrderedPhotos(photos); setIsReordering(true); }}
+                    onClick={() => { setOrderedPhotos(galleryPhotos); setIsReordering(true); }}
                     className="text-xs text-mansion-gold hover:text-mansion-gold/80 transition-colors"
                   >
                     Editar orden
@@ -602,8 +608,9 @@ export default function ProfileDetailPage() {
                 )}
               </div>
               <div className="grid grid-cols-3 gap-2.5">
-                {(isReordering ? orderedPhotos : photos).map((photo, i) => {
-                  const blocked = !isReordering && isPhotoBlocked(i);
+                {(isReordering ? orderedPhotos : galleryPhotos).map((photo, i) => {
+                  const displayIndex = i + avatarDisplayOffset;
+                  const blocked = !isReordering && isPhotoBlocked(displayIndex);
                   return (
                     <motion.div
                       key={isReordering ? photo : i}
@@ -645,7 +652,7 @@ export default function ProfileDetailPage() {
                       ) : !blocked && (
                         <div
                           className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center cursor-pointer"
-                          onClick={() => openLightbox(i)}
+                          onClick={() => openLightbox(displayIndex)}
                         >
                           <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-70 transition-opacity" />
                         </div>
@@ -819,7 +826,7 @@ export default function ProfileDetailPage() {
                 <X className="w-5 h-5 text-white" />
               </button>
               <span className="text-sm font-medium text-white/80">
-                {lightboxIndex + 1} / {totalPhotos || photos.length}
+                {lightboxIndex + 1} / {totalPhotos || displayPhotos.length}
               </span>
               <div className="w-10" />
             </div>
@@ -832,7 +839,7 @@ export default function ProfileDetailPage() {
                 className="absolute inset-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide"
                 style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
               >
-              {photos.map((photo, i) => {
+              {displayPhotos.map((photo, i) => {
                 const blocked = isPhotoBlocked(i);
                 return (
                   <div key={i} className="flex-shrink-0 snap-start relative overflow-hidden" style={{ width: '100%', minWidth: '100%', height: '100%' }}>
@@ -858,7 +865,7 @@ export default function ProfileDetailPage() {
             </div>
 
             {/* Desktop arrow buttons */}
-            {photos.length > 1 && (
+            {displayPhotos.length > 1 && (
               <>
                 {lightboxIndex > 0 && (
                   <button
@@ -868,7 +875,7 @@ export default function ProfileDetailPage() {
                     <ChevronLeft className="w-6 h-6 text-white" />
                   </button>
                 )}
-                {lightboxIndex < photos.length - 1 && (
+                {lightboxIndex < displayPhotos.length - 1 && (
                   <button
                     onClick={() => setLightboxIndex(prev => prev + 1)}
                     className="hidden lg:flex absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 items-center justify-center transition-colors z-10"
@@ -880,9 +887,9 @@ export default function ProfileDetailPage() {
             )}
 
             {/* Lightbox dots */}
-            {photos.length > 1 && (
+            {displayPhotos.length > 1 && (
               <div className="flex justify-center gap-1.5 pb-6 pt-2">
-                {photos.map((_, i) => (
+                {displayPhotos.map((_, i) => (
                   <button
                     key={i}
                     onClick={() => setLightboxIndex(i)}

@@ -62,7 +62,7 @@ function ConversationRow({ conv, typing, onDelete, deleting }) {
           name: conv.name,
           avatar_url: conv.avatar,
           avatar_crop: conv.avatarCrop,
-          photos: conv.avatar ? [conv.avatar] : [],
+          photos: [],
           online: conv.online,
         },
       },

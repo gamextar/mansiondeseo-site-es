@@ -1,5 +1,5 @@
 import { NavLink, Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { Users, Home, Shield } from 'lucide-react';
+import { Users, Home, Shield, Film } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../App';
 import { useEffect } from 'react';
@@ -19,6 +19,7 @@ export default function AdminLayout() {
   const currentSection = new URLSearchParams(location.search).get('section') || '';
   const isUsersActive = location.pathname.startsWith('/admin/usuarios');
   const isConfigActive = location.pathname.startsWith('/admin/configuracion');
+  const isVideoLabActive = location.pathname.startsWith('/admin/video-lab');
 
   return (
     <div className="min-h-screen flex">
@@ -55,6 +56,25 @@ export default function AdminLayout() {
               <Users className={`w-5 h-5 transition-colors ${isUsersActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'}`} />
               <span className={`text-sm transition-colors ${isUsersActive ? 'text-mansion-gold font-semibold' : 'text-text-muted group-hover:text-text-primary'}`}>
                 Usuarios
+              </span>
+            </div>
+          </NavLink>
+
+          <NavLink
+            to="/admin/video-lab"
+            className="relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all group"
+          >
+            {isVideoLabActive && (
+              <motion.div
+                layoutId="admin-sidebar-active"
+                className="absolute inset-0 bg-mansion-gold/10 border border-mansion-gold/20 rounded-xl"
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              />
+            )}
+            <div className="relative z-10 flex items-center gap-3 w-full">
+              <Film className={`w-5 h-5 transition-colors ${isVideoLabActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'}`} />
+              <span className={`text-sm transition-colors ${isVideoLabActive ? 'text-mansion-gold font-semibold' : 'text-text-muted group-hover:text-text-primary'}`}>
+                Video Lab
               </span>
             </div>
           </NavLink>
@@ -126,6 +146,12 @@ export default function AdminLayout() {
                 className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isConfigActive ? 'bg-mansion-gold/10 text-mansion-gold' : 'text-text-muted'}`}
               >
                 Config
+              </Link>
+              <Link
+                to="/admin/video-lab"
+                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isVideoLabActive ? 'bg-mansion-gold/10 text-mansion-gold' : 'text-text-muted'}`}
+              >
+                Video
               </Link>
               <Link to="/" className="ml-1 px-2 py-2 rounded-lg text-text-dim hover:text-text-muted">
                 <Home className="w-4 h-4" />
