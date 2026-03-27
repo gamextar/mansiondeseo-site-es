@@ -2,6 +2,12 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Radio } from 'lucide-react';
+
+const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.045 } } };
+const storyItem = {
+  hidden: { opacity: 0, scale: 0.85, y: 8 },
+  visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 20 } },
+};
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
 import { getProfiles, getToken } from '../lib/api';
@@ -72,14 +78,22 @@ export default function FeedPage() {
         <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
       {/* Stories section */}
-      <div className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0">
+      <motion.div
+        className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+      >
         <div className="flex items-center gap-1.5 mb-3">
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="text-text-muted text-sm lg:text-base font-medium">Transmitiendo</p>
         </div>
-        <div
+        <motion.div
           className="flex overflow-x-auto scrollbar-hide pb-2"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', gap: `${settings.storyCircleGap || 8}px` }}
+          variants={stagger}
+          initial="hidden"
+          animate="visible"
         >
           {profiles.slice(0, 15).map((p) => {
             const photo = (p.photos && p.photos[0]) || p.avatar_url || '';
@@ -89,12 +103,11 @@ export default function FeedPage() {
             const innerGap = settings.storyCircleInnerGap ?? 3;
             const innerSize = size - border * 2;
             return (
+              <motion.div key={`story-${p.id}`} variants={storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
               <Link
-                key={`story-${p.id}`}
                 to={`/perfiles/${p.id}`}
                 state={{ preview: { id: p.id, name: p.name, age: p.age, city: p.city, role: p.role, photos: p.photos || [], avatar_url: p.avatar_url, online: p.online, premium: p.premium, verified: p.verified, blurred: p.blurred, visiblePhotos: p.visiblePhotos, ghost_mode: p.ghost_mode } }}
-                className="flex flex-col items-center gap-1 flex-shrink-0"
-                style={{ width: size + 6 }}
+                className="flex flex-col items-center gap-1"
               >
                 <div className={`rounded-full ${
                   isOnline
@@ -115,20 +128,31 @@ export default function FeedPage() {
                 </div>
                 <span className="text-[10px] text-text-muted truncate w-full text-center leading-tight">{p.name?.split(' ')[0]}</span>
               </Link>
+              </motion.div>
             );
           })}
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       {/* Results count */}
-      <div className="px-4 lg:px-8 pb-2">
+      <motion.div
+        className="px-4 lg:px-8 pb-2"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, delay: 0.25 }}
+      >
         <p className="text-text-dim text-xs">
           {profiles.length} {profiles.length === 1 ? 'usuario' : 'usuarios'} conectados
         </p>
-      </div>
+      </motion.div>
 
       {/* Grid */}
-      <div className="px-4 lg:px-8">
+      <motion.div
+        className="px-4 lg:px-8"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
+      >
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
@@ -149,7 +173,7 @@ export default function FeedPage() {
             <p className="text-text-dim text-sm">Prueba con otro filtro</p>
           </motion.div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }
