@@ -81,15 +81,15 @@ const VIDEO_PRESETS = [
   {
     id: 'iphone-fast',
     label: 'iPhone Rápido',
-    description: 'Optimizado para encode rápido en iPhone: ultrafast + CRF 26 + cap 2.5M. Tamaño mínimo, calidad aceptable a 720p.',
+    description: 'Optimizado para encode rápido en iPhone: ultrafast + CRF 25 + cap 2.5M + multithreading. Tamaño pequeño, calidad buena a 720p.',
     statusLabel: 'modo iPhone rápido',
-    codecLabel: 'H.264 CRF 26 + cap 2.5M + AAC 24k',
-    crf: '26',
+    codecLabel: 'H.264 CRF 25 + cap 2.5M + AAC 24k',
+    crf: '25',
     maxrate: '2500k',
     bufsize: '5000k',
     audioBitrate: '24k',
     preset: 'ultrafast',
-    estimatedVideoBitrate: '1.8M',
+    estimatedVideoBitrate: '2.0M',
   },
 ];
 
@@ -463,6 +463,8 @@ export default function VideoLabPage() {
       let exitCode = await ffmpeg.exec([
         ...sharedArgs,
         '-c:v', 'libx264',
+        '-threads', '4',
+        '-x264-params', 'sliced-threads=1:threads=4',
         '-crf', selectedPreset.crf,
         '-maxrate', selectedPreset.maxrate,
         '-bufsize', selectedPreset.bufsize,
