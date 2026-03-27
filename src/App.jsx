@@ -30,9 +30,10 @@ import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 
 const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
+const StoryUploadPage = lazy(() => import('./pages/StoryUploadPage'));
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
-const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/'];
+const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/'];
 
 // Auth context — exposes registered boolean + user object + setters
 const AuthContext = createContext({
@@ -157,6 +158,9 @@ function AppLayout() {
               </RequireRegistration>
             }
           />
+
+          {/* Story upload (fullscreen onboarding flow) */}
+          <Route path="/historia/nueva" element={<StoryUploadPage />} />
 
           {/* Admin standalone layout */}
           <Route path="/admin" element={<AdminLayout />}>
