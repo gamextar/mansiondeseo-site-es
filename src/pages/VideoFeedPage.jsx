@@ -255,8 +255,8 @@ export default function VideoFeedPage() {
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
 
-    // Update active index for non-clone positions immediately
-    if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
+    // Update active index for all positions (including clones so video stays active)
+    if (rawIndex !== activeDispIdx) {
       setActiveDispIdx(rawIndex);
     }
 
