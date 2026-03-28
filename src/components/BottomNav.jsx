@@ -2,6 +2,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Film, MessageCircle, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
+import { useAuth } from '../App';
 
 const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio' },
@@ -14,15 +15,23 @@ export default function BottomNav() {
   const location = useLocation();
   const navigateTo = useNavigate();
   const { unreadCount } = useUnreadMessages();
+  const { siteSettings } = useAuth();
+
+  const bottomPadding = siteSettings?.navBottomPadding ?? 24;
+  const sidePadding = siteSettings?.navSidePadding ?? 16;
+  const navHeight = siteSettings?.navHeight ?? 56;
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
   if (hiddenPaths.some((p) => location.pathname.startsWith(p))) return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom lg:hidden flex justify-center pb-2.5 px-4 pointer-events-none">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 safe-bottom lg:hidden flex justify-center pointer-events-none"
+      style={{ paddingBottom: bottomPadding, paddingLeft: sidePadding, paddingRight: sidePadding }}
+    >
       <div className="pointer-events-auto w-full max-w-sm rounded-[2rem] bg-black/40 backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-        <div className="flex items-center justify-around h-14 px-3">
+        <div className="flex items-center justify-around px-3" style={{ height: navHeight }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
             const isActive =
               to === '/' || to === '/perfil'

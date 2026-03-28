@@ -1711,6 +1711,9 @@ async function loadSettings(env) {
     storyCircleInnerGap: parseInt(settings.story_circle_inner_gap || '3', 10),
     coinIconUrl: settings.coin_icon_url || '',
     coinIconSize: parseInt(settings.coin_icon_size || '18', 10),
+    navBottomPadding: parseInt(settings.nav_bottom_padding || '24', 10),
+    navSidePadding: parseInt(settings.nav_side_padding || '16', 10),
+    navHeight: parseInt(settings.nav_height || '56', 10),
   };
 }
 
@@ -1753,6 +1756,9 @@ function getPublicSettingsPayload(settings) {
     galleryParejaImg: settings.galleryParejaImg,
     coinIconUrl: settings.coinIconUrl,
     coinIconSize: settings.coinIconSize,
+    navBottomPadding: settings.navBottomPadding,
+    navSidePadding: settings.navSidePadding,
+    navHeight: settings.navHeight,
   };
 }
 
@@ -1797,6 +1803,9 @@ async function handleUpdateSettings(request, env) {
     'story_circle_inner_gap',
     'coin_icon_url',
     'coin_icon_size',
+    'nav_bottom_padding',
+    'nav_side_padding',
+    'nav_height',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {

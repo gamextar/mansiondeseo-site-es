@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart } from 'lucide-react';
+import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation } from 'lucide-react';
 import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, uploadImage } from '../lib/api';
 import { useAuth } from '../App';
 
@@ -14,6 +14,7 @@ export const ADMIN_SECTIONS = [
   { key: 'sitio', label: 'Sitio & Registro', icon: Globe },
   { key: 'iconografia', label: 'Iconografía', icon: Smile },
   { key: 'debug', label: 'Zona Peligrosa', icon: Shield },
+  { key: 'navegacion', label: 'Navegación', icon: Navigation },
 ];
 
 export default function SettingsPage() {
@@ -60,6 +61,11 @@ export default function SettingsPage() {
   const [galleryHombreImg, setGalleryHombreImg] = useState('');
   const [galleryMujerImg, setGalleryMujerImg] = useState('');
   const [galleryParejaImg, setGalleryParejaImg] = useState('');
+
+  // Navegación inferior
+  const [navBottomPadding, setNavBottomPadding] = useState(24);
+  const [navSidePadding, setNavSidePadding] = useState(16);
+  const [navHeight, setNavHeight] = useState(56);
 
   // Payment display
   const [paymentTitleVip, setPaymentTitleVip] = useState('Servicios Digitales');
@@ -111,6 +117,9 @@ export default function SettingsPage() {
         setPaymentTitleCoins(s.paymentTitleCoins || 'Servicios Digitales');
         setPaymentDescriptorCoins(s.paymentDescriptorCoins || 'UNICOAPPS');
         setPaymentGateway(s.paymentGateway || 'mercadopago');
+        setNavBottomPadding(s.navBottomPadding ?? 24);
+        setNavSidePadding(s.navSidePadding ?? 16);
+        setNavHeight(s.navHeight ?? 56);
       })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
@@ -151,6 +160,9 @@ export default function SettingsPage() {
         payment_title_coins: paymentTitleCoins,
         payment_descriptor_coins: paymentDescriptorCoins,
         payment_gateway: paymentGateway,
+        nav_bottom_padding: navBottomPadding,
+        nav_side_padding: navSidePadding,
+        nav_height: navHeight,
       });
       const s = data.settings;
       setBlurMobile(s.blurMobile);
@@ -179,6 +191,9 @@ export default function SettingsPage() {
       setPaymentTitleCoins(s.paymentTitleCoins || 'Servicios Digitales');
       setPaymentDescriptorCoins(s.paymentDescriptorCoins || 'UNICOAPPS');
       setPaymentGateway(s.paymentGateway || 'mercadopago');
+      setNavBottomPadding(s.navBottomPadding ?? 24);
+      setNavSidePadding(s.navSidePadding ?? 16);
+      setNavHeight(s.navHeight ?? 56);
       setSaved(true);
       setSaveError('');
       setTimeout(() => setSaved(false), 2000);
@@ -883,6 +898,89 @@ export default function SettingsPage() {
                 >
                   Ejecutar
                 </button>
+              </div>
+            </div>
+          </div>
+        </section>}
+
+        {/* Save button */}
+        {activeSection === 'navegacion' && <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Navigation className="w-4 h-4 text-mansion-gold" />
+            <h2 className="text-xs font-bold text-text-primary uppercase tracking-wider">Barra de Navegación Inferior</h2>
+          </div>
+          <div className="space-y-3">
+            {/* Bottom padding */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Navigation className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Separación inferior</h3>
+                  <p className="text-[11px] text-text-dim">Distancia del borde inferior de pantalla</p>
+                </div>
+              </div>
+              <input type="range" min="0" max="80" value={navBottomPadding} onChange={e => setNavBottomPadding(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>0px</span>
+                <span className="text-mansion-gold font-medium">{navBottomPadding}px</span>
+                <span>80px</span>
+              </div>
+            </div>
+
+            {/* Side padding */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Smartphone className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Separación lateral</h3>
+                  <p className="text-[11px] text-text-dim">Margen horizontal de la pill</p>
+                </div>
+              </div>
+              <input type="range" min="0" max="60" value={navSidePadding} onChange={e => setNavSidePadding(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>0px</span>
+                <span className="text-mansion-gold font-medium">{navSidePadding}px</span>
+                <span>60px</span>
+              </div>
+            </div>
+
+            {/* Nav height */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Monitor className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Alto de la barra</h3>
+                  <p className="text-[11px] text-text-dim">Altura en píxeles de la pill</p>
+                </div>
+              </div>
+              <input type="range" min="40" max="80" value={navHeight} onChange={e => setNavHeight(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>40px</span>
+                <span className="text-mansion-gold font-medium">{navHeight}px</span>
+                <span>80px</span>
+              </div>
+            </div>
+
+            {/* Live preview */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <h3 className="text-xs font-bold text-text-dim uppercase tracking-wider mb-3">Vista previa</h3>
+              <div className="relative bg-mansion-base rounded-xl overflow-hidden" style={{ height: 120 }}>
+                <div className="absolute bottom-0 left-0 right-0 flex justify-center" style={{ paddingBottom: navBottomPadding, paddingLeft: navSidePadding, paddingRight: navSidePadding }}>
+                  <div className="w-full rounded-[2rem] bg-black/40 border border-white/10 flex items-center justify-around px-3" style={{ height: navHeight }}>
+                    {['Inicio','Videos','Chat','Perfil'].map(label => (
+                      <div key={label} className="flex flex-col items-center gap-0.5">
+                        <div className="w-4 h-4 rounded bg-white/20" />
+                        <span className="text-[8px] text-white/40">{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
