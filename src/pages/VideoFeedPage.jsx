@@ -257,30 +257,26 @@ export default function VideoFeedPage() {
     // Scrolled to top clone → jump silently to last real item
     if (rawIndex === 0) {
       isJumpingRef.current = true;
-      container.style.scrollSnapType = 'none';
+      container.style.overflowY = 'hidden';
       container.scrollTop = stories.length * height;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          container.style.scrollSnapType = 'y mandatory';
-          isJumpingRef.current = false;
-        });
-      });
       setActiveDispIdx(stories.length);
+      setTimeout(() => {
+        container.style.overflowY = '';
+        isJumpingRef.current = false;
+      }, 50);
       return;
     }
 
     // Scrolled to bottom clone → jump silently to first real item
     if (rawIndex >= stories.length + 1) {
       isJumpingRef.current = true;
-      container.style.scrollSnapType = 'none';
+      container.style.overflowY = 'hidden';
       container.scrollTop = height;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          container.style.scrollSnapType = 'y mandatory';
-          isJumpingRef.current = false;
-        });
-      });
       setActiveDispIdx(1);
+      setTimeout(() => {
+        container.style.overflowY = '';
+        isJumpingRef.current = false;
+      }, 50);
       return;
     }
 
