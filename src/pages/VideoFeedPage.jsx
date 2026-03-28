@@ -261,12 +261,20 @@ export default function VideoFeedPage() {
         isJumpingRef.current = true;
         clearTimeout(jumpTimerRef.current);
         jumpTimerRef.current = setTimeout(() => {
-          if (containerRef.current) {
-            containerRef.current.scrollTop = stories.length * height;
-            setActiveDispIdx(stories.length);
-          }
-          requestAnimationFrame(() => { isJumpingRef.current = false; });
-        }, 150);
+          const c = containerRef.current;
+          if (!c) { isJumpingRef.current = false; return; }
+          c.style.scrollSnapType = 'none';
+          void c.offsetHeight;
+          c.scrollTop = stories.length * height;
+          void c.offsetHeight;
+          setActiveDispIdx(stories.length);
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (containerRef.current) containerRef.current.style.scrollSnapType = 'y mandatory';
+              isJumpingRef.current = false;
+            });
+          });
+        }, 350);
       }
       return;
     }
@@ -277,12 +285,20 @@ export default function VideoFeedPage() {
         isJumpingRef.current = true;
         clearTimeout(jumpTimerRef.current);
         jumpTimerRef.current = setTimeout(() => {
-          if (containerRef.current) {
-            containerRef.current.scrollTop = height;
-            setActiveDispIdx(1);
-          }
-          requestAnimationFrame(() => { isJumpingRef.current = false; });
-        }, 150);
+          const c = containerRef.current;
+          if (!c) { isJumpingRef.current = false; return; }
+          c.style.scrollSnapType = 'none';
+          void c.offsetHeight;
+          c.scrollTop = height;
+          void c.offsetHeight;
+          setActiveDispIdx(1);
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (containerRef.current) containerRef.current.style.scrollSnapType = 'y mandatory';
+              isJumpingRef.current = false;
+            });
+          });
+        }, 350);
       }
       return;
     }
