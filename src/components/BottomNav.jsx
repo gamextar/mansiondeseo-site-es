@@ -38,7 +38,7 @@ export default function BottomNav() {
     >
       <div
         className="pointer-events-auto w-full max-w-sm rounded-[2rem] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
-        style={{ backgroundColor: bgColor, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        style={{ backgroundColor: bgColor }}
       >
         <div className="flex items-center justify-around px-3" style={{ height: navHeight }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {

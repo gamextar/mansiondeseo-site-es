@@ -103,6 +103,11 @@ body {
     padding-top: env(safe-area-inset-top, 0px);
   }
 
+  /* Top padding below transparent navbar (48px nav + safe-area + 8px gap) */
+  .pt-navbar {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 56px);
+  }
+
   /* Full-height accounting for notch in PWA */
   .h-full-safe {
     height: calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));

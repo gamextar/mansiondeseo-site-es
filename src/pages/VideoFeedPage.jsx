@@ -202,7 +202,7 @@ export default function VideoFeedPage() {
   const { user, siteSettings } = useAuth();
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
-  const jumpTimerRef = useRef(null);
+  const scrollEndTimer = useRef(null);
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(true);
   // activeDispIdx: position in the infinite list [clone_last, ...stories, clone_first]
@@ -255,57 +255,53 @@ export default function VideoFeedPage() {
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
 
-    // Scrolled to top clone → let snap finish, then jump silently to last real item
-    if (rawIndex === 0) {
-      if (!isJumpingRef.current) {
-        isJumpingRef.current = true;
-        clearTimeout(jumpTimerRef.current);
-        jumpTimerRef.current = setTimeout(() => {
-          const c = containerRef.current;
-          if (!c) { isJumpingRef.current = false; return; }
-          c.style.scrollSnapType = 'none';
-          void c.offsetHeight;
-          c.scrollTop = stories.length * height;
-          void c.offsetHeight;
-          setActiveDispIdx(stories.length);
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              if (containerRef.current) containerRef.current.style.scrollSnapType = 'y mandatory';
-              isJumpingRef.current = false;
-            });
-          });
-        }, 350);
-      }
-      return;
-    }
-
-    // Scrolled to bottom clone → let snap finish, then jump silently to first real item
-    if (rawIndex >= stories.length + 1) {
-      if (!isJumpingRef.current) {
-        isJumpingRef.current = true;
-        clearTimeout(jumpTimerRef.current);
-        jumpTimerRef.current = setTimeout(() => {
-          const c = containerRef.current;
-          if (!c) { isJumpingRef.current = false; return; }
-          c.style.scrollSnapType = 'none';
-          void c.offsetHeight;
-          c.scrollTop = height;
-          void c.offsetHeight;
-          setActiveDispIdx(1);
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              if (containerRef.current) containerRef.current.style.scrollSnapType = 'y mandatory';
-              isJumpingRef.current = false;
-            });
-          });
-        }, 350);
-      }
-      return;
-    }
-
-    if (rawIndex !== activeDispIdx) {
+    // Update active index for non-clone positions immediately
+    if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
       setActiveDispIdx(rawIndex);
     }
+
+    // Debounce: wait until scroll fully stops to check clone positions
+    clearTimeout(scrollEndTimer.current);
+    scrollEndTimer.current = setTimeout(() => {
+      const c = containerRef.current;
+      if (!c || isJumpingRef.current) return;
+      const h = c.clientHeight;
+      const idx = Math.round(c.scrollTop / h);
+
+      if (idx === 0) {
+        // On top clone → jump to last real
+        isJumpingRef.current = true;
+        c.style.scrollSnapType = 'none';
+        c.style.overflow = 'hidden';
+        c.scrollTop = stories.length * h;
+        setActiveDispIdx(stories.length);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (containerRef.current) {
+              containerRef.current.style.overflow = '';
+              containerRef.current.style.scrollSnapType = 'y mandatory';
+            }
+            isJumpingRef.current = false;
+          });
+        });
+      } else if (idx >= stories.length + 1) {
+        // On bottom clone → jump to first real
+        isJumpingRef.current = true;
+        c.style.scrollSnapType = 'none';
+        c.style.overflow = 'hidden';
+        c.scrollTop = h;
+        setActiveDispIdx(1);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (containerRef.current) {
+              containerRef.current.style.overflow = '';
+              containerRef.current.style.scrollSnapType = 'y mandatory';
+            }
+            isJumpingRef.current = false;
+          });
+        });
+      }
+    }, 120);
   }, [activeDispIdx, stories.length]);
 
   const handleFavorite = useCallback(async (userId) => {

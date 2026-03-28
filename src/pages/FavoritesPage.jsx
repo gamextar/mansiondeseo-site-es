@@ -24,7 +24,7 @@ export default function FavoritesPage() {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
+    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
       <div className="px-4 lg:px-8 pt-4 lg:pt-6 pb-3">
         <h1 className="font-display text-2xl font-bold text-text-primary mb-4">Mis Favoritos</h1>
       </div>

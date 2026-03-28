@@ -69,7 +69,7 @@ export default function FeedPage() {
   );
 
   return (
-    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
+    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
       {/* Pull-to-refresh indicator */}
       <div
         ref={indicatorRef}

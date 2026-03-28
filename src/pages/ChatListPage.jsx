@@ -298,7 +298,7 @@ export default function ChatListPage() {
     };
   }, [navigate, fetchConversations, refreshUnread, subscribe, applyConversationUpdate]);
   return (
-    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-16">
+    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
       {/* Header */}
       <motion.div
         className="px-4 lg:px-8 pt-4 lg:pt-6 pb-3"
