@@ -63,10 +63,9 @@ export default function SettingsPage() {
   const [galleryMujerImg, setGalleryMujerImg] = useState('');
   const [galleryParejaImg, setGalleryParejaImg] = useState('');
 
-  // Navegación inferior
+  // Navegacion inferior
   const [navBottomPadding, setNavBottomPadding] = useState(24);
   const [navSidePadding, setNavSidePadding] = useState(16);
-  const [navHeight, setNavHeight] = useState(56);
   const [navOpacity, setNavOpacity] = useState(40);
 
   // Video feed
@@ -125,7 +124,6 @@ export default function SettingsPage() {
         setPaymentGateway(s.paymentGateway || 'mercadopago');
         setNavBottomPadding(s.navBottomPadding ?? 24);
         setNavSidePadding(s.navSidePadding ?? 16);
-        setNavHeight(s.navHeight ?? 56);
         setNavOpacity(s.navOpacity ?? 40);
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
@@ -171,7 +169,6 @@ export default function SettingsPage() {
         payment_gateway: paymentGateway,
         nav_bottom_padding: navBottomPadding,
         nav_side_padding: navSidePadding,
-        nav_height: navHeight,
         nav_opacity: navOpacity,
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
@@ -205,7 +202,6 @@ export default function SettingsPage() {
       setPaymentGateway(s.paymentGateway || 'mercadopago');
       setNavBottomPadding(s.navBottomPadding ?? 24);
       setNavSidePadding(s.navSidePadding ?? 16);
-      setNavHeight(s.navHeight ?? 56);
       setNavOpacity(s.navOpacity ?? 40);
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
@@ -965,25 +961,6 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Nav height */}
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Monitor className="w-4 h-4 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Alto de la barra</h3>
-                  <p className="text-[11px] text-text-dim">Altura en píxeles de la pill</p>
-                </div>
-              </div>
-              <input type="range" min="40" max="80" value={navHeight} onChange={e => setNavHeight(Number(e.target.value))} className="w-full accent-mansion-gold" />
-              <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>40px</span>
-                <span className="text-mansion-gold font-medium">{navHeight}px</span>
-                <span>80px</span>
-              </div>
-            </div>
-
             {/* Opacity */}
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
               <div className="flex items-center gap-3 mb-3">
@@ -1008,7 +985,7 @@ export default function SettingsPage() {
               <h3 className="text-xs font-bold text-text-dim uppercase tracking-wider mb-3">Vista previa</h3>
               <div className="relative bg-mansion-base rounded-xl overflow-hidden" style={{ height: 120 }}>
                 <div className="absolute bottom-0 left-0 right-0 flex justify-center" style={{ paddingBottom: navBottomPadding, paddingLeft: navSidePadding, paddingRight: navSidePadding }}>
-                  <div className="w-full rounded-[2rem] border border-white/10 flex items-center justify-around px-3" style={{ height: navHeight, backgroundColor: `rgba(0,0,0,${(navOpacity/100).toFixed(2)})` }}>
+                  <div className="w-full rounded-[2rem] border border-white/10 flex items-center justify-around px-3 h-14" style={{ backgroundColor: `rgba(0,0,0,${(navOpacity/100).toFixed(2)})` }}>
                     {['Inicio','Videos','Chat','Perfil'].map(label => (
                       <div key={label} className="flex flex-col items-center gap-0.5">
                         <div className="w-4 h-4 rounded bg-white/20" />

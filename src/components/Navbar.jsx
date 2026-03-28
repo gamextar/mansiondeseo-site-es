@@ -22,16 +22,16 @@ export default function Navbar() {
       className="fixed top-0 left-0 right-0 z-50 lg:left-64 xl:left-72"
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
-      <div className="max-w-7xl mx-auto px-4 lg:px-8 h-14 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 lg:px-8 h-12 flex items-center justify-between">
         {/* Logo — hidden on desktop (sidebar has its own) */}
-        <Link to="/" reloadDocument className="flex items-center gap-2.5 lg:hidden">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
-            <span className="font-display text-white text-base font-bold">M</span>
+        <Link to="/" reloadDocument className="flex items-center gap-2 lg:hidden">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
+            <span className="font-display text-white text-sm font-bold">M</span>
           </div>
-          <span className="font-display text-lg font-semibold text-gradient-gold hidden sm:inline">
+          <span className="font-display text-base font-semibold text-gradient-gold hidden sm:inline">
             Mansión Deseo
           </span>
-          <span className="font-display text-lg font-semibold text-gradient-gold sm:hidden">
+          <span className="font-display text-base font-semibold text-gradient-gold sm:hidden">
             Mansión
           </span>
         </Link>
@@ -41,9 +41,9 @@ export default function Navbar() {
         {/* Coins pill */}
         <Link
           to="/monedas"
-          className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/30 backdrop-blur-md border border-white/10 hover:bg-black/40 transition-all"
+          className="flex items-center gap-2 h-8 px-4 rounded-full bg-black/30 backdrop-blur-md border border-white/10 hover:bg-black/40 transition-all"
         >
-          <CoinIcon className="w-5 h-5" />
+          <CoinIcon className="w-[18px] h-[18px]" />
           <span className="text-sm font-bold text-mansion-gold tabular-nums">{user?.coins ?? 0}</span>
         </Link>
       </div>

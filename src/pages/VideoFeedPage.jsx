@@ -211,7 +211,7 @@ export default function VideoFeedPage() {
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
-  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 56);
+  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + 56;
 
   // Infinite list: clone of last item prepended, clone of first appended
   const infiniteStories = stories.length > 0
