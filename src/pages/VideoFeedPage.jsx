@@ -257,7 +257,6 @@ export default function VideoFeedPage() {
           setCachedVideoFeed({
             stories: nextStories,
             activeRealIndex: Math.max(0, Math.min(realActiveIndex, Math.max(nextStories.length - 1, 0))),
-            scrollTop: containerRef.current?.scrollTop || 0,
             isMuted,
           });
         }
@@ -275,22 +274,17 @@ export default function VideoFeedPage() {
     setCachedVideoFeed({
       stories,
       activeRealIndex,
-      scrollTop: containerRef.current?.scrollTop || 0,
       isMuted,
     });
   }, [stories, activeRealIndex, isMuted]);
 
-  // After stories load, restore the cached/current display position.
+  // After stories load, restore the cached/current snapped clip position.
   useEffect(() => {
     if (stories.length > 0) {
       requestAnimationFrame(() => {
         if (containerRef.current) {
-          const maxScrollTop = containerRef.current.scrollHeight - containerRef.current.clientHeight;
-          const cachedScrollTop = typeof cachedFeed?.scrollTop === 'number'
-            ? Math.max(0, Math.min(cachedFeed.scrollTop, maxScrollTop))
-            : null;
           const targetIndex = Math.max(1, Math.min(activeDispIdx, stories.length));
-          containerRef.current.scrollTop = cachedScrollTop ?? (containerRef.current.clientHeight * targetIndex);
+          containerRef.current.scrollTop = containerRef.current.clientHeight * targetIndex;
         }
       });
     }
@@ -356,13 +350,6 @@ export default function VideoFeedPage() {
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
 
-    setCachedVideoFeed({
-      stories,
-      activeRealIndex,
-      scrollTop: container.scrollTop,
-      isMuted,
-    });
-
     // Keep the previous active item while on edge clones to avoid visible jump glitches.
     if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
       setActiveDispIdx(rawIndex);
@@ -373,7 +360,7 @@ export default function VideoFeedPage() {
     scrollEndTimer.current = setTimeout(() => {
       settleInfiniteBoundary();
     }, 180);
-  }, [activeDispIdx, activeRealIndex, isMuted, stories, stories.length, settleInfiniteBoundary]);
+  }, [activeDispIdx, stories.length, settleInfiniteBoundary]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
