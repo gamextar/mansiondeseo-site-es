@@ -109,7 +109,7 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
       {/* Right side actions */}
       <div
         className="absolute right-3 lg:bottom-10 flex flex-col items-center gap-6 z-20"
-        style={{ bottom: `calc(${navBottomOffset}px + env(safe-area-inset-bottom, 0px) + 16px)` }}
+        style={{ bottom: `${navBottomOffset + 16}px` }}
       >
         {/* Favorite */}
         <button
@@ -166,7 +166,7 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
       {/* Bottom user info + caption */}
       <div
         className="absolute left-4 right-20 lg:bottom-6 z-20"
-        style={{ bottom: `calc(${navBottomOffset}px + env(safe-area-inset-bottom, 0px) + 8px)` }}
+        style={{ bottom: `${navBottomOffset + 8}px` }}
       >
         <button
           onClick={() => navigate(`/perfiles/${story.user_id}`)}
@@ -211,7 +211,8 @@ export default function VideoFeedPage() {
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
-  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + 56;
+  const navHeight = siteSettings?.navHeight ?? 71;
+  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
 
   // Infinite list: clone of last item prepended, clone of first appended
   const infiniteStories = stories.length > 0

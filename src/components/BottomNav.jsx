@@ -19,6 +19,7 @@ export default function BottomNav() {
 
   const bottomPadding = siteSettings?.navBottomPadding ?? 24;
   const sidePadding = siteSettings?.navSidePadding ?? 16;
+  const navHeight = siteSettings?.navHeight ?? 71;
   const navOpacity = siteSettings?.navOpacity ?? 40;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
 
@@ -39,7 +40,7 @@ export default function BottomNav() {
         className="pointer-events-auto w-full max-w-sm rounded-[2rem] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
         style={{ backgroundColor: bgColor }}
       >
-        <div className="flex items-center justify-around px-3 h-14">
+        <div className="flex items-center justify-around px-3" style={{ height: navHeight }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
             const isActive =
               to === '/' || to === '/perfil'
