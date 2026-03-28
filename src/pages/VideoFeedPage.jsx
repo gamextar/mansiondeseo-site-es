@@ -96,8 +96,8 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute }) {
       </AnimatePresence>
 
       {/* Gradient overlays */}
-      <div className="absolute inset-x-0 bottom-0 h-80 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
-      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/50 via-black/10 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none" />
 
       {/* Right side actions */}
       <div className="absolute right-3 bottom-28 lg:bottom-10 flex flex-col items-center gap-6 z-20">
