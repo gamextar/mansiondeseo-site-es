@@ -251,6 +251,58 @@ export default function VideoFeedPage() {
 
   useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
 
+  const settleInfiniteBoundary = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || isJumpingRef.current || stories.length === 0) return;
+
+    const height = container.clientHeight;
+    const rawIndex = Math.round(container.scrollTop / height);
+
+    if (rawIndex === 0) {
+      isJumpingRef.current = true;
+      container.style.scrollSnapType = 'none';
+      container.scrollTop = stories.length * height;
+      setActiveDispIdx(stories.length);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (containerRef.current) {
+            containerRef.current.style.scrollSnapType = 'y mandatory';
+          }
+          isJumpingRef.current = false;
+        });
+      });
+      return;
+    }
+
+    if (rawIndex >= stories.length + 1) {
+      isJumpingRef.current = true;
+      container.style.scrollSnapType = 'none';
+      container.scrollTop = height;
+      setActiveDispIdx(1);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (containerRef.current) {
+            containerRef.current.style.scrollSnapType = 'y mandatory';
+          }
+          isJumpingRef.current = false;
+        });
+      });
+    }
+  }, [stories.length]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+
+    const handleScrollEnd = () => {
+      clearTimeout(scrollEndTimer.current);
+      settleInfiniteBoundary();
+    };
+
+    container.addEventListener('scrollend', handleScrollEnd);
+    return () => container.removeEventListener('scrollend', handleScrollEnd);
+  }, [settleInfiniteBoundary]);
+
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container || isJumpingRef.current) return;
@@ -262,49 +314,12 @@ export default function VideoFeedPage() {
       setActiveDispIdx(rawIndex);
     }
 
-    // Debounce: wait until scroll fully stops to check clone positions
+    // Fallback for browsers where scrollend is unreliable or unavailable.
     clearTimeout(scrollEndTimer.current);
     scrollEndTimer.current = setTimeout(() => {
-      const c = containerRef.current;
-      if (!c || isJumpingRef.current) return;
-      const h = c.clientHeight;
-      const idx = Math.round(c.scrollTop / h);
-
-      if (idx === 0) {
-        // On top clone → jump to last real
-        isJumpingRef.current = true;
-        c.style.scrollSnapType = 'none';
-        c.style.overflow = 'hidden';
-        c.scrollTop = stories.length * h;
-        setActiveDispIdx(stories.length);
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (containerRef.current) {
-              containerRef.current.style.overflow = '';
-              containerRef.current.style.scrollSnapType = 'y mandatory';
-            }
-            isJumpingRef.current = false;
-          });
-        });
-      } else if (idx >= stories.length + 1) {
-        // On bottom clone → jump to first real
-        isJumpingRef.current = true;
-        c.style.scrollSnapType = 'none';
-        c.style.overflow = 'hidden';
-        c.scrollTop = h;
-        setActiveDispIdx(1);
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (containerRef.current) {
-              containerRef.current.style.overflow = '';
-              containerRef.current.style.scrollSnapType = 'y mandatory';
-            }
-            isJumpingRef.current = false;
-          });
-        });
-      }
-    }, 120);
-  }, [activeDispIdx, stories.length]);
+      settleInfiniteBoundary();
+    }, 180);
+  }, [activeDispIdx, stories.length, settleInfiniteBoundary]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
