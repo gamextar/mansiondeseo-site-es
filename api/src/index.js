@@ -1715,6 +1715,8 @@ async function loadSettings(env) {
     navSidePadding: parseInt(settings.nav_side_padding || '16', 10),
     navHeight: parseInt(settings.nav_height || '56', 10),
     navOpacity: parseInt(settings.nav_opacity || '40', 10),
+    videoGradientHeight: parseInt(settings.video_gradient_height || '64', 10),
+    videoGradientOpacity: parseInt(settings.video_gradient_opacity || '40', 10),
   };
 }
 
@@ -1761,6 +1763,8 @@ function getPublicSettingsPayload(settings) {
     navSidePadding: settings.navSidePadding,
     navHeight: settings.navHeight,
     navOpacity: settings.navOpacity,
+    videoGradientHeight: settings.videoGradientHeight,
+    videoGradientOpacity: settings.videoGradientOpacity,
   };
 }
 
@@ -1809,6 +1813,8 @@ async function handleUpdateSettings(request, env) {
     'nav_side_padding',
     'nav_height',
     'nav_opacity',
+    'video_gradient_height',
+    'video_gradient_opacity',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {

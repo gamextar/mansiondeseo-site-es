@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation } from 'lucide-react';
+import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film } from 'lucide-react';
 import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, uploadImage } from '../lib/api';
 import { useAuth } from '../App';
 
@@ -15,6 +15,7 @@ export const ADMIN_SECTIONS = [
   { key: 'iconografia', label: 'Iconografía', icon: Smile },
   { key: 'debug', label: 'Zona Peligrosa', icon: Shield },
   { key: 'navegacion', label: 'Navegación', icon: Navigation },
+  { key: 'videos', label: 'Videos', icon: Film },
 ];
 
 export default function SettingsPage() {
@@ -67,6 +68,10 @@ export default function SettingsPage() {
   const [navSidePadding, setNavSidePadding] = useState(16);
   const [navHeight, setNavHeight] = useState(56);
   const [navOpacity, setNavOpacity] = useState(40);
+
+  // Video feed
+  const [videoGradientHeight, setVideoGradientHeight] = useState(64);
+  const [videoGradientOpacity, setVideoGradientOpacity] = useState(40);
 
   // Payment display
   const [paymentTitleVip, setPaymentTitleVip] = useState('Servicios Digitales');
@@ -122,6 +127,8 @@ export default function SettingsPage() {
         setNavSidePadding(s.navSidePadding ?? 16);
         setNavHeight(s.navHeight ?? 56);
         setNavOpacity(s.navOpacity ?? 40);
+        setVideoGradientHeight(s.videoGradientHeight ?? 64);
+        setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
       })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
@@ -166,6 +173,8 @@ export default function SettingsPage() {
         nav_side_padding: navSidePadding,
         nav_height: navHeight,
         nav_opacity: navOpacity,
+        video_gradient_height: videoGradientHeight,
+        video_gradient_opacity: videoGradientOpacity,
       });
       const s = data.settings;
       setBlurMobile(s.blurMobile);
@@ -198,6 +207,8 @@ export default function SettingsPage() {
       setNavSidePadding(s.navSidePadding ?? 16);
       setNavHeight(s.navHeight ?? 56);
       setNavOpacity(s.navOpacity ?? 40);
+      setVideoGradientHeight(s.videoGradientHeight ?? 64);
+      setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
       setSaved(true);
       setSaveError('');
       setTimeout(() => setSaved(false), 2000);
@@ -1003,6 +1014,67 @@ export default function SettingsPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>}
+
+        {activeSection === 'videos' && <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Film className="w-4 h-4 text-mansion-gold" />
+            <h2 className="text-xs font-bold text-text-primary uppercase tracking-wider">Feed de Videos</h2>
+          </div>
+          <div className="space-y-3">
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Monitor className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Altura del degradado</h3>
+                  <p className="text-[11px] text-text-dim">Cuánto sube el oscurecimiento desde abajo</p>
+                </div>
+              </div>
+              <input type="range" min="0" max="300" value={videoGradientHeight} onChange={e => setVideoGradientHeight(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>0px</span>
+                <span className="text-mansion-gold font-medium">{videoGradientHeight}px</span>
+                <span>300px</span>
+              </div>
+            </div>
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Eye className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Intensidad del degradado</h3>
+                  <p className="text-[11px] text-text-dim">Opacidad máxima del oscurecimiento</p>
+                </div>
+              </div>
+              <input type="range" min="0" max="100" value={videoGradientOpacity} onChange={e => setVideoGradientOpacity(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>Sin sombra</span>
+                <span className="text-mansion-gold font-medium">{videoGradientOpacity}%</span>
+                <span>Máximo</span>
+              </div>
+            </div>
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <h3 className="text-xs font-bold text-text-dim uppercase tracking-wider mb-3">Vista previa</h3>
+              <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-mansion-elevated to-black" style={{ height: 140 }}>
+                <div
+                  className="absolute inset-x-0 bottom-0"
+                  style={{
+                    height: Math.min(videoGradientHeight, 140),
+                    background: `linear-gradient(to top, rgba(0,0,0,${(videoGradientOpacity/100).toFixed(2)}), rgba(0,0,0,0.04), transparent)`,
+                  }}
+                />
+                <div className="absolute bottom-3 left-3 right-3 z-10">
+                  <p className="text-white font-bold text-xs drop-shadow">@usuario</p>
+                  <p className="text-white/70 text-[10px]">Caption del video...</p>
                 </div>
               </div>
             </div>

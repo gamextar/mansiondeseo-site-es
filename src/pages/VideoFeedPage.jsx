@@ -18,7 +18,7 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute }) {
+function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
@@ -96,7 +96,13 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute }) {
       </AnimatePresence>
 
       {/* Gradient overlays */}
-      <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/40 via-black/[0.06] to-transparent pointer-events-none" />
+      <div
+        className="absolute inset-x-0 bottom-0 pointer-events-none"
+        style={{
+          height: gradientHeight,
+          background: `linear-gradient(to top, rgba(0,0,0,${(gradientOpacity/100).toFixed(2)}), rgba(0,0,0,0.04), transparent)`,
+        }}
+      />
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none" />
 
       {/* Right side actions */}
@@ -186,12 +192,15 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute }) {
 
 export default function VideoFeedPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, siteSettings } = useAuth();
   const containerRef = useRef(null);
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
+
+  const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
+  const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
 
   useEffect(() => {
     let cancelled = false;
@@ -303,7 +312,12 @@ export default function VideoFeedPage() {
         ref={containerRef}
         onScroll={handleScroll}
         className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
-        style={{ scrollSnapType: 'y mandatory' }}
+        style={{
+          scrollSnapType: 'y mandatory',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'none',
+          WebkitOverflowScrolling: 'touch',
+        }}
       >
         {stories.map((story, index) => (
           <div key={story.id} className="w-full flex-shrink-0" style={{ height: '100svh' }}>
@@ -313,6 +327,8 @@ export default function VideoFeedPage() {
               onFavorite={handleFavorite}
               isMuted={isMuted}
               onToggleMute={() => setIsMuted(m => !m)}
+              gradientHeight={gradientHeight}
+              gradientOpacity={gradientOpacity}
             />
           </div>
         ))}
