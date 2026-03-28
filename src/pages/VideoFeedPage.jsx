@@ -249,14 +249,16 @@ export default function VideoFeedPage() {
     }
   }, [stories.length]);
 
+  useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
+
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container || isJumpingRef.current) return;
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
 
-    // Update active index for all positions (including clones so video stays active)
-    if (rawIndex !== activeDispIdx) {
+    // Keep the previous active item while on edge clones to avoid visible jump glitches.
+    if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
       setActiveDispIdx(rawIndex);
     }
 
