@@ -6,23 +6,6 @@ import { getStories, toggleFavorite } from '../lib/api';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
 
-const VIDEO_FEED_CACHE_KEY = 'mansion_video_feed';
-
-function getCachedVideoFeed() {
-  try {
-    const raw = sessionStorage.getItem(VIDEO_FEED_CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function setCachedVideoFeed(data) {
-  try {
-    sessionStorage.setItem(VIDEO_FEED_CACHE_KEY, JSON.stringify(data));
-  } catch {}
-}
-
 function timeAgo(dateStr) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z').getTime();
@@ -217,20 +200,13 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
 export default function VideoFeedPage() {
   const navigate = useNavigate();
   const { user, siteSettings } = useAuth();
-  const cachedFeedRef = useRef(getCachedVideoFeed());
-  const cachedFeed = cachedFeedRef.current;
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
-  const [stories, setStories] = useState(cachedFeed?.stories || []);
-  const [loading, setLoading] = useState(!cachedFeed);
-  // activeDispIdx: position in the infinite list [clone_last, ...stories, clone_first]
-  const [activeDispIdx, setActiveDispIdx] = useState(
-    cachedFeed?.stories?.length
-      ? Math.min((cachedFeed.activeRealIndex ?? 0) + 1, cachedFeed.stories.length)
-      : 1
-  );
-  const [isMuted, setIsMuted] = useState(cachedFeed?.isMuted ?? true);
+  const [stories, setStories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeDispIdx, setActiveDispIdx] = useState(1);
+  const [isMuted, setIsMuted] = useState(true);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
@@ -252,43 +228,28 @@ export default function VideoFeedPage() {
     getStories()
       .then(data => {
         if (!cancelled) {
-          const nextStories = data.stories || [];
-          setStories(nextStories);
-          setCachedVideoFeed({
-            stories: nextStories,
-            activeRealIndex: Math.max(0, Math.min(realActiveIndex, Math.max(nextStories.length - 1, 0))),
-            isMuted,
-          });
+          setStories(data.stories || []);
         }
       })
       .catch(() => {
-        if (!cancelled && !cachedFeed) setStories([]);
+        if (!cancelled) setStories([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [cachedFeed]);
+  }, []);
 
-  useEffect(() => {
-    setCachedVideoFeed({
-      stories,
-      activeRealIndex,
-      isMuted,
-    });
-  }, [stories, activeRealIndex, isMuted]);
-
-  // After stories load, restore the cached/current snapped clip position.
+  // After stories load, snap to the first real clip.
   useEffect(() => {
     if (stories.length > 0) {
       requestAnimationFrame(() => {
         if (containerRef.current) {
-          const targetIndex = Math.max(1, Math.min(activeDispIdx, stories.length));
-          containerRef.current.scrollTop = containerRef.current.clientHeight * targetIndex;
+          containerRef.current.scrollTop = containerRef.current.clientHeight; // index 1 = first real clip
         }
       });
     }
-  }, [stories.length, activeDispIdx, cachedFeed]);
+  }, [stories.length]);
 
   useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
 
