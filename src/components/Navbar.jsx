@@ -41,10 +41,10 @@ export default function Navbar() {
         {/* Coins pill */}
         <Link
           to="/monedas"
-          className="flex items-center gap-2.5 h-11 px-5 rounded-full bg-black/30 backdrop-blur-md border border-white/10 hover:bg-black/40 transition-all"
+          className="flex items-center gap-2 h-10 px-5 rounded-full bg-black/30 backdrop-blur-md border border-white/10 hover:bg-black/40 transition-all"
         >
-          <CoinIcon className="w-7 h-7" />
-          <span className="text-xl font-bold text-mansion-gold tabular-nums">{user?.coins ?? 0}</span>
+          <CoinIcon className="w-[26px] h-[26px]" />
+          <span className="text-lg font-bold text-mansion-gold tabular-nums">{user?.coins ?? 0}</span>
         </Link>
       </div>
     </motion.header>
