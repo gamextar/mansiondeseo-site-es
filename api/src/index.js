@@ -1714,6 +1714,7 @@ async function loadSettings(env) {
     navBottomPadding: parseInt(settings.nav_bottom_padding || '24', 10),
     navSidePadding: parseInt(settings.nav_side_padding || '16', 10),
     navHeight: parseInt(settings.nav_height || '56', 10),
+    navOpacity: parseInt(settings.nav_opacity || '40', 10),
   };
 }
 
@@ -1759,6 +1760,7 @@ function getPublicSettingsPayload(settings) {
     navBottomPadding: settings.navBottomPadding,
     navSidePadding: settings.navSidePadding,
     navHeight: settings.navHeight,
+    navOpacity: settings.navOpacity,
   };
 }
 
@@ -1806,6 +1808,7 @@ async function handleUpdateSettings(request, env) {
     'nav_bottom_padding',
     'nav_side_padding',
     'nav_height',
+    'nav_opacity',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {

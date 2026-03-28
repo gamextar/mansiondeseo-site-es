@@ -284,7 +284,7 @@ export default function VideoFeedPage() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-40">
+    <div className="fixed inset-0 bg-black z-40" style={{ height: '100svh' }}>
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-50 safe-top">
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
@@ -306,7 +306,7 @@ export default function VideoFeedPage() {
         style={{ scrollSnapType: 'y mandatory' }}
       >
         {stories.map((story, index) => (
-          <div key={story.id} className="h-full w-full" style={{ height: '100dvh' }}>
+          <div key={story.id} className="w-full flex-shrink-0" style={{ height: '100svh' }}>
             <StoryCard
               story={story}
               isActive={index === activeIndex}

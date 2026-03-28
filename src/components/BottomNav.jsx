@@ -20,6 +20,8 @@ export default function BottomNav() {
   const bottomPadding = siteSettings?.navBottomPadding ?? 24;
   const sidePadding = siteSettings?.navSidePadding ?? 16;
   const navHeight = siteSettings?.navHeight ?? 56;
+  const navOpacity = siteSettings?.navOpacity ?? 40;
+  const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
@@ -30,7 +32,7 @@ export default function BottomNav() {
       className="fixed bottom-0 left-0 right-0 z-50 safe-bottom lg:hidden flex justify-center pointer-events-none"
       style={{ paddingBottom: bottomPadding, paddingLeft: sidePadding, paddingRight: sidePadding }}
     >
-      <div className="pointer-events-auto w-full max-w-sm rounded-[2rem] bg-black/40 backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+      <div className="pointer-events-auto w-full max-w-sm rounded-[2rem] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)]" style={{ backgroundColor: bgColor }}>
         <div className="flex items-center justify-around px-3" style={{ height: navHeight }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
             const isActive =

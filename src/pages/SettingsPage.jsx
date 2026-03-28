@@ -66,6 +66,7 @@ export default function SettingsPage() {
   const [navBottomPadding, setNavBottomPadding] = useState(24);
   const [navSidePadding, setNavSidePadding] = useState(16);
   const [navHeight, setNavHeight] = useState(56);
+  const [navOpacity, setNavOpacity] = useState(40);
 
   // Payment display
   const [paymentTitleVip, setPaymentTitleVip] = useState('Servicios Digitales');
@@ -120,6 +121,7 @@ export default function SettingsPage() {
         setNavBottomPadding(s.navBottomPadding ?? 24);
         setNavSidePadding(s.navSidePadding ?? 16);
         setNavHeight(s.navHeight ?? 56);
+        setNavOpacity(s.navOpacity ?? 40);
       })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
@@ -163,6 +165,7 @@ export default function SettingsPage() {
         nav_bottom_padding: navBottomPadding,
         nav_side_padding: navSidePadding,
         nav_height: navHeight,
+        nav_opacity: navOpacity,
       });
       const s = data.settings;
       setBlurMobile(s.blurMobile);
@@ -194,6 +197,7 @@ export default function SettingsPage() {
       setNavBottomPadding(s.navBottomPadding ?? 24);
       setNavSidePadding(s.navSidePadding ?? 16);
       setNavHeight(s.navHeight ?? 56);
+      setNavOpacity(s.navOpacity ?? 40);
       setSaved(true);
       setSaveError('');
       setTimeout(() => setSaved(false), 2000);
@@ -967,12 +971,31 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {/* Opacity */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Eye className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Opacidad del fondo</h3>
+                  <p className="text-[11px] text-text-dim">Transparencia del fondo de la pill</p>
+                </div>
+              </div>
+              <input type="range" min="0" max="100" value={navOpacity} onChange={e => setNavOpacity(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>Transparente</span>
+                <span className="text-mansion-gold font-medium">{navOpacity}%</span>
+                <span>Sólido</span>
+              </div>
+            </div>
+
             {/* Live preview */}
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
               <h3 className="text-xs font-bold text-text-dim uppercase tracking-wider mb-3">Vista previa</h3>
               <div className="relative bg-mansion-base rounded-xl overflow-hidden" style={{ height: 120 }}>
                 <div className="absolute bottom-0 left-0 right-0 flex justify-center" style={{ paddingBottom: navBottomPadding, paddingLeft: navSidePadding, paddingRight: navSidePadding }}>
-                  <div className="w-full rounded-[2rem] bg-black/40 border border-white/10 flex items-center justify-around px-3" style={{ height: navHeight }}>
+                  <div className="w-full rounded-[2rem] border border-white/10 flex items-center justify-around px-3" style={{ height: navHeight, backgroundColor: `rgba(0,0,0,${(navOpacity/100).toFixed(2)})` }}>
                     {['Inicio','Videos','Chat','Perfil'].map(label => (
                       <div key={label} className="flex flex-col items-center gap-0.5">
                         <div className="w-4 h-4 rounded bg-white/20" />
