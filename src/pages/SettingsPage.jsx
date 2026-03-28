@@ -1038,11 +1038,11 @@ export default function SettingsPage() {
                   <p className="text-[11px] text-text-dim">Cuánto sube el oscurecimiento desde abajo</p>
                 </div>
               </div>
-              <input type="range" min="0" max="300" value={videoGradientHeight} onChange={e => setVideoGradientHeight(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <input type="range" min="0" max="800" value={videoGradientHeight} onChange={e => setVideoGradientHeight(Number(e.target.value))} className="w-full accent-mansion-gold" />
               <div className="flex justify-between text-[11px] text-text-dim mt-1">
                 <span>0px</span>
                 <span className="text-mansion-gold font-medium">{videoGradientHeight}px</span>
-                <span>300px</span>
+                <span>800px</span>
               </div>
             </div>
 
