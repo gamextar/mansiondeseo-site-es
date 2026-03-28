@@ -6,6 +6,23 @@ import { getStories, toggleFavorite } from '../lib/api';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
 
+const VIDEO_FEED_CACHE_KEY = 'mansion_video_feed';
+
+function getCachedVideoFeed() {
+  try {
+    const raw = sessionStorage.getItem(VIDEO_FEED_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedVideoFeed(data) {
+  try {
+    sessionStorage.setItem(VIDEO_FEED_CACHE_KEY, JSON.stringify(data));
+  } catch {}
+}
+
 function timeAgo(dateStr) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z').getTime();
@@ -200,14 +217,20 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
 export default function VideoFeedPage() {
   const navigate = useNavigate();
   const { user, siteSettings } = useAuth();
+  const cachedFeedRef = useRef(getCachedVideoFeed());
+  const cachedFeed = cachedFeedRef.current;
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
-  const [stories, setStories] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [stories, setStories] = useState(cachedFeed?.stories || []);
+  const [loading, setLoading] = useState(!cachedFeed);
   // activeDispIdx: position in the infinite list [clone_last, ...stories, clone_first]
-  const [activeDispIdx, setActiveDispIdx] = useState(1);
-  const [isMuted, setIsMuted] = useState(true);
+  const [activeDispIdx, setActiveDispIdx] = useState(
+    cachedFeed?.stories?.length
+      ? Math.min((cachedFeed.activeRealIndex ?? 0) + 1, cachedFeed.stories.length)
+      : 1
+  );
+  const [isMuted, setIsMuted] = useState(cachedFeed?.isMuted ?? true);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
@@ -228,27 +251,50 @@ export default function VideoFeedPage() {
     let cancelled = false;
     getStories()
       .then(data => {
-        if (!cancelled) setStories(data.stories || []);
+        if (!cancelled) {
+          const nextStories = data.stories || [];
+          setStories(nextStories);
+          setCachedVideoFeed({
+            stories: nextStories,
+            activeRealIndex: Math.max(0, Math.min(realActiveIndex, Math.max(nextStories.length - 1, 0))),
+            scrollTop: containerRef.current?.scrollTop || 0,
+            isMuted,
+          });
+        }
       })
       .catch(() => {
-        if (!cancelled) setStories([]);
+        if (!cancelled && !cachedFeed) setStories([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [cachedFeed]);
 
-  // After stories load, scroll to displayIndex=1 (first real story)
+  useEffect(() => {
+    setCachedVideoFeed({
+      stories,
+      activeRealIndex,
+      scrollTop: containerRef.current?.scrollTop || 0,
+      isMuted,
+    });
+  }, [stories, activeRealIndex, isMuted]);
+
+  // After stories load, restore the cached/current display position.
   useEffect(() => {
     if (stories.length > 0) {
       requestAnimationFrame(() => {
         if (containerRef.current) {
-          containerRef.current.scrollTop = containerRef.current.clientHeight;
+          const maxScrollTop = containerRef.current.scrollHeight - containerRef.current.clientHeight;
+          const cachedScrollTop = typeof cachedFeed?.scrollTop === 'number'
+            ? Math.max(0, Math.min(cachedFeed.scrollTop, maxScrollTop))
+            : null;
+          const targetIndex = Math.max(1, Math.min(activeDispIdx, stories.length));
+          containerRef.current.scrollTop = cachedScrollTop ?? (containerRef.current.clientHeight * targetIndex);
         }
       });
     }
-  }, [stories.length]);
+  }, [stories.length, activeDispIdx, cachedFeed]);
 
   useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
 
@@ -310,6 +356,13 @@ export default function VideoFeedPage() {
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
 
+    setCachedVideoFeed({
+      stories,
+      activeRealIndex,
+      scrollTop: container.scrollTop,
+      isMuted,
+    });
+
     // Keep the previous active item while on edge clones to avoid visible jump glitches.
     if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
       setActiveDispIdx(rawIndex);
@@ -320,7 +373,7 @@ export default function VideoFeedPage() {
     scrollEndTimer.current = setTimeout(() => {
       settleInfiniteBoundary();
     }, 180);
-  }, [activeDispIdx, stories.length, settleInfiniteBoundary]);
+  }, [activeDispIdx, activeRealIndex, isMuted, stories, stories.length, settleInfiniteBoundary]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
@@ -387,22 +440,6 @@ export default function VideoFeedPage() {
 
   return (
     <div className="fixed inset-0 bg-black z-40">
-      {/* Header */}
-      <div
-        className="absolute left-0 right-0 z-50"
-        style={{ top: 0, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4px)' }}
-      >
-        <div className="flex items-center justify-between px-4 pb-2">
-          <h1 className="font-display text-lg font-bold text-white drop-shadow-lg">Historias</h1>
-          <button
-            onClick={() => navigate('/historia/nueva')}
-            className="w-9 h-9 rounded-full bg-mansion-gold flex items-center justify-center shadow-lg"
-          >
-            <Plus className="w-5 h-5 text-mansion-base" />
-          </button>
-        </div>
-      </div>
-
       {/* Video feed container */}
       <div
         ref={containerRef}
@@ -448,23 +485,6 @@ export default function VideoFeedPage() {
           </button>
         </div>
       )}
-
-      {/* Story counter */}
-      <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50">
-        <div className="flex gap-1">
-          {stories.length <= 10 && stories.map((_, i) => (
-            <div
-              key={i}
-              className={`h-[2px] rounded-full transition-all duration-300 ${
-                i === realActiveIndex ? 'w-6 bg-mansion-gold' : 'w-2 bg-white/30'
-              }`}
-            />
-          ))}
-          {stories.length > 10 && (
-            <span className="text-white/60 text-xs font-medium">{realActiveIndex + 1} / {stories.length}</span>
-          )}
-        </div>
-      </div>
 
       {/* Bottom safe area for nav */}
       <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/70 to-transparent pointer-events-none z-10 lg:hidden" />
