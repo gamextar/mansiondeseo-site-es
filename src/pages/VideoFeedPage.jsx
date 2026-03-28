@@ -70,6 +70,7 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
         ref={videoRef}
         src={story.video_url}
         className="absolute inset-0 w-full h-full object-cover"
+        style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
         loop
         playsInline
         muted={isMuted}
@@ -107,26 +108,12 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
 
       {/* Right side actions */}
       <div className="absolute right-3 bottom-28 lg:bottom-10 flex flex-col items-center gap-6 z-20">
-        {/* Profile photo */}
-        <button
-          onClick={() => navigate(`/perfiles/${story.user_id}`)}
-          className="flex flex-col items-center"
-        >
-          <div className="w-14 h-14 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
-            {story.avatar_url ? (
-              <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
-            )}
-          </div>
-        </button>
-
         {/* Favorite */}
         <button
           onClick={() => onFavorite(story.user_id)}
           className="flex flex-col items-center"
         >
-          <div className={`w-13 h-13 rounded-full flex items-center justify-center ${story.favorited ? 'bg-mansion-crimson/25' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
+          <div className={`rounded-full flex items-center justify-center ${story.favorited ? 'bg-mansion-crimson/25' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
             <Heart className={`w-7 h-7 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
           </div>
         </button>
@@ -155,6 +142,20 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
         <button onClick={onToggleMute} className="flex flex-col items-center">
           <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
             {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
+          </div>
+        </button>
+
+        {/* Profile photo */}
+        <button
+          onClick={() => navigate(`/perfiles/${story.user_id}`)}
+          className="flex flex-col items-center"
+        >
+          <div className="w-14 h-14 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
+            {story.avatar_url ? (
+              <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
+            )}
           </div>
         </button>
       </div>
@@ -194,13 +195,25 @@ export default function VideoFeedPage() {
   const navigate = useNavigate();
   const { user, siteSettings } = useAuth();
   const containerRef = useRef(null);
+  const isJumpingRef = useRef(false);
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeIndex, setActiveIndex] = useState(0);
+  // activeDispIdx: position in the infinite list [clone_last, ...stories, clone_first]
+  const [activeDispIdx, setActiveDispIdx] = useState(1);
   const [isMuted, setIsMuted] = useState(true);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
+
+  // Infinite list: clone of last item prepended, clone of first appended
+  const infiniteStories = stories.length > 0
+    ? [stories[stories.length - 1], ...stories, stories[0]]
+    : [];
+
+  // Real index (0-based) derived from display index
+  const realActiveIndex = stories.length > 0
+    ? Math.max(0, Math.min(activeDispIdx - 1, stories.length - 1))
+    : 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -217,16 +230,53 @@ export default function VideoFeedPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // After stories load, scroll to displayIndex=1 (first real story)
+  useEffect(() => {
+    if (stories.length > 0) {
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.clientHeight;
+        }
+      });
+    }
+  }, [stories.length]);
+
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
-    if (!container) return;
-    const scrollTop = container.scrollTop;
+    if (!container || isJumpingRef.current) return;
     const height = container.clientHeight;
-    const newIndex = Math.round(scrollTop / height);
-    if (newIndex !== activeIndex && newIndex >= 0 && newIndex < stories.length) {
-      setActiveIndex(newIndex);
+    const rawIndex = Math.round(container.scrollTop / height);
+
+    // Scrolled to top clone → jump silently to last real item
+    if (rawIndex === 0) {
+      isJumpingRef.current = true;
+      container.style.scrollSnapType = 'none';
+      container.scrollTop = stories.length * height;
+      requestAnimationFrame(() => {
+        container.style.scrollSnapType = 'y mandatory';
+        isJumpingRef.current = false;
+      });
+      setActiveDispIdx(stories.length);
+      return;
     }
-  }, [activeIndex, stories.length]);
+
+    // Scrolled to bottom clone → jump silently to first real item
+    if (rawIndex >= stories.length + 1) {
+      isJumpingRef.current = true;
+      container.style.scrollSnapType = 'none';
+      container.scrollTop = height;
+      requestAnimationFrame(() => {
+        container.style.scrollSnapType = 'y mandatory';
+        isJumpingRef.current = false;
+      });
+      setActiveDispIdx(1);
+      return;
+    }
+
+    if (rawIndex !== activeDispIdx) {
+      setActiveDispIdx(rawIndex);
+    }
+  }, [activeDispIdx, stories.length]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
@@ -239,11 +289,10 @@ export default function VideoFeedPage() {
     }
   }, []);
 
-  const scrollToIndex = useCallback((index) => {
+  const scrollByOne = useCallback((dir) => {
     const container = containerRef.current;
     if (!container) return;
-    const height = container.clientHeight;
-    container.scrollTo({ top: index * height, behavior: 'smooth' });
+    container.scrollBy({ top: dir * container.clientHeight, behavior: 'smooth' });
   }, []);
 
   if (loading) {
@@ -293,10 +342,13 @@ export default function VideoFeedPage() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-40" style={{ height: '100svh' }}>
+    <div className="fixed inset-0 bg-black z-40">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-50 safe-top">
-        <div className="flex items-center justify-between px-4 pt-3 pb-2">
+      <div
+        className="absolute left-0 right-0 z-50"
+        style={{ top: 0, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4px)' }}
+      >
+        <div className="flex items-center justify-between px-4 pb-2">
           <h1 className="font-display text-lg font-bold text-white drop-shadow-lg">Historias</h1>
           <button
             onClick={() => navigate('/historia/nueva')}
@@ -319,11 +371,11 @@ export default function VideoFeedPage() {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        {stories.map((story, index) => (
-          <div key={story.id} className="w-full flex-shrink-0" style={{ height: '100svh' }}>
+        {infiniteStories.map((story, displayIndex) => (
+          <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
             <StoryCard
               story={story}
-              isActive={index === activeIndex}
+              isActive={displayIndex === activeDispIdx}
               onFavorite={handleFavorite}
               isMuted={isMuted}
               onToggleMute={() => setIsMuted(m => !m)}
@@ -334,25 +386,21 @@ export default function VideoFeedPage() {
         ))}
       </div>
 
-      {/* Scroll hints — desktop only */}
+      {/* Scroll hints — desktop only, always shown (infinite) */}
       {stories.length > 1 && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex-col gap-2 z-30 hidden lg:flex">
-          {activeIndex > 0 && (
-            <button
-              onClick={() => scrollToIndex(activeIndex - 1)}
-              className="w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center"
-            >
-              <ChevronUp className="w-4 h-4 text-white/70" />
-            </button>
-          )}
-          {activeIndex < stories.length - 1 && (
-            <button
-              onClick={() => scrollToIndex(activeIndex + 1)}
-              className="w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center"
-            >
-              <ChevronDown className="w-4 h-4 text-white/70" />
-            </button>
-          )}
+          <button
+            onClick={() => scrollByOne(-1)}
+            className="w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center"
+          >
+            <ChevronUp className="w-4 h-4 text-white/70" />
+          </button>
+          <button
+            onClick={() => scrollByOne(1)}
+            className="w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center"
+          >
+            <ChevronDown className="w-4 h-4 text-white/70" />
+          </button>
         </div>
       )}
 
@@ -363,12 +411,12 @@ export default function VideoFeedPage() {
             <div
               key={i}
               className={`h-[2px] rounded-full transition-all duration-300 ${
-                i === activeIndex ? 'w-6 bg-mansion-gold' : 'w-2 bg-white/30'
+                i === realActiveIndex ? 'w-6 bg-mansion-gold' : 'w-2 bg-white/30'
               }`}
             />
           ))}
           {stories.length > 10 && (
-            <span className="text-white/60 text-xs font-medium">{activeIndex + 1} / {stories.length}</span>
+            <span className="text-white/60 text-xs font-medium">{realActiveIndex + 1} / {stories.length}</span>
           )}
         </div>
       </div>

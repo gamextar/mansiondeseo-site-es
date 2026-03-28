@@ -29,8 +29,12 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 safe-bottom lg:hidden flex justify-center pointer-events-none"
-      style={{ paddingBottom: bottomPadding, paddingLeft: sidePadding, paddingRight: sidePadding }}
+      className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
+      style={{
+        paddingBottom: `calc(${bottomPadding}px + env(safe-area-inset-bottom, 0px))`,
+        paddingLeft: sidePadding,
+        paddingRight: sidePadding,
+      }}
     >
       <div className="pointer-events-auto w-full max-w-sm rounded-[2rem] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)]" style={{ backgroundColor: bgColor }}>
         <div className="flex items-center justify-around px-3" style={{ height: navHeight }}>
