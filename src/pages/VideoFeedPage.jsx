@@ -202,6 +202,7 @@ export default function VideoFeedPage() {
   const { user, siteSettings } = useAuth();
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
+  const jumpTimerRef = useRef(null);
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(true);
   // activeDispIdx: position in the infinite list [clone_last, ...stories, clone_first]
@@ -254,29 +255,35 @@ export default function VideoFeedPage() {
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
 
-    // Scrolled to top clone → jump silently to last real item
+    // Scrolled to top clone → let snap finish, then jump silently to last real item
     if (rawIndex === 0) {
-      isJumpingRef.current = true;
-      container.style.overflowY = 'hidden';
-      container.scrollTop = stories.length * height;
-      setActiveDispIdx(stories.length);
-      setTimeout(() => {
-        container.style.overflowY = '';
-        isJumpingRef.current = false;
-      }, 50);
+      if (!isJumpingRef.current) {
+        isJumpingRef.current = true;
+        clearTimeout(jumpTimerRef.current);
+        jumpTimerRef.current = setTimeout(() => {
+          if (containerRef.current) {
+            containerRef.current.scrollTop = stories.length * height;
+            setActiveDispIdx(stories.length);
+          }
+          requestAnimationFrame(() => { isJumpingRef.current = false; });
+        }, 150);
+      }
       return;
     }
 
-    // Scrolled to bottom clone → jump silently to first real item
+    // Scrolled to bottom clone → let snap finish, then jump silently to first real item
     if (rawIndex >= stories.length + 1) {
-      isJumpingRef.current = true;
-      container.style.overflowY = 'hidden';
-      container.scrollTop = height;
-      setActiveDispIdx(1);
-      setTimeout(() => {
-        container.style.overflowY = '';
-        isJumpingRef.current = false;
-      }, 50);
+      if (!isJumpingRef.current) {
+        isJumpingRef.current = true;
+        clearTimeout(jumpTimerRef.current);
+        jumpTimerRef.current = setTimeout(() => {
+          if (containerRef.current) {
+            containerRef.current.scrollTop = height;
+            setActiveDispIdx(1);
+          }
+          requestAnimationFrame(() => { isJumpingRef.current = false; });
+        }, 150);
+      }
       return;
     }
 
