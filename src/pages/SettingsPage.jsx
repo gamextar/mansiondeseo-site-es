@@ -21,7 +21,7 @@ export const ADMIN_SECTIONS = [
 export default function SettingsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, setSiteSettings } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -209,6 +209,8 @@ export default function SettingsPage() {
       setNavOpacity(s.navOpacity ?? 40);
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
+      // Propagate to global context so dependent components update live
+      setSiteSettings(s);
       setSaved(true);
       setSaveError('');
       setTimeout(() => setSaved(false), 2000);
