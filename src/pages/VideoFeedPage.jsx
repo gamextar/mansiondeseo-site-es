@@ -18,7 +18,7 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity }) {
+function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
@@ -107,7 +107,10 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none" />
 
       {/* Right side actions */}
-      <div className="absolute right-3 bottom-28 lg:bottom-10 flex flex-col items-center gap-6 z-20">
+      <div
+        className="absolute right-3 lg:bottom-10 flex flex-col items-center gap-6 z-20"
+        style={{ bottom: `calc(${navBottomOffset}px + env(safe-area-inset-bottom, 0px) + 16px)` }}
+      >
         {/* Favorite */}
         <button
           onClick={() => onFavorite(story.user_id)}
@@ -161,7 +164,10 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
       </div>
 
       {/* Bottom user info + caption */}
-      <div className="absolute left-4 right-20 bottom-20 lg:bottom-6 z-20">
+      <div
+        className="absolute left-4 right-20 lg:bottom-6 z-20"
+        style={{ bottom: `calc(${navBottomOffset}px + env(safe-area-inset-bottom, 0px) + 8px)` }}
+      >
         <button
           onClick={() => navigate(`/perfiles/${story.user_id}`)}
           className="block text-left mb-1"
@@ -204,6 +210,7 @@ export default function VideoFeedPage() {
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
+  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 56);
 
   // Infinite list: clone of last item prepended, clone of first appended
   const infiniteStories = stories.length > 0
@@ -253,8 +260,10 @@ export default function VideoFeedPage() {
       container.style.scrollSnapType = 'none';
       container.scrollTop = stories.length * height;
       requestAnimationFrame(() => {
-        container.style.scrollSnapType = 'y mandatory';
-        isJumpingRef.current = false;
+        requestAnimationFrame(() => {
+          container.style.scrollSnapType = 'y mandatory';
+          isJumpingRef.current = false;
+        });
       });
       setActiveDispIdx(stories.length);
       return;
@@ -266,8 +275,10 @@ export default function VideoFeedPage() {
       container.style.scrollSnapType = 'none';
       container.scrollTop = height;
       requestAnimationFrame(() => {
-        container.style.scrollSnapType = 'y mandatory';
-        isJumpingRef.current = false;
+        requestAnimationFrame(() => {
+          container.style.scrollSnapType = 'y mandatory';
+          isJumpingRef.current = false;
+        });
       });
       setActiveDispIdx(1);
       return;
@@ -381,6 +392,7 @@ export default function VideoFeedPage() {
               onToggleMute={() => setIsMuted(m => !m)}
               gradientHeight={gradientHeight}
               gradientOpacity={gradientOpacity}
+              navBottomOffset={navBottomOffset}
             />
           </div>
         ))}
