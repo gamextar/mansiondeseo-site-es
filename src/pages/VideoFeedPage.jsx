@@ -236,7 +236,7 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
         <button
           onClick={handleHeart}
           className="pointer-events-auto relative"
-          style={{ width: 58, height: 58 }}
+          style={{ width: 58, height: 58, touchAction: 'pan-y' }}
         >
           <HeartBurst trigger={burstTrigger} />
           <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 58, height: 58 }}>
@@ -245,17 +245,17 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
         </button>
         <span className="pointer-events-none text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
       </div>
-      <button onClick={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-center">
+      <button onClick={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-center" style={{ touchAction: 'pan-y' }}>
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Send className="w-6 h-6 text-white" />
         </div>
       </button>
-      <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-center">
+      <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-center" style={{ touchAction: 'pan-y' }}>
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Gift className="w-6 h-6 text-mansion-gold" />
         </div>
       </button>
-      <button onClick={onToggleMute} className="pointer-events-auto flex flex-col items-center">
+      <button onClick={onToggleMute} className="pointer-events-auto flex flex-col items-center" style={{ touchAction: 'pan-y' }}>
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
         </div>
@@ -280,7 +280,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
         className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
         style={{ bottom: `${navBottomOffset + 8}px` }}
       >
-        <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1">
+        <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1" style={{ touchAction: 'pan-y' }}>
           <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
             {story.avatar_url ? (
               <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
