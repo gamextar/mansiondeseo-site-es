@@ -29,21 +29,34 @@ function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, o
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !videoSrc) return;
+    if (!video || !videoSrc || !shouldMount) return;
 
     if (isActive) {
-      video.currentTime = 0;
-      video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      if (video.paused) {
+        // Coming from cold state — reset and play
+        video.currentTime = 0;
+        video.muted = isMuted;
+        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      } else {
+        // Already warm-playing — just unmute, zero blink
+        video.muted = isMuted;
+        setIsPlaying(true);
+      }
+    } else if (isNearby) {
+      // Keep nearby videos playing silently for instant transitions
+      video.muted = true;
+      video.play().catch(() => {});
+      setIsPlaying(false);
     } else {
       video.pause();
       setIsPlaying(false);
     }
-  }, [isActive, videoSrc]);
+  }, [isActive, isNearby, videoSrc, shouldMount]);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (video) video.muted = isMuted;
-  }, [isMuted]);
+    if (video && isActive) video.muted = isMuted;
+  }, [isMuted, isActive]);
 
   const togglePlay = () => {
     const video = videoRef.current;
