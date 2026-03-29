@@ -372,7 +372,7 @@ export async function adminDeleteUser(userId) {
 
 // ── Stories ─────────────────────────────────────────────
 
-export async function getStories({ page = 1, limit = 20 } = {}) {
+export async function getStories({ page = 1, limit = 100 } = {}) {
   const params = new URLSearchParams({ page, limit });
   return apiFetch(`/stories?${params}`);
 }

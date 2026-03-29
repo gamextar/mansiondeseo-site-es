@@ -18,15 +18,18 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const navigate = useNavigate();
 
+  // The actual src passed to <video> — empty string if not in load window
+  const activeSrc = shouldLoad ? videoSrc : undefined;
+
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !videoSrc) return;
+    if (!video || !activeSrc) return;
 
     if (isActive) {
       video.currentTime = 0;
@@ -35,7 +38,7 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
       video.pause();
       setIsPlaying(false);
     }
-  }, [isActive, videoSrc]);
+  }, [isActive, activeSrc]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -68,13 +71,13 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
       <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
         <video
           ref={videoRef}
-          src={videoSrc}
+          src={activeSrc}
           className="absolute inset-0 w-full h-full object-cover"
           style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
           loop
           playsInline
           muted={isMuted}
-          preload="auto"
+          preload={shouldLoad ? 'auto' : 'none'}
           onClick={togglePlay}
           onEnded={handleVideoEnd}
         />
@@ -480,21 +483,27 @@ export default function VideoFeedPage() {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        {infiniteStories.map((story, displayIndex) => (
-          <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
-            <StoryCard
-              story={story}
-              videoSrc={story.video_url}
-              isActive={displayIndex === activeDispIdx}
-              onFavorite={handleFavorite}
-              isMuted={isMuted}
-              onToggleMute={() => setIsMuted(m => !m)}
-              gradientHeight={gradientHeight}
-              gradientOpacity={gradientOpacity}
-              navBottomOffset={navBottomOffset}
-            />
-          </div>
-        ))}
+        {infiniteStories.map((story, displayIndex) => {
+          const dist = Math.abs(displayIndex - activeDispIdx);
+          const isBoundary = displayIndex === 1 || displayIndex === stories.length;
+          const shouldLoad = dist <= 3 || isBoundary;
+          return (
+            <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+              <StoryCard
+                story={story}
+                videoSrc={story.video_url}
+                isActive={displayIndex === activeDispIdx}
+                shouldLoad={shouldLoad}
+                onFavorite={handleFavorite}
+                isMuted={isMuted}
+                onToggleMute={() => setIsMuted(m => !m)}
+                gradientHeight={gradientHeight}
+                gradientOpacity={gradientOpacity}
+                navBottomOffset={navBottomOffset}
+              />
+            </div>
+          );
+        })}
       </div>
 
       {stories.length > 1 && (
