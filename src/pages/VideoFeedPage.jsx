@@ -18,6 +18,9 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
+// ── Avatar size in the video overlay (px). Desktop adds 12px on top. ───────
+const AVATAR_SIZE = 52;
+
 function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
@@ -147,7 +150,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
           style={{ bottom: `${navBottomOffset + 8}px` }}
         >
           <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-1.5 mb-1">
-            <div className="w-13 h-13 rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: 52, height: 52 }}>
+            <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}>
               {story.avatar_url ? (
                 <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
               ) : (
@@ -159,12 +162,12 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
           {story.caption && (
             <p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
           )}
-          <p className="text-white/40 text-[11px] mt-1.5">{timeAgo(story.created_at)}</p>
+          <p className="text-white/40 text-[11px] mt-1.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{timeAgo(story.created_at)}</p>
         </div>
 
         <div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2.5 max-w-[360px]">
           <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5">
-            <div className="w-16 h-16 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
+            <div className="rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: AVATAR_SIZE + 12, height: AVATAR_SIZE + 12 }}>
               {story.avatar_url ? (
                 <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
               ) : (
