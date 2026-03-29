@@ -20,7 +20,6 @@ function timeAgo(dateStr) {
 
 function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
-  const prevStoryRef = useRef(story.video_url);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const navigate = useNavigate();
@@ -30,18 +29,13 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
     if (!video) return;
 
     if (isActive) {
-      // Only reset position for a different video (not on clone→real teleport)
-      const isSameVideo = prevStoryRef.current === story.video_url;
-      if (!isSameVideo) {
-        video.currentTime = 0;
-        prevStoryRef.current = story.video_url;
-      }
+      video.currentTime = 0;
       video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     } else {
       video.pause();
       setIsPlaying(false);
     }
-  }, [isActive, story.video_url]);
+  }, [isActive]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -279,13 +273,22 @@ export default function VideoFeedPage() {
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
   const [activeDispIdx, setActiveDispIdx] = useState(savedIdx);
-  const [visibleIdx, setVisibleIdx] = useState(savedIdx); // raw scroll position (includes clones)
   const [isMuted, setIsMuted] = useState(savedMuted);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
+
+  // Which display indices should be active? The real active + its clone if on boundary.
+  const isActiveForIndex = useCallback((displayIndex) => {
+    if (displayIndex === activeDispIdx) return true;
+    // Clone of last story at position 0 — active when viewing last real story
+    if (displayIndex === 0 && activeDispIdx === stories.length) return true;
+    // Clone of first story at last position — active when viewing first real story
+    if (displayIndex === stories.length + 1 && activeDispIdx === 1) return true;
+    return false;
+  }, [activeDispIdx, stories.length]);
 
   // Infinite list: clone of last item prepended, clone of first appended
   const infiniteStories = stories.length > 0
@@ -350,7 +353,6 @@ export default function VideoFeedPage() {
       container.style.scrollSnapType = 'none';
       container.scrollTop = stories.length * height;
       setActiveDispIdx(stories.length);
-      setVisibleIdx(stories.length);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (containerRef.current) {
@@ -367,7 +369,6 @@ export default function VideoFeedPage() {
       container.style.scrollSnapType = 'none';
       container.scrollTop = height;
       setActiveDispIdx(1);
-      setVisibleIdx(1);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (containerRef.current) {
@@ -398,10 +399,7 @@ export default function VideoFeedPage() {
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
 
-    // Always update visible index so clone videos play (no frozen frame on mobile)
-    if (rawIndex !== visibleIdx) setVisibleIdx(rawIndex);
-
-    // Update real active index only for non-clone positions (for persistence & boundary logic)
+    // Update active index only for real positions (not clones)
     if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
       setActiveDispIdx(rawIndex);
     }
@@ -411,7 +409,7 @@ export default function VideoFeedPage() {
     scrollEndTimer.current = setTimeout(() => {
       settleInfiniteBoundary();
     }, 180);
-  }, [visibleIdx, activeDispIdx, stories.length, settleInfiniteBoundary]);
+  }, [activeDispIdx, stories.length, settleInfiniteBoundary]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
@@ -494,7 +492,7 @@ export default function VideoFeedPage() {
           <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
             <StoryCard
               story={story}
-              isActive={displayIndex === visibleIdx}
+              isActive={isActiveForIndex(displayIndex)}
               onFavorite={handleFavorite}
               isMuted={isMuted}
               onToggleMute={() => setIsMuted(m => !m)}
