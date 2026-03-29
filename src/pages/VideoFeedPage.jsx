@@ -159,8 +159,8 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           preload={shouldLoad ? 'auto' : 'none'}
           onEnded={handleVideoEnd}
         />
-        {/* Tap-to-play overlay: z-10 so buttons at z-20 sit above it */}
-        <div className="absolute inset-0 z-10" onClick={togglePlay} />
+        {/* Mobile prioritizes swipe; keep tap-to-play overlay only on desktop */}
+        <div className="absolute inset-0 z-10 hidden lg:block" onClick={togglePlay} />
 
         <AnimatePresence>
           {showPlayIcon && (
