@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift } from 'lucide-react';
@@ -244,6 +244,12 @@ export default function VideoFeedPage() {
   const { siteSettings } = useAuth();
   const containerRef = useRef(null);
   const lastDesktopWheelAtRef = useRef(0);
+  const isResettingRef = useRef(false);
+  const scrollTimerRef = useRef(null);
+  const initialRenderRef = useRef(true);
+
+  const WINDOW_SIZE = 5;
+  const CENTER = 2;
 
   const cachedStories = () => {
     try {
@@ -267,6 +273,24 @@ export default function VideoFeedPage() {
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
 
+  const isWindowed = stories.length > WINDOW_SIZE;
+
+  const wrapIdx = useCallback((i) => {
+    if (stories.length === 0) return 0;
+    return ((i % stories.length) + stories.length) % stories.length;
+  }, [stories.length]);
+
+  // Sliding window: only 5 items in DOM, centered on activeIdx
+  const windowItems = useMemo(() => {
+    if (stories.length === 0) return [];
+    if (!isWindowed) return stories;
+    return Array.from({ length: WINDOW_SIZE }, (_, i) => {
+      const idx = wrapIdx(activeIdx - CENTER + i);
+      return stories[idx];
+    });
+  }, [activeIdx, stories, wrapIdx, isWindowed]);
+
+  // Fetch stories
   useEffect(() => {
     let cancelled = false;
     getStories()
@@ -286,15 +310,44 @@ export default function VideoFeedPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Initial scroll position
   useLayoutEffect(() => {
     if (stories.length === 0 || !containerRef.current) return;
     const container = containerRef.current;
     const height = container.clientHeight;
     if (!height) return;
-    const idx = Math.min(activeIdx, stories.length - 1);
-    container.scrollTop = height * idx;
+    if (isWindowed) {
+      container.scrollTop = CENTER * height;
+    } else {
+      const idx = Math.min(activeIdx, stories.length - 1);
+      container.scrollTop = idx * height;
+    }
   }, [stories.length]);
 
+  // Recenter after activeIdx changes (windowed mode only, skip first render)
+  useLayoutEffect(() => {
+    if (initialRenderRef.current) {
+      initialRenderRef.current = false;
+      return;
+    }
+    if (!isWindowed || !containerRef.current) return;
+    const container = containerRef.current;
+    const height = container.clientHeight;
+    if (!height) return;
+    isResettingRef.current = true;
+    container.style.scrollSnapType = 'none';
+    container.scrollTop = CENTER * height;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          containerRef.current.style.scrollSnapType = 'y mandatory';
+        }
+        isResettingRef.current = false;
+      });
+    });
+  }, [activeIdx, isWindowed]);
+
+  // Persist state
   useEffect(() => {
     try { sessionStorage.setItem('vf_idx', String(activeIdx)); } catch {}
   }, [activeIdx]);
@@ -302,15 +355,60 @@ export default function VideoFeedPage() {
     try { sessionStorage.setItem('vf_muted', isMuted ? '1' : '0'); } catch {}
   }, [isMuted]);
 
-  const handleScroll = useCallback(() => {
+  // Detect scroll settle and update activeIdx
+  const handleScrollSettle = useCallback(() => {
+    if (isResettingRef.current) return;
     const container = containerRef.current;
-    if (!container || stories.length === 0) return;
+    if (!container) return;
+    const height = container.clientHeight;
+    const pos = Math.round(container.scrollTop / height);
+
+    if (isWindowed) {
+      const delta = pos - CENTER;
+      if (delta !== 0) {
+        setActiveIdx(prev => wrapIdx(prev + delta));
+      }
+    } else {
+      if (pos >= 0 && pos < stories.length && pos !== activeIdx) {
+        setActiveIdx(pos);
+      }
+    }
+  }, [isWindowed, wrapIdx, stories.length, activeIdx]);
+
+  // Non-windowed: update active on scroll for responsive play/pause
+  const handleScroll = useCallback(() => {
+    if (isResettingRef.current || isWindowed) return;
+    const container = containerRef.current;
+    if (!container) return;
     const height = container.clientHeight;
     const idx = Math.round(container.scrollTop / height);
     if (idx >= 0 && idx < stories.length && idx !== activeIdx) {
       setActiveIdx(idx);
     }
-  }, [activeIdx, stories.length]);
+  }, [activeIdx, stories.length, isWindowed]);
+
+  // scrollend + fallback timer
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onScrollEnd = () => {
+      clearTimeout(scrollTimerRef.current);
+      handleScrollSettle();
+    };
+    const onScroll = () => {
+      clearTimeout(scrollTimerRef.current);
+      scrollTimerRef.current = setTimeout(handleScrollSettle, 180);
+    };
+
+    container.addEventListener('scrollend', onScrollEnd);
+    container.addEventListener('scroll', onScroll);
+    return () => {
+      container.removeEventListener('scrollend', onScrollEnd);
+      container.removeEventListener('scroll', onScroll);
+      clearTimeout(scrollTimerRef.current);
+    };
+  }, [handleScrollSettle]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
@@ -318,20 +416,21 @@ export default function VideoFeedPage() {
       setStories(prev => prev.map(s =>
         s.user_id === userId ? { ...s, favorited: data.favorited } : s
       ));
-    } catch {
-      // Silently fail
-    }
+    } catch {}
   }, []);
 
   const scrollByOne = useCallback((dir) => {
     const container = containerRef.current;
     if (!container) return;
     const height = container.clientHeight;
-    const idx = Math.round(container.scrollTop / height);
-    const target = idx + dir;
-    if (target < 0 || target >= stories.length) return;
-    container.scrollTo({ top: target * height, behavior: 'smooth' });
-  }, [stories.length]);
+    if (isWindowed) {
+      container.scrollTo({ top: (CENTER + dir) * height, behavior: 'smooth' });
+    } else {
+      const idx = Math.round(container.scrollTop / height) + dir;
+      if (idx < 0 || idx >= stories.length) return;
+      container.scrollTo({ top: idx * height, behavior: 'smooth' });
+    }
+  }, [isWindowed, stories.length]);
 
   const handleDesktopWheel = useCallback((event) => {
     if (typeof window === 'undefined' || !window.matchMedia('(min-width: 1024px)').matches) return;
@@ -401,11 +500,11 @@ export default function VideoFeedPage() {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        {stories.map((story, idx) => {
-          const isActive = idx === activeIdx;
-          const isNearby = Math.abs(idx - activeIdx) <= 2;
+        {windowItems.map((story, i) => {
+          const isActive = isWindowed ? (i === CENTER) : (i === activeIdx);
+          const isNearby = isWindowed ? true : (Math.abs(i - activeIdx) <= 2);
           return (
-            <div key={story.id || idx} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+            <div key={story.id} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
               <StoryCard
                 story={story}
                 videoSrc={story.video_url}
