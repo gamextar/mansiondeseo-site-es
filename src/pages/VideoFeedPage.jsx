@@ -1,15 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Gift } from 'lucide-react';
+import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift } from 'lucide-react';
 import { getStories, toggleFavorite } from '../lib/api';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
-
-const STORIES_CACHE_VERSION = '3';
-const STORIES_PAGE_SIZE = 12;
-const LOAD_MORE_THRESHOLD = 4;
-const PANE_SLOTS = ['pane-prev', 'pane-current', 'pane-next'];
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -70,9 +65,7 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
 
   return (
     <div className="relative w-full h-full bg-black flex items-center justify-center snap-start snap-always">
-      {/* Video panel — on desktop, a centered rounded container; on mobile, fullscreen */}
       <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
-        {/* Video */}
         <video
           ref={videoRef}
           src={videoSrc}
@@ -86,7 +79,6 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
           onEnded={handleVideoEnd}
         />
 
-        {/* Play/Pause overlay */}
         <AnimatePresence>
           {showPlayIcon && (
             <motion.div
@@ -103,17 +95,15 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
           )}
         </AnimatePresence>
 
-        {/* Gradient overlays */}
         <div
           className="absolute inset-x-0 bottom-0 pointer-events-none"
           style={{
             height: gradientHeight,
-            background: `linear-gradient(to top, rgba(0,0,0,${(gradientOpacity/100).toFixed(2)}), rgba(0,0,0,0.04), transparent)`,
+            background: `linear-gradient(to top, rgba(0,0,0,${(gradientOpacity / 100).toFixed(2)}), rgba(0,0,0,0.04), transparent)`,
           }}
         />
         <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none lg:rounded-t-2xl" />
 
-        {/* Mobile action icons — inside video */}
         <div
           className="absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden"
           style={{ bottom: `${navBottomOffset + 16}px` }}
@@ -121,20 +111,15 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
           <MobileActionButtons story={story} onFavorite={onFavorite} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
         </div>
 
-        {/* Desktop mute button — top-right corner of video */}
         <button onClick={onToggleMute} className="hidden lg:flex absolute top-4 right-4 z-20 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-200" style={{ width: 52, height: 52 }}>
           {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
         </button>
 
-        {/* Bottom user info + caption — mobile */}
         <div
           className="absolute left-4 right-20 z-20 lg:hidden"
           style={{ bottom: `${navBottomOffset + 8}px` }}
         >
-          <button
-            onClick={() => navigate(`/perfiles/${story.user_id}`)}
-            className="block text-left mb-1"
-          >
+          <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="block text-left mb-1">
             <p className="text-white font-bold text-[15px] leading-tight drop-shadow-lg">@{story.username}</p>
           </button>
           {story.caption && (
@@ -143,12 +128,8 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
           <p className="text-white/40 text-[11px] mt-1.5">{timeAgo(story.created_at)}</p>
         </div>
 
-        {/* Bottom user info + caption — desktop: avatar above name, bottom-left, bigger */}
         <div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2.5 max-w-[360px]">
-          <button
-            onClick={() => navigate(`/perfiles/${story.user_id}`)}
-            className="flex flex-col items-start gap-2.5"
-          >
+          <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5">
             <div className="w-16 h-16 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
               {story.avatar_url ? (
                 <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
@@ -164,7 +145,6 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
           <p className="text-white/40 text-sm mt-0.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>{timeAgo(story.created_at)}</p>
         </div>
 
-        {/* Progress bar — top on mobile, bottom on desktop — loops with video */}
         {isActive && (
           <>
             <div className="absolute top-0 left-0 right-0 h-[2px] z-30 overflow-hidden lg:hidden">
@@ -187,7 +167,6 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
         )}
       </div>
 
-      {/* Desktop action icons — outside the video panel to the right, same X as next arrow */}
       <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', bottom: '60px' }}>
         <DesktopActionButtons story={story} onFavorite={onFavorite} navigate={navigate} />
       </div>
@@ -195,7 +174,6 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
   );
 }
 
-/* Mobile action buttons (inside video, smaller) */
 function MobileActionButtons({ story, onFavorite, onToggleMute, isMuted, navigate }) {
   return (
     <>
@@ -232,7 +210,6 @@ function MobileActionButtons({ story, onFavorite, onToggleMute, isMuted, navigat
   );
 }
 
-/* Desktop action buttons (outside video, bigger, no avatar — it's inside the video now) */
 function DesktopActionButtons({ story, onFavorite, navigate }) {
   return (
     <>
@@ -262,258 +239,85 @@ export default function VideoFeedPage() {
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
   const lastDesktopWheelAtRef = useRef(0);
-  const lastVisiblePaneRef = useRef(1);
 
-  // Hydrate from sessionStorage to skip loading spinner on revisit
-  const cachedState = () => {
+  const cachedStories = () => {
     try {
-      if (sessionStorage.getItem('vf_cache_version') !== STORIES_CACHE_VERSION) {
-        return { stories: [], nextPage: 1, hasMore: true };
-      }
-
-      const rawStories = sessionStorage.getItem('vf_stories');
-      const rawNextPage = sessionStorage.getItem('vf_next_page');
-      const rawHasMore = sessionStorage.getItem('vf_has_more');
-
-      return {
-        stories: rawStories ? JSON.parse(rawStories) : [],
-        nextPage: rawNextPage ? Math.max(1, parseInt(rawNextPage, 10)) : 1,
-        hasMore: rawHasMore !== '0',
-      };
+      const raw = sessionStorage.getItem('vf_stories');
+      if (raw) return JSON.parse(raw);
     } catch {}
-    return { stories: [], nextPage: 1, hasMore: true };
+    return [];
   };
-  const initialCache = cachedState();
+  const initial = cachedStories();
 
-  const [stories, setStories] = useState(initialCache.stories);
-  const [loading, setLoading] = useState(initialCache.stories.length === 0);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [nextPage, setNextPage] = useState(initialCache.nextPage);
-  const [hasMoreStories, setHasMoreStories] = useState(initialCache.hasMore);
-  const savedIdx = () => {
-    try {
-      const v = sessionStorage.getItem('vf_story_idx');
-      return v ? Math.max(0, parseInt(v, 10)) : 0;
-    } catch {
-      return 0;
-    }
-  };
+  const [stories, setStories] = useState(initial);
+  const [loading, setLoading] = useState(initial.length === 0);
+  const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
-  const [activeStoryIdx, setActiveStoryIdx] = useState(savedIdx);
-  const [visiblePaneIdx, setVisiblePaneIdx] = useState(1);
+  const [activeDispIdx, setActiveDispIdx] = useState(savedIdx);
   const [isMuted, setIsMuted] = useState(savedMuted);
-  const [paneSlots, setPaneSlots] = useState([]);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
-  const persistStoriesCache = useCallback((nextStories, incomingNextPage, incomingHasMore) => {
-    try {
-      sessionStorage.setItem('vf_cache_version', STORIES_CACHE_VERSION);
-      sessionStorage.setItem('vf_stories', JSON.stringify(nextStories));
-      sessionStorage.setItem('vf_next_page', String(incomingNextPage));
-      sessionStorage.setItem('vf_has_more', incomingHasMore ? '1' : '0');
-    } catch {}
-  }, []);
+  const isDesktopViewport = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
 
-  const mergeStories = useCallback((prevStories, incomingStories) => {
-    const merged = [...prevStories];
-    const seen = new Set(prevStories.map((story) => story.id));
-
-    for (const story of incomingStories) {
-      if (seen.has(story.id)) continue;
-      seen.add(story.id);
-      merged.push(story);
-    }
-
-    return merged;
-  }, []);
-
-  const getPrevIndexFor = useCallback((storyIdx, totalStories, canWrap) => {
-    if (totalStories <= 1) return null;
-    if (storyIdx > 0) return storyIdx - 1;
-    return canWrap ? totalStories - 1 : null;
-  }, []);
-
-  const getNextIndexFor = useCallback((storyIdx, totalStories, canWrap) => {
-    if (totalStories <= 1) return null;
-    if (storyIdx < totalStories - 1) return storyIdx + 1;
-    return canWrap ? 0 : null;
-  }, []);
-
-  const buildPaneSlots = useCallback((storyIdx, totalStories, canWrap) => ([
-    { slotId: PANE_SLOTS[0], storyIdx: getPrevIndexFor(storyIdx, totalStories, canWrap) },
-    { slotId: PANE_SLOTS[1], storyIdx },
-    { slotId: PANE_SLOTS[2], storyIdx: getNextIndexFor(storyIdx, totalStories, canWrap) },
-  ]), [getNextIndexFor, getPrevIndexFor]);
-
-  const loadStoriesPage = useCallback(async (pageToLoad, { replace = false } = {}) => {
-    const data = await getStories({ page: pageToLoad, limit: STORIES_PAGE_SIZE });
-    const incomingStories = data.stories || [];
-    const incomingHasMore = Boolean(data.has_more);
-    const incomingNextPage = data.next_page ?? (incomingHasMore ? pageToLoad + 1 : pageToLoad);
-
-    setHasMoreStories(incomingHasMore);
-    setNextPage(incomingNextPage);
-
-    if (replace) {
-      setStories(incomingStories);
-      persistStoriesCache(incomingStories, incomingNextPage, incomingHasMore);
-      return incomingStories;
-    }
-
-    let mergedStories = incomingStories;
-    setStories((prevStories) => {
-      mergedStories = mergeStories(prevStories, incomingStories);
-      return mergedStories;
-    });
-    persistStoriesCache(mergedStories, incomingNextPage, incomingHasMore);
-    return mergedStories;
-  }, [mergeStories, persistStoriesCache]);
+  const infiniteStories = stories.length > 0
+    ? [stories[stories.length - 1], ...stories, stories[0]]
+    : [];
 
   useEffect(() => {
-    if (initialCache.stories.length > 0) {
-      setLoading(false);
-      return undefined;
-    }
-
     let cancelled = false;
-    loadStoriesPage(1, { replace: true })
+    getStories()
+      .then(data => {
+        if (!cancelled) {
+          const fresh = data.stories || [];
+          setStories(fresh);
+          try { sessionStorage.setItem('vf_stories', JSON.stringify(fresh)); } catch {}
+        }
+      })
       .catch(() => {
-        if (!cancelled) setStories([]);
+        if (!cancelled && stories.length === 0) setStories([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-
     return () => { cancelled = true; };
-  }, [initialCache.stories.length, loadStoriesPage]);
-
-  useEffect(() => {
-    if (loading || loadingMore || !hasMoreStories || stories.length === 0) return;
-    if (activeStoryIdx < Math.max(0, stories.length - LOAD_MORE_THRESHOLD)) return;
-
-    let cancelled = false;
-    setLoadingMore(true);
-
-    loadStoriesPage(nextPage)
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoadingMore(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [activeStoryIdx, hasMoreStories, loadStoriesPage, loading, loadingMore, nextPage, stories.length]);
-
-  useEffect(() => {
-    if (stories.length === 0) return;
-    if (activeStoryIdx < stories.length) return;
-    setActiveStoryIdx(stories.length - 1);
-  }, [activeStoryIdx, stories.length]);
-
-  useEffect(() => {
-    if (stories.length === 0) {
-      setPaneSlots([]);
-      return;
-    }
-
-    setPaneSlots((prevSlots) => {
-      if (
-        prevSlots.length === 3 &&
-        prevSlots[1]?.storyIdx === activeStoryIdx &&
-        prevSlots[0]?.storyIdx === getPrevIndexFor(activeStoryIdx, stories.length, !hasMoreStories) &&
-        prevSlots[2]?.storyIdx === getNextIndexFor(activeStoryIdx, stories.length, !hasMoreStories)
-      ) {
-        return prevSlots;
-      }
-
-      return buildPaneSlots(activeStoryIdx, stories.length, !hasMoreStories);
-    });
-  }, [activeStoryIdx, buildPaneSlots, getNextIndexFor, getPrevIndexFor, hasMoreStories, stories.length]);
-
-  const centerCurrentPane = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return false;
-    const height = container.clientHeight;
-    if (!height) return false;
-    container.scrollTop = height;
-    return true;
   }, []);
 
   useLayoutEffect(() => {
-    if (paneSlots.length !== 3) return;
-    setVisiblePaneIdx(1);
-    lastVisiblePaneRef.current = 1;
+    if (stories.length === 0 || !containerRef.current) return;
 
-    if (centerCurrentPane()) return undefined;
+    const container = containerRef.current;
+    const syncInitialPosition = () => {
+      const height = container.clientHeight;
+      if (!height) return false;
+
+      const idx = Math.min(Math.max(activeDispIdx, 1), stories.length);
+      container.scrollTop = height * idx;
+      return true;
+    };
+
+    if (syncInitialPosition()) return undefined;
 
     let rafId = requestAnimationFrame(() => {
-      centerCurrentPane();
+      syncInitialPosition();
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [centerCurrentPane, paneSlots.length]);
+  }, [stories.length]);
 
   useEffect(() => {
-    try { sessionStorage.setItem('vf_story_idx', String(activeStoryIdx)); } catch {}
-  }, [activeStoryIdx]);
+    try { sessionStorage.setItem('vf_idx', String(activeDispIdx)); } catch {}
+  }, [activeDispIdx]);
   useEffect(() => {
     try { sessionStorage.setItem('vf_muted', isMuted ? '1' : '0'); } catch {}
   }, [isMuted]);
 
   useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
 
-  const getPrevStoryIndex = useCallback(() => (
-    getPrevIndexFor(activeStoryIdx, stories.length, !hasMoreStories)
-  ), [activeStoryIdx, getPrevIndexFor, hasMoreStories, stories.length]);
-
-  const getNextStoryIndex = useCallback(() => (
-    getNextIndexFor(activeStoryIdx, stories.length, !hasMoreStories)
-  ), [activeStoryIdx, getNextIndexFor, hasMoreStories, stories.length]);
-
-  const commitPaneTransition = useCallback((direction, targetStoryIdx) => {
-    const container = containerRef.current;
-    if (!container || paneSlots.length !== 3) return;
-
-    isJumpingRef.current = true;
-    container.style.scrollSnapType = 'none';
-    setActiveStoryIdx(targetStoryIdx);
-    setVisiblePaneIdx(1);
-    lastVisiblePaneRef.current = 1;
-    setPaneSlots((prevSlots) => {
-      if (prevSlots.length !== 3) return prevSlots;
-
-      if (direction > 0) {
-        const [prevPane, currentPane, nextPane] = prevSlots;
-        return [
-          { ...currentPane, storyIdx: activeStoryIdx },
-          { ...nextPane, storyIdx: targetStoryIdx },
-          { ...prevPane, storyIdx: getNextIndexFor(targetStoryIdx, stories.length, !hasMoreStories) },
-        ];
-      }
-
-      const [prevPane, currentPane, nextPane] = prevSlots;
-      return [
-        { ...nextPane, storyIdx: getPrevIndexFor(targetStoryIdx, stories.length, !hasMoreStories) },
-        { ...prevPane, storyIdx: targetStoryIdx },
-        { ...currentPane, storyIdx: activeStoryIdx },
-      ];
-    });
-
-    requestAnimationFrame(() => {
-      centerCurrentPane();
-      requestAnimationFrame(() => {
-        if (containerRef.current) {
-          containerRef.current.style.scrollSnapType = 'y mandatory';
-        }
-        isJumpingRef.current = false;
-      });
-    });
-  }, [activeStoryIdx, centerCurrentPane, getNextIndexFor, getPrevIndexFor, hasMoreStories, paneSlots.length, stories.length]);
-
-  const settlePane = useCallback(() => {
+  const settleInfiniteBoundary = useCallback(() => {
     const container = containerRef.current;
     if (!container || isJumpingRef.current || stories.length === 0) return;
 
@@ -521,38 +325,36 @@ export default function VideoFeedPage() {
     const rawIndex = Math.round(container.scrollTop / height);
 
     if (rawIndex === 0) {
-      const prevStoryIdx = getPrevStoryIndex();
-      if (prevStoryIdx == null) {
-        centerCurrentPane();
-        setVisiblePaneIdx(1);
-        lastVisiblePaneRef.current = 1;
-        return;
-      }
-
-      commitPaneTransition(-1, prevStoryIdx);
+      isJumpingRef.current = true;
+      container.style.scrollSnapType = 'none';
+      container.scrollTop = stories.length * height;
+      setActiveDispIdx(stories.length);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (containerRef.current) {
+            containerRef.current.style.scrollSnapType = 'y mandatory';
+          }
+          isJumpingRef.current = false;
+        });
+      });
       return;
     }
 
-    if (rawIndex === 2) {
-      const nextStoryIdx = getNextStoryIndex();
-      if (nextStoryIdx == null) {
-        centerCurrentPane();
-        setVisiblePaneIdx(1);
-        lastVisiblePaneRef.current = 1;
-        return;
-      }
-
-      commitPaneTransition(1, nextStoryIdx);
-      return;
+    if (rawIndex >= stories.length + 1) {
+      isJumpingRef.current = true;
+      container.style.scrollSnapType = 'none';
+      container.scrollTop = height;
+      setActiveDispIdx(1);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (containerRef.current) {
+            containerRef.current.style.scrollSnapType = 'y mandatory';
+          }
+          isJumpingRef.current = false;
+        });
+      });
     }
-
-    if (rawIndex !== 1) {
-      centerCurrentPane();
-    }
-
-    setVisiblePaneIdx(1);
-    lastVisiblePaneRef.current = 1;
-  }, [centerCurrentPane, commitPaneTransition, getNextStoryIndex, getPrevStoryIndex, stories.length]);
+  }, [stories.length]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -560,30 +362,28 @@ export default function VideoFeedPage() {
 
     const handleScrollEnd = () => {
       clearTimeout(scrollEndTimer.current);
-      settlePane();
+      settleInfiniteBoundary();
     };
 
     container.addEventListener('scrollend', handleScrollEnd);
     return () => container.removeEventListener('scrollend', handleScrollEnd);
-  }, [settlePane]);
+  }, [settleInfiniteBoundary]);
 
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container || isJumpingRef.current) return;
-
     const height = container.clientHeight;
-    const rawIndex = Math.max(0, Math.min(2, Math.round(container.scrollTop / height)));
+    const rawIndex = Math.round(container.scrollTop / height);
 
-    if (rawIndex !== lastVisiblePaneRef.current) {
-      lastVisiblePaneRef.current = rawIndex;
-      setVisiblePaneIdx(rawIndex);
+    if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
+      setActiveDispIdx(rawIndex);
     }
 
     clearTimeout(scrollEndTimer.current);
     scrollEndTimer.current = setTimeout(() => {
-      settlePane();
-    }, 160);
-  }, [settlePane]);
+      settleInfiniteBoundary();
+    }, 180);
+  }, [activeDispIdx, settleInfiniteBoundary, stories.length]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
@@ -599,9 +399,7 @@ export default function VideoFeedPage() {
   const scrollByOne = useCallback((dir) => {
     const container = containerRef.current;
     if (!container) return;
-    const height = container.clientHeight;
-    const targetPane = dir > 0 ? 2 : 0;
-    container.scrollTo({ top: height * targetPane, behavior: 'smooth' });
+    container.scrollBy({ top: dir * container.clientHeight, behavior: 'smooth' });
   }, []);
 
   const handleDesktopWheel = useCallback((event) => {
@@ -632,7 +430,6 @@ export default function VideoFeedPage() {
     );
   }
 
-  // Empty state
   if (stories.length === 0) {
     return (
       <div className="fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-40 px-6">
@@ -664,27 +461,13 @@ export default function VideoFeedPage() {
           </button>
         </motion.div>
 
-        {/* Bottom nav spacing */}
         <div className="h-20" />
       </div>
     );
   }
 
-  if (paneSlots.length !== 3) {
-    return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center z-40">
-        <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  const paneStories = paneSlots.length === 3
-    ? paneSlots.map((pane) => (pane.storyIdx == null ? null : stories[pane.storyIdx] || null))
-    : [];
-
   return (
     <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
-      {/* Video feed container */}
       <div
         ref={containerRef}
         onScroll={handleScroll}
@@ -697,26 +480,23 @@ export default function VideoFeedPage() {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        {paneStories.map((story, displayIndex) => (
-          <div key={paneSlots[displayIndex]?.slotId || displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
-            {story ? (
-              <StoryCard
-                story={story}
-                videoSrc={story.video_url}
-                isActive={displayIndex === visiblePaneIdx}
-                onFavorite={handleFavorite}
-                isMuted={isMuted}
-                onToggleMute={() => setIsMuted(m => !m)}
-                gradientHeight={gradientHeight}
-                gradientOpacity={gradientOpacity}
-                navBottomOffset={navBottomOffset}
-              />
-            ) : null}
+        {infiniteStories.map((story, displayIndex) => (
+          <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+            <StoryCard
+              story={story}
+              videoSrc={story.video_url}
+              isActive={displayIndex === activeDispIdx}
+              onFavorite={handleFavorite}
+              isMuted={isMuted}
+              onToggleMute={() => setIsMuted(m => !m)}
+              gradientHeight={gradientHeight}
+              gradientOpacity={gradientOpacity}
+              navBottomOffset={navBottomOffset}
+            />
           </div>
         ))}
       </div>
 
-      {/* Scroll arrows — desktop only, < prev left / next > right */}
       {stories.length > 1 && (
         <>
           <button
@@ -736,7 +516,6 @@ export default function VideoFeedPage() {
         </>
       )}
 
-      {/* Bottom safe area for nav */}
       <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/70 to-transparent pointer-events-none z-10 lg:hidden" />
     </div>
   );
