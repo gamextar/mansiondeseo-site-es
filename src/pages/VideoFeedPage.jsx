@@ -33,9 +33,18 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
     const video = videoRef.current;
     if (!video || !videoSrc) return;
 
+    video.pause();
+    video.currentTime = 0;
+    video.load();
+    setIsPlaying(false);
+  }, [videoSrc]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoSrc) return;
+
     if (isActive) {
       video.muted = isMuted;
-      video.currentTime = 0;
       video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     } else {
       // Keep side panes warm so the next/prev story already has decoded frames
