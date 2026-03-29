@@ -280,16 +280,6 @@ export default function VideoFeedPage() {
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
 
-  // Which display indices should be active? The real active + its clone if on boundary.
-  const isActiveForIndex = useCallback((displayIndex) => {
-    if (displayIndex === activeDispIdx) return true;
-    // Clone of last story at position 0 — active when viewing last real story
-    if (displayIndex === 0 && activeDispIdx === stories.length) return true;
-    // Clone of first story at last position — active when viewing first real story
-    if (displayIndex === stories.length + 1 && activeDispIdx === 1) return true;
-    return false;
-  }, [activeDispIdx, stories.length]);
-
   // Infinite list: clone of last item prepended, clone of first appended
   const infiniteStories = stories.length > 0
     ? [stories[stories.length - 1], ...stories, stories[0]]
@@ -350,22 +340,32 @@ export default function VideoFeedPage() {
 
     if (rawIndex === 0) {
       isJumpingRef.current = true;
-      // Set scrollTop directly without disabling snap.
-      // Safari's compositor treats this as an atomic snap operation instead of a visible DOM jump.
+      container.style.scrollSnapType = 'none';
       container.scrollTop = stories.length * height;
       setActiveDispIdx(stories.length);
       requestAnimationFrame(() => {
-        isJumpingRef.current = false;
+        requestAnimationFrame(() => {
+          if (containerRef.current) {
+            containerRef.current.style.scrollSnapType = 'y mandatory';
+          }
+          isJumpingRef.current = false;
+        });
       });
       return;
     }
 
     if (rawIndex >= stories.length + 1) {
       isJumpingRef.current = true;
+      container.style.scrollSnapType = 'none';
       container.scrollTop = height;
       setActiveDispIdx(1);
       requestAnimationFrame(() => {
-        isJumpingRef.current = false;
+        requestAnimationFrame(() => {
+          if (containerRef.current) {
+            containerRef.current.style.scrollSnapType = 'y mandatory';
+          }
+          isJumpingRef.current = false;
+        });
       });
     }
   }, [stories.length]);
@@ -389,7 +389,7 @@ export default function VideoFeedPage() {
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
 
-    // Update active index only for real positions (not clones)
+    // Keep the previous active item while on edge clones to avoid visible jump glitches.
     if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
       setActiveDispIdx(rawIndex);
     }
@@ -482,7 +482,7 @@ export default function VideoFeedPage() {
           <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
             <StoryCard
               story={story}
-              isActive={isActiveForIndex(displayIndex)}
+              isActive={displayIndex === activeDispIdx}
               onFavorite={handleFavorite}
               isMuted={isMuted}
               onToggleMute={() => setIsMuted(m => !m)}
