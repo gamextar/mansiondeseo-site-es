@@ -6,6 +6,10 @@ import { getStories, toggleFavorite } from '../lib/api';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
 
+const STORIES_CACHE_VERSION = '3';
+const STORIES_PAGE_SIZE = 12;
+const LOAD_MORE_THRESHOLD = 4;
+
 function timeAgo(dateStr) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z').getTime();
@@ -257,90 +261,204 @@ export default function VideoFeedPage() {
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
   const lastDesktopWheelAtRef = useRef(0);
+  const lastVisiblePaneRef = useRef(1);
 
   // Hydrate from sessionStorage to skip loading spinner on revisit
-  const cachedStories = () => {
+  const cachedState = () => {
     try {
-      const raw = sessionStorage.getItem('vf_stories');
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return [];
-  };
-  const initial = cachedStories();
+      if (sessionStorage.getItem('vf_cache_version') !== STORIES_CACHE_VERSION) {
+        return { stories: [], nextPage: 1, hasMore: true };
+      }
 
-  const [stories, setStories] = useState(initial);
-  const [loading, setLoading] = useState(initial.length === 0);
-  const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
+      const rawStories = sessionStorage.getItem('vf_stories');
+      const rawNextPage = sessionStorage.getItem('vf_next_page');
+      const rawHasMore = sessionStorage.getItem('vf_has_more');
+
+      return {
+        stories: rawStories ? JSON.parse(rawStories) : [],
+        nextPage: rawNextPage ? Math.max(1, parseInt(rawNextPage, 10)) : 1,
+        hasMore: rawHasMore !== '0',
+      };
+    } catch {}
+    return { stories: [], nextPage: 1, hasMore: true };
+  };
+  const initialCache = cachedState();
+
+  const [stories, setStories] = useState(initialCache.stories);
+  const [loading, setLoading] = useState(initialCache.stories.length === 0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextPage, setNextPage] = useState(initialCache.nextPage);
+  const [hasMoreStories, setHasMoreStories] = useState(initialCache.hasMore);
+  const savedIdx = () => {
+    try {
+      const v = sessionStorage.getItem('vf_story_idx');
+      return v ? Math.max(0, parseInt(v, 10)) : 0;
+    } catch {
+      return 0;
+    }
+  };
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
-  const [activeDispIdx, setActiveDispIdx] = useState(savedIdx);
+  const [activeStoryIdx, setActiveStoryIdx] = useState(savedIdx);
+  const [visiblePaneIdx, setVisiblePaneIdx] = useState(1);
   const [isMuted, setIsMuted] = useState(savedMuted);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
-  const isDesktopViewport = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+  const persistStoriesCache = useCallback((nextStories, incomingNextPage, incomingHasMore) => {
+    try {
+      sessionStorage.setItem('vf_cache_version', STORIES_CACHE_VERSION);
+      sessionStorage.setItem('vf_stories', JSON.stringify(nextStories));
+      sessionStorage.setItem('vf_next_page', String(incomingNextPage));
+      sessionStorage.setItem('vf_has_more', incomingHasMore ? '1' : '0');
+    } catch {}
+  }, []);
 
-  // Infinite list: clone of last item prepended, clone of first appended
-  const infiniteStories = stories.length > 0
-    ? [stories[stories.length - 1], ...stories, stories[0]]
-    : [];
+  const mergeStories = useCallback((prevStories, incomingStories) => {
+    const merged = [...prevStories];
+    const seen = new Set(prevStories.map((story) => story.id));
+
+    for (const story of incomingStories) {
+      if (seen.has(story.id)) continue;
+      seen.add(story.id);
+      merged.push(story);
+    }
+
+    return merged;
+  }, []);
+
+  const loadStoriesPage = useCallback(async (pageToLoad, { replace = false } = {}) => {
+    const data = await getStories({ page: pageToLoad, limit: STORIES_PAGE_SIZE });
+    const incomingStories = data.stories || [];
+    const incomingHasMore = Boolean(data.has_more);
+    const incomingNextPage = data.next_page ?? (incomingHasMore ? pageToLoad + 1 : pageToLoad);
+
+    setHasMoreStories(incomingHasMore);
+    setNextPage(incomingNextPage);
+
+    if (replace) {
+      setStories(incomingStories);
+      persistStoriesCache(incomingStories, incomingNextPage, incomingHasMore);
+      return incomingStories;
+    }
+
+    let mergedStories = incomingStories;
+    setStories((prevStories) => {
+      mergedStories = mergeStories(prevStories, incomingStories);
+      return mergedStories;
+    });
+    persistStoriesCache(mergedStories, incomingNextPage, incomingHasMore);
+    return mergedStories;
+  }, [mergeStories, persistStoriesCache]);
 
   useEffect(() => {
+    if (initialCache.stories.length > 0) {
+      setLoading(false);
+      return undefined;
+    }
+
     let cancelled = false;
-    getStories()
+    loadStoriesPage(1, { replace: true })
       .catch(() => {
         if (!cancelled) setStories([]);
-      })
-      .then(data => {
-        if (!cancelled) {
-          const fresh = data.stories || [];
-          setStories(fresh);
-          try { sessionStorage.setItem('vf_stories', JSON.stringify(fresh)); } catch {}
-        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
 
     return () => { cancelled = true; };
+  }, [initialCache.stories.length, loadStoriesPage]);
+
+  useEffect(() => {
+    if (loading || loadingMore || !hasMoreStories || stories.length === 0) return;
+    if (activeStoryIdx < Math.max(0, stories.length - LOAD_MORE_THRESHOLD)) return;
+
+    let cancelled = false;
+    setLoadingMore(true);
+
+    loadStoriesPage(nextPage)
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadingMore(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [activeStoryIdx, hasMoreStories, loadStoriesPage, loading, loadingMore, nextPage, stories.length]);
+
+  useEffect(() => {
+    if (stories.length === 0) return;
+    if (activeStoryIdx < stories.length) return;
+    setActiveStoryIdx(stories.length - 1);
+  }, [activeStoryIdx, stories.length]);
+
+  const centerCurrentPane = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return false;
+    const height = container.clientHeight;
+    if (!height) return false;
+    container.scrollTop = height;
+    return true;
   }, []);
 
-  // After stories load, snap to saved position (or first clip).
   useLayoutEffect(() => {
-    if (stories.length === 0 || !containerRef.current) return;
+    if (stories.length === 0) return;
+    setVisiblePaneIdx(1);
+    lastVisiblePaneRef.current = 1;
 
-    const container = containerRef.current;
-    const syncInitialPosition = () => {
-      const height = container.clientHeight;
-      if (!height) return false;
-
-      const idx = Math.min(Math.max(activeDispIdx, 1), stories.length);
-      container.scrollTop = height * idx;
-      return true;
-    };
-
-    if (syncInitialPosition()) return undefined;
+    if (centerCurrentPane()) return undefined;
 
     let rafId = requestAnimationFrame(() => {
-      syncInitialPosition();
+      centerCurrentPane();
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [stories.length]);
+  }, [centerCurrentPane, stories.length]);
 
-  // Persist position and muted state
   useEffect(() => {
-    try { sessionStorage.setItem('vf_idx', String(activeDispIdx)); } catch {}
-  }, [activeDispIdx]);
+    try { sessionStorage.setItem('vf_story_idx', String(activeStoryIdx)); } catch {}
+  }, [activeStoryIdx]);
   useEffect(() => {
     try { sessionStorage.setItem('vf_muted', isMuted ? '1' : '0'); } catch {}
   }, [isMuted]);
 
   useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
 
-  const settleInfiniteBoundary = useCallback(() => {
+  const getPrevStoryIndex = useCallback(() => {
+    if (stories.length <= 1) return null;
+    if (activeStoryIdx > 0) return activeStoryIdx - 1;
+    return hasMoreStories ? null : stories.length - 1;
+  }, [activeStoryIdx, hasMoreStories, stories.length]);
+
+  const getNextStoryIndex = useCallback(() => {
+    if (stories.length <= 1) return null;
+    if (activeStoryIdx < stories.length - 1) return activeStoryIdx + 1;
+    return hasMoreStories ? null : 0;
+  }, [activeStoryIdx, hasMoreStories, stories.length]);
+
+  const commitPaneTransition = useCallback((targetStoryIdx) => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    isJumpingRef.current = true;
+    container.style.scrollSnapType = 'none';
+    setActiveStoryIdx(targetStoryIdx);
+    setVisiblePaneIdx(1);
+    lastVisiblePaneRef.current = 1;
+
+    requestAnimationFrame(() => {
+      centerCurrentPane();
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          containerRef.current.style.scrollSnapType = 'y mandatory';
+        }
+        isJumpingRef.current = false;
+      });
+    });
+  }, [centerCurrentPane]);
+
+  const settlePane = useCallback(() => {
     const container = containerRef.current;
     if (!container || isJumpingRef.current || stories.length === 0) return;
 
@@ -348,36 +466,38 @@ export default function VideoFeedPage() {
     const rawIndex = Math.round(container.scrollTop / height);
 
     if (rawIndex === 0) {
-      isJumpingRef.current = true;
-      container.style.scrollSnapType = 'none';
-      container.scrollTop = stories.length * height;
-      setActiveDispIdx(stories.length);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (containerRef.current) {
-            containerRef.current.style.scrollSnapType = 'y mandatory';
-          }
-          isJumpingRef.current = false;
-        });
-      });
+      const prevStoryIdx = getPrevStoryIndex();
+      if (prevStoryIdx == null) {
+        centerCurrentPane();
+        setVisiblePaneIdx(1);
+        lastVisiblePaneRef.current = 1;
+        return;
+      }
+
+      commitPaneTransition(prevStoryIdx);
       return;
     }
 
-    if (rawIndex >= stories.length + 1) {
-      isJumpingRef.current = true;
-      container.style.scrollSnapType = 'none';
-      container.scrollTop = height;
-      setActiveDispIdx(1);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (containerRef.current) {
-            containerRef.current.style.scrollSnapType = 'y mandatory';
-          }
-          isJumpingRef.current = false;
-        });
-      });
+    if (rawIndex === 2) {
+      const nextStoryIdx = getNextStoryIndex();
+      if (nextStoryIdx == null) {
+        centerCurrentPane();
+        setVisiblePaneIdx(1);
+        lastVisiblePaneRef.current = 1;
+        return;
+      }
+
+      commitPaneTransition(nextStoryIdx);
+      return;
     }
-  }, [stories.length]);
+
+    if (rawIndex !== 1) {
+      centerCurrentPane();
+    }
+
+    setVisiblePaneIdx(1);
+    lastVisiblePaneRef.current = 1;
+  }, [centerCurrentPane, commitPaneTransition, getNextStoryIndex, getPrevStoryIndex, stories.length]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -385,29 +505,30 @@ export default function VideoFeedPage() {
 
     const handleScrollEnd = () => {
       clearTimeout(scrollEndTimer.current);
-      settleInfiniteBoundary();
+      settlePane();
     };
 
     container.addEventListener('scrollend', handleScrollEnd);
     return () => container.removeEventListener('scrollend', handleScrollEnd);
-  }, [settleInfiniteBoundary]);
+  }, [settlePane]);
 
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container || isJumpingRef.current) return;
-    const height = container.clientHeight;
-    const rawIndex = Math.round(container.scrollTop / height);
 
-    if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
-      setActiveDispIdx(rawIndex);
+    const height = container.clientHeight;
+    const rawIndex = Math.max(0, Math.min(2, Math.round(container.scrollTop / height)));
+
+    if (rawIndex !== lastVisiblePaneRef.current) {
+      lastVisiblePaneRef.current = rawIndex;
+      setVisiblePaneIdx(rawIndex);
     }
 
-    // Fallback for browsers where scrollend is unreliable or unavailable.
     clearTimeout(scrollEndTimer.current);
     scrollEndTimer.current = setTimeout(() => {
-      settleInfiniteBoundary();
-    }, 180);
-  }, [activeDispIdx, settleInfiniteBoundary, stories.length]);
+      settlePane();
+    }, 160);
+  }, [settlePane]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
@@ -423,7 +544,9 @@ export default function VideoFeedPage() {
   const scrollByOne = useCallback((dir) => {
     const container = containerRef.current;
     if (!container) return;
-    container.scrollBy({ top: dir * container.clientHeight, behavior: 'smooth' });
+    const height = container.clientHeight;
+    const targetPane = dir > 0 ? 2 : 0;
+    container.scrollTo({ top: height * targetPane, behavior: 'smooth' });
   }, []);
 
   const handleDesktopWheel = useCallback((event) => {
@@ -492,6 +615,11 @@ export default function VideoFeedPage() {
     );
   }
 
+  const currentStory = stories[activeStoryIdx] || null;
+  const prevStory = stories[getPrevStoryIndex() ?? activeStoryIdx] || currentStory;
+  const nextStory = stories[getNextStoryIndex() ?? activeStoryIdx] || currentStory;
+  const paneStories = [prevStory, currentStory, nextStory];
+
   return (
     <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
       {/* Video feed container */}
@@ -507,32 +635,21 @@ export default function VideoFeedPage() {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        {infiniteStories.map((story, displayIndex) => (
-          <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
-            {(() => {
-              const isLeadingClone = displayIndex === 0;
-              const isTrailingClone = displayIndex === stories.length + 1;
-              const shouldAttachSource =
-                !isDesktopViewport
-                  ? true
-                  : !isLeadingClone && !isTrailingClone
-                  ? true
-                  : (activeDispIdx === 1 && isLeadingClone) || (activeDispIdx === stories.length && isTrailingClone);
-
-              return (
-                <StoryCard
-                  story={story}
-                  videoSrc={shouldAttachSource ? story.video_url : undefined}
-                  isActive={displayIndex === activeDispIdx}
-                  onFavorite={handleFavorite}
-                  isMuted={isMuted}
-                  onToggleMute={() => setIsMuted(m => !m)}
-                  gradientHeight={gradientHeight}
-                  gradientOpacity={gradientOpacity}
-                  navBottomOffset={navBottomOffset}
-                />
-              );
-            })()}
+        {paneStories.map((story, displayIndex) => (
+          <div key={`${story?.id || 'empty'}-${displayIndex}`} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+            {story ? (
+              <StoryCard
+                story={story}
+                videoSrc={story.video_url}
+                isActive={displayIndex === visiblePaneIdx}
+                onFavorite={handleFavorite}
+                isMuted={isMuted}
+                onToggleMute={() => setIsMuted(m => !m)}
+                gradientHeight={gradientHeight}
+                gradientOpacity={gradientOpacity}
+                navBottomOffset={navBottomOffset}
+              />
+            ) : null}
           </div>
         ))}
       </div>

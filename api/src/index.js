@@ -2690,6 +2690,7 @@ async function handleGetStories(request, env) {
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
   const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
   const offset = (page - 1) * limit;
+  const fetchLimit = limit + 1;
 
   const { results } = await env.DB.prepare(`
     SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
@@ -2699,9 +2700,11 @@ async function handleGetStories(request, env) {
     WHERE s.active = 1
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
-  `).bind(limit, offset).all();
+  `).bind(fetchLimit, offset).all();
 
-  const stories = (results || []).map(r => ({
+  const hasMore = (results || []).length > limit;
+  const pageResults = hasMore ? results.slice(0, limit) : (results || []);
+  const stories = pageResults.map(r => ({
     id: r.id,
     user_id: r.user_id,
     video_url: r.video_url,
@@ -2714,7 +2717,7 @@ async function handleGetStories(request, env) {
     avatar_crop: safeParseJSON(r.avatar_crop, null),
   }));
 
-  return json({ stories });
+  return json({ stories, has_more: hasMore, next_page: hasMore ? page + 1 : null });
 }
 
 // POST /api/admin/upload-story — admin uploads a video story for any user
