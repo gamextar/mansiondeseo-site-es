@@ -24,21 +24,28 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const navigate = useNavigate();
 
-  // The actual src passed to <video> — empty string if not in load window
-  const activeSrc = shouldLoad ? videoSrc : undefined;
+  // Once src is set, never clear it — clearing causes browser to reload the video
+  // which produces the black flash/glitch at boundaries. Matches original behavior.
+  const loadedSrcRef = useRef(undefined);
+  if (shouldLoad && videoSrc) {
+    loadedSrcRef.current = videoSrc;
+  }
+  const activeSrc = loadedSrcRef.current;
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !activeSrc) return;
+    if (!video) return;
 
     if (isActive) {
-      video.currentTime = 0;
-      video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      if (activeSrc) {
+        video.currentTime = 0;
+        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      }
     } else {
       video.pause();
       setIsPlaying(false);
     }
-  }, [isActive, activeSrc]);
+  }, [isActive]);
 
   useEffect(() => {
     const video = videoRef.current;
