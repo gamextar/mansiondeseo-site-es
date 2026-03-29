@@ -18,7 +18,7 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function StoryCard({ story, videoSrc, isActive, preloadMode, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
+function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
@@ -29,27 +29,8 @@ function StoryCard({ story, videoSrc, isActive, preloadMode, onFavorite, isMuted
     if (!video || !videoSrc) return;
 
     if (isActive) {
-      if (video.preload !== 'auto') {
-        video.preload = 'auto';
-      }
-      video.load();
       video.currentTime = 0;
-
-      const tryPlay = () => {
-        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-      };
-
-      if (video.readyState >= 2) {
-        tryPlay();
-      } else {
-        video.addEventListener('loadeddata', tryPlay, { once: true });
-        video.addEventListener('canplay', tryPlay, { once: true });
-      }
-
-      return () => {
-        video.removeEventListener('loadeddata', tryPlay);
-        video.removeEventListener('canplay', tryPlay);
-      };
+      video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     } else {
       video.pause();
       setIsPlaying(false);
@@ -95,7 +76,7 @@ function StoryCard({ story, videoSrc, isActive, preloadMode, onFavorite, isMuted
           loop
           playsInline
           muted={isMuted}
-          preload={preloadMode}
+          preload="auto"
           onClick={togglePlay}
           onEnded={handleVideoEnd}
         />
@@ -288,7 +269,6 @@ export default function VideoFeedPage() {
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
-  const [isInitialPositionReady, setIsInitialPositionReady] = useState(false);
   const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
@@ -334,7 +314,6 @@ export default function VideoFeedPage() {
     if (stories.length === 0 || !containerRef.current) return;
 
     const container = containerRef.current;
-    setIsInitialPositionReady(false);
     const syncInitialPosition = () => {
       const height = container.clientHeight;
       if (!height) return false;
@@ -344,15 +323,10 @@ export default function VideoFeedPage() {
       return true;
     };
 
-    if (syncInitialPosition()) {
-      setIsInitialPositionReady(true);
-      return undefined;
-    }
+    if (syncInitialPosition()) return undefined;
 
     let rafId = requestAnimationFrame(() => {
-      if (syncInitialPosition()) {
-        setIsInitialPositionReady(true);
-      }
+      syncInitialPosition();
     });
 
     return () => cancelAnimationFrame(rafId);
@@ -509,7 +483,6 @@ export default function VideoFeedPage() {
         onScroll={handleScroll}
         className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
         style={{
-          opacity: isInitialPositionReady ? 1 : 0,
           scrollSnapType: 'y mandatory',
           touchAction: 'pan-y',
           overscrollBehavior: 'none',
@@ -519,19 +492,18 @@ export default function VideoFeedPage() {
         {infiniteStories.map((story, displayIndex) => (
           <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
             {(() => {
-              const isNearActive = Math.abs(displayIndex - activeDispIdx) <= 1;
+              const isLeadingClone = displayIndex === 0;
+              const isTrailingClone = displayIndex === stories.length + 1;
               const shouldAttachSource =
-                displayIndex === activeDispIdx ||
-                isNearActive ||
-                (activeDispIdx === 1 && displayIndex === 0) ||
-                (activeDispIdx === stories.length && displayIndex === stories.length + 1);
+                !isLeadingClone && !isTrailingClone
+                  ? true
+                  : (activeDispIdx === 1 && isLeadingClone) || (activeDispIdx === stories.length && isTrailingClone);
 
               return (
             <StoryCard
               story={story}
               videoSrc={shouldAttachSource ? story.video_url : undefined}
-              isActive={isInitialPositionReady && displayIndex === activeDispIdx}
-              preloadMode={displayIndex === activeDispIdx ? 'auto' : Math.abs(displayIndex - activeDispIdx) <= 1 ? 'metadata' : 'none'}
+              isActive={displayIndex === activeDispIdx}
               onFavorite={handleFavorite}
               isMuted={isMuted}
               onToggleMute={() => setIsMuted(m => !m)}
