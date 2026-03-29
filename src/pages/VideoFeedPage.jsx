@@ -535,11 +535,11 @@ export default function VideoFeedPage() {
       const now = performance.now();
       const timeSinceLastScroll = now - lastScrollAtRef.current;
 
-      if (lastScrollAtRef.current > 0 && timeSinceLastScroll < 20) {
+      if (lastScrollAtRef.current > 0 && timeSinceLastScroll < 170) {
         clearTimeout(boundaryCooldownTimer.current);
         boundaryCooldownTimer.current = setTimeout(() => {
           settleInfiniteBoundary();
-        }, 20 - timeSinceLastScroll);
+        }, 170 - timeSinceLastScroll);
         return;
       }
 
