@@ -74,13 +74,12 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset, avatarSize }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
-  const navigate = useNavigate();
 
   // Once src is set, never clear it — clearing causes browser to reload the video
   // which produces the black flash/glitch at boundaries. Matches original behavior.
@@ -188,37 +187,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onT
         />
         <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none lg:rounded-t-2xl" />
 
-        <div
-          className="absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden"
-          style={{ bottom: `${navBottomOffset + 16}px` }}
-        >
-          <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
-        </div>
-
-        <button onClick={onToggleMute} className="hidden lg:flex absolute top-4 right-4 z-20 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-200" style={{ width: 52, height: 52 }}>
-          {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
-        </button>
-
-        <div
-          className="absolute left-4 right-20 z-20 lg:hidden"
-          style={{ bottom: `${navBottomOffset + 8}px` }}
-        >
-          <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5 mb-1">
-            <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
-              {story.avatar_url ? (
-                <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
-              )}
-            </div>
-            <p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{story.username}</p>
-          </button>
-          {story.caption && (
-            <p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
-          )}
-          <p className="text-white/40 text-[11px] mt-1.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{timeAgo(story.created_at)}</p>
-        </div>
-
         <div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2.5 max-w-[360px]">
           <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5">
             <div className="rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize + 12, height: avatarSize + 12 }}>
@@ -309,7 +277,46 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
   );
 }
 
-function DesktopActionButtons({ story, onFavorite, navigate }) {
+function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, navBottomOffset, avatarSize }) {
+  if (!story) return null;
+
+  return (
+    <>
+      <div
+        className="fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
+        style={{ bottom: `${navBottomOffset + 16}px` }}
+      >
+        <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
+      </div>
+
+      <div
+        className="fixed left-4 right-20 z-50 lg:hidden"
+        style={{ bottom: `${navBottomOffset + 8}px` }}
+      >
+        <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5 mb-1">
+          <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
+            {story.avatar_url ? (
+              <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
+            )}
+          </div>
+          <p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{story.username}</p>
+        </button>
+        {story.caption && (
+          <p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
+        )}
+        <p className="text-white/40 text-[11px] mt-1.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{timeAgo(story.created_at)}</p>
+      </div>
+
+      <button onClick={onToggleMute} className="hidden lg:flex fixed top-4 right-4 z-50 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-200" style={{ width: 52, height: 52 }}>
+        {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
+      </button>
+    </>
+  );
+}
+
+function DesktopActionButtons({ story, onLike, navigate }) {
   const [burstTrigger, setBurstTrigger] = useState(0);
 
   const handleHeart = () => {
@@ -376,6 +383,7 @@ export default function VideoFeedPage() {
   const infiniteStories = stories.length > 0
     ? [stories[stories.length - 1], ...stories, stories[0]]
     : [];
+  const activeStory = infiniteStories[activeDispIdx] || stories[0] || null;
 
   useEffect(() => {
     let cancelled = false;
@@ -616,18 +624,27 @@ export default function VideoFeedPage() {
                 videoSrc={story.video_url}
                 isActive={displayIndex === activeDispIdx}
                 shouldLoad={shouldLoad}
-                onLike={handleLike}
                 isMuted={isMuted}
-                onToggleMute={() => setIsMuted(m => !m)}
+                avatarSize={avatarSize}
+                onLike={handleLike}
+                navigate={navigate}
                 gradientHeight={gradientHeight}
                 gradientOpacity={gradientOpacity}
-                navBottomOffset={navBottomOffset}
-                avatarSize={avatarSize}
               />
             </div>
           );
         })}
       </div>
+
+      <MobileStoryOverlay
+        story={activeStory}
+        onLike={handleLike}
+        onToggleMute={() => setIsMuted(m => !m)}
+        isMuted={isMuted}
+        navigate={navigate}
+        navBottomOffset={navBottomOffset}
+        avatarSize={avatarSize}
+      />
 
       {stories.length > 1 && (
         <>
