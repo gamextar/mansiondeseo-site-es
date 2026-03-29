@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift } from 'lucide-react';
@@ -242,11 +242,9 @@ function DesktopActionButtons({ story, onFavorite, navigate }) {
 export default function VideoFeedPage() {
   const navigate = useNavigate();
   const { siteSettings } = useAuth();
-  const outerRef = useRef(null);
-  const sliderRef = useRef(null);
-  const touchRef = useRef({ startY: 0, startTime: 0, isDragging: false });
-  const isAnimatingRef = useRef(false);
-  const pendingDirRef = useRef(0);
+  const containerRef = useRef(null);
+  const isJumpingRef = useRef(false);
+  const scrollTimerRef = useRef(null);
   const lastWheelRef = useRef(0);
 
   const cachedStories = () => {
@@ -260,7 +258,11 @@ export default function VideoFeedPage() {
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
-  const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(0, parseInt(v, 10)) : 0; } catch { return 0; } };
+  // activeIdx is the display index in the infinite array (1-based for real stories)
+  const savedIdx = () => {
+    try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; }
+    catch { return 1; }
+  };
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
   const [activeIdx, setActiveIdx] = useState(savedIdx);
@@ -271,11 +273,11 @@ export default function VideoFeedPage() {
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
 
-  const wrapIdx = useCallback((i) => {
-    const n = stories.length;
-    if (n === 0) return 0;
-    return ((i % n) + n) % n;
-  }, [stories.length]);
+  // Infinite array: [clone_last, ...stories, clone_first]
+  const N = stories.length;
+  const infiniteItems = N > 0
+    ? [stories[N - 1], ...stories, stories[0]]
+    : [];
 
   // Fetch stories
   useEffect(() => {
@@ -289,13 +291,23 @@ export default function VideoFeedPage() {
         }
       })
       .catch(() => {
-        if (!cancelled && stories.length === 0) setStories([]);
+        if (!cancelled && N === 0) setStories([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
   }, []);
+
+  // Set initial scroll position
+  useLayoutEffect(() => {
+    if (N === 0 || !containerRef.current) return;
+    const container = containerRef.current;
+    const h = container.clientHeight;
+    if (!h) return;
+    const idx = Math.min(Math.max(activeIdx, 1), N);
+    container.scrollTop = idx * h;
+  }, [N]);
 
   // Persist state
   useEffect(() => {
@@ -305,109 +317,100 @@ export default function VideoFeedPage() {
     try { sessionStorage.setItem('vf_muted', isMuted ? '1' : '0'); } catch {}
   }, [isMuted]);
 
-  // Reset transform before paint when activeIdx changes
-  useLayoutEffect(() => {
-    if (!sliderRef.current) return;
-    sliderRef.current.style.transition = 'none';
-    sliderRef.current.style.transform = 'translateY(0)';
-  }, [activeIdx]);
+  // Boundary jump: when landed on a clone, instantly jump to the real position
+  const jumpIfNeeded = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || isJumpingRef.current || N === 0) return;
 
-  // 3-item window: prev, current, next (keyed by story.id for DOM reuse)
-  const items = useMemo(() => {
-    if (stories.length === 0) return [];
-    if (stories.length === 1) return [{ story: stories[0], offset: 0, key: stories[0].id }];
-    const offsets = [-1, 0, 1];
-    return offsets.map(offset => {
-      const idx = wrapIdx(activeIdx + offset);
-      const story = stories[idx];
-      return {
-        story,
-        offset,
-        key: stories.length >= 3 ? story.id : `${story.id}_${offset}`,
-      };
-    });
-  }, [activeIdx, stories, wrapIdx]);
+    const h = container.clientHeight;
+    if (!h) return;
+    const pos = Math.round(container.scrollTop / h);
 
-  // Animate to next/prev
-  const commitNavigation = useCallback((dir) => {
-    if (isAnimatingRef.current || stories.length <= 1) return;
-    isAnimatingRef.current = true;
-    pendingDirRef.current = dir;
-    const el = sliderRef.current;
-    if (!el) return;
-    el.style.transition = 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-    el.style.transform = `translateY(${-dir * window.innerHeight}px)`;
-  }, [stories.length]);
-
-  const handleTransitionEnd = useCallback((e) => {
-    if (e.propertyName !== 'transform') return;
-    isAnimatingRef.current = false;
-    const dir = pendingDirRef.current;
-    pendingDirRef.current = 0;
-    if (dir !== 0) {
-      setActiveIdx(prev => wrapIdx(prev + dir));
+    // Landed on clone_last (position 0) → jump to real last (position N)
+    if (pos === 0) {
+      isJumpingRef.current = true;
+      container.style.scrollSnapType = 'none';
+      container.scrollTop = N * h;
+      setActiveIdx(N);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (containerRef.current) containerRef.current.style.scrollSnapType = 'y mandatory';
+          isJumpingRef.current = false;
+        });
+      });
+      return;
     }
-  }, [wrapIdx]);
 
-  // Touch handlers
-  const handleTouchStart = useCallback((e) => {
-    if (e.touches.length !== 1 || isAnimatingRef.current) return;
-    touchRef.current = { startY: e.touches[0].clientY, startTime: Date.now(), isDragging: true };
-    if (sliderRef.current) sliderRef.current.style.transition = 'none';
-  }, []);
-
-  const handleTouchMove = useCallback((e) => {
-    if (!touchRef.current.isDragging || isAnimatingRef.current) return;
-    const delta = e.touches[0].clientY - touchRef.current.startY;
-    if (Math.abs(delta) < 8) return;
-    if (sliderRef.current) sliderRef.current.style.transform = `translateY(${delta}px)`;
-  }, []);
-
-  const handleTouchEnd = useCallback((e) => {
-    if (!touchRef.current.isDragging) return;
-    touchRef.current.isDragging = false;
-    const delta = e.changedTouches[0].clientY - touchRef.current.startY;
-    const elapsed = Math.max(1, Date.now() - touchRef.current.startTime);
-    const velocity = Math.abs(delta / elapsed);
-    const threshold = window.innerHeight * 0.15;
-
-    if ((Math.abs(delta) > threshold || velocity > 0.3) && stories.length > 1) {
-      commitNavigation(delta < 0 ? 1 : -1);
-    } else {
-      const el = sliderRef.current;
-      if (el) {
-        el.style.transition = 'transform 0.2s ease-out';
-        el.style.transform = 'translateY(0)';
-      }
+    // Landed on clone_first (position N+1) → jump to real first (position 1)
+    if (pos === N + 1) {
+      isJumpingRef.current = true;
+      container.style.scrollSnapType = 'none';
+      container.scrollTop = h;
+      setActiveIdx(1);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (containerRef.current) containerRef.current.style.scrollSnapType = 'y mandatory';
+          isJumpingRef.current = false;
+        });
+      });
     }
-  }, [commitNavigation, stories.length]);
+  }, [N]);
 
-  const handleTouchCancel = useCallback(() => {
-    touchRef.current.isDragging = false;
-    const el = sliderRef.current;
-    if (el) {
-      el.style.transition = 'transform 0.2s ease-out';
-      el.style.transform = 'translateY(0)';
+  // Track active index and set up settle detection
+  const handleScroll = useCallback(() => {
+    if (isJumpingRef.current) return;
+    const container = containerRef.current;
+    if (!container || N === 0) return;
+    const h = container.clientHeight;
+    const pos = Math.round(container.scrollTop / h);
+
+    if (pos >= 0 && pos <= N + 1 && pos !== activeIdx) {
+      setActiveIdx(pos);
     }
-  }, []);
 
-  // Desktop wheel (native listener for preventDefault)
+    clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = setTimeout(jumpIfNeeded, 150);
+  }, [activeIdx, N, jumpIfNeeded]);
+
+  // scrollend listener for instant boundary detection
   useEffect(() => {
-    const el = outerRef.current;
+    const container = containerRef.current;
+    if (!container) return;
+    const onScrollEnd = () => {
+      clearTimeout(scrollTimerRef.current);
+      jumpIfNeeded();
+    };
+    container.addEventListener('scrollend', onScrollEnd);
+    return () => {
+      container.removeEventListener('scrollend', onScrollEnd);
+      clearTimeout(scrollTimerRef.current);
+    };
+  }, [jumpIfNeeded]);
+
+  // Desktop arrow navigation
+  const scrollByOne = useCallback((dir) => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.scrollBy({ top: dir * container.clientHeight, behavior: 'smooth' });
+  }, []);
+
+  // Desktop wheel
+  useEffect(() => {
+    const el = containerRef.current;
     if (!el) return;
     const onWheel = (e) => {
       if (!window.matchMedia('(min-width: 1024px)').matches) return;
-      if (stories.length <= 1 || isAnimatingRef.current) return;
+      if (N <= 1 || isJumpingRef.current) return;
       if (Math.abs(e.deltaY) < 16) return;
       e.preventDefault();
       const now = performance.now();
-      if (now - lastWheelRef.current < 600) return;
+      if (now - lastWheelRef.current < 500) return;
       lastWheelRef.current = now;
-      commitNavigation(e.deltaY > 0 ? 1 : -1);
+      scrollByOne(e.deltaY > 0 ? 1 : -1);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [commitNavigation, stories.length]);
+  }, [scrollByOne, N]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
@@ -463,49 +466,55 @@ export default function VideoFeedPage() {
   }
 
   return (
-    <div
-      ref={outerRef}
-      className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base overflow-hidden"
-      style={{ touchAction: 'none' }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchCancel}
-    >
-      <div ref={sliderRef} className="relative w-full h-full" onTransitionEnd={handleTransitionEnd}>
-        {items.map(({ story, offset, key }) => (
-          <div
-            key={key}
-            className="absolute inset-x-0 w-full"
-            style={{ height: '100dvh', top: `${offset * 100}dvh` }}
-          >
-            <StoryCard
-              story={story}
-              videoSrc={story.video_url}
-              isActive={offset === 0}
-              isNearby={true}
-              onFavorite={handleFavorite}
-              isMuted={isMuted}
-              onToggleMute={() => setIsMuted(m => !m)}
-              gradientHeight={gradientHeight}
-              gradientOpacity={gradientOpacity}
-              navBottomOffset={navBottomOffset}
-            />
-          </div>
-        ))}
+    <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+        style={{
+          scrollSnapType: 'y mandatory',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'none',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        {infiniteItems.map((story, dispIdx) => {
+          const isActive = dispIdx === activeIdx;
+          const dist = Math.abs(dispIdx - activeIdx);
+          // Mount video if nearby (±2) OR if it's a boundary destination (positions 1 and N)
+          const isBoundaryDest = dispIdx === 1 || dispIdx === N;
+          const isNearby = dist <= 2 || isBoundaryDest;
+
+          return (
+            <div key={`${story.id}_${dispIdx}`} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+              <StoryCard
+                story={story}
+                videoSrc={story.video_url}
+                isActive={isActive}
+                isNearby={isNearby}
+                onFavorite={handleFavorite}
+                isMuted={isMuted}
+                onToggleMute={() => setIsMuted(m => !m)}
+                gradientHeight={gradientHeight}
+                gradientOpacity={gradientOpacity}
+                navBottomOffset={navBottomOffset}
+              />
+            </div>
+          );
+        })}
       </div>
 
-      {stories.length > 1 && (
+      {N > 1 && (
         <>
           <button
-            onClick={() => commitNavigation(-1)}
+            onClick={() => scrollByOne(-1)}
             className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-16 h-16 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
             style={{ left: 'calc(50% - 350px)' }}
           >
             <ChevronLeft className="w-8 h-8 text-white/70" />
           </button>
           <button
-            onClick={() => commitNavigation(1)}
+            onClick={() => scrollByOne(1)}
             className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-16 h-16 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
             style={{ right: 'calc(50% - 350px)' }}
           >
