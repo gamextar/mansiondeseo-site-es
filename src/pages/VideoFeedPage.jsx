@@ -222,6 +222,57 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   );
 }
 
+function MobileOverlayButton({ onPress, className = '', style, children }) {
+  const gestureRef = useRef(null);
+
+  return (
+    <button
+      type="button"
+      className={className}
+      style={{ ...style, touchAction: 'pan-y' }}
+      onPointerDown={(event) => {
+        gestureRef.current = {
+          x: event.clientX,
+          y: event.clientY,
+          pointerId: event.pointerId,
+          cancelled: false,
+        };
+      }}
+      onPointerMove={(event) => {
+        const gesture = gestureRef.current;
+        if (!gesture || gesture.pointerId !== event.pointerId || gesture.cancelled) return;
+        const deltaX = Math.abs(event.clientX - gesture.x);
+        const deltaY = Math.abs(event.clientY - gesture.y);
+        if (deltaX > 10 || deltaY > 10) {
+          gesture.cancelled = true;
+        }
+      }}
+      onPointerUp={(event) => {
+        const gesture = gestureRef.current;
+        if (!gesture || gesture.pointerId !== event.pointerId) return;
+        gestureRef.current = null;
+        if (!gesture.cancelled) {
+          onPress?.();
+        }
+      }}
+      onPointerCancel={() => {
+        gestureRef.current = null;
+      }}
+      onClick={(event) => {
+        event.preventDefault();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onPress?.();
+        }
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate }) {
   const [burstTrigger, setBurstTrigger] = useState(0);
 
@@ -233,33 +284,33 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
   return (
     <>
       <div className="pointer-events-none flex flex-col items-center">
-        <button
-          onClick={handleHeart}
+        <MobileOverlayButton
+          onPress={handleHeart}
           className="pointer-events-auto relative"
-          style={{ width: 58, height: 58, touchAction: 'pan-y' }}
+          style={{ width: 58, height: 58 }}
         >
           <HeartBurst trigger={burstTrigger} />
           <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 58, height: 58 }}>
             <Heart className={`w-7.5 h-7.5 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
           </div>
-        </button>
+        </MobileOverlayButton>
         <span className="pointer-events-none text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
       </div>
-      <button onClick={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-center" style={{ touchAction: 'pan-y' }}>
+      <MobileOverlayButton onPress={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Send className="w-6 h-6 text-white" />
         </div>
-      </button>
-      <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-center" style={{ touchAction: 'pan-y' }}>
+      </MobileOverlayButton>
+      <MobileOverlayButton onPress={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Gift className="w-6 h-6 text-mansion-gold" />
         </div>
-      </button>
-      <button onClick={onToggleMute} className="pointer-events-auto flex flex-col items-center" style={{ touchAction: 'pan-y' }}>
+      </MobileOverlayButton>
+      <MobileOverlayButton onPress={onToggleMute} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
         </div>
-      </button>
+      </MobileOverlayButton>
     </>
   );
 }
@@ -280,7 +331,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
         className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
         style={{ bottom: `${navBottomOffset + 8}px` }}
       >
-        <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1" style={{ touchAction: 'pan-y' }}>
+        <MobileOverlayButton onPress={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1">
           <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
             {story.avatar_url ? (
               <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
@@ -289,7 +340,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
             )}
           </div>
           <p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{story.username}</p>
-        </button>
+        </MobileOverlayButton>
         {story.caption && (
           <p className="pointer-events-none text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
         )}
