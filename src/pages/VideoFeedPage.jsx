@@ -243,8 +243,6 @@ export default function VideoFeedPage() {
   const navigate = useNavigate();
   const { siteSettings } = useAuth();
   const containerRef = useRef(null);
-  const isJumpingRef = useRef(false);
-  const scrollEndTimer = useRef(null);
   const lastDesktopWheelAtRef = useRef(0);
 
   const cachedStories = () => {
@@ -258,21 +256,16 @@ export default function VideoFeedPage() {
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
-  const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
+  const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(0, parseInt(v, 10)) : 0; } catch { return 0; } };
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
-  const [activeDispIdx, setActiveDispIdx] = useState(savedIdx);
+  const [activeIdx, setActiveIdx] = useState(savedIdx);
   const [isMuted, setIsMuted] = useState(savedMuted);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
-  const isDesktopViewport = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
-
-  const infiniteStories = stories.length > 0
-    ? [stories[stories.length - 1], ...stories, stories[0]]
-    : [];
 
   useEffect(() => {
     let cancelled = false;
@@ -295,102 +288,29 @@ export default function VideoFeedPage() {
 
   useLayoutEffect(() => {
     if (stories.length === 0 || !containerRef.current) return;
-
     const container = containerRef.current;
-    const syncInitialPosition = () => {
-      const height = container.clientHeight;
-      if (!height) return false;
-
-      const idx = Math.min(Math.max(activeDispIdx, 1), stories.length);
-      container.scrollTop = height * idx;
-      return true;
-    };
-
-    if (syncInitialPosition()) return undefined;
-
-    let rafId = requestAnimationFrame(() => {
-      syncInitialPosition();
-    });
-
-    return () => cancelAnimationFrame(rafId);
+    const height = container.clientHeight;
+    if (!height) return;
+    const idx = Math.min(activeIdx, stories.length - 1);
+    container.scrollTop = height * idx;
   }, [stories.length]);
 
   useEffect(() => {
-    try { sessionStorage.setItem('vf_idx', String(activeDispIdx)); } catch {}
-  }, [activeDispIdx]);
+    try { sessionStorage.setItem('vf_idx', String(activeIdx)); } catch {}
+  }, [activeIdx]);
   useEffect(() => {
     try { sessionStorage.setItem('vf_muted', isMuted ? '1' : '0'); } catch {}
   }, [isMuted]);
 
-  useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
-
-  const settleInfiniteBoundary = useCallback(() => {
-    const container = containerRef.current;
-    if (!container || isJumpingRef.current || stories.length === 0) return;
-
-    const height = container.clientHeight;
-    const rawIndex = Math.round(container.scrollTop / height);
-
-    if (rawIndex === 0) {
-      isJumpingRef.current = true;
-      container.style.scrollSnapType = 'none';
-      container.scrollTop = stories.length * height;
-      setActiveDispIdx(stories.length);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (containerRef.current) {
-            containerRef.current.style.scrollSnapType = 'y mandatory';
-          }
-          isJumpingRef.current = false;
-        });
-      });
-      return;
-    }
-
-    if (rawIndex >= stories.length + 1) {
-      isJumpingRef.current = true;
-      container.style.scrollSnapType = 'none';
-      container.scrollTop = height;
-      setActiveDispIdx(1);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (containerRef.current) {
-            containerRef.current.style.scrollSnapType = 'y mandatory';
-          }
-          isJumpingRef.current = false;
-        });
-      });
-    }
-  }, [stories.length]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return undefined;
-
-    const handleScrollEnd = () => {
-      clearTimeout(scrollEndTimer.current);
-      settleInfiniteBoundary();
-    };
-
-    container.addEventListener('scrollend', handleScrollEnd);
-    return () => container.removeEventListener('scrollend', handleScrollEnd);
-  }, [settleInfiniteBoundary]);
-
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
-    if (!container || isJumpingRef.current) return;
+    if (!container || stories.length === 0) return;
     const height = container.clientHeight;
-    const rawIndex = Math.round(container.scrollTop / height);
-
-    if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
-      setActiveDispIdx(rawIndex);
+    const idx = Math.round(container.scrollTop / height);
+    if (idx >= 0 && idx < stories.length && idx !== activeIdx) {
+      setActiveIdx(idx);
     }
-
-    clearTimeout(scrollEndTimer.current);
-    scrollEndTimer.current = setTimeout(() => {
-      settleInfiniteBoundary();
-    }, 180);
-  }, [activeDispIdx, settleInfiniteBoundary, stories.length]);
+  }, [activeIdx, stories.length]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
@@ -406,25 +326,19 @@ export default function VideoFeedPage() {
   const scrollByOne = useCallback((dir) => {
     const container = containerRef.current;
     if (!container) return;
-    container.scrollBy({ top: dir * container.clientHeight, behavior: 'smooth' });
-  }, []);
+    const height = container.clientHeight;
+    const idx = Math.round(container.scrollTop / height);
+    const target = idx + dir;
+    if (target < 0 || target >= stories.length) return;
+    container.scrollTo({ top: target * height, behavior: 'smooth' });
+  }, [stories.length]);
 
   const handleDesktopWheel = useCallback((event) => {
-    if (typeof window === 'undefined' || !window.matchMedia('(min-width: 1024px)').matches) {
-      return;
-    }
-
-    if (stories.length <= 1 || isJumpingRef.current || Math.abs(event.deltaY) < 16) {
-      return;
-    }
-
+    if (typeof window === 'undefined' || !window.matchMedia('(min-width: 1024px)').matches) return;
+    if (stories.length <= 1 || Math.abs(event.deltaY) < 16) return;
     event.preventDefault();
-
     const now = performance.now();
-    if (now - lastDesktopWheelAtRef.current < 420) {
-      return;
-    }
-
+    if (now - lastDesktopWheelAtRef.current < 420) return;
     lastDesktopWheelAtRef.current = now;
     scrollByOne(event.deltaY > 0 ? 1 : -1);
   }, [scrollByOne, stories.length]);
@@ -487,16 +401,11 @@ export default function VideoFeedPage() {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        {infiniteStories.map((story, displayIndex) => {
-          const isActive = displayIndex === activeDispIdx;
-          // Always mount clones (idx 0 and last)
-          const isBoundaryClone = displayIndex === 0 || displayIndex === infiniteStories.length - 1;
-          // Circular distance: when near boundary, real items at the other end are also "nearby"
-          const linearDist = Math.abs(displayIndex - activeDispIdx);
-          const wrapDist = stories.length > 0 ? Math.min(linearDist, stories.length - linearDist + 2) : linearDist;
-          const isNearby = wrapDist <= 2 || isBoundaryClone;
+        {stories.map((story, idx) => {
+          const isActive = idx === activeIdx;
+          const isNearby = Math.abs(idx - activeIdx) <= 2;
           return (
-            <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+            <div key={story.id || idx} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
               <StoryCard
                 story={story}
                 videoSrc={story.video_url}
