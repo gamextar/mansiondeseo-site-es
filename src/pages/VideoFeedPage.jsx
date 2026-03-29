@@ -232,16 +232,19 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
 
   return (
     <>
-      <button
-        onClick={handleHeart}
-        className="pointer-events-auto flex flex-col items-center relative"
-      >
-        <HeartBurst trigger={burstTrigger} />
-        <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
-          <Heart className={`w-7 h-7 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
-        </div>
-        <span className="text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
-      </button>
+      <div className="pointer-events-none flex flex-col items-center">
+        <button
+          onClick={handleHeart}
+          className="pointer-events-auto relative"
+          style={{ width: 52, height: 52 }}
+        >
+          <HeartBurst trigger={burstTrigger} />
+          <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
+            <Heart className={`w-7 h-7 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
+          </div>
+        </button>
+        <span className="pointer-events-none text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
+      </div>
       <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Send className="w-6 h-6 text-white" />
