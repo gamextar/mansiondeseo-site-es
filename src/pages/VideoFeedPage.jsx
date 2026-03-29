@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Gift } from 'lucide-react';
@@ -18,7 +18,7 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
+function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
@@ -29,6 +29,9 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
     if (!video) return;
 
     if (isActive) {
+      if (video.preload !== 'auto') {
+        video.preload = 'auto';
+      }
       video.currentTime = 0;
       video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     } else {
@@ -76,7 +79,7 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
           loop
           playsInline
           muted={isMuted}
-          preload="auto"
+          preload={preloadMode}
           onClick={togglePlay}
           onEnded={handleVideoEnd}
         />
@@ -310,15 +313,26 @@ export default function VideoFeedPage() {
   }, []);
 
   // After stories load, snap to saved position (or first clip).
-  useEffect(() => {
-    if (stories.length > 0) {
-      requestAnimationFrame(() => {
-        if (containerRef.current) {
-          const idx = Math.min(activeDispIdx, stories.length);
-          containerRef.current.scrollTop = containerRef.current.clientHeight * idx;
-        }
-      });
-    }
+  useLayoutEffect(() => {
+    if (stories.length === 0 || !containerRef.current) return;
+
+    const container = containerRef.current;
+    const syncInitialPosition = () => {
+      const height = container.clientHeight;
+      if (!height) return false;
+
+      const idx = Math.min(Math.max(activeDispIdx, 1), stories.length);
+      container.scrollTop = height * idx;
+      return true;
+    };
+
+    if (syncInitialPosition()) return undefined;
+
+    let rafId = requestAnimationFrame(() => {
+      syncInitialPosition();
+    });
+
+    return () => cancelAnimationFrame(rafId);
   }, [stories.length]);
 
   // Persist position and muted state
@@ -483,6 +497,7 @@ export default function VideoFeedPage() {
             <StoryCard
               story={story}
               isActive={displayIndex === activeDispIdx}
+              preloadMode={displayIndex === activeDispIdx ? 'auto' : Math.abs(displayIndex - activeDispIdx) <= 1 ? 'metadata' : 'none'}
               onFavorite={handleFavorite}
               isMuted={isMuted}
               onToggleMute={() => setIsMuted(m => !m)}
