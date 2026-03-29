@@ -535,7 +535,7 @@ export default function VideoFeedPage() {
       const now = performance.now();
       const timeSinceLastScroll = now - lastScrollAtRef.current;
 
-      if (lastScrollAtRef.current > 0 && timeSinceLastScroll < 105) {
+      if (lastScrollAtRef.current > 0 && timeSinceLastScroll < 115) {
         clearTimeout(boundaryCooldownTimer.current);
         boundaryCooldownTimer.current = setTimeout(() => {
           settleInfiniteBoundary();
