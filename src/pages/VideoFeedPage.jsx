@@ -710,7 +710,7 @@ export default function VideoFeedPage() {
               <StoryCard
                 story={story}
                 videoSrc={story.video_url}
-                isActive={displayIndex === activeVisualIdx}
+                isActive={displayIndex === activeDispIdx}
                 shouldLoad={shouldLoad}
                 isMuted={isMuted}
                 avatarSize={avatarSize}
