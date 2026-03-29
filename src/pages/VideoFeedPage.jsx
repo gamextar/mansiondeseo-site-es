@@ -753,6 +753,9 @@ export default function VideoFeedPage() {
               </div>
             </MobileOverlayButton>
             <p className="pointer-events-none text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{activeStory.username}</p>
+            {activeStory.caption && (
+              <p className="pointer-events-none text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{activeStory.caption}</p>
+            )}
           </div>
         </div>
       )}
