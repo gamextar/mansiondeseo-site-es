@@ -20,6 +20,7 @@ function timeAgo(dateStr) {
 
 function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
+  const progressBarRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const navigate = useNavigate();
@@ -39,6 +40,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
     if (isActive) {
       if (activeSrc) {
         video.currentTime = 0;
+        if (progressBarRef.current) progressBarRef.current.style.width = '0%';
         video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
       }
     } else {
@@ -65,6 +67,13 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
     setTimeout(() => setShowPlayIcon(false), 600);
   };
 
+  const handleTimeUpdate = () => {
+    const video = videoRef.current;
+    const bar = progressBarRef.current;
+    if (!video || !bar || !video.duration) return;
+    bar.style.width = `${(video.currentTime / video.duration) * 100}%`;
+  };
+
   const handleVideoEnd = () => {
     const video = videoRef.current;
     if (video) {
@@ -86,6 +95,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
           muted={isMuted}
           preload={shouldLoad ? 'auto' : 'none'}
           onClick={togglePlay}
+          onTimeUpdate={handleTimeUpdate}
           onEnded={handleVideoEnd}
         />
 
@@ -156,24 +166,13 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
         </div>
 
         {isActive && (
-          <>
-            <div className="absolute top-0 left-0 right-0 h-[2px] z-30 overflow-hidden lg:hidden">
-              <motion.div
-                className="h-full bg-mansion-gold"
-                initial={{ width: '0%' }}
-                animate={{ width: '100%' }}
-                transition={{ duration: 15, ease: 'linear', repeat: Infinity }}
-              />
-            </div>
-            <div className="hidden lg:block absolute bottom-0 left-0 right-0 h-[3px] z-30 lg:rounded-b-2xl overflow-hidden">
-              <motion.div
-                className="h-full bg-mansion-gold"
-                initial={{ width: '0%' }}
-                animate={{ width: '100%' }}
-                transition={{ duration: 15, ease: 'linear', repeat: Infinity }}
-              />
-            </div>
-          </>
+          <div className="absolute bottom-0 left-0 right-0 h-[3px] z-30 overflow-hidden lg:rounded-b-2xl bg-white/10">
+            <div
+              ref={progressBarRef}
+              className="h-full bg-mansion-gold"
+              style={{ width: '0%' }}
+            />
+          </div>
         )}
       </div>
 
