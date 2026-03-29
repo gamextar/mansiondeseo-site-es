@@ -117,8 +117,8 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
         </div>
 
         {/* Desktop mute button — top-right corner of video */}
-        <button onClick={onToggleMute} className="hidden lg:flex absolute top-4 right-4 z-20 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center" style={{ width: 44, height: 44 }}>
-          {isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+        <button onClick={onToggleMute} className="hidden lg:flex absolute top-4 right-4 z-20 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center" style={{ width: 52, height: 52 }}>
+          {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
         </button>
 
         {/* Bottom user info + caption — mobile */}
@@ -139,27 +139,27 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
         </div>
 
         {/* Bottom user info + caption — desktop: avatar above name, bottom-left, bigger */}
-        <div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2 max-w-[320px]">
+        <div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2.5 max-w-[360px]">
           <button
             onClick={() => navigate(`/perfiles/${story.user_id}`)}
-            className="flex flex-col items-start gap-2"
+            className="flex flex-col items-start gap-2.5"
           >
-            <div className="w-14 h-14 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
+            <div className="w-16 h-16 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
               {story.avatar_url ? (
                 <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-white/60 text-lg font-bold">{(story.username || '?')[0]}</div>
+                <div className="w-full h-full flex items-center justify-center text-white/60 text-xl font-bold">{(story.username || '?')[0]}</div>
               )}
             </div>
-            <p className="text-white font-bold text-xl leading-tight drop-shadow-lg">@{story.username}</p>
+            <p className="text-white font-bold text-2xl leading-tight drop-shadow-lg">@{story.username}</p>
           </button>
           {story.caption && (
-            <p className="text-white/90 text-base leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
+            <p className="text-white/90 text-lg leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
           )}
-          <p className="text-white/40 text-xs mt-0.5">{timeAgo(story.created_at)}</p>
+          <p className="text-white/40 text-sm mt-0.5">{timeAgo(story.created_at)}</p>
         </div>
 
-        {/* Progress bar — top on mobile, bottom on desktop */}
+        {/* Progress bar — top on mobile, bottom on desktop — loops with video */}
         {isActive && (
           <>
             <div className="absolute top-0 left-0 right-0 h-[2px] z-30 overflow-hidden lg:hidden">
@@ -167,7 +167,7 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
                 className="h-full bg-mansion-gold"
                 initial={{ width: '0%' }}
                 animate={{ width: '100%' }}
-                transition={{ duration: 15, ease: 'linear' }}
+                transition={{ duration: 15, ease: 'linear', repeat: Infinity }}
               />
             </div>
             <div className="hidden lg:block absolute bottom-0 left-0 right-0 h-[3px] z-30 lg:rounded-b-2xl overflow-hidden">
@@ -175,7 +175,7 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
                 className="h-full bg-mansion-gold"
                 initial={{ width: '0%' }}
                 animate={{ width: '100%' }}
-                transition={{ duration: 15, ease: 'linear' }}
+                transition={{ duration: 15, ease: 'linear', repeat: Infinity }}
               />
             </div>
           </>
@@ -232,18 +232,18 @@ function DesktopActionButtons({ story, onFavorite, navigate }) {
   return (
     <>
       <button onClick={() => onFavorite(story.user_id)} className="flex flex-col items-center">
-        <div className={`rounded-full flex items-center justify-center ${story.favorited ? 'bg-mansion-crimson/25' : 'bg-mansion-card/60 border border-white/10'}`} style={{ width: 60, height: 60 }}>
-          <Heart className={`w-8 h-8 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
+        <div className={`rounded-full flex items-center justify-center ${story.favorited ? 'bg-mansion-crimson/25' : 'bg-mansion-card/60 border border-white/10'}`} style={{ width: 72, height: 72 }}>
+          <Heart className={`w-9 h-9 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
         </div>
       </button>
       <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center">
-        <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center" style={{ width: 60, height: 60 }}>
-          <Send className="w-7 h-7 text-white" />
+        <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center" style={{ width: 72, height: 72 }}>
+          <Send className="w-8 h-8 text-white" />
         </div>
       </button>
       <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
-        <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center" style={{ width: 60, height: 60 }}>
-          <Gift className="w-7 h-7 text-mansion-gold" />
+        <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center" style={{ width: 72, height: 72 }}>
+          <Gift className="w-8 h-8 text-mansion-gold" />
         </div>
       </button>
     </>
