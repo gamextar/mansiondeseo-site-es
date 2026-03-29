@@ -147,7 +147,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
           style={{ bottom: `${navBottomOffset + 8}px` }}
         >
           <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-1.5 mb-1">
-            <div className="w-10 h-10 rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
+            <div className="w-13 h-13 rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: 52, height: 52 }}>
               {story.avatar_url ? (
                 <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
               ) : (
