@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift } from 'lucide-react';
-import { getStories, toggleFavorite } from '../lib/api';
+import { getStories, toggleStoryLike } from '../lib/api';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
 
@@ -74,7 +74,7 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset, avatarSize }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset, avatarSize }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
@@ -191,7 +191,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
           className="absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden"
           style={{ bottom: `${navBottomOffset + 16}px` }}
         >
-          <MobileActionButtons story={story} onFavorite={onFavorite} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
+          <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
         </div>
 
         <button onClick={onToggleMute} className="hidden lg:flex absolute top-4 right-4 z-20 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-200" style={{ width: 52, height: 52 }}>
@@ -247,27 +247,28 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
       </div>
 
       <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', bottom: '60px' }}>
-        <DesktopActionButtons story={story} onFavorite={onFavorite} navigate={navigate} />
+        <DesktopActionButtons story={story} onLike={onLike} navigate={navigate} />
       </div>
     </div>
   );
 }
 
-function MobileActionButtons({ story, onFavorite, onToggleMute, isMuted, navigate }) {
+function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate }) {
   const [burstTrigger, setBurstTrigger] = useState(0);
 
   const handleHeart = () => {
     setBurstTrigger(t => t + 1);
-    onFavorite(story.user_id);
+    onLike(story.id);
   };
 
   return (
     <>
       <button onClick={handleHeart} className="flex flex-col items-center relative">
         <HeartBurst trigger={burstTrigger} />
-        <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.favorited ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
-          <Heart className={`w-7 h-7 transition-all duration-150 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
+        <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
+          <Heart className={`w-7 h-7 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
         </div>
+        <span className="text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
       </button>
       <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
@@ -293,16 +294,17 @@ function DesktopActionButtons({ story, onFavorite, navigate }) {
 
   const handleHeart = () => {
     setBurstTrigger(t => t + 1);
-    onFavorite(story.user_id);
+    onLike(story.id);
   };
 
   return (
     <>
       <button onClick={handleHeart} className="flex flex-col items-center group relative">
         <HeartBurst trigger={burstTrigger} />
-        <div className={`rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-110 ${story.favorited ? 'bg-mansion-crimson/25 group-hover:bg-mansion-crimson/40' : 'bg-mansion-card/60 border border-white/10 group-hover:bg-mansion-card/90 group-hover:border-white/25'}`} style={{ width: 72, height: 72 }}>
-          <Heart className={`w-9 h-9 transition-all duration-150 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
+        <div className={`rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-110 ${story.liked ? 'bg-mansion-crimson/25 group-hover:bg-mansion-crimson/40' : 'bg-mansion-card/60 border border-white/10 group-hover:bg-mansion-card/90 group-hover:border-white/25'}`} style={{ width: 72, height: 72 }}>
+          <Heart className={`w-9 h-9 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
         </div>
+        <span className="text-white text-xs font-semibold mt-1.5 drop-shadow tabular-nums">{story.likes || 0}</span>
       </button>
       <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center group">
         <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-mansion-card/90 group-hover:border-white/25" style={{ width: 72, height: 72 }}>
@@ -480,21 +482,21 @@ export default function VideoFeedPage() {
     }, 180);
   }, [activeDispIdx, settleInfiniteBoundary, stories.length]);
 
-  const handleFavorite = useCallback(async (userId) => {
+  const handleLike = useCallback(async (storyId) => {
     // Optimistic: flip immediately
     setStories(prev => prev.map(s =>
-      s.user_id === userId ? { ...s, favorited: !s.favorited } : s
+      s.id === storyId ? { ...s, liked: !s.liked, likes: s.liked ? Math.max(0, s.likes - 1) : s.likes + 1 } : s
     ));
     try {
-      const data = await toggleFavorite(userId);
+      const data = await toggleStoryLike(storyId);
       // Sync with server truth
       setStories(prev => prev.map(s =>
-        s.user_id === userId ? { ...s, favorited: data.favorited } : s
+        s.id === storyId ? { ...s, liked: data.liked, likes: data.likes } : s
       ));
     } catch {
       // Revert on failure
       setStories(prev => prev.map(s =>
-        s.user_id === userId ? { ...s, favorited: !s.favorited } : s
+        s.id === storyId ? { ...s, liked: !s.liked, likes: s.liked ? Math.max(0, s.likes - 1) : s.likes + 1 } : s
       ));
     }
   }, []);
@@ -594,7 +596,7 @@ export default function VideoFeedPage() {
                 videoSrc={story.video_url}
                 isActive={displayIndex === activeDispIdx}
                 shouldLoad={shouldLoad}
-                onFavorite={handleFavorite}
+                onLike={handleLike}
                 isMuted={isMuted}
                 onToggleMute={() => setIsMuted(m => !m)}
                 gradientHeight={gradientHeight}

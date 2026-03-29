@@ -2694,6 +2694,15 @@ async function ensureStoriesTable(env) {
       )
     `).run().then(() =>
       env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_active ON stories(active, created_at)').run()
+    ).then(() =>
+      env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS story_likes (
+          user_id   TEXT NOT NULL,
+          story_id  TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (user_id, story_id)
+        )
+      `).run()
     ).catch((err) => {
       _storiesTableReady = null;
       throw err;
@@ -2710,15 +2719,21 @@ async function handleGetStories(request, env) {
   const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
   const offset = (page - 1) * limit;
 
+  // Try to get current user for per-user liked status
+  const auth = await authenticate(request, env).catch(() => null);
+  const viewerId = auth?.sub || null;
+
   const { results } = await env.DB.prepare(`
     SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
-           u.username, u.avatar_url, u.avatar_crop
+           u.username, u.avatar_url, u.avatar_crop,
+           CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
     FROM stories s
     JOIN users u ON u.id = s.user_id
+    LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?
     WHERE s.active = 1
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
-  `).bind(limit, offset).all();
+  `).bind(viewerId || '', limit, offset).all();
 
   const stories = (results || []).map(r => ({
     id: r.id,
@@ -2726,6 +2741,7 @@ async function handleGetStories(request, env) {
     video_url: r.video_url,
     caption: r.caption || '',
     likes: r.likes || 0,
+    liked: !!r.liked,
     comments: r.comments || 0,
     created_at: r.created_at,
     username: r.username,
@@ -2734,6 +2750,52 @@ async function handleGetStories(request, env) {
   }));
 
   return json({ stories });
+}
+
+// POST /api/stories/:id/like — toggle like on a story
+async function handleToggleStoryLike(request, env, storyId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  await ensureStoriesTable(env);
+
+  const story = await env.DB.prepare('SELECT id, user_id, likes FROM stories WHERE id = ?').bind(storyId).first();
+  if (!story) return error('Historia no encontrada', 404);
+
+  const existing = await env.DB.prepare(
+    'SELECT user_id FROM story_likes WHERE user_id = ? AND story_id = ?'
+  ).bind(auth.sub, storyId).first();
+
+  let liked;
+  let newLikes;
+  if (existing) {
+    await env.DB.prepare('DELETE FROM story_likes WHERE user_id = ? AND story_id = ?')
+      .bind(auth.sub, storyId).run();
+    await env.DB.prepare('UPDATE stories SET likes = MAX(0, likes - 1) WHERE id = ?').bind(storyId).run();
+    liked = false;
+    newLikes = Math.max(0, (story.likes || 0) - 1);
+  } else {
+    await env.DB.prepare('INSERT INTO story_likes (user_id, story_id) VALUES (?, ?)')
+      .bind(auth.sub, storyId).run();
+    await env.DB.prepare('UPDATE stories SET likes = likes + 1 WHERE id = ?').bind(storyId).run();
+    liked = true;
+    newLikes = (story.likes || 0) + 1;
+
+    // Notify the story author (don't notify yourself)
+    if (story.user_id !== auth.sub) {
+      try {
+        const liker = await env.DB.prepare('SELECT username FROM users WHERE id = ?').bind(auth.sub).first();
+        await notifyUser(env, story.user_id, {
+          type: 'story_like',
+          senderName: liker?.username || 'Alguien',
+          storyId,
+        });
+      } catch (e) {
+        console.error('[handleToggleStoryLike] notification error:', e.message);
+      }
+    }
+  }
+
+  return json({ liked, likes: newLikes });
 }
 
 // POST /api/admin/upload-story — admin uploads a video story for any user
@@ -2968,6 +3030,8 @@ async function handleRequest(request, env) {
   // ── Stories
   if (path === '/api/stories' && method === 'GET') return handleGetStories(request, env);
   if (path === '/api/stories' && method === 'POST') return handleUploadStory(request, env);
+  const storyLikeMatch = path.match(/^\/api\/stories\/([a-f0-9-]+)\/like$/);
+  if (storyLikeMatch && method === 'POST') return handleToggleStoryLike(request, env, storyLikeMatch[1]);
   if (path === '/api/admin/upload-story' && method === 'POST') return handleAdminUploadStory(request, env);
   const adminStoryMatch = path.match(/^\/api\/admin\/stories\/([a-f0-9-]+)$/);
   if (adminStoryMatch && method === 'DELETE') return handleAdminDeleteStory(request, env, adminStoryMatch[1]);

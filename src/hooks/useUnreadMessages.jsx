@@ -108,6 +108,13 @@ export function UnreadProvider({ children }) {
             });
             setTimeout(() => setToast(null), 5000);
             notifyListeners(data);
+          } else if (data.type === 'story_like') {
+            setToast({
+              text: `A ${data.senderName || 'alguien'} le gustó tu video`,
+              emoji: '❤️',
+            });
+            setTimeout(() => setToast(null), 4000);
+            notifyListeners(data);
           }
         } catch { /* ignore */ }
       };

@@ -262,6 +262,10 @@ export async function toggleFavorite(targetId) {
   return apiFetch(`/favorites/${targetId}`, { method: 'POST' });
 }
 
+export async function toggleStoryLike(storyId) {
+  return apiFetch(`/stories/${storyId}/like`, { method: 'POST' });
+}
+
 export async function getFavorites() {
   return apiFetch('/favorites');
 }
