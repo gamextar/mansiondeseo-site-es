@@ -485,7 +485,7 @@ export default function VideoFeedPage() {
       >
         {infiniteStories.map((story, displayIndex) => {
           const dist = Math.abs(displayIndex - activeDispIdx);
-          const isBoundary = displayIndex === 1 || displayIndex === stories.length;
+          const isBoundary = displayIndex <= 1 || displayIndex >= stories.length;
           const shouldLoad = dist <= 3 || isBoundary;
           return (
             <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
