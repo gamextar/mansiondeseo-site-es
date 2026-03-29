@@ -10,6 +10,7 @@ const STORIES_CACHE_VERSION = '3';
 const STORIES_PAGE_SIZE = 12;
 const LOAD_MORE_THRESHOLD = 4;
 const PANE_SLOTS = ['pane-prev', 'pane-current', 'pane-next'];
+const storyPosterCache = new Map();
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -23,11 +24,81 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
+async function createStoryPoster(videoUrl) {
+  if (!videoUrl) return null;
+  if (storyPosterCache.has(videoUrl)) return storyPosterCache.get(videoUrl);
+
+  const posterPromise = new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.preload = 'auto';
+    video.crossOrigin = 'anonymous';
+    video.playsInline = true;
+    video.src = videoUrl;
+
+    const finish = (value) => {
+      resolve(value);
+    };
+
+    video.onloadeddata = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 360;
+        canvas.height = 640;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          finish(null);
+          return;
+        }
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        finish(canvas.toDataURL('image/jpeg', 0.6));
+      } catch {
+        finish(null);
+      }
+    };
+
+    video.onerror = () => finish(null);
+  });
+
+  storyPosterCache.set(videoUrl, posterPromise);
+  return posterPromise;
+}
+
 function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
+  const cachedPoster = typeof storyPosterCache.get(videoSrc) === 'string' ? storyPosterCache.get(videoSrc) : null;
+  const [posterSrc, setPosterSrc] = useState(cachedPoster);
+  const [showPoster, setShowPoster] = useState(Boolean(cachedPoster));
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!videoSrc) {
+      setPosterSrc(null);
+      setShowPoster(false);
+      return undefined;
+    }
+
+    const cachedPoster = storyPosterCache.get(videoSrc);
+    if (typeof cachedPoster === 'string') {
+      setPosterSrc(cachedPoster);
+      return undefined;
+    }
+
+    createStoryPoster(videoSrc).then((poster) => {
+      if (cancelled || !poster) return;
+      storyPosterCache.set(videoSrc, poster);
+      setPosterSrc(poster);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [videoSrc]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -44,6 +115,7 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
     if (!video || !videoSrc) return;
 
     if (isActive) {
+      setShowPoster(Boolean(posterSrc));
       video.muted = isMuted;
       video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     } else {
@@ -55,13 +127,37 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
         setIsPlaying(false);
       });
     }
-  }, [isActive, videoSrc]);
+  }, [isActive, isMuted, posterSrc, videoSrc]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     video.muted = isActive ? isMuted : true;
   }, [isActive, isMuted]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isActive) return undefined;
+
+    const hidePoster = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setShowPoster(false);
+        });
+      });
+    };
+
+    if (video.readyState >= 2) {
+      hidePoster();
+    }
+
+    video.addEventListener('playing', hidePoster);
+    video.addEventListener('loadeddata', hidePoster);
+    return () => {
+      video.removeEventListener('playing', hidePoster);
+      video.removeEventListener('loadeddata', hidePoster);
+    };
+  }, [isActive, videoSrc]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -92,6 +188,7 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
         <video
           ref={videoRef}
           src={videoSrc}
+          crossOrigin="anonymous"
           className="absolute inset-0 w-full h-full object-cover"
           style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
           loop
@@ -101,6 +198,14 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
           onClick={togglePlay}
           onEnded={handleVideoEnd}
         />
+        {showPoster && posterSrc ? (
+          <img
+            src={posterSrc}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none z-[1]"
+          />
+        ) : null}
 
         {/* Play/Pause overlay */}
         <AnimatePresence>
