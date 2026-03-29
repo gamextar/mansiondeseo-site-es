@@ -190,6 +190,8 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onT
         <div
           className="absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden"
           style={{ bottom: `${navBottomOffset + 16}px` }}
+          onClick={e => e.stopPropagation()}
+          onTouchEnd={e => e.stopPropagation()}
         >
           <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
         </div>
@@ -201,6 +203,8 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onT
         <div
           className="absolute left-4 right-20 z-20 lg:hidden"
           style={{ bottom: `${navBottomOffset + 8}px` }}
+          onClick={e => e.stopPropagation()}
+          onTouchEnd={e => e.stopPropagation()}
         >
           <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5 mb-1">
             <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
