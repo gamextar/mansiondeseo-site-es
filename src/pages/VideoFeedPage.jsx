@@ -256,8 +256,19 @@ export default function VideoFeedPage() {
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
-  const [stories, setStories] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  // Hydrate from sessionStorage to skip loading spinner on revisit
+  const cachedStories = () => {
+    try {
+      const raw = sessionStorage.getItem('vf_stories');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
+  };
+  const initial = cachedStories();
+
+  const [stories, setStories] = useState(initial);
+  const [loading, setLoading] = useState(initial.length === 0);
   const [activeDispIdx, setActiveDispIdx] = useState(1);
   const [isMuted, setIsMuted] = useState(true);
 
@@ -281,11 +292,13 @@ export default function VideoFeedPage() {
     getStories()
       .then(data => {
         if (!cancelled) {
-          setStories(data.stories || []);
+          const fresh = data.stories || [];
+          setStories(fresh);
+          try { sessionStorage.setItem('vf_stories', JSON.stringify(fresh)); } catch {}
         }
       })
       .catch(() => {
-        if (!cancelled) setStories([]);
+        if (!cancelled && stories.length === 0) setStories([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
