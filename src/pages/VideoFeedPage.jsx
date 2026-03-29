@@ -643,6 +643,14 @@ export default function VideoFeedPage() {
     container.scrollBy({ top: dir * container.clientHeight, behavior: 'smooth' });
   }, []);
 
+  const jumpByOne = useCallback((dir) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const height = container.clientHeight;
+    const rawIndex = Math.round(container.scrollTop / height);
+    container.scrollTop = (rawIndex + dir) * height;
+  }, []);
+
   const handleDesktopWheel = useCallback((event) => {
     if (typeof window === 'undefined' || !window.matchMedia('(min-width: 1024px)').matches) {
       return;
@@ -797,14 +805,14 @@ export default function VideoFeedPage() {
       {stories.length > 1 && (
         <>
           <button
-            onClick={() => scrollByOne(-1)}
+            onClick={() => jumpByOne(-1)}
             className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-16 h-16 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
             style={{ left: 'calc(50% - 350px)' }}
           >
             <ChevronLeft className="w-8 h-8 text-white/70" />
           </button>
           <button
-            onClick={() => scrollByOne(1)}
+            onClick={() => jumpByOne(1)}
             className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-16 h-16 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
             style={{ right: 'calc(50% - 350px)' }}
           >
