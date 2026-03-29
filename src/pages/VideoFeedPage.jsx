@@ -18,11 +18,14 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
+function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const navigate = useNavigate();
+
+  // Only mount <video> for nearby stories (active ± 1)
+  const shouldMount = isNearby || isActive;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -66,18 +69,22 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
   return (
     <div className="relative w-full h-full bg-black flex items-center justify-center snap-start snap-always">
       <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
-        <video
-          ref={videoRef}
-          src={videoSrc}
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
-          loop
-          playsInline
-          muted={isMuted}
-          preload="auto"
-          onClick={togglePlay}
-          onEnded={handleVideoEnd}
-        />
+        {shouldMount ? (
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
+            loop
+            playsInline
+            muted={isMuted}
+            preload={isActive ? 'auto' : 'metadata'}
+            onClick={togglePlay}
+            onEnded={handleVideoEnd}
+          />
+        ) : (
+          <div className="absolute inset-0 w-full h-full bg-black" onClick={togglePlay} />
+        )}
 
         <AnimatePresence>
           {showPlayIcon && (
@@ -480,21 +487,26 @@ export default function VideoFeedPage() {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        {infiniteStories.map((story, displayIndex) => (
-          <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
-            <StoryCard
-              story={story}
-              videoSrc={story.video_url}
-              isActive={displayIndex === activeDispIdx}
-              onFavorite={handleFavorite}
-              isMuted={isMuted}
-              onToggleMute={() => setIsMuted(m => !m)}
-              gradientHeight={gradientHeight}
-              gradientOpacity={gradientOpacity}
-              navBottomOffset={navBottomOffset}
-            />
-          </div>
-        ))}
+        {infiniteStories.map((story, displayIndex) => {
+          const isActive = displayIndex === activeDispIdx;
+          const isNearby = Math.abs(displayIndex - activeDispIdx) <= 1;
+          return (
+            <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+              <StoryCard
+                story={story}
+                videoSrc={story.video_url}
+                isActive={isActive}
+                isNearby={isNearby}
+                onFavorite={handleFavorite}
+                isMuted={isMuted}
+                onToggleMute={() => setIsMuted(m => !m)}
+                gradientHeight={gradientHeight}
+                gradientOpacity={gradientOpacity}
+                navBottomOffset={navBottomOffset}
+              />
+            </div>
+          );
+        })}
       </div>
 
       {stories.length > 1 && (
