@@ -2097,7 +2097,8 @@ async function handleAdminGetUsers(request, env) {
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
   let dataQuery = `SELECT id, email, username, role, seeking, age, city, country, avatar_url, status,
-    premium, premium_until, ghost_mode, verified, online, coins, is_admin, account_status, last_active, last_ip, created_at
+    premium, premium_until, ghost_mode, verified, online, coins, is_admin, account_status, last_active, last_ip, created_at,
+    (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id
     FROM users`;
   const bindings = [];
 
@@ -2125,6 +2126,7 @@ async function handleAdminGetUsers(request, env) {
       premium: isPremiumActive(u),
       online: isOnline(u.last_active),
       is_admin: !!u.is_admin,
+      story_id: u.story_id || null,
       interests: undefined,
       photos: undefined,
     })),
@@ -2768,6 +2770,34 @@ async function handleAdminUploadStory(request, env) {
   return json({ id: storyId, video_url: videoUrl, user_id: userId, caption }, 201);
 }
 
+// ── Admin: DELETE /api/admin/stories/:id ───────────────
+async function handleAdminDeleteStory(request, env, storyId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  await ensureStoriesTable(env);
+
+  const story = await env.DB.prepare('SELECT id, video_url FROM stories WHERE id = ?').bind(storyId).first();
+  if (!story) return error('Historia no encontrada', 404);
+
+  await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(storyId).run();
+
+  // Best-effort R2 delete
+  try {
+    const r2Base = env.R2_PUBLIC_URL || '';
+    if (r2Base && story.video_url.startsWith(r2Base)) {
+      const key = story.video_url.slice(r2Base.length + 1);
+      if (key) await env.IMAGES.delete(key);
+    }
+  } catch {
+    // R2 delete is best-effort
+  }
+
+  return json({ deleted: true, story_id: storyId });
+}
+
 // POST /api/stories — authenticated user uploads their own story
 async function handleUploadStory(request, env) {
   const auth = await authenticate(request, env);
@@ -2922,6 +2952,8 @@ async function handleRequest(request, env) {
   if (path === '/api/stories' && method === 'GET') return handleGetStories(request, env);
   if (path === '/api/stories' && method === 'POST') return handleUploadStory(request, env);
   if (path === '/api/admin/upload-story' && method === 'POST') return handleAdminUploadStory(request, env);
+  const adminStoryMatch = path.match(/^\/api\/admin\/stories\/([a-f0-9-]+)$/);
+  if (adminStoryMatch && method === 'DELETE') return handleAdminDeleteStory(request, env, adminStoryMatch[1]);
 
   return error('Ruta no encontrada', 404);
 }

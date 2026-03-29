@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, Ghost, Ban, AlertTriangle, Pause, Play, Film } from 'lucide-react';
-import { adminGetUsers, adminUpdateUser, adminDeleteUser, adminUploadStoryForUser } from '../../lib/api';
+import { adminGetUsers, adminUpdateUser, adminDeleteUser, adminUploadStoryForUser, adminDeleteStory } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 
 function timeAgo(dateStr) {
@@ -91,13 +91,29 @@ export default function AdminUsersPage() {
     if (!file || !selected) return;
     setStoryUploading(true);
     try {
-      await adminUploadStoryForUser(selected.id, file, { caption: storyCaption });
-      alert(`Historia subida exitosamente para ${selected.username}`);
+      const result = await adminUploadStoryForUser(selected.id, file, { caption: storyCaption });
+      setSelected(s => ({ ...s, story_id: result.id }));
+      setUsers(prev => prev.map(u => u.id === selected.id ? { ...u, story_id: result.id } : u));
       setStoryCaption('');
     } catch (err) {
       alert(err.message || 'Error al subir historia');
     } finally {
       setStoryUploading(false);
+    }
+  };
+
+  const handleStoryDelete = async () => {
+    if (!selected?.story_id) return;
+    if (!confirm(`¿Eliminar la historia de ${selected.username}? Esta acción no se puede deshacer.`)) return;
+    setActionLoading(true);
+    try {
+      await adminDeleteStory(selected.story_id);
+      setSelected(s => ({ ...s, story_id: null }));
+      setUsers(prev => prev.map(u => u.id === selected.id ? { ...u, story_id: null } : u));
+    } catch (err) {
+      alert(err.message || 'Error al eliminar historia');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -434,24 +450,37 @@ export default function AdminUsersPage() {
                   <span className="text-xs text-red-400 font-semibold">Eliminar usuario</span>
                 </button>
 
-                {/* Upload story for user */}
+                {/* Upload / Delete story */}
                 <div className="space-y-2 pt-2 border-t border-mansion-border/20">
                   <p className="text-[10px] text-text-dim uppercase tracking-wider">Historias</p>
-                  <input
-                    type="text"
-                    value={storyCaption}
-                    onChange={e => setStoryCaption(e.target.value)}
-                    placeholder="Texto de la historia (opcional)..."
-                    className="w-full px-4 py-2 rounded-xl bg-mansion-elevated border border-mansion-border/20 text-sm text-text-primary placeholder:text-text-dim focus:outline-none focus:border-mansion-gold/40"
-                  />
-                  <button
-                    disabled={storyUploading}
-                    onClick={() => storyInputRef.current?.click()}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-mansion-elevated hover:bg-mansion-crimson/10 transition-colors text-left"
-                  >
-                    <Film className={`w-4 h-4 ${storyUploading ? 'text-text-dim animate-pulse' : 'text-mansion-crimson'}`} />
-                    <span className="text-xs text-text-primary">{storyUploading ? 'Subiendo historia...' : 'Subir historia para este usuario'}</span>
-                  </button>
+                  {selected.story_id ? (
+                    <button
+                      disabled={actionLoading}
+                      onClick={handleStoryDelete}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-red-900/20 border border-red-500/20 hover:bg-red-900/40 transition-colors text-left"
+                    >
+                      <Film className="w-4 h-4 text-red-400" />
+                      <span className="text-xs text-red-400 font-semibold">{actionLoading ? 'Eliminando...' : 'Eliminar historia'}</span>
+                    </button>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        value={storyCaption}
+                        onChange={e => setStoryCaption(e.target.value)}
+                        placeholder="Texto de la historia (opcional)..."
+                        className="w-full px-4 py-2 rounded-xl bg-mansion-elevated border border-mansion-border/20 text-sm text-text-primary placeholder:text-text-dim focus:outline-none focus:border-mansion-gold/40"
+                      />
+                      <button
+                        disabled={storyUploading}
+                        onClick={() => storyInputRef.current?.click()}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-mansion-elevated hover:bg-mansion-crimson/10 transition-colors text-left"
+                      >
+                        <Film className={`w-4 h-4 ${storyUploading ? 'text-text-dim animate-pulse' : 'text-mansion-crimson'}`} />
+                        <span className="text-xs text-text-primary">{storyUploading ? 'Subiendo historia...' : 'Subir historia para este usuario'}</span>
+                      </button>
+                    </>
+                  )}
                   <input
                     ref={storyInputRef}
                     type="file"

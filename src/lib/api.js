@@ -389,6 +389,10 @@ export async function uploadStory(file, { caption = '' } = {}) {
   return data;
 }
 
+export async function adminDeleteStory(storyId) {
+  return apiFetch(`/admin/stories/${storyId}`, { method: 'DELETE' });
+}
+
 export async function adminUploadStoryForUser(userId, file, { caption = '' } = {}) {
   const params = new URLSearchParams();
   params.set('user_id', userId);
