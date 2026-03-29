@@ -66,7 +66,7 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
   return (
     <div className="relative w-full h-full bg-black flex items-center justify-center snap-start snap-always">
       {/* Video panel — on desktop, a centered rounded container; on mobile, fullscreen */}
-      <div className="relative w-full h-full lg:h-[calc(100%-48px)] lg:max-w-[420px] lg:mx-auto lg:my-6 lg:rounded-2xl lg:overflow-hidden">
+      <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
         {/* Video */}
         <video
           ref={videoRef}
@@ -108,32 +108,44 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
         />
         <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none lg:rounded-t-2xl" />
 
-        {/* Right side actions — inside video panel on mobile, outside on desktop */}
+        {/* Mobile action icons — inside video */}
         <div
           className="absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden"
           style={{ bottom: `${navBottomOffset + 16}px` }}
         >
-          <ActionButtons story={story} onFavorite={onFavorite} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
+          <MobileActionButtons story={story} onFavorite={onFavorite} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
         </div>
+
+        {/* Desktop mute button — top-right corner of video */}
+        <button onClick={onToggleMute} className="hidden lg:flex absolute top-4 right-4 z-20 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center" style={{ width: 44, height: 44 }}>
+          {isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+        </button>
 
         {/* Bottom user info + caption */}
         <div
-          className="absolute left-4 right-20 lg:right-4 lg:bottom-6 z-20"
+          className="absolute left-4 right-20 z-20 lg:left-auto lg:right-5 lg:max-w-[260px] lg:text-right"
           style={{ bottom: `${navBottomOffset + 8}px` }}
         >
           <button
             onClick={() => navigate(`/perfiles/${story.user_id}`)}
-            className="block text-left mb-1"
+            className="block text-left lg:text-right lg:w-full mb-1"
           >
-            <p className="text-white font-bold text-[15px] leading-tight drop-shadow-lg">@{story.username}</p>
+            <p className="text-white font-bold text-[15px] lg:text-lg leading-tight drop-shadow-lg">@{story.username}</p>
           </button>
 
           {story.caption && (
-            <p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
+            <p className="text-white/90 text-sm lg:text-base leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
           )}
 
-          <p className="text-white/40 text-[11px] mt-1.5">{timeAgo(story.created_at)}</p>
+          <p className="text-white/40 text-[11px] lg:text-xs mt-1.5">{timeAgo(story.created_at)}</p>
         </div>
+
+        {/* Desktop bottom info override position */}
+        <style>{`
+          @media (min-width: 1024px) {
+            .desktop-bottom-info { bottom: 20px !important; }
+          }
+        `}</style>
 
         {/* Progress bar at top */}
         {isActive && (
@@ -148,16 +160,16 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
         )}
       </div>
 
-      {/* Desktop action icons — outside the video panel, aligned to its right edge */}
-      <div className="hidden lg:flex absolute flex-col items-center gap-6 z-20" style={{ right: 'calc(50% - 260px)', bottom: '80px' }}>
-        <ActionButtons story={story} onFavorite={onFavorite} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
+      {/* Desktop action icons — outside the video panel to the right */}
+      <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 330px)', bottom: '60px' }}>
+        <DesktopActionButtons story={story} onFavorite={onFavorite} navigate={navigate} />
       </div>
     </div>
   );
 }
 
-/* Shared action buttons extracted for mobile (inside video) and desktop (outside video) */
-function ActionButtons({ story, onFavorite, onToggleMute, isMuted, navigate }) {
+/* Mobile action buttons (inside video, smaller) */
+function MobileActionButtons({ story, onFavorite, onToggleMute, isMuted, navigate }) {
   return (
     <>
       <button onClick={() => onFavorite(story.user_id)} className="flex flex-col items-center">
@@ -186,6 +198,38 @@ function ActionButtons({ story, onFavorite, onToggleMute, isMuted, navigate }) {
             <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
+          )}
+        </div>
+      </button>
+    </>
+  );
+}
+
+/* Desktop action buttons (outside video, bigger) */
+function DesktopActionButtons({ story, onFavorite, navigate }) {
+  return (
+    <>
+      <button onClick={() => onFavorite(story.user_id)} className="flex flex-col items-center">
+        <div className={`rounded-full flex items-center justify-center ${story.favorited ? 'bg-mansion-crimson/25' : 'bg-mansion-card/60 border border-white/10'}`} style={{ width: 60, height: 60 }}>
+          <Heart className={`w-8 h-8 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
+        </div>
+      </button>
+      <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center">
+        <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center" style={{ width: 60, height: 60 }}>
+          <Send className="w-7 h-7 text-white" />
+        </div>
+      </button>
+      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
+        <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center" style={{ width: 60, height: 60 }}>
+          <Gift className="w-7 h-7 text-mansion-gold" />
+        </div>
+      </button>
+      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
+        <div className="w-16 h-16 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
+          {story.avatar_url ? (
+            <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-white/60 text-lg font-bold">{(story.username || '?')[0]}</div>
           )}
         </div>
       </button>
@@ -412,22 +456,24 @@ export default function VideoFeedPage() {
         ))}
       </div>
 
-      {/* Scroll hints — desktop only */}
+      {/* Scroll arrows — desktop only, prev left / next right */}
       {stories.length > 1 && (
-        <div className="absolute top-1/2 -translate-y-1/2 flex-col gap-2 z-30 hidden lg:flex" style={{ right: 'calc(50% - 280px)' }}>
+        <>
           <button
             onClick={() => scrollByOne(-1)}
-            className="w-10 h-10 rounded-full bg-mansion-card/60 backdrop-blur-sm flex items-center justify-center border border-white/10 hover:bg-mansion-card/80 transition-colors"
+            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/80 transition-colors"
+            style={{ left: 'calc(50% - 310px)' }}
           >
-            <ChevronUp className="w-5 h-5 text-white/70" />
+            <ChevronUp className="w-6 h-6 text-white/70" />
           </button>
           <button
             onClick={() => scrollByOne(1)}
-            className="w-10 h-10 rounded-full bg-mansion-card/60 backdrop-blur-sm flex items-center justify-center border border-white/10 hover:bg-mansion-card/80 transition-colors"
+            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/80 transition-colors"
+            style={{ right: 'calc(50% - 310px)' }}
           >
-            <ChevronDown className="w-5 h-5 text-white/70" />
+            <ChevronDown className="w-6 h-6 text-white/70" />
           </button>
-        </div>
+        </>
       )}
 
       {/* Bottom safe area for nav */}
