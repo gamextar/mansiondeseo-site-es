@@ -1364,6 +1364,21 @@ async function handleAdminChatCleanup(request, env) {
   return json({ cleaned: true, message: 'Mensajes de más de 30 días eliminados' });
 }
 
+// ── Helper: extract R2 key from a public URL and delete ─
+async function tryDeleteR2Key(env, url) {
+  if (!url || typeof url !== 'string') return;
+  try {
+    const r2Base = env.R2_PUBLIC_URL || '';
+    let key = '';
+    if (r2Base && url.startsWith(r2Base)) {
+      key = url.slice(r2Base.length + 1);
+    } else if (url.includes('/api/images/')) {
+      key = url.split('/api/images/')[1];
+    }
+    if (key) await env.IMAGES.delete(key);
+  } catch { /* best-effort */ }
+}
+
 // ── POST /api/upload ────────────────────────────────────
 
 async function handleUpload(request, env) {
@@ -1412,6 +1427,12 @@ async function handleUpload(request, env) {
   const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
 
   if (purpose === 'avatar') {
+    // Delete old avatar from R2 if it exists and is different
+    const oldAvatarUrl = user.avatar_url || '';
+    if (oldAvatarUrl && oldAvatarUrl !== publicUrl) {
+      await tryDeleteR2Key(env, oldAvatarUrl);
+    }
+
     await env.DB.prepare(`
       UPDATE users SET avatar_url = ?, avatar_crop = NULL WHERE id = ?
     `).bind(publicUrl, auth.sub).run();
@@ -1420,7 +1441,15 @@ async function handleUpload(request, env) {
   }
 
   if (purpose === 'gallery') {
-    const nextPhotos = [...galleryPhotos, publicUrl];
+    // Enforce max 6 gallery photos — delete oldest if at limit
+    const MAX_GALLERY = 6;
+    const trimmed = [...galleryPhotos];
+    while (trimmed.length >= MAX_GALLERY) {
+      const removed = trimmed.shift();
+      await tryDeleteR2Key(env, removed);
+    }
+
+    const nextPhotos = [...trimmed, publicUrl];
     await env.DB.prepare(`
       UPDATE users SET photos = ? WHERE id = ?
     `).bind(JSON.stringify(nextPhotos), auth.sub).run();
@@ -1478,21 +1507,8 @@ async function handleDeletePhoto(request, env) {
   await env.DB.prepare('UPDATE users SET photos = ? WHERE id = ?')
     .bind(JSON.stringify(photos), auth.sub).run();
 
-  // Try to delete from R2 (extract key from URL)
-  try {
-    const r2Base = env.R2_PUBLIC_URL || '';
-    let key = '';
-    if (r2Base && url.startsWith(r2Base)) {
-      key = url.slice(r2Base.length + 1); // strip base + '/'
-    } else if (url.includes('/api/images/')) {
-      key = url.split('/api/images/')[1]; // legacy format
-    }
-    if (key) {
-      await env.IMAGES.delete(key);
-    }
-  } catch {
-    // R2 delete is best-effort
-  }
+  // Delete from R2
+  await tryDeleteR2Key(env, url);
 
   return json({ photos, avatar_url: user.avatar_url || '' });
 }
@@ -2717,6 +2733,45 @@ async function handleGetStories(request, env) {
   return json({ stories });
 }
 
+// ── Helper: delete all existing stories for a user (DB + R2) ─
+async function deleteExistingStories(env, userId) {
+  const { results } = await env.DB.prepare(
+    'SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1'
+  ).bind(userId).all();
+  if (!results || results.length === 0) return;
+  for (const story of results) {
+    await tryDeleteR2Key(env, story.video_url);
+  }
+  await env.DB.prepare(
+    'DELETE FROM stories WHERE user_id = ? AND active = 1'
+  ).bind(userId).run();
+}
+
+// DELETE /api/admin/delete-story?user_id=... — admin deletes a user's story
+async function handleAdminDeleteStory(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  await ensureStoriesTable(env);
+
+  const url = new URL(request.url);
+  const userId = url.searchParams.get('user_id');
+  if (!userId) return error('user_id requerido', 400);
+
+  const count = await env.DB.prepare(
+    'SELECT COUNT(*) as n FROM stories WHERE user_id = ? AND active = 1'
+  ).bind(userId).first();
+
+  if (!count || count.n === 0) return error('Este usuario no tiene historia activa', 404);
+
+  await deleteExistingStories(env, userId);
+
+  return json({ ok: true });
+}
+
 // POST /api/admin/upload-story — admin uploads a video story for any user
 async function handleAdminUploadStory(request, env) {
   const auth = await authenticate(request, env);
@@ -2748,6 +2803,9 @@ async function handleAdminUploadStory(request, env) {
   if (videoData.byteLength > 50 * 1024 * 1024) {
     return error('El video no puede superar 50MB');
   }
+
+  // Delete previous story for this user (1 story per user)
+  await deleteExistingStories(env, userId);
 
   const ext = contentType === 'video/webm' ? 'webm' : contentType === 'video/quicktime' ? 'mov' : 'mp4';
   const key = `stories/${generateId()}.${ext}`;
@@ -2789,6 +2847,9 @@ async function handleUploadStory(request, env) {
   if (videoData.byteLength > 50 * 1024 * 1024) {
     return error('El video no puede superar 50MB');
   }
+
+  // Delete previous story for this user (1 story per user)
+  await deleteExistingStories(env, auth.sub);
 
   const ext = contentType === 'video/webm' ? 'webm' : contentType === 'video/quicktime' ? 'mov' : 'mp4';
   const key = `stories/${generateId()}.${ext}`;
@@ -2922,6 +2983,7 @@ async function handleRequest(request, env) {
   if (path === '/api/stories' && method === 'GET') return handleGetStories(request, env);
   if (path === '/api/stories' && method === 'POST') return handleUploadStory(request, env);
   if (path === '/api/admin/upload-story' && method === 'POST') return handleAdminUploadStory(request, env);
+  if (path === '/api/admin/delete-story' && method === 'DELETE') return handleAdminDeleteStory(request, env);
 
   return error('Ruta no encontrada', 404);
 }
