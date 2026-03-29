@@ -62,11 +62,29 @@ function AppLayout() {
     FULLSCREEN_PATHS.includes(location.pathname);
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
   const showChrome = !isFullscreen && !isChatDetail;
+  const { registered } = useAuth();
+  const isVideoFeed = location.pathname === '/videos';
 
   return (
     <>
       {showChrome && <DesktopSidebar />}
       {showChrome && <Navbar />}
+
+      {/* VideoFeedPage rendered persistently outside Routes so video elements
+          survive navigation — eliminates cold-start black screen on every return */}
+      {registered && (
+        <div
+          style={{
+            display: isVideoFeed ? 'block' : 'none',
+            position: 'fixed',
+            inset: 0,
+            zIndex: isVideoFeed ? 40 : -1,
+          }}
+          aria-hidden={!isVideoFeed}
+        >
+          <VideoFeedPage isVisible={isVideoFeed} />
+        </div>
+      )}
 
       <div className={showChrome ? 'lg:pl-64 xl:pl-72' : ''}>
         <motion.div
@@ -119,14 +137,8 @@ function AppLayout() {
               </RequireRegistration>
             }
           />
-          <Route
-            path="/videos"
-            element={
-              <RequireRegistration>
-                <VideoFeedPage />
-              </RequireRegistration>
-            }
-          />
+          {/* /videos is handled by the persistent VideoFeedPage above */}
+          <Route path="/videos" element={null} />
           <Route
             path="/perfiles/:id"
             element={

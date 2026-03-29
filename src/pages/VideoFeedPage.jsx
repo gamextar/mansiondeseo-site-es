@@ -18,7 +18,7 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
+function StoryCard({ story, isActive, preloadMode, onBecomeActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
@@ -37,6 +37,7 @@ function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggle
         setVideoReady(false);
       }
       video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      onBecomeActive?.(video);
     } else {
       video.pause();
       setIsPlaying(false);
@@ -275,13 +276,14 @@ function DesktopActionButtons({ story, onFavorite, navigate }) {
   );
 }
 
-export default function VideoFeedPage() {
+export default function VideoFeedPage({ isVisible = true }) {
   const navigate = useNavigate();
   const { user, siteSettings } = useAuth();
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
   const hasInitialPositionRef = useRef(false);
+  const activeVideoRef = useRef(null); // ref to currently-active video element
 
   // Hydrate from sessionStorage to skip loading spinner on revisit
   const cachedStories = () => {
@@ -350,6 +352,17 @@ export default function VideoFeedPage() {
       hasInitialPositionRef.current = false;
     }
   }, [stories.length]);
+
+  // Pause/resume the active video when navigating away/back (component stays mounted)
+  useEffect(() => {
+    const video = activeVideoRef.current;
+    if (!video) return;
+    if (isVisible) {
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+    }
+  }, [isVisible]);
 
   // Persist position and muted state
   useEffect(() => {
@@ -514,6 +527,7 @@ export default function VideoFeedPage() {
               story={story}
               isActive={displayIndex === activeDispIdx}
               preloadMode={Math.abs(displayIndex - activeDispIdx) <= 1 ? 'auto' : 'none'}
+              onBecomeActive={(videoEl) => { activeVideoRef.current = videoEl; }}
               onFavorite={handleFavorite}
               isMuted={isMuted}
               onToggleMute={() => setIsMuted(m => !m)}
