@@ -189,7 +189,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onT
 
         <div
           className="absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden"
-          style={{ bottom: `${navBottomOffset + 16}px` }}
+          style={{ bottom: `${navBottomOffset + 16}px`, touchAction: 'none' }}
           onClick={e => e.stopPropagation()}
           onTouchEnd={e => e.stopPropagation()}
         >
@@ -202,7 +202,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onT
 
         <div
           className="absolute left-4 right-20 z-20 lg:hidden"
-          style={{ bottom: `${navBottomOffset + 8}px` }}
+          style={{ bottom: `${navBottomOffset + 8}px`, touchAction: 'none' }}
           onClick={e => e.stopPropagation()}
           onTouchEnd={e => e.stopPropagation()}
         >
