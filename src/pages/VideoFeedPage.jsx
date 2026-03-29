@@ -224,33 +224,17 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
 
 function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate }) {
   const [burstTrigger, setBurstTrigger] = useState(0);
-  const touchLikeHandledRef = useRef(false);
 
   const handleHeart = () => {
     setBurstTrigger(t => t + 1);
     onLike(story.id);
   };
 
-  const handleHeartTouchStart = () => {
-    touchLikeHandledRef.current = true;
-    handleHeart();
-    setTimeout(() => {
-      touchLikeHandledRef.current = false;
-    }, 450);
-  };
-
-  const handleHeartClick = () => {
-    if (touchLikeHandledRef.current) return;
-    handleHeart();
-  };
-
   return (
     <>
       <button
-        onClick={handleHeartClick}
-        onTouchStart={handleHeartTouchStart}
-        className="pointer-events-auto flex flex-col items-center relative p-2 -m-2"
-        style={{ touchAction: 'manipulation' }}
+        onClick={handleHeart}
+        className="pointer-events-auto flex flex-col items-center relative"
       >
         <HeartBurst trigger={burstTrigger} />
         <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
