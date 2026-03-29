@@ -21,6 +21,7 @@ function timeAgo(dateStr) {
 function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
+  const rafRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const navigate = useNavigate();
@@ -37,16 +38,30 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
     const video = videoRef.current;
     if (!video) return;
 
+    const tick = () => {
+      if (!video.paused) {
+        const bar = progressBarRef.current;
+        if (bar && video.duration) {
+          bar.style.width = `${(video.currentTime / video.duration) * 100}%`;
+        }
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
     if (isActive) {
       if (activeSrc) {
         video.currentTime = 0;
         if (progressBarRef.current) progressBarRef.current.style.width = '0%';
         video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
       }
+      rafRef.current = requestAnimationFrame(tick);
     } else {
       video.pause();
       setIsPlaying(false);
+      cancelAnimationFrame(rafRef.current);
     }
+
+    return () => cancelAnimationFrame(rafRef.current);
   }, [isActive]);
 
   useEffect(() => {
@@ -65,13 +80,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
     }
     setShowPlayIcon(true);
     setTimeout(() => setShowPlayIcon(false), 600);
-  };
-
-  const handleTimeUpdate = () => {
-    const video = videoRef.current;
-    const bar = progressBarRef.current;
-    if (!video || !bar || !video.duration) return;
-    bar.style.width = `${(video.currentTime / video.duration) * 100}%`;
   };
 
   const handleVideoEnd = () => {
@@ -95,7 +103,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
           muted={isMuted}
           preload={shouldLoad ? 'auto' : 'none'}
           onClick={togglePlay}
-          onTimeUpdate={handleTimeUpdate}
           onEnded={handleVideoEnd}
         />
 
