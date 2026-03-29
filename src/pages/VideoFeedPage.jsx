@@ -539,7 +539,7 @@ export default function VideoFeedPage() {
         clearTimeout(boundaryCooldownTimer.current);
         boundaryCooldownTimer.current = setTimeout(() => {
           settleInfiniteBoundary();
-        }, 105 - timeSinceLastScroll);
+        }, 115 - timeSinceLastScroll);
         return;
       }
 
