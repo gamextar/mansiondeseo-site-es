@@ -7,20 +7,12 @@ name = "mansion-deseo-r2-worker"
 main = "src/index.js"
 compatibility_date = "2024-12-01"
 
+# ── Custom Domain ─────────────────────────────────────
+routes = [
+  { pattern = "videos.unicoapps.com", custom_domain = true }
+]
+
 # ── R2 Bucket ────────────────────────────────────────
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "mansion-deseo-images"
-
-# ── Secrets (set via wrangler secret put) ────────────
-# UPLOAD_SECRET — set via: npx wrangler secret put UPLOAD_SECRET --config r2-worker/wrangler.toml
-
-# ── Custom Domain Route ──────────────────────────────
-# After deploying, add the route in Cloudflare Dashboard:
-#   Route: videos.unicoapps.com/*
-#   Worker: mansion-deseo-r2-worker
-#
-# Or via wrangler (uncomment and set your zone ID):
-# routes = [
-#   { pattern = "videos.unicoapps.com/*", zone_name = "unicoapps.com" }
-# ]
