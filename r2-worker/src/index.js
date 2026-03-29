@@ -102,73 +102,117 @@ async function handleUpload(request, env, key) {
 }
 
 // ─────────────────────────────────────────────────────
-// GET Handler — Serve from edge cache, fallback to R2
+// Range header parser — returns R2-compatible range object
+// ─────────────────────────────────────────────────────
+function parseRangeHeader(rangeHeader, totalSize) {
+  if (!rangeHeader) return null;
+  const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
+  if (!match) return null;
+
+  const start = match[1] ? parseInt(match[1], 10) : undefined;
+  const end = match[2] ? parseInt(match[2], 10) : undefined;
+
+  if (start !== undefined && end !== undefined) {
+    return { offset: start, length: end - start + 1 };
+  }
+  if (start !== undefined) {
+    return { offset: start, length: totalSize - start };
+  }
+  if (end !== undefined) {
+    // Suffix range: last N bytes
+    return { suffix: end };
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────
+// GET Handler — Range support + edge cache for full requests
 // ─────────────────────────────────────────────────────
 async function handleGet(request, env, key, method) {
-  const cache = caches.default;
-  const cacheKey = new Request(request.url, { method: 'GET' });
+  const rangeHeader = request.headers.get('Range');
+  const isRangeRequest = !!rangeHeader;
 
-  // 1️⃣ Try edge cache first (FREE — no Class B operation)
-  let response = await cache.match(cacheKey);
-  if (response) {
-    // Cache HIT — add indicator header
-    const headers = new Headers(response.headers);
-    headers.set('X-Cache', 'HIT');
-    headers.set('Vary', 'Accept-Encoding');
+  // ── Non-range requests: try edge cache first ──────
+  if (!isRangeRequest) {
+    const cache = caches.default;
+    const cacheKey = new Request(request.url, { method: 'GET' });
+
+    let response = await cache.match(cacheKey);
+    if (response) {
+      const headers = new Headers(response.headers);
+      headers.set('X-Cache', 'HIT');
+      Object.entries(corsHeaders(request)).forEach(([k, v]) => headers.set(k, v));
+
+      if (method === 'HEAD') {
+        return new Response(null, { status: 200, headers });
+      }
+      return new Response(response.body, { status: 200, headers });
+    }
+
+    // Cache MISS — fetch full object from R2
+    const object = await env.BUCKET.get(key);
+    if (!object) return errorResponse('Not found', 404, request);
+
+    const headers = new Headers();
+    headers.set('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream');
+    headers.set('Cache-Control', CACHE_CONTROL);
+    headers.set('ETag', object.httpEtag);
+    headers.set('Accept-Ranges', 'bytes');
+    headers.set('Content-Length', String(object.size));
+    headers.set('X-Cache', 'MISS');
     Object.entries(corsHeaders(request)).forEach(([k, v]) => headers.set(k, v));
 
     if (method === 'HEAD') {
-      return new Response(null, { status: response.status, headers });
+      return new Response(null, { status: 200, headers });
     }
-    return new Response(response.body, { status: response.status, headers });
+
+    // Tee body: one stream for client, one for cache
+    const [clientStream, cacheStream] = object.body.tee();
+    try {
+      cache.put(cacheKey, new Response(cacheStream, { status: 200, headers: new Headers(headers) }));
+    } catch {
+      // Edge caching is best-effort
+    }
+
+    return new Response(clientStream, { status: 200, headers });
   }
 
-  // 2️⃣ Cache MISS — fetch from R2 (1 Class B operation)
-  const object = await env.BUCKET.get(key);
-  if (!object) {
-    return errorResponse('Not found', 404, request);
+  // ── Range requests: pass directly to R2 (no cache) ──
+  // First get object metadata to know total size
+  const head = await env.BUCKET.head(key);
+  if (!head) return errorResponse('Not found', 404, request);
+
+  const totalSize = head.size;
+  const range = parseRangeHeader(rangeHeader, totalSize);
+  if (!range) {
+    return errorResponse('Invalid Range', 416, request);
+  }
+
+  const object = await env.BUCKET.get(key, { range });
+  if (!object) return errorResponse('Not found', 404, request);
+
+  // Calculate actual byte range for Content-Range header
+  let rangeStart, rangeEnd;
+  if (range.suffix) {
+    rangeStart = totalSize - range.suffix;
+    rangeEnd = totalSize - 1;
+  } else {
+    rangeStart = range.offset;
+    rangeEnd = range.offset + range.length - 1;
   }
 
   const headers = new Headers();
-  headers.set('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream');
+  headers.set('Content-Type', head.httpMetadata?.contentType || 'application/octet-stream');
   headers.set('Cache-Control', CACHE_CONTROL);
-  headers.set('ETag', object.httpEtag);
-  headers.set('X-Cache', 'MISS');
-  headers.set('Vary', 'Accept-Encoding');
+  headers.set('ETag', head.httpEtag);
   headers.set('Accept-Ranges', 'bytes');
-
-  if (object.size) {
-    headers.set('Content-Length', String(object.size));
-  }
-
+  headers.set('Content-Range', `bytes ${rangeStart}-${rangeEnd}/${totalSize}`);
+  headers.set('Content-Length', String(rangeEnd - rangeStart + 1));
   Object.entries(corsHeaders(request)).forEach(([k, v]) => headers.set(k, v));
 
-  // Build response for caching
-  const body = object.body;
-  response = new Response(body, { status: 200, headers });
-
-  // 3️⃣ Store in edge cache (async, non-blocking)
-  // Clone before consuming the body — waitUntil keeps the worker alive
-  // We tee the body so the original response streams to the client
-  const [clientStream, cacheStream] = response.body.tee();
-
-  const cacheResponse = new Response(cacheStream, {
-    status: 200,
-    headers: response.headers,
-  });
-
-  // Use waitUntil so caching doesn't delay the response
-  const ctx = { waitUntil: (p) => p }; // fallback
-  try {
-    // cache.put is fire-and-forget safe in Workers
-    cache.put(cacheKey, cacheResponse);
-  } catch {
-    // Edge caching is best-effort
-  }
-
   if (method === 'HEAD') {
-    return new Response(null, { status: 200, headers });
+    return new Response(null, { status: 206, headers });
   }
 
-  return new Response(clientStream, { status: 200, headers });
+  return new Response(object.body, { status: 206, headers });
 }
