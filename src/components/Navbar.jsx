@@ -28,7 +28,7 @@ export default function Navbar() {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
             <span className="font-display text-white text-sm font-bold">M</span>
           </div>
-          <span className="font-display text-base font-semibold text-gradient-gold">
+          <span className="font-display text-[17px] font-semibold text-gradient-gold" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
             Mansión Deseo
           </span>
         </Link>
