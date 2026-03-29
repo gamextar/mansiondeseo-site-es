@@ -74,6 +74,44 @@ function HeartBurst({ trigger }) {
   );
 }
 
+// ── Tap-aware button: fires instantly on touchEnd, doesn't block scroll ────
+function TapButton({ onTap, children, className, style }) {
+  const startRef = useRef(null);
+  return (
+    <button
+      className={className}
+      style={style}
+      onClick={(e) => { e.stopPropagation(); onTap?.(); }}
+      onTouchStart={(e) => {
+        const t = e.touches[0];
+        startRef.current = { x: t.clientX, y: t.clientY };
+      }}
+      onTouchMove={(e) => {
+        if (!startRef.current) return;
+        const t = e.touches[0];
+        if (Math.abs(t.clientX - startRef.current.x) > 10 || Math.abs(t.clientY - startRef.current.y) > 10) {
+          startRef.current = null;
+        }
+      }}
+      onTouchEnd={(e) => {
+        e.stopPropagation();
+        if (startRef.current) {
+          const t = e.changedTouches[0];
+          const dx = Math.abs(t.clientX - startRef.current.x);
+          const dy = Math.abs(t.clientY - startRef.current.y);
+          startRef.current = null;
+          if (dx < 15 && dy < 15) {
+            e.preventDefault();
+            onTap?.();
+          }
+        }
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset, avatarSize }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
@@ -189,7 +227,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onT
 
         <div
           className="absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden"
-          style={{ bottom: `${navBottomOffset + 16}px`, touchAction: 'none' }}
+          style={{ bottom: `${navBottomOffset + 16}px` }}
           onClick={e => e.stopPropagation()}
           onTouchEnd={e => e.stopPropagation()}
         >
@@ -202,11 +240,11 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onT
 
         <div
           className="absolute left-4 right-20 z-20 lg:hidden"
-          style={{ bottom: `${navBottomOffset + 8}px`, touchAction: 'none' }}
+          style={{ bottom: `${navBottomOffset + 8}px` }}
           onClick={e => e.stopPropagation()}
           onTouchEnd={e => e.stopPropagation()}
         >
-          <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5 mb-1">
+          <TapButton onTap={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5 mb-1">
             <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
               {story.avatar_url ? (
                 <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
@@ -215,7 +253,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onT
               )}
             </div>
             <p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{story.username}</p>
-          </button>
+          </TapButton>
           {story.caption && (
             <p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
           )}
@@ -267,28 +305,28 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
 
   return (
     <>
-      <button onClick={handleHeart} className="flex flex-col items-center relative">
+      <TapButton onTap={handleHeart} className="flex flex-col items-center relative">
         <HeartBurst trigger={burstTrigger} />
         <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
           <Heart className={`w-7 h-7 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
         </div>
         <span className="text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
-      </button>
-      <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center">
+      </TapButton>
+      <TapButton onTap={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Send className="w-6 h-6 text-white" />
         </div>
-      </button>
-      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
+      </TapButton>
+      <TapButton onTap={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Gift className="w-6 h-6 text-mansion-gold" />
         </div>
-      </button>
-      <button onClick={onToggleMute} className="flex flex-col items-center">
+      </TapButton>
+      <TapButton onTap={onToggleMute} className="flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
         </div>
-      </button>
+      </TapButton>
     </>
   );
 }
