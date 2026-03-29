@@ -716,16 +716,21 @@ export default function VideoFeedPage() {
         })}
       </div>
 
-      <MobileStoryOverlay
-        story={activeStory}
-        onLike={handleLike}
-        onToggleMute={() => setIsMuted(m => !m)}
-        isMuted={isMuted}
-        navigate={navigate}
-        navBottomOffset={navBottomOffset}
-        avatarSize={avatarSize}
-        scrollContainerRef={containerRef}
-      />
+      {activeStory && (
+        <div
+          className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
+          style={{ bottom: `${navBottomOffset + 16}px` }}
+        >
+          <MobileActionButtons
+            story={activeStory}
+            onLike={handleLike}
+            onToggleMute={() => setIsMuted(m => !m)}
+            isMuted={isMuted}
+            navigate={navigate}
+            scrollContainerRef={containerRef}
+          />
+        </div>
+      )}
 
       {stories.length > 1 && (
         <>
@@ -745,8 +750,6 @@ export default function VideoFeedPage() {
           </button>
         </>
       )}
-
-      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/70 to-transparent pointer-events-none z-10 lg:hidden" />
     </div>
   );
 }
