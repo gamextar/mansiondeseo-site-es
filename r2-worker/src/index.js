@@ -103,8 +103,9 @@ async function handleUpload(request, env, key) {
 
 // ─────────────────────────────────────────────────────
 // Range header parser — returns R2-compatible range object
+// Does NOT need total size (R2 handles open-ended ranges)
 // ─────────────────────────────────────────────────────
-function parseRangeHeader(rangeHeader, totalSize) {
+function parseRangeHeader(rangeHeader) {
   if (!rangeHeader) return null;
   const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
   if (!match) return null;
@@ -116,10 +117,11 @@ function parseRangeHeader(rangeHeader, totalSize) {
     return { offset: start, length: end - start + 1 };
   }
   if (start !== undefined) {
-    return { offset: start, length: totalSize - start };
+    // Open-ended: bytes=123- → R2 handles { offset } natively
+    return { offset: start };
   }
   if (end !== undefined) {
-    // Suffix range: last N bytes
+    // Suffix: bytes=-500 → last 500 bytes
     return { suffix: end };
   }
   return null;
@@ -177,13 +179,8 @@ async function handleGet(request, env, key, method) {
     return new Response(clientStream, { status: 200, headers });
   }
 
-  // ── Range requests: pass directly to R2 (no cache) ──
-  // First get object metadata to know total size
-  const head = await env.BUCKET.head(key);
-  if (!head) return errorResponse('Not found', 404, request);
-
-  const totalSize = head.size;
-  const range = parseRangeHeader(rangeHeader, totalSize);
+  // ── Range requests: single R2 call (no head() needed) ──
+  const range = parseRangeHeader(rangeHeader);
   if (!range) {
     return errorResponse('Invalid Range', 416, request);
   }
@@ -191,23 +188,19 @@ async function handleGet(request, env, key, method) {
   const object = await env.BUCKET.get(key, { range });
   if (!object) return errorResponse('Not found', 404, request);
 
-  // Calculate actual byte range for Content-Range header
-  let rangeStart, rangeEnd;
-  if (range.suffix) {
-    rangeStart = totalSize - range.suffix;
-    rangeEnd = totalSize - 1;
-  } else {
-    rangeStart = range.offset;
-    rangeEnd = range.offset + range.length - 1;
-  }
+  const totalSize = object.size; // R2 always returns total object size
+  const actualRange = object.range; // { offset, length } of what was actually served
+
+  const rangeStart = actualRange.offset;
+  const rangeEnd = actualRange.offset + actualRange.length - 1;
 
   const headers = new Headers();
-  headers.set('Content-Type', head.httpMetadata?.contentType || 'application/octet-stream');
+  headers.set('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream');
   headers.set('Cache-Control', CACHE_CONTROL);
-  headers.set('ETag', head.httpEtag);
+  headers.set('ETag', object.httpEtag);
   headers.set('Accept-Ranges', 'bytes');
   headers.set('Content-Range', `bytes ${rangeStart}-${rangeEnd}/${totalSize}`);
-  headers.set('Content-Length', String(rangeEnd - rangeStart + 1));
+  headers.set('Content-Length', String(actualRange.length));
   Object.entries(corsHeaders(request)).forEach(([k, v]) => headers.set(k, v));
 
   if (method === 'HEAD') {
