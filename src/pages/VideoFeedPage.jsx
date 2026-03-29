@@ -249,7 +249,7 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
       <button
         onClick={handleHeartClick}
         onTouchStart={handleHeartTouchStart}
-        className="flex flex-col items-center relative p-2 -m-2"
+        className="pointer-events-auto flex flex-col items-center relative p-2 -m-2"
         style={{ touchAction: 'manipulation' }}
       >
         <HeartBurst trigger={burstTrigger} />
@@ -258,17 +258,17 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
         </div>
         <span className="text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
       </button>
-      <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center">
+      <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Send className="w-6 h-6 text-white" />
         </div>
       </button>
-      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
+      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Gift className="w-6 h-6 text-mansion-gold" />
         </div>
       </button>
-      <button onClick={onToggleMute} className="flex flex-col items-center">
+      <button onClick={onToggleMute} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
         </div>
@@ -283,17 +283,17 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
   return (
     <>
       <div
-        className="fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
+        className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
         style={{ bottom: `${navBottomOffset + 16}px` }}
       >
         <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
       </div>
 
       <div
-        className="fixed left-4 right-20 z-50 lg:hidden"
+        className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
         style={{ bottom: `${navBottomOffset + 8}px` }}
       >
-        <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5 mb-1">
+        <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1">
           <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
             {story.avatar_url ? (
               <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
@@ -304,9 +304,9 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
           <p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{story.username}</p>
         </button>
         {story.caption && (
-          <p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
+          <p className="pointer-events-none text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
         )}
-        <p className="text-white/40 text-[11px] mt-1.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{timeAgo(story.created_at)}</p>
+        <p className="pointer-events-none text-white/40 text-[11px] mt-1.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{timeAgo(story.created_at)}</p>
       </div>
 
       <button onClick={onToggleMute} className="hidden lg:flex fixed top-4 right-4 z-50 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-200" style={{ width: 52, height: 52 }}>
