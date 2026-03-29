@@ -256,6 +256,7 @@ export default function VideoFeedPage() {
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
+  const lastDesktopWheelAtRef = useRef(0);
 
   // Hydrate from sessionStorage to skip loading spinner on revisit
   const cachedStories = () => {
@@ -279,6 +280,7 @@ export default function VideoFeedPage() {
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
+  const isDesktopViewport = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
 
   // Infinite list: clone of last item prepended, clone of first appended
   const infiniteStories = stories.length > 0
@@ -429,6 +431,26 @@ export default function VideoFeedPage() {
     container.scrollBy({ top: dir * container.clientHeight, behavior: 'smooth' });
   }, []);
 
+  const handleDesktopWheel = useCallback((event) => {
+    if (typeof window === 'undefined' || !window.matchMedia('(min-width: 1024px)').matches) {
+      return;
+    }
+
+    if (stories.length <= 1 || isJumpingRef.current || Math.abs(event.deltaY) < 16) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const now = performance.now();
+    if (now - lastDesktopWheelAtRef.current < 420) {
+      return;
+    }
+
+    lastDesktopWheelAtRef.current = now;
+    scrollByOne(event.deltaY > 0 ? 1 : -1);
+  }, [scrollByOne, stories.length]);
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black flex items-center justify-center z-40">
@@ -481,6 +503,7 @@ export default function VideoFeedPage() {
       <div
         ref={containerRef}
         onScroll={handleScroll}
+        onWheel={handleDesktopWheel}
         className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
         style={{
           scrollSnapType: 'y mandatory',
@@ -495,7 +518,9 @@ export default function VideoFeedPage() {
               const isLeadingClone = displayIndex === 0;
               const isTrailingClone = displayIndex === stories.length + 1;
               const shouldAttachSource =
-                !isLeadingClone && !isTrailingClone
+                !isDesktopViewport
+                  ? true
+                  : !isLeadingClone && !isTrailingClone
                   ? true
                   : (activeDispIdx === 1 && isLeadingClone) || (activeDispIdx === stories.length && isTrailingClone);
 
