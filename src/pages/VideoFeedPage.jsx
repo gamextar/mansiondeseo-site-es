@@ -738,14 +738,21 @@ export default function VideoFeedPage() {
           style={{ bottom: `${navBottomOffset + 8}px` }}
         >
           <div className="pointer-events-none flex flex-col items-start gap-2.5 mb-1">
-            <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
-              {activeStory.avatar_url ? (
-                <AvatarImg src={activeStory.avatar_url} crop={activeStory.avatar_crop} alt={activeStory.username} className="w-full h-full" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(activeStory.username || '?')[0]}</div>
-              )}
-            </div>
-            <p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{activeStory.username}</p>
+            <MobileOverlayButton
+              onPress={() => navigate(`/perfiles/${activeStory.user_id}`, { state: { from: '/videos' } })}
+              scrollContainerRef={containerRef}
+              className="pointer-events-auto"
+              style={{ width: avatarSize, height: avatarSize }}
+            >
+              <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
+                {activeStory.avatar_url ? (
+                  <AvatarImg src={activeStory.avatar_url} crop={activeStory.avatar_crop} alt={activeStory.username} className="w-full h-full" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(activeStory.username || '?')[0]}</div>
+                )}
+              </div>
+            </MobileOverlayButton>
+            <p className="pointer-events-none text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{activeStory.username}</p>
           </div>
         </div>
       )}
