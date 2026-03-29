@@ -32,8 +32,24 @@ function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggle
       if (video.preload !== 'auto') {
         video.preload = 'auto';
       }
+      video.load();
       video.currentTime = 0;
-      video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+
+      const tryPlay = () => {
+        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      };
+
+      if (video.readyState >= 2) {
+        tryPlay();
+      } else {
+        video.addEventListener('loadeddata', tryPlay, { once: true });
+        video.addEventListener('canplay', tryPlay, { once: true });
+      }
+
+      return () => {
+        video.removeEventListener('loadeddata', tryPlay);
+        video.removeEventListener('canplay', tryPlay);
+      };
     } else {
       video.pause();
       setIsPlaying(false);
@@ -272,6 +288,7 @@ export default function VideoFeedPage() {
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
+  const [isInitialPositionReady, setIsInitialPositionReady] = useState(false);
   const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
@@ -317,6 +334,7 @@ export default function VideoFeedPage() {
     if (stories.length === 0 || !containerRef.current) return;
 
     const container = containerRef.current;
+    setIsInitialPositionReady(false);
     const syncInitialPosition = () => {
       const height = container.clientHeight;
       if (!height) return false;
@@ -326,10 +344,15 @@ export default function VideoFeedPage() {
       return true;
     };
 
-    if (syncInitialPosition()) return undefined;
+    if (syncInitialPosition()) {
+      setIsInitialPositionReady(true);
+      return undefined;
+    }
 
     let rafId = requestAnimationFrame(() => {
-      syncInitialPosition();
+      if (syncInitialPosition()) {
+        setIsInitialPositionReady(true);
+      }
     });
 
     return () => cancelAnimationFrame(rafId);
@@ -486,6 +509,7 @@ export default function VideoFeedPage() {
         onScroll={handleScroll}
         className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
         style={{
+          opacity: isInitialPositionReady ? 1 : 0,
           scrollSnapType: 'y mandatory',
           touchAction: 'pan-y',
           overscrollBehavior: 'none',
@@ -496,7 +520,7 @@ export default function VideoFeedPage() {
           <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
             <StoryCard
               story={story}
-              isActive={displayIndex === activeDispIdx}
+              isActive={isInitialPositionReady && displayIndex === activeDispIdx}
               preloadMode={displayIndex === activeDispIdx ? 'auto' : Math.abs(displayIndex - activeDispIdx) <= 1 ? 'metadata' : 'none'}
               onFavorite={handleFavorite}
               isMuted={isMuted}
