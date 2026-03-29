@@ -434,6 +434,8 @@ export default function VideoFeedPage() {
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
   const jumpUnlockTimer = useRef(null);
+  const boundaryCooldownTimer = useRef(null);
+  const lastScrollAtRef = useRef(0);
   const lastDesktopWheelAtRef = useRef(0);
 
   const cachedStories = () => {
@@ -519,6 +521,7 @@ export default function VideoFeedPage() {
   useEffect(() => () => {
     clearTimeout(scrollEndTimer.current);
     clearTimeout(jumpUnlockTimer.current);
+    clearTimeout(boundaryCooldownTimer.current);
   }, []);
 
   const settleInfiniteBoundary = useCallback(() => {
@@ -529,9 +532,21 @@ export default function VideoFeedPage() {
     const rawIndex = Math.round(container.scrollTop / height);
 
     if (rawIndex === 0 || rawIndex >= stories.length + 1) {
+      const now = performance.now();
+      const timeSinceLastScroll = now - lastScrollAtRef.current;
+
+      if (lastScrollAtRef.current > 0 && timeSinceLastScroll < 160) {
+        clearTimeout(boundaryCooldownTimer.current);
+        boundaryCooldownTimer.current = setTimeout(() => {
+          settleInfiniteBoundary();
+        }, 160 - timeSinceLastScroll);
+        return;
+      }
+
       // Cancel any pending fallback timer before jumping
       clearTimeout(scrollEndTimer.current);
       clearTimeout(jumpUnlockTimer.current);
+      clearTimeout(boundaryCooldownTimer.current);
 
       isJumpingRef.current = true;
       container.style.scrollSnapType = 'none';
@@ -576,6 +591,8 @@ export default function VideoFeedPage() {
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container || isJumpingRef.current) return;
+
+    lastScrollAtRef.current = performance.now();
 
     // Safety net: if scrollSnapType got stuck as 'none' from an interrupted jump, restore it
     if (container.style.scrollSnapType === 'none') {
