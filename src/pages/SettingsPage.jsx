@@ -1069,6 +1069,24 @@ export default function SettingsPage() {
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Monitor className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Tamaño del avatar</h3>
+                  <p className="text-[11px] text-text-dim">Diámetro del avatar de usuario en el video (móvil)</p>
+                </div>
+              </div>
+              <input type="range" min="28" max="80" value={videoAvatarSize} onChange={e => setVideoAvatarSize(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>28px</span>
+                <span className="text-mansion-gold font-medium">{videoAvatarSize}px</span>
+                <span>80px</span>
+              </div>
+            </div>
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
               <h3 className="text-xs font-bold text-text-dim uppercase tracking-wider mb-3">Vista previa</h3>
               <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-mansion-elevated to-black" style={{ height: 140 }}>
                 <div
