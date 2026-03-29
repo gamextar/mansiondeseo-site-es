@@ -12,9 +12,8 @@ compatibility_date = "2024-12-01"
 binding = "BUCKET"
 bucket_name = "mansion-deseo-images"
 
-# ── Variables ────────────────────────────────────────
-[vars]
-UPLOAD_SECRET = ""  # Set via: npx wrangler secret put UPLOAD_SECRET --config r2-worker/wrangler.toml
+# ── Secrets (set via wrangler secret put) ────────────
+# UPLOAD_SECRET — set via: npx wrangler secret put UPLOAD_SECRET --config r2-worker/wrangler.toml
 
 # ── Custom Domain Route ──────────────────────────────
 # After deploying, add the route in Cloudflare Dashboard:
