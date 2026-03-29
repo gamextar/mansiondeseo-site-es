@@ -1962,6 +1962,20 @@ async function handleSendGift(request, env) {
   // Get updated sender coins
   const updated = await env.DB.prepare('SELECT coins FROM users WHERE id = ?').bind(auth.sub).first();
 
+  // Notify receiver in real-time
+  try {
+    const senderUser = await env.DB.prepare('SELECT username FROM users WHERE id = ?').bind(auth.sub).first();
+    await notifyUser(env, receiver_id, {
+      type: 'gift',
+      senderName: senderUser?.username || 'Alguien',
+      giftName: gift.name,
+      giftEmoji: gift.emoji,
+      message: safeMessage,
+    });
+  } catch (e) {
+    console.error('[handleSendGift] notification error:', e.message);
+  }
+
   return json({
     success: true,
     coins: updated.coins,

@@ -14,7 +14,7 @@ const WS_BASE = import.meta.env.PROD
 
 export function UnreadProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
-  const [toast, setToast] = useState(null);
+  const [toast, setToast] = useState(null); // string or { text, icon }
   const prevCountRef = useRef(-1); // -1 = not yet loaded
   const listenersRef = useRef(new Set());
   const wsRef = useRef(null);
@@ -101,6 +101,13 @@ export function UnreadProvider({ children }) {
             notifyListeners(data);
           } else if (data.type === 'typing') {
             notifyListeners(data);
+          } else if (data.type === 'gift') {
+            setToast({
+              text: `${data.senderName || 'Alguien'} te envió ${data.giftName || 'un regalo'}`,
+              emoji: data.giftEmoji || '🎁',
+            });
+            setTimeout(() => setToast(null), 5000);
+            notifyListeners(data);
           }
         } catch { /* ignore */ }
       };
@@ -157,12 +164,18 @@ export function UnreadProvider({ children }) {
           onClick={() => setToast(null)}
         >
           <div className="bg-mansion-card border border-mansion-gold/30 rounded-2xl px-5 py-3 shadow-xl flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-mansion-crimson/20 flex items-center justify-center">
-              <svg className="w-4 h-4 text-mansion-crimson" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-            </div>
-            <span className="text-sm font-medium text-text-primary">{toast}</span>
+            {typeof toast === 'object' && toast.emoji ? (
+              <div className="w-8 h-8 rounded-full bg-mansion-gold/20 flex items-center justify-center">
+                <span className="text-lg">{toast.emoji}</span>
+              </div>
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-mansion-crimson/20 flex items-center justify-center">
+                <svg className="w-4 h-4 text-mansion-crimson" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+              </div>
+            )}
+            <span className="text-sm font-medium text-text-primary">{typeof toast === 'object' ? toast.text : toast}</span>
           </div>
         </div>
       )}
