@@ -72,6 +72,7 @@ export default function SettingsPage() {
   // Video feed
   const [videoGradientHeight, setVideoGradientHeight] = useState(64);
   const [videoGradientOpacity, setVideoGradientOpacity] = useState(40);
+  const [videoAvatarSize, setVideoAvatarSize] = useState(52);
 
   // Payment display
   const [paymentTitleVip, setPaymentTitleVip] = useState('Servicios Digitales');
@@ -129,6 +130,7 @@ export default function SettingsPage() {
         setNavOpacity(s.navOpacity ?? 40);
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
+        setVideoAvatarSize(s.videoAvatarSize ?? 52);
       })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
@@ -175,6 +177,7 @@ export default function SettingsPage() {
         nav_opacity: navOpacity,
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
+        video_avatar_size: videoAvatarSize,
       });
       const s = data.settings;
       setBlurMobile(s.blurMobile);
@@ -209,6 +212,7 @@ export default function SettingsPage() {
       setNavOpacity(s.navOpacity ?? 40);
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
+      setVideoAvatarSize(s.videoAvatarSize ?? 52);
       // Propagate to global context so dependent components update live
       setSiteSettings(s);
       setSaved(true);

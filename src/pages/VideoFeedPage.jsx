@@ -18,10 +18,10 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-// ── Avatar size in the video overlay (px). Desktop adds 12px on top. ───────
-const AVATAR_SIZE = 52;
+// ── Avatar size fallback; real value comes from siteSettings.videoAvatarSize ─
+const AVATAR_SIZE_DEFAULT = 52;
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset, avatarSize }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
@@ -150,7 +150,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
           style={{ bottom: `${navBottomOffset + 8}px` }}
         >
           <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-1.5 mb-1">
-            <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}>
+            <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
               {story.avatar_url ? (
                 <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
               ) : (
@@ -167,7 +167,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
 
         <div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2.5 max-w-[360px]">
           <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5">
-            <div className="rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: AVATAR_SIZE + 12, height: AVATAR_SIZE + 12 }}>
+            <div className="rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize + 12, height: avatarSize + 12 }}>
               {story.avatar_url ? (
                 <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
               ) : (
@@ -277,6 +277,7 @@ export default function VideoFeedPage() {
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
+  const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
   const isDesktopViewport = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
@@ -522,6 +523,7 @@ export default function VideoFeedPage() {
                 gradientHeight={gradientHeight}
                 gradientOpacity={gradientOpacity}
                 navBottomOffset={navBottomOffset}
+                avatarSize={avatarSize}
               />
             </div>
           );
