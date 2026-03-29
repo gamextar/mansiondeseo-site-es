@@ -78,7 +78,7 @@ function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, o
             loop
             playsInline
             muted={isMuted}
-            preload={isActive ? 'auto' : 'metadata'}
+            preload={isActive || isNearby ? 'auto' : 'metadata'}
             onClick={togglePlay}
             onEnded={handleVideoEnd}
           />
@@ -489,7 +489,10 @@ export default function VideoFeedPage() {
       >
         {infiniteStories.map((story, displayIndex) => {
           const isActive = displayIndex === activeDispIdx;
-          const isNearby = Math.abs(displayIndex - activeDispIdx) <= 1;
+          const dist = Math.abs(displayIndex - activeDispIdx);
+          // Always mount clones (idx 0 and last) + ±2 window around active
+          const isBoundaryClone = displayIndex === 0 || displayIndex === infiniteStories.length - 1;
+          const isNearby = dist <= 2 || isBoundaryClone;
           return (
             <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
               <StoryCard
