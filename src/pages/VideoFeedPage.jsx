@@ -752,7 +752,13 @@ export default function VideoFeedPage() {
                 )}
               </div>
             </MobileOverlayButton>
-            <p className="pointer-events-none text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{activeStory.username}</p>
+            <MobileOverlayButton
+              onPress={() => navigate(`/perfiles/${activeStory.user_id}`, { state: { from: '/videos' } })}
+              scrollContainerRef={containerRef}
+              className="pointer-events-auto inline-flex items-start"
+            >
+              <p className="pointer-events-none text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{activeStory.username}</p>
+            </MobileOverlayButton>
             {activeStory.caption && (
               <p className="pointer-events-none text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{activeStory.caption}</p>
             )}
