@@ -317,6 +317,58 @@ export default function VideoFeedPage() {
     try { sessionStorage.setItem('vf_muted', isMuted ? '1' : '0'); } catch {}
   }, [isMuted]);
 
+  // Capture the current video frame as a fixed overlay canvas
+  const createFrameOverlay = useCallback((srcSlot) => {
+    try {
+      const video = srcSlot?.querySelector('video');
+      if (!video || video.readyState < 2) return null;
+
+      const vw = video.videoWidth || video.clientWidth;
+      const vh = video.videoHeight || video.clientHeight;
+      if (!vw || !vh) return null;
+
+      const sw = window.innerWidth;
+      const sh = window.innerHeight;
+
+      // Calculate cover crop (same as object-fit: cover)
+      const scale = Math.max(sw / vw, sh / vh);
+      const cropW = sw / scale;
+      const cropH = sh / scale;
+      const cropX = (vw - cropW) / 2;
+      const cropY = (vh - cropH) / 2;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = sw;
+      canvas.height = sh;
+      canvas.getContext('2d').drawImage(video, cropX, cropY, cropW, cropH, 0, 0, sw, sh);
+      canvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:50;pointer-events:none;';
+      document.body.appendChild(canvas);
+      return canvas;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Remove overlay with fade
+  const removeOverlay = useCallback((overlay, destSlot) => {
+    if (!overlay) return;
+    const destVideo = destSlot?.querySelector('video');
+    const fade = () => {
+      if (!overlay.parentNode) return;
+      overlay.style.transition = 'opacity 0.12s';
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 120);
+    };
+    if (destVideo && destVideo.readyState >= 2) {
+      fade();
+    } else if (destVideo) {
+      destVideo.addEventListener('playing', fade, { once: true });
+      setTimeout(fade, 1500); // safety timeout
+    } else {
+      setTimeout(fade, 300);
+    }
+  }, []);
+
   // Boundary jump: when landed on a clone, instantly jump to the real position
   const jumpIfNeeded = useCallback(() => {
     const container = containerRef.current;
@@ -326,35 +378,31 @@ export default function VideoFeedPage() {
     if (!h) return;
     const pos = Math.round(container.scrollTop / h);
 
-    // Landed on clone_last (position 0) → jump to real last (position N)
-    if (pos === 0) {
-      isJumpingRef.current = true;
-      container.style.scrollSnapType = 'none';
-      container.scrollTop = N * h;
-      setActiveIdx(N);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (containerRef.current) containerRef.current.style.scrollSnapType = 'y mandatory';
-          isJumpingRef.current = false;
-        });
-      });
-      return;
-    }
+    let destPos = -1;
+    if (pos === 0) destPos = N;          // clone_last → real last
+    if (pos === N + 1) destPos = 1;      // clone_first → real first
+    if (destPos < 0) return;
 
-    // Landed on clone_first (position N+1) → jump to real first (position 1)
-    if (pos === N + 1) {
-      isJumpingRef.current = true;
-      container.style.scrollSnapType = 'none';
-      container.scrollTop = h;
-      setActiveIdx(1);
+    // Capture frame from current clone before jumping
+    const srcSlot = container.children[pos];
+    const overlay = createFrameOverlay(srcSlot);
+
+    isJumpingRef.current = true;
+    container.style.scrollSnapType = 'none';
+    container.scrollTop = destPos * h;
+    setActiveIdx(destPos);
+
+    requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (containerRef.current) containerRef.current.style.scrollSnapType = 'y mandatory';
-          isJumpingRef.current = false;
-        });
+        if (containerRef.current) containerRef.current.style.scrollSnapType = 'y mandatory';
+        isJumpingRef.current = false;
+
+        // Remove overlay once destination video is ready
+        const destSlot = container.children[destPos];
+        removeOverlay(overlay, destSlot);
       });
-    }
-  }, [N]);
+    });
+  }, [N, createFrameOverlay, removeOverlay]);
 
   // Track active index and set up settle detection
   const handleScroll = useCallback(() => {
