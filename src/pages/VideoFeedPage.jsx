@@ -222,7 +222,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   );
 }
 
-function MobileOverlayButton({ onPress, className = '', style, children }) {
+function MobileOverlayButton({ onPress, scrollContainerRef, className = '', style, children }) {
   const gestureRef = useRef(null);
 
   return (
@@ -231,9 +231,11 @@ function MobileOverlayButton({ onPress, className = '', style, children }) {
       className={className}
       style={{ ...style, touchAction: 'pan-y' }}
       onPointerDown={(event) => {
+        event.currentTarget.setPointerCapture?.(event.pointerId);
         gestureRef.current = {
           x: event.clientX,
           y: event.clientY,
+          lastY: event.clientY,
           pointerId: event.pointerId,
           cancelled: false,
         };
@@ -243,19 +245,33 @@ function MobileOverlayButton({ onPress, className = '', style, children }) {
         if (!gesture || gesture.pointerId !== event.pointerId || gesture.cancelled) return;
         const deltaX = Math.abs(event.clientX - gesture.x);
         const deltaY = Math.abs(event.clientY - gesture.y);
-        if (deltaX > 10 || deltaY > 10) {
+        if (deltaY > 8 && deltaY > deltaX) {
+          gesture.cancelled = true;
+        }
+        if (gesture.cancelled) {
+          const container = scrollContainerRef?.current;
+          if (container) {
+            const moveY = event.clientY - gesture.lastY;
+            container.scrollTop -= moveY;
+          }
+          gesture.lastY = event.clientY;
+          return;
+        }
+        if (deltaX > 10) {
           gesture.cancelled = true;
         }
       }}
       onPointerUp={(event) => {
         const gesture = gestureRef.current;
         if (!gesture || gesture.pointerId !== event.pointerId) return;
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
         gestureRef.current = null;
         if (!gesture.cancelled) {
           onPress?.();
         }
       }}
-      onPointerCancel={() => {
+      onPointerCancel={(event) => {
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
         gestureRef.current = null;
       }}
       onClick={(event) => {
@@ -273,7 +289,7 @@ function MobileOverlayButton({ onPress, className = '', style, children }) {
   );
 }
 
-function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate }) {
+function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, scrollContainerRef }) {
   const [burstTrigger, setBurstTrigger] = useState(0);
 
   const handleHeart = () => {
@@ -286,6 +302,7 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
       <div className="pointer-events-none flex flex-col items-center">
         <MobileOverlayButton
           onPress={handleHeart}
+          scrollContainerRef={scrollContainerRef}
           className="pointer-events-auto relative"
           style={{ width: 58, height: 58 }}
         >
@@ -296,17 +313,17 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
         </MobileOverlayButton>
         <span className="pointer-events-none text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
       </div>
-      <MobileOverlayButton onPress={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-center">
+      <MobileOverlayButton onPress={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Send className="w-6 h-6 text-white" />
         </div>
       </MobileOverlayButton>
-      <MobileOverlayButton onPress={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-center">
+      <MobileOverlayButton onPress={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Gift className="w-6 h-6 text-mansion-gold" />
         </div>
       </MobileOverlayButton>
-      <MobileOverlayButton onPress={onToggleMute} className="pointer-events-auto flex flex-col items-center">
+      <MobileOverlayButton onPress={onToggleMute} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
         </div>
@@ -315,7 +332,7 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
   );
 }
 
-function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, navBottomOffset, avatarSize }) {
+function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, navBottomOffset, avatarSize, scrollContainerRef }) {
   if (!story) return null;
 
   return (
@@ -324,14 +341,14 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
         className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
         style={{ bottom: `${navBottomOffset + 16}px` }}
       >
-        <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
+        <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} scrollContainerRef={scrollContainerRef} />
       </div>
 
       <div
         className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
         style={{ bottom: `${navBottomOffset + 8}px` }}
       >
-        <MobileOverlayButton onPress={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1">
+        <MobileOverlayButton onPress={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1">
           <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
             {story.avatar_url ? (
               <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
@@ -682,6 +699,7 @@ export default function VideoFeedPage() {
         navigate={navigate}
         navBottomOffset={navBottomOffset}
         avatarSize={avatarSize}
+        scrollContainerRef={containerRef}
       />
 
       {stories.length > 1 && (
