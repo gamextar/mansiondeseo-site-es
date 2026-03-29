@@ -1,10 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Gift } from 'lucide-react';
 import { getStories, toggleFavorite } from '../lib/api';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
+
+const STORIES_CACHE_VERSION = '3';
+const STORIES_PAGE_SIZE = 12;
+const LOAD_MORE_THRESHOLD = 4;
+const PANE_SLOTS = ['pane-prev', 'pane-current', 'pane-next'];
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -18,21 +23,18 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
+function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const navigate = useNavigate();
 
-  const shouldMount = isNearby || isActive;
-
-  // Play/pause based on active state — no currentTime reset, no priming
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoSrc) return;
 
     if (isActive) {
-      video.muted = isMuted;
+      video.currentTime = 0;
       video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     } else {
       video.pause();
@@ -42,8 +44,8 @@ function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, o
 
   useEffect(() => {
     const video = videoRef.current;
-    if (video && isActive) video.muted = isMuted;
-  }, [isMuted, isActive]);
+    if (video) video.muted = isMuted;
+  }, [isMuted]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -68,24 +70,23 @@ function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, o
 
   return (
     <div className="relative w-full h-full bg-black flex items-center justify-center snap-start snap-always">
+      {/* Video panel — on desktop, a centered rounded container; on mobile, fullscreen */}
       <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
-        {shouldMount ? (
-          <video
-            ref={videoRef}
-            src={videoSrc}
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
-            loop
-            playsInline
-            muted={isMuted}
-            preload={isActive || isNearby ? 'auto' : 'metadata'}
-            onClick={togglePlay}
-            onEnded={handleVideoEnd}
-          />
-        ) : (
-          <div className="absolute inset-0 w-full h-full bg-black" onClick={togglePlay} />
-        )}
+        {/* Video */}
+        <video
+          ref={videoRef}
+          src={videoSrc}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
+          loop
+          playsInline
+          muted={isMuted}
+          preload="auto"
+          onClick={togglePlay}
+          onEnded={handleVideoEnd}
+        />
 
+        {/* Play/Pause overlay */}
         <AnimatePresence>
           {showPlayIcon && (
             <motion.div
@@ -102,15 +103,17 @@ function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, o
           )}
         </AnimatePresence>
 
+        {/* Gradient overlays */}
         <div
           className="absolute inset-x-0 bottom-0 pointer-events-none"
           style={{
             height: gradientHeight,
-            background: `linear-gradient(to top, rgba(0,0,0,${(gradientOpacity / 100).toFixed(2)}), rgba(0,0,0,0.04), transparent)`,
+            background: `linear-gradient(to top, rgba(0,0,0,${(gradientOpacity/100).toFixed(2)}), rgba(0,0,0,0.04), transparent)`,
           }}
         />
         <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none lg:rounded-t-2xl" />
 
+        {/* Mobile action icons — inside video */}
         <div
           className="absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden"
           style={{ bottom: `${navBottomOffset + 16}px` }}
@@ -118,15 +121,20 @@ function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, o
           <MobileActionButtons story={story} onFavorite={onFavorite} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
         </div>
 
+        {/* Desktop mute button — top-right corner of video */}
         <button onClick={onToggleMute} className="hidden lg:flex absolute top-4 right-4 z-20 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-200" style={{ width: 52, height: 52 }}>
           {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
         </button>
 
+        {/* Bottom user info + caption — mobile */}
         <div
           className="absolute left-4 right-20 z-20 lg:hidden"
           style={{ bottom: `${navBottomOffset + 8}px` }}
         >
-          <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="block text-left mb-1">
+          <button
+            onClick={() => navigate(`/perfiles/${story.user_id}`)}
+            className="block text-left mb-1"
+          >
             <p className="text-white font-bold text-[15px] leading-tight drop-shadow-lg">@{story.username}</p>
           </button>
           {story.caption && (
@@ -135,8 +143,12 @@ function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, o
           <p className="text-white/40 text-[11px] mt-1.5">{timeAgo(story.created_at)}</p>
         </div>
 
+        {/* Bottom user info + caption — desktop: avatar above name, bottom-left, bigger */}
         <div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2.5 max-w-[360px]">
-          <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5">
+          <button
+            onClick={() => navigate(`/perfiles/${story.user_id}`)}
+            className="flex flex-col items-start gap-2.5"
+          >
             <div className="w-16 h-16 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
               {story.avatar_url ? (
                 <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
@@ -152,6 +164,7 @@ function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, o
           <p className="text-white/40 text-sm mt-0.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>{timeAgo(story.created_at)}</p>
         </div>
 
+        {/* Progress bar — top on mobile, bottom on desktop — loops with video */}
         {isActive && (
           <>
             <div className="absolute top-0 left-0 right-0 h-[2px] z-30 overflow-hidden lg:hidden">
@@ -174,6 +187,7 @@ function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, o
         )}
       </div>
 
+      {/* Desktop action icons — outside the video panel to the right, same X as next arrow */}
       <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', bottom: '60px' }}>
         <DesktopActionButtons story={story} onFavorite={onFavorite} navigate={navigate} />
       </div>
@@ -181,6 +195,7 @@ function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, o
   );
 }
 
+/* Mobile action buttons (inside video, smaller) */
 function MobileActionButtons({ story, onFavorite, onToggleMute, isMuted, navigate }) {
   return (
     <>
@@ -217,6 +232,7 @@ function MobileActionButtons({ story, onFavorite, onToggleMute, isMuted, navigat
   );
 }
 
+/* Desktop action buttons (outside video, bigger, no avatar — it's inside the video now) */
 function DesktopActionButtons({ story, onFavorite, navigate }) {
   return (
     <>
@@ -244,221 +260,330 @@ export default function VideoFeedPage() {
   const { siteSettings } = useAuth();
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
-  const scrollTimerRef = useRef(null);
-  const lastWheelRef = useRef(0);
+  const scrollEndTimer = useRef(null);
+  const lastDesktopWheelAtRef = useRef(0);
+  const lastVisiblePaneRef = useRef(1);
 
-  const cachedStories = () => {
+  // Hydrate from sessionStorage to skip loading spinner on revisit
+  const cachedState = () => {
     try {
-      const raw = sessionStorage.getItem('vf_stories');
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return [];
-  };
-  const initial = cachedStories();
+      if (sessionStorage.getItem('vf_cache_version') !== STORIES_CACHE_VERSION) {
+        return { stories: [], nextPage: 1, hasMore: true };
+      }
 
-  const [stories, setStories] = useState(initial);
-  const [loading, setLoading] = useState(initial.length === 0);
-  // activeIdx is the display index in the infinite array (1-based for real stories)
+      const rawStories = sessionStorage.getItem('vf_stories');
+      const rawNextPage = sessionStorage.getItem('vf_next_page');
+      const rawHasMore = sessionStorage.getItem('vf_has_more');
+
+      return {
+        stories: rawStories ? JSON.parse(rawStories) : [],
+        nextPage: rawNextPage ? Math.max(1, parseInt(rawNextPage, 10)) : 1,
+        hasMore: rawHasMore !== '0',
+      };
+    } catch {}
+    return { stories: [], nextPage: 1, hasMore: true };
+  };
+  const initialCache = cachedState();
+
+  const [stories, setStories] = useState(initialCache.stories);
+  const [loading, setLoading] = useState(initialCache.stories.length === 0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextPage, setNextPage] = useState(initialCache.nextPage);
+  const [hasMoreStories, setHasMoreStories] = useState(initialCache.hasMore);
   const savedIdx = () => {
-    try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; }
-    catch { return 1; }
+    try {
+      const v = sessionStorage.getItem('vf_story_idx');
+      return v ? Math.max(0, parseInt(v, 10)) : 0;
+    } catch {
+      return 0;
+    }
   };
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
-  const [activeIdx, setActiveIdx] = useState(savedIdx);
+  const [activeStoryIdx, setActiveStoryIdx] = useState(savedIdx);
+  const [visiblePaneIdx, setVisiblePaneIdx] = useState(1);
   const [isMuted, setIsMuted] = useState(savedMuted);
+  const [paneSlots, setPaneSlots] = useState([]);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
+  const persistStoriesCache = useCallback((nextStories, incomingNextPage, incomingHasMore) => {
+    try {
+      sessionStorage.setItem('vf_cache_version', STORIES_CACHE_VERSION);
+      sessionStorage.setItem('vf_stories', JSON.stringify(nextStories));
+      sessionStorage.setItem('vf_next_page', String(incomingNextPage));
+      sessionStorage.setItem('vf_has_more', incomingHasMore ? '1' : '0');
+    } catch {}
+  }, []);
 
-  // Infinite array: [clone_last, ...stories, clone_first]
-  const N = stories.length;
-  const infiniteItems = N > 0
-    ? [stories[N - 1], ...stories, stories[0]]
-    : [];
+  const mergeStories = useCallback((prevStories, incomingStories) => {
+    const merged = [...prevStories];
+    const seen = new Set(prevStories.map((story) => story.id));
 
-  // Fetch stories
+    for (const story of incomingStories) {
+      if (seen.has(story.id)) continue;
+      seen.add(story.id);
+      merged.push(story);
+    }
+
+    return merged;
+  }, []);
+
+  const getPrevIndexFor = useCallback((storyIdx, totalStories, canWrap) => {
+    if (totalStories <= 1) return null;
+    if (storyIdx > 0) return storyIdx - 1;
+    return canWrap ? totalStories - 1 : null;
+  }, []);
+
+  const getNextIndexFor = useCallback((storyIdx, totalStories, canWrap) => {
+    if (totalStories <= 1) return null;
+    if (storyIdx < totalStories - 1) return storyIdx + 1;
+    return canWrap ? 0 : null;
+  }, []);
+
+  const buildPaneSlots = useCallback((storyIdx, totalStories, canWrap) => ([
+    { slotId: PANE_SLOTS[0], storyIdx: getPrevIndexFor(storyIdx, totalStories, canWrap) },
+    { slotId: PANE_SLOTS[1], storyIdx },
+    { slotId: PANE_SLOTS[2], storyIdx: getNextIndexFor(storyIdx, totalStories, canWrap) },
+  ]), [getNextIndexFor, getPrevIndexFor]);
+
+  const loadStoriesPage = useCallback(async (pageToLoad, { replace = false } = {}) => {
+    const data = await getStories({ page: pageToLoad, limit: STORIES_PAGE_SIZE });
+    const incomingStories = data.stories || [];
+    const incomingHasMore = Boolean(data.has_more);
+    const incomingNextPage = data.next_page ?? (incomingHasMore ? pageToLoad + 1 : pageToLoad);
+
+    setHasMoreStories(incomingHasMore);
+    setNextPage(incomingNextPage);
+
+    if (replace) {
+      setStories(incomingStories);
+      persistStoriesCache(incomingStories, incomingNextPage, incomingHasMore);
+      return incomingStories;
+    }
+
+    let mergedStories = incomingStories;
+    setStories((prevStories) => {
+      mergedStories = mergeStories(prevStories, incomingStories);
+      return mergedStories;
+    });
+    persistStoriesCache(mergedStories, incomingNextPage, incomingHasMore);
+    return mergedStories;
+  }, [mergeStories, persistStoriesCache]);
+
   useEffect(() => {
+    if (initialCache.stories.length > 0) {
+      setLoading(false);
+      return undefined;
+    }
+
     let cancelled = false;
-    getStories()
-      .then(data => {
-        if (!cancelled) {
-          const fresh = data.stories || [];
-          setStories(fresh);
-          try { sessionStorage.setItem('vf_stories', JSON.stringify(fresh)); } catch {}
-        }
-      })
+    loadStoriesPage(1, { replace: true })
       .catch(() => {
-        if (!cancelled && N === 0) setStories([]);
+        if (!cancelled) setStories([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => { cancelled = true; };
+  }, [initialCache.stories.length, loadStoriesPage]);
+
+  useEffect(() => {
+    if (loading || loadingMore || !hasMoreStories || stories.length === 0) return;
+    if (activeStoryIdx < Math.max(0, stories.length - LOAD_MORE_THRESHOLD)) return;
+
+    let cancelled = false;
+    setLoadingMore(true);
+
+    loadStoriesPage(nextPage)
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadingMore(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [activeStoryIdx, hasMoreStories, loadStoriesPage, loading, loadingMore, nextPage, stories.length]);
+
+  useEffect(() => {
+    if (stories.length === 0) return;
+    if (activeStoryIdx < stories.length) return;
+    setActiveStoryIdx(stories.length - 1);
+  }, [activeStoryIdx, stories.length]);
+
+  useEffect(() => {
+    if (stories.length === 0) {
+      setPaneSlots([]);
+      return;
+    }
+
+    setPaneSlots((prevSlots) => {
+      if (
+        prevSlots.length === 3 &&
+        prevSlots[1]?.storyIdx === activeStoryIdx &&
+        prevSlots[0]?.storyIdx === getPrevIndexFor(activeStoryIdx, stories.length, !hasMoreStories) &&
+        prevSlots[2]?.storyIdx === getNextIndexFor(activeStoryIdx, stories.length, !hasMoreStories)
+      ) {
+        return prevSlots;
+      }
+
+      return buildPaneSlots(activeStoryIdx, stories.length, !hasMoreStories);
+    });
+  }, [activeStoryIdx, buildPaneSlots, getNextIndexFor, getPrevIndexFor, hasMoreStories, stories.length]);
+
+  const centerCurrentPane = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return false;
+    const height = container.clientHeight;
+    if (!height) return false;
+    container.scrollTop = height;
+    return true;
   }, []);
 
-  // Set initial scroll position
   useLayoutEffect(() => {
-    if (N === 0 || !containerRef.current) return;
-    const container = containerRef.current;
-    const h = container.clientHeight;
-    if (!h) return;
-    const idx = Math.min(Math.max(activeIdx, 1), N);
-    container.scrollTop = idx * h;
-  }, [N]);
+    if (paneSlots.length !== 3) return;
+    setVisiblePaneIdx(1);
+    lastVisiblePaneRef.current = 1;
 
-  // Persist state
+    if (centerCurrentPane()) return undefined;
+
+    let rafId = requestAnimationFrame(() => {
+      centerCurrentPane();
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [centerCurrentPane, paneSlots.length]);
+
   useEffect(() => {
-    try { sessionStorage.setItem('vf_idx', String(activeIdx)); } catch {}
-  }, [activeIdx]);
+    try { sessionStorage.setItem('vf_story_idx', String(activeStoryIdx)); } catch {}
+  }, [activeStoryIdx]);
   useEffect(() => {
     try { sessionStorage.setItem('vf_muted', isMuted ? '1' : '0'); } catch {}
   }, [isMuted]);
 
-  // Capture the current video frame as a fixed overlay canvas
-  const createFrameOverlay = useCallback((srcSlot) => {
-    try {
-      const video = srcSlot?.querySelector('video');
-      if (!video || video.readyState < 2) return null;
+  useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
 
-      const vw = video.videoWidth || video.clientWidth;
-      const vh = video.videoHeight || video.clientHeight;
-      if (!vw || !vh) return null;
+  const getPrevStoryIndex = useCallback(() => (
+    getPrevIndexFor(activeStoryIdx, stories.length, !hasMoreStories)
+  ), [activeStoryIdx, getPrevIndexFor, hasMoreStories, stories.length]);
 
-      const sw = window.innerWidth;
-      const sh = window.innerHeight;
+  const getNextStoryIndex = useCallback(() => (
+    getNextIndexFor(activeStoryIdx, stories.length, !hasMoreStories)
+  ), [activeStoryIdx, getNextIndexFor, hasMoreStories, stories.length]);
 
-      // Calculate cover crop (same as object-fit: cover)
-      const scale = Math.max(sw / vw, sh / vh);
-      const cropW = sw / scale;
-      const cropH = sh / scale;
-      const cropX = (vw - cropW) / 2;
-      const cropY = (vh - cropH) / 2;
-
-      const canvas = document.createElement('canvas');
-      canvas.width = sw;
-      canvas.height = sh;
-      canvas.getContext('2d').drawImage(video, cropX, cropY, cropW, cropH, 0, 0, sw, sh);
-      canvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:50;pointer-events:none;';
-      document.body.appendChild(canvas);
-      return canvas;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // Remove overlay with fade
-  const removeOverlay = useCallback((overlay, destSlot) => {
-    if (!overlay) return;
-    const destVideo = destSlot?.querySelector('video');
-    const fade = () => {
-      if (!overlay.parentNode) return;
-      overlay.style.transition = 'opacity 0.12s';
-      overlay.style.opacity = '0';
-      setTimeout(() => overlay.remove(), 120);
-    };
-    if (destVideo && destVideo.readyState >= 2) {
-      fade();
-    } else if (destVideo) {
-      destVideo.addEventListener('playing', fade, { once: true });
-      setTimeout(fade, 1500); // safety timeout
-    } else {
-      setTimeout(fade, 300);
-    }
-  }, []);
-
-  // Boundary jump: when landed on a clone, instantly jump to the real position
-  const jumpIfNeeded = useCallback(() => {
+  const commitPaneTransition = useCallback((direction, targetStoryIdx) => {
     const container = containerRef.current;
-    if (!container || isJumpingRef.current || N === 0) return;
-
-    const h = container.clientHeight;
-    if (!h) return;
-    const pos = Math.round(container.scrollTop / h);
-
-    let destPos = -1;
-    if (pos === 0) destPos = N;          // clone_last → real last
-    if (pos === N + 1) destPos = 1;      // clone_first → real first
-    if (destPos < 0) return;
-
-    // Capture frame from current clone before jumping
-    const srcSlot = container.children[pos];
-    const overlay = createFrameOverlay(srcSlot);
+    if (!container || paneSlots.length !== 3) return;
 
     isJumpingRef.current = true;
     container.style.scrollSnapType = 'none';
-    container.scrollTop = destPos * h;
-    setActiveIdx(destPos);
+    setActiveStoryIdx(targetStoryIdx);
+    setVisiblePaneIdx(1);
+    lastVisiblePaneRef.current = 1;
+    setPaneSlots((prevSlots) => {
+      if (prevSlots.length !== 3) return prevSlots;
+
+      if (direction > 0) {
+        const [prevPane, currentPane, nextPane] = prevSlots;
+        return [
+          { ...currentPane, storyIdx: activeStoryIdx },
+          { ...nextPane, storyIdx: targetStoryIdx },
+          { ...prevPane, storyIdx: getNextIndexFor(targetStoryIdx, stories.length, !hasMoreStories) },
+        ];
+      }
+
+      const [prevPane, currentPane, nextPane] = prevSlots;
+      return [
+        { ...nextPane, storyIdx: getPrevIndexFor(targetStoryIdx, stories.length, !hasMoreStories) },
+        { ...prevPane, storyIdx: targetStoryIdx },
+        { ...currentPane, storyIdx: activeStoryIdx },
+      ];
+    });
 
     requestAnimationFrame(() => {
+      centerCurrentPane();
       requestAnimationFrame(() => {
-        if (containerRef.current) containerRef.current.style.scrollSnapType = 'y mandatory';
+        if (containerRef.current) {
+          containerRef.current.style.scrollSnapType = 'y mandatory';
+        }
         isJumpingRef.current = false;
-
-        // Remove overlay once destination video is ready
-        const destSlot = container.children[destPos];
-        removeOverlay(overlay, destSlot);
       });
     });
-  }, [N, createFrameOverlay, removeOverlay]);
+  }, [activeStoryIdx, centerCurrentPane, getNextIndexFor, getPrevIndexFor, hasMoreStories, paneSlots.length, stories.length]);
 
-  // Track active index and set up settle detection
-  const handleScroll = useCallback(() => {
-    if (isJumpingRef.current) return;
+  const settlePane = useCallback(() => {
     const container = containerRef.current;
-    if (!container || N === 0) return;
-    const h = container.clientHeight;
-    const pos = Math.round(container.scrollTop / h);
+    if (!container || isJumpingRef.current || stories.length === 0) return;
 
-    if (pos >= 0 && pos <= N + 1 && pos !== activeIdx) {
-      setActiveIdx(pos);
+    const height = container.clientHeight;
+    const rawIndex = Math.round(container.scrollTop / height);
+
+    if (rawIndex === 0) {
+      const prevStoryIdx = getPrevStoryIndex();
+      if (prevStoryIdx == null) {
+        centerCurrentPane();
+        setVisiblePaneIdx(1);
+        lastVisiblePaneRef.current = 1;
+        return;
+      }
+
+      commitPaneTransition(-1, prevStoryIdx);
+      return;
     }
 
-    clearTimeout(scrollTimerRef.current);
-    scrollTimerRef.current = setTimeout(jumpIfNeeded, 150);
-  }, [activeIdx, N, jumpIfNeeded]);
+    if (rawIndex === 2) {
+      const nextStoryIdx = getNextStoryIndex();
+      if (nextStoryIdx == null) {
+        centerCurrentPane();
+        setVisiblePaneIdx(1);
+        lastVisiblePaneRef.current = 1;
+        return;
+      }
 
-  // scrollend listener for instant boundary detection
+      commitPaneTransition(1, nextStoryIdx);
+      return;
+    }
+
+    if (rawIndex !== 1) {
+      centerCurrentPane();
+    }
+
+    setVisiblePaneIdx(1);
+    lastVisiblePaneRef.current = 1;
+  }, [centerCurrentPane, commitPaneTransition, getNextStoryIndex, getPrevStoryIndex, stories.length]);
+
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
-    const onScrollEnd = () => {
-      clearTimeout(scrollTimerRef.current);
-      jumpIfNeeded();
-    };
-    container.addEventListener('scrollend', onScrollEnd);
-    return () => {
-      container.removeEventListener('scrollend', onScrollEnd);
-      clearTimeout(scrollTimerRef.current);
-    };
-  }, [jumpIfNeeded]);
+    if (!container) return undefined;
 
-  // Desktop arrow navigation
-  const scrollByOne = useCallback((dir) => {
+    const handleScrollEnd = () => {
+      clearTimeout(scrollEndTimer.current);
+      settlePane();
+    };
+
+    container.addEventListener('scrollend', handleScrollEnd);
+    return () => container.removeEventListener('scrollend', handleScrollEnd);
+  }, [settlePane]);
+
+  const handleScroll = useCallback(() => {
     const container = containerRef.current;
-    if (!container) return;
-    container.scrollBy({ top: dir * container.clientHeight, behavior: 'smooth' });
-  }, []);
+    if (!container || isJumpingRef.current) return;
 
-  // Desktop wheel
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const onWheel = (e) => {
-      if (!window.matchMedia('(min-width: 1024px)').matches) return;
-      if (N <= 1 || isJumpingRef.current) return;
-      if (Math.abs(e.deltaY) < 16) return;
-      e.preventDefault();
-      const now = performance.now();
-      if (now - lastWheelRef.current < 500) return;
-      lastWheelRef.current = now;
-      scrollByOne(e.deltaY > 0 ? 1 : -1);
-    };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, [scrollByOne, N]);
+    const height = container.clientHeight;
+    const rawIndex = Math.max(0, Math.min(2, Math.round(container.scrollTop / height)));
+
+    if (rawIndex !== lastVisiblePaneRef.current) {
+      lastVisiblePaneRef.current = rawIndex;
+      setVisiblePaneIdx(rawIndex);
+    }
+
+    clearTimeout(scrollEndTimer.current);
+    scrollEndTimer.current = setTimeout(() => {
+      settlePane();
+    }, 160);
+  }, [settlePane]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
@@ -466,8 +591,38 @@ export default function VideoFeedPage() {
       setStories(prev => prev.map(s =>
         s.user_id === userId ? { ...s, favorited: data.favorited } : s
       ));
-    } catch {}
+    } catch {
+      // Silently fail
+    }
   }, []);
+
+  const scrollByOne = useCallback((dir) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const height = container.clientHeight;
+    const targetPane = dir > 0 ? 2 : 0;
+    container.scrollTo({ top: height * targetPane, behavior: 'smooth' });
+  }, []);
+
+  const handleDesktopWheel = useCallback((event) => {
+    if (typeof window === 'undefined' || !window.matchMedia('(min-width: 1024px)').matches) {
+      return;
+    }
+
+    if (stories.length <= 1 || isJumpingRef.current || Math.abs(event.deltaY) < 16) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const now = performance.now();
+    if (now - lastDesktopWheelAtRef.current < 420) {
+      return;
+    }
+
+    lastDesktopWheelAtRef.current = now;
+    scrollByOne(event.deltaY > 0 ? 1 : -1);
+  }, [scrollByOne, stories.length]);
 
   if (loading) {
     return (
@@ -477,6 +632,7 @@ export default function VideoFeedPage() {
     );
   }
 
+  // Empty state
   if (stories.length === 0) {
     return (
       <div className="fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-40 px-6">
@@ -508,16 +664,31 @@ export default function VideoFeedPage() {
           </button>
         </motion.div>
 
+        {/* Bottom nav spacing */}
         <div className="h-20" />
       </div>
     );
   }
 
+  if (paneSlots.length !== 3) {
+    return (
+      <div className="fixed inset-0 bg-black flex items-center justify-center z-40">
+        <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const paneStories = paneSlots.length === 3
+    ? paneSlots.map((pane) => (pane.storyIdx == null ? null : stories[pane.storyIdx] || null))
+    : [];
+
   return (
     <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
+      {/* Video feed container */}
       <div
         ref={containerRef}
         onScroll={handleScroll}
+        onWheel={handleDesktopWheel}
         className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
         style={{
           scrollSnapType: 'y mandatory',
@@ -526,20 +697,13 @@ export default function VideoFeedPage() {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        {infiniteItems.map((story, dispIdx) => {
-          const isActive = dispIdx === activeIdx;
-          const dist = Math.abs(dispIdx - activeIdx);
-          // Mount video if nearby (±2) OR if it's a boundary destination (positions 1 and N)
-          const isBoundaryDest = dispIdx === 1 || dispIdx === N;
-          const isNearby = dist <= 2 || isBoundaryDest;
-
-          return (
-            <div key={`${story.id}_${dispIdx}`} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+        {paneStories.map((story, displayIndex) => (
+          <div key={paneSlots[displayIndex]?.slotId || displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+            {story ? (
               <StoryCard
                 story={story}
                 videoSrc={story.video_url}
-                isActive={isActive}
-                isNearby={isNearby}
+                isActive={displayIndex === visiblePaneIdx}
                 onFavorite={handleFavorite}
                 isMuted={isMuted}
                 onToggleMute={() => setIsMuted(m => !m)}
@@ -547,12 +711,13 @@ export default function VideoFeedPage() {
                 gradientOpacity={gradientOpacity}
                 navBottomOffset={navBottomOffset}
               />
-            </div>
-          );
-        })}
+            ) : null}
+          </div>
+        ))}
       </div>
 
-      {N > 1 && (
+      {/* Scroll arrows — desktop only, < prev left / next > right */}
+      {stories.length > 1 && (
         <>
           <button
             onClick={() => scrollByOne(-1)}
@@ -571,6 +736,7 @@ export default function VideoFeedPage() {
         </>
       )}
 
+      {/* Bottom safe area for nav */}
       <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/70 to-transparent pointer-events-none z-10 lg:hidden" />
     </div>
   );
