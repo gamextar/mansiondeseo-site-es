@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Gift } from 'lucide-react';
@@ -18,12 +18,10 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function StoryCard({ story, isActive, preloadMode, onBecomeActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
+function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
-  const wasActiveRef = useRef(isActive);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -31,19 +29,12 @@ function StoryCard({ story, isActive, preloadMode, onBecomeActive, onFavorite, i
     if (!video) return;
 
     if (isActive) {
-      // Only reset to start when RE-entering (not on initial mount where autoPlay handles it)
-      if (wasActiveRef.current === false) {
-        video.currentTime = 0;
-        setVideoReady(false);
-      }
+      video.currentTime = 0;
       video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-      onBecomeActive?.(video);
     } else {
       video.pause();
       setIsPlaying(false);
-      setVideoReady(false);
     }
-    wasActiveRef.current = isActive;
   }, [isActive]);
 
   useEffect(() => {
@@ -80,32 +71,15 @@ function StoryCard({ story, isActive, preloadMode, onBecomeActive, onFavorite, i
         <video
           ref={videoRef}
           src={story.video_url}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${videoReady ? 'opacity-100' : 'opacity-0'}`}
+          className="absolute inset-0 w-full h-full object-cover"
           style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
           loop
-          autoPlay={isActive}
           playsInline
           muted={isMuted}
-          preload={preloadMode}
+          preload="auto"
           onClick={togglePlay}
           onEnded={handleVideoEnd}
-          onLoadedData={() => setVideoReady(true)}
         />
-
-        {/* Loading placeholder — shown while first frame decodes */}
-        {!videoReady && (
-          <div className="absolute inset-0 flex items-center justify-center z-[5]">
-            <div className="absolute inset-0 bg-gradient-to-b from-mansion-base/90 via-black/80 to-mansion-base/90" />
-            {story.avatar_url && (
-              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-white/20 shadow-lg z-10 opacity-60">
-                <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
-              </div>
-            )}
-            <div className="absolute bottom-1/2 translate-y-16">
-              <div className="w-6 h-6 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
-            </div>
-          </div>
-        )}
 
         {/* Play/Pause overlay */}
         <AnimatePresence>
@@ -276,32 +250,16 @@ function DesktopActionButtons({ story, onFavorite, navigate }) {
   );
 }
 
-export default function VideoFeedPage({ isVisible = true }) {
+export default function VideoFeedPage() {
   const navigate = useNavigate();
   const { user, siteSettings } = useAuth();
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
-  const hasInitialPositionRef = useRef(false);
-  const activeVideoRef = useRef(null); // ref to currently-active video element
-
-  // Hydrate from sessionStorage to skip loading spinner on revisit
-  const cachedStories = () => {
-    try {
-      const raw = sessionStorage.getItem('vf_stories');
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return [];
-  };
-  const initial = cachedStories();
-
-  const [stories, setStories] = useState(initial);
-  const [loading, setLoading] = useState(initial.length === 0);
-  const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
-  const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
-
-  const [activeDispIdx, setActiveDispIdx] = useState(savedIdx);
-  const [isMuted, setIsMuted] = useState(savedMuted);
+  const [stories, setStories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeDispIdx, setActiveDispIdx] = useState(1);
+  const [isMuted, setIsMuted] = useState(true);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
@@ -323,13 +281,11 @@ export default function VideoFeedPage({ isVisible = true }) {
     getStories()
       .then(data => {
         if (!cancelled) {
-          const fresh = data.stories || [];
-          setStories(fresh);
-          try { sessionStorage.setItem('vf_stories', JSON.stringify(fresh)); } catch {}
+          setStories(data.stories || []);
         }
       })
       .catch(() => {
-        if (!cancelled && stories.length === 0) setStories([]);
+        if (!cancelled) setStories([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -337,40 +293,16 @@ export default function VideoFeedPage({ isVisible = true }) {
     return () => { cancelled = true; };
   }, []);
 
-  // Restore the saved position before paint so the desktop view doesn't briefly show the paused clone.
-  useLayoutEffect(() => {
-    const container = containerRef.current;
-    if (!container || stories.length === 0 || hasInitialPositionRef.current) return;
-
-    const idx = Math.min(activeDispIdx, stories.length);
-    container.scrollTop = container.clientHeight * idx;
-    hasInitialPositionRef.current = true;
-  }, [activeDispIdx, stories.length]);
-
+  // After stories load, snap to the first real clip.
   useEffect(() => {
-    if (stories.length === 0) {
-      hasInitialPositionRef.current = false;
+    if (stories.length > 0) {
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.clientHeight; // index 1 = first real clip
+        }
+      });
     }
   }, [stories.length]);
-
-  // Pause/resume the active video when navigating away/back (component stays mounted)
-  useEffect(() => {
-    const video = activeVideoRef.current;
-    if (!video) return;
-    if (isVisible) {
-      video.play().catch(() => {});
-    } else {
-      video.pause();
-    }
-  }, [isVisible]);
-
-  // Persist position and muted state
-  useEffect(() => {
-    try { sessionStorage.setItem('vf_idx', String(activeDispIdx)); } catch {}
-  }, [activeDispIdx]);
-  useEffect(() => {
-    try { sessionStorage.setItem('vf_muted', isMuted ? '1' : '0'); } catch {}
-  }, [isMuted]);
 
   useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
 
@@ -526,8 +458,6 @@ export default function VideoFeedPage({ isVisible = true }) {
             <StoryCard
               story={story}
               isActive={displayIndex === activeDispIdx}
-              preloadMode={Math.abs(displayIndex - activeDispIdx) <= 1 ? 'auto' : 'none'}
-              onBecomeActive={(videoEl) => { activeVideoRef.current = videoEl; }}
               onFavorite={handleFavorite}
               isMuted={isMuted}
               onToggleMute={() => setIsMuted(m => !m)}
