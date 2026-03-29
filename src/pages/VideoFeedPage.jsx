@@ -489,10 +489,12 @@ export default function VideoFeedPage() {
       >
         {infiniteStories.map((story, displayIndex) => {
           const isActive = displayIndex === activeDispIdx;
-          const dist = Math.abs(displayIndex - activeDispIdx);
-          // Always mount clones (idx 0 and last) + ±2 window around active
+          // Always mount clones (idx 0 and last)
           const isBoundaryClone = displayIndex === 0 || displayIndex === infiniteStories.length - 1;
-          const isNearby = dist <= 2 || isBoundaryClone;
+          // Circular distance: when near boundary, real items at the other end are also "nearby"
+          const linearDist = Math.abs(displayIndex - activeDispIdx);
+          const wrapDist = stories.length > 0 ? Math.min(linearDist, stories.length - linearDist + 2) : linearDist;
+          const isNearby = wrapDist <= 2 || isBoundaryClone;
           return (
             <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
               <StoryCard
