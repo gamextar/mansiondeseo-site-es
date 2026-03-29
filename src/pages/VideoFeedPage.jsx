@@ -350,32 +350,22 @@ export default function VideoFeedPage() {
 
     if (rawIndex === 0) {
       isJumpingRef.current = true;
-      container.style.scrollSnapType = 'none';
+      // Set scrollTop directly without disabling snap.
+      // Safari's compositor treats this as an atomic snap operation instead of a visible DOM jump.
       container.scrollTop = stories.length * height;
       setActiveDispIdx(stories.length);
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (containerRef.current) {
-            containerRef.current.style.scrollSnapType = 'y mandatory';
-          }
-          isJumpingRef.current = false;
-        });
+        isJumpingRef.current = false;
       });
       return;
     }
 
     if (rawIndex >= stories.length + 1) {
       isJumpingRef.current = true;
-      container.style.scrollSnapType = 'none';
       container.scrollTop = height;
       setActiveDispIdx(1);
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (containerRef.current) {
-            containerRef.current.style.scrollSnapType = 'y mandatory';
-          }
-          isJumpingRef.current = false;
-        });
+        isJumpingRef.current = false;
       });
     }
   }, [stories.length]);
