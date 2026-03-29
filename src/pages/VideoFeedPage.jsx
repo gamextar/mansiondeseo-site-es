@@ -9,6 +9,7 @@ import AvatarImg from '../components/AvatarImg';
 const STORIES_CACHE_VERSION = '3';
 const STORIES_PAGE_SIZE = 12;
 const LOAD_MORE_THRESHOLD = 4;
+const PANE_SLOTS = ['pane-prev', 'pane-current', 'pane-next'];
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -302,6 +303,7 @@ export default function VideoFeedPage() {
   const [activeStoryIdx, setActiveStoryIdx] = useState(savedIdx);
   const [visiblePaneIdx, setVisiblePaneIdx] = useState(1);
   const [isMuted, setIsMuted] = useState(savedMuted);
+  const [paneSlots, setPaneSlots] = useState([]);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
@@ -328,6 +330,24 @@ export default function VideoFeedPage() {
 
     return merged;
   }, []);
+
+  const getPrevIndexFor = useCallback((storyIdx, totalStories, canWrap) => {
+    if (totalStories <= 1) return null;
+    if (storyIdx > 0) return storyIdx - 1;
+    return canWrap ? totalStories - 1 : null;
+  }, []);
+
+  const getNextIndexFor = useCallback((storyIdx, totalStories, canWrap) => {
+    if (totalStories <= 1) return null;
+    if (storyIdx < totalStories - 1) return storyIdx + 1;
+    return canWrap ? 0 : null;
+  }, []);
+
+  const buildPaneSlots = useCallback((storyIdx, totalStories, canWrap) => ([
+    { slotId: PANE_SLOTS[0], storyIdx: getPrevIndexFor(storyIdx, totalStories, canWrap) },
+    { slotId: PANE_SLOTS[1], storyIdx },
+    { slotId: PANE_SLOTS[2], storyIdx: getNextIndexFor(storyIdx, totalStories, canWrap) },
+  ]), [getNextIndexFor, getPrevIndexFor]);
 
   const loadStoriesPage = useCallback(async (pageToLoad, { replace = false } = {}) => {
     const data = await getStories({ page: pageToLoad, limit: STORIES_PAGE_SIZE });
@@ -393,6 +413,26 @@ export default function VideoFeedPage() {
     setActiveStoryIdx(stories.length - 1);
   }, [activeStoryIdx, stories.length]);
 
+  useEffect(() => {
+    if (stories.length === 0) {
+      setPaneSlots([]);
+      return;
+    }
+
+    setPaneSlots((prevSlots) => {
+      if (
+        prevSlots.length === 3 &&
+        prevSlots[1]?.storyIdx === activeStoryIdx &&
+        prevSlots[0]?.storyIdx === getPrevIndexFor(activeStoryIdx, stories.length, !hasMoreStories) &&
+        prevSlots[2]?.storyIdx === getNextIndexFor(activeStoryIdx, stories.length, !hasMoreStories)
+      ) {
+        return prevSlots;
+      }
+
+      return buildPaneSlots(activeStoryIdx, stories.length, !hasMoreStories);
+    });
+  }, [activeStoryIdx, buildPaneSlots, getNextIndexFor, getPrevIndexFor, hasMoreStories, stories.length]);
+
   const centerCurrentPane = useCallback(() => {
     const container = containerRef.current;
     if (!container) return false;
@@ -403,7 +443,7 @@ export default function VideoFeedPage() {
   }, []);
 
   useLayoutEffect(() => {
-    if (stories.length === 0) return;
+    if (paneSlots.length !== 3) return;
     setVisiblePaneIdx(1);
     lastVisiblePaneRef.current = 1;
 
@@ -414,7 +454,7 @@ export default function VideoFeedPage() {
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [centerCurrentPane, stories.length]);
+  }, [centerCurrentPane, paneSlots.length]);
 
   useEffect(() => {
     try { sessionStorage.setItem('vf_story_idx', String(activeStoryIdx)); } catch {}
@@ -425,27 +465,42 @@ export default function VideoFeedPage() {
 
   useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
 
-  const getPrevStoryIndex = useCallback(() => {
-    if (stories.length <= 1) return null;
-    if (activeStoryIdx > 0) return activeStoryIdx - 1;
-    return hasMoreStories ? null : stories.length - 1;
-  }, [activeStoryIdx, hasMoreStories, stories.length]);
+  const getPrevStoryIndex = useCallback(() => (
+    getPrevIndexFor(activeStoryIdx, stories.length, !hasMoreStories)
+  ), [activeStoryIdx, getPrevIndexFor, hasMoreStories, stories.length]);
 
-  const getNextStoryIndex = useCallback(() => {
-    if (stories.length <= 1) return null;
-    if (activeStoryIdx < stories.length - 1) return activeStoryIdx + 1;
-    return hasMoreStories ? null : 0;
-  }, [activeStoryIdx, hasMoreStories, stories.length]);
+  const getNextStoryIndex = useCallback(() => (
+    getNextIndexFor(activeStoryIdx, stories.length, !hasMoreStories)
+  ), [activeStoryIdx, getNextIndexFor, hasMoreStories, stories.length]);
 
-  const commitPaneTransition = useCallback((targetStoryIdx) => {
+  const commitPaneTransition = useCallback((direction, targetStoryIdx) => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container || paneSlots.length !== 3) return;
 
     isJumpingRef.current = true;
     container.style.scrollSnapType = 'none';
     setActiveStoryIdx(targetStoryIdx);
     setVisiblePaneIdx(1);
     lastVisiblePaneRef.current = 1;
+    setPaneSlots((prevSlots) => {
+      if (prevSlots.length !== 3) return prevSlots;
+
+      if (direction > 0) {
+        const [prevPane, currentPane, nextPane] = prevSlots;
+        return [
+          { ...currentPane, storyIdx: activeStoryIdx },
+          { ...nextPane, storyIdx: targetStoryIdx },
+          { ...prevPane, storyIdx: getNextIndexFor(targetStoryIdx, stories.length, !hasMoreStories) },
+        ];
+      }
+
+      const [prevPane, currentPane, nextPane] = prevSlots;
+      return [
+        { ...nextPane, storyIdx: getPrevIndexFor(targetStoryIdx, stories.length, !hasMoreStories) },
+        { ...prevPane, storyIdx: targetStoryIdx },
+        { ...currentPane, storyIdx: activeStoryIdx },
+      ];
+    });
 
     requestAnimationFrame(() => {
       centerCurrentPane();
@@ -456,7 +511,7 @@ export default function VideoFeedPage() {
         isJumpingRef.current = false;
       });
     });
-  }, [centerCurrentPane]);
+  }, [activeStoryIdx, centerCurrentPane, getNextIndexFor, getPrevIndexFor, hasMoreStories, paneSlots.length, stories.length]);
 
   const settlePane = useCallback(() => {
     const container = containerRef.current;
@@ -474,7 +529,7 @@ export default function VideoFeedPage() {
         return;
       }
 
-      commitPaneTransition(prevStoryIdx);
+      commitPaneTransition(-1, prevStoryIdx);
       return;
     }
 
@@ -487,7 +542,7 @@ export default function VideoFeedPage() {
         return;
       }
 
-      commitPaneTransition(nextStoryIdx);
+      commitPaneTransition(1, nextStoryIdx);
       return;
     }
 
@@ -615,10 +670,17 @@ export default function VideoFeedPage() {
     );
   }
 
-  const currentStory = stories[activeStoryIdx] || null;
-  const prevStory = stories[getPrevStoryIndex() ?? activeStoryIdx] || currentStory;
-  const nextStory = stories[getNextStoryIndex() ?? activeStoryIdx] || currentStory;
-  const paneStories = [prevStory, currentStory, nextStory];
+  if (paneSlots.length !== 3) {
+    return (
+      <div className="fixed inset-0 bg-black flex items-center justify-center z-40">
+        <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const paneStories = paneSlots.length === 3
+    ? paneSlots.map((pane) => (pane.storyIdx == null ? null : stories[pane.storyIdx] || null))
+    : [];
 
   return (
     <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
@@ -636,7 +698,7 @@ export default function VideoFeedPage() {
         }}
       >
         {paneStories.map((story, displayIndex) => (
-          <div key={`${story?.id || 'empty'}-${displayIndex}`} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+          <div key={paneSlots[displayIndex]?.slotId || displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
             {story ? (
               <StoryCard
                 story={story}
