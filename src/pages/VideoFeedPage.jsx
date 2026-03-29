@@ -257,7 +257,6 @@ export default function VideoFeedPage() {
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
   const lastDesktopWheelAtRef = useRef(0);
-  const arrowAnimationFrameRef = useRef(null);
 
   // Hydrate from sessionStorage to skip loading spinner on revisit
   const cachedStories = () => {
@@ -344,11 +343,6 @@ export default function VideoFeedPage() {
   }, [isMuted]);
 
   useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
-  useEffect(() => () => {
-    if (arrowAnimationFrameRef.current) {
-      cancelAnimationFrame(arrowAnimationFrameRef.current);
-    }
-  }, []);
 
   const settleInfiniteBoundary = useCallback(() => {
     const container = containerRef.current;
@@ -435,37 +429,6 @@ export default function VideoFeedPage() {
     const container = containerRef.current;
     if (!container) return;
     container.scrollBy({ top: dir * container.clientHeight, behavior: 'smooth' });
-  }, []);
-
-  const scrollByArrow = useCallback((dir) => {
-    const container = containerRef.current;
-    if (!container || isJumpingRef.current) return;
-
-    const startTop = container.scrollTop;
-    const targetTop = startTop + dir * container.clientHeight;
-    const duration = 680;
-    const startTime = performance.now();
-
-    if (arrowAnimationFrameRef.current) {
-      cancelAnimationFrame(arrowAnimationFrameRef.current);
-    }
-
-    const easeInOutQuad = (t) => (
-      t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
-    );
-
-    const step = (now) => {
-      const progress = Math.min((now - startTime) / duration, 1);
-      container.scrollTop = startTop + (targetTop - startTop) * easeInOutQuad(progress);
-
-      if (progress < 1) {
-        arrowAnimationFrameRef.current = requestAnimationFrame(step);
-      } else {
-        arrowAnimationFrameRef.current = null;
-      }
-    };
-
-    arrowAnimationFrameRef.current = requestAnimationFrame(step);
   }, []);
 
   const handleDesktopWheel = useCallback((event) => {
@@ -583,14 +546,14 @@ export default function VideoFeedPage() {
       {stories.length > 1 && (
         <>
           <button
-            onClick={() => scrollByArrow(-1)}
+            onClick={() => scrollByOne(-1)}
             className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-16 h-16 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
             style={{ left: 'calc(50% - 350px)' }}
           >
             <ChevronLeft className="w-8 h-8 text-white/70" />
           </button>
           <button
-            onClick={() => scrollByArrow(1)}
+            onClick={() => scrollByOne(1)}
             className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-16 h-16 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
             style={{ right: 'calc(50% - 350px)' }}
           >
