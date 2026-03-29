@@ -74,6 +74,28 @@ function HeartBurst({ trigger }) {
   );
 }
 
+// ── Pointer-event tap: fires during scroll-snap settle (click doesn't) ───────
+function TapZone({ onTap, children, className, style }) {
+  const pRef = useRef(null);
+  return (
+    <button
+      className={className}
+      style={style}
+      onPointerDown={e => { pRef.current = { x: e.clientX, y: e.clientY }; }}
+      onPointerUp={e => {
+        if (!pRef.current) return;
+        const dx = Math.abs(e.clientX - pRef.current.x);
+        const dy = Math.abs(e.clientY - pRef.current.y);
+        pRef.current = null;
+        if (dx < 12 && dy < 12) onTap?.();
+      }}
+      onPointerCancel={() => { pRef.current = null; }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset, avatarSize }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
@@ -203,7 +225,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onT
           className="absolute left-4 right-20 z-20 lg:hidden"
           style={{ bottom: `${navBottomOffset + 8}px` }}
         >
-          <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5 mb-1">
+          <TapZone onTap={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5 mb-1">
             <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
               {story.avatar_url ? (
                 <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
@@ -212,7 +234,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onLike, isMuted, onT
               )}
             </div>
             <p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{story.username}</p>
-          </button>
+          </TapZone>
           {story.caption && (
             <p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
           )}
@@ -264,28 +286,28 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
 
   return (
     <>
-      <button onClick={handleHeart} className="flex flex-col items-center relative">
+      <TapZone onTap={handleHeart} className="flex flex-col items-center relative">
         <HeartBurst trigger={burstTrigger} />
         <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
           <Heart className={`w-7 h-7 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
         </div>
         <span className="text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
-      </button>
-      <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center">
+      </TapZone>
+      <TapZone onTap={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Send className="w-6 h-6 text-white" />
         </div>
-      </button>
-      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
+      </TapZone>
+      <TapZone onTap={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Gift className="w-6 h-6 text-mansion-gold" />
         </div>
-      </button>
-      <button onClick={onToggleMute} className="flex flex-col items-center">
+      </TapZone>
+      <TapZone onTap={onToggleMute} className="flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
         </div>
-      </button>
+      </TapZone>
     </>
   );
 }
