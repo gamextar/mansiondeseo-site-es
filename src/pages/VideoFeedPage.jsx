@@ -22,6 +22,7 @@ function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggle
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
+  const wasActiveRef = useRef(isActive);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -29,12 +30,16 @@ function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggle
     if (!video) return;
 
     if (isActive) {
-      video.currentTime = 0;
+      // Only reset to start when RE-entering (not on initial mount where autoPlay handles it)
+      if (wasActiveRef.current === false) {
+        video.currentTime = 0;
+      }
       video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     } else {
       video.pause();
       setIsPlaying(false);
     }
+    wasActiveRef.current = isActive;
   }, [isActive]);
 
   useEffect(() => {
