@@ -20,58 +20,26 @@ function timeAgo(dateStr) {
 
 function StoryCard({ story, videoSrc, isActive, isNearby, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
-  const primedRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const navigate = useNavigate();
 
-  // Only mount <video> for nearby stories (active ± 1)
   const shouldMount = isNearby || isActive;
 
-  // Play/pause based on active state
+  // Play/pause based on active state — no currentTime reset, no priming
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoSrc) return;
 
     if (isActive) {
       video.muted = isMuted;
-      video.currentTime = 0;
       video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-      primedRef.current = true;
     } else {
       video.pause();
       setIsPlaying(false);
     }
   }, [isActive, videoSrc]);
 
-  // Prime nearby videos: force first frame decode so they aren't black
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !videoSrc || isActive || primedRef.current) return;
-    if (!isNearby) return;
-
-    const doPrime = () => {
-      if (video.readyState >= 2) { primedRef.current = true; return; }
-      video.muted = true;
-      const p = video.play();
-      if (p) p.then(() => {
-        requestAnimationFrame(() => {
-          video.pause();
-          video.currentTime = 0;
-          primedRef.current = true;
-        });
-      }).catch(() => {});
-    };
-
-    if (video.readyState >= 1) {
-      doPrime();
-    } else {
-      video.addEventListener('loadedmetadata', doPrime, { once: true });
-      return () => video.removeEventListener('loadedmetadata', doPrime);
-    }
-  }, [isNearby, isActive, videoSrc]);
-
-  // Sync muted state (only for active video to avoid unmuting primed ones)
   useEffect(() => {
     const video = videoRef.current;
     if (video && isActive) video.muted = isMuted;
