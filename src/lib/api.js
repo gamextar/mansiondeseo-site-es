@@ -400,9 +400,3 @@ export async function adminUploadStoryForUser(userId, file, { caption = '' } = {
   });
   return data;
 }
-
-export async function adminDeleteStoryForUser(userId) {
-  return apiFetch(`/admin/delete-story?user_id=${encodeURIComponent(userId)}`, {
-    method: 'DELETE',
-  });
-}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, Ghost, Ban, AlertTriangle, Pause, Play, Film } from 'lucide-react';
-import { adminGetUsers, adminUpdateUser, adminDeleteUser, adminUploadStoryForUser, adminDeleteStoryForUser } from '../../lib/api';
+import { adminGetUsers, adminUpdateUser, adminDeleteUser, adminUploadStoryForUser } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 
 function timeAgo(dateStr) {
@@ -80,20 +80,6 @@ export default function AdminUsersPage() {
       setSelected(null);
     } catch (err) {
       alert(err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDeleteStory = async () => {
-    if (!selected) return;
-    if (!confirm(`¿Eliminar la historia de ${selected.username}? Esta acción borrará el video de R2.`)) return;
-    setActionLoading(true);
-    try {
-      await adminDeleteStoryForUser(selected.id);
-      alert(`Historia de ${selected.username} eliminada.`);
-    } catch (err) {
-      alert(err.message || 'Error al eliminar historia');
     } finally {
       setActionLoading(false);
     }
@@ -465,14 +451,6 @@ export default function AdminUsersPage() {
                   >
                     <Film className={`w-4 h-4 ${storyUploading ? 'text-text-dim animate-pulse' : 'text-mansion-crimson'}`} />
                     <span className="text-xs text-text-primary">{storyUploading ? 'Subiendo historia...' : 'Subir historia para este usuario'}</span>
-                  </button>
-                  <button
-                    disabled={actionLoading}
-                    onClick={handleDeleteStory}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-mansion-elevated hover:bg-red-500/10 transition-colors text-left"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-400" />
-                    <span className="text-xs text-red-400">Eliminar historia actual</span>
                   </button>
                   <input
                     ref={storyInputRef}
