@@ -6,11 +6,6 @@ import { getStories, toggleFavorite } from '../lib/api';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
 
-const STORIES_CACHE_VERSION = '2';
-const STORIES_PAGE_SIZE = 12;
-const STORY_WINDOW_RADIUS = 2;
-const LOAD_MORE_THRESHOLD = 4;
-
 function timeAgo(dateStr) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z').getTime();
@@ -266,130 +261,51 @@ export default function VideoFeedPage() {
   // Hydrate from sessionStorage to skip loading spinner on revisit
   const cachedStories = () => {
     try {
-      if (sessionStorage.getItem('vf_cache_version') !== STORIES_CACHE_VERSION) return [];
       const raw = sessionStorage.getItem('vf_stories');
       if (raw) return JSON.parse(raw);
     } catch {}
     return [];
   };
-  const cachedNextPage = () => {
-    try {
-      const raw = sessionStorage.getItem('vf_next_page');
-      return raw ? Math.max(1, parseInt(raw, 10)) : 1;
-    } catch {
-      return 1;
-    }
-  };
-  const cachedHasMore = () => {
-    try {
-      return sessionStorage.getItem('vf_has_more') !== '0';
-    } catch {
-      return true;
-    }
-  };
   const initial = cachedStories();
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [nextPage, setNextPage] = useState(initial.length > 0 ? cachedNextPage() : 1);
-  const [hasMoreStories, setHasMoreStories] = useState(initial.length > 0 ? cachedHasMore() : true);
   const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
   const [activeDispIdx, setActiveDispIdx] = useState(savedIdx);
-  const [visibleDispIdx, setVisibleDispIdx] = useState(savedIdx);
   const [isMuted, setIsMuted] = useState(savedMuted);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
+  const isDesktopViewport = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
 
   // Infinite list: clone of last item prepended, clone of first appended
   const infiniteStories = stories.length > 0
     ? [stories[stories.length - 1], ...stories, stories[0]]
     : [];
 
-  const persistStoriesCache = useCallback((nextStories, incomingNextPage, incomingHasMore) => {
-    try {
-      sessionStorage.setItem('vf_cache_version', STORIES_CACHE_VERSION);
-      sessionStorage.setItem('vf_stories', JSON.stringify(nextStories));
-      sessionStorage.setItem('vf_next_page', String(incomingNextPage));
-      sessionStorage.setItem('vf_has_more', incomingHasMore ? '1' : '0');
-    } catch {}
-  }, []);
-
-  const mergeStories = useCallback((prevStories, incomingStories) => {
-    const merged = [...prevStories];
-    const seen = new Set(prevStories.map((story) => story.id));
-
-    for (const story of incomingStories) {
-      if (seen.has(story.id)) continue;
-      seen.add(story.id);
-      merged.push(story);
-    }
-
-    return merged;
-  }, []);
-
-  const loadStoriesPage = useCallback(async (pageToLoad, { replace = false } = {}) => {
-    const data = await getStories({ page: pageToLoad, limit: STORIES_PAGE_SIZE });
-    const incomingStories = data.stories || [];
-    const incomingHasMore = Boolean(data.has_more);
-    const incomingNextPage = data.next_page ?? (incomingHasMore ? pageToLoad + 1 : pageToLoad);
-
-    setHasMoreStories(incomingHasMore);
-    setNextPage(incomingNextPage);
-
-    if (replace) {
-      setStories(incomingStories);
-      persistStoriesCache(incomingStories, incomingNextPage, incomingHasMore);
-      return incomingStories;
-    }
-
-    let mergedStories = incomingStories;
-    setStories((prevStories) => {
-      mergedStories = mergeStories(prevStories, incomingStories);
-      return mergedStories;
-    });
-    persistStoriesCache(mergedStories, incomingNextPage, incomingHasMore);
-    return mergedStories;
-  }, [mergeStories, persistStoriesCache]);
-
   useEffect(() => {
-    if (initial.length > 0) {
-      setLoading(false);
-      return undefined;
-    }
-
     let cancelled = false;
-    loadStoriesPage(1, { replace: true })
+    getStories()
       .catch(() => {
         if (!cancelled) setStories([]);
+      })
+      .then(data => {
+        if (!cancelled) {
+          const fresh = data.stories || [];
+          setStories(fresh);
+          try { sessionStorage.setItem('vf_stories', JSON.stringify(fresh)); } catch {}
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
 
     return () => { cancelled = true; };
-  }, [initial.length, loadStoriesPage]);
-
-  useEffect(() => {
-    if (loading || loadingMore || !hasMoreStories || stories.length === 0) return;
-    if (activeDispIdx < Math.max(1, stories.length - LOAD_MORE_THRESHOLD)) return;
-
-    let cancelled = false;
-    setLoadingMore(true);
-
-    loadStoriesPage(nextPage)
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoadingMore(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [activeDispIdx, hasMoreStories, loadStoriesPage, loading, loadingMore, nextPage, stories.length]);
+  }, []);
 
   // After stories load, snap to saved position (or first clip).
   useLayoutEffect(() => {
@@ -436,7 +352,6 @@ export default function VideoFeedPage() {
       container.style.scrollSnapType = 'none';
       container.scrollTop = stories.length * height;
       setActiveDispIdx(stories.length);
-      setVisibleDispIdx(stories.length);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (containerRef.current) {
@@ -453,7 +368,6 @@ export default function VideoFeedPage() {
       container.style.scrollSnapType = 'none';
       container.scrollTop = height;
       setActiveDispIdx(1);
-      setVisibleDispIdx(1);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (containerRef.current) {
@@ -483,11 +397,6 @@ export default function VideoFeedPage() {
     if (!container || isJumpingRef.current) return;
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
-    const boundedVisibleIndex = Math.max(0, Math.min(rawIndex, stories.length + 1));
-
-    if (boundedVisibleIndex !== visibleDispIdx) {
-      setVisibleDispIdx(boundedVisibleIndex);
-    }
 
     if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
       setActiveDispIdx(rawIndex);
@@ -498,7 +407,7 @@ export default function VideoFeedPage() {
     scrollEndTimer.current = setTimeout(() => {
       settleInfiniteBoundary();
     }, 180);
-  }, [activeDispIdx, settleInfiniteBoundary, stories.length, visibleDispIdx]);
+  }, [activeDispIdx, settleInfiniteBoundary, stories.length]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
@@ -600,19 +509,30 @@ export default function VideoFeedPage() {
       >
         {infiniteStories.map((story, displayIndex) => (
           <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
-            {Math.abs(displayIndex - visibleDispIdx) <= STORY_WINDOW_RADIUS ? (
-              <StoryCard
-                story={story}
-                videoSrc={story.video_url}
-                isActive={displayIndex === visibleDispIdx}
-                onFavorite={handleFavorite}
-                isMuted={isMuted}
-                onToggleMute={() => setIsMuted(m => !m)}
-                gradientHeight={gradientHeight}
-                gradientOpacity={gradientOpacity}
-                navBottomOffset={navBottomOffset}
-              />
-            ) : null}
+            {(() => {
+              const isLeadingClone = displayIndex === 0;
+              const isTrailingClone = displayIndex === stories.length + 1;
+              const shouldAttachSource =
+                !isDesktopViewport
+                  ? true
+                  : !isLeadingClone && !isTrailingClone
+                  ? true
+                  : (activeDispIdx === 1 && isLeadingClone) || (activeDispIdx === stories.length && isTrailingClone);
+
+              return (
+                <StoryCard
+                  story={story}
+                  videoSrc={shouldAttachSource ? story.video_url : undefined}
+                  isActive={displayIndex === activeDispIdx}
+                  onFavorite={handleFavorite}
+                  isMuted={isMuted}
+                  onToggleMute={() => setIsMuted(m => !m)}
+                  gradientHeight={gradientHeight}
+                  gradientOpacity={gradientOpacity}
+                  navBottomOffset={navBottomOffset}
+                />
+              );
+            })()}
           </div>
         ))}
       </div>
