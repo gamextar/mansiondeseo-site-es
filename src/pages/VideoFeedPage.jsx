@@ -69,7 +69,7 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
       <video
         ref={videoRef}
         src={story.video_url}
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover lg:object-contain"
         style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
         loop
         playsInline
