@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Gift } from 'lucide-react';
@@ -256,6 +256,7 @@ export default function VideoFeedPage() {
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
+  const hasInitialPositionRef = useRef(false);
 
   // Hydrate from sessionStorage to skip loading spinner on revisit
   const cachedStories = () => {
@@ -309,15 +310,19 @@ export default function VideoFeedPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // After stories load, snap to saved position (or first clip).
+  // Restore the saved position before paint so the desktop view doesn't briefly show the paused clone.
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container || stories.length === 0 || hasInitialPositionRef.current) return;
+
+    const idx = Math.min(activeDispIdx, stories.length);
+    container.scrollTop = container.clientHeight * idx;
+    hasInitialPositionRef.current = true;
+  }, [activeDispIdx, stories.length]);
+
   useEffect(() => {
-    if (stories.length > 0) {
-      requestAnimationFrame(() => {
-        if (containerRef.current) {
-          const idx = Math.min(activeDispIdx, stories.length);
-          containerRef.current.scrollTop = containerRef.current.clientHeight * idx;
-        }
-      });
+    if (stories.length === 0) {
+      hasInitialPositionRef.current = false;
     }
   }, [stories.length]);
 
