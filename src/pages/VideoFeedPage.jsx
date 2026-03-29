@@ -224,58 +224,83 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
 
 function MobileOverlayButton({ onPress, scrollContainerRef, className = '', style, children }) {
   const gestureRef = useRef(null);
+  const cleanupRef = useRef(() => {});
+
+  useEffect(() => () => {
+    cleanupRef.current?.();
+  }, []);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className={className}
-      style={{ ...style, touchAction: 'pan-y' }}
+      style={{ ...style, touchAction: 'none' }}
       onPointerDown={(event) => {
-        event.currentTarget.setPointerCapture?.(event.pointerId);
-        gestureRef.current = {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+        const gesture = {
           x: event.clientX,
           y: event.clientY,
           lastY: event.clientY,
           pointerId: event.pointerId,
           cancelled: false,
         };
-      }}
-      onPointerMove={(event) => {
-        const gesture = gestureRef.current;
-        if (!gesture || gesture.pointerId !== event.pointerId || gesture.cancelled) return;
-        const deltaX = Math.abs(event.clientX - gesture.x);
-        const deltaY = Math.abs(event.clientY - gesture.y);
-        if (deltaY > 8 && deltaY > deltaX) {
-          gesture.cancelled = true;
-        }
-        if (gesture.cancelled) {
-          const container = scrollContainerRef?.current;
-          if (container) {
-            const moveY = event.clientY - gesture.lastY;
-            container.scrollTop -= moveY;
+
+        gestureRef.current = gesture;
+
+        const handleMove = (moveEvent) => {
+          const current = gestureRef.current;
+          if (!current || current.pointerId !== moveEvent.pointerId) return;
+
+          const deltaX = Math.abs(moveEvent.clientX - current.x);
+          const deltaY = Math.abs(moveEvent.clientY - current.y);
+
+          if (deltaY > 6 && deltaY > deltaX) {
+            current.cancelled = true;
           }
-          gesture.lastY = event.clientY;
-          return;
-        }
-        if (deltaX > 10) {
-          gesture.cancelled = true;
-        }
-      }}
-      onPointerUp={(event) => {
-        const gesture = gestureRef.current;
-        if (!gesture || gesture.pointerId !== event.pointerId) return;
-        event.currentTarget.releasePointerCapture?.(event.pointerId);
-        gestureRef.current = null;
-        if (!gesture.cancelled) {
-          onPress?.();
-        }
-      }}
-      onPointerCancel={(event) => {
-        event.currentTarget.releasePointerCapture?.(event.pointerId);
-        gestureRef.current = null;
-      }}
-      onClick={(event) => {
-        event.preventDefault();
+
+          if (current.cancelled) {
+            const container = scrollContainerRef?.current;
+            if (container) {
+              const moveY = moveEvent.clientY - current.lastY;
+              container.scrollTop -= moveY;
+            }
+          }
+
+          current.lastY = moveEvent.clientY;
+        };
+
+        const finishGesture = (endEvent) => {
+          const current = gestureRef.current;
+          if (!current || current.pointerId !== endEvent.pointerId) return;
+
+          cleanupRef.current?.();
+          gestureRef.current = null;
+
+          if (!current.cancelled) {
+            onPress?.();
+          }
+        };
+
+        const cancelGesture = (cancelEvent) => {
+          const current = gestureRef.current;
+          if (!current || current.pointerId !== cancelEvent.pointerId) return;
+          cleanupRef.current?.();
+          gestureRef.current = null;
+        };
+
+        const cleanup = () => {
+          window.removeEventListener('pointermove', handleMove);
+          window.removeEventListener('pointerup', finishGesture);
+          window.removeEventListener('pointercancel', cancelGesture);
+          cleanupRef.current = () => {};
+        };
+
+        cleanupRef.current = cleanup;
+        window.addEventListener('pointermove', handleMove, { passive: true });
+        window.addEventListener('pointerup', finishGesture, { passive: true });
+        window.addEventListener('pointercancel', cancelGesture, { passive: true });
       }}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -285,7 +310,7 @@ function MobileOverlayButton({ onPress, scrollContainerRef, className = '', styl
       }}
     >
       {children}
-    </button>
+    </div>
   );
 }
 
