@@ -28,11 +28,8 @@ export default function Navbar() {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
             <span className="font-display text-white text-sm font-bold">M</span>
           </div>
-          <span className="font-display text-base font-semibold text-gradient-gold hidden sm:inline">
+          <span className="font-display text-base font-semibold text-gradient-gold">
             Mansión Deseo
-          </span>
-          <span className="font-display text-base font-semibold text-gradient-gold sm:hidden">
-            Mansión
           </span>
         </Link>
         {/* Desktop left spacer */}
@@ -41,10 +38,10 @@ export default function Navbar() {
         {/* Coins pill */}
         <Link
           to="/monedas"
-          className="flex items-center gap-2 h-10 px-5 rounded-full bg-black/30 backdrop-blur-md border border-white/10 hover:bg-black/40 transition-all"
+          className="flex items-center gap-1.5 h-7 px-3 rounded-full bg-black/30 backdrop-blur-md border border-white/10 hover:bg-black/40 transition-all"
         >
-          <CoinIcon className="w-[26px] h-[26px]" />
-          <span className="text-lg font-bold text-mansion-gold tabular-nums">{user?.coins ?? 0}</span>
+          <CoinIcon className="w-4 h-4" />
+          <span className="text-sm font-bold text-mansion-gold tabular-nums">{user?.coins ?? 0}</span>
         </Link>
       </div>
     </motion.header>

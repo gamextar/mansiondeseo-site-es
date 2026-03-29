@@ -146,7 +146,14 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
           className="absolute left-4 right-20 z-20 lg:hidden"
           style={{ bottom: `${navBottomOffset + 8}px` }}
         >
-          <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="block text-left mb-1">
+          <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-1.5 mb-1">
+            <div className="w-10 h-10 rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
+              {story.avatar_url ? (
+                <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
+              )}
+            </div>
             <p className="text-white font-bold text-[15px] leading-tight drop-shadow-lg">@{story.username}</p>
           </button>
           {story.caption && (
@@ -211,15 +218,6 @@ function MobileActionButtons({ story, onFavorite, onToggleMute, isMuted, navigat
       <button onClick={onToggleMute} className="flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
-        </div>
-      </button>
-      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
-        <div className="w-14 h-14 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
-          {story.avatar_url ? (
-            <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
-          )}
         </div>
       </button>
     </>
