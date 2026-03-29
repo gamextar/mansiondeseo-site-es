@@ -84,6 +84,73 @@ async function apiFetch(path, options = {}) {
   return data;
 }
 
+async function apiUpload(path, options = {}) {
+  const token = getToken();
+  const headers = { ...options.headers };
+  const method = options.method || 'POST';
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const bodySize = typeof options.body?.byteLength === 'number' ? options.body.byteLength : 0;
+
+    xhr.open(method, `${API_BASE}${path}`);
+
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+
+    Object.entries(headers).forEach(([key, value]) => {
+      if (value != null) xhr.setRequestHeader(key, value);
+    });
+
+    xhr.upload.onprogress = (event) => {
+      if (!options.onProgress) return;
+      if (event.lengthComputable && event.total > 0) {
+        options.onProgress(event.loaded / event.total);
+        return;
+      }
+      if (bodySize > 0) {
+        options.onProgress(Math.min(1, event.loaded / bodySize));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('Error de red'));
+    };
+
+    xhr.onload = () => {
+      let data = {};
+
+      try {
+        data = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+      } catch {
+        reject(new Error('Respuesta inválida del servidor'));
+        return;
+      }
+
+      if (xhr.status === 401 && token) {
+        clearAuth();
+        window.location.href = '/bienvenida';
+        reject(new Error('Sesión expirada'));
+        return;
+      }
+
+      if (xhr.status < 200 || xhr.status >= 300) {
+        const err = new Error(data.error || 'Error del servidor');
+        err.status = xhr.status;
+        err.data = data;
+        reject(err);
+        return;
+      }
+
+      options.onProgress?.(1);
+      resolve(data);
+    };
+
+    xhr.send(options.body);
+  });
+}
+
 // ── Auth ────────────────────────────────────────────────
 
 export async function register({ email, password, username, role, seeking, interests, age, city, bio, country }) {
@@ -381,14 +448,16 @@ export async function getStories({ page = 1, limit = 100 } = {}) {
   return apiFetch(`/stories?${params}`);
 }
 
-export async function uploadStory(file, { caption = '' } = {}) {
+export async function uploadStory(file, { caption = '', onProgress } = {}) {
   const params = new URLSearchParams();
   if (caption) params.set('caption', caption);
   const qs = params.toString();
-  const data = await apiFetch(`/stories${qs ? `?${qs}` : ''}`, {
+  const body = await file.arrayBuffer();
+  const data = await apiUpload(`/stories${qs ? `?${qs}` : ''}`, {
     method: 'POST',
     headers: { 'Content-Type': file.type },
-    body: await file.arrayBuffer(),
+    body,
+    onProgress,
   });
   return data;
 }

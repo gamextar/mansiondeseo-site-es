@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, Clock, Download, Film, LoaderCircle, Play, Scissors, Upload, Wand2 } from 'lucide-react';
+import { CheckCircle2, Clock, Film, Upload, Wand2 } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
+import { uploadStory } from '../lib/api';
 
-const MAX_CLIP_SECONDS = 15;
 const LANDSCAPE_WIDTH = 1280;
 const LANDSCAPE_HEIGHT = 720;
 const PORTRAIT_WIDTH = 720;
@@ -62,8 +62,8 @@ function getOutputProfile(sourceResolution) {
 	};
 }
 
-function getFileStem(filename = 'clip') {
-	return filename.replace(/\.[^/.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '') || 'clip';
+function getFileStem(filename = 'story') {
+	return filename.replace(/\.[^/.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '') || 'story';
 }
 
 function parseFfmpegTime(message) {
@@ -73,36 +73,14 @@ function parseFfmpegTime(message) {
 	return Number(hh) * 3600 + Number(mm) * 60 + Number(ss);
 }
 
-async function downloadBlobUrl(url, mimeType, onProgress) {
+async function downloadBlobUrl(url, mimeType) {
 	const response = await fetch(url);
 	if (!response.ok) {
 		throw new Error(`No se pudo descargar ${url}`);
 	}
 
-	const total = Number(response.headers.get('content-length') || 0);
-	if (!response.body) {
-		const buffer = await response.arrayBuffer();
-		onProgress?.(1);
-		return URL.createObjectURL(new Blob([buffer], { type: mimeType }));
-	}
-
-	const reader = response.body.getReader();
-	const chunks = [];
-	let received = 0;
-
-	for (;;) {
-		const { done, value } = await reader.read();
-		if (done) break;
-		if (!value) continue;
-		chunks.push(value);
-		received += value.length;
-		if (total > 0) {
-			onProgress?.(received / total);
-		}
-	}
-
-	onProgress?.(1);
-	return URL.createObjectURL(new Blob(chunks, { type: mimeType }));
+	const buffer = await response.arrayBuffer();
+	return URL.createObjectURL(new Blob([buffer], { type: mimeType }));
 }
 
 export default function StoryUploadPage() {
@@ -110,37 +88,30 @@ export default function StoryUploadPage() {
 	const loadPromiseRef = useRef(null);
 	const videoRef = useRef(null);
 	const sourceUrlRef = useRef('');
-	const resultUrlRef = useRef('');
-	const activeSegmentDurationRef = useRef(0);
+	const resultPreviewUrlRef = useRef('');
+	const activeEncodeDurationRef = useRef(0);
 	const isTranscodingRef = useRef(false);
 	const timerIntervalRef = useRef(null);
 	const timerStartRef = useRef(0);
-	const trimmerRef = useRef(null);
-	const draggingRef = useRef(null);
 
-	const [processingProgress, setProcessingProgress] = useState(0);
+	const [encodingProgress, setEncodingProgress] = useState(0);
+	const [uploadProgress, setUploadProgress] = useState(0);
+	const [phase, setPhase] = useState('idle');
 	const [sourceFile, setSourceFile] = useState(null);
 	const [sourceUrl, setSourceUrl] = useState('');
 	const [sourceDuration, setSourceDuration] = useState(0);
 	const [sourceResolution, setSourceResolution] = useState(null);
-	const [clipStart, setClipStart] = useState(0);
-	const [clipEnd, setClipEnd] = useState(0);
-	const [thumbnails, setThumbnails] = useState([]);
 	const [processing, setProcessing] = useState(false);
 	const [result, setResult] = useState(null);
 	const [errorMessage, setErrorMessage] = useState('');
 	const [elapsedSeconds, setElapsedSeconds] = useState(0);
-	const [useCompactStoryTrimmer, setUseCompactStoryTrimmer] = useState(false);
 
-	const selectedDuration = clipEnd > clipStart ? clipEnd - clipStart : 0;
-	const segmentWidth = sourceDuration > 0 ? ((clipEnd - clipStart) / sourceDuration) * 100 : 0;
-	const segmentOffset = sourceDuration > 0 ? (clipStart / sourceDuration) * 100 : 0;
 	const outputProfile = getOutputProfile(sourceResolution);
-	const storyStep = result?.url ? 'done' : sourceFile ? 'trim' : 'pick';
-	const storyStepIndex = storyStep === 'pick' ? 0 : storyStep === 'trim' ? 1 : 2;
+	const storyStep = result?.id ? 'done' : sourceFile ? 'process' : 'pick';
+	const storyStepIndex = storyStep === 'pick' ? 0 : storyStep === 'process' ? 1 : 2;
 	const storySteps = [
 		{ id: 'pick', label: 'Elegir' },
-		{ id: 'trim', label: 'Recortar' },
+		{ id: 'process', label: 'Procesar' },
 		{ id: 'done', label: 'Lista' },
 	];
 
@@ -151,27 +122,20 @@ export default function StoryUploadPage() {
 	useEffect(() => {
 		const ffmpeg = ffmpegRef.current;
 
-		const handleProgress = () => {};
-
 		const handleLog = ({ message }) => {
-			if (isTranscodingRef.current) {
-				const elapsed = parseFfmpegTime(message);
-				if (elapsed !== null && activeSegmentDurationRef.current > 0) {
-					const pct = clamp(elapsed / activeSegmentDurationRef.current, 0, 0.99);
-					setProcessingProgress(pct);
-				}
-			}
+			if (!isTranscodingRef.current) return;
+			const elapsed = parseFfmpegTime(message);
+			if (elapsed === null || activeEncodeDurationRef.current <= 0) return;
+			setEncodingProgress(clamp(elapsed / activeEncodeDurationRef.current, 0, 0.99));
 		};
 
-		ffmpeg.on('progress', handleProgress);
 		ffmpeg.on('log', handleLog);
 
 		return () => {
-			ffmpeg.off('progress', handleProgress);
 			ffmpeg.off('log', handleLog);
 			ffmpeg.terminate();
 			if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
-			if (resultUrlRef.current) URL.revokeObjectURL(resultUrlRef.current);
+			if (resultPreviewUrlRef.current) URL.revokeObjectURL(resultPreviewUrlRef.current);
 			clearInterval(timerIntervalRef.current);
 		};
 	}, []);
@@ -179,87 +143,6 @@ export default function StoryUploadPage() {
 	useEffect(() => {
 		sourceUrlRef.current = sourceUrl;
 	}, [sourceUrl]);
-
-	useEffect(() => {
-		resultUrlRef.current = result?.url || '';
-	}, [result]);
-
-	useEffect(() => {
-		if (typeof window === 'undefined') return undefined;
-
-		const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
-		const smallViewportQuery = window.matchMedia('(max-width: 767px)');
-		const standaloneQuery = window.matchMedia('(display-mode: standalone)');
-
-		const syncCompactStoryTrimmer = () => {
-			setUseCompactStoryTrimmer(
-				coarsePointerQuery.matches ||
-				smallViewportQuery.matches ||
-				standaloneQuery.matches ||
-				window.navigator.standalone === true
-			);
-		};
-
-		syncCompactStoryTrimmer();
-
-		const subscribe = (query) => {
-			if (typeof query.addEventListener === 'function') {
-				query.addEventListener('change', syncCompactStoryTrimmer);
-				return () => query.removeEventListener('change', syncCompactStoryTrimmer);
-			}
-
-			query.addListener(syncCompactStoryTrimmer);
-			return () => query.removeListener(syncCompactStoryTrimmer);
-		};
-
-		const unsubscribers = [
-			subscribe(coarsePointerQuery),
-			subscribe(smallViewportQuery),
-			subscribe(standaloneQuery),
-		];
-
-		return () => {
-			unsubscribers.forEach((unsubscribe) => unsubscribe());
-		};
-	}, []);
-
-	useEffect(() => {
-		if (!sourceUrl || sourceDuration <= 0) {
-			setThumbnails([]);
-			return undefined;
-		}
-
-		let cancelled = false;
-		const video = document.createElement('video');
-		video.muted = true;
-		video.preload = 'auto';
-		video.src = sourceUrl;
-		const count = Math.min(20, Math.max(10, Math.ceil(sourceDuration / 1.5)));
-		const step = sourceDuration / count;
-		const canvas = document.createElement('canvas');
-		canvas.width = 80;
-		canvas.height = 56;
-		const ctx = canvas.getContext('2d');
-
-		video.onloadeddata = async () => {
-			if (!ctx) return;
-			const thumbs = [];
-			for (let index = 0; index < count; index += 1) {
-				if (cancelled) return;
-				video.currentTime = Math.min(index * step + 0.01, sourceDuration - 0.01);
-				await new Promise((resolve) => {
-					video.onseeked = resolve;
-				});
-				ctx.drawImage(video, 0, 0, 80, 56);
-				thumbs.push(canvas.toDataURL('image/jpeg', 0.4));
-			}
-			if (!cancelled) setThumbnails(thumbs);
-		};
-
-		return () => {
-			cancelled = true;
-		};
-	}, [sourceUrl, sourceDuration]);
 
 	const ensureEngineLoaded = async () => {
 		const ffmpeg = ffmpegRef.current;
@@ -270,28 +153,9 @@ export default function StoryUploadPage() {
 		}
 
 		loadPromiseRef.current = (async () => {
-			let coreJsProgress = 0;
-			let wasmProgress = 0;
-
-			const coreURL = await downloadBlobUrl(
-				`${FFMPEG_BASE_URL}/ffmpeg-core.js`,
-				'text/javascript',
-				(progress) => {
-					coreJsProgress = progress;
-				}
-			);
-
-			const wasmURL = await downloadBlobUrl(
-				`${FFMPEG_BASE_URL}/ffmpeg-core.wasm`,
-				'application/wasm',
-				(progress) => {
-					wasmProgress = progress;
-				}
-			);
-
-			if (coreJsProgress >= 0 || wasmProgress >= 0) {
-				await ffmpeg.load({ coreURL, wasmURL });
-			}
+			const coreURL = await downloadBlobUrl(`${FFMPEG_BASE_URL}/ffmpeg-core.js`, 'text/javascript');
+			const wasmURL = await downloadBlobUrl(`${FFMPEG_BASE_URL}/ffmpeg-core.wasm`, 'application/wasm');
+			await ffmpeg.load({ coreURL, wasmURL });
 		})();
 
 		try {
@@ -307,9 +171,9 @@ export default function StoryUploadPage() {
 	};
 
 	const resetResult = () => {
-		if (resultUrlRef.current) {
-			URL.revokeObjectURL(resultUrlRef.current);
-			resultUrlRef.current = '';
+		if (resultPreviewUrlRef.current) {
+			URL.revokeObjectURL(resultPreviewUrlRef.current);
+			resultPreviewUrlRef.current = '';
 		}
 		setResult(null);
 	};
@@ -324,10 +188,9 @@ export default function StoryUploadPage() {
 		setSourceUrl('');
 		setSourceDuration(0);
 		setSourceResolution(null);
-		setClipStart(0);
-		setClipEnd(0);
-		setThumbnails([]);
-		setProcessingProgress(0);
+		setEncodingProgress(0);
+		setUploadProgress(0);
+		setPhase('idle');
 		setErrorMessage('');
 	};
 
@@ -338,12 +201,12 @@ export default function StoryUploadPage() {
 
 		resetResult();
 		setErrorMessage('');
-		setClipStart(0);
-		setClipEnd(0);
 		setSourceDuration(0);
 		setSourceResolution(null);
 		setSourceFile(file);
-		setProcessingProgress(0);
+		setEncodingProgress(0);
+		setUploadProgress(0);
+		setPhase('idle');
 
 		const nextSourceUrl = URL.createObjectURL(file);
 		if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
@@ -355,185 +218,136 @@ export default function StoryUploadPage() {
 	const handleLoadedMetadata = () => {
 		const video = videoRef.current;
 		if (!video) return;
-		const duration = video.duration || 0;
-		setSourceDuration(duration);
+		setSourceDuration(video.duration || 0);
 		setSourceResolution(video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : null);
-		setClipStart(0);
-		setClipEnd(Math.min(duration, MAX_CLIP_SECONDS));
 	};
 
-	const syncPreviewToSelection = (nextStart) => {
-		const video = videoRef.current;
-		if (!video) return;
-		video.currentTime = nextStart;
-	};
+	const encodeStoryVideo = async () => {
+		const ffmpeg = await ensureEngineLoaded();
+		const inputExtension = sourceFile.name.split('.').pop()?.toLowerCase() || 'mp4';
+		const inputFileName = `input.${inputExtension}`;
+		const outputFileName = `${getFileStem(sourceFile.name)}-story.mp4`;
+		const safeDuration = Math.max(0.1, sourceDuration || 0.1);
 
-	const handleStartChange = (nextValue) => {
-		const nextStart = clamp(Number(nextValue), 0, Math.max(0, sourceDuration - 1));
-		const nextEnd = Math.min(sourceDuration, nextStart + MAX_CLIP_SECONDS);
-		setClipStart(nextStart);
-		setClipEnd(nextEnd);
-		syncPreviewToSelection(nextStart);
-	};
+		activeEncodeDurationRef.current = safeDuration;
 
-	const handleUseCurrentTime = () => {
-		const video = videoRef.current;
-		if (!video) return;
-		handleStartChange(video.currentTime || 0);
-	};
+		try { await ffmpeg.deleteFile(inputFileName); } catch {}
+		try { await ffmpeg.deleteFile(outputFileName); } catch {}
 
-	const handlePreviewSegment = async () => {
-		const video = videoRef.current;
-		if (!video) return;
-		video.currentTime = clipStart;
-		try {
-			await video.play();
-		} catch {
-			// Ignore autoplay restrictions.
-		}
-	};
+		const inputData = await fetchFile(sourceFile);
+		await ffmpeg.writeFile(inputFileName, inputData);
 
-	const handlePreviewTimeUpdate = () => {
-		const video = videoRef.current;
-		if (!video || clipEnd <= clipStart) return;
-		if (video.currentTime >= clipEnd) {
-			video.currentTime = clipStart;
-			if (!video.paused) {
-				video.play().catch(() => {});
-			}
-		}
-	};
+		const sharedArgs = [
+			'-i', inputFileName,
+			'-vf', `${outputProfile.scaleFilter},setsar=1`,
+			'-movflags', '+faststart',
+		];
 
-	const onHandlePointerDown = (event, handle) => {
-		event.preventDefault();
-		draggingRef.current = handle;
-		event.currentTarget.setPointerCapture(event.pointerId);
-	};
+		let exitCode = await ffmpeg.exec([
+			...sharedArgs,
+			'-c:v', 'libx264',
+			'-threads', '4',
+			'-x264-params', 'sliced-threads=1:threads=4',
+			'-crf', STORY_PRESET.crf,
+			'-maxrate', STORY_PRESET.maxrate,
+			'-bufsize', STORY_PRESET.bufsize,
+			'-preset', STORY_PRESET.preset,
+			'-pix_fmt', 'yuv420p',
+			'-c:a', 'aac',
+			'-b:a', STORY_PRESET.audioBitrate,
+			...(STORY_PRESET.audioMono ? ['-ac', '1'] : []),
+			outputFileName,
+		]);
 
-	const onHandlePointerMove = (event) => {
-		const handle = draggingRef.current;
-		if (!handle) return;
-		const element = trimmerRef.current;
-		if (!element || sourceDuration <= 0) return;
-		const rect = element.getBoundingClientRect();
-		const frac = clamp((event.clientX - rect.left) / rect.width, 0, 1);
-		const time = frac * sourceDuration;
-		if (handle === 'left') {
-			const minStart = Math.max(0, clipEnd - MAX_CLIP_SECONDS);
-			const newStart = clamp(time, minStart, clipEnd - 0.5);
-			setClipStart(newStart);
-			syncPreviewToSelection(newStart);
-			return;
+		if (exitCode !== 0) {
+			try { await ffmpeg.deleteFile(outputFileName); } catch {}
+			exitCode = await ffmpeg.exec([
+				...sharedArgs,
+				'-c:v', 'mpeg4',
+				'-q:v', '4',
+				'-c:a', 'aac',
+				'-b:a', STORY_PRESET.audioBitrate,
+				...(STORY_PRESET.audioMono ? ['-ac', '1'] : []),
+				outputFileName,
+			]);
 		}
 
-		const maxEnd = Math.min(sourceDuration, clipStart + MAX_CLIP_SECONDS);
-		const newEnd = clamp(time, clipStart + 0.5, maxEnd);
-		setClipEnd(newEnd);
-		if (videoRef.current) videoRef.current.currentTime = newEnd;
+		if (exitCode !== 0) {
+			throw new Error('FFmpeg no pudo generar el MP4 final.');
+		}
+
+		const data = await ffmpeg.readFile(outputFileName);
+		const outputBlob = new Blob([data], { type: 'video/mp4' });
+		const previewUrl = URL.createObjectURL(outputBlob);
+		const encodedFile = new File([outputBlob], outputFileName, { type: 'video/mp4' });
+
+		try { await ffmpeg.deleteFile(inputFileName); } catch {}
+		try { await ffmpeg.deleteFile(outputFileName); } catch {}
+
+		return {
+			file: encodedFile,
+			previewUrl,
+			fileName: outputFileName,
+			sizeLabel: `${(outputBlob.size / (1024 * 1024)).toFixed(2)} MB`,
+			duration: sourceDuration || 0,
+		};
 	};
 
-	const onHandlePointerUp = () => {
-		draggingRef.current = null;
-	};
-
-	const transcodeVideo = async () => {
+	const processAndUploadStory = async () => {
 		if (!sourceFile) {
 			setErrorMessage('Primero sube un video.');
 			return;
 		}
 
 		try {
-			const ffmpeg = await ensureEngineLoaded();
 			resetResult();
 			setErrorMessage('');
 			setProcessing(true);
+			setPhase('encoding');
 			isTranscodingRef.current = true;
-			setProcessingProgress(0);
+			setEncodingProgress(0);
+			setUploadProgress(0);
 			setElapsedSeconds(0);
 			timerStartRef.current = performance.now();
 			timerIntervalRef.current = setInterval(() => {
 				setElapsedSeconds(Math.floor((performance.now() - timerStartRef.current) / 1000));
 			}, 500);
 
-			const inputExtension = sourceFile.name.split('.').pop()?.toLowerCase() || 'mp4';
-			const inputFileName = `input.${inputExtension}`;
-			const outputFileName = `${getFileStem(sourceFile.name)}-720p-15s.mp4`;
-			const segmentDuration = Math.max(0.1, clipEnd - clipStart);
-			activeSegmentDurationRef.current = segmentDuration;
-
-			try { await ffmpeg.deleteFile(inputFileName); } catch {}
-			try { await ffmpeg.deleteFile(outputFileName); } catch {}
-
-			const inputData = await fetchFile(sourceFile);
-			await ffmpeg.writeFile(inputFileName, inputData);
-
-			const sharedArgs = [
-				'-ss', clipStart.toFixed(2),
-				'-t', segmentDuration.toFixed(2),
-				'-i', inputFileName,
-				'-vf', `${outputProfile.scaleFilter},setsar=1`,
-				'-movflags', '+faststart',
-			];
-
-			let exitCode = await ffmpeg.exec([
-				...sharedArgs,
-				'-c:v', 'libx264',
-				'-threads', '4',
-				'-x264-params', 'sliced-threads=1:threads=4',
-				'-crf', STORY_PRESET.crf,
-				'-maxrate', STORY_PRESET.maxrate,
-				'-bufsize', STORY_PRESET.bufsize,
-				'-preset', STORY_PRESET.preset,
-				'-pix_fmt', 'yuv420p',
-				'-c:a', 'aac',
-				'-b:a', STORY_PRESET.audioBitrate,
-				...(STORY_PRESET.audioMono ? ['-ac', '1'] : []),
-				outputFileName,
-			]);
-
-			if (exitCode !== 0) {
-				try { await ffmpeg.deleteFile(outputFileName); } catch {}
-				exitCode = await ffmpeg.exec([
-					...sharedArgs,
-					'-c:v', 'mpeg4',
-					'-q:v', '4',
-					'-c:a', 'aac',
-					'-b:a', STORY_PRESET.audioBitrate,
-					...(STORY_PRESET.audioMono ? ['-ac', '1'] : []),
-					outputFileName,
-				]);
-			}
-
-			if (exitCode !== 0) {
-				throw new Error('FFmpeg no pudo generar el MP4 final.');
-			}
-
-			const data = await ffmpeg.readFile(outputFileName);
-			const outputBlob = new Blob([data], { type: 'video/mp4' });
-			const outputUrl = URL.createObjectURL(outputBlob);
+			const encoded = await encodeStoryVideo();
 			const processingElapsedSeconds = (performance.now() - timerStartRef.current) / 1000;
 
-			setProcessingProgress(1);
-			setResult({
-				url: outputUrl,
-				fileName: outputFileName,
-				sizeLabel: `${(outputBlob.size / (1024 * 1024)).toFixed(2)} MB`,
-				duration: segmentDuration,
-				processingTimeLabel: formatElapsedSeconds(processingElapsedSeconds),
+			resultPreviewUrlRef.current = encoded.previewUrl;
+			setEncodingProgress(1);
+			setPhase('uploading');
+
+			const story = await uploadStory(encoded.file, {
+				onProgress: (progress) => setUploadProgress(clamp(progress, 0, 1)),
 			});
 
-			try { await ffmpeg.deleteFile(inputFileName); } catch {}
-			try { await ffmpeg.deleteFile(outputFileName); } catch {}
+			setUploadProgress(1);
+			setPhase('done');
+			setResult({
+				...story,
+				previewUrl: encoded.previewUrl,
+				fileName: encoded.fileName,
+				sizeLabel: encoded.sizeLabel,
+				duration: encoded.duration,
+				processingTimeLabel: formatElapsedSeconds(processingElapsedSeconds),
+			});
 		} catch (error) {
-			setErrorMessage(error?.message || 'No se pudo convertir el video.');
+			setErrorMessage(error?.message || 'No se pudo publicar la historia.');
+			setPhase('idle');
 		} finally {
 			clearInterval(timerIntervalRef.current);
 			timerIntervalRef.current = null;
 			setProcessing(false);
 			isTranscodingRef.current = false;
-			activeSegmentDurationRef.current = 0;
+			activeEncodeDurationRef.current = 0;
 		}
 	};
+
+	const progressValue = phase === 'uploading' ? uploadProgress : encodingProgress;
+	const progressLabel = phase === 'uploading' ? 'Verificando historia' : 'Encoding';
 
 	return (
 		<div className="min-h-screen bg-mansion-base text-text-primary relative overflow-hidden">
@@ -581,8 +395,8 @@ export default function StoryUploadPage() {
 								<Film className="w-9 h-9 text-mansion-gold" />
 							</motion.div>
 							<h1 className="font-display text-2xl sm:text-3xl font-bold text-text-primary">Nueva Historia</h1>
-							<p className="text-text-muted mt-2 mb-4 max-w-sm">Por favor seleccioná tu video para crear una historia.</p>
-							<p className="text-sm text-text-dim max-w-md mb-8">Después vas a poder elegir qué tramo de hasta 15 segundos querés publicar.</p>
+							<p className="text-text-muted mt-2 mb-4 max-w-sm">Seleccioná tu video para publicarlo como historia.</p>
+							<p className="text-sm text-text-dim max-w-md mb-8">Ya no recortamos clips. Tomamos el video completo, lo optimizamos y luego lo publicamos.</p>
 							<label className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors cursor-pointer shadow-[0_12px_30px_rgba(212,175,55,0.18)]">
 								<Upload className="w-5 h-5" />
 								Seleccionar video
@@ -591,9 +405,9 @@ export default function StoryUploadPage() {
 						</motion.section>
 					)}
 
-					{storyStep === 'trim' && (
+					{storyStep === 'process' && (
 						<motion.section
-							key="trim"
+							key="process"
 							initial={{ opacity: 0, y: 24 }}
 							animate={{ opacity: 1, y: 0 }}
 							exit={{ opacity: 0, y: -20 }}
@@ -618,8 +432,8 @@ export default function StoryUploadPage() {
 									})}
 								</div>
 								<div className="text-center">
-									<h2 className="font-display text-2xl font-semibold text-text-primary">Ajustá tu historia</h2>
-									<p className="text-sm text-text-muted mt-1">Elegí el tramo que querés publicar y después convertí.</p>
+									<h2 className="font-display text-2xl font-semibold text-text-primary">Prepará tu historia</h2>
+									<p className="text-sm text-text-muted mt-1">Se va a procesar el video completo y luego se publicará en tu feed de historias.</p>
 								</div>
 							</div>
 
@@ -633,7 +447,6 @@ export default function StoryUploadPage() {
 										preload="metadata"
 										className="w-full h-full object-contain"
 										onLoadedMetadata={handleLoadedMetadata}
-										onTimeUpdate={handlePreviewTimeUpdate}
 									/>
 								)}
 								<div className="absolute left-4 bottom-4 right-4 flex items-center justify-between gap-3 pointer-events-none">
@@ -649,134 +462,25 @@ export default function StoryUploadPage() {
 							</div>
 
 							<div className="p-6 sm:p-8">
-								<motion.div
-									initial={{ opacity: 0, y: 12 }}
-									animate={{ opacity: 1, y: 0 }}
-									transition={{ delay: 0.08, duration: 0.28, ease: 'easeOut' }}
-									style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-								>
-									<div className="flex items-start justify-between gap-4 mb-4">
-										<div className="flex items-start gap-2">
-											<Scissors className="w-4 h-4 text-mansion-gold mt-0.5 shrink-0" />
-											<p className="text-sm text-text-muted">
-												Podés seleccionar la parte del video que deseas publicar <span className="text-text-dim">(opcional)</span>
-											</p>
-										</div>
-										<button
-											type="button"
-											onClick={handlePreviewSegment}
-											disabled={!sourceUrl}
-											className="shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 border border-white/10 text-text-primary hover:border-mansion-gold/30 disabled:opacity-50 transition-colors"
-										>
-											<Play className="w-4 h-4" />
-											Ver
-										</button>
+								<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+									<div className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-left">
+										<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Resolución original</p>
+										<p className="text-text-primary mt-1">{sourceResolution ? `${sourceResolution.width}x${sourceResolution.height}` : 'Detectando...'}</p>
 									</div>
-
-									{useCompactStoryTrimmer ? (
-										<div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-											<div className="flex items-center justify-between gap-3 mb-3 text-xs">
-												<span className="text-text-dim">Arrastrá para elegir el inicio</span>
-												<button
-													type="button"
-													onClick={handleUseCurrentTime}
-													disabled={!sourceUrl}
-													className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 border border-white/10 text-text-primary hover:border-mansion-gold/30 disabled:opacity-50 transition-colors"
-												>
-													<Scissors className="w-3.5 h-3.5" />
-													Usar tiempo actual
-												</button>
-											</div>
-											<input
-												type="range"
-												min="0"
-												max={Math.max(0, sourceDuration - Math.min(MAX_CLIP_SECONDS, sourceDuration))}
-												step="0.1"
-												value={clipStart}
-												onChange={(event) => handleStartChange(event.target.value)}
-												className="w-full accent-mansion-gold"
-											/>
-											<div className="mt-4 rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
-												<div className="flex items-center justify-between gap-3 text-xs text-text-dim">
-													<span>Inicio {formatTime(clipStart)}</span>
-													<span>Fin {formatTime(clipEnd)}</span>
-												</div>
-												<div className="mt-3 h-2 rounded-full bg-black/30 overflow-hidden">
-													<div
-														className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light"
-														style={{ marginLeft: `${segmentOffset}%`, width: `${Math.max(segmentWidth, 8)}%` }}
-													/>
-												</div>
-											</div>
-											<p className="text-xs text-text-dim mt-3">En móvil/PWA usamos un recorte compacto para evitar problemas con previews y thumbnails.</p>
-										</div>
-									) : (
-										<div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-3">
-											<div ref={trimmerRef} className="relative h-[64px] rounded-xl bg-black/40 overflow-hidden select-none touch-none">
-												<div className="absolute inset-0 flex">
-													{thumbnails.length > 0
-														? thumbnails.map((src, index) => (
-																<img key={src + index} src={src} alt="" className="h-full flex-1 object-cover" draggable={false} />
-															))
-														: sourceUrl && (
-																<div className="flex-1 flex items-center justify-center text-text-dim text-xs">
-																	<LoaderCircle className="w-4 h-4 animate-spin mr-2" />
-																	Generando vista previa…
-																</div>
-															)}
-												</div>
-												<div className="absolute inset-y-0 left-0 bg-black/60 pointer-events-none" style={{ width: `${segmentOffset}%` }} />
-												<div className="absolute inset-y-0 right-0 bg-black/60 pointer-events-none" style={{ width: `${Math.max(0, 100 - segmentOffset - segmentWidth)}%` }} />
-												<div className="absolute inset-y-0 pointer-events-none" style={{ left: `${segmentOffset}%`, width: `${segmentWidth}%` }}>
-													<div className="absolute top-0 left-3.5 right-3.5 h-[3px] bg-mansion-gold" />
-													<div className="absolute bottom-0 left-3.5 right-3.5 h-[3px] bg-mansion-gold" />
-												</div>
-												<div
-													className="absolute inset-y-0 z-10 cursor-ew-resize"
-													style={{ left: `calc(${segmentOffset}% - 6px)`, width: '20px' }}
-													onPointerDown={(event) => onHandlePointerDown(event, 'left')}
-													onPointerMove={onHandlePointerMove}
-													onPointerUp={onHandlePointerUp}
-												>
-													<div className="absolute inset-y-0 right-0 w-3.5 bg-mansion-gold rounded-l-lg flex items-center justify-center">
-														<div className="w-[2px] h-5 rounded-full bg-mansion-base/40" />
-													</div>
-												</div>
-												<div
-													className="absolute inset-y-0 z-10 cursor-ew-resize"
-													style={{ left: `calc(${segmentOffset + segmentWidth}% - 14px)`, width: '20px' }}
-													onPointerDown={(event) => onHandlePointerDown(event, 'right')}
-													onPointerMove={onHandlePointerMove}
-													onPointerUp={onHandlePointerUp}
-												>
-													<div className="absolute inset-y-0 left-0 w-3.5 bg-mansion-gold rounded-r-lg flex items-center justify-center">
-														<div className="w-[2px] h-5 rounded-full bg-mansion-base/40" />
-													</div>
-												</div>
-											</div>
-										</div>
-									)}
-
-									<div className="grid grid-cols-3 gap-3 mt-3 text-xs">
-										<div className="rounded-2xl bg-white/5 border border-white/10 px-3 py-2 text-left">
-											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Inicio</p>
-											<p className="text-text-primary mt-1">{formatTime(clipStart)}</p>
-										</div>
-										<div className="rounded-2xl bg-mansion-gold/10 border border-mansion-gold/20 px-3 py-2 text-center">
-											<p className="text-[10px] uppercase tracking-[0.18em] text-mansion-gold/80">Clip</p>
-											<p className="text-mansion-gold font-semibold mt-1">{selectedDuration > 0 ? `${selectedDuration.toFixed(1)}s` : '—'}</p>
-										</div>
-										<div className="rounded-2xl bg-white/5 border border-white/10 px-3 py-2 text-right">
-											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Fin</p>
-											<p className="text-text-primary mt-1">{formatTime(clipEnd)}</p>
-										</div>
+									<div className="rounded-2xl bg-mansion-gold/10 border border-mansion-gold/20 px-4 py-3 text-center">
+										<p className="text-[10px] uppercase tracking-[0.18em] text-mansion-gold/80">Salida</p>
+										<p className="text-mansion-gold font-semibold mt-1">{outputProfile.label}</p>
 									</div>
-								</motion.div>
+									<div className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-right">
+										<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Flujo</p>
+										<p className="text-text-primary mt-1">Encode → Publicación</p>
+									</div>
+								</div>
 
 								<motion.div
 									initial={{ opacity: 0, y: 12 }}
 									animate={{ opacity: 1, y: 0 }}
-									transition={{ delay: 0.14, duration: 0.28, ease: 'easeOut' }}
+									transition={{ delay: 0.12, duration: 0.28, ease: 'easeOut' }}
 									style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
 									className="mt-6"
 								>
@@ -784,30 +488,47 @@ export default function StoryUploadPage() {
 										<div className="space-y-3">
 											<button
 												type="button"
-												onClick={transcodeVideo}
-												disabled={!selectedDuration}
-												className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light disabled:opacity-60 transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
+												onClick={processAndUploadStory}
+												className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
 											>
 												<Wand2 className="w-5 h-5" />
-												Crear historia
+												Publicar historia
 											</button>
-											<p className="text-xs text-text-dim text-center">La conversión ocurre en tu navegador. No se sube el video al servidor.</p>
+											<p className="text-xs text-text-dim text-center">Primero optimizamos el video en el navegador y después lo subimos a tu historia con progreso real.</p>
 										</div>
 									) : (
-										<div className="space-y-3 rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-4">
-											<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
-												<div className="h-3 bg-white/5">
-													<div
-														className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300"
-														style={{ width: `${Math.round(processingProgress * 100)}%` }}
-													/>
+										<div className="space-y-4 rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-4">
+											<div className="space-y-2">
+												<div className="flex items-center justify-between text-sm">
+													<span className="text-text-muted">Encoding</span>
+													<span className="font-semibold text-mansion-gold tabular-nums">{Math.round(encodingProgress * 100)}%</span>
+												</div>
+												<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
+													<div className="h-3 bg-white/5">
+														<div className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${Math.round(encodingProgress * 100)}%` }} />
+													</div>
 												</div>
 											</div>
-											<div className="flex items-center justify-between text-sm">
-												<span className="text-text-muted">Creando tu historia…</span>
-												<span className="font-semibold text-mansion-gold tabular-nums">{Math.round(processingProgress * 100)}%</span>
-											</div>
-											<p className="text-xs text-text-dim">Mientras se procesa mantenemos las animaciones al mínimo para no competir con el encode.</p>
+
+											{phase !== 'encoding' && (
+												<div className="space-y-2">
+													<div className="flex items-center justify-between text-sm">
+														<span className="text-text-muted">Verificando historia</span>
+														<span className="font-semibold text-mansion-gold tabular-nums">{Math.round(uploadProgress * 100)}%</span>
+													</div>
+													<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
+														<div className="h-3 bg-white/5">
+															<div className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${Math.round(uploadProgress * 100)}%` }} />
+														</div>
+													</div>
+												</div>
+											)}
+
+											<p className="text-xs text-text-dim">
+												{phase === 'encoding'
+													? 'Optimando el video para la historia.'
+													: 'Subiendo la historia al servidor y validando la publicación.'}
+											</p>
 										</div>
 									)}
 								</motion.div>
@@ -844,7 +565,7 @@ export default function StoryUploadPage() {
 								</div>
 							</div>
 							<div className="aspect-video bg-black">
-								<video src={result.url} controls playsInline className="w-full h-full object-contain" />
+								<video src={result.video_url || result.previewUrl} controls playsInline className="w-full h-full object-contain" />
 							</div>
 
 							<div className="p-6 sm:p-8 text-center">
@@ -857,19 +578,20 @@ export default function StoryUploadPage() {
 								>
 									<CheckCircle2 className="w-7 h-7 text-green-400" />
 								</motion.div>
-								<h2 className="font-display text-2xl font-bold text-text-primary">¡Tu historia está lista!</h2>
+								<h2 className="font-display text-2xl font-bold text-text-primary">¡Tu historia fue publicada!</h2>
 								<p className="text-text-muted mt-1 mb-6 text-sm">
-									{result.sizeLabel} · {result.duration.toFixed(1)}s · procesado en {result.processingTimeLabel}
+									{result.sizeLabel} · {result.duration > 0 ? `${result.duration.toFixed(1)}s` : 'duración original'} · procesado en {result.processingTimeLabel}
 								</p>
 
 								<div className="flex flex-col gap-3">
 									<a
-										href={result.url}
-										download={result.fileName}
+										href={result.video_url}
+										target="_blank"
+										rel="noreferrer"
 										className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
 									>
-										<Download className="w-5 h-5" />
-										Descargar historia
+										<Film className="w-5 h-5" />
+										Abrir historia publicada
 									</a>
 									<button
 										type="button"
@@ -890,13 +612,13 @@ export default function StoryUploadPage() {
 				<div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl bg-black/88 border border-white/10 shadow-2xl">
 					<Clock className="w-5 h-5 text-mansion-gold" />
 					<div>
-						<p className="text-[10px] uppercase tracking-[0.2em] text-text-dim">Tiempo de conversión</p>
+						<p className="text-[10px] uppercase tracking-[0.2em] text-text-dim">{progressLabel}</p>
 						<p className="text-2xl font-display font-bold text-text-primary tabular-nums">
 							{String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}
 						</p>
 					</div>
 					<div className="ml-2 text-right">
-						<p className="text-lg font-bold text-mansion-gold tabular-nums">{Math.round(processingProgress * 100)}%</p>
+						<p className="text-lg font-bold text-mansion-gold tabular-nums">{Math.round(progressValue * 100)}%</p>
 					</div>
 				</div>
 			)}
