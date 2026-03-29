@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift } from 'lucide-react';
@@ -20,6 +20,59 @@ function timeAgo(dateStr) {
 
 // ── Avatar size fallback; real value comes from siteSettings.videoAvatarSize ─
 const AVATAR_SIZE_DEFAULT = 52;
+
+// ── Floating hearts burst animation ──────────────────────────────────────────
+function HeartBurst({ trigger }) {
+  const [particles, setParticles] = useState([]);
+  const prevTrigger = useRef(0);
+
+  useEffect(() => {
+    if (trigger <= prevTrigger.current) return;
+    prevTrigger.current = trigger;
+    const count = 10;
+    const now = Date.now();
+    const next = Array.from({ length: count }, (_, i) => ({
+      id: `${now}-${i}`,
+      x: (Math.random() - 0.5) * 110,
+      y: -(60 + Math.random() * 120),
+      scale: 0.6 + Math.random() * 1.0,
+      rotate: (Math.random() - 0.5) * 60,
+      delay: i * 40,
+      dur: 700 + Math.random() * 400,
+    }));
+    setParticles(p => [...p, ...next]);
+    setTimeout(() => setParticles(p => p.filter(x => !next.find(n => n.id === x.id))), 1600);
+  }, [trigger]);
+
+  if (!particles.length) return null;
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-visible" style={{ zIndex: 50 }}>
+      {particles.map(p => (
+        <div
+          key={p.id}
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%,-50%)',
+            animation: `hburst-${p.id} ${p.dur}ms ease-out ${p.delay}ms forwards`,
+          }}
+        >
+          <style>{`
+            @keyframes hburst-${p.id} {
+              0%   { transform: translate(-50%,-50%) translate(0px,0px) scale(0.2) rotate(${p.rotate}deg); opacity:1; }
+              60%  { opacity:1; }
+              100% { transform: translate(-50%,-50%) translate(${p.x}px,${p.y}px) scale(${p.scale}) rotate(${p.rotate * 2}deg); opacity:0; }
+            }
+          `}</style>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#ef4444">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset, avatarSize }) {
   const videoRef = useRef(null);
@@ -201,11 +254,19 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, onFavorite, isMuted,
 }
 
 function MobileActionButtons({ story, onFavorite, onToggleMute, isMuted, navigate }) {
+  const [burstTrigger, setBurstTrigger] = useState(0);
+
+  const handleHeart = () => {
+    setBurstTrigger(t => t + 1);
+    onFavorite(story.user_id);
+  };
+
   return (
     <>
-      <button onClick={() => onFavorite(story.user_id)} className="flex flex-col items-center">
-        <div className={`rounded-full flex items-center justify-center ${story.favorited ? 'bg-mansion-crimson/25' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
-          <Heart className={`w-7 h-7 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
+      <button onClick={handleHeart} className="flex flex-col items-center relative">
+        <HeartBurst trigger={burstTrigger} />
+        <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.favorited ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
+          <Heart className={`w-7 h-7 transition-all duration-150 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
         </div>
       </button>
       <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center">
@@ -228,11 +289,19 @@ function MobileActionButtons({ story, onFavorite, onToggleMute, isMuted, navigat
 }
 
 function DesktopActionButtons({ story, onFavorite, navigate }) {
+  const [burstTrigger, setBurstTrigger] = useState(0);
+
+  const handleHeart = () => {
+    setBurstTrigger(t => t + 1);
+    onFavorite(story.user_id);
+  };
+
   return (
     <>
-      <button onClick={() => onFavorite(story.user_id)} className="flex flex-col items-center group">
+      <button onClick={handleHeart} className="flex flex-col items-center group relative">
+        <HeartBurst trigger={burstTrigger} />
         <div className={`rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-110 ${story.favorited ? 'bg-mansion-crimson/25 group-hover:bg-mansion-crimson/40' : 'bg-mansion-card/60 border border-white/10 group-hover:bg-mansion-card/90 group-hover:border-white/25'}`} style={{ width: 72, height: 72 }}>
-          <Heart className={`w-9 h-9 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
+          <Heart className={`w-9 h-9 transition-all duration-150 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
         </div>
       </button>
       <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center group">
@@ -412,13 +481,21 @@ export default function VideoFeedPage() {
   }, [activeDispIdx, settleInfiniteBoundary, stories.length]);
 
   const handleFavorite = useCallback(async (userId) => {
+    // Optimistic: flip immediately
+    setStories(prev => prev.map(s =>
+      s.user_id === userId ? { ...s, favorited: !s.favorited } : s
+    ));
     try {
       const data = await toggleFavorite(userId);
+      // Sync with server truth
       setStories(prev => prev.map(s =>
         s.user_id === userId ? { ...s, favorited: data.favorited } : s
       ));
     } catch {
-      // Silently fail
+      // Revert on failure
+      setStories(prev => prev.map(s =>
+        s.user_id === userId ? { ...s, favorited: !s.favorited } : s
+      ));
     }
   }, []);
 
