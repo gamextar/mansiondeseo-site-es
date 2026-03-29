@@ -737,11 +737,7 @@ export default function VideoFeedPage() {
           className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
           style={{ bottom: `${navBottomOffset + 8}px` }}
         >
-          <MobileOverlayButton
-            onPress={() => navigate(`/perfiles/${activeStory.user_id}`, { state: { from: '/videos' } })}
-            scrollContainerRef={containerRef}
-            className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1"
-          >
+          <div className="pointer-events-none flex flex-col items-start gap-2.5 mb-1">
             <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
               {activeStory.avatar_url ? (
                 <AvatarImg src={activeStory.avatar_url} crop={activeStory.avatar_crop} alt={activeStory.username} className="w-full h-full" />
@@ -750,7 +746,7 @@ export default function VideoFeedPage() {
               )}
             </div>
             <p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{activeStory.username}</p>
-          </MobileOverlayButton>
+          </div>
         </div>
       )}
 
