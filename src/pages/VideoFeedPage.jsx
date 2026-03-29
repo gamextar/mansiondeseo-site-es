@@ -22,6 +22,7 @@ function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggle
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
   const wasActiveRef = useRef(isActive);
   const navigate = useNavigate();
 
@@ -33,11 +34,13 @@ function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggle
       // Only reset to start when RE-entering (not on initial mount where autoPlay handles it)
       if (wasActiveRef.current === false) {
         video.currentTime = 0;
+        setVideoReady(false);
       }
       video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     } else {
       video.pause();
       setIsPlaying(false);
+      setVideoReady(false);
     }
     wasActiveRef.current = isActive;
   }, [isActive]);
@@ -76,7 +79,7 @@ function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggle
         <video
           ref={videoRef}
           src={story.video_url}
-          className="absolute inset-0 w-full h-full object-cover"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${videoReady ? 'opacity-100' : 'opacity-0'}`}
           style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
           loop
           autoPlay={isActive}
@@ -85,7 +88,23 @@ function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggle
           preload={preloadMode}
           onClick={togglePlay}
           onEnded={handleVideoEnd}
+          onLoadedData={() => setVideoReady(true)}
         />
+
+        {/* Loading placeholder — shown while first frame decodes */}
+        {!videoReady && (
+          <div className="absolute inset-0 flex items-center justify-center z-[5]">
+            <div className="absolute inset-0 bg-gradient-to-b from-mansion-base/90 via-black/80 to-mansion-base/90" />
+            {story.avatar_url && (
+              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-white/20 shadow-lg z-10 opacity-60">
+                <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
+              </div>
+            )}
+            <div className="absolute bottom-1/2 translate-y-16">
+              <div className="w-6 h-6 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+            </div>
+          </div>
+        )}
 
         {/* Play/Pause overlay */}
         <AnimatePresence>
