@@ -298,6 +298,7 @@ export default function VideoFeedPage() {
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
   const [activeDispIdx, setActiveDispIdx] = useState(savedIdx);
+  const [visibleDispIdx, setVisibleDispIdx] = useState(savedIdx);
   const [isMuted, setIsMuted] = useState(savedMuted);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
@@ -435,6 +436,7 @@ export default function VideoFeedPage() {
       container.style.scrollSnapType = 'none';
       container.scrollTop = stories.length * height;
       setActiveDispIdx(stories.length);
+      setVisibleDispIdx(stories.length);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (containerRef.current) {
@@ -451,6 +453,7 @@ export default function VideoFeedPage() {
       container.style.scrollSnapType = 'none';
       container.scrollTop = height;
       setActiveDispIdx(1);
+      setVisibleDispIdx(1);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (containerRef.current) {
@@ -480,8 +483,12 @@ export default function VideoFeedPage() {
     if (!container || isJumpingRef.current) return;
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
+    const boundedVisibleIndex = Math.max(0, Math.min(rawIndex, stories.length + 1));
 
-    // Keep the previous active item while on edge clones to avoid visible jump glitches.
+    if (boundedVisibleIndex !== visibleDispIdx) {
+      setVisibleDispIdx(boundedVisibleIndex);
+    }
+
     if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
       setActiveDispIdx(rawIndex);
     }
@@ -491,7 +498,7 @@ export default function VideoFeedPage() {
     scrollEndTimer.current = setTimeout(() => {
       settleInfiniteBoundary();
     }, 180);
-  }, [activeDispIdx, stories.length, settleInfiniteBoundary]);
+  }, [activeDispIdx, settleInfiniteBoundary, stories.length, visibleDispIdx]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
@@ -593,11 +600,11 @@ export default function VideoFeedPage() {
       >
         {infiniteStories.map((story, displayIndex) => (
           <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
-            {Math.abs(displayIndex - activeDispIdx) <= STORY_WINDOW_RADIUS ? (
+            {Math.abs(displayIndex - visibleDispIdx) <= STORY_WINDOW_RADIUS ? (
               <StoryCard
                 story={story}
                 videoSrc={story.video_url}
-                isActive={displayIndex === activeDispIdx}
+                isActive={displayIndex === visibleDispIdx}
                 onFavorite={handleFavorite}
                 isMuted={isMuted}
                 onToggleMute={() => setIsMuted(m => !m)}
