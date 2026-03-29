@@ -248,6 +248,7 @@ export default function VideoFeedPage() {
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
+  const jumpUnlockTimer = useRef(null);
   const lastDesktopWheelAtRef = useRef(0);
 
   const cachedStories = () => {
@@ -325,7 +326,10 @@ export default function VideoFeedPage() {
     try { sessionStorage.setItem('vf_muted', isMuted ? '1' : '0'); } catch {}
   }, [isMuted]);
 
-  useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
+  useEffect(() => () => {
+    clearTimeout(scrollEndTimer.current);
+    clearTimeout(jumpUnlockTimer.current);
+  }, []);
 
   const settleInfiniteBoundary = useCallback(() => {
     const container = containerRef.current;
@@ -334,33 +338,31 @@ export default function VideoFeedPage() {
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
 
-    if (rawIndex === 0) {
-      isJumpingRef.current = true;
-      container.style.scrollSnapType = 'none';
-      container.scrollTop = stories.length * height;
-      setActiveDispIdx(stories.length);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (containerRef.current) {
-            containerRef.current.style.scrollSnapType = 'y mandatory';
-          }
-          isJumpingRef.current = false;
-        });
-      });
-      return;
-    }
+    if (rawIndex === 0 || rawIndex >= stories.length + 1) {
+      // Cancel any pending fallback timer before jumping
+      clearTimeout(scrollEndTimer.current);
+      clearTimeout(jumpUnlockTimer.current);
 
-    if (rawIndex >= stories.length + 1) {
       isJumpingRef.current = true;
       container.style.scrollSnapType = 'none';
-      container.scrollTop = height;
-      setActiveDispIdx(1);
+
+      if (rawIndex === 0) {
+        container.scrollTop = stories.length * height;
+        setActiveDispIdx(stories.length);
+      } else {
+        container.scrollTop = height;
+        setActiveDispIdx(1);
+      }
+
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (containerRef.current) {
             containerRef.current.style.scrollSnapType = 'y mandatory';
           }
-          isJumpingRef.current = false;
+          // Extra 80ms lock: absorbs any scroll event fired during the rAF window
+          jumpUnlockTimer.current = setTimeout(() => {
+            isJumpingRef.current = false;
+          }, 80);
         });
       });
     }
@@ -382,6 +384,12 @@ export default function VideoFeedPage() {
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container || isJumpingRef.current) return;
+
+    // Safety net: if scrollSnapType got stuck as 'none' from an interrupted jump, restore it
+    if (container.style.scrollSnapType === 'none') {
+      container.style.scrollSnapType = 'y mandatory';
+    }
+
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
 
