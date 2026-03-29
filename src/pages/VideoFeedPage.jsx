@@ -20,6 +20,7 @@ function timeAgo(dateStr) {
 
 function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
+  const prevStoryRef = useRef(story.video_url);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const navigate = useNavigate();
@@ -29,13 +30,18 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
     if (!video) return;
 
     if (isActive) {
-      video.currentTime = 0;
+      // Only reset position for a different video (not on clone→real teleport)
+      const isSameVideo = prevStoryRef.current === story.video_url;
+      if (!isSameVideo) {
+        video.currentTime = 0;
+        prevStoryRef.current = story.video_url;
+      }
       video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     } else {
       video.pause();
       setIsPlaying(false);
     }
-  }, [isActive]);
+  }, [isActive, story.video_url]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -273,6 +279,7 @@ export default function VideoFeedPage() {
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
   const [activeDispIdx, setActiveDispIdx] = useState(savedIdx);
+  const [visibleIdx, setVisibleIdx] = useState(savedIdx); // raw scroll position (includes clones)
   const [isMuted, setIsMuted] = useState(savedMuted);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
@@ -343,6 +350,7 @@ export default function VideoFeedPage() {
       container.style.scrollSnapType = 'none';
       container.scrollTop = stories.length * height;
       setActiveDispIdx(stories.length);
+      setVisibleIdx(stories.length);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (containerRef.current) {
@@ -359,6 +367,7 @@ export default function VideoFeedPage() {
       container.style.scrollSnapType = 'none';
       container.scrollTop = height;
       setActiveDispIdx(1);
+      setVisibleIdx(1);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (containerRef.current) {
@@ -389,7 +398,10 @@ export default function VideoFeedPage() {
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
 
-    // Keep the previous active item while on edge clones to avoid visible jump glitches.
+    // Always update visible index so clone videos play (no frozen frame on mobile)
+    if (rawIndex !== visibleIdx) setVisibleIdx(rawIndex);
+
+    // Update real active index only for non-clone positions (for persistence & boundary logic)
     if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
       setActiveDispIdx(rawIndex);
     }
@@ -399,7 +411,7 @@ export default function VideoFeedPage() {
     scrollEndTimer.current = setTimeout(() => {
       settleInfiniteBoundary();
     }, 180);
-  }, [activeDispIdx, stories.length, settleInfiniteBoundary]);
+  }, [visibleIdx, activeDispIdx, stories.length, settleInfiniteBoundary]);
 
   const handleFavorite = useCallback(async (userId) => {
     try {
@@ -482,7 +494,7 @@ export default function VideoFeedPage() {
           <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
             <StoryCard
               story={story}
-              isActive={displayIndex === activeDispIdx}
+              isActive={displayIndex === visibleIdx}
               onFavorite={handleFavorite}
               isMuted={isMuted}
               onToggleMute={() => setIsMuted(m => !m)}
