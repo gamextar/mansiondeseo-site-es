@@ -18,7 +18,7 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
+function StoryCard({ story, videoSrc, isActive, preloadMode, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
@@ -26,7 +26,7 @@ function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggle
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !videoSrc) return;
 
     if (isActive) {
       if (video.preload !== 'auto') {
@@ -54,7 +54,7 @@ function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggle
       video.pause();
       setIsPlaying(false);
     }
-  }, [isActive]);
+  }, [isActive, videoSrc]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -89,7 +89,7 @@ function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggle
         {/* Video */}
         <video
           ref={videoRef}
-          src={story.video_url}
+          src={videoSrc}
           className="absolute inset-0 w-full h-full object-cover"
           style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
           loop
@@ -518,8 +518,18 @@ export default function VideoFeedPage() {
       >
         {infiniteStories.map((story, displayIndex) => (
           <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+            {(() => {
+              const isNearActive = Math.abs(displayIndex - activeDispIdx) <= 1;
+              const shouldAttachSource =
+                displayIndex === activeDispIdx ||
+                isNearActive ||
+                (activeDispIdx === 1 && displayIndex === 0) ||
+                (activeDispIdx === stories.length && displayIndex === stories.length + 1);
+
+              return (
             <StoryCard
               story={story}
+              videoSrc={shouldAttachSource ? story.video_url : undefined}
               isActive={isInitialPositionReady && displayIndex === activeDispIdx}
               preloadMode={displayIndex === activeDispIdx ? 'auto' : Math.abs(displayIndex - activeDispIdx) <= 1 ? 'metadata' : 'none'}
               onFavorite={handleFavorite}
@@ -529,6 +539,8 @@ export default function VideoFeedPage() {
               gradientOpacity={gradientOpacity}
               navBottomOffset={navBottomOffset}
             />
+              );
+            })()}
           </div>
         ))}
       </div>
