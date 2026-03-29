@@ -34,18 +34,25 @@ function StoryCard({ story, videoSrc, isActive, onFavorite, isMuted, onToggleMut
     if (!video || !videoSrc) return;
 
     if (isActive) {
+      video.muted = isMuted;
       video.currentTime = 0;
       video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     } else {
-      video.pause();
-      setIsPlaying(false);
+      // Keep side panes warm so the next/prev story already has decoded frames
+      // when it slides into view. With only 3 panes mounted this is affordable.
+      video.muted = true;
+      video.play().then(() => setIsPlaying(true)).catch(() => {
+        video.pause();
+        setIsPlaying(false);
+      });
     }
   }, [isActive, videoSrc]);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (video) video.muted = isMuted;
-  }, [isMuted]);
+    if (!video) return;
+    video.muted = isActive ? isMuted : true;
+  }, [isActive, isMuted]);
 
   const togglePlay = () => {
     const video = videoRef.current;
