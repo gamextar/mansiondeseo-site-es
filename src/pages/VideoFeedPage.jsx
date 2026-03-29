@@ -269,8 +269,11 @@ export default function VideoFeedPage() {
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
-  const [activeDispIdx, setActiveDispIdx] = useState(1);
-  const [isMuted, setIsMuted] = useState(true);
+  const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
+  const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
+
+  const [activeDispIdx, setActiveDispIdx] = useState(savedIdx);
+  const [isMuted, setIsMuted] = useState(savedMuted);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
@@ -306,16 +309,25 @@ export default function VideoFeedPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // After stories load, snap to the first real clip.
+  // After stories load, snap to saved position (or first clip).
   useEffect(() => {
     if (stories.length > 0) {
       requestAnimationFrame(() => {
         if (containerRef.current) {
-          containerRef.current.scrollTop = containerRef.current.clientHeight; // index 1 = first real clip
+          const idx = Math.min(activeDispIdx, stories.length);
+          containerRef.current.scrollTop = containerRef.current.clientHeight * idx;
         }
       });
     }
   }, [stories.length]);
+
+  // Persist position and muted state
+  useEffect(() => {
+    try { sessionStorage.setItem('vf_idx', String(activeDispIdx)); } catch {}
+  }, [activeDispIdx]);
+  useEffect(() => {
+    try { sessionStorage.setItem('vf_muted', isMuted ? '1' : '0'); } catch {}
+  }, [isMuted]);
 
   useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
 
