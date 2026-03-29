@@ -65,135 +65,131 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
 
   return (
     <div className="relative w-full h-full bg-black flex items-center justify-center snap-start snap-always">
-      {/* Video */}
-      <video
-        ref={videoRef}
-        src={story.video_url}
-        className="absolute inset-0 w-full h-full object-cover lg:object-contain"
-        style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
-        loop
-        playsInline
-        muted={isMuted}
-        preload="auto"
-        onClick={togglePlay}
-        onEnded={handleVideoEnd}
-      />
+      {/* Video panel — on desktop, a centered rounded container; on mobile, fullscreen */}
+      <div className="relative w-full h-full lg:h-[calc(100%-48px)] lg:max-w-[420px] lg:mx-auto lg:my-6 lg:rounded-2xl lg:overflow-hidden">
+        {/* Video */}
+        <video
+          ref={videoRef}
+          src={story.video_url}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
+          loop
+          playsInline
+          muted={isMuted}
+          preload="auto"
+          onClick={togglePlay}
+          onEnded={handleVideoEnd}
+        />
 
-      {/* Play/Pause overlay */}
-      <AnimatePresence>
-        {showPlayIcon && (
-          <motion.div
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 1.3, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
-          >
-            <div className="w-20 h-20 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm">
-              <Play className={`w-10 h-10 text-white ${isPlaying ? 'hidden' : ''}`} />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        {/* Play/Pause overlay */}
+        <AnimatePresence>
+          {showPlayIcon && (
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 1.3, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+            >
+              <div className="w-20 h-20 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm">
+                <Play className={`w-10 h-10 text-white ${isPlaying ? 'hidden' : ''}`} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* Gradient overlays */}
-      <div
-        className="absolute inset-x-0 bottom-0 pointer-events-none"
-        style={{
-          height: gradientHeight,
-          background: `linear-gradient(to top, rgba(0,0,0,${(gradientOpacity/100).toFixed(2)}), rgba(0,0,0,0.04), transparent)`,
-        }}
-      />
-      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none" />
+        {/* Gradient overlays */}
+        <div
+          className="absolute inset-x-0 bottom-0 pointer-events-none"
+          style={{
+            height: gradientHeight,
+            background: `linear-gradient(to top, rgba(0,0,0,${(gradientOpacity/100).toFixed(2)}), rgba(0,0,0,0.04), transparent)`,
+          }}
+        />
+        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none lg:rounded-t-2xl" />
 
-      {/* Right side actions */}
-      <div
-        className="absolute right-3 lg:bottom-10 flex flex-col items-center gap-6 z-20"
-        style={{ bottom: `${navBottomOffset + 16}px` }}
-      >
-        {/* Favorite */}
-        <button
-          onClick={() => onFavorite(story.user_id)}
-          className="flex flex-col items-center"
+        {/* Right side actions — inside video panel on mobile, outside on desktop */}
+        <div
+          className="absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden"
+          style={{ bottom: `${navBottomOffset + 16}px` }}
         >
-          <div className={`rounded-full flex items-center justify-center ${story.favorited ? 'bg-mansion-crimson/25' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
-            <Heart className={`w-7 h-7 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
-          </div>
-        </button>
-
-        {/* Send message */}
-        <button
-          onClick={() => navigate(`/mensajes/${story.user_id}`)}
-          className="flex flex-col items-center"
-        >
-          <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
-            <Send className="w-6 h-6 text-white" />
-          </div>
-        </button>
-
-        {/* Send gift */}
-        <button
-          onClick={() => navigate(`/perfiles/${story.user_id}`)}
-          className="flex flex-col items-center"
-        >
-          <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
-            <Gift className="w-6 h-6 text-mansion-gold" />
-          </div>
-        </button>
-
-        {/* Mute toggle */}
-        <button onClick={onToggleMute} className="flex flex-col items-center">
-          <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
-            {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
-          </div>
-        </button>
-
-        {/* Profile photo */}
-        <button
-          onClick={() => navigate(`/perfiles/${story.user_id}`)}
-          className="flex flex-col items-center"
-        >
-          <div className="w-14 h-14 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
-            {story.avatar_url ? (
-              <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
-            )}
-          </div>
-        </button>
-      </div>
-
-      {/* Bottom user info + caption */}
-      <div
-        className="absolute left-4 right-20 lg:bottom-6 z-20"
-        style={{ bottom: `${navBottomOffset + 8}px` }}
-      >
-        <button
-          onClick={() => navigate(`/perfiles/${story.user_id}`)}
-          className="block text-left mb-1"
-        >
-          <p className="text-white font-bold text-[15px] leading-tight drop-shadow-lg">@{story.username}</p>
-        </button>
-
-        {story.caption && (
-          <p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
-        )}
-
-        <p className="text-white/40 text-[11px] mt-1.5">{timeAgo(story.created_at)}</p>
-      </div>
-
-      {/* Progress bar at top */}
-      {isActive && (
-        <div className="absolute top-0 left-0 right-0 h-[2px] z-30">
-          <motion.div
-            className="h-full bg-mansion-gold"
-            initial={{ width: '0%' }}
-            animate={{ width: '100%' }}
-            transition={{ duration: 15, ease: 'linear' }}
-          />
+          <ActionButtons story={story} onFavorite={onFavorite} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
         </div>
-      )}
+
+        {/* Bottom user info + caption */}
+        <div
+          className="absolute left-4 right-20 lg:right-4 lg:bottom-6 z-20"
+          style={{ bottom: `${navBottomOffset + 8}px` }}
+        >
+          <button
+            onClick={() => navigate(`/perfiles/${story.user_id}`)}
+            className="block text-left mb-1"
+          >
+            <p className="text-white font-bold text-[15px] leading-tight drop-shadow-lg">@{story.username}</p>
+          </button>
+
+          {story.caption && (
+            <p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
+          )}
+
+          <p className="text-white/40 text-[11px] mt-1.5">{timeAgo(story.created_at)}</p>
+        </div>
+
+        {/* Progress bar at top */}
+        {isActive && (
+          <div className="absolute top-0 left-0 right-0 h-[2px] z-30 lg:rounded-t-2xl overflow-hidden">
+            <motion.div
+              className="h-full bg-mansion-gold"
+              initial={{ width: '0%' }}
+              animate={{ width: '100%' }}
+              transition={{ duration: 15, ease: 'linear' }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Desktop action icons — outside the video panel, aligned to its right edge */}
+      <div className="hidden lg:flex absolute flex-col items-center gap-6 z-20" style={{ right: 'calc(50% - 260px)', bottom: '80px' }}>
+        <ActionButtons story={story} onFavorite={onFavorite} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} />
+      </div>
     </div>
+  );
+}
+
+/* Shared action buttons extracted for mobile (inside video) and desktop (outside video) */
+function ActionButtons({ story, onFavorite, onToggleMute, isMuted, navigate }) {
+  return (
+    <>
+      <button onClick={() => onFavorite(story.user_id)} className="flex flex-col items-center">
+        <div className={`rounded-full flex items-center justify-center ${story.favorited ? 'bg-mansion-crimson/25' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
+          <Heart className={`w-7 h-7 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
+        </div>
+      </button>
+      <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center">
+        <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+          <Send className="w-6 h-6 text-white" />
+        </div>
+      </button>
+      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
+        <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+          <Gift className="w-6 h-6 text-mansion-gold" />
+        </div>
+      </button>
+      <button onClick={onToggleMute} className="flex flex-col items-center">
+        <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+          {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
+        </div>
+      </button>
+      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
+        <div className="w-14 h-14 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
+          {story.avatar_url ? (
+            <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
+          )}
+        </div>
+      </button>
+    </>
   );
 }
 
@@ -387,7 +383,7 @@ export default function VideoFeedPage() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-40">
+    <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
       {/* Video feed container */}
       <div
         ref={containerRef}
@@ -416,20 +412,20 @@ export default function VideoFeedPage() {
         ))}
       </div>
 
-      {/* Scroll hints — desktop only, always shown (infinite) */}
+      {/* Scroll hints — desktop only */}
       {stories.length > 1 && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex-col gap-2 z-30 hidden lg:flex">
+        <div className="absolute top-1/2 -translate-y-1/2 flex-col gap-2 z-30 hidden lg:flex" style={{ right: 'calc(50% - 280px)' }}>
           <button
             onClick={() => scrollByOne(-1)}
-            className="w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center"
+            className="w-10 h-10 rounded-full bg-mansion-card/60 backdrop-blur-sm flex items-center justify-center border border-white/10 hover:bg-mansion-card/80 transition-colors"
           >
-            <ChevronUp className="w-4 h-4 text-white/70" />
+            <ChevronUp className="w-5 h-5 text-white/70" />
           </button>
           <button
             onClick={() => scrollByOne(1)}
-            className="w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center"
+            className="w-10 h-10 rounded-full bg-mansion-card/60 backdrop-blur-sm flex items-center justify-center border border-white/10 hover:bg-mansion-card/80 transition-colors"
           >
-            <ChevronDown className="w-4 h-4 text-white/70" />
+            <ChevronDown className="w-5 h-5 text-white/70" />
           </button>
         </div>
       )}
