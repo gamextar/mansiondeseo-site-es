@@ -18,7 +18,7 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
+function StoryCard({ story, isActive, preloadMode, onFavorite, isMuted, onToggleMute, gradientHeight, gradientOpacity, navBottomOffset }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
@@ -74,9 +74,10 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
           className="absolute inset-0 w-full h-full object-cover"
           style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
           loop
+          autoPlay={isActive}
           playsInline
           muted={isMuted}
-          preload="auto"
+          preload={preloadMode}
           onClick={togglePlay}
           onEnded={handleVideoEnd}
         />
@@ -488,6 +489,7 @@ export default function VideoFeedPage() {
             <StoryCard
               story={story}
               isActive={displayIndex === activeDispIdx}
+              preloadMode={Math.abs(displayIndex - activeDispIdx) <= 1 ? 'auto' : 'none'}
               onFavorite={handleFavorite}
               isMuted={isMuted}
               onToggleMute={() => setIsMuted(m => !m)}
