@@ -451,6 +451,7 @@ export default function VideoFeedPage() {
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
   const [activeDispIdx, setActiveDispIdx] = useState(savedIdx);
+  const [activeVisualIdx, setActiveVisualIdx] = useState(savedIdx);
   const [isMuted, setIsMuted] = useState(savedMuted);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
@@ -463,7 +464,7 @@ export default function VideoFeedPage() {
   const infiniteStories = stories.length > 0
     ? [stories[stories.length - 1], ...stories, stories[0]]
     : [];
-  const activeStory = infiniteStories[activeDispIdx] || stories[0] || null;
+  const activeStory = infiniteStories[activeVisualIdx] || stories[0] || null;
 
   useEffect(() => {
     let cancelled = false;
@@ -494,6 +495,7 @@ export default function VideoFeedPage() {
 
       const idx = Math.min(Math.max(activeDispIdx, 1), stories.length);
       container.scrollTop = height * idx;
+      setActiveVisualIdx(idx);
       return true;
     };
 
@@ -536,9 +538,11 @@ export default function VideoFeedPage() {
       if (rawIndex === 0) {
         container.scrollTop = stories.length * height;
         setActiveDispIdx(stories.length);
+        setActiveVisualIdx(stories.length);
       } else {
         container.scrollTop = height;
         setActiveDispIdx(1);
+        setActiveVisualIdx(1);
       }
 
       requestAnimationFrame(() => {
@@ -580,6 +584,10 @@ export default function VideoFeedPage() {
     const height = container.clientHeight;
     const rawIndex = Math.round(container.scrollTop / height);
 
+    if (rawIndex >= 0 && rawIndex <= stories.length + 1 && rawIndex !== activeVisualIdx) {
+      setActiveVisualIdx(rawIndex);
+    }
+
     if (rawIndex > 0 && rawIndex <= stories.length && rawIndex !== activeDispIdx) {
       setActiveDispIdx(rawIndex);
     }
@@ -588,7 +596,7 @@ export default function VideoFeedPage() {
     scrollEndTimer.current = setTimeout(() => {
       settleInfiniteBoundary();
     }, 90);
-  }, [activeDispIdx, settleInfiniteBoundary, stories.length]);
+  }, [activeDispIdx, activeVisualIdx, settleInfiniteBoundary, stories.length]);
 
   const handleLike = useCallback(async (storyId) => {
     // Optimistic: flip immediately
@@ -702,7 +710,7 @@ export default function VideoFeedPage() {
               <StoryCard
                 story={story}
                 videoSrc={story.video_url}
-                isActive={displayIndex === activeDispIdx}
+                isActive={displayIndex === activeVisualIdx}
                 shouldLoad={shouldLoad}
                 isMuted={isMuted}
                 avatarSize={avatarSize}
