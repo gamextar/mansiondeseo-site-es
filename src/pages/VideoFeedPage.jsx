@@ -236,11 +236,11 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
         <button
           onClick={handleHeart}
           className="pointer-events-auto relative"
-          style={{ width: 52, height: 52 }}
+          style={{ width: 58, height: 58 }}
         >
           <HeartBurst trigger={burstTrigger} />
-          <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 52, height: 52 }}>
-            <Heart className={`w-7 h-7 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
+          <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 58, height: 58 }}>
+            <Heart className={`w-7.5 h-7.5 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
           </div>
         </button>
         <span className="pointer-events-none text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
