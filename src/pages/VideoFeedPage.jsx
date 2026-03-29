@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Play, Film, ChevronUp, ChevronDown, Gift } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Gift } from 'lucide-react';
 import { getStories, toggleFavorite } from '../lib/api';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
@@ -121,42 +121,64 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
           {isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
         </button>
 
-        {/* Bottom user info + caption */}
+        {/* Bottom user info + caption — mobile */}
         <div
-          className="absolute left-4 right-20 z-20 lg:left-auto lg:right-5 lg:max-w-[260px] lg:text-right"
+          className="absolute left-4 right-20 z-20 lg:hidden"
           style={{ bottom: `${navBottomOffset + 8}px` }}
         >
           <button
             onClick={() => navigate(`/perfiles/${story.user_id}`)}
-            className="block text-left lg:text-right lg:w-full mb-1"
+            className="block text-left mb-1"
           >
-            <p className="text-white font-bold text-[15px] lg:text-lg leading-tight drop-shadow-lg">@{story.username}</p>
+            <p className="text-white font-bold text-[15px] leading-tight drop-shadow-lg">@{story.username}</p>
           </button>
-
           {story.caption && (
-            <p className="text-white/90 text-sm lg:text-base leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
+            <p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
           )}
-
-          <p className="text-white/40 text-[11px] lg:text-xs mt-1.5">{timeAgo(story.created_at)}</p>
+          <p className="text-white/40 text-[11px] mt-1.5">{timeAgo(story.created_at)}</p>
         </div>
 
-        {/* Desktop bottom info override position */}
-        <style>{`
-          @media (min-width: 1024px) {
-            .desktop-bottom-info { bottom: 20px !important; }
-          }
-        `}</style>
+        {/* Bottom user info + caption — desktop: avatar above name, bottom-left, bigger */}
+        <div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2 max-w-[320px]">
+          <button
+            onClick={() => navigate(`/perfiles/${story.user_id}`)}
+            className="flex flex-col items-start gap-2"
+          >
+            <div className="w-14 h-14 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
+              {story.avatar_url ? (
+                <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-white/60 text-lg font-bold">{(story.username || '?')[0]}</div>
+              )}
+            </div>
+            <p className="text-white font-bold text-xl leading-tight drop-shadow-lg">@{story.username}</p>
+          </button>
+          {story.caption && (
+            <p className="text-white/90 text-base leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
+          )}
+          <p className="text-white/40 text-xs mt-0.5">{timeAgo(story.created_at)}</p>
+        </div>
 
-        {/* Progress bar at top */}
+        {/* Progress bar — top on mobile, bottom on desktop */}
         {isActive && (
-          <div className="absolute top-0 left-0 right-0 h-[2px] z-30 lg:rounded-t-2xl overflow-hidden">
-            <motion.div
-              className="h-full bg-mansion-gold"
-              initial={{ width: '0%' }}
-              animate={{ width: '100%' }}
-              transition={{ duration: 15, ease: 'linear' }}
-            />
-          </div>
+          <>
+            <div className="absolute top-0 left-0 right-0 h-[2px] z-30 overflow-hidden lg:hidden">
+              <motion.div
+                className="h-full bg-mansion-gold"
+                initial={{ width: '0%' }}
+                animate={{ width: '100%' }}
+                transition={{ duration: 15, ease: 'linear' }}
+              />
+            </div>
+            <div className="hidden lg:block absolute bottom-0 left-0 right-0 h-[3px] z-30 lg:rounded-b-2xl overflow-hidden">
+              <motion.div
+                className="h-full bg-mansion-gold"
+                initial={{ width: '0%' }}
+                animate={{ width: '100%' }}
+                transition={{ duration: 15, ease: 'linear' }}
+              />
+            </div>
+          </>
         )}
       </div>
 
@@ -205,7 +227,7 @@ function MobileActionButtons({ story, onFavorite, onToggleMute, isMuted, navigat
   );
 }
 
-/* Desktop action buttons (outside video, bigger) */
+/* Desktop action buttons (outside video, bigger, no avatar — it's inside the video now) */
 function DesktopActionButtons({ story, onFavorite, navigate }) {
   return (
     <>
@@ -222,15 +244,6 @@ function DesktopActionButtons({ story, onFavorite, navigate }) {
       <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
         <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center" style={{ width: 60, height: 60 }}>
           <Gift className="w-7 h-7 text-mansion-gold" />
-        </div>
-      </button>
-      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
-        <div className="w-16 h-16 rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg">
-          {story.avatar_url ? (
-            <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-white/60 text-lg font-bold">{(story.username || '?')[0]}</div>
-          )}
         </div>
       </button>
     </>
@@ -456,22 +469,22 @@ export default function VideoFeedPage() {
         ))}
       </div>
 
-      {/* Scroll arrows — desktop only, prev left / next right */}
+      {/* Scroll arrows — desktop only, < prev left / next > right */}
       {stories.length > 1 && (
         <>
           <button
             onClick={() => scrollByOne(-1)}
-            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/80 transition-colors"
-            style={{ left: 'calc(50% - 310px)' }}
+            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-14 h-14 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/80 transition-colors"
+            style={{ left: 'calc(50% - 340px)' }}
           >
-            <ChevronUp className="w-6 h-6 text-white/70" />
+            <ChevronLeft className="w-7 h-7 text-white/70" />
           </button>
           <button
             onClick={() => scrollByOne(1)}
-            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/80 transition-colors"
-            style={{ right: 'calc(50% - 310px)' }}
+            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-14 h-14 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/80 transition-colors"
+            style={{ right: 'calc(50% - 340px)' }}
           >
-            <ChevronDown className="w-6 h-6 text-white/70" />
+            <ChevronRight className="w-7 h-7 text-white/70" />
           </button>
         </>
       )}
