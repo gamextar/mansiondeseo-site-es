@@ -85,6 +85,8 @@ export default function ProfileDetailPage() {
   const location = useLocation();
   const { user, setUser } = useAuth();
   const preview = location.state?.preview || null;
+  const backTarget = location.state?.from || null;
+  const backTargetState = location.state?.returnState;
   const cachedDetail = readProfileDetailCache(id);
   const previewProfile = buildPreviewProfile(preview);
   const initialProfile = cachedDetail?.profile || previewProfile;
@@ -293,6 +295,14 @@ export default function ProfileDetailPage() {
     setLightboxIndex(idx);
   }, []);
 
+  const handleBack = useCallback(() => {
+    if (backTarget) {
+      navigate(backTarget, backTargetState ? { state: backTargetState } : undefined);
+      return;
+    }
+    navigate(-1);
+  }, [backTarget, backTargetState, navigate]);
+
   // Keyboard navigation for lightbox
   useEffect(() => {
     if (!lightboxOpen) return;
@@ -402,7 +412,7 @@ export default function ProfileDetailPage() {
           <motion.button
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="w-10 h-10 rounded-full glass flex items-center justify-center"
           >
             <ChevronLeft className="w-5 h-5 text-text-primary" />

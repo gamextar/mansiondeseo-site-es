@@ -95,6 +95,7 @@ export default function ChatPage() {
   const httpHistoryLoadedRef = useRef(false);
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
+  const backTarget = location.state?.from || '/mensajes';
 
   // Format DO message to UI format
   function formatMsg(msg) {
@@ -443,13 +444,32 @@ export default function ChatPage() {
       >
         <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
           <button
-            onClick={() => navigate('/mensajes')}
+            onClick={() => navigate(backTarget)}
             className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
 
-          <div className="relative flex-shrink-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`)}>
+          <div className="relative flex-shrink-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`, {
+            state: {
+              from: location.pathname,
+              returnState: location.state || null,
+              preview: partner ? {
+                id: partnerId,
+                name: partner.name,
+                age: partner.age,
+                city: partner.city,
+                role: partner.role,
+                photos: partner.photos || [],
+                avatar_url: partner.avatar_url,
+                avatar_crop: partner.avatar_crop || null,
+                online: partner.online,
+                premium: partner.premium,
+                blurred: partner.blurred,
+                visiblePhotos: partner.visiblePhotos,
+              } : null,
+            },
+          })}>
             <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-mansion-border/40">
               <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt={partner.name} className="w-full h-full" />
             </div>
@@ -458,7 +478,26 @@ export default function ChatPage() {
             )}
           </div>
 
-          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`)}>
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`, {
+            state: {
+              from: location.pathname,
+              returnState: location.state || null,
+              preview: partner ? {
+                id: partnerId,
+                name: partner.name,
+                age: partner.age,
+                city: partner.city,
+                role: partner.role,
+                photos: partner.photos || [],
+                avatar_url: partner.avatar_url,
+                avatar_crop: partner.avatar_crop || null,
+                online: partner.online,
+                premium: partner.premium,
+                blurred: partner.blurred,
+                visiblePhotos: partner.visiblePhotos,
+              } : null,
+            },
+          })}>
             <h2 className="font-semibold text-sm text-text-primary truncate">{partner.name}</h2>
             <p className={`text-[11px] ${partnerTyping ? 'text-mansion-gold' : partner.online ? 'text-green-400' : 'text-text-dim'}`}>
               {partnerTyping ? 'Escribiendo...' : partner.online ? '● En línea' : 'Desconectado'}

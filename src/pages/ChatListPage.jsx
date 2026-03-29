@@ -57,6 +57,7 @@ function ConversationRow({ conv, typing, onDelete, deleting }) {
     if (isDraggingRef.current || deleting) return;
     navigate(`/mensajes/${conv.profileId}`, {
       state: {
+        from: '/mensajes',
         partnerPreview: {
           id: conv.profileId,
           name: conv.name,

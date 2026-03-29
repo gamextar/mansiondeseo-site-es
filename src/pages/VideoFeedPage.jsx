@@ -188,7 +188,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
         <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none lg:rounded-t-2xl" />
 
         <div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2.5 max-w-[360px]">
-          <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-start gap-2.5">
+          <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="flex flex-col items-start gap-2.5">
             <div className="rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize + 12, height: avatarSize + 12 }}>
               {story.avatar_url ? (
                 <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
@@ -245,12 +245,12 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate })
         </button>
         <span className="pointer-events-none text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
       </div>
-      <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="pointer-events-auto flex flex-col items-center">
+      <button onClick={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Send className="w-6 h-6 text-white" />
         </div>
       </button>
-      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="pointer-events-auto flex flex-col items-center">
+      <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Gift className="w-6 h-6 text-mansion-gold" />
         </div>
@@ -280,7 +280,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
         className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
         style={{ bottom: `${navBottomOffset + 8}px` }}
       >
-        <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1">
+        <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1">
           <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
             {story.avatar_url ? (
               <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
@@ -320,12 +320,12 @@ function DesktopActionButtons({ story, onLike, navigate }) {
         </div>
         <span className="text-white text-xs font-semibold mt-1.5 drop-shadow tabular-nums">{story.likes || 0}</span>
       </button>
-      <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center group">
+      <button onClick={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} className="flex flex-col items-center group">
         <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-mansion-card/90 group-hover:border-white/25" style={{ width: 72, height: 72 }}>
           <Send className="w-8 h-8 text-white" />
         </div>
       </button>
-      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center group">
+      <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="flex flex-col items-center group">
         <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-mansion-card/90 group-hover:border-white/25" style={{ width: 72, height: 72 }}>
           <Gift className="w-8 h-8 text-mansion-gold" />
         </div>
