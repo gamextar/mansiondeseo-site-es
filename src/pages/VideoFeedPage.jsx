@@ -117,7 +117,7 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
         </div>
 
         {/* Desktop mute button — top-right corner of video */}
-        <button onClick={onToggleMute} className="hidden lg:flex absolute top-4 right-4 z-20 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center" style={{ width: 52, height: 52 }}>
+        <button onClick={onToggleMute} className="hidden lg:flex absolute top-4 right-4 z-20 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-200" style={{ width: 52, height: 52 }}>
           {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
         </button>
 
@@ -151,12 +151,12 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
                 <div className="w-full h-full flex items-center justify-center text-white/60 text-xl font-bold">{(story.username || '?')[0]}</div>
               )}
             </div>
-            <p className="text-white font-bold text-2xl leading-tight drop-shadow-lg">@{story.username}</p>
+            <p className="text-white font-bold text-xl leading-tight" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.5)' }}>@{story.username}</p>
           </button>
           {story.caption && (
-            <p className="text-white/90 text-lg leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>
+            <p className="text-white/90 text-lg leading-relaxed line-clamp-3" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.6), 0 0 2px rgba(0,0,0,0.4)' }}>{story.caption}</p>
           )}
-          <p className="text-white/40 text-sm mt-0.5">{timeAgo(story.created_at)}</p>
+          <p className="text-white/40 text-sm mt-0.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>{timeAgo(story.created_at)}</p>
         </div>
 
         {/* Progress bar — top on mobile, bottom on desktop — loops with video */}
@@ -182,8 +182,8 @@ function StoryCard({ story, isActive, onFavorite, isMuted, onToggleMute, gradien
         )}
       </div>
 
-      {/* Desktop action icons — outside the video panel to the right */}
-      <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 330px)', bottom: '60px' }}>
+      {/* Desktop action icons — outside the video panel to the right, same X as next arrow */}
+      <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', bottom: '60px' }}>
         <DesktopActionButtons story={story} onFavorite={onFavorite} navigate={navigate} />
       </div>
     </div>
@@ -231,18 +231,18 @@ function MobileActionButtons({ story, onFavorite, onToggleMute, isMuted, navigat
 function DesktopActionButtons({ story, onFavorite, navigate }) {
   return (
     <>
-      <button onClick={() => onFavorite(story.user_id)} className="flex flex-col items-center">
-        <div className={`rounded-full flex items-center justify-center ${story.favorited ? 'bg-mansion-crimson/25' : 'bg-mansion-card/60 border border-white/10'}`} style={{ width: 72, height: 72 }}>
+      <button onClick={() => onFavorite(story.user_id)} className="flex flex-col items-center group">
+        <div className={`rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-110 ${story.favorited ? 'bg-mansion-crimson/25 group-hover:bg-mansion-crimson/40' : 'bg-mansion-card/60 border border-white/10 group-hover:bg-mansion-card/90 group-hover:border-white/25'}`} style={{ width: 72, height: 72 }}>
           <Heart className={`w-9 h-9 ${story.favorited ? 'text-mansion-crimson fill-mansion-crimson' : 'text-white'}`} />
         </div>
       </button>
-      <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center">
-        <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center" style={{ width: 72, height: 72 }}>
+      <button onClick={() => navigate(`/mensajes/${story.user_id}`)} className="flex flex-col items-center group">
+        <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-mansion-card/90 group-hover:border-white/25" style={{ width: 72, height: 72 }}>
           <Send className="w-8 h-8 text-white" />
         </div>
       </button>
-      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center">
-        <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center" style={{ width: 72, height: 72 }}>
+      <button onClick={() => navigate(`/perfiles/${story.user_id}`)} className="flex flex-col items-center group">
+        <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-mansion-card/90 group-hover:border-white/25" style={{ width: 72, height: 72 }}>
           <Gift className="w-8 h-8 text-mansion-gold" />
         </div>
       </button>
@@ -474,17 +474,17 @@ export default function VideoFeedPage() {
         <>
           <button
             onClick={() => scrollByOne(-1)}
-            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-14 h-14 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/80 transition-colors"
-            style={{ left: 'calc(50% - 340px)' }}
+            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-16 h-16 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
+            style={{ left: 'calc(50% - 350px)' }}
           >
-            <ChevronLeft className="w-7 h-7 text-white/70" />
+            <ChevronLeft className="w-8 h-8 text-white/70" />
           </button>
           <button
             onClick={() => scrollByOne(1)}
-            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-14 h-14 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/80 transition-colors"
-            style={{ right: 'calc(50% - 340px)' }}
+            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-16 h-16 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
+            style={{ right: 'calc(50% - 350px)' }}
           >
-            <ChevronRight className="w-7 h-7 text-white/70" />
+            <ChevronRight className="w-8 h-8 text-white/70" />
           </button>
         </>
       )}
