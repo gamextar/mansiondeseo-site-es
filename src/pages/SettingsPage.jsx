@@ -74,6 +74,7 @@ export default function SettingsPage() {
   const [videoGradientHeight, setVideoGradientHeight] = useState(64);
   const [videoGradientOpacity, setVideoGradientOpacity] = useState(40);
   const [videoAvatarSize, setVideoAvatarSize] = useState(52);
+  const [storyMaxDurationSeconds, setStoryMaxDurationSeconds] = useState('15');
 
   // Encoder
   const [encoderCrf, setEncoderCrf] = useState('29');
@@ -140,6 +141,7 @@ export default function SettingsPage() {
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
         setVideoAvatarSize(s.videoAvatarSize ?? 52);
+        setStoryMaxDurationSeconds(String(s.storyMaxDurationSeconds ?? 15));
         setEncoderCrf(s.encoderCrf || '29');
         setEncoderMaxrate(s.encoderMaxrate || '2700k');
         setEncoderBufsize(s.encoderBufsize || '8000k');
@@ -193,6 +195,7 @@ export default function SettingsPage() {
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
         video_avatar_size: videoAvatarSize,
+        story_max_duration_seconds: storyMaxDurationSeconds,
         encoder_crf: encoderCrf,
         encoder_maxrate: encoderMaxrate,
         encoder_bufsize: encoderBufsize,
@@ -234,6 +237,7 @@ export default function SettingsPage() {
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
       setVideoAvatarSize(s.videoAvatarSize ?? 52);
+      setStoryMaxDurationSeconds(String(s.storyMaxDurationSeconds ?? 15));
       setEncoderCrf(s.encoderCrf || '29');
       setEncoderMaxrate(s.encoderMaxrate || '2700k');
       setEncoderBufsize(s.encoderBufsize || '8000k');
@@ -1140,6 +1144,24 @@ export default function SettingsPage() {
           <p className="text-[11px] text-text-dim mb-4">Estos parámetros controlan cómo se procesan los videos subidos como historias (FFmpeg WASM, H.264).</p>
           <div className="space-y-3">
 
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Duración máxima</h3>
+                  <p className="text-[11px] text-text-dim">Cantidad máxima de segundos que se procesan por historia</p>
+                </div>
+              </div>
+              <input
+                type="number"
+                min="1"
+                max="120"
+                step="1"
+                value={storyMaxDurationSeconds}
+                onChange={e => setStoryMaxDurationSeconds(e.target.value.replace(/[^0-9]/g, '') || '1')}
+                className="w-full bg-mansion-elevated text-text-primary rounded-xl px-4 py-3 border border-white/10 text-sm"
+              />
+            </div>
+
             {/* CRF */}
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
               <div className="flex items-center justify-between mb-3">
@@ -1224,7 +1246,7 @@ export default function SettingsPage() {
             <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-gold/20">
               <h3 className="text-xs font-bold text-mansion-gold uppercase tracking-wider mb-2">Configuración activa</h3>
               <p className="text-sm text-text-primary font-mono">
-                CRF {encoderCrf} · {encoderMaxrate} cap · {encoderBufsize} buf · {encoderPreset} · {encoderAudioBitrate === 'none' ? 'sin audio' : `AAC ${encoderAudioBitrate}${encoderAudioMono ? ' mono' : ''}`}
+                {storyMaxDurationSeconds}s max · CRF {encoderCrf} · {encoderMaxrate} cap · {encoderBufsize} buf · {encoderPreset} · {encoderAudioBitrate === 'none' ? 'sin audio' : `AAC ${encoderAudioBitrate}${encoderAudioMono ? ' mono' : ''}`}
               </p>
             </div>
           </div>

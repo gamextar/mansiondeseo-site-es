@@ -200,6 +200,7 @@ function StoryPreview({ videoUrl, caption, user, onClose }) {
 export default function StoryUploadPage() {
 	const navigate = useNavigate();
 	const { user, siteSettings } = useAuth();
+	const maxStoryDurationSeconds = Math.max(1, Number(siteSettings?.storyMaxDurationSeconds || 15));
 	const encoderParams = {
 		crf: siteSettings?.encoderCrf || ENCODER_DEFAULTS.crf,
 		maxrate: siteSettings?.encoderMaxrate || ENCODER_DEFAULTS.maxrate,
@@ -352,7 +353,7 @@ export default function StoryUploadPage() {
 		const inputExtension = sourceFile.name.split('.').pop()?.toLowerCase() || 'mp4';
 		const inputFileName = `input.${inputExtension}`;
 		const outputFileName = `${getFileStem(sourceFile.name)}-story.mp4`;
-		const safeDuration = Math.max(0.1, sourceDuration || 0.1);
+		const safeDuration = Math.max(0.1, Math.min(sourceDuration || maxStoryDurationSeconds, maxStoryDurationSeconds));
 
 		activeEncodeDurationRef.current = safeDuration;
 
@@ -364,6 +365,7 @@ export default function StoryUploadPage() {
 
 		const sharedArgs = [
 			'-i', inputFileName,
+			'-t', safeDuration.toFixed(2),
 			'-vf', `${outputProfile.scaleFilter},setsar=1`,
 			'-movflags', '+faststart',
 		];
@@ -377,9 +379,6 @@ export default function StoryUploadPage() {
 			'-maxrate', encoderParams.maxrate,
 			'-bufsize', encoderParams.bufsize,
 			'-preset', encoderParams.preset,
-			'-g', '30',
-			'-keyint_min', '1',
-			'-force_key_frames', 'expr:eq(n,0)',
 			'-pix_fmt', 'yuv420p',
 			'-c:a', 'aac',
 			'-b:a', encoderParams.audioBitrate,
@@ -417,7 +416,7 @@ export default function StoryUploadPage() {
 			previewUrl,
 			fileName: outputFileName,
 			sizeLabel: `${(outputBlob.size / (1024 * 1024)).toFixed(2)} MB`,
-			duration: sourceDuration || 0,
+			duration: safeDuration,
 		};
 	};
 
