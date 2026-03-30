@@ -1217,7 +1217,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <select value={encoderBufsize} onChange={e => setEncoderBufsize(e.target.value)} className="w-full bg-mansion-elevated text-text-primary rounded-xl px-4 py-3 border border-white/10 text-sm">
-                {['2000k','3000k','4000k','5000k','6000k','7000k','7500k','8000k','10000k','12000k','15000k'].map(v => <option key={v} value={v}>{v}</option>)}
+                {['2000k','3000k','4000k','5000k','6000k','7000k','7500k','8000k','9000k','10000k','12000k','15000k'].map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
 
