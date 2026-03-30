@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, Clock, Film, Upload, Wand2 } from 'lucide-react';
+import { CheckCircle2, Clock, Eye, Film, Upload, Wand2, X } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import { uploadStory } from '../lib/api';
@@ -105,6 +105,7 @@ export default function StoryUploadPage() {
 	const [result, setResult] = useState(null);
 	const [errorMessage, setErrorMessage] = useState('');
 	const [elapsedSeconds, setElapsedSeconds] = useState(0);
+	const [showPreview, setShowPreview] = useState(false);
 
 	const outputProfile = getOutputProfile(sourceResolution);
 	const storyStep = result?.id ? 'done' : sourceFile ? 'process' : 'pick';
@@ -347,7 +348,7 @@ export default function StoryUploadPage() {
 	};
 
 	const progressValue = phase === 'uploading' ? uploadProgress : encodingProgress;
-	const progressLabel = phase === 'uploading' ? 'Verificando historia' : 'Encoding';
+	const progressLabel = phase === 'uploading' ? 'Verificando historia' : 'Cargando Historia';
 
 	return (
 		<div className="min-h-screen bg-mansion-base text-text-primary relative overflow-hidden">
@@ -375,11 +376,10 @@ export default function StoryUploadPage() {
 
 									return (
 										<div key={step.id} className="flex items-center gap-2">
-											<div className={`w-9 h-9 rounded-full border flex items-center justify-center text-xs font-semibold transition-transform duration-300 ${active || complete ? 'bg-mansion-gold text-mansion-base border-mansion-gold scale-100' : 'bg-white/5 text-text-dim border-white/10 scale-95'}`}>
+											<div className={`w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold transition-transform duration-300 ${active || complete ? 'bg-mansion-gold text-mansion-base border-mansion-gold scale-100' : 'bg-white/5 text-text-dim border-white/10 scale-95'}`}>
 												{index + 1}
 											</div>
-											<span className={`text-xs uppercase tracking-[0.2em] ${active || complete ? 'text-mansion-gold' : 'text-text-dim'}`}>{step.label}</span>
-											{index < storySteps.length - 1 && <div className={`w-8 sm:w-12 h-px ${storyStepIndex > index ? 'bg-mansion-gold/70' : 'bg-white/10'}`} />}
+											{index < storySteps.length - 1 && <div className={`w-6 sm:w-10 h-px ${storyStepIndex > index ? 'bg-mansion-gold/70' : 'bg-white/10'}`} />}
 										</div>
 									);
 								})}
@@ -395,8 +395,7 @@ export default function StoryUploadPage() {
 								<Film className="w-9 h-9 text-mansion-gold" />
 							</motion.div>
 							<h1 className="font-display text-2xl sm:text-3xl font-bold text-text-primary">Nueva Historia</h1>
-							<p className="text-text-muted mt-2 mb-4 max-w-sm">Seleccioná tu video para publicarlo como historia.</p>
-							<p className="text-sm text-text-dim max-w-md mb-8">Ya no recortamos clips. Tomamos el video completo, lo optimizamos y luego lo publicamos.</p>
+							<p className="text-text-muted mt-2 mb-8 max-w-sm">Seleccioná tu video para publicarlo como historia.</p>
 							<label className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors cursor-pointer shadow-[0_12px_30px_rgba(212,175,55,0.18)]">
 								<Upload className="w-5 h-5" />
 								Seleccionar video
@@ -462,21 +461,6 @@ export default function StoryUploadPage() {
 							</div>
 
 							<div className="p-6 sm:p-8">
-								<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-									<div className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-left">
-										<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Resolución original</p>
-										<p className="text-text-primary mt-1">{sourceResolution ? `${sourceResolution.width}x${sourceResolution.height}` : 'Detectando...'}</p>
-									</div>
-									<div className="rounded-2xl bg-mansion-gold/10 border border-mansion-gold/20 px-4 py-3 text-center">
-										<p className="text-[10px] uppercase tracking-[0.18em] text-mansion-gold/80">Salida</p>
-										<p className="text-mansion-gold font-semibold mt-1">{outputProfile.label}</p>
-									</div>
-									<div className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-right">
-										<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Flujo</p>
-										<p className="text-text-primary mt-1">Encode → Publicación</p>
-									</div>
-								</div>
-
 								<motion.div
 									initial={{ opacity: 0, y: 12 }}
 									animate={{ opacity: 1, y: 0 }}
@@ -492,7 +476,7 @@ export default function StoryUploadPage() {
 												className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
 											>
 												<Wand2 className="w-5 h-5" />
-												Publicar historia
+												Cargar historia
 											</button>
 											<p className="text-xs text-text-dim text-center">Primero optimizamos el video en el navegador y después lo subimos a tu historia con progreso real.</p>
 										</div>
@@ -500,7 +484,7 @@ export default function StoryUploadPage() {
 										<div className="space-y-4 rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-4">
 											<div className="space-y-2">
 												<div className="flex items-center justify-between text-sm">
-													<span className="text-text-muted">Encoding</span>
+													<span className="text-text-muted">Cargando Historia</span>
 													<span className="font-semibold text-mansion-gold tabular-nums">{Math.round(encodingProgress * 100)}%</span>
 												</div>
 												<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
@@ -526,8 +510,8 @@ export default function StoryUploadPage() {
 
 											<p className="text-xs text-text-dim">
 												{phase === 'encoding'
-													? 'Optimando el video para la historia.'
-													: 'Subiendo la historia al servidor y validando la publicación.'}
+													? 'Optimizando el video para la historia.'
+													: 'Subiendo y verificando la historia.'}
 											</p>
 										</div>
 									)}
@@ -564,10 +548,6 @@ export default function StoryUploadPage() {
 									))}
 								</div>
 							</div>
-							<div className="aspect-video bg-black">
-								<video src={result.video_url || result.previewUrl} controls playsInline className="w-full h-full object-contain" />
-							</div>
-
 							<div className="p-6 sm:p-8 text-center">
 								<motion.div
 									initial={{ scale: 0.5, opacity: 0 }}
@@ -584,15 +564,14 @@ export default function StoryUploadPage() {
 								</p>
 
 								<div className="flex flex-col gap-3">
-									<a
-										href={result.video_url}
-										target="_blank"
-										rel="noreferrer"
+									<button
+										type="button"
+										onClick={() => setShowPreview(true)}
 										className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
 									>
-										<Film className="w-5 h-5" />
-										Abrir historia publicada
-									</a>
+										<Eye className="w-5 h-5" />
+										Previsualizar historia
+									</button>
 									<button
 										type="button"
 										onClick={resetStoryFlow}
@@ -607,6 +586,24 @@ export default function StoryUploadPage() {
 					)}
 				</AnimatePresence>
 			</div>
+
+			{showPreview && result && (
+				<div className="fixed inset-0 z-[100] bg-black flex flex-col">
+					<div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
+						<span className="text-white font-display font-bold text-lg">Tu historia</span>
+						<button type="button" onClick={() => setShowPreview(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+							<X className="w-5 h-5 text-white" />
+						</button>
+					</div>
+					<video
+						src={result.video_url || result.previewUrl}
+						autoPlay
+						playsInline
+						controls
+						className="flex-1 w-full h-full object-contain"
+					/>
+				</div>
+			)}
 
 			{processing && (
 				<div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl bg-black/88 border border-white/10 shadow-2xl">
