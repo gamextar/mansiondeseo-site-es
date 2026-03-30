@@ -77,6 +77,7 @@ export default function SettingsPage() {
   const [storyMaxDurationSeconds, setStoryMaxDurationSeconds] = useState('15');
 
   // Encoder
+  const [encoderThreads, setEncoderThreads] = useState('4');
   const [encoderCrf, setEncoderCrf] = useState('29');
   const [encoderMaxrate, setEncoderMaxrate] = useState('2700k');
   const [encoderBufsize, setEncoderBufsize] = useState('8000k');
@@ -142,6 +143,7 @@ export default function SettingsPage() {
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
         setVideoAvatarSize(s.videoAvatarSize ?? 52);
         setStoryMaxDurationSeconds(String(s.storyMaxDurationSeconds ?? 15));
+        setEncoderThreads(String(s.encoderThreads ?? 4));
         setEncoderCrf(s.encoderCrf || '29');
         setEncoderMaxrate(s.encoderMaxrate || '2700k');
         setEncoderBufsize(s.encoderBufsize || '8000k');
@@ -196,6 +198,7 @@ export default function SettingsPage() {
         video_gradient_opacity: videoGradientOpacity,
         video_avatar_size: videoAvatarSize,
         story_max_duration_seconds: storyMaxDurationSeconds,
+        encoder_threads: encoderThreads,
         encoder_crf: encoderCrf,
         encoder_maxrate: encoderMaxrate,
         encoder_bufsize: encoderBufsize,
@@ -238,6 +241,7 @@ export default function SettingsPage() {
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
       setVideoAvatarSize(s.videoAvatarSize ?? 52);
       setStoryMaxDurationSeconds(String(s.storyMaxDurationSeconds ?? 15));
+      setEncoderThreads(String(s.encoderThreads ?? 4));
       setEncoderCrf(s.encoderCrf || '29');
       setEncoderMaxrate(s.encoderMaxrate || '2700k');
       setEncoderBufsize(s.encoderBufsize || '8000k');
@@ -1162,6 +1166,18 @@ export default function SettingsPage() {
               />
             </div>
 
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Threads</h3>
+                  <p className="text-[11px] text-text-dim">Cantidad de hilos para el encode H.264 y el fallback</p>
+                </div>
+              </div>
+              <select value={encoderThreads} onChange={e => setEncoderThreads(e.target.value)} className="w-full bg-mansion-elevated text-text-primary rounded-xl px-4 py-3 border border-white/10 text-sm">
+                {['1','2','3','4','5','6','7','8'].map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+
             {/* CRF */}
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
               <div className="flex items-center justify-between mb-3">
@@ -1246,7 +1262,7 @@ export default function SettingsPage() {
             <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-gold/20">
               <h3 className="text-xs font-bold text-mansion-gold uppercase tracking-wider mb-2">Configuración activa</h3>
               <p className="text-sm text-text-primary font-mono">
-                {storyMaxDurationSeconds}s max · CRF {encoderCrf} · {encoderMaxrate} cap · {encoderBufsize} buf · {encoderPreset} · {encoderAudioBitrate === 'none' ? 'sin audio' : `AAC ${encoderAudioBitrate}${encoderAudioMono ? ' mono' : ''}`}
+                {storyMaxDurationSeconds}s max · {encoderThreads} threads · CRF {encoderCrf} · {encoderMaxrate} cap · {encoderBufsize} buf · {encoderPreset} · {encoderAudioBitrate === 'none' ? 'sin audio' : `AAC ${encoderAudioBitrate}${encoderAudioMono ? ' mono' : ''}`}
               </p>
             </div>
           </div>

@@ -201,6 +201,7 @@ export default function StoryUploadPage() {
 	const navigate = useNavigate();
 	const { user, siteSettings } = useAuth();
 	const maxStoryDurationSeconds = Math.max(1, Number(siteSettings?.storyMaxDurationSeconds || 15));
+	const encoderThreads = Math.max(1, Number(siteSettings?.encoderThreads || 4));
 	const encoderParams = {
 		crf: siteSettings?.encoderCrf || ENCODER_DEFAULTS.crf,
 		maxrate: siteSettings?.encoderMaxrate || ENCODER_DEFAULTS.maxrate,
@@ -373,8 +374,8 @@ export default function StoryUploadPage() {
 		let exitCode = await ffmpeg.exec([
 			...sharedArgs,
 			'-c:v', 'libx264',
-			'-threads', '4',
-			'-x264-params', 'sliced-threads=1:threads=4',
+			'-threads', String(encoderThreads),
+			'-x264-params', `sliced-threads=1:threads=${encoderThreads}`,
 			'-crf', encoderParams.crf,
 			'-maxrate', encoderParams.maxrate,
 			'-bufsize', encoderParams.bufsize,
@@ -391,6 +392,7 @@ export default function StoryUploadPage() {
 			exitCode = await ffmpeg.exec([
 				...sharedArgs,
 				'-c:v', 'mpeg4',
+				'-threads', String(encoderThreads),
 				'-q:v', '4',
 				'-c:a', 'aac',
 				'-b:a', encoderParams.audioBitrate,
@@ -605,6 +607,11 @@ export default function StoryUploadPage() {
 												<Wand2 className="w-5 h-5" />
 												Cargar historia
 											</button>
+											{sourceDuration > maxStoryDurationSeconds && (
+												<div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+													Se procesarán solo los primeros {maxStoryDurationSeconds}s de este video.
+												</div>
+											)}
 											<p className="text-xs text-text-dim text-center">Primero optimizamos el video en el navegador y después lo subimos a tu historia con progreso real.</p>
 										</div>
 									) : (
