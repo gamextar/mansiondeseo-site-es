@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film } from 'lucide-react';
+import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard } from 'lucide-react';
 import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, uploadImage } from '../lib/api';
 import { useAuth } from '../App';
 
@@ -16,6 +16,7 @@ export const ADMIN_SECTIONS = [
   { key: 'debug', label: 'Zona Peligrosa', icon: Shield },
   { key: 'navegacion', label: 'Navegación', icon: Navigation },
   { key: 'videos', label: 'Videos', icon: Film },
+  { key: 'encoder', label: 'Encoder', icon: Clapperboard },
 ];
 
 export default function SettingsPage() {
@@ -74,6 +75,14 @@ export default function SettingsPage() {
   const [videoGradientOpacity, setVideoGradientOpacity] = useState(40);
   const [videoAvatarSize, setVideoAvatarSize] = useState(52);
 
+  // Encoder
+  const [encoderCrf, setEncoderCrf] = useState('29');
+  const [encoderMaxrate, setEncoderMaxrate] = useState('2700k');
+  const [encoderBufsize, setEncoderBufsize] = useState('8000k');
+  const [encoderAudioBitrate, setEncoderAudioBitrate] = useState('64k');
+  const [encoderAudioMono, setEncoderAudioMono] = useState(true);
+  const [encoderPreset, setEncoderPreset] = useState('superfast');
+
   // Payment display
   const [paymentTitleVip, setPaymentTitleVip] = useState('Servicios Digitales');
   const [paymentDescriptorVip, setPaymentDescriptorVip] = useState('UNICOAPPS');
@@ -131,6 +140,12 @@ export default function SettingsPage() {
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
         setVideoAvatarSize(s.videoAvatarSize ?? 52);
+        setEncoderCrf(s.encoderCrf || '29');
+        setEncoderMaxrate(s.encoderMaxrate || '2700k');
+        setEncoderBufsize(s.encoderBufsize || '8000k');
+        setEncoderAudioBitrate(s.encoderAudioBitrate || '64k');
+        setEncoderAudioMono(s.encoderAudioMono ?? true);
+        setEncoderPreset(s.encoderPreset || 'superfast');
       })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
@@ -178,6 +193,12 @@ export default function SettingsPage() {
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
         video_avatar_size: videoAvatarSize,
+        encoder_crf: encoderCrf,
+        encoder_maxrate: encoderMaxrate,
+        encoder_bufsize: encoderBufsize,
+        encoder_audio_bitrate: encoderAudioBitrate,
+        encoder_audio_mono: encoderAudioMono ? '1' : '0',
+        encoder_preset: encoderPreset,
       });
       const s = data.settings;
       setBlurMobile(s.blurMobile);
@@ -213,6 +234,12 @@ export default function SettingsPage() {
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
       setVideoAvatarSize(s.videoAvatarSize ?? 52);
+      setEncoderCrf(s.encoderCrf || '29');
+      setEncoderMaxrate(s.encoderMaxrate || '2700k');
+      setEncoderBufsize(s.encoderBufsize || '8000k');
+      setEncoderAudioBitrate(s.encoderAudioBitrate || '64k');
+      setEncoderAudioMono(s.encoderAudioMono ?? true);
+      setEncoderPreset(s.encoderPreset || 'superfast');
       // Propagate to global context so dependent components update live
       setSiteSettings(s);
       setSaved(true);
@@ -1101,6 +1128,104 @@ export default function SettingsPage() {
                   <p className="text-white/70 text-[10px]">Caption del video...</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>}
+
+        {activeSection === 'encoder' && <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Clapperboard className="w-4 h-4 text-mansion-gold" />
+            <h2 className="text-xs font-bold text-text-primary uppercase tracking-wider">Encoder de Historias</h2>
+          </div>
+          <p className="text-[11px] text-text-dim mb-4">Estos parámetros controlan cómo se procesan los videos subidos como historias (FFmpeg WASM, H.264).</p>
+          <div className="space-y-3">
+
+            {/* CRF */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">CRF (Calidad)</h3>
+                  <p className="text-[11px] text-text-dim">Menor = mejor calidad + archivo más grande</p>
+                </div>
+                <span className="text-lg font-bold text-mansion-gold tabular-nums">{encoderCrf}</span>
+              </div>
+              <input type="range" min="18" max="40" value={encoderCrf} onChange={e => setEncoderCrf(e.target.value)} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>18 (alta)</span>
+                <span>29 (default)</span>
+                <span>40 (baja)</span>
+              </div>
+            </div>
+
+            {/* Maxrate */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Bitrate máximo (cap)</h3>
+                  <p className="text-[11px] text-text-dim">Techo de bitrate de video</p>
+                </div>
+              </div>
+              <select value={encoderMaxrate} onChange={e => setEncoderMaxrate(e.target.value)} className="w-full bg-mansion-elevated text-text-primary rounded-xl px-4 py-3 border border-white/10 text-sm">
+                {['1000k','1500k','2000k','2500k','2700k','3000k','3500k','4000k','4500k','5000k','6000k'].map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+
+            {/* Bufsize */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Buffer size</h3>
+                  <p className="text-[11px] text-text-dim">Tamaño del buffer del rate control (normalmente 2-3× maxrate)</p>
+                </div>
+              </div>
+              <select value={encoderBufsize} onChange={e => setEncoderBufsize(e.target.value)} className="w-full bg-mansion-elevated text-text-primary rounded-xl px-4 py-3 border border-white/10 text-sm">
+                {['2000k','3000k','4000k','5000k','6000k','8000k','10000k','12000k','15000k'].map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+
+            {/* Preset */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Preset (Velocidad)</h3>
+                  <p className="text-[11px] text-text-dim">Más rápido = peor compresión, más pesado</p>
+                </div>
+              </div>
+              <select value={encoderPreset} onChange={e => setEncoderPreset(e.target.value)} className="w-full bg-mansion-elevated text-text-primary rounded-xl px-4 py-3 border border-white/10 text-sm">
+                {['ultrafast','superfast','veryfast','faster','fast','medium'].map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+
+            {/* Audio Bitrate */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Audio Bitrate</h3>
+                  <p className="text-[11px] text-text-dim">Calidad del audio AAC</p>
+                </div>
+              </div>
+              <select value={encoderAudioBitrate} onChange={e => setEncoderAudioBitrate(e.target.value)} className="w-full bg-mansion-elevated text-text-primary rounded-xl px-4 py-3 border border-white/10 text-sm">
+                {['none','16k','24k','32k','48k','64k','96k','128k'].map(v => <option key={v} value={v}>{v === 'none' ? 'Sin audio' : v}</option>)}
+              </select>
+            </div>
+
+            {/* Audio Mono */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Audio Mono</h3>
+                  <p className="text-[11px] text-text-dim">Convertir a mono (reduce tamaño)</p>
+                </div>
+                <ToggleSwitch value={encoderAudioMono} onChange={setEncoderAudioMono} />
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-gold/20">
+              <h3 className="text-xs font-bold text-mansion-gold uppercase tracking-wider mb-2">Configuración activa</h3>
+              <p className="text-sm text-text-primary font-mono">
+                CRF {encoderCrf} · {encoderMaxrate} cap · {encoderBufsize} buf · {encoderPreset} · {encoderAudioBitrate === 'none' ? 'sin audio' : `AAC ${encoderAudioBitrate}${encoderAudioMono ? ' mono' : ''}`}
+              </p>
             </div>
           </div>
         </section>}

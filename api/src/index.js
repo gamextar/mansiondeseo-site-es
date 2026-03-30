@@ -1718,6 +1718,12 @@ async function loadSettings(env) {
     videoGradientHeight: parseInt(settings.video_gradient_height || '64', 10),
     videoGradientOpacity: parseInt(settings.video_gradient_opacity || '40', 10),
     videoAvatarSize: parseInt(settings.video_avatar_size || '52', 10),
+    encoderCrf: settings.encoder_crf || '29',
+    encoderMaxrate: settings.encoder_maxrate || '2700k',
+    encoderBufsize: settings.encoder_bufsize || '8000k',
+    encoderAudioBitrate: settings.encoder_audio_bitrate || '64k',
+    encoderAudioMono: settings.encoder_audio_mono !== '0',
+    encoderPreset: settings.encoder_preset || 'superfast',
   };
 }
 
@@ -1767,6 +1773,12 @@ function getPublicSettingsPayload(settings) {
     videoGradientHeight: settings.videoGradientHeight,
     videoGradientOpacity: settings.videoGradientOpacity,
     videoAvatarSize: settings.videoAvatarSize,
+    encoderCrf: settings.encoderCrf,
+    encoderMaxrate: settings.encoderMaxrate,
+    encoderBufsize: settings.encoderBufsize,
+    encoderAudioBitrate: settings.encoderAudioBitrate,
+    encoderAudioMono: settings.encoderAudioMono,
+    encoderPreset: settings.encoderPreset,
   };
 }
 
@@ -1818,6 +1830,12 @@ async function handleUpdateSettings(request, env) {
     'video_gradient_height',
     'video_gradient_opacity',
     'video_avatar_size',
+    'encoder_crf',
+    'encoder_maxrate',
+    'encoder_bufsize',
+    'encoder_audio_bitrate',
+    'encoder_audio_mono',
+    'encoder_preset',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {

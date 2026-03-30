@@ -12,7 +12,7 @@ const LANDSCAPE_HEIGHT = 720;
 const PORTRAIT_WIDTH = 720;
 const PORTRAIT_HEIGHT = 1280;
 const FFMPEG_BASE_URL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
-const STORY_PRESET = {
+const ENCODER_DEFAULTS = {
 	crf: '29',
 	maxrate: '2700k',
 	bufsize: '8000k',
@@ -197,7 +197,15 @@ function StoryPreview({ videoUrl, caption, user, onClose }) {
 }
 
 export default function StoryUploadPage() {
-	const { user } = useAuth();
+	const { user, siteSettings } = useAuth();
+	const encoderParams = {
+		crf: siteSettings?.encoderCrf || ENCODER_DEFAULTS.crf,
+		maxrate: siteSettings?.encoderMaxrate || ENCODER_DEFAULTS.maxrate,
+		bufsize: siteSettings?.encoderBufsize || ENCODER_DEFAULTS.bufsize,
+		audioBitrate: siteSettings?.encoderAudioBitrate || ENCODER_DEFAULTS.audioBitrate,
+		audioMono: siteSettings?.encoderAudioMono ?? ENCODER_DEFAULTS.audioMono,
+		preset: siteSettings?.encoderPreset || ENCODER_DEFAULTS.preset,
+	};
 	const ffmpegRef = useRef(null);
 	const loadPromiseRef = useRef(null);
 	const videoRef = useRef(null);
@@ -363,14 +371,14 @@ export default function StoryUploadPage() {
 			'-c:v', 'libx264',
 			'-threads', '4',
 			'-x264-params', 'sliced-threads=1:threads=4',
-			'-crf', STORY_PRESET.crf,
-			'-maxrate', STORY_PRESET.maxrate,
-			'-bufsize', STORY_PRESET.bufsize,
-			'-preset', STORY_PRESET.preset,
+			'-crf', encoderParams.crf,
+			'-maxrate', encoderParams.maxrate,
+			'-bufsize', encoderParams.bufsize,
+			'-preset', encoderParams.preset,
 			'-pix_fmt', 'yuv420p',
 			'-c:a', 'aac',
-			'-b:a', STORY_PRESET.audioBitrate,
-			...(STORY_PRESET.audioMono ? ['-ac', '1'] : []),
+			'-b:a', encoderParams.audioBitrate,
+			...(encoderParams.audioMono ? ['-ac', '1'] : []),
 			outputFileName,
 		]);
 
@@ -381,8 +389,8 @@ export default function StoryUploadPage() {
 				'-c:v', 'mpeg4',
 				'-q:v', '4',
 				'-c:a', 'aac',
-				'-b:a', STORY_PRESET.audioBitrate,
-				...(STORY_PRESET.audioMono ? ['-ac', '1'] : []),
+				'-b:a', encoderParams.audioBitrate,
+				...(encoderParams.audioMono ? ['-ac', '1'] : []),
 				outputFileName,
 			]);
 		}
