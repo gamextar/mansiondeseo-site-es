@@ -1166,7 +1166,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <select value={encoderMaxrate} onChange={e => setEncoderMaxrate(e.target.value)} className="w-full bg-mansion-elevated text-text-primary rounded-xl px-4 py-3 border border-white/10 text-sm">
-                {['1000k','1500k','2000k','2500k','2700k','3000k','3500k','4000k','4500k','5000k','6000k'].map(v => <option key={v} value={v}>{v}</option>)}
+                {['1000k','1500k','2000k','2100k','2200k','2300k','2400k','2500k','2600k','2700k','2800k','2900k','3000k','3500k','4000k','4500k','5000k','6000k'].map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
 
@@ -1179,7 +1179,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <select value={encoderBufsize} onChange={e => setEncoderBufsize(e.target.value)} className="w-full bg-mansion-elevated text-text-primary rounded-xl px-4 py-3 border border-white/10 text-sm">
-                {['2000k','3000k','4000k','5000k','6000k','8000k','10000k','12000k','15000k'].map(v => <option key={v} value={v}>{v}</option>)}
+                {['2000k','3000k','4000k','5000k','6000k','7000k','7500k','8000k','10000k','12000k','15000k'].map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
 
