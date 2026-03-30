@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Clock, Eye, Film, Gift, Heart, LayoutDashboard, Send, Upload, Volume2, VolumeX, Wand2, X } from 'lucide-react';
+import { CheckCircle2, Clock, Download, Eye, Film, Gift, Heart, LayoutDashboard, Send, Upload, Volume2, VolumeX, Wand2, X } from 'lucide-react';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
@@ -723,6 +723,14 @@ export default function StoryUploadPage() {
 										<Eye className="w-5 h-5" />
 										Previsualizar historia
 									</button>
+									<a
+										href={result.previewUrl}
+										download={result.fileName || 'historia.mp4'}
+										className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-medium hover:bg-white/10 transition-colors"
+									>
+										<Download className="w-5 h-5" />
+										Descargar historia
+									</a>
 									<button
 										type="button"
 										onClick={resetStoryFlow}
