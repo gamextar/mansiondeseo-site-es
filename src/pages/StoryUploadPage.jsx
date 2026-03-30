@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, Clock, Eye, Film, Upload, Wand2, X } from 'lucide-react';
+import { CheckCircle2, Clock, Eye, Film, Upload, Volume2, VolumeX, Wand2, X } from 'lucide-react';
+import { useAuth } from '../App';
+import AvatarImg from '../components/AvatarImg';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import { uploadStory } from '../lib/api';
@@ -83,7 +85,102 @@ async function downloadBlobUrl(url, mimeType) {
 	return URL.createObjectURL(new Blob([buffer], { type: mimeType }));
 }
 
+// ── Feed-style fullscreen story preview ─────────────────────────────────────
+function StoryPreview({ videoUrl, caption, user, onClose }) {
+	const videoRef = useRef(null);
+	const progressRef = useRef(null);
+	const rafRef = useRef(null);
+	const [isMuted, setIsMuted] = useState(true);
+
+	useEffect(() => {
+		const video = videoRef.current;
+		if (!video) return;
+		video.play().catch(() => {});
+
+		const tick = () => {
+			if (progressRef.current && video.duration) {
+				progressRef.current.style.width = `${(video.currentTime / video.duration) * 100}%`;
+			}
+			rafRef.current = requestAnimationFrame(tick);
+		};
+		rafRef.current = requestAnimationFrame(tick);
+
+		return () => cancelAnimationFrame(rafRef.current);
+	}, []);
+
+	const avatarSize = 48;
+
+	return (
+		<div className="fixed inset-0 z-[100] bg-black">
+			{/* Video */}
+			<video
+				ref={videoRef}
+				src={videoUrl}
+				className="absolute inset-0 w-full h-full object-cover"
+				loop
+				playsInline
+				muted={isMuted}
+				autoPlay
+			/>
+
+			{/* Top gradient */}
+			<div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none" />
+
+			{/* Bottom gradient */}
+			<div
+				className="absolute inset-x-0 bottom-0 pointer-events-none"
+				style={{ height: '45%', background: 'linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0.04), transparent)' }}
+			/>
+
+			{/* Close button */}
+			<button
+				type="button"
+				onClick={onClose}
+				className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center"
+			>
+				<X className="w-5 h-5 text-white" />
+			</button>
+
+			{/* Mute toggle */}
+			<button
+				type="button"
+				onClick={() => setIsMuted(m => !m)}
+				className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center"
+			>
+				{isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+			</button>
+
+			{/* User info overlay (bottom-left, feed-style) */}
+			<div className="absolute left-4 right-20 bottom-10 z-20 flex flex-col items-start gap-2.5">
+				<div className="flex flex-col items-start gap-2.5">
+					<div
+						className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg"
+						style={{ width: avatarSize, height: avatarSize }}
+					>
+						{user?.avatar_url ? (
+							<AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
+						) : (
+							<div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(user?.username || '?')[0]}</div>
+						)}
+					</div>
+					<p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.5)' }}>@{user?.username || 'usuario'}</p>
+				</div>
+				{caption && (
+					<p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.6)' }}>{caption}</p>
+				)}
+				<p className="text-white/40 text-[11px] mt-0.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>Ahora</p>
+			</div>
+
+			{/* Progress bar (bottom) */}
+			<div className="absolute bottom-0 left-0 right-0 h-[3px] z-30 bg-white/10">
+				<div ref={progressRef} className="h-full bg-mansion-gold" style={{ width: '0%' }} />
+			</div>
+		</div>
+	);
+}
+
 export default function StoryUploadPage() {
+	const { user } = useAuth();
 	const ffmpegRef = useRef(null);
 	const loadPromiseRef = useRef(null);
 	const videoRef = useRef(null);
@@ -588,21 +685,12 @@ export default function StoryUploadPage() {
 			</div>
 
 			{showPreview && result && (
-				<div className="fixed inset-0 z-[100] bg-black flex flex-col">
-					<div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
-						<span className="text-white font-display font-bold text-lg">Tu historia</span>
-						<button type="button" onClick={() => setShowPreview(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-							<X className="w-5 h-5 text-white" />
-						</button>
-					</div>
-					<video
-						src={result.video_url || result.previewUrl}
-						autoPlay
-						playsInline
-						controls
-						className="flex-1 w-full h-full object-contain"
-					/>
-				</div>
+				<StoryPreview
+					videoUrl={result.video_url || result.previewUrl}
+					caption={result.caption}
+					user={user}
+					onClose={() => setShowPreview(false)}
+				/>
 			)}
 
 			{processing && (
