@@ -448,6 +448,13 @@ export async function getStories({ page = 1, limit = 100 } = {}) {
   return apiFetch(`/stories?${params}`);
 }
 
+function invalidateStoryFeedCache() {
+  try {
+    sessionStorage.removeItem('vf_stories');
+    sessionStorage.removeItem('vf_idx');
+  } catch {}
+}
+
 export async function uploadStory(file, { caption = '', onProgress } = {}) {
   const params = new URLSearchParams();
   if (caption) params.set('caption', caption);
@@ -458,12 +465,15 @@ export async function uploadStory(file, { caption = '', onProgress } = {}) {
     headers: { 'Content-Type': file.type },
     body: await file.arrayBuffer(),
   });
+  invalidateStoryFeedCache();
   onProgress?.(1);
   return data;
 }
 
 export async function adminDeleteStory(storyId) {
-  return apiFetch(`/admin/stories/${storyId}`, { method: 'DELETE' });
+  const data = await apiFetch(`/admin/stories/${storyId}`, { method: 'DELETE' });
+  invalidateStoryFeedCache();
+  return data;
 }
 
 export async function adminUploadStoryForUser(userId, file, { caption = '' } = {}) {
@@ -475,5 +485,6 @@ export async function adminUploadStoryForUser(userId, file, { caption = '' } = {
     headers: { 'Content-Type': file.type },
     body: await file.arrayBuffer(),
   });
+  invalidateStoryFeedCache();
   return data;
 }
