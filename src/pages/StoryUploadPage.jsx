@@ -456,6 +456,7 @@ export default function StoryUploadPage() {
 				previewUrl: encoded.previewUrl,
 				fileName: encoded.fileName,
 				sizeLabel: encoded.sizeLabel,
+				originalSizeLabel: sourceFile ? `${(sourceFile.size / (1024 * 1024)).toFixed(2)} MB` : null,
 				duration: encoded.duration,
 				processingTimeLabel: formatElapsedSeconds(processingElapsedSeconds),
 			});
@@ -691,9 +692,27 @@ export default function StoryUploadPage() {
 									<CheckCircle2 className="w-7 h-7 text-green-400" />
 								</motion.div>
 								<h2 className="font-display text-2xl font-bold text-text-primary">¡Tu historia fue publicada!</h2>
-								<p className="text-text-muted mt-1 mb-6 text-sm">
-									{result.sizeLabel} · {result.duration > 0 ? `${result.duration.toFixed(1)}s` : 'duración original'} · procesado en {result.processingTimeLabel}
-								</p>
+								<p className="text-text-muted mt-1 text-sm">El encoding ha finalizado correctamente</p>
+
+								{/* Encoding summary */}
+								<div className="mt-4 mb-6 grid grid-cols-2 gap-2 text-left">
+									<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+										<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Tamaño original</p>
+										<p className="text-base font-semibold text-text-primary tabular-nums">{result.originalSizeLabel ?? '—'}</p>
+									</div>
+									<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+										<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Tamaño final</p>
+										<p className="text-base font-semibold text-mansion-gold tabular-nums">{result.sizeLabel}</p>
+									</div>
+									<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+										<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Duración</p>
+										<p className="text-base font-semibold text-text-primary tabular-nums">{result.duration > 0 ? `${result.duration.toFixed(1)}s` : '—'}</p>
+									</div>
+									<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+										<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Tiempo de encoding</p>
+										<p className="text-base font-semibold text-text-primary tabular-nums">{result.processingTimeLabel}</p>
+									</div>
+								</div>
 
 								<div className="flex flex-col gap-3">
 									<button
