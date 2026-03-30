@@ -2859,6 +2859,18 @@ async function handleAdminUploadStory(request, env) {
     ? `${env.R2_PUBLIC_URL}/${key}`
     : `/api/images/${key}`;
 
+  // Delete any previous story for this user (DB + R2)
+  const existingAdmin = await env.DB.prepare(
+    'SELECT id, video_url FROM stories WHERE user_id = ?'
+  ).bind(userId).all();
+  for (const old of existingAdmin.results || []) {
+    try {
+      const oldKey = old.video_url.replace(/^https?:\/\/[^/]+\//, '');
+      await env.IMAGES.delete(oldKey);
+    } catch {}
+    await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(old.id).run();
+  }
+
   const storyId = generateId();
   await env.DB.prepare(`
     INSERT INTO stories (id, user_id, video_url, caption) VALUES (?, ?, ?, ?)
