@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, Clock, Eye, Film, Gift, Heart, Send, Upload, Volume2, VolumeX, Wand2, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CheckCircle2, Clock, Eye, Film, Gift, Heart, LayoutDashboard, Send, Upload, Volume2, VolumeX, Wand2, X } from 'lucide-react';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
@@ -197,6 +198,7 @@ function StoryPreview({ videoUrl, caption, user, onClose }) {
 }
 
 export default function StoryUploadPage() {
+	const navigate = useNavigate();
 	const { user, siteSettings } = useAuth();
 	const encoderParams = {
 		crf: siteSettings?.encoderCrf || ENCODER_DEFAULTS.crf,
@@ -701,6 +703,14 @@ export default function StoryUploadPage() {
 									>
 										<Upload className="w-5 h-5" />
 										Subir otra historia
+									</button>
+									<button
+										type="button"
+										onClick={() => navigate('/perfil')}
+										className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-muted font-medium hover:bg-white/10 transition-colors"
+									>
+										<LayoutDashboard className="w-5 h-5" />
+										Ir al panel de control
 									</button>
 								</div>
 							</div>
