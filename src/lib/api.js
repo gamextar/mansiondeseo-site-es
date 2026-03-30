@@ -459,14 +459,14 @@ export async function uploadStory(file, { caption = '', onProgress } = {}) {
   const params = new URLSearchParams();
   if (caption) params.set('caption', caption);
   const qs = params.toString();
-  onProgress?.(0);
-  const data = await apiFetch(`/stories${qs ? `?${qs}` : ''}`, {
+  const body = await file.arrayBuffer();
+  const data = await apiUpload(`/stories${qs ? `?${qs}` : ''}`, {
     method: 'POST',
     headers: { 'Content-Type': file.type },
-    body: await file.arrayBuffer(),
+    body,
+    onProgress,
   });
   invalidateStoryFeedCache();
-  onProgress?.(1);
   return data;
 }
 
