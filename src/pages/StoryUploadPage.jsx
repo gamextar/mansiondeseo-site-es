@@ -660,8 +660,8 @@ export default function StoryUploadPage() {
 							style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
 							className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 overflow-hidden"
 						>
-							<div className="px-6 sm:px-8 pt-6 pb-4 border-b border-white/10 bg-white/[0.02]">
-								<div className="flex items-center justify-center gap-2">
+							<div className="px-6 sm:px-8 pt-6 pb-4 border-b border-white/10 bg-white/[0.02] relative flex items-center justify-center">
+								<div className="flex items-center gap-2">
 									{storySteps.map((step, index) => (
 										<div key={step.id} className="flex items-center gap-2">
 											<div className="w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold bg-mansion-gold text-mansion-base border-mansion-gold">
@@ -671,6 +671,14 @@ export default function StoryUploadPage() {
 										</div>
 									))}
 								</div>
+								<button
+									type="button"
+									onClick={() => navigate('/perfil')}
+									className="absolute right-4 sm:right-6 w-8 h-8 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/10 transition-colors"
+									aria-label="Volver al panel de control"
+								>
+									<X className="w-4 h-4" />
+								</button>
 							</div>
 							<div className="p-6 sm:p-8 text-center">
 								<motion.div
