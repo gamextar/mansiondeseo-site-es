@@ -105,13 +105,13 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
 
     if (isActive) {
       if (activeSrc) {
-        video.currentTime = 0;
-        if (progressBarRef.current) progressBarRef.current.style.width = '0%';
         video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
       }
       rafRef.current = requestAnimationFrame(tick);
     } else {
       video.pause();
+      video.currentTime = 0;
+      if (progressBarRef.current) progressBarRef.current.style.width = '0%';
       setIsPlaying(false);
       cancelAnimationFrame(rafRef.current);
     }
