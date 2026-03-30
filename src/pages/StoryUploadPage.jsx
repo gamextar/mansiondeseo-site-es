@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, Clock, Eye, Film, Upload, Volume2, VolumeX, Wand2, X } from 'lucide-react';
+import { CheckCircle2, Clock, Eye, Film, Gift, Heart, Send, Upload, Volume2, VolumeX, Wand2, X } from 'lucide-react';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
@@ -132,27 +132,44 @@ function StoryPreview({ videoUrl, caption, user, onClose }) {
 				style={{ height: '45%', background: 'linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0.04), transparent)' }}
 			/>
 
-			{/* Close button */}
+			{/* Close button — top-right, inside PWA safe area */}
 			<button
 				type="button"
 				onClick={onClose}
-				className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center"
+				className="absolute z-20 w-11 h-11 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center"
+				style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
 			>
 				<X className="w-5 h-5 text-white" />
 			</button>
 
-			{/* Mute toggle */}
-			<button
-				type="button"
-				onClick={() => setIsMuted(m => !m)}
-				className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center"
-			>
-				{isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
-			</button>
+			{/* Right-side action icons (visual only, matching feed) */}
+			<div className="pointer-events-none absolute right-3 flex flex-col items-center gap-6 z-20" style={{ bottom: 28 }}>
+				<div className="flex flex-col items-center">
+					<div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+						<Heart className="w-6 h-6 text-white" />
+					</div>
+					<span className="text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">0</span>
+				</div>
+				<div className="flex flex-col items-center">
+					<div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+						<Send className="w-6 h-6 text-white" />
+					</div>
+				</div>
+				<div className="flex flex-col items-center">
+					<div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+						<Gift className="w-6 h-6 text-mansion-gold" />
+					</div>
+				</div>
+				<div className="flex flex-col items-center" onClick={() => setIsMuted(m => !m)} style={{ pointerEvents: 'auto', cursor: 'pointer' }}>
+					<div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+						{isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
+					</div>
+				</div>
+			</div>
 
-			{/* User info overlay (bottom-left, feed-style) */}
-			<div className="absolute left-4 right-20 bottom-10 z-20 flex flex-col items-start gap-2.5">
-				<div className="flex flex-col items-start gap-2.5">
+			{/* User info + caption overlay (bottom-left, feed-style) */}
+			<div className="absolute left-4 right-20 z-20" style={{ bottom: 20 }}>
+				<div className="flex flex-col items-start gap-2.5 mb-1">
 					<div
 						className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg"
 						style={{ width: avatarSize, height: avatarSize }}
@@ -168,7 +185,7 @@ function StoryPreview({ videoUrl, caption, user, onClose }) {
 				{caption && (
 					<p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.6)' }}>{caption}</p>
 				)}
-				<p className="text-white/40 text-[11px] mt-0.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>Ahora</p>
+				<p className="text-white/40 text-[11px] mt-1.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>Ahora</p>
 			</div>
 
 			{/* Progress bar (bottom) */}
