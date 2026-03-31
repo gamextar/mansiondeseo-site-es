@@ -519,33 +519,37 @@ export default function StoryUploadPage() {
 	};
 
 	const maskedEncodingProgress = clamp(encodingProgress, 0, 1);
+	const maskedUploadProgress = clamp(uploadProgress, 0, 1);
+	const verificationEncodingShare = 0.86;
 	const loadingStoryProgress = phase === 'preparing'
 		? 0
 		: clamp(maskedEncodingProgress * 2, 0, 1);
 	const verificationProgress = phase === 'preparing'
 		? 0
 		: phase === 'encoding'
-			? clamp((maskedEncodingProgress - 0.5) * 2, 0, 1)
-			: phase === 'uploading' || phase === 'done'
-				? 1
+			? clamp(((maskedEncodingProgress - 0.5) * 2) * verificationEncodingShare, 0, verificationEncodingShare)
+			: phase === 'uploading'
+				? verificationEncodingShare + (maskedUploadProgress * (1 - verificationEncodingShare))
+				: phase === 'done'
+					? 1
 				: 0;
 	const showVerificationProgress = phase === 'encoding'
 		? maskedEncodingProgress >= 0.5
 		: phase === 'uploading' || phase === 'done';
+	const loadingStoryPercent = Math.round(loadingStoryProgress * 100);
+	const verificationPercent = Math.round(verificationProgress * 100);
 	const progressValue = phase === 'preparing'
 		? 0
-		: phase === 'uploading'
-			? 1
-			: showVerificationProgress
+		: showVerificationProgress
 				? verificationProgress
 				: loadingStoryProgress;
 	const progressLabel = phase === 'preparing'
-		? 'Preparando video'
+		? 'Iniciando historia'
 		: phase === 'uploading'
-			? 'Verificando historia'
+			? 'Publicando historia'
 			: showVerificationProgress
 				? 'Verificando historia'
-				: 'Cargando Historia';
+				: 'Cargando historia';
 
 	return (
 		<div className="min-h-screen bg-mansion-base text-text-primary relative overflow-hidden">
@@ -661,16 +665,16 @@ export default function StoryUploadPage() {
 									) : (
 										<div className="space-y-4 rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-5 sm:p-6">
 											{phase === 'preparing' && (
-												<p className="text-xs text-text-dim">Analizando el video y preparando el motor antes de comenzar el encoding.</p>
+												<p className="text-xs text-text-dim">Estamos preparando el video para iniciar una publicación más fluida.</p>
 											)}
 											<div className="space-y-2">
 												<div className="flex items-center justify-between text-sm">
-													<span className="text-text-muted">Cargando Historia</span>
-													<span className="font-semibold text-mansion-gold tabular-nums">{Math.round(loadingStoryProgress * 100)}%</span>
+													<span className="text-text-muted">Cargando historia</span>
+													<span className="font-semibold text-mansion-gold tabular-nums">{loadingStoryPercent}%</span>
 												</div>
 												<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
 													<div className="h-3 bg-white/5">
-														<div className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${Math.round(loadingStoryProgress * 100)}%` }} />
+														<div className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${loadingStoryPercent}%` }} />
 													</div>
 												</div>
 											</div>
@@ -679,11 +683,11 @@ export default function StoryUploadPage() {
 												<div className="space-y-2">
 													<div className="flex items-center justify-between text-sm">
 														<span className="text-text-muted">Verificando historia</span>
-														<span className="font-semibold text-mansion-gold tabular-nums">{Math.round(verificationProgress * 100)}%</span>
+														<span className="font-semibold text-mansion-gold tabular-nums">{verificationPercent}%</span>
 													</div>
 													<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
 														<div className="h-3 bg-white/5">
-															<div className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${Math.round(verificationProgress * 100)}%` }} />
+															<div className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${verificationPercent}%` }} />
 														</div>
 													</div>
 												</div>
@@ -691,12 +695,12 @@ export default function StoryUploadPage() {
 
 											<p className="text-xs text-text-dim">
 												{phase === 'preparing'
-													? 'Preparando el archivo para arrancar el proceso.'
+													? 'Ajustando el archivo y dejando listo el proceso inicial.'
 													: phase === 'encoding'
 														? showVerificationProgress
-															? 'Terminando el encoding antes de publicar la historia.'
-															: 'Procesando la historia para publicarla.'
-													: 'Subiendo automáticamente la historia cuando termina la preparación.'}
+															? 'Revisando los ultimos detalles del video antes de publicarlo.'
+															: 'Optimizando la historia para que se publique con mejor fluidez.'
+													: 'Publicando la historia y confirmando que quede disponible.'}
 											</p>
 										</div>
 									)}
