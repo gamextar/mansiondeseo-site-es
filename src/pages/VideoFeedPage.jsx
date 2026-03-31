@@ -90,6 +90,12 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   }
   const activeSrc = loadedSrcRef.current;
 
+  const attemptPlay = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !isActive || !activeSrc) return;
+    video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+  }, [activeSrc, isActive]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -105,9 +111,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     };
 
     if (isActive) {
-      if (activeSrc) {
-        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-      }
+      attemptPlay();
       rafRef.current = requestAnimationFrame(tick);
     } else {
       video.pause();
@@ -118,7 +122,30 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     }
 
     return () => cancelAnimationFrame(rafRef.current);
-  }, [isActive]);
+  }, [attemptPlay, isActive]);
+
+  useEffect(() => {
+    if (!isActive || !activeSrc) return;
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleReady = () => {
+      attemptPlay();
+    };
+
+    video.addEventListener('loadeddata', handleReady);
+    video.addEventListener('canplay', handleReady);
+
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      attemptPlay();
+    }
+
+    return () => {
+      video.removeEventListener('loadeddata', handleReady);
+      video.removeEventListener('canplay', handleReady);
+    };
+  }, [activeSrc, attemptPlay, isActive]);
 
   useEffect(() => {
     const video = videoRef.current;
