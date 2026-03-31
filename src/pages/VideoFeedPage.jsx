@@ -483,6 +483,10 @@ export default function VideoFeedPage() {
   const [activeDispIdx, setActiveDispIdx] = useState(savedIdx);
   const [boundaryOverlayIdx, setBoundaryOverlayIdx] = useState(null);
   const [isMuted, setIsMuted] = useState(savedMuted);
+  const [isDesktopViewport, setIsDesktopViewport] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(min-width: 1024px)').matches;
+  });
 
   const persistStories = useCallback((nextStories) => {
     try {
@@ -495,13 +499,34 @@ export default function VideoFeedPage() {
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
-  const isDesktopViewport = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
 
   const infiniteStories = stories.length > 0
     ? [stories[stories.length - 1], ...stories, stories[0]]
     : [];
-  const overlayIdx = boundaryOverlayIdx ?? activeDispIdx;
-  const activeStory = infiniteStories[overlayIdx] || stories[0] || null;
+  const desktopActiveIdx = Math.min(Math.max(activeDispIdx, 1), Math.max(stories.length, 1));
+  const mobileOverlayIdx = boundaryOverlayIdx ?? activeDispIdx;
+  const activeStory = isDesktopViewport
+    ? stories[desktopActiveIdx - 1] || stories[0] || null
+    : infiniteStories[mobileOverlayIdx] || stories[0] || null;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const media = window.matchMedia('(min-width: 1024px)');
+    const handleChange = (event) => {
+      setIsDesktopViewport(event.matches);
+    };
+
+    setIsDesktopViewport(media.matches);
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', handleChange);
+      return () => media.removeEventListener('change', handleChange);
+    }
+
+    media.addListener(handleChange);
+    return () => media.removeListener(handleChange);
+  }, []);
 
   const refreshStories = useCallback(async () => {
     const data = await getStories();
@@ -544,6 +569,7 @@ export default function VideoFeedPage() {
   }, [persistStories, subscribe]);
 
   useLayoutEffect(() => {
+    if (isDesktopViewport) return undefined;
     if (stories.length === 0 || !containerRef.current) return;
 
     const container = containerRef.current;
@@ -564,7 +590,7 @@ export default function VideoFeedPage() {
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [stories.length]);
+  }, [activeDispIdx, isDesktopViewport, stories.length]);
 
   useEffect(() => {
     try { sessionStorage.setItem('vf_idx', String(activeDispIdx)); } catch {}
@@ -644,6 +670,7 @@ export default function VideoFeedPage() {
   }, [settleInfiniteBoundary]);
 
   const handleScroll = useCallback(() => {
+    if (isDesktopViewport) return;
     const container = containerRef.current;
     if (!container || isJumpingRef.current) return;
 
@@ -671,7 +698,7 @@ export default function VideoFeedPage() {
     scrollEndTimer.current = setTimeout(() => {
       settleInfiniteBoundary();
     }, 90);
-  }, [activeDispIdx, boundaryOverlayIdx, settleInfiniteBoundary, stories.length]);
+  }, [activeDispIdx, boundaryOverlayIdx, isDesktopViewport, settleInfiniteBoundary, stories.length]);
 
   const handleLike = useCallback(async (storyId) => {
     // Optimistic: flip immediately
@@ -718,25 +745,24 @@ export default function VideoFeedPage() {
     container.scrollTop = (rawIndex + dir) * height;
   }, []);
 
+  const moveDesktopByOne = useCallback((dir) => {
+    if (stories.length === 0) return;
+    setBoundaryOverlayIdx(null);
+    setActiveDispIdx((prev) => {
+      const current = Math.min(Math.max(prev, 1), stories.length);
+      if (dir > 0) {
+        return current >= stories.length ? 1 : current + 1;
+      }
+      return current <= 1 ? stories.length : current - 1;
+    });
+  }, [stories.length]);
+
   const handleDesktopWheel = useCallback((event) => {
-    if (typeof window === 'undefined' || !window.matchMedia('(min-width: 1024px)').matches) {
+    if (!isDesktopViewport) {
       return;
     }
-
-    if (stories.length <= 1 || isJumpingRef.current || Math.abs(event.deltaY) < 16) {
-      return;
-    }
-
     event.preventDefault();
-
-    const now = performance.now();
-    if (now - lastDesktopWheelAtRef.current < 420) {
-      return;
-    }
-
-    lastDesktopWheelAtRef.current = now;
-    scrollByOne(event.deltaY > 0 ? 1 : -1);
-  }, [scrollByOne, stories.length]);
+  }, [isDesktopViewport]);
 
   if (loading) {
     return (
@@ -784,29 +810,16 @@ export default function VideoFeedPage() {
 
   return (
     <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        onWheel={handleDesktopWheel}
-        className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
-        style={{
-          scrollSnapType: 'y mandatory',
-          touchAction: 'pan-y',
-          overscrollBehavior: 'none',
-          WebkitOverflowScrolling: 'touch',
-        }}
-      >
-        {infiniteStories.map((story, displayIndex) => {
-          const dist = Math.abs(displayIndex - activeDispIdx);
-          const isBoundary = displayIndex <= 1 || displayIndex >= stories.length;
-          const shouldLoad = dist <= 3 || isBoundary;
-          return (
-            <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+      {isDesktopViewport ? (
+        <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
+          {activeStory && (
+            <div className="w-full h-full">
               <StoryCard
-                story={story}
-                videoSrc={story.video_url}
-                isActive={displayIndex === activeDispIdx}
-                shouldLoad={shouldLoad}
+                key={activeStory.id}
+                story={activeStory}
+                videoSrc={activeStory.video_url}
+                isActive
+                shouldLoad
                 isMuted={isMuted}
                 avatarSize={avatarSize}
                 onLike={handleLike}
@@ -815,9 +828,43 @@ export default function VideoFeedPage() {
                 gradientOpacity={gradientOpacity}
               />
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      ) : (
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+          style={{
+            scrollSnapType: 'y mandatory',
+            touchAction: 'pan-y',
+            overscrollBehavior: 'none',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          {infiniteStories.map((story, displayIndex) => {
+            const dist = Math.abs(displayIndex - activeDispIdx);
+            const isBoundary = displayIndex <= 1 || displayIndex >= stories.length;
+            const shouldLoad = dist <= 3 || isBoundary;
+            return (
+              <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+                <StoryCard
+                  story={story}
+                  videoSrc={story.video_url}
+                  isActive={displayIndex === activeDispIdx}
+                  shouldLoad={shouldLoad}
+                  isMuted={isMuted}
+                  avatarSize={avatarSize}
+                  onLike={handleLike}
+                  navigate={navigate}
+                  gradientHeight={gradientHeight}
+                  gradientOpacity={gradientOpacity}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {activeStory && (
         <div
@@ -872,14 +919,14 @@ export default function VideoFeedPage() {
       {stories.length > 1 && (
         <>
           <button
-            onClick={() => jumpByOne(-1)}
+            onClick={() => (isDesktopViewport ? moveDesktopByOne(-1) : jumpByOne(-1))}
             className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-16 h-16 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
             style={{ left: 'calc(50% - 350px)' }}
           >
             <ChevronLeft className="w-8 h-8 text-white/70" />
           </button>
           <button
-            onClick={() => jumpByOne(1)}
+            onClick={() => (isDesktopViewport ? moveDesktopByOne(1) : jumpByOne(1))}
             className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-16 h-16 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
             style={{ right: 'calc(50% - 350px)' }}
           >
