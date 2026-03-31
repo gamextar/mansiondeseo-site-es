@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Clock, Download, Eye, Film, Gift, Heart, LayoutDashboard, Send, Upload, Volume2, VolumeX, Wand2, X } from 'lucide-react';
+import { CheckCircle2, Clock, Download, Eye, Film, Gift, Heart, LayoutDashboard, Send, Upload, Volume2, VolumeX, X } from 'lucide-react';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
@@ -84,6 +84,35 @@ async function downloadBlobUrl(url, mimeType) {
 
 	const buffer = await response.arrayBuffer();
 	return URL.createObjectURL(new Blob([buffer], { type: mimeType }));
+}
+
+async function loadVideoMetadata(fileUrl) {
+	const video = document.createElement('video');
+	video.preload = 'metadata';
+	video.playsInline = true;
+
+	return new Promise((resolve, reject) => {
+		const cleanup = () => {
+			video.removeAttribute('src');
+			video.load();
+		};
+
+		video.onloadedmetadata = () => {
+			const metadata = {
+				duration: video.duration || 0,
+				resolution: video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : null,
+			};
+			cleanup();
+			resolve(metadata);
+		};
+
+		video.onerror = () => {
+			cleanup();
+			reject(new Error('No se pudo leer el video seleccionado.'));
+		};
+
+		video.src = fileUrl;
+	});
 }
 
 // ── Feed-style fullscreen story preview ─────────────────────────────────────
@@ -212,8 +241,6 @@ export default function StoryUploadPage() {
 	};
 	const ffmpegRef = useRef(null);
 	const loadPromiseRef = useRef(null);
-	const videoRef = useRef(null);
-	const sourceUrlRef = useRef('');
 	const resultPreviewUrlRef = useRef('');
 	const activeEncodeDurationRef = useRef(0);
 	const isTranscodingRef = useRef(false);
@@ -224,7 +251,6 @@ export default function StoryUploadPage() {
 	const [uploadProgress, setUploadProgress] = useState(0);
 	const [phase, setPhase] = useState('idle');
 	const [sourceFile, setSourceFile] = useState(null);
-	const [sourceUrl, setSourceUrl] = useState('');
 	const [sourceDuration, setSourceDuration] = useState(0);
 	const [sourceResolution, setSourceResolution] = useState(null);
 	const [processing, setProcessing] = useState(false);
@@ -261,15 +287,10 @@ export default function StoryUploadPage() {
 		return () => {
 			ffmpeg.off('log', handleLog);
 			ffmpeg.terminate();
-			if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
 			if (resultPreviewUrlRef.current) URL.revokeObjectURL(resultPreviewUrlRef.current);
 			clearInterval(timerIntervalRef.current);
 		};
 	}, []);
-
-	useEffect(() => {
-		sourceUrlRef.current = sourceUrl;
-	}, [sourceUrl]);
 
 	const ensureEngineLoaded = async () => {
 		const ffmpeg = ffmpegRef.current;
@@ -307,12 +328,7 @@ export default function StoryUploadPage() {
 
 	const resetStoryFlow = () => {
 		resetResult();
-		if (sourceUrlRef.current) {
-			URL.revokeObjectURL(sourceUrlRef.current);
-			sourceUrlRef.current = '';
-		}
 		setSourceFile(null);
-		setSourceUrl('');
 		setSourceDuration(0);
 		setSourceResolution(null);
 		setEncodingProgress(0);
@@ -333,35 +349,58 @@ export default function StoryUploadPage() {
 		setSourceFile(file);
 		setEncodingProgress(0);
 		setUploadProgress(0);
-		setPhase('idle');
+		setPhase('preparing');
+		setProcessing(true);
+		setElapsedSeconds(0);
+		clearInterval(timerIntervalRef.current);
+		timerStartRef.current = performance.now();
+		timerIntervalRef.current = setInterval(() => {
+			setElapsedSeconds(Math.floor((performance.now() - timerStartRef.current) / 1000));
+		}, 500);
 
-		const nextSourceUrl = URL.createObjectURL(file);
-		if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
-		setSourceUrl(nextSourceUrl);
+		const tempSourceUrl = URL.createObjectURL(file);
 
-		await ensureEngineLoaded().catch(() => {});
+		try {
+			const [metadata] = await Promise.all([
+				loadVideoMetadata(tempSourceUrl),
+				ensureEngineLoaded(),
+			]);
+
+			setSourceDuration(metadata.duration);
+			setSourceResolution(metadata.resolution);
+			await processAndUploadStory({
+				file,
+				duration: metadata.duration,
+				resolution: metadata.resolution,
+				skipSetup: true,
+			});
+		} catch (error) {
+			setErrorMessage(error?.message || 'No se pudo preparar la historia.');
+			setPhase('idle');
+			setProcessing(false);
+			clearInterval(timerIntervalRef.current);
+			timerIntervalRef.current = null;
+			isTranscodingRef.current = false;
+			activeEncodeDurationRef.current = 0;
+		} finally {
+			URL.revokeObjectURL(tempSourceUrl);
+		}
 	};
 
-	const handleLoadedMetadata = () => {
-		const video = videoRef.current;
-		if (!video) return;
-		setSourceDuration(video.duration || 0);
-		setSourceResolution(video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : null);
-	};
-
-	const encodeStoryVideo = async () => {
+	const encodeStoryVideo = async ({ file, duration, resolution }) => {
 		const ffmpeg = await ensureEngineLoaded();
-		const inputExtension = sourceFile.name.split('.').pop()?.toLowerCase() || 'mp4';
+		const inputExtension = file.name.split('.').pop()?.toLowerCase() || 'mp4';
 		const inputFileName = `input.${inputExtension}`;
-		const outputFileName = `${getFileStem(sourceFile.name)}-story.mp4`;
-		const safeDuration = Math.max(0.1, Math.min(sourceDuration || maxStoryDurationSeconds, maxStoryDurationSeconds));
+		const outputFileName = `${getFileStem(file.name)}-story.mp4`;
+		const safeDuration = Math.max(0.1, Math.min(duration || maxStoryDurationSeconds, maxStoryDurationSeconds));
+		const outputProfile = getOutputProfile(resolution);
 
 		activeEncodeDurationRef.current = safeDuration;
 
 		try { await ffmpeg.deleteFile(inputFileName); } catch {}
 		try { await ffmpeg.deleteFile(outputFileName); } catch {}
 
-		const inputData = await fetchFile(sourceFile);
+		const inputData = await fetchFile(file);
 		await ffmpeg.writeFile(inputFileName, inputData);
 
 		const sharedArgs = [
@@ -422,8 +461,8 @@ export default function StoryUploadPage() {
 		};
 	};
 
-	const processAndUploadStory = async () => {
-		if (!sourceFile) {
+	const processAndUploadStory = async ({ file = sourceFile, duration = sourceDuration, resolution = sourceResolution, skipSetup = false } = {}) => {
+		if (!file) {
 			setErrorMessage('Primero sube un video.');
 			return;
 		}
@@ -431,18 +470,21 @@ export default function StoryUploadPage() {
 		try {
 			resetResult();
 			setErrorMessage('');
-			setProcessing(true);
+			if (!skipSetup) {
+				setProcessing(true);
+				setElapsedSeconds(0);
+				clearInterval(timerIntervalRef.current);
+				timerStartRef.current = performance.now();
+				timerIntervalRef.current = setInterval(() => {
+					setElapsedSeconds(Math.floor((performance.now() - timerStartRef.current) / 1000));
+				}, 500);
+			}
 			setPhase('encoding');
 			isTranscodingRef.current = true;
 			setEncodingProgress(0);
 			setUploadProgress(0);
-			setElapsedSeconds(0);
-			timerStartRef.current = performance.now();
-			timerIntervalRef.current = setInterval(() => {
-				setElapsedSeconds(Math.floor((performance.now() - timerStartRef.current) / 1000));
-			}, 500);
 
-			const encoded = await encodeStoryVideo();
+			const encoded = await encodeStoryVideo({ file, duration, resolution });
 			const processingElapsedSeconds = (performance.now() - timerStartRef.current) / 1000;
 
 			resultPreviewUrlRef.current = encoded.previewUrl;
@@ -460,7 +502,7 @@ export default function StoryUploadPage() {
 				previewUrl: encoded.previewUrl,
 				fileName: encoded.fileName,
 				sizeLabel: encoded.sizeLabel,
-				originalSizeLabel: sourceFile ? `${(sourceFile.size / (1024 * 1024)).toFixed(2)} MB` : null,
+				originalSizeLabel: file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : null,
 				duration: encoded.duration,
 				processingTimeLabel: formatElapsedSeconds(processingElapsedSeconds),
 			});
@@ -477,7 +519,11 @@ export default function StoryUploadPage() {
 	};
 
 	const progressValue = phase === 'uploading' ? uploadProgress : encodingProgress;
-	const progressLabel = phase === 'uploading' ? 'Verificando historia' : 'Cargando Historia';
+	const progressLabel = phase === 'uploading'
+		? 'Verificando historia'
+		: phase === 'preparing'
+			? 'Preparando video'
+			: 'Cargando Historia';
 
 	return (
 		<div className="min-h-screen bg-mansion-base text-text-primary relative overflow-hidden">
@@ -561,33 +607,30 @@ export default function StoryUploadPage() {
 								</div>
 								<div className="text-center">
 									<h2 className="font-display text-2xl font-semibold text-text-primary">Prepará tu historia</h2>
-									<p className="text-sm text-text-muted mt-1">Se va a procesar el video completo y luego se publicará en tu feed de historias.</p>
+									<p className="text-sm text-text-muted mt-1">En cuanto eliges el archivo, empezamos a prepararlo y publicarlo automáticamente.</p>
 								</div>
 							</div>
 
-							<div className="aspect-video bg-black relative">
-								{sourceUrl && (
-									<video
-										ref={videoRef}
-										src={sourceUrl}
-										controls
-										playsInline
-										preload="metadata"
-										className="w-full h-full object-contain"
-										onLoadedMetadata={handleLoadedMetadata}
-									/>
-								)}
-								<div className="absolute left-4 bottom-4 right-4 flex items-center justify-between gap-3 pointer-events-none">
-									<div className="px-3 py-2 rounded-2xl bg-black/55 border border-white/10 text-left">
-										<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Video</p>
-										<p className="text-sm text-text-primary truncate max-w-[180px] sm:max-w-[260px]">{sourceFile?.name || 'Sin archivo'}</p>
-									</div>
-									<div className="px-3 py-2 rounded-2xl bg-black/55 border border-white/10 text-right shrink-0">
-										<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Duración</p>
-										<p className="text-sm text-mansion-gold font-semibold">{sourceDuration ? formatTime(sourceDuration) : '—'}</p>
+								<div className="p-6 sm:p-8 border-b border-white/10 bg-black/10">
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+										<div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
+											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Archivo</p>
+											<p className="text-sm text-text-primary mt-1 truncate">{sourceFile?.name || 'Sin archivo'}</p>
+										</div>
+										<div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
+											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Duración</p>
+											<p className="text-sm text-mansion-gold font-semibold mt-1">{sourceDuration ? formatTime(sourceDuration) : 'Analizando...'}</p>
+										</div>
+										<div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
+											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Resolución</p>
+											<p className="text-sm text-text-primary mt-1">{sourceResolution ? `${sourceResolution.width}x${sourceResolution.height}` : 'Analizando...'}</p>
+										</div>
+										<div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
+											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Salida</p>
+											<p className="text-sm text-text-primary mt-1">{outputProfile.label}</p>
+										</div>
 									</div>
 								</div>
-							</div>
 
 							<div className="p-6 sm:p-8">
 								<motion.div
@@ -599,23 +642,26 @@ export default function StoryUploadPage() {
 								>
 									{!processing ? (
 										<div className="space-y-3">
-											<button
-												type="button"
-												onClick={processAndUploadStory}
-												className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
-											>
-												<Wand2 className="w-5 h-5" />
-												Cargar historia
-											</button>
+											<div className="rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-4 text-center">
+												<p className="text-sm text-text-primary font-medium">El archivo ya fue seleccionado.</p>
+												<p className="text-xs text-text-dim mt-1">Si hubo un error, puedes elegir otro video para reintentar.</p>
+											</div>
+											<label className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-medium hover:bg-white/10 transition-colors cursor-pointer">
+												<Upload className="w-5 h-5" />
+												Elegir otro video
+												<input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
+											</label>
 											{sourceDuration > maxStoryDurationSeconds && (
 												<div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
 													Se procesarán solo los primeros {maxStoryDurationSeconds}s de este video.
 												</div>
 											)}
-											<p className="text-xs text-text-dim text-center">Primero optimizamos el video en el navegador y después lo subimos a tu historia con progreso real.</p>
 										</div>
 									) : (
 										<div className="space-y-4 rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-4">
+											{phase === 'preparing' && (
+												<p className="text-xs text-text-dim">Analizando el video y preparando el motor antes de comenzar el encoding.</p>
+											)}
 											<div className="space-y-2">
 												<div className="flex items-center justify-between text-sm">
 													<span className="text-text-muted">Cargando Historia</span>
@@ -643,7 +689,9 @@ export default function StoryUploadPage() {
 											)}
 
 											<p className="text-xs text-text-dim">
-												{phase === 'encoding'
+												{phase === 'preparing'
+													? 'Preparando el archivo para arrancar el proceso.'
+													: phase === 'encoding'
 													? 'Optimizando el video para la historia.'
 													: 'Subiendo y verificando la historia.'}
 											</p>
