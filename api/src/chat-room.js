@@ -13,6 +13,21 @@ export class ChatRoom {
     this.chatId = null;
     this.dailyLimitCache = { value: null, expiresAt: 0 };
     this.userStatusCache = new Map();
+    this.messageConversationIdReady = null;
+    this.typingNotifyCache = new Map();
+  }
+
+  shouldNotifyTyping(senderId, receiverId) {
+    const key = `${senderId}:${receiverId}`;
+    const now = Date.now();
+    const lastSentAt = this.typingNotifyCache.get(key) || 0;
+    if (now - lastSentAt < 3000) return false;
+    this.typingNotifyCache.set(key, now);
+    return true;
+  }
+
+  buildConversationId(userA, userB) {
+    return [String(userA), String(userB)].sort().join(':');
   }
 
   debug(...args) {
@@ -202,6 +217,35 @@ export class ChatRoom {
     return this.conversationStateReady;
   }
 
+  async ensureMessageConversationIdColumn() {
+    if (!this.messageConversationIdReady) {
+      this.messageConversationIdReady = (async () => {
+        try {
+          await this.env.DB.prepare('ALTER TABLE messages ADD COLUMN conversation_id TEXT').run();
+        } catch (err) {
+          const message = String(err?.message || '').toLowerCase();
+          if (!message.includes('duplicate column name')) {
+            throw err;
+          }
+        }
+
+        await Promise.all([
+          this.env.DB.prepare(
+            'CREATE INDEX IF NOT EXISTS idx_messages_conversation_created ON messages(conversation_id, created_at)'
+          ).run(),
+          this.env.DB.prepare(
+            'CREATE INDEX IF NOT EXISTS idx_messages_conversation_receiver_unread ON messages(conversation_id, receiver_id, is_read, created_at)'
+          ).run(),
+        ]);
+      })().catch((err) => {
+        this.messageConversationIdReady = null;
+        throw err;
+      });
+    }
+
+    return this.messageConversationIdReady;
+  }
+
   async syncConversationStateForMessage(senderId, receiverId, msg) {
     await this.ensureConversationStateTables();
     const lastMessage = (msg.content || '').slice(0, 50);
@@ -232,6 +276,65 @@ export class ChatRoom {
     await this.env.DB.prepare(
       'UPDATE conversation_state SET unread_count = 0, updated_at = datetime(\'now\') WHERE user_id = ? AND partner_id = ?'
     ).bind(userId, partnerId).run();
+  }
+
+  async rebuildConversationStateForPair(userA, userB) {
+    await this.ensureConversationStateTables();
+    await this.ensureMessageConversationIdColumn();
+    const conversationId = this.buildConversationId(userA, userB);
+
+    const rebuildForUser = async (userId, partnerId) => {
+      const hiddenRow = await this.env.DB.prepare(
+        'SELECT hidden_before FROM hidden_conversations WHERE user_id = ? AND partner_id = ?'
+      ).bind(userId, partnerId).first();
+      const hiddenBefore = hiddenRow?.hidden_before || null;
+
+      const latestMessage = await this.env.DB.prepare(`
+        SELECT content, created_at
+        FROM messages
+        WHERE conversation_id = ?
+          AND (? IS NULL OR created_at > ?)
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).bind(conversationId, hiddenBefore, hiddenBefore).first();
+
+      if (!latestMessage) {
+        await this.env.DB.prepare(
+          'DELETE FROM conversation_state WHERE user_id = ? AND partner_id = ?'
+        ).bind(userId, partnerId).run();
+        return;
+      }
+
+      const unreadRow = await this.env.DB.prepare(`
+        SELECT COUNT(*) as unread
+        FROM messages
+        WHERE conversation_id = ?
+          AND receiver_id = ?
+          AND is_read = 0
+          AND (? IS NULL OR created_at > ?)
+      `).bind(conversationId, userId, hiddenBefore, hiddenBefore).first();
+
+      await this.env.DB.prepare(
+        `INSERT INTO conversation_state (user_id, partner_id, last_message, last_message_at, unread_count, updated_at)
+         VALUES (?, ?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(user_id, partner_id) DO UPDATE SET
+           last_message = excluded.last_message,
+           last_message_at = excluded.last_message_at,
+           unread_count = excluded.unread_count,
+           updated_at = excluded.updated_at`
+      ).bind(
+        userId,
+        partnerId,
+        (latestMessage.content || '').slice(0, 50),
+        latestMessage.created_at,
+        Number(unreadRow?.unread || 0),
+      ).run();
+    };
+
+    await Promise.all([
+      rebuildForUser(userA, userB),
+      rebuildForUser(userB, userA),
+    ]);
   }
 
   async fetch(request) {
@@ -314,6 +417,24 @@ export class ChatRoom {
         const [tag] = this.state.getTags(sock);
         if (tag !== senderId) {
           try { sock.send(JSON.stringify({ type: 'typing', userId: senderId })); } catch {}
+        }
+      }
+
+      const chatId = await this.getChatId();
+      if (chatId) {
+        const id1 = chatId.slice(0, 36);
+        const id2 = chatId.slice(37);
+        const receiverId = id1 !== senderId ? id1 : id2;
+        if (receiverId && this.shouldNotifyTyping(senderId, receiverId)) {
+          try {
+            const doId = this.env.USER_NOTIFICATIONS.idFromName(receiverId);
+            const stub = this.env.USER_NOTIFICATIONS.get(doId);
+            stub.fetch('https://do/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'typing', chatId, userId: senderId }),
+            }).catch(() => {});
+          } catch { /* ignore */ }
         }
       }
     } else if (data.type === 'ping') {
@@ -430,16 +551,23 @@ export class ChatRoom {
     // Async: write to D1 (source of truth) + notify UserNotification DOs
     if (receiverId) {
       const chatId = [senderId, receiverId].sort().join('-');
+      const conversationId = this.buildConversationId(senderId, receiverId);
       this.state.waitUntil((async () => {
         this.debug('[ChatRoom.handleMessage] waitUntil started, chatId:', chatId, 'sender:', senderId, 'receiver:', receiverId);
+        await this.ensureMessageConversationIdColumn().catch((err) => {
+          console.error('messages conversation_id ensure error:', err.message);
+        });
         // Write to D1
         await this.env.DB.prepare(
-          'INSERT INTO messages (id, sender_id, receiver_id, content, created_at) VALUES (?, ?, ?, ?, ?)'
-        ).bind(msgId, senderId, receiverId, content, now).run().catch(err => {
+          'INSERT INTO messages (id, sender_id, receiver_id, content, created_at, conversation_id) VALUES (?, ?, ?, ?, ?, ?)'
+        ).bind(msgId, senderId, receiverId, content, now, conversationId).run().catch(err => {
           console.error('D1 message write error:', err.message);
         });
         await this.syncConversationStateForMessage(senderId, receiverId, msg).catch((err) => {
           console.error('conversation_state sync error:', err.message);
+          return this.rebuildConversationStateForPair(senderId, receiverId).catch((repairErr) => {
+            console.error('conversation_state repair error:', repairErr.message);
+          });
         });
         this.debug('[ChatRoom.handleMessage] D1 write done');
         // Notify UserNotification DOs so ChatListPage updates in real-time
