@@ -592,7 +592,7 @@ export default function VideoFeedPage() {
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [activeDispIdx, isDesktopViewport, stories.length]);
+  }, [isDesktopViewport, stories.length]);
 
   useEffect(() => {
     try { sessionStorage.setItem('vf_idx', String(activeDispIdx)); } catch {}
