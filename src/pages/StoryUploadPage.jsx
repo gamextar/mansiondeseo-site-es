@@ -518,12 +518,34 @@ export default function StoryUploadPage() {
 		}
 	};
 
-	const progressValue = phase === 'uploading' ? uploadProgress : encodingProgress;
-	const progressLabel = phase === 'uploading'
-		? 'Verificando historia'
-		: phase === 'preparing'
-			? 'Preparando video'
-			: 'Cargando Historia';
+	const maskedEncodingProgress = clamp(encodingProgress, 0, 1);
+	const loadingStoryProgress = phase === 'preparing'
+		? 0
+		: clamp(maskedEncodingProgress * 2, 0, 1);
+	const verificationProgress = phase === 'preparing'
+		? 0
+		: phase === 'encoding'
+			? clamp((maskedEncodingProgress - 0.5) * 2, 0, 1)
+			: phase === 'uploading' || phase === 'done'
+				? 1
+				: 0;
+	const showVerificationProgress = phase === 'encoding'
+		? maskedEncodingProgress >= 0.5
+		: phase === 'uploading' || phase === 'done';
+	const progressValue = phase === 'preparing'
+		? 0
+		: phase === 'uploading'
+			? 1
+			: showVerificationProgress
+				? verificationProgress
+				: loadingStoryProgress;
+	const progressLabel = phase === 'preparing'
+		? 'Preparando video'
+		: phase === 'uploading'
+			? 'Verificando historia'
+			: showVerificationProgress
+				? 'Verificando historia'
+				: 'Cargando Historia';
 
 	return (
 		<div className="min-h-screen bg-mansion-base text-text-primary relative overflow-hidden">
@@ -611,27 +633,6 @@ export default function StoryUploadPage() {
 								</div>
 							</div>
 
-								<div className="p-6 sm:p-8 border-b border-white/10 bg-black/10">
-									<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
-										<div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
-											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Archivo</p>
-											<p className="text-sm text-text-primary mt-1 truncate">{sourceFile?.name || 'Sin archivo'}</p>
-										</div>
-										<div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
-											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Duración</p>
-											<p className="text-sm text-mansion-gold font-semibold mt-1">{sourceDuration ? formatTime(sourceDuration) : 'Analizando...'}</p>
-										</div>
-										<div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
-											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Resolución</p>
-											<p className="text-sm text-text-primary mt-1">{sourceResolution ? `${sourceResolution.width}x${sourceResolution.height}` : 'Analizando...'}</p>
-										</div>
-										<div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
-											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Salida</p>
-											<p className="text-sm text-text-primary mt-1">{outputProfile.label}</p>
-										</div>
-									</div>
-								</div>
-
 							<div className="p-6 sm:p-8">
 								<motion.div
 									initial={{ opacity: 0, y: 12 }}
@@ -658,31 +659,31 @@ export default function StoryUploadPage() {
 											)}
 										</div>
 									) : (
-										<div className="space-y-4 rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-4">
+										<div className="space-y-4 rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-5 sm:p-6">
 											{phase === 'preparing' && (
 												<p className="text-xs text-text-dim">Analizando el video y preparando el motor antes de comenzar el encoding.</p>
 											)}
 											<div className="space-y-2">
 												<div className="flex items-center justify-between text-sm">
 													<span className="text-text-muted">Cargando Historia</span>
-													<span className="font-semibold text-mansion-gold tabular-nums">{Math.round(encodingProgress * 100)}%</span>
+													<span className="font-semibold text-mansion-gold tabular-nums">{Math.round(loadingStoryProgress * 100)}%</span>
 												</div>
 												<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
 													<div className="h-3 bg-white/5">
-														<div className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${Math.round(encodingProgress * 100)}%` }} />
+														<div className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${Math.round(loadingStoryProgress * 100)}%` }} />
 													</div>
 												</div>
 											</div>
 
-											{phase !== 'encoding' && (
+											{showVerificationProgress && (
 												<div className="space-y-2">
 													<div className="flex items-center justify-between text-sm">
 														<span className="text-text-muted">Verificando historia</span>
-														<span className="font-semibold text-mansion-gold tabular-nums">{Math.round(uploadProgress * 100)}%</span>
+														<span className="font-semibold text-mansion-gold tabular-nums">{Math.round(verificationProgress * 100)}%</span>
 													</div>
 													<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
 														<div className="h-3 bg-white/5">
-															<div className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${Math.round(uploadProgress * 100)}%` }} />
+															<div className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${Math.round(verificationProgress * 100)}%` }} />
 														</div>
 													</div>
 												</div>
@@ -692,8 +693,10 @@ export default function StoryUploadPage() {
 												{phase === 'preparing'
 													? 'Preparando el archivo para arrancar el proceso.'
 													: phase === 'encoding'
-													? 'Optimizando el video para la historia.'
-													: 'Subiendo y verificando la historia.'}
+														? showVerificationProgress
+															? 'Terminando el encoding antes de publicar la historia.'
+															: 'Procesando la historia para publicarla.'
+													: 'Subiendo automáticamente la historia cuando termina la preparación.'}
 											</p>
 										</div>
 									)}
