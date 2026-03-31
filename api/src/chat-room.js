@@ -10,6 +10,9 @@ export class ChatRoom {
     this.sql = state.storage.sql;
     this.initPromise = this.init();
     this.hiddenConversationsReady = null;
+    this.chatId = null;
+    this.dailyLimitCache = { value: null, expiresAt: 0 };
+    this.userStatusCache = new Map();
   }
 
   debug(...args) {
@@ -77,8 +80,6 @@ export class ChatRoom {
     const chatId = [senderId, receiverId].sort().join('-');
     let senderConversation = null;
     let receiverConversation = null;
-    let receiverUnreadCount = 0;
-    let receiverConversationUnread = 1;
 
     try {
       const { results: users } = await this.env.DB.prepare(
@@ -88,43 +89,9 @@ export class ChatRoom {
       const userMap = new Map(users.map((user) => [user.id, user]));
       senderConversation = this.buildConversationPreview(userMap.get(receiverId), msg, 0);
       receiverConversation = this.buildConversationPreview(userMap.get(senderId), msg, 0);
+      if (receiverConversation) delete receiverConversation.unread;
     } catch (err) {
       console.error('[ChatRoom.buildNewMessageEvents] users query error:', err.message);
-    }
-
-    try {
-      const [totalRow, conversationRow] = await Promise.all([
-        this.env.DB.prepare(
-          `SELECT COUNT(*) as unread
-           FROM messages m
-           LEFT JOIN hidden_conversations hc
-             ON hc.user_id = ?
-            AND hc.partner_id = m.sender_id
-           WHERE m.receiver_id = ?
-             AND m.is_read = 0
-             AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)`
-        ).bind(receiverId, receiverId).first(),
-        this.env.DB.prepare(
-          `SELECT COUNT(*) as unread
-           FROM messages m
-           LEFT JOIN hidden_conversations hc
-             ON hc.user_id = ?
-            AND hc.partner_id = ?
-           WHERE m.sender_id = ?
-             AND m.receiver_id = ?
-             AND m.is_read = 0
-             AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)`
-        ).bind(receiverId, senderId, senderId, receiverId).first(),
-      ]);
-
-      receiverUnreadCount = Number(totalRow?.unread || 0);
-      receiverConversationUnread = Number(conversationRow?.unread || 0);
-    } catch (err) {
-      console.error('[ChatRoom.buildNewMessageEvents] unread query error:', err.message);
-    }
-
-    if (receiverConversation) {
-      receiverConversation.unread = receiverConversationUnread;
     }
 
     return {
@@ -138,10 +105,62 @@ export class ChatRoom {
         type: 'new_message',
         chatId,
         partnerId: senderId,
-        unreadCount: receiverUnreadCount,
+        unreadDelta: 1,
+        conversationUnreadDelta: 1,
         conversation: receiverConversation,
       },
     };
+  }
+
+  async getChatId() {
+    if (this.chatId) return this.chatId;
+    const stored = await this.state.storage.get('chatId');
+    this.chatId = stored || null;
+    return this.chatId;
+  }
+
+  async rememberChatId(chatId) {
+    if (!chatId || this.chatId === chatId) return;
+    this.chatId = chatId;
+    await this.state.storage.put('chatId', chatId);
+  }
+
+  async getDailyLimit() {
+    const now = Date.now();
+    if (this.dailyLimitCache.value != null && now < this.dailyLimitCache.expiresAt) {
+      return this.dailyLimitCache.value;
+    }
+
+    const limitSetting = await this.env.DB.prepare(
+      "SELECT value FROM site_settings WHERE key = 'daily_message_limit'"
+    ).first();
+    const dailyLimit = parseInt(limitSetting?.value || '5', 10);
+    this.dailyLimitCache = {
+      value: dailyLimit,
+      expiresAt: now + 60_000,
+    };
+    return dailyLimit;
+  }
+
+  async getSenderStatus(userId) {
+    const now = Date.now();
+    const cached = this.userStatusCache.get(userId);
+    if (cached && now < cached.expiresAt) {
+      return cached;
+    }
+
+    const sender = await this.env.DB.prepare(
+      'SELECT premium, premium_until FROM users WHERE id = ?'
+    ).bind(userId).first();
+
+    const next = {
+      isPremium: !!(sender && sender.premium && sender.premium_until &&
+        new Date(sender.premium_until.endsWith('Z') ? sender.premium_until : sender.premium_until + 'Z') > new Date()),
+      expiresAt: now + 60_000,
+    };
+
+    this.userStatusCache.set(userId, next);
+    return next;
   }
 
   async init() {
@@ -186,7 +205,7 @@ export class ChatRoom {
     // Extract chatId: may be in query params (old) or in URL path (new: /api/chat/ws/{chatId})
     const chatId = url.searchParams.get('chatId') || url.pathname.split('/').pop();
     if (chatId) {
-      await this.state.storage.put('chatId', chatId);
+      await this.rememberChatId(chatId);
     }
 
     const pair = new WebSocketPair();
@@ -239,24 +258,6 @@ export class ChatRoom {
           try { sock.send(JSON.stringify({ type: 'typing', userId: senderId })); } catch {}
         }
       }
-      // Also notify UserNotification DO so ChatListPage can show typing
-      const chatId = await this.state.storage.get('chatId');
-      if (chatId) {
-        const id1 = chatId.slice(0, 36);
-        const id2 = chatId.slice(37);
-        const receiverId = id1 !== senderId ? id1 : id2;
-        if (receiverId) {
-          try {
-            const doId = this.env.USER_NOTIFICATIONS.idFromName(receiverId);
-            const stub = this.env.USER_NOTIFICATIONS.get(doId);
-            stub.fetch('https://do/notify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'typing', chatId, userId: senderId }),
-            }).catch(() => {});
-          } catch { /* ignore */ }
-        }
-      }
     } else if (data.type === 'ping') {
       ws.send(JSON.stringify({ type: 'pong' }));
     }
@@ -281,7 +282,7 @@ export class ChatRoom {
 
     // Derive receiverId from stored chatId if receiver is not connected
     if (!receiverId) {
-      const chatId = await this.state.storage.get('chatId');
+      const chatId = await this.getChatId();
       if (chatId) {
         // chatId = "uuid1-uuid2" where each UUID is 36 chars (8-4-4-4-12)
         // Split at position 36 (the separator hyphen between the two UUIDs)
@@ -294,19 +295,11 @@ export class ChatRoom {
     // Check daily message limit via D1
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const sender = await this.env.DB.prepare(
-        'SELECT premium, premium_until FROM users WHERE id = ?'
-      ).bind(senderId).first();
-
-      const isPremium = sender && sender.premium && sender.premium_until &&
-        new Date(sender.premium_until.endsWith('Z') ? sender.premium_until : sender.premium_until + 'Z') > new Date();
+      const senderStatus = await this.getSenderStatus(senderId);
+      const isPremium = senderStatus.isPremium;
 
       if (!isPremium) {
-        // Load configurable limit
-        const limitSetting = await this.env.DB.prepare(
-          "SELECT value FROM site_settings WHERE key = 'daily_message_limit'"
-        ).first();
-        const dailyLimit = parseInt(limitSetting?.value || '5', 10);
+        const dailyLimit = await this.getDailyLimit();
 
         const limitRow = await this.env.DB.prepare(
           'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'

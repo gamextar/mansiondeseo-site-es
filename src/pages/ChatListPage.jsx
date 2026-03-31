@@ -200,17 +200,21 @@ export default function ChatListPage() {
   const applyConversationUpdate = useCallback((event) => {
     const conversation = event?.conversation;
     if (!conversation?.profileId) return false;
+    const unreadDelta = Number(event?.conversationUnreadDelta || 0);
 
     setConversations((prev) => {
       const existing = prev.find((item) => item.profileId === conversation.profileId);
+      const nextUnread = typeof conversation.unread === 'number'
+        ? conversation.unread
+        : Math.max(0, Number(existing?.unread || 0) + unreadDelta);
       const nextConversation = existing
         ? {
             ...existing,
             ...conversation,
-            unread: typeof conversation.unread === 'number' ? conversation.unread : existing.unread,
+            unread: nextUnread,
           }
         : {
-            unread: 0,
+            unread: nextUnread,
             ...conversation,
           };
 

@@ -148,6 +148,13 @@ export function UnreadProvider({ children }) {
                 isActiveChat ? Math.max(0, data.unreadCount - 1) : data.unreadCount,
                 { showToast: !isActiveChat }
               );
+            } else if (typeof data.unreadDelta === 'number') {
+              if (prevCountRef.current >= 0) {
+                const nextCount = Math.max(0, prevCountRef.current + (isActiveChat ? 0 : data.unreadDelta));
+                applyUnreadCount(nextCount, { showToast: !isActiveChat && data.unreadDelta > 0 });
+              } else {
+                fetchUnread({ force: true }).catch(() => {});
+              }
             } else if (!isActiveChat) {
               fetchUnread({ force: true }).catch(() => {});
             }

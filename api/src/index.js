@@ -1241,8 +1241,6 @@ async function buildNewMessageEvents(env, senderId, receiverId, msg) {
 
   let senderConversation = null;
   let receiverConversation = null;
-  let receiverUnreadCount = 0;
-  let receiverConversationUnread = 1;
 
   try {
     const { results: users } = await env.DB.prepare(
@@ -1252,43 +1250,9 @@ async function buildNewMessageEvents(env, senderId, receiverId, msg) {
     const userMap = new Map(users.map((user) => [user.id, user]));
     senderConversation = buildConversationPreview(userMap.get(receiverId), msg, 0);
     receiverConversation = buildConversationPreview(userMap.get(senderId), msg, 0);
+    if (receiverConversation) delete receiverConversation.unread;
   } catch (err) {
     console.error('[buildNewMessageEvents] users query error:', err.message);
-  }
-
-  try {
-    const [totalRow, conversationRow] = await Promise.all([
-      env.DB.prepare(
-        `SELECT COUNT(*) as unread
-         FROM messages m
-         LEFT JOIN hidden_conversations hc
-           ON hc.user_id = ?
-          AND hc.partner_id = m.sender_id
-         WHERE m.receiver_id = ?
-           AND m.is_read = 0
-           AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)`
-      ).bind(receiverId, receiverId).first(),
-      env.DB.prepare(
-        `SELECT COUNT(*) as unread
-         FROM messages m
-         LEFT JOIN hidden_conversations hc
-           ON hc.user_id = ?
-          AND hc.partner_id = ?
-         WHERE m.sender_id = ?
-           AND m.receiver_id = ?
-           AND m.is_read = 0
-           AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)`
-      ).bind(receiverId, senderId, senderId, receiverId).first(),
-    ]);
-
-    receiverUnreadCount = Number(totalRow?.unread || 0);
-    receiverConversationUnread = Number(conversationRow?.unread || 0);
-  } catch (err) {
-    console.error('[buildNewMessageEvents] unread query error:', err.message);
-  }
-
-  if (receiverConversation) {
-    receiverConversation.unread = receiverConversationUnread;
   }
 
   return {
@@ -1302,7 +1266,8 @@ async function buildNewMessageEvents(env, senderId, receiverId, msg) {
       type: 'new_message',
       chatId,
       partnerId: senderId,
-      unreadCount: receiverUnreadCount,
+      unreadDelta: 1,
+      conversationUnreadDelta: 1,
       conversation: receiverConversation,
     },
   };
