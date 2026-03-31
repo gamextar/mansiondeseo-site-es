@@ -176,6 +176,64 @@ export class ChatRoom {
     `);
   }
 
+  async ensureConversationStateTables() {
+    if (!this.conversationStateReady) {
+      this.conversationStateReady = Promise.all([
+        this.env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS conversation_state (
+            user_id TEXT NOT NULL REFERENCES users(id),
+            partner_id TEXT NOT NULL REFERENCES users(id),
+            last_message TEXT NOT NULL DEFAULT '',
+            last_message_at TEXT NOT NULL,
+            unread_count INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (user_id, partner_id)
+          )
+        `).run(),
+        this.env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_conversation_state_user_last ON conversation_state(user_id, last_message_at DESC)'
+        ).run(),
+      ]).catch((err) => {
+        this.conversationStateReady = null;
+        throw err;
+      });
+    }
+
+    return this.conversationStateReady;
+  }
+
+  async syncConversationStateForMessage(senderId, receiverId, msg) {
+    await this.ensureConversationStateTables();
+    const lastMessage = (msg.content || '').slice(0, 50);
+    await Promise.all([
+      this.env.DB.prepare(
+        `INSERT INTO conversation_state (user_id, partner_id, last_message, last_message_at, unread_count, updated_at)
+         VALUES (?, ?, ?, ?, 0, datetime('now'))
+         ON CONFLICT(user_id, partner_id) DO UPDATE SET
+           last_message = excluded.last_message,
+           last_message_at = excluded.last_message_at,
+           unread_count = 0,
+           updated_at = excluded.updated_at`
+      ).bind(senderId, receiverId, lastMessage, msg.created_at).run(),
+      this.env.DB.prepare(
+        `INSERT INTO conversation_state (user_id, partner_id, last_message, last_message_at, unread_count, updated_at)
+         VALUES (?, ?, ?, ?, 1, datetime('now'))
+         ON CONFLICT(user_id, partner_id) DO UPDATE SET
+           last_message = excluded.last_message,
+           last_message_at = excluded.last_message_at,
+           unread_count = conversation_state.unread_count + 1,
+           updated_at = excluded.updated_at`
+      ).bind(receiverId, senderId, lastMessage, msg.created_at).run(),
+    ]);
+  }
+
+  async clearConversationStateUnread(userId, partnerId) {
+    await this.ensureConversationStateTables();
+    await this.env.DB.prepare(
+      'UPDATE conversation_state SET unread_count = 0, updated_at = datetime(\'now\') WHERE user_id = ? AND partner_id = ?'
+    ).bind(userId, partnerId).run();
+  }
+
   async fetch(request) {
     await this.initPromise;
 
@@ -380,6 +438,9 @@ export class ChatRoom {
         ).bind(msgId, senderId, receiverId, content, now).run().catch(err => {
           console.error('D1 message write error:', err.message);
         });
+        await this.syncConversationStateForMessage(senderId, receiverId, msg).catch((err) => {
+          console.error('conversation_state sync error:', err.message);
+        });
         this.debug('[ChatRoom.handleMessage] D1 write done');
         // Notify UserNotification DOs so ChatListPage updates in real-time
         const events = await this.buildNewMessageEvents(senderId, receiverId, msg);
@@ -409,9 +470,16 @@ export class ChatRoom {
     const { messageIds } = data;
     if (!Array.isArray(messageIds) || messageIds.length === 0) return;
 
+    const uniqueMessageIds = [...new Set(messageIds.filter((id) => typeof id === 'string' && id))];
+    if (uniqueMessageIds.length === 0) return;
+
+    const chunkSize = 50;
+
     // Update DO SQLite
-    for (const mid of messageIds) {
-      this.sql.exec('UPDATE messages SET is_read = 1 WHERE id = ?', mid);
+    for (let index = 0; index < uniqueMessageIds.length; index += chunkSize) {
+      const chunk = uniqueMessageIds.slice(index, index + chunkSize);
+      const placeholders = chunk.map(() => '?').join(', ');
+      this.sql.exec(`UPDATE messages SET is_read = 1 WHERE id IN (${placeholders})`, ...chunk);
     }
 
     // Notify other sockets
@@ -420,15 +488,30 @@ export class ChatRoom {
       const [tag] = this.state.getTags(sock);
       if (tag !== readerId) {
         try {
-          sock.send(JSON.stringify({ type: 'read', messageIds }));
+          sock.send(JSON.stringify({ type: 'read', messageIds: uniqueMessageIds }));
         } catch { /* ignore */ }
       }
     }
 
     // Async: update D1
     this.state.waitUntil((async () => {
-      for (const mid of messageIds) {
-        await this.env.DB.prepare('UPDATE messages SET is_read = 1 WHERE id = ?').bind(mid).run().catch(() => {});
+      const chatId = await this.getChatId();
+      let partnerId = null;
+      if (chatId) {
+        const id1 = chatId.slice(0, 36);
+        const id2 = chatId.slice(37);
+        partnerId = id1 !== readerId ? id1 : id2;
+      }
+      for (let index = 0; index < uniqueMessageIds.length; index += chunkSize) {
+        const chunk = uniqueMessageIds.slice(index, index + chunkSize);
+        const placeholders = chunk.map(() => '?').join(', ');
+        await this.env.DB.prepare(`UPDATE messages SET is_read = 1 WHERE id IN (${placeholders})`)
+          .bind(...chunk)
+          .run()
+          .catch(() => {});
+      }
+      if (partnerId) {
+        await this.clearConversationStateUnread(readerId, partnerId).catch(() => {});
       }
     })());
   }

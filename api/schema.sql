@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS idx_messages_sender   ON messages(sender_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_conv     ON messages(sender_id, receiver_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_receiver_unread ON messages(receiver_id, is_read, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_receiver_sender_unread ON messages(receiver_id, sender_id, is_read, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_receiver_sender_created ON messages(receiver_id, sender_id, created_at);
 
 -- Hidden conversations (soft delete per user)
 CREATE TABLE IF NOT EXISTS hidden_conversations (
@@ -68,6 +71,25 @@ CREATE TABLE IF NOT EXISTS hidden_conversations (
 );
 
 CREATE INDEX IF NOT EXISTS idx_hidden_conversations_user ON hidden_conversations(user_id, hidden_before);
+
+-- Denormalized conversation state (fast conversation list + unread sums)
+CREATE TABLE IF NOT EXISTS conversation_state (
+  user_id         TEXT NOT NULL REFERENCES users(id),
+  partner_id      TEXT NOT NULL REFERENCES users(id),
+  last_message    TEXT NOT NULL DEFAULT '',
+  last_message_at TEXT NOT NULL,
+  unread_count    INTEGER NOT NULL DEFAULT 0,
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, partner_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversation_state_user_last ON conversation_state(user_id, last_message_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conversation_state_user_unread ON conversation_state(user_id, unread_count, last_message_at DESC);
+
+CREATE TABLE IF NOT EXISTS conversation_state_status (
+  user_id        TEXT PRIMARY KEY REFERENCES users(id),
+  initialized_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 -- Daily message counter (enforces 5-message free limit)
 CREATE TABLE IF NOT EXISTS message_limits (

@@ -18,6 +18,8 @@ const _routeMetrics = new Map();
 let _metricsWindowStartedAt = Date.now();
 let _metricsRequestCount = 0;
 let _hiddenConversationsReady = null;
+let _messagingIndexesReady = null;
+let _conversationStateReady = null;
 
 // ── Helpers ─────────────────────────────────────────────
 
@@ -58,6 +60,225 @@ async function ensureHiddenConversationsTable(env) {
   }
 
   return _hiddenConversationsReady;
+}
+
+async function ensureMessagingIndexes(env) {
+  if (!_messagingIndexesReady) {
+    _messagingIndexesReady = Promise.all([
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_messages_receiver_unread ON messages(receiver_id, is_read, created_at)'
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_messages_receiver_sender_unread ON messages(receiver_id, sender_id, is_read, created_at)'
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_messages_receiver_sender_created ON messages(receiver_id, sender_id, created_at)'
+      ).run(),
+    ]).catch((err) => {
+      _messagingIndexesReady = null;
+      throw err;
+    });
+  }
+
+  return _messagingIndexesReady;
+}
+
+async function ensureConversationStateTables(env) {
+  if (!_conversationStateReady) {
+    _conversationStateReady = Promise.all([
+      env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS conversation_state (
+          user_id TEXT NOT NULL REFERENCES users(id),
+          partner_id TEXT NOT NULL REFERENCES users(id),
+          last_message TEXT NOT NULL DEFAULT '',
+          last_message_at TEXT NOT NULL,
+          unread_count INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (user_id, partner_id)
+        )
+      `).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_conversation_state_user_last ON conversation_state(user_id, last_message_at DESC)'
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_conversation_state_user_unread ON conversation_state(user_id, unread_count, last_message_at DESC)'
+      ).run(),
+      env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS conversation_state_status (
+          user_id TEXT PRIMARY KEY REFERENCES users(id),
+          initialized_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `).run(),
+    ]).catch((err) => {
+      _conversationStateReady = null;
+      throw err;
+    });
+  }
+
+  return _conversationStateReady;
+}
+
+async function isConversationStateInitialized(env, userId) {
+  await ensureConversationStateTables(env);
+  const row = await env.DB.prepare(
+    'SELECT 1 FROM conversation_state_status WHERE user_id = ?'
+  ).bind(userId).first();
+  return !!row;
+}
+
+async function markConversationStateInitialized(env, userId) {
+  await ensureConversationStateTables(env);
+  await env.DB.prepare(
+    `INSERT INTO conversation_state_status (user_id, initialized_at)
+     VALUES (?, datetime('now'))
+     ON CONFLICT(user_id) DO UPDATE SET initialized_at = excluded.initialized_at`
+  ).bind(userId).run();
+}
+
+async function setConversationState(env, userId, partnerId, { lastMessage, lastMessageAt, unreadCount }) {
+  await ensureConversationStateTables(env);
+  await env.DB.prepare(
+    `INSERT INTO conversation_state (user_id, partner_id, last_message, last_message_at, unread_count, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(user_id, partner_id) DO UPDATE SET
+       last_message = excluded.last_message,
+       last_message_at = excluded.last_message_at,
+       unread_count = excluded.unread_count,
+       updated_at = excluded.updated_at`
+  ).bind(userId, partnerId, lastMessage, lastMessageAt, unreadCount).run();
+}
+
+async function incrementConversationStateUnread(env, userId, partnerId, { lastMessage, lastMessageAt, unreadDelta = 1 }) {
+  await ensureConversationStateTables(env);
+  await env.DB.prepare(
+    `INSERT INTO conversation_state (user_id, partner_id, last_message, last_message_at, unread_count, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(user_id, partner_id) DO UPDATE SET
+       last_message = excluded.last_message,
+       last_message_at = excluded.last_message_at,
+       unread_count = MAX(0, conversation_state.unread_count + ?),
+       updated_at = excluded.updated_at`
+  ).bind(userId, partnerId, lastMessage, lastMessageAt, Math.max(0, unreadDelta), unreadDelta).run();
+}
+
+async function clearConversationStateUnread(env, userId, partnerId) {
+  await ensureConversationStateTables(env);
+  await env.DB.prepare(
+    'UPDATE conversation_state SET unread_count = 0, updated_at = datetime(\'now\') WHERE user_id = ? AND partner_id = ?'
+  ).bind(userId, partnerId).run();
+}
+
+async function deleteConversationState(env, userId, partnerId) {
+  await ensureConversationStateTables(env);
+  await env.DB.prepare(
+    'DELETE FROM conversation_state WHERE user_id = ? AND partner_id = ?'
+  ).bind(userId, partnerId).run();
+}
+
+async function syncConversationStateForMessage(env, senderId, receiverId, msg) {
+  await ensureConversationStateTables(env);
+  const lastMessage = (msg.content || '').slice(0, 50);
+  await Promise.all([
+    setConversationState(env, senderId, receiverId, {
+      lastMessage,
+      lastMessageAt: msg.created_at,
+      unreadCount: 0,
+    }),
+    incrementConversationStateUnread(env, receiverId, senderId, {
+      lastMessage,
+      lastMessageAt: msg.created_at,
+      unreadDelta: 1,
+    }),
+  ]);
+}
+
+async function loadLegacyConversations(env, userId) {
+  const { results } = await env.DB.prepare(`
+    SELECT
+      partner_id,
+      MAX(created_at) AS last_at,
+      SUM(CASE WHEN receiver_id = ? AND is_read = 0 THEN 1 ELSE 0 END) AS unread
+    FROM (
+      SELECT
+        m.*,
+        CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AS partner_id
+      FROM messages m
+      LEFT JOIN hidden_conversations hc
+        ON hc.user_id = ?
+       AND hc.partner_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END
+      WHERE (m.sender_id = ? OR m.receiver_id = ?)
+        AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)
+    )
+    GROUP BY partner_id
+    ORDER BY last_at DESC
+  `).bind(userId, userId, userId, userId, userId, userId).all();
+
+  if (!results.length) return [];
+
+  const partnerIds = results.map((row) => row.partner_id);
+  const placeholders = partnerIds.map(() => '?').join(',');
+  const { results: partners } = await env.DB.prepare(
+    `SELECT id, username, avatar_url, avatar_crop, last_active FROM users WHERE id IN (${placeholders})`
+  ).bind(...partnerIds).all();
+  const partnerMap = new Map(partners.map((partner) => [partner.id, partner]));
+
+  const { results: lastMsgs } = await env.DB.prepare(`
+    SELECT m.* FROM messages m
+    INNER JOIN (
+      SELECT
+        CASE WHEN m2.sender_id = ? THEN m2.receiver_id ELSE m2.sender_id END AS pid,
+        MAX(m2.created_at) AS max_at
+      FROM messages m2
+      LEFT JOIN hidden_conversations hc
+        ON hc.user_id = ?
+       AND hc.partner_id = CASE WHEN m2.sender_id = ? THEN m2.receiver_id ELSE m2.sender_id END
+      WHERE (m2.sender_id = ? OR m2.receiver_id = ?)
+        AND (hc.hidden_before IS NULL OR m2.created_at > hc.hidden_before)
+      GROUP BY pid
+    ) latest ON (
+      CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END = latest.pid
+      AND m.created_at = latest.max_at
+    )
+    WHERE m.sender_id = ? OR m.receiver_id = ?
+  `).bind(userId, userId, userId, userId, userId, userId, userId, userId).all();
+  const msgMap = new Map();
+  for (const message of lastMsgs) {
+    const partnerId = message.sender_id === userId ? message.receiver_id : message.sender_id;
+    if (!msgMap.has(partnerId)) msgMap.set(partnerId, message);
+  }
+
+  const conversations = [];
+  for (const row of results) {
+    const partner = partnerMap.get(row.partner_id);
+    if (!partner) continue;
+    const message = msgMap.get(row.partner_id);
+    conversations.push({
+      id: `conv-${row.partner_id}`,
+      profileId: row.partner_id,
+      name: partner.username,
+      avatar: partner.avatar_url || '',
+      avatarCrop: safeParseJSON(partner.avatar_crop, null),
+      lastMessage: message ? message.content.slice(0, 50) : '',
+      timestamp: row.last_at,
+      unread: Number(row.unread || 0),
+      online: isOnline(partner.last_active),
+    });
+  }
+
+  return conversations;
+}
+
+async function backfillConversationStateForUser(env, userId) {
+  const conversations = await loadLegacyConversations(env, userId);
+  await ensureConversationStateTables(env);
+  await env.DB.prepare('DELETE FROM conversation_state WHERE user_id = ?').bind(userId).run();
+  await Promise.all(conversations.map((conversation) => setConversationState(env, userId, conversation.profileId, {
+    lastMessage: conversation.lastMessage || '',
+    lastMessageAt: conversation.timestamp,
+    unreadCount: Number(conversation.unread || 0),
+  })));
+  await markConversationStateInitialized(env, userId);
+  return conversations;
 }
 
 function getProfileVisitDedupeWindowMinutes(env) {
@@ -852,6 +1073,7 @@ async function handleProfileDetail(request, env, userId) {
 async function handleSendMessage(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  await ensureConversationStateTables(env);
 
   const { receiver_id, content } = await request.json();
   if (!receiver_id || !content || !content.trim()) {
@@ -910,6 +1132,8 @@ async function handleSendMessage(request, env) {
     created_at: now,
   };
 
+  await syncConversationStateForMessage(env, auth.sub, receiver_id, msg);
+
   // Notify ChatRoom DO so it broadcasts to connected receivers via WebSocket
   notifyChatRoom(env, auth.sub, receiver_id, msg).catch(() => {});
 
@@ -948,10 +1172,13 @@ async function handleGetMessages(request, env, otherUserId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   await ensureHiddenConversationsTable(env);
+  await ensureMessagingIndexes(env);
+  await ensureConversationStateTables(env);
   const url = new URL(request.url);
   const before = url.searchParams.get('before');
   const rawLimit = Number(url.searchParams.get('limit') || 40);
   const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 40, 1), 100);
+  const queryLimit = limit + 1;
   const hiddenRow = await env.DB.prepare(
     'SELECT hidden_before FROM hidden_conversations WHERE user_id = ? AND partner_id = ?'
   ).bind(auth.sub, otherUserId).first();
@@ -987,10 +1214,12 @@ async function handleGetMessages(request, env, otherUserId) {
     `;
 
   const bindings = before
-    ? [auth.sub, otherUserId, otherUserId, auth.sub, hiddenBefore, hiddenBefore, before, limit]
-    : [auth.sub, otherUserId, otherUserId, auth.sub, hiddenBefore, hiddenBefore, limit];
+    ? [auth.sub, otherUserId, otherUserId, auth.sub, hiddenBefore, hiddenBefore, before, queryLimit]
+    : [auth.sub, otherUserId, otherUserId, auth.sub, hiddenBefore, hiddenBefore, queryLimit];
 
   const { results } = await env.DB.prepare(query).bind(...bindings).all();
+  const hasMore = results.length > limit;
+  const windowedResults = hasMore ? results.slice(1) : results;
 
   // Mark as read
   await env.DB.prepare(`
@@ -998,25 +1227,9 @@ async function handleGetMessages(request, env, otherUserId) {
     WHERE sender_id = ? AND receiver_id = ? AND is_read = 0
       AND (? IS NULL OR created_at > ?)
   `).bind(otherUserId, auth.sub, hiddenBefore, hiddenBefore).run();
+  await clearConversationStateUnread(env, auth.sub, otherUserId);
 
-  let hasMore = false;
-  if (results.length > 0) {
-    const oldestCreatedAt = results[0].created_at;
-    const olderRow = await env.DB.prepare(`
-      SELECT 1
-      FROM messages
-      WHERE (
-        (sender_id = ? AND receiver_id = ?)
-        OR (sender_id = ? AND receiver_id = ?)
-      )
-        AND (? IS NULL OR created_at > ?)
-        AND created_at < ?
-      LIMIT 1
-    `).bind(auth.sub, otherUserId, otherUserId, auth.sub, hiddenBefore, hiddenBefore, oldestCreatedAt).first();
-    hasMore = !!olderRow;
-  }
-
-  const messages = results.map(m => ({
+  const messages = windowedResults.map(m => ({
     id: m.id,
     senderId: m.sender_id === auth.sub ? 'me' : 'them',
     text: m.content,
@@ -1034,84 +1247,41 @@ async function handleConversations(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   await ensureHiddenConversationsTable(env);
+  await ensureMessagingIndexes(env);
+  await ensureConversationStateTables(env);
 
-  // 1) Get latest message per conversation partner + unread count in a single query
+  if (!(await isConversationStateInitialized(env, auth.sub))) {
+    const conversations = await backfillConversationStateForUser(env, auth.sub);
+    return json({ conversations });
+  }
+
   const { results } = await env.DB.prepare(`
     SELECT
-      partner_id,
-      MAX(created_at) AS last_at,
-      SUM(CASE WHEN receiver_id = ? AND is_read = 0 THEN 1 ELSE 0 END) AS unread
-    FROM (
-      SELECT
-        m.*,
-        CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AS partner_id
-      FROM messages m
-      LEFT JOIN hidden_conversations hc
-        ON hc.user_id = ?
-       AND hc.partner_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END
-      WHERE (m.sender_id = ? OR m.receiver_id = ?)
-        AND (hc.hidden_before IS NULL OR m.created_at > hc.hidden_before)
-    )
-    GROUP BY partner_id
-    ORDER BY last_at DESC
-  `).bind(auth.sub, auth.sub, auth.sub, auth.sub, auth.sub, auth.sub).all();
+      cs.partner_id,
+      cs.last_message,
+      cs.last_message_at,
+      cs.unread_count,
+      u.username,
+      u.avatar_url,
+      u.avatar_crop,
+      u.last_active
+    FROM conversation_state cs
+    JOIN users u ON u.id = cs.partner_id
+    WHERE cs.user_id = ?
+    ORDER BY cs.last_message_at DESC
+  `).bind(auth.sub).all();
 
-  if (!results.length) return json({ conversations: [] });
-
-  // 2) Fetch all partner profiles in one query
-  const partnerIds = results.map(r => r.partner_id);
-  const placeholders = partnerIds.map(() => '?').join(',');
-  const { results: partners } = await env.DB.prepare(
-    `SELECT id, username, avatar_url, avatar_crop, last_active FROM users WHERE id IN (${placeholders})`
-  ).bind(...partnerIds).all();
-  const partnerMap = new Map(partners.map(p => [p.id, p]));
-
-  // 3) Fetch the actual last message content for each conversation in one query
-  // Build: SELECT * FROM messages WHERE (id = ?) OR (id = ?) ...
-  // Use a subquery approach instead
-  const { results: lastMsgs } = await env.DB.prepare(`
-    SELECT m.* FROM messages m
-    INNER JOIN (
-      SELECT
-        CASE WHEN m2.sender_id = ? THEN m2.receiver_id ELSE m2.sender_id END AS pid,
-        MAX(m2.created_at) AS max_at
-      FROM messages m2
-      LEFT JOIN hidden_conversations hc
-        ON hc.user_id = ?
-       AND hc.partner_id = CASE WHEN m2.sender_id = ? THEN m2.receiver_id ELSE m2.sender_id END
-      WHERE (m2.sender_id = ? OR m2.receiver_id = ?)
-        AND (hc.hidden_before IS NULL OR m2.created_at > hc.hidden_before)
-      GROUP BY pid
-    ) latest ON (
-      CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END = latest.pid
-      AND m.created_at = latest.max_at
-    )
-    WHERE m.sender_id = ? OR m.receiver_id = ?
-  `).bind(auth.sub, auth.sub, auth.sub, auth.sub, auth.sub, auth.sub, auth.sub, auth.sub).all();
-  const msgMap = new Map();
-  for (const m of lastMsgs) {
-    const pid = m.sender_id === auth.sub ? m.receiver_id : m.sender_id;
-    if (!msgMap.has(pid)) msgMap.set(pid, m);
-  }
-
-  // 4) Build response
-  const conversations = [];
-  for (const r of results) {
-    const partner = partnerMap.get(r.partner_id);
-    if (!partner) continue;
-    const msg = msgMap.get(r.partner_id);
-    conversations.push({
-      id: `conv-${r.partner_id}`,
-      profileId: r.partner_id,
-      name: partner.username,
-      avatar: partner.avatar_url || '',
-      avatarCrop: safeParseJSON(partner.avatar_crop, null),
-      lastMessage: msg ? msg.content.slice(0, 50) : '',
-      timestamp: r.last_at,
-      unread: r.unread,
-      online: isOnline(partner.last_active),
-    });
-  }
+  const conversations = results.map((row) => ({
+    id: `conv-${row.partner_id}`,
+    profileId: row.partner_id,
+    name: row.username,
+    avatar: row.avatar_url || '',
+    avatarCrop: safeParseJSON(row.avatar_crop, null),
+    lastMessage: (row.last_message || '').slice(0, 50),
+    timestamp: row.last_message_at,
+    unread: Number(row.unread_count || 0),
+    online: isOnline(row.last_active),
+  }));
 
   return json({ conversations });
 }
@@ -1120,6 +1290,8 @@ async function handleDeleteConversation(request, env, otherUserId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   await ensureHiddenConversationsTable(env);
+  await ensureMessagingIndexes(env);
+  await ensureConversationStateTables(env);
 
   const hiddenBefore = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
@@ -1129,6 +1301,7 @@ async function handleDeleteConversation(request, env, otherUserId) {
     ON CONFLICT(user_id, partner_id)
     DO UPDATE SET hidden_before = excluded.hidden_before
   `).bind(auth.sub, otherUserId, hiddenBefore).run();
+  await deleteConversationState(env, auth.sub, otherUserId);
 
   const unreadRow = await env.DB.prepare(`
     SELECT COUNT(*) as unread
@@ -1297,6 +1470,15 @@ async function handleUnreadCount(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   await ensureHiddenConversationsTable(env);
+  await ensureMessagingIndexes(env);
+  await ensureConversationStateTables(env);
+
+  if (await isConversationStateInitialized(env, auth.sub)) {
+    const row = await env.DB.prepare(
+      'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'
+    ).bind(auth.sub).first();
+    return json({ unread: Number(row?.unread || 0) });
+  }
 
   const row = await env.DB.prepare(`
     SELECT COUNT(*) as unread
