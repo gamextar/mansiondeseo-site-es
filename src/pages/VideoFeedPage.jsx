@@ -812,23 +812,40 @@ export default function VideoFeedPage() {
     <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
       {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
-          {activeStory && (
-            <div className="w-full h-full">
-              <StoryCard
-                key={activeStory.id}
-                story={activeStory}
-                videoSrc={activeStory.video_url}
-                isActive
-                shouldLoad
-                isMuted={isMuted}
-                avatarSize={avatarSize}
-                onLike={handleLike}
-                navigate={navigate}
-                gradientHeight={gradientHeight}
-                gradientOpacity={gradientOpacity}
-              />
-            </div>
-          )}
+          <div className="relative w-full h-full">
+            {stories.map((story, index) => {
+              const activeIndex = desktopActiveIdx - 1;
+              const rawDistance = Math.abs(index - activeIndex);
+              const circularDistance = Math.min(rawDistance, stories.length - rawDistance);
+              const isActive = index === activeIndex;
+              const shouldLoad = stories.length <= 3 || circularDistance <= 1;
+
+              return (
+                <div
+                  key={story.id}
+                  className="absolute inset-0"
+                  style={{
+                    opacity: isActive ? 1 : 0,
+                    pointerEvents: isActive ? 'auto' : 'none',
+                    zIndex: isActive ? 10 : 0,
+                  }}
+                >
+                  <StoryCard
+                    story={story}
+                    videoSrc={story.video_url}
+                    isActive={isActive}
+                    shouldLoad={shouldLoad}
+                    isMuted={isMuted}
+                    avatarSize={avatarSize}
+                    onLike={handleLike}
+                    navigate={navigate}
+                    gradientHeight={gradientHeight}
+                    gradientOpacity={gradientOpacity}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <div
