@@ -25,16 +25,36 @@ function timeAgo(dateStr) {
 }
 
 const CONV_CACHE_KEY = 'mansion_conversations';
+const CONV_CACHE_TTL_MS = 15_000;
 
 function getCachedConversations() {
   try {
     const raw = sessionStorage.getItem(CONV_CACHE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return { conversations: [], timestamp: 0 };
+
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return { conversations: parsed, timestamp: 0 };
+    }
+
+    return {
+      conversations: Array.isArray(parsed?.conversations) ? parsed.conversations : [],
+      timestamp: Number(parsed?.timestamp) || 0,
+    };
   } catch { return []; }
 }
 
 function setCachedConversations(convs) {
-  try { sessionStorage.setItem(CONV_CACHE_KEY, JSON.stringify(convs)); } catch {}
+  try {
+    sessionStorage.setItem(CONV_CACHE_KEY, JSON.stringify({
+      conversations: convs,
+      timestamp: Date.now(),
+    }));
+  } catch {}
+}
+
+function isConversationCacheFresh(timestamp) {
+  return timestamp > 0 && Date.now() - timestamp < CONV_CACHE_TTL_MS;
 }
 
 function ConversationRow({ conv, typing, onDelete, deleting }) {
@@ -167,12 +187,13 @@ function ConversationRow({ conv, typing, onDelete, deleting }) {
 }
 
 export default function ChatListPage() {
-  const cached = getCachedConversations();
-  const [conversations, setConversations] = useState(cached);
-  const [loading, setLoading] = useState(cached.length === 0);
+  const cachedState = getCachedConversations();
+  const [conversations, setConversations] = useState(cachedState.conversations);
+  const [loading, setLoading] = useState(cachedState.conversations.length === 0);
   const [deletingId, setDeletingId] = useState(null);
   const [typingChats, setTypingChats] = useState({});
   const typingTimersRef = useRef({});
+  const lastSyncAtRef = useRef(cachedState.timestamp || 0);
   const navigate = useNavigate();
   const { refresh: refreshUnread, subscribe } = useUnreadMessages();
 
@@ -212,6 +233,7 @@ export default function ChatListPage() {
         const convs = data.conversations || [];
         setConversations(convs);
         setCachedConversations(convs);
+        lastSyncAtRef.current = Date.now();
       })
       .catch((err) => {
         console.error('Conversations fetch error:', err);
@@ -251,20 +273,30 @@ export default function ChatListPage() {
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
-    if (!cached.length) setLoading(true);
-    getConversations()
-      .then(data => {
-        const convs = data.conversations || [];
-        setConversations(convs);
-        setCachedConversations(convs);
-      })
-      .catch((err) => {
-        console.error('Initial conversations fetch error:', err);
-      })
-      .finally(() => setLoading(false));
+    const hasFreshCache = isConversationCacheFresh(lastSyncAtRef.current);
+    if (!cachedState.conversations.length) setLoading(true);
+
+    if (hasFreshCache) {
+      setLoading(false);
+    } else {
+      getConversations()
+        .then(data => {
+          const convs = data.conversations || [];
+          setConversations(convs);
+          setCachedConversations(convs);
+          lastSyncAtRef.current = Date.now();
+        })
+        .catch((err) => {
+          console.error('Initial conversations fetch error:', err);
+        })
+        .finally(() => setLoading(false));
+    }
 
     // Refresh when tab/window gets focus (e.g. returning from another app)
-    const onFocus = () => { fetchConversations(); refreshUnread(); };
+    const onFocus = () => {
+      if (isConversationCacheFresh(lastSyncAtRef.current)) return;
+      fetchConversations();
+    };
     window.addEventListener('focus', onFocus);
 
     // Real-time: refresh when a new message arrives via notification WebSocket
@@ -297,7 +329,7 @@ export default function ChatListPage() {
       window.removeEventListener('focus', onFocus);
       unsubscribe();
     };
-  }, [navigate, fetchConversations, refreshUnread, subscribe, applyConversationUpdate]);
+  }, [navigate, fetchConversations, refreshUnread, subscribe, applyConversationUpdate, cachedState.conversations.length]);
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
       {/* Header */}

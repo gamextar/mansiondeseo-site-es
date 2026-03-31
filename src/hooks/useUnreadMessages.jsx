@@ -11,6 +11,9 @@ const UnreadContext = createContext({
 const WS_BASE = import.meta.env.PROD
   ? 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev'
   : `ws://${window.location.hostname}:8787`;
+const NOTIFICATION_PING_MS = 55_000;
+const UNREAD_REFRESH_STALE_MS = 60_000;
+const UNREAD_FETCH_DEBOUNCE_MS = 4_000;
 
 export function UnreadProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -20,6 +23,10 @@ export function UnreadProvider({ children }) {
   const wsRef = useRef(null);
   const wsRetryRef = useRef(0);
   const wsClosedRef = useRef(false);
+  const wsPausedRef = useRef(false);
+  const wsConnectedRef = useRef(false);
+  const unreadFetchRef = useRef(null);
+  const lastUnreadFetchAtRef = useRef(0);
   const activeChatIdRef = useRef(null);
 
   const applyUnreadCount = useCallback((total, { showToast = false } = {}) => {
@@ -33,19 +40,59 @@ export function UnreadProvider({ children }) {
     setUnreadCount(nextTotal);
   }, []);
 
-  const fetchUnread = useCallback(() => {
+  const stopPing = useCallback((socket = wsRef.current) => {
+    if (!socket?._pingTimer) return;
+    clearInterval(socket._pingTimer);
+    socket._pingTimer = null;
+  }, []);
+
+  const startPing = useCallback((socket = wsRef.current) => {
+    if (!socket || document.visibilityState !== 'visible') return;
+    stopPing(socket);
+    socket._pingTimer = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, NOTIFICATION_PING_MS);
+  }, [stopPing]);
+
+  const fetchUnread = useCallback(({ force = false } = {}) => {
     const token = getToken();
     if (!token) {
       prevCountRef.current = 0;
       setUnreadCount(0);
-      return;
+      return Promise.resolve({ unread: 0 });
     }
-    getUnreadCount()
+
+    const now = Date.now();
+    if (unreadFetchRef.current) return unreadFetchRef.current;
+    if (!force && lastUnreadFetchAtRef.current && now - lastUnreadFetchAtRef.current < UNREAD_FETCH_DEBOUNCE_MS) {
+      return Promise.resolve({ unread: prevCountRef.current });
+    }
+
+    lastUnreadFetchAtRef.current = now;
+    const request = getUnreadCount()
       .then((data) => {
         applyUnreadCount(data.unread || 0, { showToast: true });
+        return data;
       })
-      .catch(() => {});
+      .catch((error) => {
+        throw error;
+      })
+      .finally(() => {
+        if (unreadFetchRef.current === request) unreadFetchRef.current = null;
+      });
+
+    unreadFetchRef.current = request;
+    return request;
   }, [applyUnreadCount]);
+
+  const shouldRefreshUnread = useCallback(() => {
+    if (!getToken()) return false;
+    if (!wsConnectedRef.current) return true;
+    return Date.now() - lastUnreadFetchAtRef.current > UNREAD_REFRESH_STALE_MS;
+  }, []);
 
   // Notify all subscribers (e.g. ChatListPage) of a new event
   const notifyListeners = useCallback((event) => {
@@ -59,9 +106,22 @@ export function UnreadProvider({ children }) {
   }, []);
 
   // Connect notification WebSocket
+  const disconnectWs = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws) return;
+    stopPing(ws);
+    ws.onclose = null;
+    ws.close();
+    wsRef.current = null;
+    wsConnectedRef.current = false;
+  }, [stopPing]);
+
   const connectWs = useCallback(() => {
     const token = getToken();
-    if (!token || wsClosedRef.current) return;
+    if (!token || wsClosedRef.current || wsPausedRef.current) return;
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
 
     const url = `${WS_BASE}/api/notifications/ws?token=${encodeURIComponent(token)}`;
     try {
@@ -70,17 +130,17 @@ export function UnreadProvider({ children }) {
 
       ws.onopen = () => {
         wsRetryRef.current = 0;
-        // Keep-alive ping every 25s
-        ws._pingTimer = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping' }));
-          }
-        }, 25_000);
+        wsConnectedRef.current = true;
+        startPing(ws);
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          if (data.type === 'connected' || data.type === 'pong') {
+            wsConnectedRef.current = true;
+            return;
+          }
           if (data.type === 'new_message') {
             const isActiveChat = !!activeChatIdRef.current && data.chatId === activeChatIdRef.current;
             if (typeof data.unreadCount === 'number') {
@@ -89,14 +149,14 @@ export function UnreadProvider({ children }) {
                 { showToast: !isActiveChat }
               );
             } else if (!isActiveChat) {
-              fetchUnread();
+              fetchUnread({ force: true }).catch(() => {});
             }
             notifyListeners(data);
           } else if (data.type === 'conversation_deleted') {
             if (typeof data.unreadCount === 'number') {
               applyUnreadCount(data.unreadCount);
             } else {
-              fetchUnread();
+              fetchUnread({ force: true }).catch(() => {});
             }
             notifyListeners(data);
           } else if (data.type === 'typing') {
@@ -120,8 +180,10 @@ export function UnreadProvider({ children }) {
       };
 
       ws.onclose = () => {
-        clearInterval(ws._pingTimer);
-        if (!wsClosedRef.current) {
+        stopPing(ws);
+        if (wsRef.current === ws) wsRef.current = null;
+        wsConnectedRef.current = false;
+        if (!wsClosedRef.current && !wsPausedRef.current) {
           const delay = Math.min(1000 * Math.pow(2, wsRetryRef.current), 30_000);
           wsRetryRef.current++;
           setTimeout(connectWs, delay);
@@ -130,39 +192,57 @@ export function UnreadProvider({ children }) {
 
       ws.onerror = () => { /* onclose will fire */ };
     } catch {
+      wsConnectedRef.current = false;
       const delay = Math.min(1000 * Math.pow(2, wsRetryRef.current), 30_000);
       wsRetryRef.current++;
       setTimeout(connectWs, delay);
     }
-  }, [fetchUnread, notifyListeners]);
+  }, [applyUnreadCount, fetchUnread, notifyListeners, startPing, stopPing]);
 
   // Initial fetch + WebSocket (no polling — real-time only)
   useEffect(() => {
-    fetchUnread();
+    fetchUnread({ force: true }).catch(() => {});
     wsClosedRef.current = false;
-    connectWs();
-    return () => {
-      wsClosedRef.current = true;
-      if (wsRef.current) {
-        wsRef.current.onclose = null;
-        wsRef.current.close();
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        wsPausedRef.current = false;
+        connectWs();
+        if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
+        else startPing();
+      } else {
+        wsPausedRef.current = true;
+        disconnectWs();
       }
     };
-  }, [fetchUnread, connectWs]);
 
-  // Also refetch on window focus
-  useEffect(() => {
-    const onFocus = () => fetchUnread();
+    const onFocus = () => {
+      if (document.visibilityState !== 'visible') return;
+      wsPausedRef.current = false;
+      connectWs();
+      if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
+      else startPing();
+    };
+
+    if (document.visibilityState === 'visible') connectWs();
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [fetchUnread]);
+
+    return () => {
+      wsClosedRef.current = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onFocus);
+      disconnectWs();
+    };
+  }, [connectWs, disconnectWs, fetchUnread, shouldRefreshUnread, startPing]);
 
   const setActiveChatId = useCallback((chatId) => {
     activeChatIdRef.current = chatId || null;
   }, []);
 
   return (
-    <UnreadContext.Provider value={{ unreadCount, refresh: fetchUnread, subscribe, setActiveChatId }}>
+    <UnreadContext.Provider value={{ unreadCount, refresh: () => fetchUnread({ force: true }), subscribe, setActiveChatId }}>
       {children}
       {/* Toast notification */}
       {toast && (

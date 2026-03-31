@@ -7,6 +7,35 @@ const API_BASE = import.meta.env.PROD
   : '/api';
 const TOKEN_KEY = 'mansion_token';
 const USER_KEY = 'mansion_user';
+const sharedGetCache = new Map();
+
+function sharedGet(key, fetcher, { ttlMs = 0 } = {}) {
+  const now = Date.now();
+  const cached = sharedGetCache.get(key);
+
+  if (cached?.promise) return cached.promise;
+  if (ttlMs > 0 && cached?.value !== undefined && now - cached.timestamp < ttlMs) {
+    return Promise.resolve(cached.value);
+  }
+
+  const promise = fetcher()
+    .then((value) => {
+      sharedGetCache.set(key, { value, timestamp: Date.now(), promise: null });
+      return value;
+    })
+    .catch((error) => {
+      sharedGetCache.delete(key);
+      throw error;
+    });
+
+  sharedGetCache.set(key, {
+    value: cached?.value,
+    timestamp: cached?.timestamp || 0,
+    promise,
+  });
+
+  return promise;
+}
 
 // ── Token management ────────────────────────────────────
 
@@ -344,7 +373,7 @@ export async function checkFavorite(targetId) {
 // ── Visits ──────────────────────────────────────────────
 
 export async function getVisits() {
-  return apiFetch('/visits');
+  return sharedGet('visits', () => apiFetch('/visits'), { ttlMs: 30_000 });
 }
 
 // ── Gifts & Coins ───────────────────────────────────────

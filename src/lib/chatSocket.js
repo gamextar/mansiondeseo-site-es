@@ -6,6 +6,7 @@
 const WS_BASE = import.meta.env.PROD
   ? 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev'
   : `ws://${window.location.hostname}:8787`;
+const CHAT_PING_MS = 45_000;
 
 /**
  * Creates a managed WebSocket connection to the ChatRoom Durable Object.
@@ -34,6 +35,22 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   let pingTimer = null;
   let closed = false; // true when user explicitly closes
 
+  function stopPing() {
+    clearInterval(pingTimer);
+    pingTimer = null;
+  }
+
+  function startPing() {
+    if (document.visibilityState !== 'visible') return;
+    stopPing();
+    pingTimer = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, CHAT_PING_MS);
+  }
+
   function setState(s) {
     state = s;
     callbacks.onStateChange?.(s);
@@ -53,12 +70,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     ws.onopen = () => {
       retryCount = 0;
       setState('connected');
-      // Keep-alive ping every 20s
-      pingTimer = setInterval(() => {
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'ping' }));
-        }
-      }, 20_000);
+      startPing();
     };
 
     ws.onmessage = (event) => {
@@ -97,7 +109,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     };
 
     ws.onclose = () => {
-      clearInterval(pingTimer);
+      stopPing();
       if (!closed) {
         setState('disconnected');
         scheduleReconnect();
@@ -137,7 +149,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   function close() {
     closed = true;
     clearTimeout(retryTimer);
-    clearInterval(pingTimer);
+    stopPing();
     if (ws) {
       ws.onclose = null; // prevent reconnect
       ws.close();
@@ -150,8 +162,28 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     return state;
   }
 
+  function handleVisibilityChange() {
+    if (closed) return;
+    if (document.visibilityState === 'visible') {
+      if (ws?.readyState === WebSocket.OPEN) startPing();
+      return;
+    }
+    stopPing();
+  }
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+
   // Start connection
   connect();
 
-  return { send, sendTyping, markRead, close, getState };
+  return {
+    send,
+    sendTyping,
+    markRead,
+    close: () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      close();
+    },
+    getState,
+  };
 }

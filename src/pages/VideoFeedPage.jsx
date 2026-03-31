@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift } from 'lucide-react';
 import { getStories, toggleStoryLike } from '../lib/api';
 import { useAuth } from '../App';
+import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
 
 function timeAgo(dateStr) {
@@ -429,6 +430,7 @@ function DesktopActionButtons({ story, onLike, navigate }) {
 export default function VideoFeedPage() {
   const navigate = useNavigate();
   const { siteSettings } = useAuth();
+  const { subscribe } = useUnreadMessages();
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
@@ -455,6 +457,12 @@ export default function VideoFeedPage() {
   const [boundaryOverlayIdx, setBoundaryOverlayIdx] = useState(null);
   const [isMuted, setIsMuted] = useState(savedMuted);
 
+  const persistStories = useCallback((nextStories) => {
+    try {
+      sessionStorage.setItem('vf_stories', JSON.stringify(nextStories));
+    } catch {}
+  }, []);
+
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
@@ -468,24 +476,45 @@ export default function VideoFeedPage() {
   const overlayIdx = boundaryOverlayIdx ?? activeDispIdx;
   const activeStory = infiniteStories[overlayIdx] || stories[0] || null;
 
+  const refreshStories = useCallback(async () => {
+    const data = await getStories();
+    const fresh = data.stories || [];
+    setStories(fresh);
+    persistStories(fresh);
+    return fresh;
+  }, [persistStories]);
+
   useEffect(() => {
     let cancelled = false;
-    getStories()
-      .then(data => {
-        if (!cancelled) {
-          const fresh = data.stories || [];
-          setStories(fresh);
-          try { sessionStorage.setItem('vf_stories', JSON.stringify(fresh)); } catch {}
-        }
-      })
+
+    refreshStories()
       .catch(() => {
         if (!cancelled && stories.length === 0) setStories([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshStories, stories.length]);
+
+  useEffect(() => {
+    return subscribe((event) => {
+      if (event?.type !== 'story_like' || !event.storyId) return;
+
+      setStories((prev) => {
+        const next = prev.map((story) => (
+          story.id === event.storyId
+            ? { ...story, likes: Math.max(0, Number(story.likes || 0) + 1) }
+            : story
+        ));
+        persistStories(next);
+        return next;
+      });
+    });
+  }, [persistStories, subscribe]);
 
   useLayoutEffect(() => {
     if (stories.length === 0 || !containerRef.current) return;
@@ -619,22 +648,34 @@ export default function VideoFeedPage() {
 
   const handleLike = useCallback(async (storyId) => {
     // Optimistic: flip immediately
-    setStories(prev => prev.map(s =>
-      s.id === storyId ? { ...s, liked: !s.liked, likes: s.liked ? Math.max(0, s.likes - 1) : s.likes + 1 } : s
-    ));
+    setStories(prev => {
+      const next = prev.map(s =>
+        s.id === storyId ? { ...s, liked: !s.liked, likes: s.liked ? Math.max(0, s.likes - 1) : s.likes + 1 } : s
+      );
+      persistStories(next);
+      return next;
+    });
     try {
       const data = await toggleStoryLike(storyId);
       // Sync with server truth
-      setStories(prev => prev.map(s =>
-        s.id === storyId ? { ...s, liked: data.liked, likes: data.likes } : s
-      ));
+      setStories(prev => {
+        const next = prev.map(s =>
+          s.id === storyId ? { ...s, liked: data.liked, likes: data.likes } : s
+        );
+        persistStories(next);
+        return next;
+      });
     } catch {
       // Revert on failure
-      setStories(prev => prev.map(s =>
-        s.id === storyId ? { ...s, liked: !s.liked, likes: s.liked ? Math.max(0, s.likes - 1) : s.likes + 1 } : s
-      ));
+      setStories(prev => {
+        const next = prev.map(s =>
+          s.id === storyId ? { ...s, liked: !s.liked, likes: s.liked ? Math.max(0, s.likes - 1) : s.likes + 1 } : s
+        );
+        persistStories(next);
+        return next;
+      });
     }
-  }, []);
+  }, [persistStories]);
 
   const scrollByOne = useCallback((dir) => {
     const container = containerRef.current;
