@@ -75,7 +75,7 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
@@ -115,7 +115,9 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       rafRef.current = requestAnimationFrame(tick);
     } else {
       video.pause();
-      video.currentTime = 0;
+      if (resetOnDeactivate) {
+        video.currentTime = 0;
+      }
       if (progressBarRef.current) progressBarRef.current.style.width = '0%';
       setIsPlaying(false);
       cancelAnimationFrame(rafRef.current);
@@ -826,8 +828,12 @@ export default function VideoFeedPage() {
                   className="absolute inset-0"
                   style={{
                     opacity: isActive ? 1 : 0,
+                    visibility: isActive ? 'visible' : 'hidden',
                     pointerEvents: isActive ? 'auto' : 'none',
                     zIndex: isActive ? 10 : 0,
+                    contain: 'paint',
+                    WebkitBackfaceVisibility: 'hidden',
+                    backfaceVisibility: 'hidden',
                   }}
                 >
                   <StoryCard
@@ -841,6 +847,7 @@ export default function VideoFeedPage() {
                     navigate={navigate}
                     gradientHeight={gradientHeight}
                     gradientOpacity={gradientOpacity}
+                    resetOnDeactivate={false}
                   />
                 </div>
               );
@@ -876,6 +883,7 @@ export default function VideoFeedPage() {
                   navigate={navigate}
                   gradientHeight={gradientHeight}
                   gradientOpacity={gradientOpacity}
+                  resetOnDeactivate
                 />
               </div>
             );
