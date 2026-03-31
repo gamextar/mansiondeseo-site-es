@@ -1054,17 +1054,16 @@ async function handleSendMessage(request, env) {
 
   // Check daily message limit
   const today = todayUTC();
-  const limit = await env.DB.prepare(
-    'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
-  ).bind(auth.sub, today).first();
+  const [limit, sender, siteSettings] = await Promise.all([
+    env.DB.prepare(
+      'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
+    ).bind(auth.sub, today).first(),
+    env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
+    cached('settings', 300_000, () => loadSettings(env)),
+  ]);
 
   const currentCount = limit?.msg_count || 0;
 
-  // Check if user is premium (unlimited)
-  const sender = await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
-
-  // Load configurable daily limit
-  const siteSettings = await loadSettings(env);
   const dailyLimit = siteSettings.dailyMessageLimit || 5;
 
   if (!isPremiumActive(sender) && currentCount >= dailyLimit) {
@@ -1292,16 +1291,16 @@ async function handleMessageLimit(request, env) {
   if (!auth) return error('No autorizado', 401);
 
   const today = todayUTC();
-  const limit = await env.DB.prepare(
-    'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
-  ).bind(auth.sub, today).first();
-
-  const sender = await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
+  const [limit, sender, siteSettings] = await Promise.all([
+    env.DB.prepare(
+      'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
+    ).bind(auth.sub, today).first(),
+    env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
+    cached('settings', 300_000, () => loadSettings(env)),
+  ]);
 
   const count = limit?.msg_count || 0;
 
-  // Load configurable daily limit
-  const siteSettings = await loadSettings(env);
   const dailyLimit = siteSettings.dailyMessageLimit || 5;
   const senderPremium = isPremiumActive(sender);
 
@@ -1369,6 +1368,16 @@ function buildConversationPreview(partner, msg, unread) {
   };
 }
 
+async function loadConversationUsers(env, senderId, receiverId) {
+  const cacheKey = `message-users:${[senderId, receiverId].sort().join(':')}`;
+  return cached(cacheKey, 60_000, async () => {
+    const { results } = await env.DB.prepare(
+      'SELECT id, username, avatar_url, avatar_crop, last_active FROM users WHERE id IN (?, ?)'
+    ).bind(senderId, receiverId).all();
+    return results;
+  });
+}
+
 async function buildNewMessageEvents(env, senderId, receiverId, msg) {
   await ensureHiddenConversationsTable(env);
   const chatId = [senderId, receiverId].sort().join('-');
@@ -1377,9 +1386,7 @@ async function buildNewMessageEvents(env, senderId, receiverId, msg) {
   let receiverConversation = null;
 
   try {
-    const { results: users } = await env.DB.prepare(
-      'SELECT id, username, avatar_url, avatar_crop, last_active FROM users WHERE id IN (?, ?)'
-    ).bind(senderId, receiverId).all();
+    const users = await loadConversationUsers(env, senderId, receiverId);
 
     const userMap = new Map(users.map((user) => [user.id, user]));
     senderConversation = buildConversationPreview(userMap.get(receiverId), msg, 0);

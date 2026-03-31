@@ -199,26 +199,13 @@ export default function ChatPage() {
     // Open WebSocket connection for real-time messages
     chatRef.current = createChatSocket(String(user.id), partnerId, token, {
       onHistory(msgs) {
-        // Only use DO history if HTTP returned no messages (fresh conversation or migration gap)
         setMessages(prev => {
-          if (!httpHistoryLoadedRef.current && prev.length === 0 && msgs.length > 0) {
-            wasAtBottomRef.current = true;
-            requestScrollToBottom('auto');
-            return msgs.map(m => formatMsg(m));
-          }
-          // Otherwise just update read status from DO
           if (msgs.length > 0) {
             const doMap = new Map(msgs.map(m => [m.id, m.is_read]));
             return prev.map(m => doMap.has(m.id) ? { ...m, is_read: doMap.get(m.id) } : m);
           }
           return prev;
         });
-        // Mark unread incoming messages as read
-        const unread = msgs.filter(m => m.sender_id !== String(user.id) && !m.is_read);
-        if (unread.length > 0) {
-          chatRef.current?.markRead(unread.map(m => m.id));
-          refreshUnread();
-        }
       },
       onMessage(msg) {
         // Deduplicate: skip if message already exists

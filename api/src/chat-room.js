@@ -13,6 +13,7 @@ export class ChatRoom {
     this.chatId = null;
     this.dailyLimitCache = { value: null, expiresAt: 0 };
     this.userStatusCache = new Map();
+    this.userPreviewCache = new Map();
     this.messageConversationIdReady = null;
     this.typingNotifyCache = new Map();
   }
@@ -66,6 +67,27 @@ export class ChatRoom {
     };
   }
 
+  async getUserPreview(userId) {
+    const now = Date.now();
+    const cached = this.userPreviewCache.get(userId);
+    if (cached && now < cached.expiresAt) {
+      return cached.value;
+    }
+
+    const user = await this.env.DB.prepare(
+      'SELECT id, username, avatar_url, avatar_crop, last_active FROM users WHERE id = ?'
+    ).bind(userId).first();
+
+    if (user) {
+      this.userPreviewCache.set(userId, {
+        value: user,
+        expiresAt: now + 60_000,
+      });
+    }
+
+    return user || null;
+  }
+
   async ensureHiddenConversationsTable() {
     if (!this.hiddenConversationsReady) {
       this.hiddenConversationsReady = Promise.all([
@@ -97,9 +119,10 @@ export class ChatRoom {
     let receiverConversation = null;
 
     try {
-      const { results: users } = await this.env.DB.prepare(
-        'SELECT id, username, avatar_url, avatar_crop, last_active FROM users WHERE id IN (?, ?)'
-      ).bind(senderId, receiverId).all();
+      const users = await Promise.all([
+        this.getUserPreview(senderId),
+        this.getUserPreview(receiverId),
+      ]);
 
       const userMap = new Map(users.map((user) => [user.id, user]));
       senderConversation = this.buildConversationPreview(userMap.get(receiverId), msg, 0);
