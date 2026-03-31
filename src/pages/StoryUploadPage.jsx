@@ -137,10 +137,10 @@ function StoryPreview({ videoUrl, caption, user, onClose }) {
 			<button
 				type="button"
 				onClick={onClose}
-				className="absolute z-20 w-11 h-11 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center"
+				className="absolute z-20 flex h-14 w-14 items-center justify-center rounded-full bg-black/45 backdrop-blur-sm"
 				style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
 			>
-				<X className="w-5 h-5 text-white" />
+				<X className="h-7 w-7 text-white" />
 			</button>
 
 			{/* Right-side action icons (visual only, matching feed) */}

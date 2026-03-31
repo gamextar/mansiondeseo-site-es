@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift } from 'lucide-react';
+import { Heart, Send, Plus, Volume2, VolumeX, Play, Pause, Film, ChevronLeft, ChevronRight, Gift } from 'lucide-react';
 import { getStories, toggleStoryLike } from '../lib/api';
 import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
@@ -161,6 +161,15 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
         />
         {/* Mobile prioritizes swipe; keep tap-to-play overlay only on desktop */}
         <div className="absolute inset-0 z-10 hidden lg:block" onClick={togglePlay} />
+
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="absolute top-4 left-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-black/45 backdrop-blur-sm transition-all duration-200 active:scale-95 lg:hidden"
+          aria-label={isPlaying ? 'Pausar video' : 'Reproducir video'}
+        >
+          {isPlaying ? <Pause className="h-7 w-7 text-white" /> : <Play className="ml-0.5 h-7 w-7 text-white" />}
+        </button>
 
         <AnimatePresence>
           {showPlayIcon && (
