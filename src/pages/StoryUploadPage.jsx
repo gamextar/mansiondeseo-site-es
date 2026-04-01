@@ -520,7 +520,7 @@ export default function StoryUploadPage() {
 
 	const maskedEncodingProgress = clamp(encodingProgress, 0, 1);
 	const maskedUploadProgress = clamp(uploadProgress, 0, 1);
-	const verificationEncodingShare = 0.86;
+	const verificationEncodingShare = 0.95;
 	const loadingStoryProgress = phase === 'preparing'
 		? 0
 		: clamp(maskedEncodingProgress * 2, 0, 1);
@@ -679,8 +679,16 @@ export default function StoryUploadPage() {
 												</div>
 											</div>
 
-											{showVerificationProgress && (
-												<div className="space-y-2">
+											<AnimatePresence initial={false}>
+												{showVerificationProgress && (
+													<motion.div
+														initial={{ opacity: 0, y: 10, scaleY: 0.92 }}
+														animate={{ opacity: 1, y: 0, scaleY: 1 }}
+														exit={{ opacity: 0, y: -6, scaleY: 0.96 }}
+														transition={{ duration: 0.24, ease: 'easeOut' }}
+														style={{ originY: 0, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+														className="space-y-2"
+													>
 													<div className="flex items-center justify-between text-sm">
 														<span className="text-text-muted">Verificando historia</span>
 														<span className="font-semibold text-mansion-gold tabular-nums">{verificationPercent}%</span>
@@ -690,8 +698,9 @@ export default function StoryUploadPage() {
 															<div className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${verificationPercent}%` }} />
 														</div>
 													</div>
-												</div>
-											)}
+													</motion.div>
+												)}
+											</AnimatePresence>
 
 											<p className="text-xs text-text-dim">
 												{phase === 'preparing'
