@@ -126,6 +126,7 @@ async function apiUpload(path, options = {}) {
 
     if (token) {
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('X-Session-Token', token);
     }
 
     Object.entries(headers).forEach(([key, value]) => {

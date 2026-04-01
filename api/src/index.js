@@ -455,8 +455,11 @@ async function validateTurnstile(token, secret, ip) {
 
 async function authenticate(request, env) {
   const authHeader = request.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  const token = authHeader.slice(7);
+  const fallbackToken = request.headers.get('X-Session-Token') || '';
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : fallbackToken.trim();
+  if (!token) return null;
   const payload = await verifyJWT(token, env.JWT_SECRET);
   if (!payload) return null;
   // Update last_active + IP (fire-and-forget)
@@ -492,7 +495,7 @@ function corsHeaders(env, request) {
   return {
     'Access-Control-Allow-Origin': acao,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Turnstile-Token',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token, X-Turnstile-Token',
     'Access-Control-Max-Age': '86400',
   };
 }
