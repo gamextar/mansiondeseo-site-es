@@ -388,7 +388,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 					className="absolute inset-0 z-20"
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
-					transition={{ delay: 3, duration: 0.7, ease: 'easeOut' }}
+					transition={{ delay: 0, duration: 0.5, ease: 'easeOut' }}
 					style={{ pointerEvents: 'none' }}
 					onAnimationComplete={() => {
 						if (overlayRef.current) overlayRef.current.style.pointerEvents = 'auto';
@@ -1086,17 +1086,17 @@ export default function StoryUploadPage() {
 														)}
 													</div>
 												) : (
-													<div className="rounded-[1.75rem] border border-white/10 bg-black/40 backdrop-blur-md p-5 sm:p-6 shadow-[0_12px_40px_rgba(0,0,0,0.24)]">
+													<div className="rounded-[1.75rem] border border-white/12 bg-black/45 backdrop-blur-md p-6 sm:p-7 shadow-[0_16px_48px_rgba(0,0,0,0.32)]">
 														{/* Spinner + label */}
-														<div className="flex items-center gap-4 mb-5">
+														<div className="flex items-center gap-5 mb-6">
 															<div className="relative flex-shrink-0">
-																<svg className="w-10 h-10 -rotate-90" viewBox="0 0 40 40">
-																	<circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3.5" />
+																<svg className="w-16 h-16 -rotate-90" viewBox="0 0 56 56">
+																	<circle cx="28" cy="28" r="23" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
 																	<circle
-																		cx="20" cy="20" r="16" fill="none"
-																		stroke="url(#spinGrad)" strokeWidth="3.5"
+																		cx="28" cy="28" r="23" fill="none"
+																		stroke="url(#spinGrad)" strokeWidth="4"
 																		strokeLinecap="round"
-																		strokeDasharray={`${100.5 * loadingStoryProgress} 100.5`}
+																		strokeDasharray={`${144.5 * loadingStoryProgress} 144.5`}
 																		style={{ transition: 'stroke-dasharray 0.35s ease' }}
 																	/>
 																	<defs>
@@ -1106,13 +1106,13 @@ export default function StoryUploadPage() {
 																		</linearGradient>
 																	</defs>
 																</svg>
-																<span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-mansion-gold tabular-nums">{loadingStoryPercent}%</span>
+																<span className="absolute inset-0 flex items-center justify-center text-[13px] font-bold text-mansion-gold tabular-nums">{loadingStoryPercent}%</span>
 															</div>
 															<div className="flex-1 min-w-0">
-																<p className="text-sm font-semibold text-white leading-tight">
+																<p className="text-base font-semibold text-white leading-snug">
 																	{phase === 'preparing' ? 'Preparando…' : phase === 'encoding' ? 'Optimizando video…' : phase === 'uploading' ? 'Publicando…' : 'Procesando…'}
 																</p>
-																<p className="text-xs text-white/50 mt-0.5 truncate">
+																<p className="text-sm text-white/50 mt-1 truncate">
 																	{phase === 'preparing'
 																		? 'Cargando motor de video'
 																		: phase === 'encoding'
@@ -1122,12 +1122,12 @@ export default function StoryUploadPage() {
 															</div>
 														</div>
 														{/* Encoding progress bar */}
-														<div className="space-y-1.5">
-															<div className="flex items-center justify-between text-xs text-white/50">
+														<div className="space-y-2">
+															<div className="flex items-center justify-between text-sm text-white/55">
 																<span>Procesando</span>
-																<span className="tabular-nums">{loadingStoryPercent}%</span>
+																<span className="tabular-nums font-medium">{loadingStoryPercent}%</span>
 															</div>
-															<div className="h-1.5 w-full rounded-full bg-white/8 overflow-hidden">
+															<div className="h-2.5 w-full rounded-full bg-white/8 overflow-hidden">
 																<div className="h-full rounded-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${loadingStoryPercent}%` }} />
 															</div>
 														</div>
@@ -1139,13 +1139,13 @@ export default function StoryUploadPage() {
 																	exit={{ opacity: 0, y: -6, scaleY: 0.96 }}
 																	transition={{ duration: 0.24, ease: 'easeOut' }}
 																	style={{ originY: 0, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-																	className="mt-3 space-y-1.5"
+																	className="mt-4 space-y-2"
 																>
-																	<div className="flex items-center justify-between text-xs text-white/50">
+																	<div className="flex items-center justify-between text-sm text-white/55">
 																		<span>Verificando</span>
-																		<span className="tabular-nums">{verificationPercent}%</span>
+																		<span className="tabular-nums font-medium">{verificationPercent}%</span>
 																	</div>
-																	<div className="h-1.5 w-full rounded-full bg-white/8 overflow-hidden">
+																	<div className="h-2.5 w-full rounded-full bg-white/8 overflow-hidden">
 																		<div className="h-full rounded-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${verificationPercent}%` }} />
 																	</div>
 																</motion.div>
