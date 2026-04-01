@@ -160,6 +160,7 @@ export default function SettingsPage() {
     const next = Number.isFinite(parsed) ? Math.max(40, Math.min(220, parsed)) : fallback;
     activeStoryPreset.setSize(next);
     setAvatarSizeDraft(String(next));
+    return next;
   };
 
   useEffect(() => {
@@ -227,6 +228,21 @@ export default function SettingsPage() {
   }, [user, navigate]);
 
   const handleSave = async () => {
+    const parsedDraft = Number(avatarSizeDraft);
+    const committedDraftSize = Number.isFinite(parsedDraft)
+      ? Math.max(40, Math.min(220, parsedDraft))
+      : activeStoryPreset.size;
+    const nextPresetSmall = storyPresetEditor === 'small' ? committedDraftSize : storyCirclePresetSmall;
+    const nextPresetMedium = storyPresetEditor === 'medium' ? committedDraftSize : storyCirclePresetMedium;
+    const nextPresetLarge = storyPresetEditor === 'large' ? committedDraftSize : storyCirclePresetLarge;
+    const nextPresetXl = storyPresetEditor === 'xl' ? committedDraftSize : storyCirclePresetXl;
+
+    if (storyPresetEditor === 'small') setStoryCirclePresetSmall(committedDraftSize);
+    if (storyPresetEditor === 'medium') setStoryCirclePresetMedium(committedDraftSize);
+    if (storyPresetEditor === 'large') setStoryCirclePresetLarge(committedDraftSize);
+    if (storyPresetEditor === 'xl') setStoryCirclePresetXl(committedDraftSize);
+    setAvatarSizeDraft(String(committedDraftSize));
+
     setSaving(true);
     setSaved(false);
     try {
@@ -265,12 +281,12 @@ export default function SettingsPage() {
         nav_height: navHeight,
         nav_opacity: navOpacity,
         nav_blur: navBlur,
-        story_circle_size: storyCirclePresetMedium,
-        story_circle_preset_small: storyCirclePresetSmall,
-        story_circle_preset_medium: storyCirclePresetMedium,
-        story_circle_preset_large: storyCirclePresetLarge,
-        story_circle_preset_xl: storyCirclePresetXl,
-        sidebar_avatar_size: storyCirclePresetXl,
+        story_circle_size: nextPresetMedium,
+        story_circle_preset_small: nextPresetSmall,
+        story_circle_preset_medium: nextPresetMedium,
+        story_circle_preset_large: nextPresetLarge,
+        story_circle_preset_xl: nextPresetXl,
+        sidebar_avatar_size: nextPresetXl,
         story_circle_gap: storyCircleGap,
         story_circle_border: storyCircleBorder,
         story_circle_inner_gap: storyCircleInnerGap,
