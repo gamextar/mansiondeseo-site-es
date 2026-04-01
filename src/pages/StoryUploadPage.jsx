@@ -533,7 +533,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 					<button
 						type="button"
 						onClick={onConfirm}
-						className="flex h-[4.75rem] w-[4.75rem] sm:h-[5.25rem] sm:w-[5.25rem] items-center justify-center rounded-full bg-emerald-500/92 border border-emerald-300/35 backdrop-blur-md text-white hover:bg-emerald-400 transition-colors shadow-[0_12px_28px_rgba(16,185,129,0.28)]"
+						className="flex h-[4.75rem] w-[4.75rem] sm:h-[5.25rem] sm:w-[5.25rem] items-center justify-center rounded-full bg-emerald-500/40 border border-emerald-400/30 backdrop-blur-md text-white hover:bg-emerald-500/55 transition-colors shadow-[0_12px_28px_rgba(16,185,129,0.22)]"
 						aria-label="Confirmar historia"
 					>
 						<CheckCircle2 className="h-8 w-8 sm:h-9 sm:w-9" />
@@ -1070,10 +1070,10 @@ export default function StoryUploadPage() {
 										Seleccionar video
 										<input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
 									</label>
-									{engineStatus === 'loading' && (
+									{showProgressHud && engineStatus === 'loading' && (
 										<p className="text-xs text-white/56 mt-4" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7)' }}>Preparando el motor de video para acelerar el siguiente paso...</p>
 									)}
-									{engineStatus === 'ready' && (
+									{showProgressHud && engineStatus === 'ready' && (
 										<p className="text-xs text-mansion-gold/95 mt-4" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7)' }}>Motor de video listo. El procesamiento arrancará más rápido al elegir el archivo.</p>
 									)}
 								</div>
