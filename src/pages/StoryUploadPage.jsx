@@ -384,7 +384,15 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 			}, 420);
 		};
 
-		video.currentTime = 0;
+		const previewStartTime = Number.isFinite(video.duration) && video.duration > STORY_POSTER_FRAME_TIME_SECONDS + 0.03
+			? STORY_POSTER_FRAME_TIME_SECONDS
+			: 0;
+
+		try {
+			video.currentTime = previewStartTime;
+		} catch {
+			video.currentTime = 0;
+		}
 		video.play().then(revealWhenFrameIsReady).catch(() => {
 			scheduleRevealFallback();
 		});
