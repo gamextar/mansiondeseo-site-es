@@ -79,6 +79,7 @@ export default function SettingsPage() {
   const [storyCircleBorder, setStoryCircleBorder] = useState(4);
   const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
   const [storyPresetEditor, setStoryPresetEditor] = useState('medium');
+  const [avatarSizeDraft, setAvatarSizeDraft] = useState('88');
 
   // Video feed
   const [videoGradientHeight, setVideoGradientHeight] = useState(64);
@@ -148,6 +149,18 @@ export default function SettingsPage() {
   const storyCircleGapPx = Math.max(0, Math.round((storyCirclePresetMedium * storyCircleGap) / 100));
   const storyCircleBorderPx = Math.max(1, Math.round((storyCirclePresetMedium * storyCircleBorder) / 100));
   const storyCircleInnerGapPx = Math.max(0, Math.round((storyCirclePresetMedium * storyCircleInnerGap) / 100));
+
+  useEffect(() => {
+    setAvatarSizeDraft(String(activeStoryPreset.size));
+  }, [activeStoryPreset.size, storyPresetEditor]);
+
+  const commitAvatarSizeDraft = () => {
+    const parsed = Number(avatarSizeDraft);
+    const fallback = activeStoryPreset.size;
+    const next = Number.isFinite(parsed) ? Math.max(40, Math.min(220, parsed)) : fallback;
+    activeStoryPreset.setSize(next);
+    setAvatarSizeDraft(String(next));
+  };
 
   useEffect(() => {
     if (!user?.is_admin) { navigate('/'); return; }
@@ -1206,6 +1219,24 @@ export default function SettingsPage() {
                       <p className="text-sm font-semibold text-text-primary">Ajustes para {activeStoryPreset.label.toLowerCase()}</p>
                       <p className="text-[11px] text-text-dim">{activeStoryPreset.context}</p>
                     </div>
+                    <label className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
+                      <span className="mb-1 block text-[11px] text-text-dim">Avatar size</span>
+                      <input
+                        type="number"
+                        min="40"
+                        max="220"
+                        value={avatarSizeDraft}
+                        onChange={(e) => setAvatarSizeDraft(e.target.value)}
+                        onBlur={commitAvatarSizeDraft}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        className="w-full rounded-lg border border-white/10 bg-mansion-base px-2 py-1.5 text-sm text-text-primary outline-none focus:border-mansion-gold/40"
+                      />
+                      <p className="mt-1 text-[10px] text-text-dim">Se aplica al preview al salir del campo.</p>
+                    </label>
                     <div className="grid gap-3 sm:grid-cols-1">
                       <div className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
                         <div className="flex items-center justify-between gap-3 mb-2">
@@ -1236,18 +1267,7 @@ export default function SettingsPage() {
                         <span>16%</span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <label className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
-                        <span className="mb-1 block text-[10px] text-text-dim">Avatar size</span>
-                        <input
-                          type="number"
-                          min="40"
-                          max="220"
-                          value={activeStoryPreset.size}
-                          onChange={(e) => activeStoryPreset.setSize(Math.max(40, Number(e.target.value) || 40))}
-                          className="w-full rounded-lg border border-white/10 bg-mansion-base px-2 py-1.5 text-sm text-text-primary outline-none focus:border-mansion-gold/40"
-                        />
-                      </label>
+                    <div className="grid grid-cols-2 gap-2">
                       <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                         <p className="text-[10px] text-text-dim">Anillo</p>
                         <p className="text-sm font-semibold text-text-primary">{activeStoryPresetRingPx}px</p>
