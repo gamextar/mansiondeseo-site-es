@@ -276,23 +276,29 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 				</div>
 			</div>
 
-			<div className="absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-4" style={{ bottom: 'max(env(safe-area-inset-bottom, 20px), 20px)' }}>
-				<button
-					type="button"
-					onClick={onClose}
-					className="flex h-14 w-14 items-center justify-center rounded-full bg-black/50 border border-white/15 backdrop-blur-md text-white hover:bg-black/60 transition-colors"
-					aria-label="Cancelar previsualización"
-				>
-					<X className="h-6 w-6" />
-				</button>
-				<button
-					type="button"
-					onClick={onConfirm}
-					className="flex h-14 w-14 items-center justify-center rounded-full bg-mansion-gold/90 border border-mansion-gold/40 backdrop-blur-md text-mansion-base hover:bg-mansion-gold transition-colors shadow-[0_12px_28px_rgba(212,175,55,0.24)]"
-					aria-label="Confirmar historia"
-				>
-					<CheckCircle2 className="h-6 w-6" />
-				</button>
+			<div className="absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-5" style={{ bottom: 'clamp(120px, 24vh, 220px)' }}>
+				<div className="flex flex-col items-center gap-2">
+					<button
+						type="button"
+						onClick={onClose}
+						className="flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] items-center justify-center rounded-full bg-black/55 border border-white/20 backdrop-blur-md text-white hover:bg-black/65 transition-colors shadow-[0_12px_30px_rgba(0,0,0,0.28)]"
+						aria-label="Cancelar previsualización"
+					>
+						<X className="h-7 w-7" />
+					</button>
+					<span className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-white/78">Cancelar</span>
+				</div>
+				<div className="flex flex-col items-center gap-2">
+					<button
+						type="button"
+						onClick={onConfirm}
+						className="flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] items-center justify-center rounded-full bg-mansion-gold/90 border border-mansion-gold/40 backdrop-blur-md text-mansion-base hover:bg-mansion-gold transition-colors shadow-[0_12px_28px_rgba(212,175,55,0.24)]"
+						aria-label="Confirmar historia"
+					>
+						<CheckCircle2 className="h-7 w-7" />
+					</button>
+					<span className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-mansion-gold-light">Publicar</span>
+				</div>
 			</div>
 		</div>
 	);
@@ -331,10 +337,11 @@ export default function StoryUploadPage() {
 	const [errorMessage, setErrorMessage] = useState('');
 	const [elapsedSeconds, setElapsedSeconds] = useState(0);
 	const [showPreview, setShowPreview] = useState(false);
+	const [previewConfirmed, setPreviewConfirmed] = useState(false);
 	const [engineStatus, setEngineStatus] = useState('idle');
 
 	const outputProfile = getOutputProfile(sourceResolution);
-	const storyStep = result?.id ? 'preview' : sourceFile ? 'process' : 'pick';
+	const storyStep = result?.id ? (showPreview ? 'preview' : previewConfirmed ? 'done' : 'preview') : sourceFile ? 'process' : 'pick';
 	const storyStepIndex = storyStep === 'pick' ? 0 : storyStep === 'process' ? 1 : 2;
 	const storySteps = [
 		{ id: 'pick', label: 'Elegir' },
@@ -433,6 +440,7 @@ export default function StoryUploadPage() {
 		setUploadProgress(0);
 		setElapsedSeconds(0);
 		setShowPreview(false);
+		setPreviewConfirmed(false);
 		setPhase('idle');
 		setErrorMessage('');
 		clearInterval(timerIntervalRef.current);
@@ -611,6 +619,7 @@ export default function StoryUploadPage() {
 				duration: encoded.duration,
 				processingTimeLabel: formatElapsedSeconds(processingElapsedSeconds),
 			});
+			setPreviewConfirmed(false);
 			setShowPreview(true);
 		} catch (error) {
 			setErrorMessage(error?.message || 'No se pudo publicar la historia.');
@@ -899,29 +908,8 @@ export default function StoryUploadPage() {
 								>
 									<CheckCircle2 className="w-7 h-7 text-green-400" />
 								</motion.div>
-								<h2 className="font-display text-2xl font-bold text-text-primary">¡Tu historia fue publicada!</h2>
-								<p className="text-text-muted mt-1 text-sm">El encoding ha finalizado correctamente</p>
-
-								{showProgressHud && (
-									<div className="mt-4 mb-6 grid grid-cols-2 gap-2 text-left">
-										<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-											<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Tamaño original</p>
-											<p className="text-base font-semibold text-text-primary tabular-nums">{result.originalSizeLabel ?? '—'}</p>
-										</div>
-										<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-											<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Tamaño final</p>
-											<p className="text-base font-semibold text-mansion-gold tabular-nums">{result.sizeLabel}</p>
-										</div>
-										<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-											<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Duración</p>
-											<p className="text-base font-semibold text-text-primary tabular-nums">{result.duration > 0 ? `${result.duration.toFixed(1)}s` : '—'}</p>
-										</div>
-										<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-											<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Tiempo de encoding</p>
-											<p className="text-base font-semibold text-text-primary tabular-nums">{result.processingTimeLabel}</p>
-										</div>
-									</div>
-								)}
+								<h2 className="font-display text-2xl font-bold text-text-primary">Historia confirmada</h2>
+								<p className="text-text-muted mt-1 text-sm">La historia ya está publicada. Puedes revisarla otra vez, volver a tu perfil o subir otra.</p>
 
 								<div className="flex flex-col gap-3">
 									<button
@@ -930,18 +918,8 @@ export default function StoryUploadPage() {
 										className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
 									>
 										<Eye className="w-5 h-5" />
-										Previsualizar historia
+										Ver de nuevo
 									</button>
-									{showProgressHud && (
-										<a
-											href={result.previewUrl}
-											download={result.fileName || 'historia.mp4'}
-											className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-medium hover:bg-white/10 transition-colors"
-										>
-											<Download className="w-5 h-5" />
-											Descargar historia
-										</a>
-									)}
 									<button
 										type="button"
 										onClick={resetStoryFlow}
@@ -972,7 +950,10 @@ export default function StoryUploadPage() {
 					user={user}
 					avatarSize={siteSettings?.videoAvatarSize ?? 52}
 					onClose={resetStoryFlow}
-					onConfirm={() => navigate('/perfil')}
+					onConfirm={() => {
+						setShowPreview(false);
+						setPreviewConfirmed(true);
+					}}
 				/>
 			)}
 
