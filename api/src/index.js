@@ -492,9 +492,6 @@ function corsHeaders(env, request) {
   )) {
     acao = origin;
   }
-  const storyCirclePresetMedium = parseInt(settings.story_circle_preset_medium || settings.story_circle_size || '88', 10);
-  const storyCirclePresetXl = parseInt(settings.story_circle_preset_xl || settings.sidebar_avatar_size || '154', 10);
-
   return {
     'Access-Control-Allow-Origin': acao,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -1784,6 +1781,8 @@ async function loadSettings(env) {
   const { results } = await env.DB.prepare('SELECT key, value FROM site_settings').all();
   const settings = {};
   for (const r of results) settings[r.key] = r.value;
+  const storyCirclePresetMedium = parseInt(settings.story_circle_preset_medium || settings.story_circle_size || '88', 10);
+  const storyCirclePresetXl = parseInt(settings.story_circle_preset_xl || settings.sidebar_avatar_size || '154', 10);
   return {
     blurLevel: parseInt(settings.blur_level || '14', 10),
     blurMobile: parseInt(settings.blur_mobile || settings.blur_level || '14', 10),
