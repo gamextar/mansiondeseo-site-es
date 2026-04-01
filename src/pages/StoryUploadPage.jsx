@@ -203,10 +203,10 @@ function StoryStageShell({ backgroundImageUrl, children, variant = 'default' }) 
 						src={backgroundImageUrl}
 						alt=""
 						className="absolute inset-0 w-full h-full object-cover"
-						initial={{ opacity: 0, scale: 1.02 }}
+						initial={{ opacity: 0, scale: 1.065 }}
 						animate={{ opacity: 1, scale: 1 }}
-						exit={{ opacity: 0, scale: 1.01 }}
-						transition={{ duration: 0.34, ease: 'easeOut' }}
+						exit={{ opacity: 0, scale: 1.015 }}
+						transition={{ duration: 0.42, ease: 'easeOut' }}
 					/>
 				)}
 			</AnimatePresence>
@@ -219,16 +219,31 @@ function StoryStageShell({ backgroundImageUrl, children, variant = 'default' }) 
 }
 
 // ── Feed-style fullscreen story preview ─────────────────────────────────────
-function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize = 52 }) {
+function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, avatarSize = 52 }) {
 	const videoRef = useRef(null);
 	const progressRef = useRef(null);
 	const rafRef = useRef(null);
 	const [isMuted, setIsMuted] = useState(true);
+	const [isVideoVisible, setIsVideoVisible] = useState(false);
+
+	useEffect(() => {
+		setIsVideoVisible(false);
+	}, [videoUrl, posterUrl]);
 
 	useEffect(() => {
 		const video = videoRef.current;
 		if (!video) return;
-		video.play().catch(() => {});
+
+		const revealVideo = () => {
+			requestAnimationFrame(() => {
+				setIsVideoVisible(true);
+			});
+		};
+
+		video.currentTime = 0;
+		video.play().then(revealVideo).catch(() => {});
+		video.addEventListener('playing', revealVideo);
+		video.addEventListener('loadeddata', revealVideo);
 
 		const tick = () => {
 			if (progressRef.current && video.duration) {
@@ -238,21 +253,40 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 		};
 		rafRef.current = requestAnimationFrame(tick);
 
-		return () => cancelAnimationFrame(rafRef.current);
-	}, []);
+		return () => {
+			video.removeEventListener('playing', revealVideo);
+			video.removeEventListener('loadeddata', revealVideo);
+			cancelAnimationFrame(rafRef.current);
+		};
+	}, [videoUrl]);
 
 	return (
 		<>
+			<AnimatePresence initial={false}>
+				{posterUrl && !isVideoVisible && (
+					<motion.img
+						key={`${posterUrl}-preview-poster`}
+						src={posterUrl}
+						alt=""
+						className="absolute inset-0 z-[1] h-full w-full object-cover"
+						initial={{ opacity: 1, scale: 1.012 }}
+						animate={{ opacity: 1, scale: 1 }}
+						exit={{ opacity: 0, scale: 1.008 }}
+						transition={{ duration: 0.28, ease: 'easeOut' }}
+					/>
+				)}
+			</AnimatePresence>
 			<motion.video
 				ref={videoRef}
 				src={videoUrl}
 				className="absolute inset-0 z-0 h-full w-full object-cover"
 				style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
-				initial={{ opacity: 0, scale: 1.01 }}
-				animate={{ opacity: 1, scale: 1 }}
-				transition={{ duration: 0.36, ease: 'easeOut' }}
+				initial={{ opacity: 0, scale: 1.008 }}
+				animate={{ opacity: isVideoVisible ? 1 : 0, scale: 1 }}
+				transition={{ duration: 0.3, ease: 'easeOut' }}
 				loop
 				playsInline
+				preload="auto"
 				muted={isMuted}
 				autoPlay
 			/>
@@ -990,6 +1024,7 @@ export default function StoryUploadPage() {
 								>
 									<StoryPreview
 										videoUrl={result.video_url || result.previewUrl}
+											posterUrl={storyBackdropUrl}
 										caption={result.caption}
 										user={user}
 										avatarSize={siteSettings?.videoAvatarSize ?? 52}
