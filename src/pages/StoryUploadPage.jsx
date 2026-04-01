@@ -13,6 +13,7 @@ const LANDSCAPE_HEIGHT = 720;
 const PORTRAIT_WIDTH = 720;
 const PORTRAIT_HEIGHT = 1280;
 const STORY_POSTER_FRAME_TIME_SECONDS = 0.05;
+const STORY_PREVIEW_START_DELAY_MS = 200;
 const FFMPEG_BASE_URL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
 const ENCODER_DEFAULTS = {
 	crf: '29',
@@ -355,6 +356,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 		const video = videoRef.current;
 		if (!video) return;
 		let revealTimeoutId = null;
+		let playStartTimeoutId = null;
 
 		const revealWhenFrameIsReady = () => {
 			if (typeof video.requestVideoFrameCallback === 'function') {
@@ -384,6 +386,12 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 			}, 420);
 		};
 
+		const startPlayback = () => {
+			video.play().then(revealWhenFrameIsReady).catch(() => {
+				scheduleRevealFallback();
+			});
+		};
+
 		const previewStartTime = Number.isFinite(video.duration) && video.duration > STORY_POSTER_FRAME_TIME_SECONDS + 0.03
 			? STORY_POSTER_FRAME_TIME_SECONDS
 			: 0;
@@ -393,9 +401,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 		} catch {
 			video.currentTime = 0;
 		}
-		video.play().then(revealWhenFrameIsReady).catch(() => {
-			scheduleRevealFallback();
-		});
+		playStartTimeoutId = setTimeout(startPlayback, STORY_PREVIEW_START_DELAY_MS);
 		video.addEventListener('playing', revealWhenFrameIsReady);
 		video.addEventListener('loadeddata', revealWhenFrameIsReady);
 		video.addEventListener('canplay', revealWhenFrameIsReady);
@@ -411,6 +417,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 		rafRef.current = requestAnimationFrame(tick);
 
 		return () => {
+			if (playStartTimeoutId) clearTimeout(playStartTimeoutId);
 			if (revealTimeoutId) clearTimeout(revealTimeoutId);
 			video.removeEventListener('playing', revealWhenFrameIsReady);
 			video.removeEventListener('loadeddata', revealWhenFrameIsReady);
