@@ -287,11 +287,11 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 						type="button"
 						onClick={onClose}
 						className="flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] items-center justify-center rounded-full bg-black/55 border border-white/20 backdrop-blur-md text-white hover:bg-black/65 transition-colors shadow-[0_12px_30px_rgba(0,0,0,0.28)]"
-						aria-label="Cancelar previsualización"
+						aria-label="Cambiar historia"
 					>
-						<X className="h-7 w-7" />
+						<Upload className="h-7 w-7" />
 					</button>
-					<span className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-white/78" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.65), 0 0 2px rgba(0,0,0,0.45)' }}>Cancelar</span>
+					<span className="rounded-full border border-white/10 bg-black/28 px-3 py-1 text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Cambiar</span>
 				</motion.div>
 				<motion.div
 					initial={{ opacity: 0, y: 12 }}
@@ -307,7 +307,7 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 					>
 						<CheckCircle2 className="h-7 w-7" />
 					</button>
-					<span className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-mansion-gold-light" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.65), 0 0 2px rgba(0,0,0,0.45)' }}>Publicar</span>
+					<span className="rounded-full border border-mansion-gold/15 bg-black/28 px-3 py-1 text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-mansion-gold-light backdrop-blur-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Publicar</span>
 				</motion.div>
 			</div>
 		</div>
