@@ -1017,6 +1017,9 @@ export default function StoryUploadPage() {
 				? 'Subida real'
 				: 'Completado';
 	const shellVariant = storyStep === 'pick' ? 'pick' : storyStep === 'preview' ? 'preview' : 'default';
+	const activeShellBackgroundUrl = storyStep === 'preview' || storyStep === 'done'
+		? result?.posterUrl || storyBackdropUrl
+		: storyBackdropUrl;
 	const closeStoryUpload = () => navigate('/perfil');
 	const headerConfig = storyStep === 'pick'
 		? {
@@ -1059,7 +1062,7 @@ export default function StoryUploadPage() {
 
 			<div className="relative w-full h-[100dvh]">
 				<div className={STORY_STAGE_VIEWPORT_CLASS}>
-					<StoryStageShell backgroundImageUrl={storyBackdropUrl} variant={shellVariant}>
+					<StoryStageShell backgroundImageUrl={activeShellBackgroundUrl} variant={shellVariant}>
 						{storyStep !== 'preview' && (
 							<StoryStageHeader
 								steps={storySteps}
