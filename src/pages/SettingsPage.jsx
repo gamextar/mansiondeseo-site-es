@@ -118,6 +118,12 @@ export default function SettingsPage() {
     { key: 'large', label: 'Grande', size: 92, context: 'sidebar desktop y hero avatars' },
     { key: 'sidebar', label: 'Sidebar real', size: sidebarRealPreviewSize, context: 'tamaño real del avatar en la sidebar desktop actual' },
   ];
+  const storySizePresets = [
+    { key: 'small', label: 'Chico', size: 72 },
+    { key: 'medium', label: 'Mediano', size: 88 },
+    { key: 'large', label: 'Grande', size: 104 },
+    { key: 'xl', label: 'XL', size: 120 },
+  ];
   const activeSidebarPreview = sidebarPreviewOptions.find(option => option.key === sidebarPreviewSize) || sidebarPreviewOptions[1];
   const activeSidebarRingPx = Math.max(1, Math.round((activeSidebarPreview.size * sidebarStoryRingWidth) / 100));
   const storyCircleGapPx = Math.max(0, Math.round((storyCircleSize * storyCircleGap) / 100));
@@ -1099,18 +1105,34 @@ export default function SettingsPage() {
                   <Film className="w-4 h-4 text-mansion-gold" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Tamaño stories home</h3>
-                  <p className="text-[11px] text-text-dim">Diámetro de los círculos en la fila de historias</p>
+                  <h3 className="text-sm font-semibold text-text-primary">Presets tamaño stories home</h3>
+                  <p className="text-[11px] text-text-dim">Seleccioná el diámetro del avatar en píxeles</p>
                 </div>
               </div>
-              <input type="range" min="56" max="132" value={storyCircleSize} onChange={e => setStoryCircleSize(Number(e.target.value))} className="w-full accent-mansion-gold" />
-              <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>56px</span>
-                <span className="text-mansion-gold font-medium">{storyCircleSize}px</span>
-                <span>132px</span>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {storySizePresets.map((preset) => {
+                  const active = storyCircleSize === preset.size;
+                  return (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      onClick={() => setStoryCircleSize(preset.size)}
+                      className={`rounded-xl border px-3 py-2 text-left transition-colors ${active ? 'border-mansion-gold/40 bg-mansion-gold/10 text-text-primary' : 'border-white/5 bg-mansion-card/40 text-text-dim hover:border-white/10 hover:text-text-primary'}`}
+                    >
+                      <p className="text-xs font-semibold">{preset.label}</p>
+                      <p className="text-[10px] opacity-80">{preset.size}px</p>
+                    </button>
+                  );
+                })}
               </div>
-              <p className="mt-2 text-[11px] text-text-dim">Este es el único valor absoluto. Los demás se recalculan proporcionalmente según este tamaño.</p>
+              <p className="mt-3 text-[11px] text-text-dim">Actual: <span className="text-mansion-gold font-medium">{storyCircleSize}px</span>. Este es el único valor absoluto; los demás se recalculan proporcionalmente.</p>
             </div>
+
+            <div className="rounded-2xl border border-white/5 bg-mansion-card/50 p-4">
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-text-primary">Ajustes generales</h3>
+                <p className="text-[11px] text-text-dim">Estos valores siempre se calculan en proporción al preset elegido arriba.</p>
+              </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
               <div className="flex items-center gap-3 mb-3">
@@ -1131,7 +1153,7 @@ export default function SettingsPage() {
               <p className="mt-2 text-[11px] text-text-dim">Equivale a {storyCircleGapPx}px con un avatar de {storyCircleSize}px.</p>
             </div>
 
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+            <div className="mt-3 bg-mansion-card rounded-2xl p-4 border border-white/5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
                   <User className="w-4 h-4 text-mansion-gold" />
@@ -1150,7 +1172,7 @@ export default function SettingsPage() {
               <p className="mt-2 text-[11px] text-text-dim">Equivale a {storyCircleBorderPx}px con un avatar de {storyCircleSize}px.</p>
             </div>
 
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+            <div className="mt-3 bg-mansion-card rounded-2xl p-4 border border-white/5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
                   <Monitor className="w-4 h-4 text-mansion-gold" />
@@ -1167,6 +1189,56 @@ export default function SettingsPage() {
                 <span>16%</span>
               </div>
               <p className="mt-2 text-[11px] text-text-dim">Equivale a {storyCircleInnerGapPx}px con un avatar de {storyCircleSize}px.</p>
+            </div>
+            </div>
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <h3 className="text-xs font-bold text-text-dim uppercase tracking-wider mb-3">Preview stories home</h3>
+              <div className="rounded-xl bg-mansion-base/70 border border-white/5 p-4 overflow-hidden">
+                <div className="mb-3 flex items-center gap-1.5">
+                  <div className="h-3.5 w-3.5 rounded-full bg-mansion-crimson/80" />
+                  <p className="text-xs font-medium text-text-dim">Transmitiendo</p>
+                </div>
+                <div className="flex overflow-hidden" style={{ gap: `${storyCircleGapPx}px` }}>
+                  {[
+                    { label: 'Tú', active: true, gold: true },
+                    { label: 'Luna', active: true },
+                    { label: 'Mia', active: false },
+                  ].map((item) => (
+                    <div key={item.label} className="flex shrink-0 flex-col items-center gap-1" style={{ width: storyCircleSize + 6 }}>
+                      <div
+                        className={`rounded-full ${item.gold ? 'bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold' : item.active ? 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson' : 'bg-gradient-to-tr from-mansion-border/60 to-mansion-border/40'}`}
+                        style={{ width: storyCircleSize, height: storyCircleSize, padding: storyCircleBorderPx }}
+                      >
+                        <div className="h-full w-full rounded-full bg-mansion-base" style={{ padding: storyCircleInnerGapPx }}>
+                          <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-white/10 to-white/5 text-text-muted">
+                            <User className="w-4 h-4" />
+                          </div>
+                        </div>
+                      </div>
+                      <span className={`w-full truncate text-center text-[10px] leading-tight ${item.gold ? 'text-mansion-gold' : 'text-text-muted'}`}>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
+                    <p className="text-[10px] text-text-dim">Avatar</p>
+                    <p className="text-sm font-semibold text-text-primary">{storyCircleSize}px</p>
+                  </div>
+                  <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
+                    <p className="text-[10px] text-text-dim">Separación</p>
+                    <p className="text-sm font-semibold text-text-primary">{storyCircleGapPx}px</p>
+                  </div>
+                  <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
+                    <p className="text-[10px] text-text-dim">Anillo</p>
+                    <p className="text-sm font-semibold text-text-primary">{storyCircleBorderPx}px</p>
+                  </div>
+                  <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
+                    <p className="text-[10px] text-text-dim">Espacio interno</p>
+                    <p className="text-sm font-semibold text-text-primary">{storyCircleInnerGapPx}px</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
