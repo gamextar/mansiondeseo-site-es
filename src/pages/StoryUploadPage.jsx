@@ -918,8 +918,8 @@ export default function StoryUploadPage() {
 								>
 									<CheckCircle2 className="w-7 h-7 text-green-400" />
 								</motion.div>
-								<h2 className="font-display text-2xl font-bold text-text-primary">Historia confirmada</h2>
-								<p className="text-text-muted mt-1 text-sm">La historia ya está publicada. Puedes revisarla otra vez, volver a tu perfil o subir otra.</p>
+								<h2 className="font-display text-2xl font-bold text-text-primary" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Historia confirmada</h2>
+								<p className="text-text-muted mt-1 text-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.72), 0 0 3px rgba(0,0,0,0.48)' }}>La historia ya está publicada. Puedes revisarla otra vez, volver a tu perfil o subir otra.</p>
 
 								<div className="flex flex-col gap-3">
 									<button
