@@ -1099,7 +1099,7 @@ export default function SettingsPage() {
                 <span className="text-mansion-gold font-medium">{navOpacity}%</span>
                 <span>Sólido</span>
               </div>
-              <p className="mt-2 text-[11px] text-text-dim">En desktop no se aplica porque la barra inferior está oculta y se usa la sidebar.</p>
+              <p className="mt-2 text-[11px] text-text-dim">En 0 también se apagan blur, borde y sombra para que desaparezca visualmente. En desktop no se aplica porque la barra inferior está oculta.</p>
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
@@ -1291,7 +1291,7 @@ export default function SettingsPage() {
                 <div className="grid gap-4 items-center" style={{ gridTemplateColumns: `minmax(${Math.min(activeSidebarPreview.size + 20, 220)}px, max-content) minmax(0, 1fr)` }}>
                   <div className="flex items-center justify-center overflow-visible">
                     <div className="relative shrink-0 rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: activeSidebarPreview.size, height: activeSidebarPreview.size, aspectRatio: '1 / 1' }}>
-                      <div className="absolute rounded-full bg-mansion-card overflow-hidden" style={{ inset: `${sidebarStoryRingWidth}%` }}>
+                      <div className="absolute rounded-full bg-mansion-card overflow-hidden" style={{ inset: `${storyCircleBorder}%` }}>
                         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/10 to-white/5 text-text-muted">
                           <User className="w-4 h-4" />
                         </div>

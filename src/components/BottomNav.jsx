@@ -22,6 +22,9 @@ export default function BottomNav() {
   const navHeight = siteSettings?.navHeight ?? 71;
   const navOpacity = siteSettings?.navOpacity ?? 40;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
+  const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
+  const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
+  const blurAmount = navOpacity <= 0 ? '0px' : '24px';
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
@@ -37,8 +40,14 @@ export default function BottomNav() {
       }}
     >
       <div
-        className="pointer-events-auto w-full max-w-sm rounded-[2rem] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
-        style={{ backgroundColor: bgColor }}
+        className="pointer-events-auto w-full max-w-sm rounded-[2rem] border"
+        style={{
+          backgroundColor: bgColor,
+          borderColor,
+          boxShadow: `0 8px 32px ${shadowColor}`,
+          backdropFilter: `blur(${blurAmount})`,
+          WebkitBackdropFilter: `blur(${blurAmount})`,
+        }}
       >
         <div className="flex items-center justify-around px-3" style={{ height: navHeight }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
