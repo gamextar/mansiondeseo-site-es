@@ -3034,7 +3034,7 @@ async function handleDeleteOwnStory(request, env, storyId) {
   if (!story) return error('Historia no encontrada', 404);
   if (story.user_id !== auth.sub) return error('No puedes borrar historias de otros usuarios', 403);
 
-  await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(storyId).run();
+  await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(story.id).run();
 
   // Best-effort R2 delete
   try {
@@ -3047,7 +3047,7 @@ async function handleDeleteOwnStory(request, env, storyId) {
     // R2 delete is best-effort
   }
 
-  return json({ deleted: true, story_id: storyId });
+  return json({ deleted: true, story_id: story.id });
 }
 
 async function handleAdminDeleteStory(request, env, storyId) {
