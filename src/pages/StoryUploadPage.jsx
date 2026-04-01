@@ -900,6 +900,8 @@ export default function StoryUploadPage() {
 				processingTimeLabel: formatElapsedSeconds(processingElapsedSeconds),
 			});
 			setPreviewConfirmed(false);
+			// Hold the progress screen at 100% for 2.5s before showing the video
+			await new Promise(resolve => setTimeout(resolve, 2500));
 			setShowPreview(true);
 		} catch (error) {
 			setErrorMessage(error?.message || 'No se pudo publicar la historia.');
