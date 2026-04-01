@@ -946,9 +946,7 @@ export default function StoryUploadPage() {
 				? 'Subida real'
 				: 'Completado';
 	const shellVariant = storyStep === 'pick' ? 'pick' : storyStep === 'preview' ? 'preview' : 'default';
-	const activeShellBackgroundUrl = storyStep === 'preview' || storyStep === 'done'
-		? result?.posterUrl || storyBackdropUrl
-		: storyBackdropUrl;
+	const activeShellBackgroundUrl = storyBackdropUrl;
 	const closeStoryUpload = () => navigate('/perfil');
 	const headerConfig = storyStep === 'pick'
 		? {
