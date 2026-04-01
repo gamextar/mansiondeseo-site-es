@@ -333,7 +333,7 @@ function StoryStageShell({ backgroundImageUrl, children, variant = 'default' }) 
 }
 
 // ── Feed-style fullscreen story preview ─────────────────────────────────────
-function StoryPreview({ videoUrl, posterUrl, caption, user, onConfirm, avatarSize = 52 }) {
+function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, avatarSize = 52 }) {
 	const videoRef = useRef(null);
 	const progressRef = useRef(null);
 	const rafRef = useRef(null);
@@ -1148,10 +1148,11 @@ export default function StoryUploadPage() {
 								>
 									<StoryPreview
 										videoUrl={result.video_url || result.previewUrl}
-											posterUrl={storyBackdropUrl}
+										posterUrl={storyBackdropUrl}
 										caption={result.caption}
 										user={user}
 										avatarSize={siteSettings?.videoAvatarSize ?? 52}
+										onClose={resetStoryFlow}
 										onConfirm={() => {
 											setShowPreview(false);
 											setPreviewConfirmed(true);
