@@ -13,8 +13,6 @@ const LANDSCAPE_HEIGHT = 720;
 const PORTRAIT_WIDTH = 720;
 const PORTRAIT_HEIGHT = 1280;
 const STORY_POSTER_FRAME_TIME_SECONDS = 0;
-const STORY_PREVIEW_START_DELAY_MS = 200;
-const STORY_PREVIEW_HOLD_FRAME_MS = 160;
 const FFMPEG_BASE_URL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
 const ENCODER_DEFAULTS = {
 	crf: '29',
@@ -339,64 +337,59 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 		const video = videoRef.current;
 		if (!video) return;
 		let revealTimeoutId = null;
-		let playStartTimeoutId = null;
 		let hasPreparedInitialFrame = false;
 
-		const revealWhenFrameIsReady = () => {
-			if (typeof video.requestVideoFrameCallback === 'function') {
-				video.requestVideoFrameCallback(() => {
-					revealVideo();
-				});
-				return;
-			}
-
-			requestAnimationFrame(() => {
-				requestAnimationFrame(() => {
-					revealVideo();
-				});
-			});
+		/* Remove the poster only after we are confident the video is
+		   actually painting frames on screen (not just "playing"). */
+		const revealVideo = () => {
+			setIsVideoVisible(true);
 		};
 
-		const revealVideo = () => {
-			requestAnimationFrame(() => {
-				setIsVideoVisible(true);
-			});
+		const revealAfterFramesArePainting = () => {
+			if (typeof video.requestVideoFrameCallback === 'function') {
+				// Wait for 2 actual rendered frames so the compositor has
+				// something visible before we yank the poster away.
+				video.requestVideoFrameCallback(() => {
+					video.requestVideoFrameCallback(() => {
+						revealVideo();
+					});
+				});
+			} else {
+				// Fallback for browsers without rVFC (Safari < 15.4):
+				// wait 250 ms after play — enough for a few frames at 30fps.
+				setTimeout(revealVideo, 250);
+			}
 		};
 
 		const scheduleRevealFallback = () => {
 			if (revealTimeoutId) clearTimeout(revealTimeoutId);
-			revealTimeoutId = setTimeout(() => {
-				revealVideo();
-			}, 420);
+			revealTimeoutId = setTimeout(revealVideo, 800);
 		};
 
-		const startPlayback = () => {
-			video.play().then(revealWhenFrameIsReady).catch(() => {
-				scheduleRevealFallback();
-			});
-		};
-
-		const revealAndQueuePlayback = () => {
-			if (playStartTimeoutId) clearTimeout(playStartTimeoutId);
-			revealVideo();
-			playStartTimeoutId = setTimeout(startPlayback, STORY_PREVIEW_HOLD_FRAME_MS);
+		const startPlaybackAndReveal = () => {
+			video.play()
+				.then(() => {
+					revealAfterFramesArePainting();
+				})
+				.catch(() => {
+					// Autoplay blocked — reveal poster‐less anyway
+					revealVideo();
+				});
 		};
 
 		const prepareInitialFrame = () => {
 			if (hasPreparedInitialFrame) return;
 			hasPreparedInitialFrame = true;
-			video.pause();
 			video.currentTime = 0;
-			revealAndQueuePlayback();
+			video.pause();
+			// Start playback behind the poster after a short delay
+			startPlaybackAndReveal();
 		};
 
 		video.currentTime = 0;
 		video.pause();
-		playStartTimeoutId = setTimeout(prepareInitialFrame, STORY_PREVIEW_START_DELAY_MS);
-		video.addEventListener('playing', revealWhenFrameIsReady);
 		video.addEventListener('loadeddata', prepareInitialFrame);
 		video.addEventListener('canplay', prepareInitialFrame);
-		video.addEventListener('loadedmetadata', prepareInitialFrame);
 		scheduleRevealFallback();
 
 		const tick = () => {
@@ -408,12 +401,9 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 		rafRef.current = requestAnimationFrame(tick);
 
 		return () => {
-			if (playStartTimeoutId) clearTimeout(playStartTimeoutId);
 			if (revealTimeoutId) clearTimeout(revealTimeoutId);
-			video.removeEventListener('playing', revealWhenFrameIsReady);
 			video.removeEventListener('loadeddata', prepareInitialFrame);
 			video.removeEventListener('canplay', prepareInitialFrame);
-			video.removeEventListener('loadedmetadata', prepareInitialFrame);
 			cancelAnimationFrame(rafRef.current);
 		};
 	}, [videoUrl]);
