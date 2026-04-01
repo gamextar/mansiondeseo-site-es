@@ -12,7 +12,6 @@ const LANDSCAPE_WIDTH = 1280;
 const LANDSCAPE_HEIGHT = 720;
 const PORTRAIT_WIDTH = 720;
 const PORTRAIT_HEIGHT = 1280;
-const STORY_PREVIEW_FRAME_TIME_SECONDS = 0.05;
 const FFMPEG_BASE_URL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
 const ENCODER_DEFAULTS = {
 	crf: '29',
@@ -217,15 +216,6 @@ async function captureVideoPoster(fileUrl, { maxWidth = 720, quality = 0.82 } = 
 		const scheduleCapture = () => {
 			if (captureRequested || settled) return;
 			captureRequested = true;
-			const safeSeekTime = Number.isFinite(video.duration) && video.duration > STORY_PREVIEW_FRAME_TIME_SECONDS + 0.03
-				? STORY_PREVIEW_FRAME_TIME_SECONDS
-				: 0;
-			if (safeSeekTime > 0) {
-				try {
-					video.currentTime = safeSeekTime;
-					return;
-				} catch {}
-			}
 			captureFrame();
 		};
 
@@ -351,7 +341,6 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 		const video = videoRef.current;
 		if (!video) return;
 		let revealTimeoutId = null;
-		let playRequested = false;
 
 		const revealWhenFrameIsReady = () => {
 			if (typeof video.requestVideoFrameCallback === 'function') {
@@ -374,36 +363,6 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 			});
 		};
 
-		const startPlayback = () => {
-			if (playRequested) return;
-			playRequested = true;
-			video.play().then(revealWhenFrameIsReady).catch(() => {
-				scheduleRevealFallback();
-			});
-		};
-
-		const syncPreviewFrame = () => {
-			const safePreviewTime = Number.isFinite(video.duration) && video.duration > STORY_PREVIEW_FRAME_TIME_SECONDS + 0.03
-				? STORY_PREVIEW_FRAME_TIME_SECONDS
-				: 0;
-
-			if (safePreviewTime <= 0) {
-				startPlayback();
-				return;
-			}
-
-			if (Math.abs(video.currentTime - safePreviewTime) <= 0.01) {
-				startPlayback();
-				return;
-			}
-
-			try {
-				video.currentTime = safePreviewTime;
-			} catch {
-				startPlayback();
-			}
-		};
-
 		const scheduleRevealFallback = () => {
 			if (revealTimeoutId) clearTimeout(revealTimeoutId);
 			revealTimeoutId = setTimeout(() => {
@@ -412,11 +371,13 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 		};
 
 		video.currentTime = 0;
+		video.play().then(revealWhenFrameIsReady).catch(() => {
+			scheduleRevealFallback();
+		});
 		video.addEventListener('playing', revealWhenFrameIsReady);
 		video.addEventListener('loadeddata', revealWhenFrameIsReady);
 		video.addEventListener('canplay', revealWhenFrameIsReady);
-		video.addEventListener('loadedmetadata', syncPreviewFrame);
-		video.addEventListener('seeked', startPlayback);
+		video.addEventListener('loadedmetadata', scheduleRevealFallback);
 		scheduleRevealFallback();
 
 		const tick = () => {
@@ -432,8 +393,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 			video.removeEventListener('playing', revealWhenFrameIsReady);
 			video.removeEventListener('loadeddata', revealWhenFrameIsReady);
 			video.removeEventListener('canplay', revealWhenFrameIsReady);
-			video.removeEventListener('loadedmetadata', syncPreviewFrame);
-			video.removeEventListener('seeked', startPlayback);
+			video.removeEventListener('loadedmetadata', scheduleRevealFallback);
 			cancelAnimationFrame(rafRef.current);
 		};
 	}, [videoUrl]);
