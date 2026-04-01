@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Radio } from 'lucide-react';
 import { useAuth } from '../App';
@@ -106,7 +106,11 @@ export default function FeedPage() {
           {/* User's own story circle */}
           {user?.has_active_story && (
             <motion.div variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
-              <Link to="/perfil" className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                onClick={() => navigate('/videos', { state: { storyUserId: user.id } })}
+                className="flex flex-col items-center gap-1"
+              >
                 <div className="rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: storyCircleSize, height: storyCircleSize, padding: storyCircleBorder }}>
                   <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: storyCircleInnerGap }}>
                     <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
@@ -121,7 +125,7 @@ export default function FeedPage() {
                   </div>
                 </div>
                 <span className="text-[10px] text-mansion-gold truncate w-full text-center leading-tight">Tú</span>
-              </Link>
+              </button>
             </motion.div>
           )}
           {profiles.slice(0, 15).map((p) => {
@@ -134,9 +138,9 @@ export default function FeedPage() {
             const innerSize = size - border * 2;
             return (
               <motion.div key={`story-${p.id}`} variants={storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
-              <Link
-                to={`/perfiles/${p.id}`}
-                state={{ preview: { id: p.id, name: p.name, age: p.age, city: p.city, role: p.role, photos: p.photos || [], avatar_url: p.avatar_url, avatar_crop: p.avatar_crop || null, online: p.online, premium: p.premium, verified: p.verified, blurred: p.blurred, visiblePhotos: p.visiblePhotos, ghost_mode: p.ghost_mode } }}
+              <button
+                type="button"
+                onClick={() => navigate('/videos', { state: { storyUserId: p.id } })}
                 className="flex flex-col items-center gap-1"
               >
                 <div className={`rounded-full ${
@@ -162,7 +166,7 @@ export default function FeedPage() {
             );
           })}
         </motion.div>
-      </motion.div>
+              </button>
 
       {/* Results count */}
       <motion.div

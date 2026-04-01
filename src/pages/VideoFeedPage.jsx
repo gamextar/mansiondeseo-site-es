@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X } from 'lucide-react';
 import { getStories, toggleStoryLike, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
@@ -457,6 +457,7 @@ function DesktopActionButtons({ story, onLike, navigate, onGift }) {
 }
 
 export default function VideoFeedPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { siteSettings, user, setUser } = useAuth();
   const { subscribe } = useUnreadMessages();
@@ -523,6 +524,7 @@ export default function VideoFeedPage() {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(min-width: 1024px)').matches;
   });
+  const initialStoryUserIdRef = useRef(location.state?.storyUserId || null);
 
   const persistStories = useCallback((nextStories) => {
     try {
@@ -587,6 +589,18 @@ export default function VideoFeedPage() {
       cancelled = true;
     };
   }, [refreshStories, stories.length]);
+
+  useEffect(() => {
+    const targetStoryUserId = initialStoryUserIdRef.current;
+    if (!targetStoryUserId || stories.length === 0) return;
+
+    const targetIndex = stories.findIndex((story) => story.user_id === targetStoryUserId);
+    if (targetIndex < 0) return;
+
+    setActiveDispIdx(targetIndex + 1);
+    setBoundaryOverlayIdx(null);
+    initialStoryUserIdRef.current = null;
+  }, [stories]);
 
   useEffect(() => {
     return subscribe((event) => {
