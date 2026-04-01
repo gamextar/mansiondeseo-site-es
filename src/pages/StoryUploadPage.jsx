@@ -276,7 +276,7 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 				</div>
 			</div>
 
-			<div className="absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-5" style={{ bottom: 'clamp(120px, 24vh, 220px)' }}>
+			<div className="absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-10 sm:gap-14" style={{ top: '50%', transform: 'translate(-50%, -50%)' }}>
 				<motion.div
 					initial={{ opacity: 0, y: 12 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -291,7 +291,7 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 					>
 						<X className="h-7 w-7" />
 					</button>
-					<span className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-white/78">Cancelar</span>
+					<span className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-white/78" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.65), 0 0 2px rgba(0,0,0,0.45)' }}>Cancelar</span>
 				</motion.div>
 				<motion.div
 					initial={{ opacity: 0, y: 12 }}
@@ -307,7 +307,7 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 					>
 						<CheckCircle2 className="h-7 w-7" />
 					</button>
-					<span className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-mansion-gold-light">Publicar</span>
+					<span className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-mansion-gold-light" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.65), 0 0 2px rgba(0,0,0,0.45)' }}>Publicar</span>
 				</motion.div>
 			</div>
 		</div>
