@@ -1206,19 +1206,8 @@ export default function SettingsPage() {
                       <p className="text-sm font-semibold text-text-primary">Ajustes para {activeStoryPreset.label.toLowerCase()}</p>
                       <p className="text-[11px] text-text-dim">{activeStoryPreset.context}</p>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <label className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
-                        <span className="mb-1 block text-[11px] text-text-dim">Avatar size</span>
-                        <input
-                          type="number"
-                          min="40"
-                          max="220"
-                          value={activeStoryPreset.size}
-                          onChange={(e) => activeStoryPreset.setSize(Math.max(40, Number(e.target.value) || 40))}
-                          className="w-full rounded-lg border border-white/10 bg-mansion-base px-2 py-1.5 text-sm text-text-primary outline-none focus:border-mansion-gold/40"
-                        />
-                      </label>
-                      <div className="rounded-xl border border-white/5 bg-mansion-card/40 p-3 sm:col-span-2">
+                    <div className="grid gap-3 sm:grid-cols-1">
+                      <div className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
                         <div className="flex items-center justify-between gap-3 mb-2">
                           <div>
                             <p className="text-xs font-semibold text-text-primary">Grosor global del anillo</p>
@@ -1247,7 +1236,18 @@ export default function SettingsPage() {
                         <span>16%</span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
+                        <span className="mb-1 block text-[10px] text-text-dim">Avatar size</span>
+                        <input
+                          type="number"
+                          min="40"
+                          max="220"
+                          value={activeStoryPreset.size}
+                          onChange={(e) => activeStoryPreset.setSize(Math.max(40, Number(e.target.value) || 40))}
+                          className="w-full rounded-lg border border-white/10 bg-mansion-base px-2 py-1.5 text-sm text-text-primary outline-none focus:border-mansion-gold/40"
+                        />
+                      </label>
                       <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                         <p className="text-[10px] text-text-dim">Anillo</p>
                         <p className="text-sm font-semibold text-text-primary">{activeStoryPresetRingPx}px</p>
