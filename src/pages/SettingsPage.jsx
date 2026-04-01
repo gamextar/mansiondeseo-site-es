@@ -120,6 +120,9 @@ export default function SettingsPage() {
   ];
   const activeSidebarPreview = sidebarPreviewOptions.find(option => option.key === sidebarPreviewSize) || sidebarPreviewOptions[1];
   const activeSidebarRingPx = Math.max(1, Math.round((activeSidebarPreview.size * sidebarStoryRingWidth) / 100));
+  const storyCircleGapPx = Math.max(0, Math.round((storyCircleSize * storyCircleGap) / 100));
+  const storyCircleBorderPx = Math.max(1, Math.round((storyCircleSize * storyCircleBorder) / 100));
+  const storyCircleInnerGapPx = Math.max(0, Math.round((storyCircleSize * storyCircleInnerGap) / 100));
 
   useEffect(() => {
     const updateSidebarRealPreviewSize = () => {
@@ -1106,6 +1109,7 @@ export default function SettingsPage() {
                 <span className="text-mansion-gold font-medium">{storyCircleSize}px</span>
                 <span>132px</span>
               </div>
+              <p className="mt-2 text-[11px] text-text-dim">Este es el único valor absoluto. Los demás se recalculan proporcionalmente según este tamaño.</p>
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
@@ -1115,15 +1119,16 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Separación entre stories</h3>
-                  <p className="text-[11px] text-text-dim">Espacio horizontal entre círculos de historias</p>
+                  <p className="text-[11px] text-text-dim">Valor global relativo al tamaño del avatar</p>
                 </div>
               </div>
-              <input type="range" min="0" max="24" value={storyCircleGap} onChange={e => setStoryCircleGap(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <input type="range" min="0" max="30" value={storyCircleGap} onChange={e => setStoryCircleGap(Number(e.target.value))} className="w-full accent-mansion-gold" />
               <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>0px</span>
-                <span className="text-mansion-gold font-medium">{storyCircleGap}px</span>
-                <span>24px</span>
+                <span>0%</span>
+                <span className="text-mansion-gold font-medium">{storyCircleGap}%</span>
+                <span>30%</span>
               </div>
+              <p className="mt-2 text-[11px] text-text-dim">Equivale a {storyCircleGapPx}px con un avatar de {storyCircleSize}px.</p>
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
@@ -1133,15 +1138,16 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Grosor del anillo</h3>
-                  <p className="text-[11px] text-text-dim">Ancho del borde exterior de cada story en home</p>
+                  <p className="text-[11px] text-text-dim">Valor global relativo al tamaño del avatar</p>
                 </div>
               </div>
-              <input type="range" min="1" max="16" value={storyCircleBorder} onChange={e => setStoryCircleBorder(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <input type="range" min="1" max="18" value={storyCircleBorder} onChange={e => setStoryCircleBorder(Number(e.target.value))} className="w-full accent-mansion-gold" />
               <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>1px</span>
-                <span className="text-mansion-gold font-medium">{storyCircleBorder}px</span>
-                <span>16px</span>
+                <span>1%</span>
+                <span className="text-mansion-gold font-medium">{storyCircleBorder}%</span>
+                <span>18%</span>
               </div>
+              <p className="mt-2 text-[11px] text-text-dim">Equivale a {storyCircleBorderPx}px con un avatar de {storyCircleSize}px.</p>
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
@@ -1151,15 +1157,16 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Espacio negro interno</h3>
-                  <p className="text-[11px] text-text-dim">Separación entre el anillo y la foto dentro del story</p>
+                  <p className="text-[11px] text-text-dim">Valor global relativo al tamaño del avatar</p>
                 </div>
               </div>
-              <input type="range" min="0" max="12" value={storyCircleInnerGap} onChange={e => setStoryCircleInnerGap(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <input type="range" min="0" max="16" value={storyCircleInnerGap} onChange={e => setStoryCircleInnerGap(Number(e.target.value))} className="w-full accent-mansion-gold" />
               <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>0px</span>
-                <span className="text-mansion-gold font-medium">{storyCircleInnerGap}px</span>
-                <span>12px</span>
+                <span>0%</span>
+                <span className="text-mansion-gold font-medium">{storyCircleInnerGap}%</span>
+                <span>16%</span>
               </div>
+              <p className="mt-2 text-[11px] text-text-dim">Equivale a {storyCircleInnerGapPx}px con un avatar de {storyCircleSize}px.</p>
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">

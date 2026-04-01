@@ -70,6 +70,11 @@ export default function FeedPage() {
     useCallback(() => loadProfiles(savedFilter, { silent: true }), [loadProfiles, savedFilter])
   );
 
+  const storyCircleSize = settings.storyCircleSize || 88;
+  const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (settings.storyCircleGap ?? 8)) / 100));
+  const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (settings.storyCircleBorder ?? 4)) / 100));
+  const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (settings.storyCircleInnerGap ?? 3)) / 100));
+
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
       {/* Pull-to-refresh indicator */}
@@ -93,17 +98,17 @@ export default function FeedPage() {
         </div>
         <motion.div
           className="flex overflow-x-auto scrollbar-hide pb-2"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', gap: `${settings.storyCircleGap || 8}px` }}
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', gap: `${storyCircleGap}px` }}
           variants={stagger}
           initial="hidden"
           animate="visible"
         >
           {/* User's own story circle */}
           {user?.has_active_story && (
-            <motion.div variants={storyItem} className="flex-shrink-0" style={{ width: (settings.storyCircleSize || 88) + 6 }}>
+            <motion.div variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
               <Link to="/perfil" className="flex flex-col items-center gap-1">
-                <div className="rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: settings.storyCircleSize || 88, height: settings.storyCircleSize || 88, padding: settings.storyCircleBorder ?? 4 }}>
-                  <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: settings.storyCircleInnerGap ?? 3 }}>
+                <div className="rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: storyCircleSize, height: storyCircleSize, padding: storyCircleBorder }}>
+                  <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: storyCircleInnerGap }}>
                     <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
                       {user.avatar_url ? (
                         <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
@@ -123,9 +128,9 @@ export default function FeedPage() {
             const photo = getPrimaryProfilePhoto(p);
             const photoCrop = getPrimaryProfileCrop(p);
             const isOnline = p.online;
-            const size = settings.storyCircleSize || 88;
-            const border = settings.storyCircleBorder ?? 4;
-            const innerGap = settings.storyCircleInnerGap ?? 3;
+            const size = storyCircleSize;
+            const border = storyCircleBorder;
+            const innerGap = storyCircleInnerGap;
             const innerSize = size - border * 2;
             return (
               <motion.div key={`story-${p.id}`} variants={storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
