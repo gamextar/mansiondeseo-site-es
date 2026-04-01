@@ -80,7 +80,6 @@ export default function SettingsPage() {
   const [storyCircleGap, setStoryCircleGap] = useState(8);
   const [storyCircleBorder, setStoryCircleBorder] = useState(4);
   const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
-  const [sidebarPreviewSize, setSidebarPreviewSize] = useState('medium');
 
   // Video feed
   const [videoGradientHeight, setVideoGradientHeight] = useState(64);
@@ -114,20 +113,43 @@ export default function SettingsPage() {
   const [newGiftPrice, setNewGiftPrice] = useState('');
   const [newGiftCategory, setNewGiftCategory] = useState('general');
 
-  const sidebarPreviewOptions = [
-    { key: 'small', label: 'Chico', size: 44, context: 'chips compactos o mini avatares' },
-    { key: 'medium', label: 'Mediano', size: 64, context: 'tarjetas y bloques intermedios' },
-    { key: 'large', label: 'Grande', size: 92, context: 'sidebar desktop y hero avatars' },
-    { key: 'sidebar', label: 'Sidebar', size: sidebarAvatarSize, context: 'tamaño configurado del avatar en la sidebar desktop' },
+  const storyPresetSections = [
+    {
+      key: 'small',
+      label: 'Preset chico',
+      context: 'chips compactos o mini avatares',
+      size: storyCirclePresetSmall,
+      setSize: setStoryCirclePresetSmall,
+    },
+    {
+      key: 'medium',
+      label: 'Preset mediano',
+      context: 'tarjetas y bloques intermedios',
+      size: storyCirclePresetMedium,
+      setSize: setStoryCirclePresetMedium,
+    },
+    {
+      key: 'large',
+      label: 'Preset grande',
+      context: 'módulos destacados y bloques más amplios',
+      size: storyCirclePresetLarge,
+      setSize: setStoryCirclePresetLarge,
+    },
+    {
+      key: 'xl',
+      label: 'Preset XL',
+      context: 'variantes más protagónicas dentro de la UI',
+      size: storyCirclePresetXl,
+      setSize: setStoryCirclePresetXl,
+    },
+    {
+      key: 'sidebar',
+      label: 'Sidebar desktop',
+      context: 'tamaño configurado del avatar en la sidebar desktop',
+      size: sidebarAvatarSize,
+      setSize: setSidebarAvatarSize,
+    },
   ];
-  const storySizePresets = [
-    { key: 'small', label: 'Chico', size: storyCirclePresetSmall },
-    { key: 'medium', label: 'Mediano', size: storyCirclePresetMedium },
-    { key: 'large', label: 'Grande', size: storyCirclePresetLarge },
-    { key: 'xl', label: 'XL', size: storyCirclePresetXl },
-  ];
-  const activeSidebarPreview = sidebarPreviewOptions.find(option => option.key === sidebarPreviewSize) || sidebarPreviewOptions[1];
-  const activeSidebarRingPx = Math.max(1, Math.round((activeSidebarPreview.size * storyCircleBorder) / 100));
   const storyCircleGapPx = Math.max(0, Math.round((storyCircleSize * storyCircleGap) / 100));
   const storyCircleBorderPx = Math.max(1, Math.round((storyCircleSize * storyCircleBorder) / 100));
   const storyCircleInnerGapPx = Math.max(0, Math.round((storyCircleSize * storyCircleInnerGap) / 100));
@@ -1159,115 +1181,110 @@ export default function SettingsPage() {
           <div className="space-y-3">
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
               <h3 className="text-xs font-bold text-text-dim uppercase tracking-wider mb-3">Configuración de anillo</h3>
-              <div className="rounded-xl bg-mansion-base/70 border border-white/5 p-4">
-                <div className="flex gap-2 mb-4 flex-wrap">
-                  {[...storySizePresets, { key: 'sidebar', label: 'Sidebar', size: sidebarAvatarSize }].map(option => {
-                    const active = option.key === sidebarPreviewSize;
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => {
-                          setSidebarPreviewSize(option.key);
-                          setStoryCircleSize(option.size);
-                        }}
-                        className={`min-w-[88px] flex-1 rounded-xl border px-3 py-2 text-left transition-colors ${active ? 'border-mansion-gold/40 bg-mansion-gold/10 text-text-primary' : 'border-white/5 bg-mansion-card/40 text-text-dim hover:border-white/10 hover:text-text-primary'}`}
-                      >
-                        <p className="text-xs font-semibold">{option.label}</p>
-                        <p className="text-[10px] opacity-80">{option.size}px</p>
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="space-y-3">
+                {storyPresetSections.map((preset) => {
+                  const ringPx = Math.max(1, Math.round((preset.size * storyCircleBorder) / 100));
+                  const innerGapPx = Math.max(0, Math.round((preset.size * storyCircleInnerGap) / 100));
 
-                <div className="grid gap-4 items-center" style={{ gridTemplateColumns: `minmax(${Math.min(activeSidebarPreview.size + 20, 220)}px, max-content) minmax(0, 1fr)` }}>
-                  <div className="flex items-center justify-center overflow-visible">
-                    <div className="relative shrink-0 rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: activeSidebarPreview.size, height: activeSidebarPreview.size, aspectRatio: '1 / 1' }}>
-                      <div className="absolute rounded-full bg-mansion-card overflow-hidden" style={{ inset: `${storyCircleBorder}%` }}>
-                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/10 to-white/5 text-text-muted">
-                          <User className="w-4 h-4" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm font-semibold text-text-primary">Ajustes para {activeSidebarPreview.label.toLowerCase()}</p>
-                      <p className="text-[11px] text-text-dim">Todo queda contenido en esta sección dinámica.</p>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <label className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
-                        <span className="mb-1 block text-[11px] text-text-dim">Avatar size</span>
-                        <input
-                          type="number"
-                          min="40"
-                          max="220"
-                          value={activeSidebarPreview.key === 'small' ? storyCirclePresetSmall : activeSidebarPreview.key === 'medium' ? storyCirclePresetMedium : activeSidebarPreview.key === 'large' ? storyCirclePresetLarge : activeSidebarPreview.key === 'xl' ? storyCirclePresetXl : sidebarAvatarSize}
-                          onChange={(e) => {
-                            const next = Number(e.target.value) || 40;
-                            if (activeSidebarPreview.key === 'small') setStoryCirclePresetSmall(next);
-                            else if (activeSidebarPreview.key === 'medium') setStoryCirclePresetMedium(next);
-                            else if (activeSidebarPreview.key === 'large') setStoryCirclePresetLarge(next);
-                            else if (activeSidebarPreview.key === 'xl') setStoryCirclePresetXl(next);
-                            else setSidebarAvatarSize(next);
-                            setStoryCircleSize(next);
-                          }}
-                          className="w-full rounded-lg border border-white/10 bg-mansion-base px-2 py-1.5 text-sm text-text-primary outline-none focus:border-mansion-gold/40"
-                        />
-                      </label>
-                      <div className="rounded-xl border border-white/5 bg-mansion-card/40 p-3 sm:col-span-2">
-                        <div className="flex items-center justify-between gap-3 mb-2">
-                          <div>
-                            <p className="text-xs font-semibold text-text-primary">Grosor global del anillo</p>
-                            <p className="text-[10px] text-text-dim">Comparte el mismo setting entre home y sidebar</p>
+                  return (
+                    <div key={preset.key} className="rounded-xl bg-mansion-base/70 border border-white/5 p-4">
+                      <div className="grid gap-4 items-center lg:grid-cols-[minmax(120px,max-content)_minmax(0,1fr)]">
+                        <div className="flex items-center justify-center overflow-visible">
+                          <div className="relative shrink-0 rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: preset.size, height: preset.size, aspectRatio: '1 / 1' }}>
+                            <div className="absolute rounded-full bg-mansion-card overflow-hidden" style={{ inset: `${storyCircleBorder}%` }}>
+                              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/10 to-white/5 text-text-muted">
+                                <User className="w-4 h-4" />
+                              </div>
+                            </div>
                           </div>
-                          <span className="text-sm font-semibold text-mansion-gold">{storyCircleBorder}%</span>
                         </div>
-                        <input type="range" min="1" max="18" value={storyCircleBorder} onChange={e => setStoryCircleBorder(Number(e.target.value))} className="w-full accent-mansion-gold" />
-                        <div className="mt-1 flex justify-between text-[10px] text-text-dim">
-                          <span>1%</span>
-                          <span>18%</span>
+
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-sm font-semibold text-text-primary">{preset.label}</p>
+                            <p className="text-[11px] text-text-dim">{preset.context}</p>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-3">
+                            <label className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
+                              <span className="mb-1 block text-[11px] text-text-dim">Avatar size</span>
+                              <input
+                                type="number"
+                                min="40"
+                                max="220"
+                                value={preset.size}
+                                onChange={(e) => preset.setSize(Math.max(40, Number(e.target.value) || 40))}
+                                className="w-full rounded-lg border border-white/10 bg-mansion-base px-2 py-1.5 text-sm text-text-primary outline-none focus:border-mansion-gold/40"
+                              />
+                            </label>
+                            <div className="rounded-xl border border-white/5 bg-mansion-card/40 p-3 sm:col-span-2">
+                              <div className="flex items-center justify-between gap-3 mb-2">
+                                <div>
+                                  <p className="text-xs font-semibold text-text-primary">Grosor global del anillo</p>
+                                  <p className="text-[10px] text-text-dim">Comparte el mismo setting entre home y sidebar</p>
+                                </div>
+                                <span className="text-sm font-semibold text-mansion-gold">{storyCircleBorder}%</span>
+                              </div>
+                              <input type="range" min="1" max="18" value={storyCircleBorder} onChange={e => setStoryCircleBorder(Number(e.target.value))} className="w-full accent-mansion-gold" />
+                              <div className="mt-1 flex justify-between text-[10px] text-text-dim">
+                                <span>1%</span>
+                                <span>18%</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
+                            <div className="flex items-center justify-between gap-3 mb-2">
+                              <div>
+                                <p className="text-xs font-semibold text-text-primary">Espacio interno</p>
+                                <p className="text-[10px] text-text-dim">Separación negra entre anillo y foto</p>
+                              </div>
+                              <span className="text-sm font-semibold text-mansion-gold">{storyCircleInnerGap}%</span>
+                            </div>
+                            <input type="range" min="0" max="16" value={storyCircleInnerGap} onChange={e => setStoryCircleInnerGap(Number(e.target.value))} className="w-full accent-mansion-gold" />
+                            <div className="mt-1 flex justify-between text-[10px] text-text-dim">
+                              <span>0%</span>
+                              <span>16%</span>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
+                              <p className="text-[10px] text-text-dim">Anillo</p>
+                              <p className="text-sm font-semibold text-text-primary">{ringPx}px</p>
+                            </div>
+                            <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
+                              <p className="text-[10px] text-text-dim">Espacio interno</p>
+                              <p className="text-sm font-semibold text-text-primary">{innerGapPx}px</p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
-                      <div className="flex items-center justify-between gap-3 mb-2">
-                        <div>
-                          <p className="text-xs font-semibold text-text-primary">Espacio interno</p>
-                          <p className="text-[10px] text-text-dim">Separación negra entre anillo y foto</p>
-                        </div>
-                        <span className="text-sm font-semibold text-mansion-gold">{storyCircleInnerGap}%</span>
-                      </div>
-                      <input type="range" min="0" max="16" value={storyCircleInnerGap} onChange={e => setStoryCircleInnerGap(Number(e.target.value))} className="w-full accent-mansion-gold" />
-                      <div className="mt-1 flex justify-between text-[10px] text-text-dim">
-                        <span>0%</span>
-                        <span>16%</span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
-                        <p className="text-[10px] text-text-dim">Avatar</p>
-                        <p className="text-sm font-semibold text-text-primary">{activeSidebarPreview.size}px</p>
-                      </div>
-                      <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
-                        <p className="text-[10px] text-text-dim">Anillo</p>
-                        <p className="text-sm font-semibold text-text-primary">{activeSidebarRingPx}px</p>
-                      </div>
-                      <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
-                        <p className="text-[10px] text-text-dim">Espacio interno</p>
-                        <p className="text-sm font-semibold text-text-primary">{Math.max(0, Math.round((activeSidebarPreview.size * storyCircleInnerGap) / 100))}px</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
             </div>
 
             <div className="rounded-2xl border border-white/5 bg-mansion-card/50 p-4">
               <div className="mb-3">
                 <h3 className="text-sm font-semibold text-text-primary">Ajustes generales</h3>
-                <p className="text-[11px] text-text-dim">Estos valores siempre se calculan en proporción al preset activo.</p>
+                <p className="text-[11px] text-text-dim">El preview de home usa este tamaño base y no cambia al editar los presets de arriba.</p>
+              </div>
+
+              <div className="bg-mansion-card rounded-2xl p-4 border border-white/5 mb-3">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                    <User className="w-4 h-4 text-mansion-gold" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">Tamaño base de stories home</h3>
+                    <p className="text-[11px] text-text-dim">Este es el tamaño real que usa la fila de stories en la home</p>
+                  </div>
+                </div>
+                <input type="range" min="40" max="180" value={storyCircleSize} onChange={e => setStoryCircleSize(Number(e.target.value))} className="w-full accent-mansion-gold" />
+                <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                  <span>40px</span>
+                  <span className="text-mansion-gold font-medium">{storyCircleSize}px</span>
+                  <span>180px</span>
+                </div>
               </div>
 
               <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
