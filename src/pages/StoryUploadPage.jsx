@@ -1203,7 +1203,7 @@ export default function StoryUploadPage() {
 										caption={result.caption}
 										user={user}
 										avatarSize={siteSettings?.videoAvatarSize ?? 52}
-										overlayDelay={showFinalizingOverlay ? 4.5 : 0}
+										overlayDelay={showFinalizingOverlay ? 2.5 : 0}
 										onClose={closeStoryUpload}
 										onConfirm={() => {
 											setShowPreview(false);
@@ -1268,12 +1268,12 @@ export default function StoryUploadPage() {
 									style={{ background: 'inherit' }}
 								>
 									<div className="mt-auto mb-6 sm:mb-10">
-										<div className="rounded-[1.75rem] border border-white/12 bg-black/45 backdrop-blur-md p-6 sm:p-7 shadow-[0_16px_48px_rgba(0,0,0,0.32)]">
-											<div className="flex items-center gap-5 mb-6">
+										<div className="rounded-[2rem] border border-white/12 bg-black/50 backdrop-blur-xl p-7 sm:p-8 shadow-[0_20px_56px_rgba(0,0,0,0.38)]">
+											<div className="flex items-center gap-5 mb-7">
 												<div className="relative flex-shrink-0">
-													<svg className="w-16 h-16 -rotate-90" viewBox="0 0 56 56">
-														<circle cx="28" cy="28" r="23" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
-														<circle cx="28" cy="28" r="23" fill="none" stroke="url(#finGrad)" strokeWidth="4" strokeLinecap="round" strokeDasharray="144.5 144.5" />
+													<svg className="w-[4.5rem] h-[4.5rem] -rotate-90" viewBox="0 0 56 56">
+														<circle cx="28" cy="28" r="23" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="3.5" />
+														<circle cx="28" cy="28" r="23" fill="none" stroke="url(#finGrad)" strokeWidth="3.5" strokeLinecap="round" strokeDasharray="144.5 144.5" />
 														<defs>
 															<linearGradient id="finGrad" x1="0%" y1="0%" x2="100%" y2="0%">
 																<stop offset="0%" stopColor="#d4af37" />
@@ -1281,28 +1281,28 @@ export default function StoryUploadPage() {
 															</linearGradient>
 														</defs>
 													</svg>
-													<span className="absolute inset-0 flex items-center justify-center text-[13px] font-bold text-mansion-gold tabular-nums">100%</span>
+													<span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-mansion-gold tabular-nums">100%</span>
 												</div>
 												<div className="flex-1 min-w-0">
-													<p className="text-base font-semibold text-white leading-snug">Preparando reproducción…</p>
-													<p className="text-sm text-white/50 mt-1 truncate">Optimizando para reproducción</p>
+													<p className="text-[17px] font-semibold text-white leading-snug">Preparando reproducción…</p>
+													<p className="text-[13px] text-white/50 mt-1.5 truncate">Optimizando para reproducción</p>
 												</div>
 											</div>
-											<div className="space-y-2">
-												<div className="flex items-center justify-between text-sm text-white/55">
+											<div className="space-y-2.5">
+												<div className="flex items-center justify-between text-[13px] text-white/55">
 													<span>Procesando</span>
 													<span className="tabular-nums font-medium">100%</span>
 												</div>
-												<div className="h-2.5 w-full rounded-full bg-white/8 overflow-hidden">
+												<div className="h-3 w-full rounded-full bg-white/8 overflow-hidden">
 													<div className="h-full rounded-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light" style={{ width: '100%' }} />
 												</div>
 											</div>
-											<div className="mt-4 space-y-2">
-												<div className="flex items-center justify-between text-sm text-white/55">
+											<div className="mt-5 space-y-2.5">
+												<div className="flex items-center justify-between text-[13px] text-white/55">
 													<span>Verificando</span>
 													<span className="tabular-nums font-medium">{verificationPercent}%</span>
 												</div>
-												<div className="h-2.5 w-full rounded-full bg-white/8 overflow-hidden">
+												<div className="h-3 w-full rounded-full bg-white/8 overflow-hidden">
 													<div className="h-full rounded-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${verificationPercent}%` }} />
 												</div>
 											</div>
