@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Radio } from 'lucide-react';
+import { Radio, Plus } from 'lucide-react';
 import { useAuth } from '../App';
 
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.045 } } };
@@ -118,28 +118,44 @@ export default function FeedPage() {
           animate="visible"
         >
           {/* User's own story circle */}
-          {user?.has_active_story && (
+          {user && (
             <motion.div variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
-              <button
-                type="button"
-                onClick={() => navigate('/videos', { state: { storyUserId: user.id } })}
-                className="flex flex-col items-center gap-1"
-              >
-                <div className="rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: storyCircleSize, height: storyCircleSize, padding: storyCircleBorder }}>
-                  <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: storyCircleInnerGap }}>
-                    <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
-                      {user.avatar_url ? (
-                        <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
-                          {user.username?.charAt(0)}
-                        </div>
-                      )}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={user.has_active_story ? () => navigate('/videos', { state: { storyUserId: user.id } }) : () => navigate('/historia/nueva')}
+                  className="flex flex-col items-center gap-1 w-full"
+                >
+                  <div className={`rounded-full ${
+                    user.has_active_story
+                      ? viewedStoryUsers.has(String(user.id))
+                        ? 'bg-white/20'
+                        : 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400'
+                      : 'bg-mansion-border/40'
+                  }`} style={{ width: storyCircleSize, height: storyCircleSize, padding: storyCircleBorder }}>
+                    <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: storyCircleInnerGap }}>
+                      <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
+                        {user.avatar_url ? (
+                          <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
+                            {user.username?.charAt(0)}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <span className="text-[10px] text-mansion-gold truncate w-full text-center leading-tight">Tú</span>
-              </button>
+                  <span className="text-[10px] text-mansion-gold truncate w-full text-center leading-tight">Tú</span>
+                </button>
+                {/* Plus badge */}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva'); }}
+                  className="absolute bottom-4 right-0 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
+                >
+                  <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
+                </button>
+              </div>
             </motion.div>
           )}
           {profiles.filter(p => p.has_active_story).slice(0, 15).map((p) => {
