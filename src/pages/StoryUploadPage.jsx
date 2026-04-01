@@ -216,27 +216,9 @@ async function captureVideoPoster(fileUrl, { maxWidth = 720, quality = 0.82 } = 
 			});
 		};
 
-		const scheduleCapture = () => {
-			if (captureRequested || settled) return;
-			captureRequested = true;
-			const safeSeekTime = Number.isFinite(video.duration) && video.duration > STORY_POSTER_FRAME_TIME_SECONDS + 0.03
-				? STORY_POSTER_FRAME_TIME_SECONDS
-				: 0;
-
-			if (safeSeekTime > 0) {
-				try {
-					video.currentTime = safeSeekTime;
-					return;
-				} catch {}
-			}
-
-			captureFrame();
-		};
-
 		video.onerror = fail;
-		video.onseeked = captureFrame;
 		video.onloadeddata = captureFrame;
-		video.onloadedmetadata = scheduleCapture;
+		video.onseeked = captureFrame;
 
 		video.src = fileUrl;
 		video.load();
