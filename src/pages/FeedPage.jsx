@@ -135,38 +135,37 @@ export default function FeedPage() {
             const size = storyCircleSize;
             const border = storyCircleBorder;
             const innerGap = storyCircleInnerGap;
-            const innerSize = size - border * 2;
             return (
               <motion.div key={`story-${p.id}`} variants={storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
-              <button
-                type="button"
-                onClick={() => navigate('/videos', { state: { storyUserId: p.id } })}
-                className="flex flex-col items-center gap-1"
-              >
-                <div className={`rounded-full ${
-                  isOnline
-                    ? 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson'
-                    : 'bg-gradient-to-tr from-mansion-border/60 to-mansion-border/40'
-                }`} style={{ width: size, height: size, padding: border }}>
-                  <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: innerGap }}>
-                    <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
-                      {photo ? (
-                        <AvatarImg src={photo} crop={photoCrop} alt={p.name} className="w-full h-full" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
-                          {p.name?.charAt(0)}
-                        </div>
-                      )}
+                <button
+                  type="button"
+                  onClick={() => navigate('/videos', { state: { storyUserId: p.id } })}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <div className={`rounded-full ${
+                    isOnline
+                      ? 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson'
+                      : 'bg-gradient-to-tr from-mansion-border/60 to-mansion-border/40'
+                  }`} style={{ width: size, height: size, padding: border }}>
+                    <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: innerGap }}>
+                      <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
+                        {photo ? (
+                          <AvatarImg src={photo} crop={photoCrop} alt={p.name} className="w-full h-full" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
+                            {p.name?.charAt(0)}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <span className="text-[10px] text-text-muted truncate w-full text-center leading-tight">{p.name?.split(' ')[0]}</span>
-              </Link>
+                  <span className="text-[10px] text-text-muted truncate w-full text-center leading-tight">{p.name?.split(' ')[0]}</span>
+                </button>
               </motion.div>
             );
           })}
         </motion.div>
-              </button>
+      </motion.div>
 
       {/* Results count */}
       <motion.div
