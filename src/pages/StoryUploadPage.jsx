@@ -34,6 +34,14 @@ function formatElapsedSeconds(totalSeconds) {
 	return `${safeSeconds.toFixed(1)}s`;
 }
 
+function formatDebugTimer(totalSeconds) {
+	const safeSeconds = Math.max(0, Number.isFinite(totalSeconds) ? totalSeconds : 0);
+	const minutes = Math.floor(safeSeconds / 60);
+	const seconds = Math.floor(safeSeconds % 60);
+	const tenths = Math.floor((safeSeconds - Math.floor(safeSeconds)) * 10);
+	return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${tenths}`;
+}
+
 function clamp(value, min, max) {
 	return Math.min(Math.max(value, min), max);
 }
@@ -230,6 +238,7 @@ export default function StoryUploadPage() {
 	const navigate = useNavigate();
 	const { user, siteSettings } = useAuth();
 	const maxStoryDurationSeconds = Math.max(1, Number(siteSettings?.storyMaxDurationSeconds || 15));
+	const showProgressHud = siteSettings?.encoderShowProgressHud !== false;
 	const encoderThreads = Math.max(1, Number(siteSettings?.encoderThreads || 4));
 	const encoderParams = {
 		crf: siteSettings?.encoderCrf || ENCODER_DEFAULTS.crf,
@@ -333,8 +342,25 @@ export default function StoryUploadPage() {
 		setSourceResolution(null);
 		setEncodingProgress(0);
 		setUploadProgress(0);
+		setElapsedSeconds(0);
 		setPhase('idle');
 		setErrorMessage('');
+		clearInterval(timerIntervalRef.current);
+		timerIntervalRef.current = null;
+	};
+
+	const startElapsedTimer = () => {
+		setElapsedSeconds(0);
+		clearInterval(timerIntervalRef.current);
+		timerStartRef.current = performance.now();
+		timerIntervalRef.current = setInterval(() => {
+			setElapsedSeconds((performance.now() - timerStartRef.current) / 1000);
+		}, 100);
+	};
+
+	const stopElapsedTimer = () => {
+		clearInterval(timerIntervalRef.current);
+		timerIntervalRef.current = null;
 	};
 
 	const handleFileChange = async (event) => {
@@ -351,12 +377,7 @@ export default function StoryUploadPage() {
 		setUploadProgress(0);
 		setPhase('preparing');
 		setProcessing(true);
-		setElapsedSeconds(0);
-		clearInterval(timerIntervalRef.current);
-		timerStartRef.current = performance.now();
-		timerIntervalRef.current = setInterval(() => {
-			setElapsedSeconds(Math.floor((performance.now() - timerStartRef.current) / 1000));
-		}, 500);
+		startElapsedTimer();
 
 		const tempSourceUrl = URL.createObjectURL(file);
 
@@ -378,8 +399,7 @@ export default function StoryUploadPage() {
 			setErrorMessage(error?.message || 'No se pudo preparar la historia.');
 			setPhase('idle');
 			setProcessing(false);
-			clearInterval(timerIntervalRef.current);
-			timerIntervalRef.current = null;
+			stopElapsedTimer();
 			isTranscodingRef.current = false;
 			activeEncodeDurationRef.current = 0;
 		} finally {
@@ -472,12 +492,7 @@ export default function StoryUploadPage() {
 			setErrorMessage('');
 			if (!skipSetup) {
 				setProcessing(true);
-				setElapsedSeconds(0);
-				clearInterval(timerIntervalRef.current);
-				timerStartRef.current = performance.now();
-				timerIntervalRef.current = setInterval(() => {
-					setElapsedSeconds(Math.floor((performance.now() - timerStartRef.current) / 1000));
-				}, 500);
+				startElapsedTimer();
 			}
 			setPhase('encoding');
 			isTranscodingRef.current = true;
@@ -510,8 +525,7 @@ export default function StoryUploadPage() {
 			setErrorMessage(error?.message || 'No se pudo publicar la historia.');
 			setPhase('idle');
 		} finally {
-			clearInterval(timerIntervalRef.current);
-			timerIntervalRef.current = null;
+			stopElapsedTimer();
 			setProcessing(false);
 			isTranscodingRef.current = false;
 			activeEncodeDurationRef.current = 0;
@@ -568,8 +582,16 @@ export default function StoryUploadPage() {
 							exit={{ opacity: 0, y: -20 }}
 							transition={{ duration: 0.28, ease: 'easeOut' }}
 							style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-							className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 p-8 sm:p-10 flex flex-col items-center text-center"
+							className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 p-8 sm:p-10 flex flex-col items-center text-center relative"
 						>
+							<button
+								type="button"
+								onClick={() => navigate('/perfil')}
+								className="absolute right-4 top-4 sm:right-6 sm:top-6 w-8 h-8 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/10 transition-colors"
+								aria-label="Cerrar nueva historia"
+							>
+								<X className="w-4 h-4" />
+							</button>
 							<div className="w-full flex items-center justify-center gap-2 mb-8">
 								{storySteps.map((step, index) => {
 									const active = storyStepIndex === index;
@@ -836,14 +858,12 @@ export default function StoryUploadPage() {
 				/>
 			)}
 
-			{processing && (
+			{processing && showProgressHud && (
 				<div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl bg-black/88 border border-white/10 shadow-2xl">
 					<Clock className="w-5 h-5 text-mansion-gold" />
 					<div>
 						<p className="text-[10px] uppercase tracking-[0.2em] text-text-dim">{progressLabel}</p>
-						<p className="text-2xl font-display font-bold text-text-primary tabular-nums">
-							{String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}
-						</p>
+						<p className="text-2xl font-display font-bold text-text-primary tabular-nums">{formatDebugTimer(elapsedSeconds)}</p>
 					</div>
 					<div className="ml-2 text-right">
 						<p className="text-lg font-bold text-mansion-gold tabular-nums">{Math.round(progressValue * 100)}%</p>
