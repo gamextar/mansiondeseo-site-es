@@ -71,12 +71,10 @@ export default function SettingsPage() {
   const [navHeight, setNavHeight] = useState(71);
   const [navOpacity, setNavOpacity] = useState(40);
   const [navBlur, setNavBlur] = useState(24);
-  const [storyCircleSize, setStoryCircleSize] = useState(88);
   const [storyCirclePresetSmall, setStoryCirclePresetSmall] = useState(72);
   const [storyCirclePresetMedium, setStoryCirclePresetMedium] = useState(88);
   const [storyCirclePresetLarge, setStoryCirclePresetLarge] = useState(104);
-  const [storyCirclePresetXl, setStoryCirclePresetXl] = useState(120);
-  const [sidebarAvatarSize, setSidebarAvatarSize] = useState(154);
+  const [storyCirclePresetXl, setStoryCirclePresetXl] = useState(154);
   const [storyCircleGap, setStoryCircleGap] = useState(8);
   const [storyCircleBorder, setStoryCircleBorder] = useState(4);
   const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
@@ -124,39 +122,32 @@ export default function SettingsPage() {
     },
     {
       key: 'medium',
-      label: 'Mediano',
-      context: 'tarjetas y bloques intermedios',
+      label: 'Stories',
+      context: 'tamaño usado en la fila de stories de la home',
       size: storyCirclePresetMedium,
       setSize: setStoryCirclePresetMedium,
     },
     {
       key: 'large',
-      label: 'Grande',
-      context: 'módulos destacados y bloques más amplios',
+      label: 'Destacado',
+      context: 'variantes más amplias dentro de la interfaz',
       size: storyCirclePresetLarge,
       setSize: setStoryCirclePresetLarge,
     },
     {
       key: 'xl',
-      label: 'Preset XL',
-      context: 'variantes más protagónicas dentro de la UI',
+      label: 'Sidebar desktop',
+      context: 'tamaño usado por el avatar de la sidebar desktop',
       size: storyCirclePresetXl,
       setSize: setStoryCirclePresetXl,
-    },
-    {
-      key: 'sidebar',
-      label: 'Sidebar desktop',
-      context: 'tamaño configurado del avatar en la sidebar desktop',
-      size: sidebarAvatarSize,
-      setSize: setSidebarAvatarSize,
     },
   ];
   const activeStoryPreset = storyPresetOptions.find(option => option.key === storyPresetEditor) || storyPresetOptions[1];
   const activeStoryPresetRingPx = Math.max(1, Math.round((activeStoryPreset.size * storyCircleBorder) / 100));
   const activeStoryPresetInnerGapPx = Math.max(0, Math.round((activeStoryPreset.size * storyCircleInnerGap) / 100));
-  const storyCircleGapPx = Math.max(0, Math.round((storyCircleSize * storyCircleGap) / 100));
-  const storyCircleBorderPx = Math.max(1, Math.round((storyCircleSize * storyCircleBorder) / 100));
-  const storyCircleInnerGapPx = Math.max(0, Math.round((storyCircleSize * storyCircleInnerGap) / 100));
+  const storyCircleGapPx = Math.max(0, Math.round((storyCirclePresetMedium * storyCircleGap) / 100));
+  const storyCircleBorderPx = Math.max(1, Math.round((storyCirclePresetMedium * storyCircleBorder) / 100));
+  const storyCircleInnerGapPx = Math.max(0, Math.round((storyCirclePresetMedium * storyCircleInnerGap) / 100));
 
   useEffect(() => {
     if (!user?.is_admin) { navigate('/'); return; }
@@ -197,12 +188,10 @@ export default function SettingsPage() {
         setNavHeight(s.navHeight ?? 71);
         setNavOpacity(s.navOpacity ?? 40);
         setNavBlur(s.navBlur ?? 24);
-        setStoryCircleSize(s.storyCircleSize ?? 88);
         setStoryCirclePresetSmall(s.storyCirclePresetSmall ?? 72);
-        setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? 88);
+        setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? s.storyCircleSize ?? 88);
         setStoryCirclePresetLarge(s.storyCirclePresetLarge ?? 104);
-        setStoryCirclePresetXl(s.storyCirclePresetXl ?? 120);
-        setSidebarAvatarSize(s.sidebarAvatarSize ?? 154);
+        setStoryCirclePresetXl(s.storyCirclePresetXl ?? s.sidebarAvatarSize ?? 154);
         setStoryCircleGap(s.storyCircleGap ?? 8);
         setStoryCircleBorder(s.storyCircleBorder ?? 4);
         setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
@@ -263,12 +252,12 @@ export default function SettingsPage() {
         nav_height: navHeight,
         nav_opacity: navOpacity,
         nav_blur: navBlur,
-        story_circle_size: storyCircleSize,
+        story_circle_size: storyCirclePresetMedium,
         story_circle_preset_small: storyCirclePresetSmall,
         story_circle_preset_medium: storyCirclePresetMedium,
         story_circle_preset_large: storyCirclePresetLarge,
         story_circle_preset_xl: storyCirclePresetXl,
-        sidebar_avatar_size: sidebarAvatarSize,
+        sidebar_avatar_size: storyCirclePresetXl,
         story_circle_gap: storyCircleGap,
         story_circle_border: storyCircleBorder,
         story_circle_inner_gap: storyCircleInnerGap,
@@ -317,12 +306,10 @@ export default function SettingsPage() {
       setNavHeight(s.navHeight ?? 71);
       setNavOpacity(s.navOpacity ?? 40);
       setNavBlur(s.navBlur ?? 24);
-      setStoryCircleSize(s.storyCircleSize ?? 88);
       setStoryCirclePresetSmall(s.storyCirclePresetSmall ?? 72);
-      setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? 88);
+      setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? s.storyCircleSize ?? 88);
       setStoryCirclePresetLarge(s.storyCirclePresetLarge ?? 104);
-      setStoryCirclePresetXl(s.storyCirclePresetXl ?? 120);
-      setSidebarAvatarSize(s.sidebarAvatarSize ?? 154);
+      setStoryCirclePresetXl(s.storyCirclePresetXl ?? s.sidebarAvatarSize ?? 154);
       setStoryCircleGap(s.storyCircleGap ?? 8);
       setStoryCircleBorder(s.storyCircleBorder ?? 4);
       setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
@@ -1282,25 +1269,7 @@ export default function SettingsPage() {
             <div className="rounded-2xl border border-white/5 bg-mansion-card/50 p-4">
               <div className="mb-3">
                 <h3 className="text-sm font-semibold text-text-primary">Ajustes generales</h3>
-                <p className="text-[11px] text-text-dim">El preview de home usa este tamaño base y no cambia al editar los presets de arriba.</p>
-              </div>
-
-              <div className="bg-mansion-card rounded-2xl p-4 border border-white/5 mb-3">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                    <User className="w-4 h-4 text-mansion-gold" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-text-primary">Tamaño base de stories home</h3>
-                    <p className="text-[11px] text-text-dim">Este es el tamaño real que usa la fila de stories en la home</p>
-                  </div>
-                </div>
-                <input type="range" min="40" max="180" value={storyCircleSize} onChange={e => setStoryCircleSize(Number(e.target.value))} className="w-full accent-mansion-gold" />
-                <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                  <span>40px</span>
-                  <span className="text-mansion-gold font-medium">{storyCircleSize}px</span>
-                  <span>180px</span>
-                </div>
+                <p className="text-[11px] text-text-dim">La home toma el preset Stories y la sidebar desktop toma el preset Sidebar desktop.</p>
               </div>
 
               <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
@@ -1319,7 +1288,7 @@ export default function SettingsPage() {
                   <span className="text-mansion-gold font-medium">{storyCircleGap}%</span>
                   <span>30%</span>
                 </div>
-                <p className="mt-2 text-[11px] text-text-dim">Equivale a {storyCircleGapPx}px con un avatar de {storyCircleSize}px.</p>
+                <p className="mt-2 text-[11px] text-text-dim">Equivale a {storyCircleGapPx}px con un avatar de {storyCirclePresetMedium}px en Stories.</p>
               </div>
             </div>
 
@@ -1336,10 +1305,10 @@ export default function SettingsPage() {
                     { label: 'Luna', active: true },
                     { label: 'Mia', active: false },
                   ].map((item) => (
-                    <div key={item.label} className="flex shrink-0 flex-col items-center gap-1" style={{ width: storyCircleSize + 6 }}>
+                    <div key={item.label} className="flex shrink-0 flex-col items-center gap-1" style={{ width: storyCirclePresetMedium + 6 }}>
                       <div
                         className={`rounded-full ${item.gold ? 'bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold' : item.active ? 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson' : 'bg-gradient-to-tr from-mansion-border/60 to-mansion-border/40'}`}
-                        style={{ width: storyCircleSize, height: storyCircleSize, padding: storyCircleBorderPx }}
+                        style={{ width: storyCirclePresetMedium, height: storyCirclePresetMedium, padding: storyCircleBorderPx }}
                       >
                         <div className="h-full w-full rounded-full bg-mansion-base" style={{ padding: storyCircleInnerGapPx }}>
                           <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-white/10 to-white/5 text-text-muted">
@@ -1354,7 +1323,7 @@ export default function SettingsPage() {
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                     <p className="text-[10px] text-text-dim">Avatar</p>
-                    <p className="text-sm font-semibold text-text-primary">{storyCircleSize}px</p>
+                    <p className="text-sm font-semibold text-text-primary">{storyCirclePresetMedium}px</p>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                     <p className="text-[10px] text-text-dim">Separación</p>

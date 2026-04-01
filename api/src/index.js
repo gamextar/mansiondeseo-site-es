@@ -492,6 +492,9 @@ function corsHeaders(env, request) {
   )) {
     acao = origin;
   }
+  const storyCirclePresetMedium = parseInt(settings.story_circle_preset_medium || settings.story_circle_size || '88', 10);
+  const storyCirclePresetXl = parseInt(settings.story_circle_preset_xl || settings.sidebar_avatar_size || '154', 10);
+
   return {
     'Access-Control-Allow-Origin': acao,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -1813,12 +1816,12 @@ async function loadSettings(env) {
     paymentTitleCoins: settings.payment_title_coins || 'Servicios Digitales',
     paymentDescriptorCoins: settings.payment_descriptor_coins || 'UNICOAPPS',
     paymentGateway: settings.payment_gateway || 'mercadopago',
-    storyCircleSize: parseInt(settings.story_circle_size || '88', 10),
+    storyCircleSize: storyCirclePresetMedium,
     storyCirclePresetSmall: parseInt(settings.story_circle_preset_small || '72', 10),
-    storyCirclePresetMedium: parseInt(settings.story_circle_preset_medium || '88', 10),
+    storyCirclePresetMedium,
     storyCirclePresetLarge: parseInt(settings.story_circle_preset_large || '104', 10),
-    storyCirclePresetXl: parseInt(settings.story_circle_preset_xl || '120', 10),
-    sidebarAvatarSize: parseInt(settings.sidebar_avatar_size || '154', 10),
+    storyCirclePresetXl,
+    sidebarAvatarSize: storyCirclePresetXl,
     storyCircleGap: parseInt(settings.story_circle_gap || '8', 10),
     storyCircleBorder: parseInt(settings.story_circle_border || '4', 10),
     storyCircleInnerGap: parseInt(settings.story_circle_inner_gap || '3', 10),
