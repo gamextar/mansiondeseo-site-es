@@ -74,6 +74,7 @@ export default function SettingsPage() {
   const [storyCircleBorder, setStoryCircleBorder] = useState(4);
   const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
   const [sidebarStoryRingWidth, setSidebarStoryRingWidth] = useState(4);
+  const [sidebarPreviewSize, setSidebarPreviewSize] = useState('medium');
 
   // Video feed
   const [videoGradientHeight, setVideoGradientHeight] = useState(64);
@@ -106,6 +107,14 @@ export default function SettingsPage() {
   const [newGiftEmoji, setNewGiftEmoji] = useState('');
   const [newGiftPrice, setNewGiftPrice] = useState('');
   const [newGiftCategory, setNewGiftCategory] = useState('general');
+
+  const sidebarPreviewOptions = [
+    { key: 'small', label: 'Chico', size: 44, context: 'chips compactos o mini avatares' },
+    { key: 'medium', label: 'Mediano', size: 64, context: 'tarjetas y bloques intermedios' },
+    { key: 'large', label: 'Grande', size: 92, context: 'sidebar desktop y hero avatars' },
+  ];
+  const activeSidebarPreview = sidebarPreviewOptions.find(option => option.key === sidebarPreviewSize) || sidebarPreviewOptions[1];
+  const activeSidebarRingPx = Math.max(1, Math.round((activeSidebarPreview.size * sidebarStoryRingWidth) / 100));
 
   useEffect(() => {
     if (!user?.is_admin) { navigate('/'); return; }
@@ -1160,28 +1169,56 @@ export default function SettingsPage() {
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
               <h3 className="text-xs font-bold text-text-dim uppercase tracking-wider mb-3">Preview anillo relativo</h3>
               <div className="rounded-xl bg-mansion-base/70 border border-white/5 p-4">
-                <div className="flex items-end justify-between gap-4">
-                  {[
-                    { label: 'Chico', size: 44 },
-                    { label: 'Medio', size: 64 },
-                    { label: 'Grande', size: 92 },
-                  ].map(({ label, size }) => (
-                    <div key={label} className="flex flex-1 flex-col items-center gap-2">
-                      <div className="relative rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: size, height: size }}>
-                        <div className="absolute rounded-full bg-mansion-card overflow-hidden" style={{ inset: `${sidebarStoryRingWidth}%` }}>
-                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/10 to-white/5 text-text-muted">
-                            <User className="w-4 h-4" />
-                          </div>
+                <div className="flex gap-2 mb-4">
+                  {sidebarPreviewOptions.map(option => {
+                    const active = option.key === sidebarPreviewSize;
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => setSidebarPreviewSize(option.key)}
+                        className={`flex-1 rounded-xl border px-3 py-2 text-left transition-colors ${active ? 'border-mansion-gold/40 bg-mansion-gold/10 text-text-primary' : 'border-white/5 bg-mansion-card/40 text-text-dim hover:border-white/10 hover:text-text-primary'}`}
+                      >
+                        <p className="text-xs font-semibold">{option.label}</p>
+                        <p className="text-[10px] opacity-80">{option.size}px</p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-[140px_1fr] sm:items-center">
+                  <div className="flex items-center justify-center">
+                    <div className="relative rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: activeSidebarPreview.size, height: activeSidebarPreview.size }}>
+                      <div className="absolute rounded-full bg-mansion-card overflow-hidden" style={{ inset: `${sidebarStoryRingWidth}%` }}>
+                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/10 to-white/5 text-text-muted">
+                          <User className="w-4 h-4" />
                         </div>
                       </div>
-                      <div className="text-center">
-                        <p className="text-[11px] font-medium text-text-primary">{label}</p>
-                        <p className="text-[10px] text-text-dim">{size}px</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm font-semibold text-text-primary">Ajustes para {activeSidebarPreview.label.toLowerCase()}</p>
+                      <p className="text-[11px] text-text-dim">{activeSidebarPreview.context}</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
+                        <p className="text-[10px] text-text-dim">Avatar</p>
+                        <p className="text-sm font-semibold text-text-primary">{activeSidebarPreview.size}px</p>
+                      </div>
+                      <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
+                        <p className="text-[10px] text-text-dim">Anillo</p>
+                        <p className="text-sm font-semibold text-text-primary">{activeSidebarRingPx}px</p>
+                      </div>
+                      <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
+                        <p className="text-[10px] text-text-dim">Relación</p>
+                        <p className="text-sm font-semibold text-mansion-gold">{sidebarStoryRingWidth}%</p>
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
-                <p className="mt-3 text-[10px] text-text-dim">Simula cómo se verá el anillo en avatares de distinto tamaño dentro del sitio.</p>
+                <p className="mt-3 text-[10px] text-text-dim">Seleccioná una escala para ver cómo se traduce el porcentaje a píxeles en cada tamaño de avatar.</p>
               </div>
             </div>
 
