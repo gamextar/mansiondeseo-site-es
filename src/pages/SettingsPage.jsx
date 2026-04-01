@@ -1247,11 +1247,7 @@ export default function SettingsPage() {
                         <span>16%</span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
-                        <p className="text-[10px] text-text-dim">Avatar</p>
-                        <p className="text-sm font-semibold text-text-primary">{activeStoryPreset.size}px</p>
-                      </div>
+                    <div className="grid grid-cols-2 gap-2">
                       <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                         <p className="text-[10px] text-text-dim">Anillo</p>
                         <p className="text-sm font-semibold text-text-primary">{activeStoryPresetRingPx}px</p>
