@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil } from 'lucide-react';
 import { useAuth } from '../App';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getVisits, getReceivedGifts, deleteOwnStory } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
@@ -48,6 +48,36 @@ export default function ProfilePage() {
   const [feedFilter, setFeedFilter] = useState(() => localStorage.getItem('mansion_feed_filter') || 'all');
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
+  const [galleryEditing, setGalleryEditing] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const lightboxScrollRef = useRef(null);
+
+  const closeLightbox = useCallback(() => setLightboxOpen(false), []);
+
+  const handleLightboxScroll = useCallback(() => {
+    const el = lightboxScrollRef.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollLeft / el.offsetWidth);
+    setLightboxIndex(idx);
+  }, []);
+
+  useEffect(() => {
+    if (lightboxOpen && lightboxScrollRef.current) {
+      lightboxScrollRef.current.scrollTo({ left: lightboxIndex * lightboxScrollRef.current.offsetWidth, behavior: 'instant' });
+    }
+  }, [lightboxOpen, lightboxIndex]);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setLightboxOpen(false);
+      if (e.key === 'ArrowRight') setLightboxIndex(prev => Math.min(prev + 1, (getGalleryPhotos(user) || []).length - 1));
+      if (e.key === 'ArrowLeft') setLightboxIndex(prev => Math.max(prev - 1, 0));
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [lightboxOpen, user]);
 
   useEffect(() => {
     getVisits().then(data => setVisitors(data.visitors || [])).catch(() => {});
@@ -452,14 +482,29 @@ export default function ProfilePage() {
         <motion.div variants={fadeUp} className="mb-8">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">Mi Galería</h3>
-            <button
-              onClick={() => galleryInputRef.current?.click()}
-              disabled={uploading}
-              className="flex items-center gap-1 text-xs text-mansion-gold hover:text-mansion-gold-light transition-colors disabled:opacity-50"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              {uploading ? 'Subiendo...' : 'Agregar'}
-            </button>
+            <div className="flex items-center gap-2">
+              {galleryEditing && (
+                <button
+                  onClick={() => galleryInputRef.current?.click()}
+                  disabled={uploading}
+                  className="flex items-center gap-1 text-xs text-mansion-gold hover:text-mansion-gold-light transition-colors disabled:opacity-50"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {uploading ? 'Subiendo...' : 'Agregar'}
+                </button>
+              )}
+              <button
+                onClick={() => setGalleryEditing(prev => !prev)}
+                className={`flex items-center gap-1 text-xs transition-colors ${
+                  galleryEditing
+                    ? 'text-mansion-gold hover:text-mansion-gold-light'
+                    : 'text-text-muted hover:text-text-primary'
+                }`}
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                {galleryEditing ? 'Listo' : 'Editar'}
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-2.5">
@@ -467,41 +512,48 @@ export default function ProfilePage() {
               <motion.div
                 key={url}
                 data-drag-idx={i}
-                draggable={photos.length > 1}
-                onDragStart={(e) => handleDragStart(i, e)}
-                onDragOver={(e) => handleDragOver(i, e)}
-                onDrop={handleDrop}
-                onTouchStart={(e) => handleTouchStart(i, e)}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
+                draggable={galleryEditing && photos.length > 1}
+                onDragStart={galleryEditing ? (e) => handleDragStart(i, e) : undefined}
+                onDragOver={galleryEditing ? (e) => handleDragOver(i, e) : undefined}
+                onDrop={galleryEditing ? handleDrop : undefined}
+                onTouchStart={galleryEditing ? (e) => handleTouchStart(i, e) : undefined}
+                onTouchMove={galleryEditing ? handleTouchMove : undefined}
+                onTouchEnd={galleryEditing ? handleTouchEnd : undefined}
+                onClick={galleryEditing ? undefined : () => { setLightboxIndex(i); setLightboxOpen(true); }}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.04 }}
-                className="relative group aspect-square rounded-2xl overflow-hidden bg-mansion-card border border-mansion-border/20 cursor-grab active:cursor-grabbing"
+                className={`relative group aspect-square rounded-2xl overflow-hidden bg-mansion-card border border-mansion-border/20 ${
+                  galleryEditing ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+                }`}
               >
                 <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover pointer-events-none transition-transform duration-300 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                <button
-                  onClick={() => handleDeletePhoto(url)}
-                  disabled={deleting === url}
-                  className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center lg:opacity-0 lg:group-hover:opacity-100 transition-opacity disabled:opacity-50"
-                >
-                  {deleting === url ? (
-                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <X className="w-4 h-4" />
-                  )}
-                </button>
+                {galleryEditing && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeletePhoto(url); }}
+                    disabled={deleting === url}
+                    className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center lg:opacity-0 lg:group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                  >
+                    {deleting === url ? (
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <X className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
               </motion.div>
             ))}
-            <button
-              onClick={() => galleryInputRef.current?.click()}
-              disabled={uploading}
-              className="aspect-square rounded-2xl border-2 border-dashed border-mansion-border/30 hover:border-mansion-gold/40 flex flex-col items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
-            >
-              <Plus className="w-5 h-5 text-text-dim" />
-              <span className="text-[10px] text-text-dim">Foto</span>
-            </button>
+            {galleryEditing && (
+              <button
+                onClick={() => galleryInputRef.current?.click()}
+                disabled={uploading}
+                className="aspect-square rounded-2xl border-2 border-dashed border-mansion-border/30 hover:border-mansion-gold/40 flex flex-col items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <Plus className="w-5 h-5 text-text-dim" />
+                <span className="text-[10px] text-text-dim">Foto</span>
+              </button>
+            )}
           </div>
 
           <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleGalleryUpload} />
@@ -695,6 +747,79 @@ export default function ProfilePage() {
           </button>
         </motion.div>
       </motion.div>
+
+      {/* ── Lightbox ── */}
+      {lightboxOpen && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col" onClick={closeLightbox}>
+          <div className="flex items-center justify-between px-4 py-3 relative z-10">
+            <button
+              onClick={closeLightbox}
+              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+            <span className="text-sm font-medium text-white/80">
+              {lightboxIndex + 1} / {photos.length}
+            </span>
+            <div className="w-10" />
+          </div>
+
+          <div className="flex-1 relative min-h-0" onClick={(e) => e.stopPropagation()}>
+            <div
+              ref={lightboxScrollRef}
+              onScroll={handleLightboxScroll}
+              className="absolute inset-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide"
+              style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+            >
+              {photos.map((url, i) => (
+                <div key={i} className="flex-shrink-0 snap-start" style={{ width: '100%', minWidth: '100%', height: '100%' }}>
+                  <img
+                    src={url}
+                    alt={`Foto ${i + 1}`}
+                    className="w-full h-full object-contain select-none"
+                    draggable={false}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {photos.length > 1 && (
+            <>
+              {lightboxIndex > 0 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setLightboxIndex(prev => prev - 1); }}
+                  className="hidden lg:flex absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 items-center justify-center transition-colors z-10"
+                >
+                  <ChevronLeft className="w-6 h-6 text-white" />
+                </button>
+              )}
+              {lightboxIndex < photos.length - 1 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setLightboxIndex(prev => prev + 1); }}
+                  className="hidden lg:flex absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 items-center justify-center transition-colors z-10"
+                >
+                  <ChevronRight className="w-6 h-6 text-white" />
+                </button>
+              )}
+            </>
+          )}
+
+          {photos.length > 1 && (
+            <div className="flex justify-center gap-1.5 pb-6 pt-2" onClick={(e) => e.stopPropagation()}>
+              {photos.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setLightboxIndex(i)}
+                  className={`rounded-full transition-all duration-300 ${
+                    i === lightboxIndex ? 'w-6 h-2 bg-white' : 'w-2 h-2 bg-white/40'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
