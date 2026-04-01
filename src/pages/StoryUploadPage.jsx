@@ -483,10 +483,6 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 					<div ref={progressRef} className="h-full bg-mansion-gold" style={{ width: '0%' }} />
 				</div>
 
-				</motion.div>/* end delayed overlays */
-				)}
-				</AnimatePresence>
-
 			<div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', bottom: '60px' }}>
 				<div className="flex flex-col items-center">
 					<div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
@@ -545,6 +541,10 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 					<span className="rounded-full border border-white/10 bg-black/28 px-3 py-1 text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Publicar</span>
 				</motion.div>
 			</div>
+
+				</motion.div>/* end delayed overlays */
+				)}
+				</AnimatePresence>
 		</>
 	);
 }
