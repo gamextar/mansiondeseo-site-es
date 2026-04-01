@@ -422,6 +422,17 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 				autoPlay
 			/>
 
+				{/* Close button — top-right, inside PWA safe area */}
+				<button
+					type="button"
+					onClick={onClose}
+					className="absolute z-20 flex h-14 w-14 items-center justify-center rounded-full bg-black/45 backdrop-blur-sm"
+					style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
+					aria-label="Cerrar vista previa"
+				>
+					<X className="h-7 w-7 text-white" />
+				</button>
+
 				{/* Right-side action icons (visual only, matching feed) */}
 				<div className="pointer-events-none absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden" style={{ bottom: 28 }}>
 					<div className="flex flex-col items-center">
@@ -1005,15 +1016,17 @@ export default function StoryUploadPage() {
 			<div className="relative w-full h-[100dvh]">
 				<div className={STORY_STAGE_VIEWPORT_CLASS}>
 					<StoryStageShell backgroundImageUrl={storyBackdropUrl} variant={shellVariant}>
-						<StoryStageHeader
-							steps={storySteps}
-							currentStepIndex={storyStepIndex}
-							title={headerConfig.title}
-							subtitle={headerConfig.subtitle}
-							showClose={headerConfig.showClose}
-							onClose={headerConfig.onClose}
-							closeLabel={headerConfig.closeLabel}
-						/>
+						{storyStep !== 'preview' && (
+							<StoryStageHeader
+								steps={storySteps}
+								currentStepIndex={storyStepIndex}
+								title={headerConfig.title}
+								subtitle={headerConfig.subtitle}
+								showClose={headerConfig.showClose}
+								onClose={headerConfig.onClose}
+								closeLabel={headerConfig.closeLabel}
+							/>
+						)}
 						<AnimatePresence mode="sync" initial={false}>
 							{storyStep === 'pick' && (
 								<motion.section
