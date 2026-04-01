@@ -174,9 +174,12 @@ async function captureVideoPoster(fileUrl, { maxWidth = 720, quality = 0.82 } = 
 	});
 }
 
+const STORY_STAGE_VIEWPORT_CLASS = 'fixed inset-0 z-10 flex items-center justify-center p-2 sm:p-3';
+const STORY_STAGE_FRAME_CLASS = 'relative h-full w-full overflow-hidden rounded-[1.75rem] bg-black shadow-[0_18px_60px_rgba(0,0,0,0.45)] sm:rounded-[2rem] lg:my-4 lg:h-[calc(100%-32px)] lg:max-w-[520px]';
+
 function StoryStageShell({ backgroundImageUrl, children }) {
 	return (
-		<div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden bg-black">
+		<div className={STORY_STAGE_FRAME_CLASS}>
 			{backgroundImageUrl ? (
 				<img src={backgroundImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
 			) : (
@@ -188,8 +191,8 @@ function StoryStageShell({ backgroundImageUrl, children }) {
 				/>
 			)}
 			<div className="absolute inset-0 bg-black/38" />
-			<div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent pointer-events-none lg:rounded-t-2xl" />
-			<div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black/70 via-black/18 to-transparent pointer-events-none lg:rounded-b-2xl" />
+			<div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent pointer-events-none rounded-t-[inherit]" />
+			<div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black/70 via-black/18 to-transparent pointer-events-none rounded-b-[inherit]" />
 			<div className="relative z-10 flex h-full flex-col">{children}</div>
 		</div>
 	);
@@ -219,8 +222,8 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 	}, []);
 
 	return (
-		<div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
-			<div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden bg-black">
+		<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/92 p-2 sm:p-3">
+			<div className={STORY_STAGE_FRAME_CLASS}>
 				{/* Video */}
 				<video
 					ref={videoRef}
@@ -234,7 +237,7 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 				/>
 
 				{/* Top gradient */}
-				<div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none lg:rounded-t-2xl" />
+				<div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none rounded-t-[inherit]" />
 
 				{/* Bottom gradient */}
 				<div
@@ -794,7 +797,7 @@ export default function StoryUploadPage() {
 				<div className="absolute bottom-[-12%] left-[-6%] w-[460px] h-[460px] rounded-full bg-mansion-gold/10 blur-3xl" />
 			</div>
 
-			<div className="relative w-full min-h-screen flex items-center justify-center">
+			<div className="relative w-full h-[100dvh]">
 				<AnimatePresence mode="wait">
 					{storyStep === 'pick' && (
 						<motion.section
@@ -804,7 +807,7 @@ export default function StoryUploadPage() {
 							exit={{ opacity: 0, y: -20 }}
 							transition={{ duration: 0.28, ease: 'easeOut' }}
 							style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-							className="w-full h-[100dvh]"
+							className={STORY_STAGE_VIEWPORT_CLASS}
 						>
 							<StoryStageShell>
 								<button
@@ -866,7 +869,7 @@ export default function StoryUploadPage() {
 							exit={{ opacity: 0, y: -20 }}
 							transition={{ duration: 0.28, ease: 'easeOut' }}
 							style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-							className="w-full h-[100dvh]"
+							className={STORY_STAGE_VIEWPORT_CLASS}
 						>
 							<StoryStageShell backgroundImageUrl={storyBackdropUrl}>
 								<div className="flex h-full flex-col px-6 sm:px-8 pt-6 sm:pt-7 pb-8">
@@ -984,68 +987,70 @@ export default function StoryUploadPage() {
 							exit={{ opacity: 0, y: -20 }}
 							transition={{ duration: 0.3, ease: 'easeOut' }}
 							style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-							className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 overflow-hidden"
+							className={STORY_STAGE_VIEWPORT_CLASS}
 						>
-							<div className="px-6 sm:px-8 pt-6 pb-4 border-b border-white/10 bg-white/[0.02] relative flex items-center justify-center">
-								<div className="flex items-center gap-2">
-									{storySteps.map((step, index) => (
-										<div key={step.id} className="flex items-center gap-2">
-											<div className="w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold bg-mansion-gold text-mansion-base border-mansion-gold">
-												{index + 1}
-											</div>
-											{index < storySteps.length - 1 && <div className="w-8 sm:w-10 h-px bg-mansion-gold/70" />}
-										</div>
-									))}
-								</div>
+							<StoryStageShell backgroundImageUrl={storyBackdropUrl}>
 								<button
 									type="button"
 									onClick={() => navigate('/perfil')}
-									className="absolute right-4 sm:right-6 w-8 h-8 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/10 transition-colors"
+									className="absolute right-4 top-4 sm:right-6 sm:top-6 z-20 w-10 h-10 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-colors"
 									aria-label="Volver al panel de control"
 								>
-									<X className="w-4 h-4" />
+									<X className="w-5 h-5" />
 								</button>
-							</div>
-							<div className="p-6 sm:p-8 text-center">
-								<motion.div
-									initial={{ scale: 0.5, opacity: 0 }}
-									animate={{ scale: 1, opacity: 1 }}
-									transition={{ delay: 0.08, duration: 0.24, ease: 'easeOut' }}
-									style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-									className="w-14 h-14 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-4"
-								>
-									<CheckCircle2 className="w-7 h-7 text-green-400" />
-								</motion.div>
-								<h2 className="font-display text-2xl font-bold text-text-primary" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Historia confirmada</h2>
-								<p className="text-text-muted mt-1 text-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.72), 0 0 3px rgba(0,0,0,0.48)' }}>La historia ya está publicada. Puedes revisarla otra vez, volver a tu perfil o subir otra.</p>
+								<div className="flex h-full flex-col px-6 sm:px-8 pt-6 sm:pt-7 pb-8">
+									<div className="flex items-center justify-center gap-2 mb-5">
+										{storySteps.map((step, index) => (
+											<div key={step.id} className="flex items-center gap-2">
+												<div className="w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold bg-mansion-gold text-mansion-base border-mansion-gold">
+													{index + 1}
+												</div>
+												{index < storySteps.length - 1 && <div className="w-8 sm:w-10 h-px bg-mansion-gold/70" />}
+											</div>
+										))}
+									</div>
+									<div className="mt-auto mb-auto rounded-[1.75rem] border border-white/10 bg-black/42 backdrop-blur-md p-6 sm:p-7 text-center shadow-[0_12px_40px_rgba(0,0,0,0.24)]">
+										<motion.div
+											initial={{ scale: 0.5, opacity: 0 }}
+											animate={{ scale: 1, opacity: 1 }}
+											transition={{ delay: 0.08, duration: 0.24, ease: 'easeOut' }}
+											style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+											className="w-14 h-14 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-4"
+										>
+											<CheckCircle2 className="w-7 h-7 text-green-400" />
+										</motion.div>
+										<h2 className="font-display text-2xl font-bold text-white" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Historia confirmada</h2>
+										<p className="text-white/74 mt-1 text-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.72), 0 0 3px rgba(0,0,0,0.48)' }}>La historia ya está publicada. Puedes revisarla otra vez, volver a tu perfil o subir otra.</p>
 
-								<div className="flex flex-col gap-3">
-									<button
-										type="button"
-										onClick={() => setShowPreview(true)}
-										className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
-									>
-										<Eye className="w-5 h-5" />
-										Ver de nuevo
-									</button>
-									<button
-										type="button"
-										onClick={resetStoryFlow}
-										className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-medium hover:bg-white/10 transition-colors"
-									>
-										<Upload className="w-5 h-5" />
-										Subir otra historia
-									</button>
-									<button
-										type="button"
-										onClick={() => navigate('/perfil')}
-										className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-muted font-medium hover:bg-white/10 transition-colors"
-									>
-										<LayoutDashboard className="w-5 h-5" />
-										Ir al panel de control
-									</button>
+										<div className="mt-5 flex flex-col gap-3">
+											<button
+												type="button"
+												onClick={() => setShowPreview(true)}
+												className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
+											>
+												<Eye className="w-5 h-5" />
+												Ver de nuevo
+											</button>
+											<button
+												type="button"
+												onClick={resetStoryFlow}
+												className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-medium hover:bg-white/10 transition-colors"
+											>
+												<Upload className="w-5 h-5" />
+												Subir otra historia
+											</button>
+											<button
+												type="button"
+												onClick={() => navigate('/perfil')}
+												className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white/72 font-medium hover:bg-white/10 transition-colors"
+											>
+												<LayoutDashboard className="w-5 h-5" />
+												Ir al panel de control
+											</button>
+										</div>
+									</div>
 								</div>
-							</div>
+							</StoryStageShell>
 						</motion.section>
 					)}
 				</AnimatePresence>
