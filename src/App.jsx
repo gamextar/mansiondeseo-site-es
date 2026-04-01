@@ -27,7 +27,7 @@ import CoinsPage from './pages/CoinsPage';
 import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
 import StoryUploadPage from './pages/StoryUploadPage';
 import VideoFeedPage from './pages/VideoFeedPage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap } from './lib/api';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, getStories } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 
@@ -238,6 +238,18 @@ export default function App() {
       if (data?.user) {
         setUser(data.user);
         setRegisteredState(true);
+
+        // Check if user has an active story (works even if backend doesn't return has_active_story yet)
+        if (data.user.has_active_story === undefined) {
+          getStories({ limit: 100 }).then(storiesData => {
+            if (cancelled) return;
+            const userId = data.user.id;
+            const hasStory = (storiesData.stories || []).some(s => s.user_id === userId);
+            if (hasStory) {
+              setUser(prev => prev ? { ...prev, has_active_story: true } : prev);
+            }
+          }).catch(() => {});
+        }
       }
 
       if (data?.settings) {
