@@ -402,11 +402,15 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 
 	return (
 		<>
-			{posterUrl && !isVideoVisible && (
+			{posterUrl && (
 				<img
 					src={posterUrl}
 					alt=""
-					className="absolute inset-0 z-[1] h-full w-full object-cover"
+					className="absolute inset-0 h-full w-full object-cover"
+					style={{
+						zIndex: isVideoVisible ? -1 : 1,
+						pointerEvents: 'none',
+					}}
 				/>
 			)}
 			<video
