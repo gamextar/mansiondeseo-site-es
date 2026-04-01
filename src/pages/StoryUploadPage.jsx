@@ -94,42 +94,80 @@ async function downloadBlobUrl(url, mimeType) {
 	return URL.createObjectURL(new Blob([buffer], { type: mimeType }));
 }
 
+function withTimeout(promise, timeoutMs, timeoutMessage) {
+	return new Promise((resolve, reject) => {
+		const timeoutId = setTimeout(() => {
+			reject(new Error(timeoutMessage));
+		}, timeoutMs);
+
+		promise
+			.then((value) => {
+				clearTimeout(timeoutId);
+				resolve(value);
+			})
+			.catch((error) => {
+				clearTimeout(timeoutId);
+				reject(error);
+			});
+	});
+}
+
 async function loadVideoMetadata(fileUrl) {
 	const video = document.createElement('video');
 	video.preload = 'metadata';
 	video.playsInline = true;
+	video.muted = true;
+	video.setAttribute('playsinline', 'true');
+	video.setAttribute('webkit-playsinline', 'true');
 
 	return new Promise((resolve, reject) => {
+		let settled = false;
+
 		const cleanup = () => {
 			video.removeAttribute('src');
 			video.load();
 		};
 
-		video.onloadedmetadata = () => {
-			const metadata = {
-				duration: video.duration || 0,
-				resolution: video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : null,
-			};
+		const succeed = (metadata) => {
+			if (settled) return;
+			settled = true;
 			cleanup();
 			resolve(metadata);
 		};
 
-		video.onerror = () => {
+		const fail = () => {
+			if (settled) return;
+			settled = true;
 			cleanup();
 			reject(new Error('No se pudo leer el video seleccionado.'));
 		};
 
+		video.onloadedmetadata = () => {
+			succeed({
+				duration: video.duration || 0,
+				resolution: video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : null,
+			});
+		};
+
+		video.onerror = fail;
+
 		video.src = fileUrl;
+		video.load();
 	});
 }
 
 async function captureVideoPoster(fileUrl, { maxWidth = 720, quality = 0.82 } = {}) {
 	const video = document.createElement('video');
-	video.preload = 'auto';
+	video.preload = 'metadata';
 	video.muted = true;
 	video.playsInline = true;
+	video.setAttribute('playsinline', 'true');
+	video.setAttribute('webkit-playsinline', 'true');
 
 	return new Promise((resolve, reject) => {
+		let settled = false;
+		let captureRequested = false;
+
 		const cleanup = () => {
 			video.pause();
 			video.removeAttribute('src');
@@ -137,14 +175,16 @@ async function captureVideoPoster(fileUrl, { maxWidth = 720, quality = 0.82 } = 
 		};
 
 		const fail = () => {
+			if (settled) return;
+			settled = true;
 			cleanup();
 			reject(new Error('No se pudo capturar la portada del video.'));
 		};
 
-		video.onerror = fail;
-
-		video.onloadeddata = () => {
+		const captureFrame = () => {
+			if (settled) return;
 			requestAnimationFrame(() => {
+				if (settled) return;
 				try {
 					const sourceWidth = video.videoWidth || 1;
 					const sourceHeight = video.videoHeight || 1;
@@ -157,20 +197,42 @@ async function captureVideoPoster(fileUrl, { maxWidth = 720, quality = 0.82 } = 
 					if (!context) throw new Error('Canvas no disponible');
 					context.drawImage(video, 0, 0, targetWidth, targetHeight);
 					canvas.toBlob((blob) => {
+						if (settled) return;
 						cleanup();
 						if (!blob) {
+							settled = true;
 							reject(new Error('No se pudo generar la portada del video.'));
 							return;
 						}
+						settled = true;
 						resolve(URL.createObjectURL(blob));
 					}, 'image/jpeg', quality);
-				} catch (error) {
-					fail(error);
+				} catch {
+					fail();
 				}
 			});
 		};
 
+		const scheduleCapture = () => {
+			if (captureRequested || settled) return;
+			captureRequested = true;
+			const safeSeekTime = Number.isFinite(video.duration) && video.duration > 0.08 ? 0.05 : 0;
+			if (safeSeekTime > 0) {
+				try {
+					video.currentTime = safeSeekTime;
+					return;
+				} catch {}
+			}
+			captureFrame();
+		};
+
+		video.onerror = fail;
+		video.onseeked = captureFrame;
+		video.onloadeddata = captureFrame;
+		video.onloadedmetadata = scheduleCapture;
+
 		video.src = fileUrl;
+		video.load();
 	});
 }
 
@@ -629,11 +691,18 @@ export default function StoryUploadPage() {
 		const tempSourceUrl = URL.createObjectURL(file);
 
 		try {
-			const [metadata, backdropUrl] = await Promise.all([
+			const enginePromise = ensureEngineLoaded();
+			const metadata = await withTimeout(
 				loadVideoMetadata(tempSourceUrl),
-				captureVideoPoster(tempSourceUrl).catch(() => ''),
-				ensureEngineLoaded(),
-			]);
+				8000,
+				'No se pudo leer el video seleccionado.'
+			);
+			const backdropUrl = await withTimeout(
+				captureVideoPoster(tempSourceUrl),
+				3500,
+				'No se pudo capturar la portada del video.'
+			).catch(() => '');
+			await enginePromise;
 
 			setSourceDuration(metadata.duration);
 			setSourceResolution(metadata.resolution);
