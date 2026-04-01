@@ -1827,7 +1827,6 @@ async function loadSettings(env) {
     encoderAudioBitrate: settings.encoder_audio_bitrate || '64k',
     encoderAudioMono: settings.encoder_audio_mono !== '0',
     encoderPreset: settings.encoder_preset || 'superfast',
-    encoderShowProgressHud: settings.encoder_show_progress_hud !== '0',
   };
 }
 
@@ -1885,7 +1884,6 @@ function getPublicSettingsPayload(settings) {
     encoderAudioBitrate: settings.encoderAudioBitrate,
     encoderAudioMono: settings.encoderAudioMono,
     encoderPreset: settings.encoderPreset,
-    encoderShowProgressHud: settings.encoderShowProgressHud,
   };
 }
 
@@ -1945,7 +1943,6 @@ async function handleUpdateSettings(request, env) {
     'encoder_audio_bitrate',
     'encoder_audio_mono',
     'encoder_preset',
-    'encoder_show_progress_hud',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {

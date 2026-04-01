@@ -84,7 +84,6 @@ export default function SettingsPage() {
   const [encoderAudioBitrate, setEncoderAudioBitrate] = useState('64k');
   const [encoderAudioMono, setEncoderAudioMono] = useState(true);
   const [encoderPreset, setEncoderPreset] = useState('superfast');
-  const [encoderShowProgressHud, setEncoderShowProgressHud] = useState(true);
 
   // Payment display
   const [paymentTitleVip, setPaymentTitleVip] = useState('Servicios Digitales');
@@ -151,7 +150,6 @@ export default function SettingsPage() {
         setEncoderAudioBitrate(s.encoderAudioBitrate || '64k');
         setEncoderAudioMono(s.encoderAudioMono ?? true);
         setEncoderPreset(s.encoderPreset || 'superfast');
-        setEncoderShowProgressHud(s.encoderShowProgressHud ?? true);
       })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
@@ -207,7 +205,6 @@ export default function SettingsPage() {
         encoder_audio_bitrate: encoderAudioBitrate,
         encoder_audio_mono: encoderAudioMono ? '1' : '0',
         encoder_preset: encoderPreset,
-        encoder_show_progress_hud: encoderShowProgressHud ? '1' : '0',
       });
       const s = data.settings;
       setBlurMobile(s.blurMobile);
@@ -251,7 +248,6 @@ export default function SettingsPage() {
       setEncoderAudioBitrate(s.encoderAudioBitrate || '64k');
       setEncoderAudioMono(s.encoderAudioMono ?? true);
       setEncoderPreset(s.encoderPreset || 'superfast');
-      setEncoderShowProgressHud(s.encoderShowProgressHud ?? true);
       // Propagate to global context so dependent components update live
       setSiteSettings(s);
       setSaved(true);
@@ -1262,21 +1258,11 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Monitor de progreso</h3>
-                  <p className="text-[11px] text-text-dim">Muestra u oculta el HUD flotante con tiempo real y porcentaje para debug</p>
-                </div>
-                <ToggleSwitch value={encoderShowProgressHud} onChange={setEncoderShowProgressHud} />
-              </div>
-            </div>
-
             {/* Summary */}
             <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-gold/20">
               <h3 className="text-xs font-bold text-mansion-gold uppercase tracking-wider mb-2">Configuración activa</h3>
               <p className="text-sm text-text-primary font-mono">
-                {storyMaxDurationSeconds}s max · {encoderThreads} threads · CRF {encoderCrf} · {encoderMaxrate} cap · {encoderBufsize} buf · {encoderPreset} · {encoderAudioBitrate === 'none' ? 'sin audio' : `AAC ${encoderAudioBitrate}${encoderAudioMono ? ' mono' : ''}`} · HUD {encoderShowProgressHud ? 'on' : 'off'}
+                {storyMaxDurationSeconds}s max · {encoderThreads} threads · CRF {encoderCrf} · {encoderMaxrate} cap · {encoderBufsize} buf · {encoderPreset} · {encoderAudioBitrate === 'none' ? 'sin audio' : `AAC ${encoderAudioBitrate}${encoderAudioMono ? ' mono' : ''}`}
               </p>
             </div>
           </div>

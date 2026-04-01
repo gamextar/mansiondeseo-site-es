@@ -34,14 +34,6 @@ function formatElapsedSeconds(totalSeconds) {
 	return `${safeSeconds.toFixed(1)}s`;
 }
 
-function formatDebugTimer(totalSeconds) {
-	const safeSeconds = Math.max(0, Number.isFinite(totalSeconds) ? totalSeconds : 0);
-	const minutes = Math.floor(safeSeconds / 60);
-	const seconds = Math.floor(safeSeconds % 60);
-	const tenths = Math.floor((safeSeconds - Math.floor(safeSeconds)) * 10);
-	return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${tenths}`;
-}
-
 function clamp(value, min, max) {
 	return Math.min(Math.max(value, min), max);
 }
@@ -238,7 +230,6 @@ export default function StoryUploadPage() {
 	const navigate = useNavigate();
 	const { user, siteSettings } = useAuth();
 	const maxStoryDurationSeconds = Math.max(1, Number(siteSettings?.storyMaxDurationSeconds || 15));
-	const showProgressHud = siteSettings?.encoderShowProgressHud !== false;
 	const encoderThreads = Math.max(1, Number(siteSettings?.encoderThreads || 4));
 	const encoderParams = {
 		crf: siteSettings?.encoderCrf || ENCODER_DEFAULTS.crf,
@@ -267,7 +258,6 @@ export default function StoryUploadPage() {
 	const [errorMessage, setErrorMessage] = useState('');
 	const [elapsedSeconds, setElapsedSeconds] = useState(0);
 	const [showPreview, setShowPreview] = useState(false);
-	const [engineStatus, setEngineStatus] = useState('idle');
 
 	const outputProfile = getOutputProfile(sourceResolution);
 	const storyStep = result?.id ? 'done' : sourceFile ? 'process' : 'pick';
@@ -302,7 +292,7 @@ export default function StoryUploadPage() {
 		};
 	}, []);
 
-	const ensureEngineLoaded = async ({ suppressErrors = false } = {}) => {
+	const ensureEngineLoaded = async () => {
 		const ffmpeg = ffmpegRef.current;
 		if (ffmpeg.loaded) return ffmpeg;
 		if (loadPromiseRef.current) {
@@ -319,9 +309,7 @@ export default function StoryUploadPage() {
 		try {
 			await loadPromiseRef.current;
 		} catch (error) {
-			if (!suppressErrors) {
-				setErrorMessage(error?.message || 'Error al cargar FFmpeg.');
-			}
+			setErrorMessage(error?.message || 'Error al cargar FFmpeg.');
 			throw error;
 		} finally {
 			loadPromiseRef.current = null;
@@ -329,28 +317,6 @@ export default function StoryUploadPage() {
 
 		return ffmpeg;
 	};
-
-	useEffect(() => {
-		let cancelled = false;
-
-		setEngineStatus(ffmpegRef.current?.loaded ? 'ready' : 'loading');
-
-		ensureEngineLoaded({ suppressErrors: true })
-			.then(() => {
-				if (!cancelled) {
-					setEngineStatus('ready');
-				}
-			})
-			.catch(() => {
-				if (!cancelled) {
-					setEngineStatus('idle');
-				}
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, []);
 
 	const resetResult = () => {
 		if (resultPreviewUrlRef.current) {
@@ -367,25 +333,8 @@ export default function StoryUploadPage() {
 		setSourceResolution(null);
 		setEncodingProgress(0);
 		setUploadProgress(0);
-		setElapsedSeconds(0);
 		setPhase('idle');
 		setErrorMessage('');
-		clearInterval(timerIntervalRef.current);
-		timerIntervalRef.current = null;
-	};
-
-	const startElapsedTimer = () => {
-		setElapsedSeconds(0);
-		clearInterval(timerIntervalRef.current);
-		timerStartRef.current = performance.now();
-		timerIntervalRef.current = setInterval(() => {
-			setElapsedSeconds((performance.now() - timerStartRef.current) / 1000);
-		}, 100);
-	};
-
-	const stopElapsedTimer = () => {
-		clearInterval(timerIntervalRef.current);
-		timerIntervalRef.current = null;
 	};
 
 	const handleFileChange = async (event) => {
@@ -402,7 +351,12 @@ export default function StoryUploadPage() {
 		setUploadProgress(0);
 		setPhase('preparing');
 		setProcessing(true);
-		startElapsedTimer();
+		setElapsedSeconds(0);
+		clearInterval(timerIntervalRef.current);
+		timerStartRef.current = performance.now();
+		timerIntervalRef.current = setInterval(() => {
+			setElapsedSeconds(Math.floor((performance.now() - timerStartRef.current) / 1000));
+		}, 500);
 
 		const tempSourceUrl = URL.createObjectURL(file);
 
@@ -424,7 +378,8 @@ export default function StoryUploadPage() {
 			setErrorMessage(error?.message || 'No se pudo preparar la historia.');
 			setPhase('idle');
 			setProcessing(false);
-			stopElapsedTimer();
+			clearInterval(timerIntervalRef.current);
+			timerIntervalRef.current = null;
 			isTranscodingRef.current = false;
 			activeEncodeDurationRef.current = 0;
 		} finally {
@@ -517,7 +472,12 @@ export default function StoryUploadPage() {
 			setErrorMessage('');
 			if (!skipSetup) {
 				setProcessing(true);
-				startElapsedTimer();
+				setElapsedSeconds(0);
+				clearInterval(timerIntervalRef.current);
+				timerStartRef.current = performance.now();
+				timerIntervalRef.current = setInterval(() => {
+					setElapsedSeconds(Math.floor((performance.now() - timerStartRef.current) / 1000));
+				}, 500);
 			}
 			setPhase('encoding');
 			isTranscodingRef.current = true;
@@ -550,61 +510,20 @@ export default function StoryUploadPage() {
 			setErrorMessage(error?.message || 'No se pudo publicar la historia.');
 			setPhase('idle');
 		} finally {
-			stopElapsedTimer();
+			clearInterval(timerIntervalRef.current);
+			timerIntervalRef.current = null;
 			setProcessing(false);
 			isTranscodingRef.current = false;
 			activeEncodeDurationRef.current = 0;
 		}
 	};
 
-	const maskedEncodingProgress = clamp(encodingProgress, 0, 1);
-	const maskedUploadProgress = clamp(uploadProgress, 0, 1);
-	const verificationEncodingShare = 0.95;
-	const loadingStoryProgress = phase === 'preparing'
-		? 0
-		: clamp(maskedEncodingProgress * 2, 0, 1);
-	const verificationProgress = phase === 'preparing'
-		? 0
-		: phase === 'encoding'
-			? clamp(((maskedEncodingProgress - 0.5) * 2) * verificationEncodingShare, 0, verificationEncodingShare)
-			: phase === 'uploading'
-				? verificationEncodingShare + (maskedUploadProgress * (1 - verificationEncodingShare))
-				: phase === 'done'
-					? 1
-				: 0;
-	const showVerificationProgress = phase === 'encoding'
-		? maskedEncodingProgress >= 0.5
-		: phase === 'uploading' || phase === 'done';
-	const loadingStoryPercent = Math.round(loadingStoryProgress * 100);
-	const verificationPercent = Math.round(verificationProgress * 100);
-	const progressValue = phase === 'preparing'
-		? 0
-		: showVerificationProgress
-				? verificationProgress
-				: loadingStoryProgress;
-	const progressLabel = phase === 'preparing'
-		? 'Iniciando historia'
-		: phase === 'uploading'
-			? 'Publicando historia'
-			: showVerificationProgress
-				? 'Verificando historia'
-				: 'Cargando historia';
-	const debugProgressValue = phase === 'preparing'
-		? 0
-		: phase === 'encoding'
-			? maskedEncodingProgress
-			: phase === 'uploading'
-				? maskedUploadProgress
-				: phase === 'done'
-					? 1
-					: 0;
-	const debugProgressLabel = phase === 'preparing'
-		? 'Preparando motor'
-		: phase === 'encoding'
-			? 'Encoding real'
-			: phase === 'uploading'
-				? 'Subida real'
-				: 'Completado';
+	const progressValue = phase === 'uploading' ? uploadProgress : encodingProgress;
+	const progressLabel = phase === 'uploading'
+		? 'Verificando historia'
+		: phase === 'preparing'
+			? 'Preparando video'
+			: 'Cargando Historia';
 
 	return (
 		<div className="min-h-screen bg-mansion-base text-text-primary relative overflow-hidden">
@@ -623,16 +542,8 @@ export default function StoryUploadPage() {
 							exit={{ opacity: 0, y: -20 }}
 							transition={{ duration: 0.28, ease: 'easeOut' }}
 							style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-							className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 p-8 sm:p-10 flex flex-col items-center text-center relative"
+							className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 p-8 sm:p-10 flex flex-col items-center text-center"
 						>
-							<button
-								type="button"
-								onClick={() => navigate('/perfil')}
-								className="absolute right-4 top-4 sm:right-6 sm:top-6 w-8 h-8 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/10 transition-colors"
-								aria-label="Cerrar nueva historia"
-							>
-								<X className="w-4 h-4" />
-							</button>
 							<div className="w-full flex items-center justify-center gap-2 mb-8">
 								{storySteps.map((step, index) => {
 									const active = storyStepIndex === index;
@@ -665,12 +576,6 @@ export default function StoryUploadPage() {
 								Seleccionar video
 								<input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
 							</label>
-							{engineStatus === 'loading' && (
-								<p className="text-xs text-text-dim mt-4">Preparando el motor de video para acelerar el siguiente paso...</p>
-							)}
-							{engineStatus === 'ready' && (
-								<p className="text-xs text-mansion-gold/90 mt-4">Motor de video listo. El procesamiento arrancará más rápido al elegir el archivo.</p>
-							)}
 						</motion.section>
 					)}
 
@@ -706,6 +611,27 @@ export default function StoryUploadPage() {
 								</div>
 							</div>
 
+								<div className="p-6 sm:p-8 border-b border-white/10 bg-black/10">
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+										<div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
+											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Archivo</p>
+											<p className="text-sm text-text-primary mt-1 truncate">{sourceFile?.name || 'Sin archivo'}</p>
+										</div>
+										<div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
+											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Duración</p>
+											<p className="text-sm text-mansion-gold font-semibold mt-1">{sourceDuration ? formatTime(sourceDuration) : 'Analizando...'}</p>
+										</div>
+										<div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
+											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Resolución</p>
+											<p className="text-sm text-text-primary mt-1">{sourceResolution ? `${sourceResolution.width}x${sourceResolution.height}` : 'Analizando...'}</p>
+										</div>
+										<div className="rounded-2xl bg-black/25 border border-white/10 px-4 py-3">
+											<p className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Salida</p>
+											<p className="text-sm text-text-primary mt-1">{outputProfile.label}</p>
+										</div>
+									</div>
+								</div>
+
 							<div className="p-6 sm:p-8">
 								<motion.div
 									initial={{ opacity: 0, y: 12 }}
@@ -732,53 +658,42 @@ export default function StoryUploadPage() {
 											)}
 										</div>
 									) : (
-										<div className="space-y-4 rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-5 sm:p-6">
+										<div className="space-y-4 rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-4">
 											{phase === 'preparing' && (
-												<p className="text-xs text-text-dim">Estamos preparando el video para iniciar una publicación más fluida.</p>
+												<p className="text-xs text-text-dim">Analizando el video y preparando el motor antes de comenzar el encoding.</p>
 											)}
 											<div className="space-y-2">
 												<div className="flex items-center justify-between text-sm">
-													<span className="text-text-muted">Cargando historia</span>
-													<span className="font-semibold text-mansion-gold tabular-nums">{loadingStoryPercent}%</span>
+													<span className="text-text-muted">Cargando Historia</span>
+													<span className="font-semibold text-mansion-gold tabular-nums">{Math.round(encodingProgress * 100)}%</span>
 												</div>
 												<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
 													<div className="h-3 bg-white/5">
-														<div className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${loadingStoryPercent}%` }} />
+														<div className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${Math.round(encodingProgress * 100)}%` }} />
 													</div>
 												</div>
 											</div>
 
-											<AnimatePresence initial={false}>
-												{showVerificationProgress && (
-													<motion.div
-														initial={{ opacity: 0, y: 10, scaleY: 0.92 }}
-														animate={{ opacity: 1, y: 0, scaleY: 1 }}
-														exit={{ opacity: 0, y: -6, scaleY: 0.96 }}
-														transition={{ duration: 0.24, ease: 'easeOut' }}
-														style={{ originY: 0, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-														className="space-y-2"
-													>
+											{phase !== 'encoding' && (
+												<div className="space-y-2">
 													<div className="flex items-center justify-between text-sm">
 														<span className="text-text-muted">Verificando historia</span>
-														<span className="font-semibold text-mansion-gold tabular-nums">{verificationPercent}%</span>
+														<span className="font-semibold text-mansion-gold tabular-nums">{Math.round(uploadProgress * 100)}%</span>
 													</div>
 													<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
 														<div className="h-3 bg-white/5">
-															<div className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${verificationPercent}%` }} />
+															<div className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${Math.round(uploadProgress * 100)}%` }} />
 														</div>
 													</div>
-													</motion.div>
-												)}
-											</AnimatePresence>
+												</div>
+											)}
 
 											<p className="text-xs text-text-dim">
 												{phase === 'preparing'
-													? 'Ajustando el archivo y dejando listo el proceso inicial.'
+													? 'Preparando el archivo para arrancar el proceso.'
 													: phase === 'encoding'
-														? showVerificationProgress
-															? 'Revisando los ultimos detalles del video antes de publicarlo.'
-															: 'Optimizando la historia para que se publique con mejor fluidez.'
-													: 'Publicando la historia y confirmando que quede disponible.'}
+													? 'Optimizando el video para la historia.'
+													: 'Subiendo y verificando la historia.'}
 											</p>
 										</div>
 									)}
@@ -905,15 +820,17 @@ export default function StoryUploadPage() {
 				/>
 			)}
 
-			{processing && showProgressHud && (
+			{processing && (
 				<div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl bg-black/88 border border-white/10 shadow-2xl">
 					<Clock className="w-5 h-5 text-mansion-gold" />
 					<div>
-						<p className="text-[10px] uppercase tracking-[0.2em] text-text-dim">{debugProgressLabel}</p>
-						<p className="text-2xl font-display font-bold text-text-primary tabular-nums">{formatDebugTimer(elapsedSeconds)}</p>
+						<p className="text-[10px] uppercase tracking-[0.2em] text-text-dim">{progressLabel}</p>
+						<p className="text-2xl font-display font-bold text-text-primary tabular-nums">
+							{String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}
+						</p>
 					</div>
 					<div className="ml-2 text-right">
-						<p className="text-lg font-bold text-mansion-gold tabular-nums">{Math.round(debugProgressValue * 100)}%</p>
+						<p className="text-lg font-bold text-mansion-gold tabular-nums">{Math.round(progressValue * 100)}%</p>
 					</div>
 				</div>
 			)}
