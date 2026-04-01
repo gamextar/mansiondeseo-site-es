@@ -875,214 +875,191 @@ export default function StoryUploadPage() {
 
 							{storyStep === 'process' && (
 								<motion.section
-							key="process"
-							initial={{ opacity: 0, y: 24 }}
-							animate={{ opacity: 1, y: 0 }}
-							exit={{ opacity: 0, y: -20 }}
-							transition={{ duration: 0.28, ease: 'easeOut' }}
-							style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-							className="absolute inset-0"
-						>
-								<div className="flex h-full flex-col px-6 sm:px-8 pt-6 sm:pt-7 pb-8">
-									<div className="flex items-center justify-center gap-2 mb-5">
-										{storySteps.map((step, index) => {
-											const active = storyStepIndex === index;
-											const complete = storyStepIndex > index;
-
-											return (
-												<div key={step.id} className="flex items-center gap-2">
-													<div className={`w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold ${active || complete ? 'bg-mansion-gold text-mansion-base border-mansion-gold' : 'bg-white/5 text-white/55 border-white/10'}`}>
-														{index + 1}
-													</div>
-													{index < storySteps.length - 1 && <div className={`w-8 sm:w-10 h-px ${storyStepIndex > index ? 'bg-mansion-gold/70' : 'bg-white/10'}`} />}
-										</motion.section>
-										)}
-
-										{storyStep === 'preview' && result && (
-											<motion.section
-												key="preview"
-												initial={{ opacity: 0 }}
-												animate={{ opacity: 1 }}
-												exit={{ opacity: 0 }}
-												transition={{ duration: 0.24, ease: 'easeOut' }}
-												className="absolute inset-0"
-											>
-												<StoryPreview
-													videoUrl={result.video_url || result.previewUrl}
-													caption={result.caption}
-													user={user}
-													avatarSize={siteSettings?.videoAvatarSize ?? 52}
-													onClose={resetStoryFlow}
-													onConfirm={() => {
-														setShowPreview(false);
-														setPreviewConfirmed(true);
-													}}
-												/>
-											</motion.section>
-										)}
-									</div>
-										{storyStep === 'done' && (
-											<motion.section
-										<p className="text-sm text-white/72 mt-1" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.68)' }}>En cuanto eliges el archivo, empezamos a prepararlo y publicarlo automáticamente.</p>
-									</div>
-
-									<div className="mt-auto mb-6 sm:mb-10">
-										<motion.div
-											initial={{ opacity: 0, y: 12 }}
-										className="absolute inset-0"
-											transition={{ delay: 0.12, duration: 0.28, ease: 'easeOut' }}
-										>
-											{!processing ? (
-												<div className="space-y-3 rounded-[1.75rem] border border-white/10 bg-black/38 backdrop-blur-md p-5 sm:p-6 text-center shadow-[0_12px_40px_rgba(0,0,0,0.22)]">
-													<p className="text-sm text-white font-medium">El archivo ya fue seleccionado.</p>
-													<p className="text-xs text-white/65 mt-1">Si hubo un error, puedes elegir otro video para reintentar.</p>
-													<label className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/8 border border-white/10 text-white font-medium hover:bg-white/12 transition-colors cursor-pointer">
-														<Upload className="w-5 h-5" />
-														Elegir otro video
-														<input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
-													</label>
-													{sourceDuration > maxStoryDurationSeconds && (
-														<div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-															Se procesarán solo los primeros {maxStoryDurationSeconds}s de este video.
-														</div>
-													)}
-												</div>
-											) : (
-												<div className="space-y-4 rounded-[1.75rem] border border-white/10 bg-black/40 backdrop-blur-md p-5 sm:p-6 shadow-[0_12px_40px_rgba(0,0,0,0.24)]">
-											{phase === 'preparing' && (
-														<p className="text-xs text-white/62">Estamos preparando el video para iniciar una publicación más fluida.</p>
-											)}
-											<div className="space-y-2">
-												<div className="flex items-center justify-between text-sm">
-															<span className="text-white/74">Cargando historia</span>
-													<span className="font-semibold text-mansion-gold tabular-nums">{loadingStoryPercent}%</span>
-												</div>
-												<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
-													<div className="h-3 bg-white/5">
-														<div className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${loadingStoryPercent}%` }} />
-													</div>
-												</div>
-											</div>
-
-											<AnimatePresence initial={false}>
-												{showVerificationProgress && (
-													<motion.div
-														initial={{ opacity: 0, y: 10, scaleY: 0.92 }}
-														animate={{ opacity: 1, y: 0, scaleY: 1 }}
-														exit={{ opacity: 0, y: -6, scaleY: 0.96 }}
-														transition={{ duration: 0.24, ease: 'easeOut' }}
-														style={{ originY: 0, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-														className="space-y-2"
-													>
-													<div className="flex items-center justify-between text-sm">
-															<span className="text-white/74">Verificando historia</span>
-														<span className="font-semibold text-mansion-gold tabular-nums">{verificationPercent}%</span>
-													</div>
-													<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
-														<div className="h-3 bg-white/5">
-															<div className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${verificationPercent}%` }} />
-														</div>
-													</div>
-													</motion.div>
-												)}
-											</AnimatePresence>
-
-													<p className="text-xs text-white/62">
-												{phase === 'preparing'
-													? 'Ajustando el archivo y dejando listo el proceso inicial.'
-													: phase === 'encoding'
-														? showVerificationProgress
-															? 'Revisando los ultimos detalles del video antes de publicarlo.'
-															: 'Optimizando la historia para que se publique con mejor fluidez.'
-													: 'Publicando la historia y confirmando que quede disponible.'}
-											</p>
-												</div>
-											)}
-										</motion.div>
-
-										{errorMessage && !processing && (
-											<div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-												{errorMessage}
-											</div>
-										)}
-									</div>
-								</div>
-							</StoryStageShell>
-						</motion.section>
-					)}
-
-					{storyStep === 'done' && (
-						<motion.section
-							key="done"
-							initial={{ opacity: 0, scale: 0.96 }}
-							animate={{ opacity: 1, scale: 1 }}
-							exit={{ opacity: 0, y: -20 }}
-							transition={{ duration: 0.3, ease: 'easeOut' }}
-							style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-							className={STORY_STAGE_VIEWPORT_CLASS}
-						>
-							<StoryStageShell backgroundImageUrl={storyBackdropUrl}>
-								<button
-									type="button"
-									onClick={() => navigate('/perfil')}
-									className="absolute right-4 top-4 sm:right-6 sm:top-6 z-20 w-10 h-10 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-									aria-label="Volver al panel de control"
+									key="process"
+									initial={{ opacity: 0, y: 24 }}
+									animate={{ opacity: 1, y: 0 }}
+									exit={{ opacity: 0, y: -20 }}
+									transition={{ duration: 0.28, ease: 'easeOut' }}
+									style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+									className="absolute inset-0"
 								>
-									<X className="w-5 h-5" />
-								</button>
-								<div className="flex h-full flex-col px-6 sm:px-8 pt-6 sm:pt-7 pb-8">
-									<div className="flex items-center justify-center gap-2 mb-5">
-										{storySteps.map((step, index) => (
-											<div key={step.id} className="flex items-center gap-2">
-												<div className="w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold bg-mansion-gold text-mansion-base border-mansion-gold">
-													{index + 1}
-												</div>
-												{index < storySteps.length - 1 && <div className="w-8 sm:w-10 h-px bg-mansion-gold/70" />}
-											</div>
-										))}
-									</div>
-									<div className="mt-auto mb-auto rounded-[1.75rem] border border-white/10 bg-black/42 backdrop-blur-md p-6 sm:p-7 text-center shadow-[0_12px_40px_rgba(0,0,0,0.24)]">
-										<motion.div
-											initial={{ scale: 0.5, opacity: 0 }}
-											animate={{ scale: 1, opacity: 1 }}
-											transition={{ delay: 0.08, duration: 0.24, ease: 'easeOut' }}
-											style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-											className="w-14 h-14 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-4"
-										>
-											<CheckCircle2 className="w-7 h-7 text-green-400" />
-										</motion.div>
-										<h2 className="font-display text-2xl font-bold text-white" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Historia confirmada</h2>
-										<p className="text-white/74 mt-1 text-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.72), 0 0 3px rgba(0,0,0,0.48)' }}>La historia ya está publicada. Puedes revisarla otra vez, volver a tu perfil o subir otra.</p>
+									<div className="flex h-full flex-col px-6 sm:px-8 pt-6 sm:pt-7 pb-8">
+										<div className="flex items-center justify-center gap-2 mb-5">
+											{storySteps.map((step, index) => {
+												const active = storyStepIndex === index;
+												const complete = storyStepIndex > index;
 
-										<div className="mt-5 flex flex-col gap-3">
-											<button
-												type="button"
-												onClick={() => setShowPreview(true)}
-												className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
+												return (
+													<div key={step.id} className="flex items-center gap-2">
+														<div className={`w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold ${active || complete ? 'bg-mansion-gold text-mansion-base border-mansion-gold' : 'bg-white/5 text-white/55 border-white/10'}`}>
+															{index + 1}
+														</div>
+														{index < storySteps.length - 1 && <div className={`w-8 sm:w-10 h-px ${storyStepIndex > index ? 'bg-mansion-gold/70' : 'bg-white/10'}`} />}
+													</div>
+												);
+											})}
+										</div>
+										<div className="text-center">
+											<h2 className="font-display text-2xl sm:text-3xl font-semibold text-white" style={{ textShadow: '0 3px 14px rgba(0,0,0,0.78)' }}>Prepará tu historia</h2>
+											<p className="text-sm text-white/72 mt-1" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.68)' }}>En cuanto eliges el archivo, empezamos a prepararlo y publicarlo automáticamente.</p>
+										</div>
+										<div className="mt-auto mb-6 sm:mb-10">
+											<motion.div
+												initial={{ opacity: 0, y: 12 }}
+												animate={{ opacity: 1, y: 0 }}
+												transition={{ delay: 0.12, duration: 0.28, ease: 'easeOut' }}
+												style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
 											>
-												<Eye className="w-5 h-5" />
-												Ver de nuevo
-											</button>
-											<button
-												type="button"
-												onClick={resetStoryFlow}
-												className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-medium hover:bg-white/10 transition-colors"
-											>
-												<Upload className="w-5 h-5" />
-												Subir otra historia
-											</button>
-											<button
-												type="button"
-												onClick={() => navigate('/perfil')}
-												className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white/72 font-medium hover:bg-white/10 transition-colors"
-											>
-												<LayoutDashboard className="w-5 h-5" />
-												Ir al panel de control
-											</button>
+												{!processing ? (
+													<div className="space-y-3 rounded-[1.75rem] border border-white/10 bg-black/38 backdrop-blur-md p-5 sm:p-6 text-center shadow-[0_12px_40px_rgba(0,0,0,0.22)]">
+														<p className="text-sm text-white font-medium">El archivo ya fue seleccionado.</p>
+														<p className="text-xs text-white/65 mt-1">Si hubo un error, puedes elegir otro video para reintentar.</p>
+														<label className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/8 border border-white/10 text-white font-medium hover:bg-white/12 transition-colors cursor-pointer">
+															<Upload className="w-5 h-5" />
+															Elegir otro video
+															<input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
+														</label>
+														{sourceDuration > maxStoryDurationSeconds && (
+															<div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+																Se procesarán solo los primeros {maxStoryDurationSeconds}s de este video.
+															</div>
+														)}
+													</div>
+												) : (
+													<div className="space-y-4 rounded-[1.75rem] border border-white/10 bg-black/40 backdrop-blur-md p-5 sm:p-6 shadow-[0_12px_40px_rgba(0,0,0,0.24)]">
+														{phase === 'preparing' && <p className="text-xs text-white/62">Estamos preparando el video para iniciar una publicación más fluida.</p>}
+														<div className="space-y-2">
+															<div className="flex items-center justify-between text-sm">
+																<span className="text-white/74">Cargando historia</span>
+																<span className="font-semibold text-mansion-gold tabular-nums">{loadingStoryPercent}%</span>
+															</div>
+															<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
+																<div className="h-3 bg-white/5">
+																	<div className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${loadingStoryPercent}%` }} />
+																</div>
+															</div>
+														</div>
+														<AnimatePresence initial={false}>
+															{showVerificationProgress && (
+																<motion.div
+																	initial={{ opacity: 0, y: 10, scaleY: 0.92 }}
+																	animate={{ opacity: 1, y: 0, scaleY: 1 }}
+																	exit={{ opacity: 0, y: -6, scaleY: 0.96 }}
+																	transition={{ duration: 0.24, ease: 'easeOut' }}
+																	style={{ originY: 0, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+																	className="space-y-2"
+																>
+																	<div className="flex items-center justify-between text-sm">
+																		<span className="text-white/74">Verificando historia</span>
+																		<span className="font-semibold text-mansion-gold tabular-nums">{verificationPercent}%</span>
+																	</div>
+																	<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
+																		<div className="h-3 bg-white/5">
+																			<div className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${verificationPercent}%` }} />
+																		</div>
+																	</div>
+																</motion.div>
+															)}
+														</AnimatePresence>
+														<p className="text-xs text-white/62">
+															{phase === 'preparing'
+																? 'Ajustando el archivo y dejando listo el proceso inicial.'
+																: phase === 'encoding'
+																	? showVerificationProgress
+																		? 'Revisando los ultimos detalles del video antes de publicarlo.'
+																		: 'Optimizando la historia para que se publique con mejor fluidez.'
+																	: 'Publicando la historia y confirmando que quede disponible.'}
+														</p>
+													</div>
+												)}
+											</motion.div>
+											{errorMessage && !processing && <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">{errorMessage}</div>}
 										</div>
 									</div>
-								</div>
-							</motion.section>
+								</motion.section>
+							)}
+
+							{storyStep === 'preview' && result && (
+								<motion.section
+									key="preview"
+									initial={{ opacity: 0 }}
+									animate={{ opacity: 1 }}
+									exit={{ opacity: 0 }}
+									transition={{ duration: 0.24, ease: 'easeOut' }}
+									className="absolute inset-0"
+								>
+									<StoryPreview
+										videoUrl={result.video_url || result.previewUrl}
+										caption={result.caption}
+										user={user}
+										avatarSize={siteSettings?.videoAvatarSize ?? 52}
+										onClose={resetStoryFlow}
+										onConfirm={() => {
+											setShowPreview(false);
+											setPreviewConfirmed(true);
+										}}
+									/>
+								</motion.section>
+							)}
+
+							{storyStep === 'done' && (
+								<motion.section
+									key="done"
+									initial={{ opacity: 0, scale: 0.96 }}
+									animate={{ opacity: 1, scale: 1 }}
+									exit={{ opacity: 0, y: -20 }}
+									transition={{ duration: 0.3, ease: 'easeOut' }}
+									style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+									className="absolute inset-0"
+								>
+									<button
+										type="button"
+										onClick={() => navigate('/perfil')}
+										className="absolute right-4 top-4 sm:right-6 sm:top-6 z-20 w-10 h-10 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+										aria-label="Volver al panel de control"
+									>
+										<X className="w-5 h-5" />
+									</button>
+									<div className="flex h-full flex-col px-6 sm:px-8 pt-6 sm:pt-7 pb-8">
+										<div className="flex items-center justify-center gap-2 mb-5">
+											{storySteps.map((step, index) => (
+												<div key={step.id} className="flex items-center gap-2">
+													<div className="w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold bg-mansion-gold text-mansion-base border-mansion-gold">
+														{index + 1}
+													</div>
+													{index < storySteps.length - 1 && <div className="w-8 sm:w-10 h-px bg-mansion-gold/70" />}
+												</div>
+											))}
+										</div>
+										<div className="mt-auto mb-auto rounded-[1.75rem] border border-white/10 bg-black/42 backdrop-blur-md p-6 sm:p-7 text-center shadow-[0_12px_40px_rgba(0,0,0,0.24)]">
+											<motion.div
+												initial={{ scale: 0.5, opacity: 0 }}
+												animate={{ scale: 1, opacity: 1 }}
+												transition={{ delay: 0.08, duration: 0.24, ease: 'easeOut' }}
+												style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+												className="w-14 h-14 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-4"
+											>
+												<CheckCircle2 className="w-7 h-7 text-green-400" />
+											</motion.div>
+											<h2 className="font-display text-2xl font-bold text-white" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Historia confirmada</h2>
+											<p className="text-white/74 mt-1 text-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.72), 0 0 3px rgba(0,0,0,0.48)' }}>La historia ya está publicada. Puedes revisarla otra vez, volver a tu perfil o subir otra.</p>
+											<div className="mt-5 flex flex-col gap-3">
+												<button type="button" onClick={() => setShowPreview(true)} className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]">
+													<Eye className="w-5 h-5" />
+													Ver de nuevo
+												</button>
+												<button type="button" onClick={resetStoryFlow} className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-medium hover:bg-white/10 transition-colors">
+													<Upload className="w-5 h-5" />
+													Subir otra historia
+												</button>
+												<button type="button" onClick={() => navigate('/perfil')} className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white/72 font-medium hover:bg-white/10 transition-colors">
+													<LayoutDashboard className="w-5 h-5" />
+													Ir al panel de control
+												</button>
+											</div>
+										</div>
+									</div>
+								</motion.section>
 							)}
 						</AnimatePresence>
 					</StoryStageShell>
