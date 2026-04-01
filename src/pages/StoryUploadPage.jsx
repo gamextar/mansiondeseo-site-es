@@ -322,7 +322,7 @@ function StoryStageShell({ backgroundImageUrl, children, variant = 'default' }) 
 }
 
 // ── Feed-style fullscreen story preview ─────────────────────────────────────
-function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, avatarSize = 52 }) {
+function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, avatarSize = 52, overlayDelay = 0 }) {
 	const videoRef = useRef(null);
 	const progressRef = useRef(null);
 	const rafRef = useRef(null);
@@ -388,7 +388,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 					className="absolute inset-0 z-20"
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
-					transition={{ delay: 0, duration: 0.5, ease: 'easeOut' }}
+					transition={{ delay: overlayDelay, duration: 0.5, ease: 'easeOut' }}
 					style={{ pointerEvents: 'none' }}
 					onAnimationComplete={() => {
 						if (overlayRef.current) overlayRef.current.style.pointerEvents = 'auto';
@@ -912,7 +912,7 @@ export default function StoryUploadPage() {
 			setShowPreview(true);
 			setShowFinalizingOverlay(true);
 			const _finStart = performance.now();
-			const _finDuration = 10000;
+			const _finDuration = 4000;
 			const _finTick = (now) => {
 				const t = Math.min((now - _finStart) / _finDuration, 1);
 				setFinalizingProgress(t);
@@ -1194,6 +1194,7 @@ export default function StoryUploadPage() {
 										caption={result.caption}
 										user={user}
 										avatarSize={siteSettings?.videoAvatarSize ?? 52}
+										overlayDelay={showFinalizingOverlay ? 4.5 : 0}
 										onClose={closeStoryUpload}
 										onConfirm={() => {
 											setShowPreview(false);
