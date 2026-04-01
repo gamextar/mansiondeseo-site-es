@@ -247,7 +247,7 @@ function StoryStageHeader({
 					style={STORY_STAGE_CLOSE_BUTTON_STYLE}
 					aria-label={closeLabel}
 				>
-					<X className="h-7 w-7" />
+					<X className="h-7 w-7 text-white" />
 				</button>
 			)}
 			<div
@@ -381,12 +381,20 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 				muted={isMuted}
 			/>
 
+				{/* All overlays — fade in after 1.5s so the video is seen cleanly first */}
+				<motion.div
+					className="absolute inset-0 z-20"
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					transition={{ delay: 1.5, duration: 0.4, ease: 'easeOut' }}
+					style={{ pointerEvents: 'none' }}
+				>
 				{/* Close button — top-right, inside PWA safe area */}
 				<button
 					type="button"
 					onClick={onClose}
 					className={STORY_STAGE_CLOSE_BUTTON_CLASS}
-					style={STORY_STAGE_CLOSE_BUTTON_STYLE}
+					style={{ ...STORY_STAGE_CLOSE_BUTTON_STYLE, pointerEvents: 'auto' }}
 					aria-label="Cerrar vista previa"
 				>
 					<X className="h-7 w-7 text-white" />
@@ -462,6 +470,8 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 				<div className="absolute bottom-0 left-0 right-0 h-[3px] z-30 bg-white/10 lg:rounded-b-2xl overflow-hidden">
 					<div ref={progressRef} className="h-full bg-mansion-gold" style={{ width: '0%' }} />
 				</div>
+
+				</motion.div>{/* end delayed overlays */}
 
 			<div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', bottom: '60px' }}>
 				<div className="flex flex-col items-center">
@@ -1071,17 +1081,49 @@ export default function StoryUploadPage() {
 														)}
 													</div>
 												) : (
-													<div className="space-y-4 rounded-[1.75rem] border border-white/10 bg-black/40 backdrop-blur-md p-5 sm:p-6 shadow-[0_12px_40px_rgba(0,0,0,0.24)]">
-														{phase === 'preparing' && <p className="text-xs text-white/62">Estamos preparando el video para iniciar una publicación más fluida.</p>}
-														<div className="space-y-2">
-															<div className="flex items-center justify-between text-sm">
-																<span className="text-white/74">Cargando historia</span>
-																<span className="font-semibold text-mansion-gold tabular-nums">{loadingStoryPercent}%</span>
+													<div className="rounded-[1.75rem] border border-white/10 bg-black/40 backdrop-blur-md p-5 sm:p-6 shadow-[0_12px_40px_rgba(0,0,0,0.24)]">
+														{/* Spinner + label */}
+														<div className="flex items-center gap-4 mb-5">
+															<div className="relative flex-shrink-0">
+																<svg className="w-10 h-10 -rotate-90" viewBox="0 0 40 40">
+																	<circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3.5" />
+																	<circle
+																		cx="20" cy="20" r="16" fill="none"
+																		stroke="url(#spinGrad)" strokeWidth="3.5"
+																		strokeLinecap="round"
+																		strokeDasharray={`${100.5 * loadingStoryProgress} 100.5`}
+																		style={{ transition: 'stroke-dasharray 0.35s ease' }}
+																	/>
+																	<defs>
+																		<linearGradient id="spinGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+																			<stop offset="0%" stopColor="#d4af37" />
+																			<stop offset="100%" stopColor="#f0d060" />
+																		</linearGradient>
+																	</defs>
+																</svg>
+																<span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-mansion-gold tabular-nums">{loadingStoryPercent}%</span>
 															</div>
-															<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
-																<div className="h-3 bg-white/5">
-																	<div className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${loadingStoryPercent}%` }} />
-																</div>
+															<div className="flex-1 min-w-0">
+																<p className="text-sm font-semibold text-white leading-tight">
+																	{phase === 'preparing' ? 'Preparando…' : phase === 'encoding' ? 'Optimizando video…' : phase === 'uploading' ? 'Publicando…' : 'Procesando…'}
+																</p>
+																<p className="text-xs text-white/50 mt-0.5 truncate">
+																	{phase === 'preparing'
+																		? 'Cargando motor de video'
+																		: phase === 'encoding'
+																			? showVerificationProgress ? 'Revisando detalles finales' : 'Comprimiendo y optimizando'
+																			: 'Subiendo a los servidores'}
+																</p>
+															</div>
+														</div>
+														{/* Encoding progress bar */}
+														<div className="space-y-1.5">
+															<div className="flex items-center justify-between text-xs text-white/50">
+																<span>Procesando</span>
+																<span className="tabular-nums">{loadingStoryPercent}%</span>
+															</div>
+															<div className="h-1.5 w-full rounded-full bg-white/8 overflow-hidden">
+																<div className="h-full rounded-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${loadingStoryPercent}%` }} />
 															</div>
 														</div>
 														<AnimatePresence initial={false}>
@@ -1092,29 +1134,18 @@ export default function StoryUploadPage() {
 																	exit={{ opacity: 0, y: -6, scaleY: 0.96 }}
 																	transition={{ duration: 0.24, ease: 'easeOut' }}
 																	style={{ originY: 0, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-																	className="space-y-2"
+																	className="mt-3 space-y-1.5"
 																>
-																	<div className="flex items-center justify-between text-sm">
-																		<span className="text-white/74">Verificando historia</span>
-																		<span className="font-semibold text-mansion-gold tabular-nums">{verificationPercent}%</span>
+																	<div className="flex items-center justify-between text-xs text-white/50">
+																		<span>Verificando</span>
+																		<span className="tabular-nums">{verificationPercent}%</span>
 																	</div>
-																	<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
-																		<div className="h-3 bg-white/5">
-																			<div className="h-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${verificationPercent}%` }} />
-																		</div>
+																	<div className="h-1.5 w-full rounded-full bg-white/8 overflow-hidden">
+																		<div className="h-full rounded-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${verificationPercent}%` }} />
 																	</div>
 																</motion.div>
 															)}
 														</AnimatePresence>
-														<p className="text-xs text-white/62">
-															{phase === 'preparing'
-																? 'Ajustando el archivo y dejando listo el proceso inicial.'
-																: phase === 'encoding'
-																	? showVerificationProgress
-																		? 'Revisando los ultimos detalles del video antes de publicarlo.'
-																		: 'Optimizando la historia para que se publique con mejor fluidez.'
-																	: 'Publicando la historia y confirmando que quede disponible.'}
-														</p>
 													</div>
 												)}
 											</motion.div>
