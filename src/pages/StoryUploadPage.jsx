@@ -124,7 +124,7 @@ async function loadVideoMetadata(fileUrl) {
 }
 
 // ── Feed-style fullscreen story preview ─────────────────────────────────────
-function StoryPreview({ videoUrl, caption, user, onClose, avatarSize = 52 }) {
+function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize = 52 }) {
 	const videoRef = useRef(null);
 	const progressRef = useRef(null);
 	const rafRef = useRef(null);
@@ -275,6 +275,25 @@ function StoryPreview({ videoUrl, caption, user, onClose, avatarSize = 52 }) {
 					</div>
 				</div>
 			</div>
+
+			<div className="absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-4" style={{ bottom: 'max(env(safe-area-inset-bottom, 20px), 20px)' }}>
+				<button
+					type="button"
+					onClick={onClose}
+					className="flex h-14 w-14 items-center justify-center rounded-full bg-black/50 border border-white/15 backdrop-blur-md text-white hover:bg-black/60 transition-colors"
+					aria-label="Cancelar previsualización"
+				>
+					<X className="h-6 w-6" />
+				</button>
+				<button
+					type="button"
+					onClick={onConfirm}
+					className="flex h-14 w-14 items-center justify-center rounded-full bg-mansion-gold/90 border border-mansion-gold/40 backdrop-blur-md text-mansion-base hover:bg-mansion-gold transition-colors shadow-[0_12px_28px_rgba(212,175,55,0.24)]"
+					aria-label="Confirmar historia"
+				>
+					<CheckCircle2 className="h-6 w-6" />
+				</button>
+			</div>
 		</div>
 	);
 }
@@ -315,7 +334,7 @@ export default function StoryUploadPage() {
 	const [engineStatus, setEngineStatus] = useState('idle');
 
 	const outputProfile = getOutputProfile(sourceResolution);
-	const storyStep = result?.id ? 'done' : sourceFile ? 'process' : 'pick';
+	const storyStep = result?.id ? 'preview' : sourceFile ? 'process' : 'pick';
 	const storyStepIndex = storyStep === 'pick' ? 0 : storyStep === 'process' ? 1 : 2;
 	const storySteps = [
 		{ id: 'pick', label: 'Elegir' },
@@ -413,6 +432,7 @@ export default function StoryUploadPage() {
 		setEncodingProgress(0);
 		setUploadProgress(0);
 		setElapsedSeconds(0);
+		setShowPreview(false);
 		setPhase('idle');
 		setErrorMessage('');
 		clearInterval(timerIntervalRef.current);
@@ -591,6 +611,7 @@ export default function StoryUploadPage() {
 				duration: encoded.duration,
 				processingTimeLabel: formatElapsedSeconds(processingElapsedSeconds),
 			});
+			setShowPreview(true);
 		} catch (error) {
 			setErrorMessage(error?.message || 'No se pudo publicar la historia.');
 			setPhase('idle');
@@ -950,7 +971,8 @@ export default function StoryUploadPage() {
 					caption={result.caption}
 					user={user}
 					avatarSize={siteSettings?.videoAvatarSize ?? 52}
-					onClose={() => setShowPreview(false)}
+					onClose={resetStoryFlow}
+					onConfirm={() => navigate('/perfil')}
 				/>
 			)}
 
