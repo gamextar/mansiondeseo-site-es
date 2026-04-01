@@ -70,6 +70,10 @@ export default function SettingsPage() {
   const [navHeight, setNavHeight] = useState(71);
   const [navOpacity, setNavOpacity] = useState(40);
   const [storyCircleSize, setStoryCircleSize] = useState(88);
+  const [storyCirclePresetSmall, setStoryCirclePresetSmall] = useState(72);
+  const [storyCirclePresetMedium, setStoryCirclePresetMedium] = useState(88);
+  const [storyCirclePresetLarge, setStoryCirclePresetLarge] = useState(104);
+  const [storyCirclePresetXl, setStoryCirclePresetXl] = useState(120);
   const [storyCircleGap, setStoryCircleGap] = useState(8);
   const [storyCircleBorder, setStoryCircleBorder] = useState(4);
   const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
@@ -119,10 +123,10 @@ export default function SettingsPage() {
     { key: 'sidebar', label: 'Sidebar real', size: sidebarRealPreviewSize, context: 'tamaño real del avatar en la sidebar desktop actual' },
   ];
   const storySizePresets = [
-    { key: 'small', label: 'Chico', size: 72 },
-    { key: 'medium', label: 'Mediano', size: 88 },
-    { key: 'large', label: 'Grande', size: 104 },
-    { key: 'xl', label: 'XL', size: 120 },
+    { key: 'small', label: 'Chico', size: storyCirclePresetSmall },
+    { key: 'medium', label: 'Mediano', size: storyCirclePresetMedium },
+    { key: 'large', label: 'Grande', size: storyCirclePresetLarge },
+    { key: 'xl', label: 'XL', size: storyCirclePresetXl },
   ];
   const activeSidebarPreview = sidebarPreviewOptions.find(option => option.key === sidebarPreviewSize) || sidebarPreviewOptions[1];
   const activeSidebarRingPx = Math.max(1, Math.round((activeSidebarPreview.size * sidebarStoryRingWidth) / 100));
@@ -179,6 +183,10 @@ export default function SettingsPage() {
         setNavHeight(s.navHeight ?? 71);
         setNavOpacity(s.navOpacity ?? 40);
         setStoryCircleSize(s.storyCircleSize ?? 88);
+        setStoryCirclePresetSmall(s.storyCirclePresetSmall ?? 72);
+        setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? 88);
+        setStoryCirclePresetLarge(s.storyCirclePresetLarge ?? 104);
+        setStoryCirclePresetXl(s.storyCirclePresetXl ?? 120);
         setStoryCircleGap(s.storyCircleGap ?? 8);
         setStoryCircleBorder(s.storyCircleBorder ?? 4);
         setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
@@ -240,6 +248,10 @@ export default function SettingsPage() {
         nav_height: navHeight,
         nav_opacity: navOpacity,
         story_circle_size: storyCircleSize,
+        story_circle_preset_small: storyCirclePresetSmall,
+        story_circle_preset_medium: storyCirclePresetMedium,
+        story_circle_preset_large: storyCirclePresetLarge,
+        story_circle_preset_xl: storyCirclePresetXl,
         story_circle_gap: storyCircleGap,
         story_circle_border: storyCircleBorder,
         story_circle_inner_gap: storyCircleInnerGap,
@@ -289,6 +301,10 @@ export default function SettingsPage() {
       setNavHeight(s.navHeight ?? 71);
       setNavOpacity(s.navOpacity ?? 40);
       setStoryCircleSize(s.storyCircleSize ?? 88);
+      setStoryCirclePresetSmall(s.storyCirclePresetSmall ?? 72);
+      setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? 88);
+      setStoryCirclePresetLarge(s.storyCirclePresetLarge ?? 104);
+      setStoryCirclePresetXl(s.storyCirclePresetXl ?? 120);
       setStoryCircleGap(s.storyCircleGap ?? 8);
       setStoryCircleBorder(s.storyCircleBorder ?? 4);
       setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
@@ -1127,6 +1143,24 @@ export default function SettingsPage() {
                 })}
               </div>
               <p className="mt-3 text-[11px] text-text-dim">Actual: <span className="text-mansion-gold font-medium">{storyCircleSize}px</span>. Este es el único valor absoluto; los demás se recalculan proporcionalmente.</p>
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <label className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
+                  <span className="mb-1 block text-[11px] text-text-dim">Chico</span>
+                  <input type="number" min="40" max="160" value={storyCirclePresetSmall} onChange={e => setStoryCirclePresetSmall(Number(e.target.value) || 40)} className="w-full rounded-lg border border-white/10 bg-mansion-base px-2 py-1.5 text-sm text-text-primary outline-none focus:border-mansion-gold/40" />
+                </label>
+                <label className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
+                  <span className="mb-1 block text-[11px] text-text-dim">Mediano</span>
+                  <input type="number" min="40" max="160" value={storyCirclePresetMedium} onChange={e => setStoryCirclePresetMedium(Number(e.target.value) || 40)} className="w-full rounded-lg border border-white/10 bg-mansion-base px-2 py-1.5 text-sm text-text-primary outline-none focus:border-mansion-gold/40" />
+                </label>
+                <label className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
+                  <span className="mb-1 block text-[11px] text-text-dim">Grande</span>
+                  <input type="number" min="40" max="160" value={storyCirclePresetLarge} onChange={e => setStoryCirclePresetLarge(Number(e.target.value) || 40)} className="w-full rounded-lg border border-white/10 bg-mansion-base px-2 py-1.5 text-sm text-text-primary outline-none focus:border-mansion-gold/40" />
+                </label>
+                <label className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
+                  <span className="mb-1 block text-[11px] text-text-dim">XL</span>
+                  <input type="number" min="40" max="160" value={storyCirclePresetXl} onChange={e => setStoryCirclePresetXl(Number(e.target.value) || 40)} className="w-full rounded-lg border border-white/10 bg-mansion-base px-2 py-1.5 text-sm text-text-primary outline-none focus:border-mansion-gold/40" />
+                </label>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-white/5 bg-mansion-card/50 p-4">
