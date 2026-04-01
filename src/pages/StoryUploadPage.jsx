@@ -283,7 +283,7 @@ export default function StoryUploadPage() {
 	const navigate = useNavigate();
 	const { user, siteSettings } = useAuth();
 	const maxStoryDurationSeconds = Math.max(1, Number(siteSettings?.storyMaxDurationSeconds || 15));
-	const showProgressHud = siteSettings?.encoderShowProgressHud !== false;
+	const showProgressHud = siteSettings?.encoderShowProgressHud === true;
 	const encoderThreads = Math.max(1, Number(siteSettings?.encoderThreads || 4));
 	const encoderParams = {
 		crf: siteSettings?.encoderCrf || ENCODER_DEFAULTS.crf,
@@ -881,25 +881,26 @@ export default function StoryUploadPage() {
 								<h2 className="font-display text-2xl font-bold text-text-primary">¡Tu historia fue publicada!</h2>
 								<p className="text-text-muted mt-1 text-sm">El encoding ha finalizado correctamente</p>
 
-								{/* Encoding summary */}
-								<div className="mt-4 mb-6 grid grid-cols-2 gap-2 text-left">
-									<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-										<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Tamaño original</p>
-										<p className="text-base font-semibold text-text-primary tabular-nums">{result.originalSizeLabel ?? '—'}</p>
+								{showProgressHud && (
+									<div className="mt-4 mb-6 grid grid-cols-2 gap-2 text-left">
+										<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+											<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Tamaño original</p>
+											<p className="text-base font-semibold text-text-primary tabular-nums">{result.originalSizeLabel ?? '—'}</p>
+										</div>
+										<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+											<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Tamaño final</p>
+											<p className="text-base font-semibold text-mansion-gold tabular-nums">{result.sizeLabel}</p>
+										</div>
+										<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+											<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Duración</p>
+											<p className="text-base font-semibold text-text-primary tabular-nums">{result.duration > 0 ? `${result.duration.toFixed(1)}s` : '—'}</p>
+										</div>
+										<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+											<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Tiempo de encoding</p>
+											<p className="text-base font-semibold text-text-primary tabular-nums">{result.processingTimeLabel}</p>
+										</div>
 									</div>
-									<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-										<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Tamaño final</p>
-										<p className="text-base font-semibold text-mansion-gold tabular-nums">{result.sizeLabel}</p>
-									</div>
-									<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-										<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Duración</p>
-										<p className="text-base font-semibold text-text-primary tabular-nums">{result.duration > 0 ? `${result.duration.toFixed(1)}s` : '—'}</p>
-									</div>
-									<div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-										<p className="text-[10px] uppercase tracking-widest text-text-dim mb-1">Tiempo de encoding</p>
-										<p className="text-base font-semibold text-text-primary tabular-nums">{result.processingTimeLabel}</p>
-									</div>
-								</div>
+								)}
 
 								<div className="flex flex-col gap-3">
 									<button
