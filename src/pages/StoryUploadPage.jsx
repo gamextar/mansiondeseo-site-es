@@ -566,6 +566,7 @@ export default function StoryUploadPage() {
 
 	const [encodingProgress, setEncodingProgress] = useState(0);
 	const [uploadProgress, setUploadProgress] = useState(0);
+	const [finalizingProgress, setFinalizingProgress] = useState(0);
 	const [phase, setPhase] = useState('idle');
 	const [sourceFile, setSourceFile] = useState(null);
 	const [sourceDuration, setSourceDuration] = useState(0);
@@ -696,6 +697,7 @@ export default function StoryUploadPage() {
 		setSourceResolution(null);
 		setEncodingProgress(0);
 		setUploadProgress(0);
+		setFinalizingProgress(0);
 		setElapsedSeconds(0);
 		setShowPreview(false);
 		setPreviewConfirmed(false);
@@ -734,6 +736,7 @@ export default function StoryUploadPage() {
 		uploadTokenRef.current = getToken() || '';
 		setEncodingProgress(0);
 		setUploadProgress(0);
+		setFinalizingProgress(0);
 		setPhase('preparing');
 		setProcessing(true);
 		startElapsedTimer();
@@ -868,6 +871,7 @@ export default function StoryUploadPage() {
 			isTranscodingRef.current = true;
 			setEncodingProgress(0);
 			setUploadProgress(0);
+			setFinalizingProgress(0);
 
 			const encoded = await encodeStoryVideo({ file, duration, resolution });
 			const processingElapsedSeconds = (performance.now() - timerStartRef.current) / 1000;
@@ -900,8 +904,18 @@ export default function StoryUploadPage() {
 				processingTimeLabel: formatElapsedSeconds(processingElapsedSeconds),
 			});
 			setPreviewConfirmed(false);
-			// Hold the progress screen at 100% for 2.5s before showing the video
-			await new Promise(resolve => setTimeout(resolve, 2500));
+			// Animate the final 5% of the progress bar over 2.5s before revealing the video
+			await new Promise(resolve => {
+				const startTime = performance.now();
+				const duration = 2500;
+				function tick(now) {
+					const t = Math.min((now - startTime) / duration, 1);
+					setFinalizingProgress(t);
+					if (t < 1) requestAnimationFrame(tick);
+					else resolve();
+				}
+				requestAnimationFrame(tick);
+			});
 			setShowPreview(true);
 		} catch (error) {
 			setErrorMessage(error?.message || 'No se pudo publicar la historia.');
@@ -916,7 +930,7 @@ export default function StoryUploadPage() {
 
 	const maskedEncodingProgress = clamp(encodingProgress, 0, 1);
 	const maskedUploadProgress = clamp(uploadProgress, 0, 1);
-	const verificationEncodingShare = 0.95;
+	const verificationEncodingShare = 0.9;
 	const loadingStoryProgress = phase === 'preparing'
 		? 0
 		: clamp(maskedEncodingProgress * 2, 0, 1);
@@ -925,9 +939,9 @@ export default function StoryUploadPage() {
 		: phase === 'encoding'
 			? clamp(((maskedEncodingProgress - 0.5) * 2) * verificationEncodingShare, 0, verificationEncodingShare)
 			: phase === 'uploading'
-				? verificationEncodingShare + (maskedUploadProgress * (1 - verificationEncodingShare))
+				? verificationEncodingShare + (maskedUploadProgress * 0.05)
 				: phase === 'done'
-					? 1
+					? 0.95 + (finalizingProgress * 0.05)
 				: 0;
 	const showVerificationProgress = phase === 'encoding'
 		? maskedEncodingProgress >= 0.5
