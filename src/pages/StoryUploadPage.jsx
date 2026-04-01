@@ -347,6 +347,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onConfirm, avatarSiz
 	useEffect(() => {
 		const video = videoRef.current;
 		if (!video) return;
+		let revealTimeoutId = null;
 
 		const revealVideo = () => {
 			requestAnimationFrame(() => {
@@ -354,10 +355,22 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onConfirm, avatarSiz
 			});
 		};
 
+		const scheduleRevealFallback = () => {
+			if (revealTimeoutId) clearTimeout(revealTimeoutId);
+			revealTimeoutId = setTimeout(() => {
+				revealVideo();
+			}, 420);
+		};
+
 		video.currentTime = 0;
-		video.play().then(revealVideo).catch(() => {});
+		video.play().then(revealVideo).catch(() => {
+			scheduleRevealFallback();
+		});
 		video.addEventListener('playing', revealVideo);
 		video.addEventListener('loadeddata', revealVideo);
+		video.addEventListener('canplay', revealVideo);
+		video.addEventListener('loadedmetadata', scheduleRevealFallback);
+		scheduleRevealFallback();
 
 		const tick = () => {
 			if (progressRef.current && video.duration) {
@@ -368,8 +381,11 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onConfirm, avatarSiz
 		rafRef.current = requestAnimationFrame(tick);
 
 		return () => {
+			if (revealTimeoutId) clearTimeout(revealTimeoutId);
 			video.removeEventListener('playing', revealVideo);
 			video.removeEventListener('loadeddata', revealVideo);
+			video.removeEventListener('canplay', revealVideo);
+			video.removeEventListener('loadedmetadata', scheduleRevealFallback);
 			cancelAnimationFrame(rafRef.current);
 		};
 	}, [videoUrl]);
@@ -393,6 +409,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onConfirm, avatarSiz
 			<motion.video
 				ref={videoRef}
 				src={videoUrl}
+				poster={posterUrl || undefined}
 				className="absolute inset-0 z-0 h-full w-full object-cover"
 				style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
 				initial={{ opacity: 0, scale: 1.008 }}
@@ -997,7 +1014,7 @@ export default function StoryUploadPage() {
 							onClose={headerConfig.onClose}
 							closeLabel={headerConfig.closeLabel}
 						/>
-						<AnimatePresence mode="wait" initial={false}>
+						<AnimatePresence mode="sync" initial={false}>
 							{storyStep === 'pick' && (
 								<motion.section
 							key="pick"
