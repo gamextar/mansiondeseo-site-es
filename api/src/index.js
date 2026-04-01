@@ -3003,7 +3003,12 @@ async function handleDeleteOwnStory(request, env, storyId) {
 
   await ensureStoriesTable(env);
 
-  const story = await env.DB.prepare('SELECT id, user_id, video_url FROM stories WHERE id = ?').bind(storyId).first();
+  let story;
+  if (storyId === 'current') {
+    story = await env.DB.prepare('SELECT id, user_id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first();
+  } else {
+    story = await env.DB.prepare('SELECT id, user_id, video_url FROM stories WHERE id = ?').bind(storyId).first();
+  }
   if (!story) return error('Historia no encontrada', 404);
   if (story.user_id !== auth.sub) return error('No puedes borrar historias de otros usuarios', 403);
 
