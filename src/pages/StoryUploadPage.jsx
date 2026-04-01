@@ -614,6 +614,7 @@ export default function StoryUploadPage() {
 	const loadPromiseRef = useRef(null);
 	const uploadTokenRef = useRef('');
 	const resultPreviewUrlRef = useRef('');
+	const resultPosterUrlRef = useRef('');
 	const activeEncodeDurationRef = useRef(0);
 	const isTranscodingRef = useRef(false);
 	const timerIntervalRef = useRef(null);
@@ -663,6 +664,7 @@ export default function StoryUploadPage() {
 			ffmpeg.off('log', handleLog);
 			ffmpeg.terminate();
 			if (resultPreviewUrlRef.current) URL.revokeObjectURL(resultPreviewUrlRef.current);
+			if (resultPosterUrlRef.current) URL.revokeObjectURL(resultPosterUrlRef.current);
 			clearInterval(timerIntervalRef.current);
 		};
 	}, []);
@@ -727,6 +729,10 @@ export default function StoryUploadPage() {
 		if (resultPreviewUrlRef.current) {
 			URL.revokeObjectURL(resultPreviewUrlRef.current);
 			resultPreviewUrlRef.current = '';
+		}
+		if (resultPosterUrlRef.current) {
+			URL.revokeObjectURL(resultPosterUrlRef.current);
+			resultPosterUrlRef.current = '';
 		}
 		setResult(null);
 	};
@@ -921,8 +927,14 @@ export default function StoryUploadPage() {
 
 			const encoded = await encodeStoryVideo({ file, duration, resolution });
 			const processingElapsedSeconds = (performance.now() - timerStartRef.current) / 1000;
+			const encodedPosterUrl = await withTimeout(
+				captureVideoPoster(encoded.previewUrl),
+				3500,
+				'No se pudo capturar la portada final de la historia.'
+			).catch(() => '');
 
 			resultPreviewUrlRef.current = encoded.previewUrl;
+			resultPosterUrlRef.current = encodedPosterUrl;
 			setEncodingProgress(1);
 			setPhase('uploading');
 
@@ -936,6 +948,7 @@ export default function StoryUploadPage() {
 			setResult({
 				...story,
 				previewUrl: encoded.previewUrl,
+				posterUrl: encodedPosterUrl,
 				fileName: encoded.fileName,
 				sizeLabel: encoded.sizeLabel,
 				originalSizeLabel: file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : null,
@@ -1192,7 +1205,7 @@ export default function StoryUploadPage() {
 								>
 									<StoryPreview
 										videoUrl={result.video_url || result.previewUrl}
-										posterUrl={storyBackdropUrl}
+										posterUrl={result.posterUrl || storyBackdropUrl}
 										caption={result.caption}
 										user={user}
 										avatarSize={siteSettings?.videoAvatarSize ?? 52}
