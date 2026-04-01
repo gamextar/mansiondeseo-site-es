@@ -280,6 +280,84 @@ function StoryStageHeader({
 	);
 }
 
+function AnimatedPickBackground() {
+	return (
+		<div className="absolute inset-0 overflow-hidden" style={{ background: '#07070e' }}>
+			{/* Blob 1 — gold, upper-right */}
+			<motion.div
+				className="absolute rounded-full pointer-events-none"
+				style={{
+					width: '85%', height: '75%',
+					background: 'radial-gradient(circle at 38% 38%, rgba(212,175,55,0.58) 0%, rgba(212,175,55,0.18) 42%, transparent 72%)',
+					filter: 'blur(56px)',
+					top: '-28%', right: '-22%',
+					willChange: 'transform',
+				}}
+				animate={{ x: [0, 38, -16, 0], y: [0, 24, -12, 0], scale: [1, 1.09, 0.93, 1] }}
+				transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+			/>
+			{/* Blob 2 — crimson, lower-left */}
+			<motion.div
+				className="absolute rounded-full pointer-events-none"
+				style={{
+					width: '78%', height: '68%',
+					background: 'radial-gradient(circle at 55% 55%, rgba(148,18,48,0.68) 0%, rgba(120,16,42,0.2) 46%, transparent 74%)',
+					filter: 'blur(62px)',
+					bottom: '-24%', left: '-20%',
+					willChange: 'transform',
+				}}
+				animate={{ x: [0, -30, 20, 0], y: [0, -22, 14, 0], scale: [1, 0.91, 1.12, 1] }}
+				transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+			/>
+			{/* Blob 3 — gold, drifting center accent */}
+			<motion.div
+				className="absolute rounded-full pointer-events-none"
+				style={{
+					width: '52%', height: '44%',
+					background: 'radial-gradient(circle, rgba(212,175,55,0.30) 0%, transparent 68%)',
+					filter: 'blur(46px)',
+					top: '30%', left: '18%',
+					willChange: 'transform, opacity',
+				}}
+				animate={{ x: [0, 22, -26, 10, 0], y: [0, -18, 10, -6, 0], opacity: [0.45, 0.9, 0.55, 0.85, 0.45] }}
+				transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut', delay: 4.5 }}
+			/>
+			{/* Blob 4 — deep crimson, top-left edge */}
+			<motion.div
+				className="absolute rounded-full pointer-events-none"
+				style={{
+					width: '55%', height: '48%',
+					background: 'radial-gradient(circle, rgba(100,12,36,0.50) 0%, transparent 70%)',
+					filter: 'blur(50px)',
+					top: '-10%', left: '-8%',
+					willChange: 'transform, opacity',
+				}}
+				animate={{ x: [0, 16, -12, 0], y: [0, 20, -8, 0], opacity: [0.6, 1, 0.7, 0.6] }}
+				transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+			/>
+			{/* Shimmer — thin diagonal light streak */}
+			<motion.div
+				className="absolute pointer-events-none"
+				style={{
+					width: '160%', height: '1px',
+					background: 'linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.18) 35%, rgba(212,175,55,0.42) 50%, rgba(212,175,55,0.18) 65%, transparent 100%)',
+					top: '50%', left: '-30%',
+					filter: 'blur(0.5px)',
+					transform: 'rotate(-7deg)',
+					willChange: 'transform, opacity',
+				}}
+				animate={{ y: [-140, 140], opacity: [0, 0.8, 0.8, 0] }}
+				transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 2, repeatDelay: 5 }}
+			/>
+			{/* Subtle vignette overlay */}
+			<div
+				className="absolute inset-0 pointer-events-none"
+				style={{ background: 'radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%)' }}
+			/>
+		</div>
+	);
+}
+
 function StoryStageShell({ backgroundImageUrl, children, variant = 'default' }) {
 	const shellOverlayClass = variant === 'pick' ? 'absolute inset-0 bg-black/10' : variant === 'preview' ? 'absolute inset-0 bg-black/14' : 'absolute inset-0 bg-black/28';
 	const topGradientClass = variant === 'pick'
@@ -295,12 +373,16 @@ function StoryStageShell({ backgroundImageUrl, children, variant = 'default' }) 
 
 	return (
 		<div className={STORY_STAGE_FRAME_CLASS}>
-			<div
-				className={`absolute inset-0${useAnimatedBg ? ' story-animated-bg' : ''}`}
-				style={useAnimatedBg ? undefined : {
-					background: 'radial-gradient(circle at 20% 20%, rgba(212,175,55,0.12), transparent 32%), radial-gradient(circle at 82% 18%, rgba(120,16,42,0.16), transparent 28%), linear-gradient(180deg, rgba(10,10,16,0.98) 0%, rgba(17,17,24,0.96) 100%)',
-				}}
-			/>
+			{useAnimatedBg ? (
+				<AnimatedPickBackground />
+			) : (
+				<div
+					className="absolute inset-0"
+					style={{
+						background: 'radial-gradient(circle at 20% 20%, rgba(212,175,55,0.12), transparent 32%), radial-gradient(circle at 82% 18%, rgba(120,16,42,0.16), transparent 28%), linear-gradient(180deg, rgba(10,10,16,0.98) 0%, rgba(17,17,24,0.96) 100%)',
+					}}
+				/>
+			)}
 			<AnimatePresence initial={false} mode="sync">
 				{backgroundImageUrl && (
 					<motion.img
