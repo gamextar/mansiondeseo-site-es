@@ -326,8 +326,15 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 	const videoRef = useRef(null);
 	const progressRef = useRef(null);
 	const rafRef = useRef(null);
-	const overlayRef = useRef(null);
 	const [isMuted, setIsMuted] = useState(true);
+	const [overlayVisible, setOverlayVisible] = useState(overlayDelay === 0);
+
+	useEffect(() => {
+		if (overlayDelay <= 0) { setOverlayVisible(true); return; }
+		setOverlayVisible(false);
+		const t = setTimeout(() => setOverlayVisible(true), overlayDelay * 1000);
+		return () => clearTimeout(t);
+	}, [overlayDelay]);
 
 	useEffect(() => {
 		const video = videoRef.current;
@@ -382,18 +389,16 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 				muted={isMuted}
 			/>
 
-				{/* All overlays — fade in after delay; pointer events disabled until fully visible */}
-				<motion.div
-					ref={overlayRef}
-					className="absolute inset-0 z-20"
-					initial={{ opacity: 0 }}
-					animate={{ opacity: 1 }}
-					transition={{ delay: overlayDelay, duration: 0.5, ease: 'easeOut' }}
-					style={{ pointerEvents: 'none' }}
-					onAnimationComplete={() => {
-						if (overlayRef.current) overlayRef.current.style.pointerEvents = 'auto';
-					}}
-				>
+			{/* All overlays — fade in after delay controlled by state */}
+			<AnimatePresence>
+			{overlayVisible && (
+			<motion.div
+				key="preview-overlays"
+				className="absolute inset-0 z-20"
+				initial={{ opacity: 0 }}
+				animate={{ opacity: 1 }}
+				transition={{ duration: 0.5, ease: 'easeOut' }}
+			>
 				{/* Close button — top-right, inside PWA safe area */}
 				<button
 					type="button"
@@ -476,7 +481,9 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 					<div ref={progressRef} className="h-full bg-mansion-gold" style={{ width: '0%' }} />
 				</div>
 
-				</motion.div>{/* end delayed overlays */}
+				</motion.div>/* end delayed overlays */
+				)}
+				</AnimatePresence>
 
 			<div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', bottom: '60px' }}>
 				<div className="flex flex-col items-center">
@@ -912,7 +919,7 @@ export default function StoryUploadPage() {
 			setShowPreview(true);
 			setShowFinalizingOverlay(true);
 			const _finStart = performance.now();
-			const _finDuration = 4000;
+			const _finDuration = 2000;
 			const _finTick = (now) => {
 				const t = Math.min((now - _finStart) / _finDuration, 1);
 				setFinalizingProgress(t);
