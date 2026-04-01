@@ -576,6 +576,7 @@ export default function StoryUploadPage() {
 	const [errorMessage, setErrorMessage] = useState('');
 	const [elapsedSeconds, setElapsedSeconds] = useState(0);
 	const [showPreview, setShowPreview] = useState(false);
+	const [showFinalizingOverlay, setShowFinalizingOverlay] = useState(false);
 	const [previewConfirmed, setPreviewConfirmed] = useState(false);
 	const [engineStatus, setEngineStatus] = useState('idle');
 	const [storyBackdropUrl, setStoryBackdropUrl] = useState('');
@@ -700,6 +701,7 @@ export default function StoryUploadPage() {
 		setFinalizingProgress(0);
 		setElapsedSeconds(0);
 		setShowPreview(false);
+		setShowFinalizingOverlay(false);
 		setPreviewConfirmed(false);
 		uploadTokenRef.current = '';
 		setPhase('idle');
@@ -904,19 +906,20 @@ export default function StoryUploadPage() {
 				processingTimeLabel: formatElapsedSeconds(processingElapsedSeconds),
 			});
 			setPreviewConfirmed(false);
-			// Animate the final 5% of the progress bar over 2.5s before revealing the video
-			await new Promise(resolve => {
-				const startTime = performance.now();
-				const duration = 10000;
-				function tick(now) {
-					const t = Math.min((now - startTime) / duration, 1);
-					setFinalizingProgress(t);
-					if (t < 1) requestAnimationFrame(tick);
-					else resolve();
-				}
-				requestAnimationFrame(tick);
-			});
+			// Show preview immediately so the video starts buffering in the background.
+			// The finalizing overlay sits on top and animates the last 5% of the bar
+			// over ~10 seconds — by the time it fades, the video is ready to play.
 			setShowPreview(true);
+			setShowFinalizingOverlay(true);
+			const _finStart = performance.now();
+			const _finDuration = 10000;
+			const _finTick = (now) => {
+				const t = Math.min((now - _finStart) / _finDuration, 1);
+				setFinalizingProgress(t);
+				if (t < 1) requestAnimationFrame(_finTick);
+				else setShowFinalizingOverlay(false);
+			};
+			requestAnimationFrame(_finTick);
 		} catch (error) {
 			setErrorMessage(error?.message || 'No se pudo publicar la historia.');
 			setPhase('idle');
@@ -1242,6 +1245,63 @@ export default function StoryUploadPage() {
 								</motion.section>
 							)}
 						</AnimatePresence>
+
+						{/* Finalizing overlay — sits on top of StoryPreview while video buffers in background */}
+						<AnimatePresence>
+							{showFinalizingOverlay && (
+								<motion.div
+									key="finalizing-overlay"
+									initial={{ opacity: 1 }}
+									exit={{ opacity: 0 }}
+									transition={{ duration: 0.5, ease: 'easeOut' }}
+									className="absolute inset-0 z-50 flex flex-col px-6 pb-8 pt-44 sm:px-8 sm:pt-48"
+									style={{ background: 'inherit' }}
+								>
+									<div className="mt-auto mb-6 sm:mb-10">
+										<div className="rounded-[1.75rem] border border-white/12 bg-black/45 backdrop-blur-md p-6 sm:p-7 shadow-[0_16px_48px_rgba(0,0,0,0.32)]">
+											<div className="flex items-center gap-5 mb-6">
+												<div className="relative flex-shrink-0">
+													<svg className="w-16 h-16 -rotate-90" viewBox="0 0 56 56">
+														<circle cx="28" cy="28" r="23" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
+														<circle cx="28" cy="28" r="23" fill="none" stroke="url(#finGrad)" strokeWidth="4" strokeLinecap="round" strokeDasharray="144.5 144.5" />
+														<defs>
+															<linearGradient id="finGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+																<stop offset="0%" stopColor="#d4af37" />
+																<stop offset="100%" stopColor="#f0d060" />
+															</linearGradient>
+														</defs>
+													</svg>
+													<span className="absolute inset-0 flex items-center justify-center text-[13px] font-bold text-mansion-gold tabular-nums">100%</span>
+												</div>
+												<div className="flex-1 min-w-0">
+													<p className="text-base font-semibold text-white leading-snug">Preparando reproducción…</p>
+													<p className="text-sm text-white/50 mt-1 truncate">Optimizando para reproducción</p>
+												</div>
+											</div>
+											<div className="space-y-2">
+												<div className="flex items-center justify-between text-sm text-white/55">
+													<span>Procesando</span>
+													<span className="tabular-nums font-medium">100%</span>
+												</div>
+												<div className="h-2.5 w-full rounded-full bg-white/8 overflow-hidden">
+													<div className="h-full rounded-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light" style={{ width: '100%' }} />
+												</div>
+											</div>
+											<div className="mt-4 space-y-2">
+												<div className="flex items-center justify-between text-sm text-white/55">
+													<span>Verificando</span>
+													<span className="tabular-nums font-medium">{verificationPercent}%</span>
+												</div>
+												<div className="h-2.5 w-full rounded-full bg-white/8 overflow-hidden">
+													<div className="h-full rounded-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${verificationPercent}%` }} />
+												</div>
+											</div>
+										</div>
+									</div>
+								</motion.div>
+							)}
+						</AnimatePresence>
+
 					</StoryStageShell>
 				</div>
 			</div>
