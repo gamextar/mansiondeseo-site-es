@@ -907,7 +907,7 @@ export default function StoryUploadPage() {
 			// Animate the final 5% of the progress bar over 2.5s before revealing the video
 			await new Promise(resolve => {
 				const startTime = performance.now();
-				const duration = 6000;
+				const duration = 10000;
 				function tick(now) {
 					const t = Math.min((now - startTime) / duration, 1);
 					setFinalizingProgress(t);
