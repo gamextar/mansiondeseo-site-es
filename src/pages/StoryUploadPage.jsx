@@ -123,6 +123,78 @@ async function loadVideoMetadata(fileUrl) {
 	});
 }
 
+async function captureVideoPoster(fileUrl, { maxWidth = 720, quality = 0.82 } = {}) {
+	const video = document.createElement('video');
+	video.preload = 'auto';
+	video.muted = true;
+	video.playsInline = true;
+
+	return new Promise((resolve, reject) => {
+		const cleanup = () => {
+			video.pause();
+			video.removeAttribute('src');
+			video.load();
+		};
+
+		const fail = () => {
+			cleanup();
+			reject(new Error('No se pudo capturar la portada del video.'));
+		};
+
+		video.onerror = fail;
+
+		video.onloadeddata = () => {
+			requestAnimationFrame(() => {
+				try {
+					const sourceWidth = video.videoWidth || 1;
+					const sourceHeight = video.videoHeight || 1;
+					const targetWidth = Math.min(sourceWidth, maxWidth);
+					const targetHeight = Math.max(1, Math.round((sourceHeight / sourceWidth) * targetWidth));
+					const canvas = document.createElement('canvas');
+					canvas.width = targetWidth;
+					canvas.height = targetHeight;
+					const context = canvas.getContext('2d');
+					if (!context) throw new Error('Canvas no disponible');
+					context.drawImage(video, 0, 0, targetWidth, targetHeight);
+					canvas.toBlob((blob) => {
+						cleanup();
+						if (!blob) {
+							reject(new Error('No se pudo generar la portada del video.'));
+							return;
+						}
+						resolve(URL.createObjectURL(blob));
+					}, 'image/jpeg', quality);
+				} catch (error) {
+					fail(error);
+				}
+			});
+		};
+
+		video.src = fileUrl;
+	});
+}
+
+function StoryStageShell({ backgroundImageUrl, children }) {
+	return (
+		<div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden bg-black">
+			{backgroundImageUrl ? (
+				<img src={backgroundImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+			) : (
+				<div
+					className="absolute inset-0"
+					style={{
+						background: 'radial-gradient(circle at 20% 20%, rgba(212,175,55,0.12), transparent 32%), radial-gradient(circle at 82% 18%, rgba(120,16,42,0.16), transparent 28%), linear-gradient(180deg, rgba(10,10,16,0.98) 0%, rgba(17,17,24,0.96) 100%)',
+					}}
+				/>
+			)}
+			<div className="absolute inset-0 bg-black/38" />
+			<div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent pointer-events-none lg:rounded-t-2xl" />
+			<div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black/70 via-black/18 to-transparent pointer-events-none lg:rounded-b-2xl" />
+			<div className="relative z-10 flex h-full flex-col">{children}</div>
+		</div>
+	);
+}
+
 // ── Feed-style fullscreen story preview ─────────────────────────────────────
 function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize = 52 }) {
 	const videoRef = useRef(null);
@@ -350,6 +422,7 @@ export default function StoryUploadPage() {
 	const [showPreview, setShowPreview] = useState(false);
 	const [previewConfirmed, setPreviewConfirmed] = useState(false);
 	const [engineStatus, setEngineStatus] = useState('idle');
+	const [storyBackdropUrl, setStoryBackdropUrl] = useState('');
 
 	const outputProfile = getOutputProfile(sourceResolution);
 	const storyStep = result?.id ? (showPreview ? 'preview' : previewConfirmed ? 'done' : 'preview') : sourceFile ? 'process' : 'pick';
@@ -383,6 +456,12 @@ export default function StoryUploadPage() {
 			clearInterval(timerIntervalRef.current);
 		};
 	}, []);
+
+	useEffect(() => () => {
+		if (storyBackdropUrl) {
+			URL.revokeObjectURL(storyBackdropUrl);
+		}
+	}, [storyBackdropUrl]);
 
 	const ensureEngineLoaded = async ({ suppressErrors = false } = {}) => {
 		const ffmpeg = ffmpegRef.current;
@@ -442,8 +521,16 @@ export default function StoryUploadPage() {
 		setResult(null);
 	};
 
+	const resetStoryBackdrop = () => {
+		if (storyBackdropUrl) {
+			URL.revokeObjectURL(storyBackdropUrl);
+		}
+		setStoryBackdropUrl('');
+	};
+
 	const resetStoryFlow = () => {
 		resetResult();
+		resetStoryBackdrop();
 		setSourceFile(null);
 		setSourceDuration(0);
 		setSourceResolution(null);
@@ -479,6 +566,7 @@ export default function StoryUploadPage() {
 		if (!file) return;
 
 		resetResult();
+		resetStoryBackdrop();
 		setErrorMessage('');
 		setSourceDuration(0);
 		setSourceResolution(null);
@@ -493,13 +581,17 @@ export default function StoryUploadPage() {
 		const tempSourceUrl = URL.createObjectURL(file);
 
 		try {
-			const [metadata] = await Promise.all([
+			const [metadata, backdropUrl] = await Promise.all([
 				loadVideoMetadata(tempSourceUrl),
+				captureVideoPoster(tempSourceUrl).catch(() => ''),
 				ensureEngineLoaded(),
 			]);
 
 			setSourceDuration(metadata.duration);
 			setSourceResolution(metadata.resolution);
+			if (backdropUrl) {
+				setStoryBackdropUrl(backdropUrl);
+			}
 			await processAndUploadStory({
 				file,
 				duration: metadata.duration,
@@ -702,7 +794,7 @@ export default function StoryUploadPage() {
 				<div className="absolute bottom-[-12%] left-[-6%] w-[460px] h-[460px] rounded-full bg-mansion-gold/10 blur-3xl" />
 			</div>
 
-			<div className="relative max-w-xl mx-auto px-4 sm:px-6 py-8 sm:py-10 min-h-screen flex items-center justify-center">
+			<div className="relative w-full min-h-screen flex items-center justify-center">
 				<AnimatePresence mode="wait">
 					{storyStep === 'pick' && (
 						<motion.section
@@ -712,54 +804,57 @@ export default function StoryUploadPage() {
 							exit={{ opacity: 0, y: -20 }}
 							transition={{ duration: 0.28, ease: 'easeOut' }}
 							style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-							className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 p-8 sm:p-10 flex flex-col items-center text-center relative"
+							className="w-full h-[100dvh]"
 						>
-							<button
-								type="button"
-								onClick={() => navigate('/perfil')}
-								className="absolute right-4 top-4 sm:right-6 sm:top-6 w-8 h-8 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/10 transition-colors"
-								aria-label="Cerrar nueva historia"
-							>
-								<X className="w-4 h-4" />
-							</button>
-							<div className="w-full flex items-center justify-center gap-2 mb-8">
-								{storySteps.map((step, index) => {
-									const active = storyStepIndex === index;
-									const complete = storyStepIndex > index;
+							<StoryStageShell>
+								<button
+									type="button"
+									onClick={() => navigate('/perfil')}
+									className="absolute right-4 top-4 sm:right-6 sm:top-6 z-20 w-10 h-10 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+									aria-label="Cerrar nueva historia"
+								>
+									<X className="w-5 h-5" />
+								</button>
+								<div className="flex h-full flex-col items-center justify-center px-8 text-center">
+									<div className="w-full flex items-center justify-center gap-2 mb-10">
+										{storySteps.map((step, index) => {
+											const active = storyStepIndex === index;
+											const complete = storyStepIndex > index;
 
-									return (
-										<div key={step.id} className="flex items-center gap-2">
-											<div className={`w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold transition-transform duration-300 ${active || complete ? 'bg-mansion-gold text-mansion-base border-mansion-gold scale-100' : 'bg-white/5 text-text-dim border-white/10 scale-95'}`}>
-												{index + 1}
-											</div>
-											{index < storySteps.length - 1 && <div className={`w-6 sm:w-10 h-px ${storyStepIndex > index ? 'bg-mansion-gold/70' : 'bg-white/10'}`} />}
-										</div>
-									);
-								})}
-							</div>
-
-							<motion.div
-								initial={{ scale: 0.8, opacity: 0 }}
-								animate={{ scale: 1, opacity: 1 }}
-								transition={{ delay: 0.08, duration: 0.28, ease: 'easeOut' }}
-								style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-								className="w-20 h-20 rounded-[1.25rem] bg-mansion-gold/10 border border-mansion-gold/20 flex items-center justify-center mb-6 shadow-[0_0_0_1px_rgba(212,175,55,0.06)]"
-							>
-								<Film className="w-9 h-9 text-mansion-gold" />
-							</motion.div>
-							<h1 className="font-display text-2xl sm:text-3xl font-bold text-text-primary">Nueva Historia</h1>
-							<p className="text-text-muted mt-2 mb-8 max-w-sm">Seleccioná tu video para publicarlo como historia.</p>
-							<label className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors cursor-pointer shadow-[0_12px_30px_rgba(212,175,55,0.18)]">
-								<Upload className="w-5 h-5" />
-								Seleccionar video
-								<input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
-							</label>
-							{engineStatus === 'loading' && (
-								<p className="text-xs text-text-dim mt-4">Preparando el motor de video para acelerar el siguiente paso...</p>
-							)}
-							{engineStatus === 'ready' && (
-								<p className="text-xs text-mansion-gold/90 mt-4">Motor de video listo. El procesamiento arrancará más rápido al elegir el archivo.</p>
-							)}
+											return (
+												<div key={step.id} className="flex items-center gap-2">
+													<div className={`w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold transition-transform duration-300 ${active || complete ? 'bg-mansion-gold text-mansion-base border-mansion-gold scale-100' : 'bg-white/5 text-white/55 border-white/10 scale-95'}`}>
+														{index + 1}
+													</div>
+													{index < storySteps.length - 1 && <div className={`w-6 sm:w-10 h-px ${storyStepIndex > index ? 'bg-mansion-gold/70' : 'bg-white/10'}`} />}
+												</div>
+											);
+										})}
+									</div>
+									<motion.div
+										initial={{ scale: 0.8, opacity: 0 }}
+										animate={{ scale: 1, opacity: 1 }}
+										transition={{ delay: 0.08, duration: 0.28, ease: 'easeOut' }}
+										style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+										className="w-20 h-20 rounded-[1.25rem] bg-mansion-gold/10 border border-mansion-gold/20 flex items-center justify-center mb-6 shadow-[0_0_0_1px_rgba(212,175,55,0.06)]"
+									>
+										<Film className="w-9 h-9 text-mansion-gold" />
+									</motion.div>
+									<h1 className="font-display text-3xl sm:text-4xl font-bold text-white" style={{ textShadow: '0 3px 14px rgba(0,0,0,0.78)' }}>Nueva Historia</h1>
+									<p className="text-white/74 mt-3 mb-8 max-w-sm" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.68)' }}>Seleccioná tu video para publicarlo como historia.</p>
+									<label className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors cursor-pointer shadow-[0_12px_30px_rgba(212,175,55,0.18)]">
+										<Upload className="w-5 h-5" />
+										Seleccionar video
+										<input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
+									</label>
+									{engineStatus === 'loading' && (
+										<p className="text-xs text-white/56 mt-4" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7)' }}>Preparando el motor de video para acelerar el siguiente paso...</p>
+									)}
+									{engineStatus === 'ready' && (
+										<p className="text-xs text-mansion-gold/95 mt-4" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7)' }}>Motor de video listo. El procesamiento arrancará más rápido al elegir el archivo.</p>
+									)}
+								</div>
+							</StoryStageShell>
 						</motion.section>
 					)}
 
@@ -771,63 +866,60 @@ export default function StoryUploadPage() {
 							exit={{ opacity: 0, y: -20 }}
 							transition={{ duration: 0.28, ease: 'easeOut' }}
 							style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-							className="w-full glass-elevated rounded-[2rem] border border-mansion-border/20 overflow-hidden"
+							className="w-full h-[100dvh]"
 						>
-							<div className="px-6 sm:px-8 pt-6 sm:pt-7 pb-4 border-b border-white/10 bg-white/[0.02]">
-								<div className="flex items-center justify-center gap-2 mb-5">
-									{storySteps.map((step, index) => {
-										const active = storyStepIndex === index;
-										const complete = storyStepIndex > index;
+							<StoryStageShell backgroundImageUrl={storyBackdropUrl}>
+								<div className="flex h-full flex-col px-6 sm:px-8 pt-6 sm:pt-7 pb-8">
+									<div className="flex items-center justify-center gap-2 mb-5">
+										{storySteps.map((step, index) => {
+											const active = storyStepIndex === index;
+											const complete = storyStepIndex > index;
 
-										return (
-											<div key={step.id} className="flex items-center gap-2">
-												<div className={`w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold ${active || complete ? 'bg-mansion-gold text-mansion-base border-mansion-gold' : 'bg-white/5 text-text-dim border-white/10'}`}>
-													{index + 1}
+											return (
+												<div key={step.id} className="flex items-center gap-2">
+													<div className={`w-8 h-8 rounded-full border flex items-center justify-center text-[11px] font-semibold ${active || complete ? 'bg-mansion-gold text-mansion-base border-mansion-gold' : 'bg-white/5 text-white/55 border-white/10'}`}>
+														{index + 1}
+													</div>
+													{index < storySteps.length - 1 && <div className={`w-8 sm:w-10 h-px ${storyStepIndex > index ? 'bg-mansion-gold/70' : 'bg-white/10'}`} />}
 												</div>
-												{index < storySteps.length - 1 && <div className={`w-8 sm:w-10 h-px ${storyStepIndex > index ? 'bg-mansion-gold/70' : 'bg-white/10'}`} />}
-											</div>
-										);
-									})}
-								</div>
-								<div className="text-center">
-									<h2 className="font-display text-2xl font-semibold text-text-primary">Prepará tu historia</h2>
-									<p className="text-sm text-text-muted mt-1">En cuanto eliges el archivo, empezamos a prepararlo y publicarlo automáticamente.</p>
-								</div>
-							</div>
+											);
+										})}
+									</div>
+									<div className="text-center">
+										<h2 className="font-display text-2xl sm:text-3xl font-semibold text-white" style={{ textShadow: '0 3px 14px rgba(0,0,0,0.78)' }}>Prepará tu historia</h2>
+										<p className="text-sm text-white/72 mt-1" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.68)' }}>En cuanto eliges el archivo, empezamos a prepararlo y publicarlo automáticamente.</p>
+									</div>
 
-							<div className="p-6 sm:p-8">
-								<motion.div
-									initial={{ opacity: 0, y: 12 }}
-									animate={{ opacity: 1, y: 0 }}
-									transition={{ delay: 0.12, duration: 0.28, ease: 'easeOut' }}
-									style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-									className="mt-6"
-								>
-									{!processing ? (
-										<div className="space-y-3">
-											<div className="rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-4 text-center">
-												<p className="text-sm text-text-primary font-medium">El archivo ya fue seleccionado.</p>
-												<p className="text-xs text-text-dim mt-1">Si hubo un error, puedes elegir otro video para reintentar.</p>
-											</div>
-											<label className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-medium hover:bg-white/10 transition-colors cursor-pointer">
-												<Upload className="w-5 h-5" />
-												Elegir otro video
-												<input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
-											</label>
-											{sourceDuration > maxStoryDurationSeconds && (
-												<div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-													Se procesarán solo los primeros {maxStoryDurationSeconds}s de este video.
+									<div className="mt-auto mb-6 sm:mb-10">
+										<motion.div
+											initial={{ opacity: 0, y: 12 }}
+											animate={{ opacity: 1, y: 0 }}
+											transition={{ delay: 0.12, duration: 0.28, ease: 'easeOut' }}
+											style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+										>
+											{!processing ? (
+												<div className="space-y-3 rounded-[1.75rem] border border-white/10 bg-black/38 backdrop-blur-md p-5 sm:p-6 text-center shadow-[0_12px_40px_rgba(0,0,0,0.22)]">
+													<p className="text-sm text-white font-medium">El archivo ya fue seleccionado.</p>
+													<p className="text-xs text-white/65 mt-1">Si hubo un error, puedes elegir otro video para reintentar.</p>
+													<label className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/8 border border-white/10 text-white font-medium hover:bg-white/12 transition-colors cursor-pointer">
+														<Upload className="w-5 h-5" />
+														Elegir otro video
+														<input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
+													</label>
+													{sourceDuration > maxStoryDurationSeconds && (
+														<div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+															Se procesarán solo los primeros {maxStoryDurationSeconds}s de este video.
+														</div>
+													)}
 												</div>
-											)}
-										</div>
-									) : (
-										<div className="space-y-4 rounded-[1.5rem] border border-mansion-gold/15 bg-mansion-gold/[0.04] p-5 sm:p-6">
+											) : (
+												<div className="space-y-4 rounded-[1.75rem] border border-white/10 bg-black/40 backdrop-blur-md p-5 sm:p-6 shadow-[0_12px_40px_rgba(0,0,0,0.24)]">
 											{phase === 'preparing' && (
-												<p className="text-xs text-text-dim">Estamos preparando el video para iniciar una publicación más fluida.</p>
+														<p className="text-xs text-white/62">Estamos preparando el video para iniciar una publicación más fluida.</p>
 											)}
 											<div className="space-y-2">
 												<div className="flex items-center justify-between text-sm">
-													<span className="text-text-muted">Cargando historia</span>
+															<span className="text-white/74">Cargando historia</span>
 													<span className="font-semibold text-mansion-gold tabular-nums">{loadingStoryPercent}%</span>
 												</div>
 												<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
@@ -848,7 +940,7 @@ export default function StoryUploadPage() {
 														className="space-y-2"
 													>
 													<div className="flex items-center justify-between text-sm">
-														<span className="text-text-muted">Verificando historia</span>
+															<span className="text-white/74">Verificando historia</span>
 														<span className="font-semibold text-mansion-gold tabular-nums">{verificationPercent}%</span>
 													</div>
 													<div className="rounded-2xl bg-black/25 border border-white/10 overflow-hidden">
@@ -860,7 +952,7 @@ export default function StoryUploadPage() {
 												)}
 											</AnimatePresence>
 
-											<p className="text-xs text-text-dim">
+													<p className="text-xs text-white/62">
 												{phase === 'preparing'
 													? 'Ajustando el archivo y dejando listo el proceso inicial.'
 													: phase === 'encoding'
@@ -869,16 +961,18 @@ export default function StoryUploadPage() {
 															: 'Optimizando la historia para que se publique con mejor fluidez.'
 													: 'Publicando la historia y confirmando que quede disponible.'}
 											</p>
-										</div>
-									)}
-								</motion.div>
+												</div>
+											)}
+										</motion.div>
 
-								{errorMessage && !processing && (
-									<div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-										{errorMessage}
+										{errorMessage && !processing && (
+											<div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+												{errorMessage}
+											</div>
+										)}
 									</div>
-								)}
-							</div>
+								</div>
+							</StoryStageShell>
 						</motion.section>
 					)}
 
