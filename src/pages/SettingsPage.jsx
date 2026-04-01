@@ -74,15 +74,11 @@ export default function SettingsPage() {
   const [storyCirclePresetMedium, setStoryCirclePresetMedium] = useState(88);
   const [storyCirclePresetLarge, setStoryCirclePresetLarge] = useState(104);
   const [storyCirclePresetXl, setStoryCirclePresetXl] = useState(120);
+  const [sidebarAvatarSize, setSidebarAvatarSize] = useState(154);
   const [storyCircleGap, setStoryCircleGap] = useState(8);
   const [storyCircleBorder, setStoryCircleBorder] = useState(4);
   const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
-  const [sidebarStoryRingWidth, setSidebarStoryRingWidth] = useState(4);
   const [sidebarPreviewSize, setSidebarPreviewSize] = useState('medium');
-  const [sidebarRealPreviewSize, setSidebarRealPreviewSize] = useState(() => {
-    if (typeof window === 'undefined') return 154;
-    return window.innerWidth >= 1280 ? 173 : 154;
-  });
 
   // Video feed
   const [videoGradientHeight, setVideoGradientHeight] = useState(64);
@@ -120,7 +116,7 @@ export default function SettingsPage() {
     { key: 'small', label: 'Chico', size: 44, context: 'chips compactos o mini avatares' },
     { key: 'medium', label: 'Mediano', size: 64, context: 'tarjetas y bloques intermedios' },
     { key: 'large', label: 'Grande', size: 92, context: 'sidebar desktop y hero avatars' },
-    { key: 'sidebar', label: 'Sidebar real', size: sidebarRealPreviewSize, context: 'tamaño real del avatar en la sidebar desktop actual' },
+    { key: 'sidebar', label: 'Sidebar', size: sidebarAvatarSize, context: 'tamaño configurado del avatar en la sidebar desktop' },
   ];
   const storySizePresets = [
     { key: 'small', label: 'Chico', size: storyCirclePresetSmall },
@@ -129,20 +125,10 @@ export default function SettingsPage() {
     { key: 'xl', label: 'XL', size: storyCirclePresetXl },
   ];
   const activeSidebarPreview = sidebarPreviewOptions.find(option => option.key === sidebarPreviewSize) || sidebarPreviewOptions[1];
-  const activeSidebarRingPx = Math.max(1, Math.round((activeSidebarPreview.size * sidebarStoryRingWidth) / 100));
+  const activeSidebarRingPx = Math.max(1, Math.round((activeSidebarPreview.size * storyCircleBorder) / 100));
   const storyCircleGapPx = Math.max(0, Math.round((storyCircleSize * storyCircleGap) / 100));
   const storyCircleBorderPx = Math.max(1, Math.round((storyCircleSize * storyCircleBorder) / 100));
   const storyCircleInnerGapPx = Math.max(0, Math.round((storyCircleSize * storyCircleInnerGap) / 100));
-
-  useEffect(() => {
-    const updateSidebarRealPreviewSize = () => {
-      setSidebarRealPreviewSize(window.innerWidth >= 1280 ? 173 : 154);
-    };
-
-    updateSidebarRealPreviewSize();
-    window.addEventListener('resize', updateSidebarRealPreviewSize);
-    return () => window.removeEventListener('resize', updateSidebarRealPreviewSize);
-  }, []);
 
   useEffect(() => {
     if (!user?.is_admin) { navigate('/'); return; }
@@ -187,10 +173,10 @@ export default function SettingsPage() {
         setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? 88);
         setStoryCirclePresetLarge(s.storyCirclePresetLarge ?? 104);
         setStoryCirclePresetXl(s.storyCirclePresetXl ?? 120);
+        setSidebarAvatarSize(s.sidebarAvatarSize ?? 154);
         setStoryCircleGap(s.storyCircleGap ?? 8);
         setStoryCircleBorder(s.storyCircleBorder ?? 4);
         setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
-        setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? 4);
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
         setVideoAvatarSize(s.videoAvatarSize ?? 52);
@@ -252,10 +238,10 @@ export default function SettingsPage() {
         story_circle_preset_medium: storyCirclePresetMedium,
         story_circle_preset_large: storyCirclePresetLarge,
         story_circle_preset_xl: storyCirclePresetXl,
+        sidebar_avatar_size: sidebarAvatarSize,
         story_circle_gap: storyCircleGap,
         story_circle_border: storyCircleBorder,
         story_circle_inner_gap: storyCircleInnerGap,
-        sidebar_story_ring_width: sidebarStoryRingWidth,
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
         video_avatar_size: videoAvatarSize,
@@ -305,10 +291,10 @@ export default function SettingsPage() {
       setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? 88);
       setStoryCirclePresetLarge(s.storyCirclePresetLarge ?? 104);
       setStoryCirclePresetXl(s.storyCirclePresetXl ?? 120);
+      setSidebarAvatarSize(s.sidebarAvatarSize ?? 154);
       setStoryCircleGap(s.storyCircleGap ?? 8);
       setStoryCircleBorder(s.storyCircleBorder ?? 4);
       setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
-      setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? 4);
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
       setVideoAvatarSize(s.videoAvatarSize ?? 52);
@@ -1161,6 +1147,12 @@ export default function SettingsPage() {
                   <input type="number" min="40" max="160" value={storyCirclePresetXl} onChange={e => setStoryCirclePresetXl(Number(e.target.value) || 40)} className="w-full rounded-lg border border-white/10 bg-mansion-base px-2 py-1.5 text-sm text-text-primary outline-none focus:border-mansion-gold/40" />
                 </label>
               </div>
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:max-w-[220px]">
+                <label className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
+                  <span className="mb-1 block text-[11px] text-text-dim">Sidebar</span>
+                  <input type="number" min="72" max="220" value={sidebarAvatarSize} onChange={e => setSidebarAvatarSize(Number(e.target.value) || 72)} className="w-full rounded-lg border border-white/10 bg-mansion-base px-2 py-1.5 text-sm text-text-primary outline-none focus:border-mansion-gold/40" />
+                </label>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-white/5 bg-mansion-card/50 p-4">
@@ -1315,12 +1307,12 @@ export default function SettingsPage() {
                     <div className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
                       <div className="flex items-center justify-between gap-3 mb-2">
                         <div>
-                          <p className="text-xs font-semibold text-text-primary">Grosor del anillo</p>
-                          <p className="text-[10px] text-text-dim">Porcentaje relativo al avatar seleccionado</p>
+                          <p className="text-xs font-semibold text-text-primary">Grosor global del anillo</p>
+                          <p className="text-[10px] text-text-dim">Comparte el mismo setting que usan las stories de la home</p>
                         </div>
-                        <span className="text-sm font-semibold text-mansion-gold">{sidebarStoryRingWidth}%</span>
+                        <span className="text-sm font-semibold text-mansion-gold">{storyCircleBorder}%</span>
                       </div>
-                      <input type="range" min="1" max="18" value={sidebarStoryRingWidth} onChange={e => setSidebarStoryRingWidth(Number(e.target.value))} className="w-full accent-mansion-gold" />
+                      <input type="range" min="1" max="18" value={storyCircleBorder} onChange={e => setStoryCircleBorder(Number(e.target.value))} className="w-full accent-mansion-gold" />
                       <div className="mt-1 flex justify-between text-[10px] text-text-dim">
                         <span>1%</span>
                         <span>18%</span>
@@ -1337,7 +1329,7 @@ export default function SettingsPage() {
                       </div>
                       <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                         <p className="text-[10px] text-text-dim">Relación</p>
-                        <p className="text-sm font-semibold text-mansion-gold">{sidebarStoryRingWidth}%</p>
+                        <p className="text-sm font-semibold text-mansion-gold">{storyCircleBorder}%</p>
                       </div>
                     </div>
                   </div>
