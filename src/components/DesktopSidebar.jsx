@@ -31,7 +31,8 @@ export default function DesktopSidebar() {
   const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
   const [visitors, setVisitors] = useState([]);
-  const { user } = useAuth();
+  const { user, siteSettings } = useAuth();
+  const sidebarRingWidth = siteSettings?.sidebarStoryRingWidth ?? 4;
 
   useEffect(() => {
     if (!getToken()) return;
@@ -57,7 +58,7 @@ export default function DesktopSidebar() {
       {/* Profile avatar + name */}
       {user && (
         <Link to="/perfil" className="flex flex-col items-center py-6 border-b border-mansion-border/20 hover:opacity-90 transition-opacity">
-          <div className={`w-[60%] aspect-square rounded-full p-[3px] ${user.has_active_story ? 'bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold' : 'bg-gradient-to-br from-mansion-gold/60 to-mansion-gold-light/40'}`}>
+          <div className={`w-[60%] aspect-square rounded-full ${user.has_active_story ? 'bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold' : 'bg-gradient-to-br from-mansion-gold/60 to-mansion-gold-light/40'}`} style={{ padding: sidebarRingWidth }}>
             <div className="w-full h-full rounded-full bg-mansion-card overflow-hidden">
               {user.avatar_url ? (
                 <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
