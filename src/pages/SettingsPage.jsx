@@ -69,6 +69,7 @@ export default function SettingsPage() {
   const [navSidePadding, setNavSidePadding] = useState(16);
   const [navHeight, setNavHeight] = useState(71);
   const [navOpacity, setNavOpacity] = useState(40);
+  const [sidebarStoryRingWidth, setSidebarStoryRingWidth] = useState(4);
 
   // Video feed
   const [videoGradientHeight, setVideoGradientHeight] = useState(64);
@@ -140,6 +141,7 @@ export default function SettingsPage() {
         setNavSidePadding(s.navSidePadding ?? 16);
         setNavHeight(s.navHeight ?? 71);
         setNavOpacity(s.navOpacity ?? 40);
+        setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? 4);
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
         setVideoAvatarSize(s.videoAvatarSize ?? 52);
@@ -196,6 +198,7 @@ export default function SettingsPage() {
         nav_side_padding: navSidePadding,
         nav_height: navHeight,
         nav_opacity: navOpacity,
+        sidebar_story_ring_width: sidebarStoryRingWidth,
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
         video_avatar_size: videoAvatarSize,
@@ -240,6 +243,7 @@ export default function SettingsPage() {
       setNavSidePadding(s.navSidePadding ?? 16);
       setNavHeight(s.navHeight ?? 71);
       setNavOpacity(s.navOpacity ?? 40);
+      setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? 4);
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
       setVideoAvatarSize(s.videoAvatarSize ?? 52);
@@ -1043,6 +1047,24 @@ export default function SettingsPage() {
                 <span>Transparente</span>
                 <span className="text-mansion-gold font-medium">{navOpacity}%</span>
                 <span>Sólido</span>
+              </div>
+            </div>
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <User className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Grosor anillo historia sidebar</h3>
+                  <p className="text-[11px] text-text-dim">Borde del anillo en el avatar del perfil desktop</p>
+                </div>
+              </div>
+              <input type="range" min="1" max="16" value={sidebarStoryRingWidth} onChange={e => setSidebarStoryRingWidth(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>1px</span>
+                <span className="text-mansion-gold font-medium">{sidebarStoryRingWidth}px</span>
+                <span>16px</span>
               </div>
             </div>
 
