@@ -894,7 +894,7 @@ async function handleProfiles(request, env) {
   const profilesCacheKey = `profiles:${filter}:${country}:${search}`;
 
   // Parallel: cached settings + cached profiles + per-user data (always fresh)
-  const [settings, results, { results: favRows }, { results: favByRows }, { results: storyRows }] = await Promise.all([
+  const [settings, results, { results: favRows }, { results: favByRows }, storyRows] = await Promise.all([
     cached('settings', 300_000, () => loadSettings(env)),  // 5 min
     cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results)),  // 30s
     env.DB.prepare('SELECT target_id FROM favorites WHERE user_id = ?').bind(auth.sub).all(),
