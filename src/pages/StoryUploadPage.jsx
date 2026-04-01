@@ -564,6 +564,22 @@ export default function StoryUploadPage() {
 			: showVerificationProgress
 				? 'Verificando historia'
 				: 'Cargando historia';
+	const debugProgressValue = phase === 'preparing'
+		? 0
+		: phase === 'encoding'
+			? maskedEncodingProgress
+			: phase === 'uploading'
+				? maskedUploadProgress
+				: phase === 'done'
+					? 1
+					: 0;
+	const debugProgressLabel = phase === 'preparing'
+		? 'Preparando motor'
+		: phase === 'encoding'
+			? 'Encoding real'
+			: phase === 'uploading'
+				? 'Subida real'
+				: 'Completado';
 
 	return (
 		<div className="min-h-screen bg-mansion-base text-text-primary relative overflow-hidden">
@@ -862,11 +878,11 @@ export default function StoryUploadPage() {
 				<div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl bg-black/88 border border-white/10 shadow-2xl">
 					<Clock className="w-5 h-5 text-mansion-gold" />
 					<div>
-						<p className="text-[10px] uppercase tracking-[0.2em] text-text-dim">{progressLabel}</p>
+						<p className="text-[10px] uppercase tracking-[0.2em] text-text-dim">{debugProgressLabel}</p>
 						<p className="text-2xl font-display font-bold text-text-primary tabular-nums">{formatDebugTimer(elapsedSeconds)}</p>
 					</div>
 					<div className="ml-2 text-right">
-						<p className="text-lg font-bold text-mansion-gold tabular-nums">{Math.round(progressValue * 100)}%</p>
+						<p className="text-lg font-bold text-mansion-gold tabular-nums">{Math.round(debugProgressValue * 100)}%</p>
 					</div>
 				</div>
 			)}
