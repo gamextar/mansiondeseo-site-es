@@ -1206,9 +1206,11 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-center overflow-visible py-2">
                     <div className="relative shrink-0 rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: activeStoryPreset.size, height: activeStoryPreset.size, aspectRatio: '1 / 1' }}>
-                      <div className="absolute rounded-full bg-mansion-card overflow-hidden" style={{ inset: `${storyCircleBorder}%` }}>
-                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/10 to-white/5 text-text-muted">
-                          <User className="w-4 h-4" />
+                      <div className="absolute rounded-full bg-mansion-card" style={{ inset: `${storyCircleBorder}%` }}>
+                        <div className="h-full w-full rounded-full bg-mansion-base" style={{ padding: activeStoryPresetInnerGapPx }}>
+                          <div className="flex h-full w-full items-center justify-center rounded-full overflow-hidden bg-gradient-to-br from-white/10 to-white/5 text-text-muted">
+                            <User className="w-4 h-4" />
+                          </div>
                         </div>
                       </div>
                     </div>
