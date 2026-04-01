@@ -1190,8 +1190,8 @@ export default function SettingsPage() {
                   })}
                 </div>
 
-                <div className="grid gap-4 items-center" style={{ gridTemplateColumns: `minmax(${Math.min(activeStoryPreset.size + 20, 220)}px, max-content) minmax(0, 1fr)` }}>
-                  <div className="flex items-center justify-center overflow-visible">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center overflow-visible py-2">
                     <div className="relative shrink-0 rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: activeStoryPreset.size, height: activeStoryPreset.size, aspectRatio: '1 / 1' }}>
                       <div className="absolute rounded-full bg-mansion-card overflow-hidden" style={{ inset: `${storyCircleBorder}%` }}>
                         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/10 to-white/5 text-text-muted">
