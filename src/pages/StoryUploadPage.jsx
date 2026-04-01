@@ -14,6 +14,7 @@ const PORTRAIT_WIDTH = 720;
 const PORTRAIT_HEIGHT = 1280;
 const STORY_POSTER_FRAME_TIME_SECONDS = 0.05;
 const STORY_PREVIEW_START_DELAY_MS = 200;
+const STORY_PREVIEW_HOLD_FRAME_MS = 160;
 const FFMPEG_BASE_URL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
 const ENCODER_DEFAULTS = {
 	crf: '29',
@@ -357,6 +358,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 		if (!video) return;
 		let revealTimeoutId = null;
 		let playStartTimeoutId = null;
+		let hasPreparedInitialFrame = false;
 
 		const revealWhenFrameIsReady = () => {
 			if (typeof video.requestVideoFrameCallback === 'function') {
@@ -392,6 +394,24 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 			});
 		};
 
+		const revealAndQueuePlayback = () => {
+			if (playStartTimeoutId) clearTimeout(playStartTimeoutId);
+			revealVideo();
+			playStartTimeoutId = setTimeout(startPlayback, STORY_PREVIEW_HOLD_FRAME_MS);
+		};
+
+		const prepareInitialFrame = () => {
+			if (hasPreparedInitialFrame) return;
+			hasPreparedInitialFrame = true;
+			video.pause();
+
+			try {
+				video.currentTime = previewStartTime;
+			} catch {
+				revealAndQueuePlayback();
+			}
+		};
+
 		const previewStartTime = Number.isFinite(video.duration) && video.duration > STORY_POSTER_FRAME_TIME_SECONDS + 0.03
 			? STORY_POSTER_FRAME_TIME_SECONDS
 			: 0;
@@ -401,11 +421,14 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 		} catch {
 			video.currentTime = 0;
 		}
-		playStartTimeoutId = setTimeout(startPlayback, STORY_PREVIEW_START_DELAY_MS);
+		video.pause();
+		playStartTimeoutId = setTimeout(prepareInitialFrame, STORY_PREVIEW_START_DELAY_MS);
 		video.addEventListener('playing', revealWhenFrameIsReady);
-		video.addEventListener('loadeddata', revealWhenFrameIsReady);
-		video.addEventListener('canplay', revealWhenFrameIsReady);
+		video.addEventListener('loadeddata', prepareInitialFrame);
+		video.addEventListener('canplay', prepareInitialFrame);
+		video.addEventListener('seeked', revealAndQueuePlayback);
 		video.addEventListener('loadedmetadata', scheduleRevealFallback);
+		video.addEventListener('loadedmetadata', prepareInitialFrame);
 		scheduleRevealFallback();
 
 		const tick = () => {
@@ -420,9 +443,11 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 			if (playStartTimeoutId) clearTimeout(playStartTimeoutId);
 			if (revealTimeoutId) clearTimeout(revealTimeoutId);
 			video.removeEventListener('playing', revealWhenFrameIsReady);
-			video.removeEventListener('loadeddata', revealWhenFrameIsReady);
-			video.removeEventListener('canplay', revealWhenFrameIsReady);
+			video.removeEventListener('loadeddata', prepareInitialFrame);
+			video.removeEventListener('canplay', prepareInitialFrame);
+			video.removeEventListener('seeked', revealAndQueuePlayback);
 			video.removeEventListener('loadedmetadata', scheduleRevealFallback);
+			video.removeEventListener('loadedmetadata', prepareInitialFrame);
 			cancelAnimationFrame(rafRef.current);
 		};
 	}, [videoUrl]);
@@ -456,7 +481,6 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 				playsInline
 				preload="auto"
 				muted={isMuted}
-				autoPlay
 			/>
 
 				{/* Close button — top-right, inside PWA safe area */}
