@@ -21,10 +21,11 @@ export default function BottomNav() {
   const sidePadding = siteSettings?.navSidePadding ?? 16;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navOpacity = siteSettings?.navOpacity ?? 40;
+  const navBlur = siteSettings?.navBlur ?? 24;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
-  const blurAmount = navOpacity <= 0 ? '0px' : '24px';
+  const blurAmount = navOpacity <= 0 ? '0px' : `${navBlur}px`;
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
