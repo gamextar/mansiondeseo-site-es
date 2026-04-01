@@ -124,7 +124,7 @@ async function loadVideoMetadata(fileUrl) {
 }
 
 // ── Feed-style fullscreen story preview ─────────────────────────────────────
-function StoryPreview({ videoUrl, caption, user, onClose }) {
+function StoryPreview({ videoUrl, caption, user, onClose, avatarSize = 52 }) {
 	const videoRef = useRef(null);
 	const progressRef = useRef(null);
 	const rafRef = useRef(null);
@@ -146,42 +146,113 @@ function StoryPreview({ videoUrl, caption, user, onClose }) {
 		return () => cancelAnimationFrame(rafRef.current);
 	}, []);
 
-	const avatarSize = 48;
-
 	return (
-		<div className="fixed inset-0 z-[100] bg-black">
-			{/* Video */}
-			<video
-				ref={videoRef}
-				src={videoUrl}
-				className="absolute inset-0 w-full h-full object-cover"
-				loop
-				playsInline
-				muted={isMuted}
-				autoPlay
-			/>
+		<div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
+			<div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden bg-black">
+				{/* Video */}
+				<video
+					ref={videoRef}
+					src={videoUrl}
+					className="absolute inset-0 w-full h-full object-cover"
+					style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
+					loop
+					playsInline
+					muted={isMuted}
+					autoPlay
+				/>
 
-			{/* Top gradient */}
-			<div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none" />
+				{/* Top gradient */}
+				<div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none lg:rounded-t-2xl" />
 
-			{/* Bottom gradient */}
-			<div
-				className="absolute inset-x-0 bottom-0 pointer-events-none"
-				style={{ height: '45%', background: 'linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0.04), transparent)' }}
-			/>
+				{/* Bottom gradient */}
+				<div
+					className="absolute inset-x-0 bottom-0 pointer-events-none"
+					style={{ height: '45%', background: 'linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0.04), transparent)' }}
+				/>
 
-			{/* Close button — top-right, inside PWA safe area */}
-			<button
-				type="button"
-				onClick={onClose}
-				className="absolute z-20 flex h-14 w-14 items-center justify-center rounded-full bg-black/45 backdrop-blur-sm"
-				style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
-			>
-				<X className="h-7 w-7 text-white" />
-			</button>
+				{/* Close button — top-right, inside PWA safe area */}
+				<button
+					type="button"
+					onClick={onClose}
+					className="absolute z-20 flex h-14 w-14 items-center justify-center rounded-full bg-black/45 backdrop-blur-sm"
+					style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
+				>
+					<X className="h-7 w-7 text-white" />
+				</button>
 
-			{/* Right-side action icons (visual only, matching feed) */}
-			<div className="pointer-events-none absolute right-3 flex flex-col items-center gap-6 z-20" style={{ bottom: 28 }}>
+				{/* Right-side action icons (visual only, matching feed) */}
+				<div className="pointer-events-none absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden" style={{ bottom: 28 }}>
+					<div className="flex flex-col items-center">
+						<div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+							<Heart className="w-6 h-6 text-white" />
+						</div>
+						<span className="text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">0</span>
+					</div>
+					<div className="flex flex-col items-center">
+						<div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+							<Send className="w-6 h-6 text-white" />
+						</div>
+					</div>
+					<div className="flex flex-col items-center">
+						<div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+							<Gift className="w-6 h-6 text-mansion-gold" />
+						</div>
+					</div>
+					<div className="flex flex-col items-center" onClick={() => setIsMuted(m => !m)} style={{ pointerEvents: 'auto', cursor: 'pointer' }}>
+						<div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+							{isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
+						</div>
+					</div>
+				</div>
+
+				<div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2.5 max-w-[360px]">
+					<div className="flex flex-col items-start gap-2.5">
+						<div
+							className="rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg"
+							style={{ width: avatarSize + 12, height: avatarSize + 12 }}
+						>
+							{user?.avatar_url ? (
+								<AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
+							) : (
+								<div className="w-full h-full flex items-center justify-center text-white/60 text-xl font-bold">{(user?.username || '?')[0]}</div>
+							)}
+						</div>
+						<p className="text-white font-bold text-xl leading-tight" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.5)' }}>@{user?.username || 'usuario'}</p>
+					</div>
+					{caption && (
+						<p className="text-white/90 text-lg leading-relaxed line-clamp-3" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.6), 0 0 2px rgba(0,0,0,0.4)' }}>{caption}</p>
+					)}
+					<p className="text-white/40 text-sm mt-0.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Ahora</p>
+				</div>
+
+				{/* User info + caption overlay (mobile) */}
+				<div className="absolute left-4 right-20 z-20 lg:hidden" style={{ bottom: 20 }}>
+					<div className="flex flex-col items-start gap-2.5 mb-1">
+						<div
+							className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg"
+							style={{ width: avatarSize, height: avatarSize }}
+						>
+							{user?.avatar_url ? (
+								<AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
+							) : (
+								<div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(user?.username || '?')[0]}</div>
+							)}
+						</div>
+						<p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.5)' }}>@{user?.username || 'usuario'}</p>
+					</div>
+					{caption && (
+						<p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.6)' }}>{caption}</p>
+					)}
+					<p className="text-white/40 text-[11px] mt-1.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>Ahora</p>
+				</div>
+
+				{/* Progress bar (bottom) */}
+				<div className="absolute bottom-0 left-0 right-0 h-[3px] z-30 bg-white/10 lg:rounded-b-2xl overflow-hidden">
+					<div ref={progressRef} className="h-full bg-mansion-gold" style={{ width: '0%' }} />
+				</div>
+			</div>
+
+			<div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', bottom: '60px' }}>
 				<div className="flex flex-col items-center">
 					<div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
 						<Heart className="w-6 h-6 text-white" />
@@ -198,37 +269,11 @@ function StoryPreview({ videoUrl, caption, user, onClose }) {
 						<Gift className="w-6 h-6 text-mansion-gold" />
 					</div>
 				</div>
-				<div className="flex flex-col items-center" onClick={() => setIsMuted(m => !m)} style={{ pointerEvents: 'auto', cursor: 'pointer' }}>
+				<div className="flex flex-col items-center" onClick={() => setIsMuted(m => !m)} style={{ cursor: 'pointer' }}>
 					<div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
 						{isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
 					</div>
 				</div>
-			</div>
-
-			{/* User info + caption overlay (bottom-left, feed-style) */}
-			<div className="absolute left-4 right-20 z-20" style={{ bottom: 20 }}>
-				<div className="flex flex-col items-start gap-2.5 mb-1">
-					<div
-						className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg"
-						style={{ width: avatarSize, height: avatarSize }}
-					>
-						{user?.avatar_url ? (
-							<AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
-						) : (
-							<div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(user?.username || '?')[0]}</div>
-						)}
-					</div>
-					<p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.5)' }}>@{user?.username || 'usuario'}</p>
-				</div>
-				{caption && (
-					<p className="text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.6)' }}>{caption}</p>
-				)}
-				<p className="text-white/40 text-[11px] mt-1.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>Ahora</p>
-			</div>
-
-			{/* Progress bar (bottom) */}
-			<div className="absolute bottom-0 left-0 right-0 h-[3px] z-30 bg-white/10">
-				<div ref={progressRef} className="h-full bg-mansion-gold" style={{ width: '0%' }} />
 			</div>
 		</div>
 	);
@@ -901,6 +946,7 @@ export default function StoryUploadPage() {
 					videoUrl={result.video_url || result.previewUrl}
 					caption={result.caption}
 					user={user}
+					avatarSize={siteSettings?.videoAvatarSize ?? 52}
 					onClose={() => setShowPreview(false)}
 				/>
 			)}
