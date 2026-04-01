@@ -420,29 +420,19 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 
 	return (
 		<>
-			<AnimatePresence initial={false}>
-				{posterUrl && !isVideoVisible && (
-					<motion.img
-						key={`${posterUrl}-preview-poster`}
-						src={posterUrl}
-						alt=""
-						className="absolute inset-0 z-[1] h-full w-full object-cover"
-						initial={{ opacity: 1, scale: 1.012 }}
-						animate={{ opacity: 1, scale: 1 }}
-						exit={{ opacity: 0, scale: 1.008 }}
-						transition={{ duration: 0.28, ease: 'easeOut' }}
-					/>
-				)}
-			</AnimatePresence>
-			<motion.video
+			{posterUrl && !isVideoVisible && (
+				<img
+					src={posterUrl}
+					alt=""
+					className="absolute inset-0 z-[1] h-full w-full object-cover"
+				/>
+			)}
+			<video
 				ref={videoRef}
 				src={videoUrl}
 				poster={posterUrl || undefined}
 				className="absolute inset-0 z-0 h-full w-full object-cover"
 				style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
-				initial={{ opacity: 0, scale: 1.008 }}
-				animate={{ opacity: isVideoVisible ? 1 : 0, scale: 1 }}
-				transition={{ duration: 0.3, ease: 'easeOut' }}
 				loop
 				playsInline
 				preload="auto"
