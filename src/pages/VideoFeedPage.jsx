@@ -594,7 +594,7 @@ export default function VideoFeedPage() {
     const targetStoryUserId = initialStoryUserIdRef.current;
     if (!targetStoryUserId || stories.length === 0) return;
 
-    const targetIndex = stories.findIndex((story) => Number(story.user_id) === Number(targetStoryUserId));
+    const targetIndex = stories.findIndex((story) => String(story.user_id) === String(targetStoryUserId));
     if (targetIndex < 0) return;
 
     setActiveDispIdx(targetIndex + 1);
