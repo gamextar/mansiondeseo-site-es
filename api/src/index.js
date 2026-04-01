@@ -3094,6 +3094,9 @@ async function handleRequest(request, env) {
   if (path === '/api/payment/approved' && method === 'POST') return handlePaymentApproved(request, env);
   if (path === '/api/payment/uala-approved' && method === 'POST') return handleUalaApproved(request, env);
 
+  // Story upload is JWT-authenticated and sends large binary bodies — skip Turnstile
+  if (path === '/api/stories' && method === 'POST') return handleUploadStory(request, env);
+
   // Turnstile validation for mutations (skip for GET and dev)
   if (['POST', 'PUT', 'DELETE'].includes(method) && env.TURNSTILE_SECRET) {
     const turnstileToken = request.headers.get('X-Turnstile-Token');
@@ -3184,7 +3187,7 @@ async function handleRequest(request, env) {
 
   // ── Stories
   if (path === '/api/stories' && method === 'GET') return handleGetStories(request, env);
-  if (path === '/api/stories' && method === 'POST') return handleUploadStory(request, env);
+  // POST /api/stories is handled above (before Turnstile check)
   const storyLikeMatch = path.match(/^\/api\/stories\/([a-f0-9-]+)\/like$/);
   if (storyLikeMatch && method === 'POST') return handleToggleStoryLike(request, env, storyLikeMatch[1]);
   if (path === '/api/admin/upload-story' && method === 'POST') return handleAdminUploadStory(request, env);

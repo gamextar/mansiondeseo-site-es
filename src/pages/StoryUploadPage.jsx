@@ -339,40 +339,33 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 		let revealTimeoutId = null;
 		let hasPreparedInitialFrame = false;
 
-		/* Remove the poster only after we are confident the video is
-		   actually painting frames on screen (not just "playing"). */
 		const revealVideo = () => {
 			setIsVideoVisible(true);
 		};
 
-		const revealAfterFramesArePainting = () => {
-			if (typeof video.requestVideoFrameCallback === 'function') {
-				// Wait for 2 actual rendered frames so the compositor has
-				// something visible before we yank the poster away.
-				video.requestVideoFrameCallback(() => {
-					video.requestVideoFrameCallback(() => {
-						revealVideo();
-					});
-				});
-			} else {
-				// Fallback for browsers without rVFC (Safari < 15.4):
-				// wait 250 ms after play — enough for a few frames at 30fps.
-				setTimeout(revealVideo, 250);
-			}
-		};
-
 		const scheduleRevealFallback = () => {
 			if (revealTimeoutId) clearTimeout(revealTimeoutId);
-			revealTimeoutId = setTimeout(revealVideo, 800);
+			revealTimeoutId = setTimeout(revealVideo, 1200);
 		};
 
 		const startPlaybackAndReveal = () => {
 			video.play()
 				.then(() => {
-					revealAfterFramesArePainting();
+					if (typeof video.requestVideoFrameCallback === 'function') {
+						// Wait 3 real rendered frames — guarantees pixels on screen
+						video.requestVideoFrameCallback(() => {
+							video.requestVideoFrameCallback(() => {
+								video.requestVideoFrameCallback(() => {
+									revealVideo();
+								});
+							});
+						});
+					} else {
+						// Safari < 15.4 / iOS PWA: wait enough for several frames
+						setTimeout(revealVideo, 300);
+					}
 				})
 				.catch(() => {
-					// Autoplay blocked — reveal poster‐less anyway
 					revealVideo();
 				});
 		};
@@ -382,7 +375,6 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 			hasPreparedInitialFrame = true;
 			video.currentTime = 0;
 			video.pause();
-			// Start playback behind the poster after a short delay
 			startPlaybackAndReveal();
 		};
 
