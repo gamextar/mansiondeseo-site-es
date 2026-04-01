@@ -75,6 +75,10 @@ export default function SettingsPage() {
   const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
   const [sidebarStoryRingWidth, setSidebarStoryRingWidth] = useState(4);
   const [sidebarPreviewSize, setSidebarPreviewSize] = useState('medium');
+  const [sidebarRealPreviewSize, setSidebarRealPreviewSize] = useState(() => {
+    if (typeof window === 'undefined') return 154;
+    return window.innerWidth >= 1280 ? 173 : 154;
+  });
 
   // Video feed
   const [videoGradientHeight, setVideoGradientHeight] = useState(64);
@@ -112,9 +116,20 @@ export default function SettingsPage() {
     { key: 'small', label: 'Chico', size: 44, context: 'chips compactos o mini avatares' },
     { key: 'medium', label: 'Mediano', size: 64, context: 'tarjetas y bloques intermedios' },
     { key: 'large', label: 'Grande', size: 92, context: 'sidebar desktop y hero avatars' },
+    { key: 'sidebar', label: 'Sidebar real', size: sidebarRealPreviewSize, context: 'tamaño real del avatar en la sidebar desktop actual' },
   ];
   const activeSidebarPreview = sidebarPreviewOptions.find(option => option.key === sidebarPreviewSize) || sidebarPreviewOptions[1];
   const activeSidebarRingPx = Math.max(1, Math.round((activeSidebarPreview.size * sidebarStoryRingWidth) / 100));
+
+  useEffect(() => {
+    const updateSidebarRealPreviewSize = () => {
+      setSidebarRealPreviewSize(window.innerWidth >= 1280 ? 173 : 154);
+    };
+
+    updateSidebarRealPreviewSize();
+    window.addEventListener('resize', updateSidebarRealPreviewSize);
+    return () => window.removeEventListener('resize', updateSidebarRealPreviewSize);
+  }, []);
 
   useEffect(() => {
     if (!user?.is_admin) { navigate('/'); return; }
@@ -1148,25 +1163,6 @@ export default function SettingsPage() {
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <User className="w-4 h-4 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Grosor anillo historia sidebar</h3>
-                  <p className="text-[11px] text-text-dim">Borde del anillo en el avatar del perfil desktop</p>
-                </div>
-              </div>
-              <input type="range" min="1" max="18" value={sidebarStoryRingWidth} onChange={e => setSidebarStoryRingWidth(Number(e.target.value))} className="w-full accent-mansion-gold" />
-              <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>1%</span>
-                <span className="text-mansion-gold font-medium">{sidebarStoryRingWidth}%</span>
-                <span>18%</span>
-              </div>
-              <p className="mt-2 text-[11px] text-text-dim">Se calcula relativo al tamaño del avatar, para que escale mejor entre secciones.</p>
-            </div>
-
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
               <h3 className="text-xs font-bold text-text-dim uppercase tracking-wider mb-3">Preview anillo relativo</h3>
               <div className="rounded-xl bg-mansion-base/70 border border-white/5 p-4">
                 <div className="flex gap-2 mb-4">
@@ -1202,6 +1198,20 @@ export default function SettingsPage() {
                       <p className="text-sm font-semibold text-text-primary">Ajustes para {activeSidebarPreview.label.toLowerCase()}</p>
                       <p className="text-[11px] text-text-dim">{activeSidebarPreview.context}</p>
                     </div>
+                    <div className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <div>
+                          <p className="text-xs font-semibold text-text-primary">Grosor del anillo</p>
+                          <p className="text-[10px] text-text-dim">Porcentaje relativo al avatar seleccionado</p>
+                        </div>
+                        <span className="text-sm font-semibold text-mansion-gold">{sidebarStoryRingWidth}%</span>
+                      </div>
+                      <input type="range" min="1" max="18" value={sidebarStoryRingWidth} onChange={e => setSidebarStoryRingWidth(Number(e.target.value))} className="w-full accent-mansion-gold" />
+                      <div className="mt-1 flex justify-between text-[10px] text-text-dim">
+                        <span>1%</span>
+                        <span>18%</span>
+                      </div>
+                    </div>
                     <div className="grid grid-cols-3 gap-2">
                       <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                         <p className="text-[10px] text-text-dim">Avatar</p>
@@ -1218,7 +1228,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
-                <p className="mt-3 text-[10px] text-text-dim">Seleccioná una escala para ver cómo se traduce el porcentaje a píxeles en cada tamaño de avatar.</p>
+                <p className="mt-3 text-[10px] text-text-dim">Elegí una escala y ajustá el porcentaje solo dentro de ese panel para ver el resultado en forma más compacta.</p>
               </div>
             </div>
 
