@@ -594,13 +594,26 @@ export default function VideoFeedPage() {
     const targetStoryUserId = initialStoryUserIdRef.current;
     if (!targetStoryUserId || stories.length === 0) return;
 
-    const targetIndex = stories.findIndex((story) => story.user_id === targetStoryUserId);
+    const targetIndex = stories.findIndex((story) => Number(story.user_id) === Number(targetStoryUserId));
     if (targetIndex < 0) return;
 
     setActiveDispIdx(targetIndex + 1);
     setBoundaryOverlayIdx(null);
     initialStoryUserIdRef.current = null;
   }, [stories]);
+
+  useEffect(() => {
+    if (!activeStory?.user_id) return;
+    try {
+      const arr = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
+      const uid = Number(activeStory.user_id);
+      if (!arr.includes(uid)) {
+        arr.push(uid);
+        if (arr.length > 300) arr.splice(0, arr.length - 300);
+        localStorage.setItem('viewed_story_users', JSON.stringify(arr));
+      }
+    } catch {}
+  }, [activeStory?.user_id]);
 
   useEffect(() => {
     return subscribe((event) => {

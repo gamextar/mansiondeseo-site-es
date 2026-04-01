@@ -75,6 +75,11 @@ export default function FeedPage() {
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (settings.storyCircleBorder ?? 4)) / 100));
   const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (settings.storyCircleInnerGap ?? 3)) / 100));
 
+  const [viewedStoryUsers] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('viewed_story_users') || '[]')); }
+    catch { return new Set(); }
+  });
+
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
       {/* Pull-to-refresh indicator */}
@@ -128,10 +133,10 @@ export default function FeedPage() {
               </button>
             </motion.div>
           )}
-          {profiles.slice(0, 15).map((p) => {
+          {profiles.filter(p => p.has_active_story).slice(0, 15).map((p) => {
             const photo = getPrimaryProfilePhoto(p);
             const photoCrop = getPrimaryProfileCrop(p);
-            const isOnline = p.online;
+            const isViewed = viewedStoryUsers.has(p.id);
             const size = storyCircleSize;
             const border = storyCircleBorder;
             const innerGap = storyCircleInnerGap;
@@ -143,9 +148,9 @@ export default function FeedPage() {
                   className="flex flex-col items-center gap-1"
                 >
                   <div className={`rounded-full ${
-                    isOnline
-                      ? 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson'
-                      : 'bg-gradient-to-tr from-mansion-border/60 to-mansion-border/40'
+                    isViewed
+                      ? 'bg-white/20'
+                      : 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson'
                   }`} style={{ width: size, height: size, padding: border }}>
                     <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: innerGap }}>
                       <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">

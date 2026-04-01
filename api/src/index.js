@@ -894,15 +894,17 @@ async function handleProfiles(request, env) {
   const profilesCacheKey = `profiles:${filter}:${country}:${search}`;
 
   // Parallel: cached settings + cached profiles + per-user data (always fresh)
-  const [settings, results, { results: favRows }, { results: favByRows }] = await Promise.all([
+  const [settings, results, { results: favRows }, { results: favByRows }, { results: storyRows }] = await Promise.all([
     cached('settings', 300_000, () => loadSettings(env)),  // 5 min
     cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results)),  // 30s
     env.DB.prepare('SELECT target_id FROM favorites WHERE user_id = ?').bind(auth.sub).all(),
     env.DB.prepare('SELECT user_id FROM favorites WHERE target_id = ?').bind(auth.sub).all(),
+    cached('active_story_users', 30_000, () => env.DB.prepare('SELECT DISTINCT user_id FROM stories WHERE active = 1').all().then(r => r.results)),  // 30s
   ]);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
   const viewerFavorites = new Set(favRows.map(r => r.target_id));
   const favoritedBySet = new Set(favByRows.map(r => r.user_id));
+  const activeStoryUserIds = new Set(storyRows.map(r => r.user_id));
 
   // Filter out current user (cached query includes everyone) + map to frontend shape
   const profiles = results.filter(u => u.id !== auth.sub).slice(0, 50).map(u => {
@@ -939,6 +941,7 @@ async function handleProfiles(request, env) {
       lastActive: u.last_active,
       avatar_url: u.avatar_url,
       avatar_crop: safeParseJSON(u.avatar_crop, null),
+      has_active_story: activeStoryUserIds.has(u.id),
     };
   });
 
