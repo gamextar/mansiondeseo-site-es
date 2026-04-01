@@ -282,77 +282,86 @@ function StoryStageHeader({
 
 function AnimatedPickBackground() {
 	return (
-		<div className="absolute inset-0 overflow-hidden" style={{ background: '#07070e' }}>
-			{/* Blob 1 — gold, upper-right */}
+		<div className="absolute inset-0 overflow-hidden" style={{ background: '#050508' }}>
+			{/* Blob 1 — deep violet, top-left anchor */}
 			<motion.div
 				className="absolute rounded-full pointer-events-none"
 				style={{
-					width: '85%', height: '75%',
-					background: 'radial-gradient(circle at 38% 38%, rgba(212,175,55,0.58) 0%, rgba(212,175,55,0.18) 42%, transparent 72%)',
-					filter: 'blur(56px)',
-					top: '-28%', right: '-22%',
+					width: '110%', height: '80%',
+					background: 'radial-gradient(circle at 40% 40%, rgba(99,40,180,0.72) 0%, rgba(68,20,140,0.28) 44%, transparent 70%)',
+					filter: 'blur(72px)',
+					top: '-30%', left: '-18%',
 					willChange: 'transform',
 				}}
-				animate={{ x: [0, 38, -16, 0], y: [0, 24, -12, 0], scale: [1, 1.09, 0.93, 1] }}
-				transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+				animate={{ x: [0, 32, -14, 0], y: [0, 28, -10, 0], scale: [1, 1.08, 0.94, 1] }}
+				transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
 			/>
-			{/* Blob 2 — crimson, lower-left */}
+			{/* Blob 2 — electric blue, bottom-right */}
 			<motion.div
 				className="absolute rounded-full pointer-events-none"
 				style={{
-					width: '78%', height: '68%',
-					background: 'radial-gradient(circle at 55% 55%, rgba(148,18,48,0.68) 0%, rgba(120,16,42,0.2) 46%, transparent 74%)',
-					filter: 'blur(62px)',
-					bottom: '-24%', left: '-20%',
+					width: '95%', height: '75%',
+					background: 'radial-gradient(circle at 50% 50%, rgba(24,100,220,0.65) 0%, rgba(14,60,160,0.22) 46%, transparent 72%)',
+					filter: 'blur(68px)',
+					bottom: '-28%', right: '-16%',
 					willChange: 'transform',
 				}}
-				animate={{ x: [0, -30, 20, 0], y: [0, -22, 14, 0], scale: [1, 0.91, 1.12, 1] }}
-				transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+				animate={{ x: [0, -28, 18, 0], y: [0, -24, 12, 0], scale: [1, 0.92, 1.1, 1] }}
+				transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut', delay: 2.5 }}
 			/>
-			{/* Blob 3 — gold, drifting center accent */}
+			{/* Blob 3 — teal/cyan, center-right accent */}
 			<motion.div
 				className="absolute rounded-full pointer-events-none"
 				style={{
-					width: '52%', height: '44%',
-					background: 'radial-gradient(circle, rgba(212,175,55,0.30) 0%, transparent 68%)',
-					filter: 'blur(46px)',
-					top: '30%', left: '18%',
+					width: '60%', height: '55%',
+					background: 'radial-gradient(circle, rgba(0,200,185,0.44) 0%, rgba(0,160,148,0.12) 50%, transparent 72%)',
+					filter: 'blur(52px)',
+					top: '28%', right: '-8%',
 					willChange: 'transform, opacity',
 				}}
-				animate={{ x: [0, 22, -26, 10, 0], y: [0, -18, 10, -6, 0], opacity: [0.45, 0.9, 0.55, 0.85, 0.45] }}
-				transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut', delay: 4.5 }}
+				animate={{ x: [0, -22, 16, 0], y: [0, 18, -14, 0], opacity: [0.5, 0.95, 0.6, 0.5] }}
+				transition={{ duration: 19, repeat: Infinity, ease: 'easeInOut', delay: 5 }}
 			/>
-			{/* Blob 4 — deep crimson, top-left edge */}
+			{/* Blob 4 — magenta/pink, lower-left warmth */}
 			<motion.div
 				className="absolute rounded-full pointer-events-none"
 				style={{
-					width: '55%', height: '48%',
-					background: 'radial-gradient(circle, rgba(100,12,36,0.50) 0%, transparent 70%)',
-					filter: 'blur(50px)',
-					top: '-10%', left: '-8%',
+					width: '62%', height: '50%',
+					background: 'radial-gradient(circle, rgba(200,40,160,0.38) 0%, rgba(160,20,120,0.10) 52%, transparent 74%)',
+					filter: 'blur(58px)',
+					bottom: '5%', left: '-10%',
 					willChange: 'transform, opacity',
 				}}
-				animate={{ x: [0, 16, -12, 0], y: [0, 20, -8, 0], opacity: [0.6, 1, 0.7, 0.6] }}
-				transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+				animate={{ x: [0, 20, -16, 0], y: [0, -16, 10, 0], opacity: [0.45, 0.85, 0.55, 0.45] }}
+				transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
 			/>
-			{/* Shimmer — thin diagonal light streak */}
+			{/* Noise grain texture */}
+			<div
+				className="absolute inset-0 pointer-events-none"
+				style={{
+					backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.06\'/%3E%3C/svg%3E")',
+					backgroundSize: '160px 160px',
+					opacity: 0.55,
+					mixBlendMode: 'overlay',
+				}}
+			/>
+			{/* Slow horizontal aurora ripple */}
 			<motion.div
 				className="absolute pointer-events-none"
 				style={{
-					width: '160%', height: '1px',
-					background: 'linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.18) 35%, rgba(212,175,55,0.42) 50%, rgba(212,175,55,0.18) 65%, transparent 100%)',
-					top: '50%', left: '-30%',
-					filter: 'blur(0.5px)',
-					transform: 'rotate(-7deg)',
+					width: '200%', height: '38%',
+					background: 'linear-gradient(0deg, transparent 0%, rgba(80,40,200,0.10) 30%, rgba(0,190,200,0.13) 55%, rgba(80,40,200,0.08) 75%, transparent 100%)',
+					filter: 'blur(28px)',
+					top: '30%', left: '-50%',
 					willChange: 'transform, opacity',
 				}}
-				animate={{ y: [-140, 140], opacity: [0, 0.8, 0.8, 0] }}
-				transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 2, repeatDelay: 5 }}
+				animate={{ y: [-50, 50, -50], opacity: [0.6, 1, 0.6] }}
+				transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
 			/>
-			{/* Subtle vignette overlay */}
+			{/* Vignette */}
 			<div
 				className="absolute inset-0 pointer-events-none"
-				style={{ background: 'radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%)' }}
+				style={{ background: 'radial-gradient(ellipse at 50% 50%, transparent 35%, rgba(0,0,0,0.65) 100%)' }}
 			/>
 		</div>
 	);
