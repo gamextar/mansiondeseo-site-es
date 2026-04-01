@@ -277,7 +277,12 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 			</div>
 
 			<div className="absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-5" style={{ bottom: 'clamp(120px, 24vh, 220px)' }}>
-				<div className="flex flex-col items-center gap-2">
+				<motion.div
+					initial={{ opacity: 0, y: 12 }}
+					animate={{ opacity: 1, y: 0 }}
+					transition={{ delay: 0.08, duration: 0.24, ease: 'easeOut' }}
+					className="flex flex-col items-center gap-2"
+				>
 					<button
 						type="button"
 						onClick={onClose}
@@ -287,8 +292,13 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 						<X className="h-7 w-7" />
 					</button>
 					<span className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-white/78">Cancelar</span>
-				</div>
-				<div className="flex flex-col items-center gap-2">
+				</motion.div>
+				<motion.div
+					initial={{ opacity: 0, y: 12 }}
+					animate={{ opacity: 1, y: 0 }}
+					transition={{ delay: 0.14, duration: 0.24, ease: 'easeOut' }}
+					className="flex flex-col items-center gap-2"
+				>
 					<button
 						type="button"
 						onClick={onConfirm}
@@ -298,7 +308,7 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 						<CheckCircle2 className="h-7 w-7" />
 					</button>
 					<span className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-mansion-gold-light">Publicar</span>
-				</div>
+				</motion.div>
 			</div>
 		</div>
 	);
