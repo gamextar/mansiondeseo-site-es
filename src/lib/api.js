@@ -114,7 +114,7 @@ async function apiFetch(path, options = {}) {
 }
 
 async function apiUpload(path, options = {}) {
-  const token = getToken();
+  const token = options.tokenOverride ?? getToken();
   const headers = { ...options.headers };
   const method = options.method || 'POST';
 
@@ -484,7 +484,7 @@ function invalidateStoryFeedCache() {
   } catch {}
 }
 
-export async function uploadStory(file, { caption = '', onProgress } = {}) {
+export async function uploadStory(file, { caption = '', onProgress, tokenOverride } = {}) {
   const params = new URLSearchParams();
   if (caption) params.set('caption', caption);
   const qs = params.toString();
@@ -494,6 +494,7 @@ export async function uploadStory(file, { caption = '', onProgress } = {}) {
     headers: { 'Content-Type': file.type },
     body,
     onProgress,
+	 tokenOverride,
   });
   invalidateStoryFeedCache();
   return data;

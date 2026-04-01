@@ -6,7 +6,7 @@ import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
-import { uploadStory } from '../lib/api';
+import { getToken, uploadStory } from '../lib/api';
 
 const LANDSCAPE_WIDTH = 1280;
 const LANDSCAPE_HEIGHT = 720;
@@ -330,6 +330,7 @@ export default function StoryUploadPage() {
 	};
 	const ffmpegRef = useRef(null);
 	const loadPromiseRef = useRef(null);
+	const uploadTokenRef = useRef('');
 	const resultPreviewUrlRef = useRef('');
 	const activeEncodeDurationRef = useRef(0);
 	const isTranscodingRef = useRef(false);
@@ -451,6 +452,7 @@ export default function StoryUploadPage() {
 		setElapsedSeconds(0);
 		setShowPreview(false);
 		setPreviewConfirmed(false);
+		uploadTokenRef.current = '';
 		setPhase('idle');
 		setErrorMessage('');
 		clearInterval(timerIntervalRef.current);
@@ -481,6 +483,7 @@ export default function StoryUploadPage() {
 		setSourceDuration(0);
 		setSourceResolution(null);
 		setSourceFile(file);
+		uploadTokenRef.current = getToken() || '';
 		setEncodingProgress(0);
 		setUploadProgress(0);
 		setPhase('preparing');
@@ -615,6 +618,7 @@ export default function StoryUploadPage() {
 			setPhase('uploading');
 
 			const story = await uploadStory(encoded.file, {
+				tokenOverride: uploadTokenRef.current || getToken() || undefined,
 				onProgress: (progress) => setUploadProgress(clamp(progress, 0, 1)),
 			});
 
