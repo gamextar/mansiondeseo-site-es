@@ -12,6 +12,7 @@ const LANDSCAPE_WIDTH = 1280;
 const LANDSCAPE_HEIGHT = 720;
 const PORTRAIT_WIDTH = 720;
 const PORTRAIT_HEIGHT = 1280;
+const STORY_POSTER_FRAME_TIME_SECONDS = 0.05;
 const FFMPEG_BASE_URL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
 const ENCODER_DEFAULTS = {
 	crf: '29',
@@ -216,6 +217,17 @@ async function captureVideoPoster(fileUrl, { maxWidth = 720, quality = 0.82 } = 
 		const scheduleCapture = () => {
 			if (captureRequested || settled) return;
 			captureRequested = true;
+			const safeSeekTime = Number.isFinite(video.duration) && video.duration > STORY_POSTER_FRAME_TIME_SECONDS + 0.03
+				? STORY_POSTER_FRAME_TIME_SECONDS
+				: 0;
+
+			if (safeSeekTime > 0) {
+				try {
+					video.currentTime = safeSeekTime;
+					return;
+				} catch {}
+			}
+
 			captureFrame();
 		};
 
