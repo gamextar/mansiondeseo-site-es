@@ -267,6 +267,7 @@ export default function StoryUploadPage() {
 	const [errorMessage, setErrorMessage] = useState('');
 	const [elapsedSeconds, setElapsedSeconds] = useState(0);
 	const [showPreview, setShowPreview] = useState(false);
+	const [engineStatus, setEngineStatus] = useState('idle');
 
 	const outputProfile = getOutputProfile(sourceResolution);
 	const storyStep = result?.id ? 'done' : sourceFile ? 'process' : 'pick';
@@ -301,7 +302,7 @@ export default function StoryUploadPage() {
 		};
 	}, []);
 
-	const ensureEngineLoaded = async () => {
+	const ensureEngineLoaded = async ({ suppressErrors = false } = {}) => {
 		const ffmpeg = ffmpegRef.current;
 		if (ffmpeg.loaded) return ffmpeg;
 		if (loadPromiseRef.current) {
@@ -318,7 +319,9 @@ export default function StoryUploadPage() {
 		try {
 			await loadPromiseRef.current;
 		} catch (error) {
-			setErrorMessage(error?.message || 'Error al cargar FFmpeg.');
+			if (!suppressErrors) {
+				setErrorMessage(error?.message || 'Error al cargar FFmpeg.');
+			}
 			throw error;
 		} finally {
 			loadPromiseRef.current = null;
@@ -326,6 +329,28 @@ export default function StoryUploadPage() {
 
 		return ffmpeg;
 	};
+
+	useEffect(() => {
+		let cancelled = false;
+
+		setEngineStatus(ffmpegRef.current?.loaded ? 'ready' : 'loading');
+
+		ensureEngineLoaded({ suppressErrors: true })
+			.then(() => {
+				if (!cancelled) {
+					setEngineStatus('ready');
+				}
+			})
+			.catch(() => {
+				if (!cancelled) {
+					setEngineStatus('idle');
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, []);
 
 	const resetResult = () => {
 		if (resultPreviewUrlRef.current) {
@@ -640,6 +665,12 @@ export default function StoryUploadPage() {
 								Seleccionar video
 								<input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
 							</label>
+							{engineStatus === 'loading' && (
+								<p className="text-xs text-text-dim mt-4">Preparando el motor de video para acelerar el siguiente paso...</p>
+							)}
+							{engineStatus === 'ready' && (
+								<p className="text-xs text-mansion-gold/90 mt-4">Motor de video listo. El procesamiento arrancará más rápido al elegir el archivo.</p>
+							)}
 						</motion.section>
 					)}
 
