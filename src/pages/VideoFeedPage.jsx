@@ -606,7 +606,7 @@ export default function VideoFeedPage() {
     if (!activeStory?.user_id) return;
     try {
       const arr = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
-      const uid = Number(activeStory.user_id);
+      const uid = String(activeStory.user_id);
       if (!arr.includes(uid)) {
         arr.push(uid);
         if (arr.length > 300) arr.splice(0, arr.length - 300);

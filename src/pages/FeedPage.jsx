@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Radio } from 'lucide-react';
@@ -75,10 +75,19 @@ export default function FeedPage() {
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (settings.storyCircleBorder ?? 4)) / 100));
   const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (settings.storyCircleInnerGap ?? 3)) / 100));
 
-  const [viewedStoryUsers] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('viewed_story_users') || '[]')); }
-    catch { return new Set(); }
-  });
+  const viewedRaw = useSyncExternalStore(
+    useCallback((cb) => {
+      const handler = () => cb();
+      window.addEventListener('storage', handler);
+      window.addEventListener('focus', handler);
+      window.addEventListener('visibilitychange', handler);
+      return () => { window.removeEventListener('storage', handler); window.removeEventListener('focus', handler); window.removeEventListener('visibilitychange', handler); };
+    }, []),
+    () => localStorage.getItem('viewed_story_users') || '[]',
+  );
+  const viewedStoryUsers = useMemo(() => {
+    try { return new Set(JSON.parse(viewedRaw)); } catch { return new Set(); }
+  }, [viewedRaw]);
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
