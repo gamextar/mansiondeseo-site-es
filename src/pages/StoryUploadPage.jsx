@@ -386,7 +386,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 					className="absolute inset-0 z-20"
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
-					transition={{ delay: 1.5, duration: 0.4, ease: 'easeOut' }}
+					transition={{ delay: 2.5, duration: 0.7, ease: 'easeOut' }}
 					style={{ pointerEvents: 'none' }}
 				>
 				{/* Close button — top-right, inside PWA safe area */}
