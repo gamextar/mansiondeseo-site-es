@@ -326,6 +326,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 	const videoRef = useRef(null);
 	const progressRef = useRef(null);
 	const rafRef = useRef(null);
+	const overlayRef = useRef(null);
 	const [isMuted, setIsMuted] = useState(true);
 
 	useEffect(() => {
@@ -381,20 +382,24 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 				muted={isMuted}
 			/>
 
-				{/* All overlays — fade in after 1.5s so the video is seen cleanly first */}
+				{/* All overlays — fade in after delay; pointer events disabled until fully visible */}
 				<motion.div
+					ref={overlayRef}
 					className="absolute inset-0 z-20"
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
-					transition={{ delay: 2.5, duration: 0.7, ease: 'easeOut' }}
+					transition={{ delay: 3, duration: 0.7, ease: 'easeOut' }}
 					style={{ pointerEvents: 'none' }}
+					onAnimationComplete={() => {
+						if (overlayRef.current) overlayRef.current.style.pointerEvents = 'auto';
+					}}
 				>
 				{/* Close button — top-right, inside PWA safe area */}
 				<button
 					type="button"
 					onClick={onClose}
 					className={STORY_STAGE_CLOSE_BUTTON_CLASS}
-					style={{ ...STORY_STAGE_CLOSE_BUTTON_STYLE, pointerEvents: 'auto' }}
+					style={STORY_STAGE_CLOSE_BUTTON_STYLE}
 					aria-label="Cerrar vista previa"
 				>
 					<X className="h-7 w-7 text-white" />
