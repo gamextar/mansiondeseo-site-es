@@ -507,6 +507,12 @@ export async function adminDeleteStory(storyId) {
   return data;
 }
 
+export async function deleteOwnStory(storyId) {
+  const data = await apiFetch(`/stories/${storyId}`, { method: 'DELETE' });
+  invalidateStoryFeedCache();
+  return data;
+}
+
 export async function adminUploadStoryForUser(userId, file, { caption = '' } = {}) {
   const params = new URLSearchParams();
   params.set('user_id', userId);

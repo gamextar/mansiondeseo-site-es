@@ -6,7 +6,7 @@ import { useAuth } from '../App';
 import AvatarImg from '../components/AvatarImg';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
-import { getToken, uploadStory } from '../lib/api';
+import { getToken, uploadStory, deleteOwnStory } from '../lib/api';
 
 const LANDSCAPE_WIDTH = 1280;
 const LANDSCAPE_HEIGHT = 720;
@@ -225,7 +225,7 @@ async function captureVideoPoster(fileUrl, { maxWidth = 720, quality = 0.82 } = 
 
 const STORY_STAGE_VIEWPORT_CLASS = 'fixed inset-0 z-10 flex items-center justify-center p-0 sm:p-3';
 const STORY_STAGE_FRAME_CLASS = 'relative h-full w-full overflow-hidden rounded-none bg-black shadow-none sm:rounded-[1.75rem] sm:shadow-[0_18px_60px_rgba(0,0,0,0.45)] lg:my-4 lg:h-[calc(100%-32px)] lg:max-w-[520px]';
-const STORY_STAGE_CLOSE_BUTTON_CLASS = 'absolute z-20 flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60';
+const STORY_STAGE_CLOSE_BUTTON_CLASS = 'absolute z-30 flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60';
 const STORY_STAGE_CLOSE_BUTTON_STYLE = { top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 };
 
 function StoryStageHeader({
@@ -281,21 +281,23 @@ function StoryStageHeader({
 }
 
 function StoryStageShell({ backgroundImageUrl, children, variant = 'default' }) {
-	const shellOverlayClass = variant === 'pick' ? 'absolute inset-0 bg-black/18' : variant === 'preview' ? 'absolute inset-0 bg-black/14' : 'absolute inset-0 bg-black/28';
+	const shellOverlayClass = variant === 'pick' ? 'absolute inset-0 bg-black/10' : variant === 'preview' ? 'absolute inset-0 bg-black/14' : 'absolute inset-0 bg-black/28';
 	const topGradientClass = variant === 'pick'
-		? 'absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/18 via-black/6 to-transparent pointer-events-none rounded-t-[inherit]'
+		? 'absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/12 via-black/4 to-transparent pointer-events-none rounded-t-[inherit]'
 		: 'absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/32 to-transparent pointer-events-none rounded-t-[inherit]';
 	const bottomGradientClass = variant === 'pick'
-		? 'absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-black/34 via-black/10 to-transparent pointer-events-none rounded-b-[inherit]'
+		? 'absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-black/24 via-black/8 to-transparent pointer-events-none rounded-b-[inherit]'
 		: variant === 'preview'
 			? 'absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-black/58 via-black/12 to-transparent pointer-events-none rounded-b-[inherit]'
 			: 'absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black/58 via-black/16 to-transparent pointer-events-none rounded-b-[inherit]';
 
+	const useAnimatedBg = variant === 'pick' && !backgroundImageUrl;
+
 	return (
 		<div className={STORY_STAGE_FRAME_CLASS}>
 			<div
-				className="absolute inset-0"
-				style={{
+				className={`absolute inset-0${useAnimatedBg ? ' story-animated-bg' : ''}`}
+				style={useAnimatedBg ? undefined : {
 					background: 'radial-gradient(circle at 20% 20%, rgba(212,175,55,0.12), transparent 32%), radial-gradient(circle at 82% 18%, rgba(120,16,42,0.16), transparent 28%), linear-gradient(180deg, rgba(10,10,16,0.98) 0%, rgba(17,17,24,0.96) 100%)',
 				}}
 			/>
@@ -551,7 +553,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 
 export default function StoryUploadPage() {
 	const navigate = useNavigate();
-	const { user, siteSettings } = useAuth();
+	const { user, siteSettings, setUser } = useAuth();
 	const maxStoryDurationSeconds = Math.max(1, Number(siteSettings?.storyMaxDurationSeconds || 15));
 	const showProgressHud = siteSettings?.encoderShowProgressHud === true;
 	const encoderThreads = Math.max(1, Number(siteSettings?.encoderThreads || 4));
@@ -991,6 +993,15 @@ export default function StoryUploadPage() {
 	const shellVariant = storyStep === 'pick' ? 'pick' : storyStep === 'preview' ? 'preview' : 'default';
 	const activeShellBackgroundUrl = storyBackdropUrl;
 	const closeStoryUpload = () => navigate('/perfil');
+
+	const deleteAndResetStory = async () => {
+		if (result?.id) {
+			try { await deleteOwnStory(result.id); } catch { /* best-effort */ }
+		}
+		setUser(prev => ({ ...prev, has_active_story: false }));
+		resetStoryFlow();
+	};
+
 	const headerConfig = storyStep === 'pick'
 		? {
 			title: 'Nueva Historia',
@@ -1204,10 +1215,10 @@ export default function StoryUploadPage() {
 										user={user}
 										avatarSize={siteSettings?.videoAvatarSize ?? 52}
 										overlayDelay={showFinalizingOverlay ? 2.4 : 0}
-										onClose={closeStoryUpload}
+										onClose={deleteAndResetStory}
 										onConfirm={() => {
-											setShowPreview(false);
-											setPreviewConfirmed(true);
+											setUser(prev => ({ ...prev, has_active_story: true }));
+											navigate('/perfil');
 										}}
 									/>
 								</motion.section>

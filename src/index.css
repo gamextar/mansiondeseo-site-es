@@ -53,6 +53,22 @@ body {
   color: #F0EDE8;
 }
 
+/* Story upload animated background */
+@keyframes story-bg-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.story-animated-bg {
+  background: linear-gradient(135deg, 
+    rgba(212,175,55,0.18) 0%, 
+    rgba(120,16,42,0.22) 25%, 
+    rgba(10,10,16,0.95) 50%, 
+    rgba(120,16,42,0.18) 75%, 
+    rgba(212,175,55,0.15) 100%);
+  background-size: 300% 300%;
+  animation: story-bg-shift 8s ease-in-out infinite;
+}
+
 /* Custom utilities */
 @layer utilities {
   .text-gradient-gold {

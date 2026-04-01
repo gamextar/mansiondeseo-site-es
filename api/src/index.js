@@ -846,9 +846,13 @@ async function handleAppBootstrap(request, env) {
     const auth = await authenticate(request, env);
     if (!auth) return error('No autorizado', 401);
 
-    const dbUser = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first();
+    const [dbUser, activeStory] = await Promise.all([
+      env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
+      env.DB.prepare('SELECT id FROM stories WHERE user_id = ? AND active = 1 LIMIT 1').bind(auth.sub).first(),
+    ]);
     if (!dbUser) return error('Usuario no encontrado', 404);
     user = sanitizeUser(dbUser, env);
+    user.has_active_story = !!activeStory;
   }
 
   const settings = await settingsPromise;
@@ -2993,6 +2997,32 @@ async function handleAdminUploadStory(request, env) {
 }
 
 // ── Admin: DELETE /api/admin/stories/:id ───────────────
+async function handleDeleteOwnStory(request, env, storyId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  await ensureStoriesTable(env);
+
+  const story = await env.DB.prepare('SELECT id, user_id, video_url FROM stories WHERE id = ?').bind(storyId).first();
+  if (!story) return error('Historia no encontrada', 404);
+  if (story.user_id !== auth.sub) return error('No puedes borrar historias de otros usuarios', 403);
+
+  await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(storyId).run();
+
+  // Best-effort R2 delete
+  try {
+    const r2Base = env.R2_PUBLIC_URL || '';
+    if (r2Base && story.video_url && story.video_url.startsWith(r2Base)) {
+      const key = story.video_url.slice(r2Base.length + 1);
+      if (key) await env.IMAGES.delete(key);
+    }
+  } catch {
+    // R2 delete is best-effort
+  }
+
+  return json({ deleted: true, story_id: storyId });
+}
+
 async function handleAdminDeleteStory(request, env, storyId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
@@ -3190,6 +3220,8 @@ async function handleRequest(request, env) {
   // POST /api/stories is handled above (before Turnstile check)
   const storyLikeMatch = path.match(/^\/api\/stories\/([a-f0-9-]+)\/like$/);
   if (storyLikeMatch && method === 'POST') return handleToggleStoryLike(request, env, storyLikeMatch[1]);
+  const userStoryMatch = path.match(/^\/api\/stories\/([a-f0-9-]+)$/);
+  if (userStoryMatch && method === 'DELETE') return handleDeleteOwnStory(request, env, userStoryMatch[1]);
   if (path === '/api/admin/upload-story' && method === 'POST') return handleAdminUploadStory(request, env);
   const adminStoryMatch = path.match(/^\/api\/admin\/stories\/([a-f0-9-]+)$/);
   if (adminStoryMatch && method === 'DELETE') return handleAdminDeleteStory(request, env, adminStoryMatch[1]);

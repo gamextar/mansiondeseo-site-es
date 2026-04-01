@@ -15,7 +15,7 @@ export default function BottomNav() {
   const location = useLocation();
   const navigateTo = useNavigate();
   const { unreadCount } = useUnreadMessages();
-  const { siteSettings } = useAuth();
+  const { siteSettings, user } = useAuth();
 
   const bottomPadding = siteSettings?.navBottomPadding ?? 24;
   const sidePadding = siteSettings?.navSidePadding ?? 16;
@@ -77,6 +77,9 @@ export default function BottomNav() {
                     <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] rounded-full bg-mansion-crimson text-white text-[9px] font-bold flex items-center justify-center px-1">
                       {unreadCount}
                     </span>
+                  )}
+                  {to === '/perfil' && user?.has_active_story && (
+                    <span className="absolute -top-1 -right-1 w-[10px] h-[10px] rounded-full bg-gradient-to-tr from-mansion-gold to-mansion-crimson border-2 border-black/60" />
                   )}
                 </div>
 

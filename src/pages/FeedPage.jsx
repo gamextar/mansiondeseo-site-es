@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Radio } from 'lucide-react';
+import { useAuth } from '../App';
 
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.045 } } };
 const storyItem = {
@@ -39,6 +40,7 @@ export default function FeedPage() {
   const [settings, setSettings] = useState(cached?.settings || {});
   const [loading, setLoading] = useState(!cached);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const loadProfiles = useCallback((filter, { silent = false } = {}) => {
     const c = getCachedFeed(filter);
@@ -96,6 +98,27 @@ export default function FeedPage() {
           initial="hidden"
           animate="visible"
         >
+          {/* User's own story circle */}
+          {user?.has_active_story && (
+            <motion.div variants={storyItem} className="flex-shrink-0" style={{ width: (settings.storyCircleSize || 88) + 6 }}>
+              <Link to="/perfil" className="flex flex-col items-center gap-1">
+                <div className="rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: settings.storyCircleSize || 88, height: settings.storyCircleSize || 88, padding: settings.storyCircleBorder ?? 4 }}>
+                  <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: settings.storyCircleInnerGap ?? 3 }}>
+                    <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
+                      {user.avatar_url ? (
+                        <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
+                          {user.username?.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[10px] text-mansion-gold truncate w-full text-center leading-tight">Tú</span>
+              </Link>
+            </motion.div>
+          )}
           {profiles.slice(0, 15).map((p) => {
             const photo = getPrimaryProfilePhoto(p);
             const photoCrop = getPrimaryProfileCrop(p);

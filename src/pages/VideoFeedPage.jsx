@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift } from 'lucide-react';
-import { getStories, toggleStoryLike } from '../lib/api';
+import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X } from 'lucide-react';
+import { getStories, toggleStoryLike, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../App';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
@@ -75,7 +75,7 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
@@ -245,7 +245,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       </div>
 
       <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', bottom: '60px' }}>
-        <DesktopActionButtons story={story} onLike={onLike} navigate={navigate} />
+        <DesktopActionButtons story={story} onLike={onLike} navigate={navigate} onGift={onGift} />
       </div>
     </div>
   );
@@ -343,7 +343,7 @@ function MobileOverlayButton({ onPress, scrollContainerRef, className = '', styl
   );
 }
 
-function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, scrollContainerRef }) {
+function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, scrollContainerRef, onGift }) {
   const [burstTrigger, setBurstTrigger] = useState(0);
 
   const handleHeart = () => {
@@ -372,7 +372,7 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, s
           <Send className="w-6 h-6 text-white" />
         </div>
       </MobileOverlayButton>
-      <MobileOverlayButton onPress={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
+      <MobileOverlayButton onPress={() => onGift(story)} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           <Gift className="w-6 h-6 text-mansion-gold" />
         </div>
@@ -386,7 +386,7 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, s
   );
 }
 
-function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, navBottomOffset, avatarSize, scrollContainerRef }) {
+function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, navBottomOffset, avatarSize, scrollContainerRef, onGift }) {
   if (!story) return null;
 
   return (
@@ -395,7 +395,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
         className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
         style={{ bottom: `${navBottomOffset + 16}px` }}
       >
-        <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} scrollContainerRef={scrollContainerRef} />
+        <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} scrollContainerRef={scrollContainerRef} onGift={onGift} />
       </div>
 
       <div
@@ -425,7 +425,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
   );
 }
 
-function DesktopActionButtons({ story, onLike, navigate }) {
+function DesktopActionButtons({ story, onLike, navigate, onGift }) {
   const [burstTrigger, setBurstTrigger] = useState(0);
 
   const handleHeart = () => {
@@ -447,7 +447,7 @@ function DesktopActionButtons({ story, onLike, navigate }) {
           <Send className="w-8 h-8 text-white" />
         </div>
       </button>
-      <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="flex flex-col items-center group">
+      <button onClick={() => onGift(story)} className="flex flex-col items-center group">
         <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-mansion-card/90 group-hover:border-white/25" style={{ width: 72, height: 72 }}>
           <Gift className="w-8 h-8 text-mansion-gold" />
         </div>
@@ -458,8 +458,42 @@ function DesktopActionButtons({ story, onLike, navigate }) {
 
 export default function VideoFeedPage() {
   const navigate = useNavigate();
-  const { siteSettings } = useAuth();
+  const { siteSettings, user, setUser } = useAuth();
   const { subscribe } = useUnreadMessages();
+
+  // Gift modal state
+  const [giftModalOpen, setGiftModalOpen] = useState(false);
+  const [giftTargetStory, setGiftTargetStory] = useState(null);
+  const [giftCatalog, setGiftCatalog] = useState([]);
+  const [giftSent, setGiftSent] = useState(null);
+  const [sendingGift, setSendingGift] = useState(null);
+
+  const openGiftModal = useCallback((story) => {
+    setGiftTargetStory(story);
+    setGiftModalOpen(true);
+    setGiftSent(null);
+    if (giftCatalog.length === 0) {
+      getGiftCatalog().then(data => setGiftCatalog(data.gifts || [])).catch(() => {});
+    }
+  }, [giftCatalog.length]);
+
+  const handleSendGift = useCallback(async (giftId) => {
+    if (sendingGift || !giftTargetStory) return;
+    setSendingGift(giftId);
+    try {
+      const data = await apiSendGift(giftTargetStory.user_id, giftId);
+      if (user && data.coins !== undefined) {
+        setUser(prev => prev ? { ...prev, coins: data.coins } : prev);
+      }
+      setGiftSent(data.gift);
+      setTimeout(() => { setGiftModalOpen(false); setGiftSent(null); setGiftTargetStory(null); }, 1500);
+    } catch (err) {
+      alert(err.message || 'Error al enviar regalo');
+    } finally {
+      setSendingGift(null);
+    }
+  }, [sendingGift, giftTargetStory, user, setUser]);
+
   const containerRef = useRef(null);
   const isJumpingRef = useRef(false);
   const scrollEndTimer = useRef(null);
@@ -848,6 +882,7 @@ export default function VideoFeedPage() {
                     gradientHeight={gradientHeight}
                     gradientOpacity={gradientOpacity}
                     resetOnDeactivate={false}
+                    onGift={openGiftModal}
                   />
                 </div>
               );
@@ -884,6 +919,7 @@ export default function VideoFeedPage() {
                   gradientHeight={gradientHeight}
                   gradientOpacity={gradientOpacity}
                   resetOnDeactivate
+                  onGift={openGiftModal}
                 />
               </div>
             );
@@ -903,6 +939,7 @@ export default function VideoFeedPage() {
             isMuted={isMuted}
             navigate={navigate}
             scrollContainerRef={containerRef}
+            onGift={openGiftModal}
           />
         </div>
       )}
@@ -959,6 +996,85 @@ export default function VideoFeedPage() {
           </button>
         </>
       )}
+
+      {/* Gift Modal */}
+      <AnimatePresence>
+        {giftModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center"
+            onClick={() => { setGiftModalOpen(false); setGiftSent(null); setGiftTargetStory(null); }}
+          >
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-mansion-base border border-mansion-border/30 rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[80vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-mansion-border/20">
+                <div>
+                  <h3 className="font-display text-lg font-bold text-text-primary">Enviar regalo</h3>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" fill="#C9A84C" stroke="#A88A3D" strokeWidth="1.5" />
+                      <circle cx="12" cy="12" r="7" fill="none" stroke="#A88A3D" strokeWidth="0.75" />
+                      <text x="12" y="16" textAnchor="middle" fill="#8B7332" fontSize="10" fontWeight="bold" fontFamily="serif">$</text>
+                    </svg>
+                    <span className="text-xs font-bold text-mansion-gold">{user?.coins ?? 0} monedas</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setGiftModalOpen(false); setGiftSent(null); setGiftTargetStory(null); }}
+                  className="w-8 h-8 rounded-full bg-mansion-elevated flex items-center justify-center text-text-muted hover:text-text-primary"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {giftSent ? (
+                <div className="flex flex-col items-center justify-center py-12 px-4">
+                  <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-5xl mb-3">{giftSent.gift_emoji}</motion.span>
+                  <p className="text-text-primary font-semibold">¡Regalo enviado!</p>
+                  <p className="text-text-dim text-sm mt-1">{giftSent.gift_name} para @{giftTargetStory?.username}</p>
+                </div>
+              ) : (
+                <div className="p-4 overflow-y-auto max-h-[60vh]">
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {giftCatalog.map((gift) => {
+                      const canAfford = (user?.coins ?? 0) >= gift.price;
+                      return (
+                        <button
+                          key={gift.id}
+                          onClick={() => canAfford && handleSendGift(gift.id)}
+                          disabled={!canAfford || !!sendingGift}
+                          className={`flex flex-col items-center gap-1 p-3 rounded-2xl border transition-all ${
+                            canAfford
+                              ? 'bg-mansion-card/60 border-mansion-border/20 hover:border-mansion-gold/40 hover:bg-mansion-gold/5 active:scale-95'
+                              : 'bg-mansion-card/30 border-mansion-border/10 opacity-50'
+                          } ${sendingGift === gift.id ? 'animate-pulse' : ''}`}
+                        >
+                          <span className="text-3xl">{gift.emoji}</span>
+                          <span className="text-xs font-medium text-text-primary truncate w-full text-center">{gift.name}</span>
+                          <span className="flex items-center gap-0.5 text-[10px] text-mansion-gold font-bold">
+                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" fill="#C9A84C" stroke="#A88A3D" strokeWidth="1.5" />
+                              <text x="12" y="16" textAnchor="middle" fill="#8B7332" fontSize="10" fontWeight="bold" fontFamily="serif">$</text>
+                            </svg>
+                            {gift.price}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
