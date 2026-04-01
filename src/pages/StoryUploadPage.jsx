@@ -177,22 +177,42 @@ async function captureVideoPoster(fileUrl, { maxWidth = 720, quality = 0.82 } = 
 const STORY_STAGE_VIEWPORT_CLASS = 'fixed inset-0 z-10 flex items-center justify-center p-2 sm:p-3';
 const STORY_STAGE_FRAME_CLASS = 'relative h-full w-full overflow-hidden rounded-[1.75rem] bg-black shadow-[0_18px_60px_rgba(0,0,0,0.45)] sm:rounded-[2rem] lg:my-4 lg:h-[calc(100%-32px)] lg:max-w-[520px]';
 
-function StoryStageShell({ backgroundImageUrl, children }) {
+function StoryStageShell({ backgroundImageUrl, children, variant = 'default' }) {
+	const shellOverlayClass = variant === 'pick' ? 'absolute inset-0 bg-black/18' : variant === 'preview' ? 'absolute inset-0 bg-black/14' : 'absolute inset-0 bg-black/28';
+	const topGradientClass = variant === 'pick'
+		? 'absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/18 via-black/6 to-transparent pointer-events-none rounded-t-[inherit]'
+		: 'absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/32 to-transparent pointer-events-none rounded-t-[inherit]';
+	const bottomGradientClass = variant === 'pick'
+		? 'absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-black/34 via-black/10 to-transparent pointer-events-none rounded-b-[inherit]'
+		: variant === 'preview'
+			? 'absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-black/58 via-black/12 to-transparent pointer-events-none rounded-b-[inherit]'
+			: 'absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black/58 via-black/16 to-transparent pointer-events-none rounded-b-[inherit]';
+
 	return (
 		<div className={STORY_STAGE_FRAME_CLASS}>
-			{backgroundImageUrl ? (
-				<img src={backgroundImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-			) : (
-				<div
-					className="absolute inset-0"
-					style={{
-						background: 'radial-gradient(circle at 20% 20%, rgba(212,175,55,0.12), transparent 32%), radial-gradient(circle at 82% 18%, rgba(120,16,42,0.16), transparent 28%), linear-gradient(180deg, rgba(10,10,16,0.98) 0%, rgba(17,17,24,0.96) 100%)',
-					}}
-				/>
-			)}
-			<div className="absolute inset-0 bg-black/38" />
-			<div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent pointer-events-none rounded-t-[inherit]" />
-			<div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black/70 via-black/18 to-transparent pointer-events-none rounded-b-[inherit]" />
+			<div
+				className="absolute inset-0"
+				style={{
+					background: 'radial-gradient(circle at 20% 20%, rgba(212,175,55,0.12), transparent 32%), radial-gradient(circle at 82% 18%, rgba(120,16,42,0.16), transparent 28%), linear-gradient(180deg, rgba(10,10,16,0.98) 0%, rgba(17,17,24,0.96) 100%)',
+				}}
+			/>
+			<AnimatePresence initial={false} mode="sync">
+				{backgroundImageUrl && (
+					<motion.img
+						key={backgroundImageUrl}
+						src={backgroundImageUrl}
+						alt=""
+						className="absolute inset-0 w-full h-full object-cover"
+						initial={{ opacity: 0, scale: 1.02 }}
+						animate={{ opacity: 1, scale: 1 }}
+						exit={{ opacity: 0, scale: 1.01 }}
+						transition={{ duration: 0.34, ease: 'easeOut' }}
+					/>
+				)}
+			</AnimatePresence>
+			<div className={shellOverlayClass} />
+			<div className={topGradientClass} />
+			<div className={bottomGradientClass} />
 			<div className="relative z-10 flex h-full flex-col">{children}</div>
 		</div>
 	);
@@ -222,28 +242,20 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 	}, []);
 
 	return (
-		<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/92 p-2 sm:p-3">
-			<div className={STORY_STAGE_FRAME_CLASS}>
-				{/* Video */}
-				<video
-					ref={videoRef}
-					src={videoUrl}
-					className="absolute inset-0 w-full h-full object-cover"
-					style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
-					loop
-					playsInline
-					muted={isMuted}
-					autoPlay
-				/>
-
-				{/* Top gradient */}
-				<div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none rounded-t-[inherit]" />
-
-				{/* Bottom gradient */}
-				<div
-					className="absolute inset-x-0 bottom-0 pointer-events-none"
-					style={{ height: '45%', background: 'linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0.04), transparent)' }}
-				/>
+		<>
+			<motion.video
+				ref={videoRef}
+				src={videoUrl}
+				className="absolute inset-0 z-0 h-full w-full object-cover"
+				style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
+				initial={{ opacity: 0, scale: 1.01 }}
+				animate={{ opacity: 1, scale: 1 }}
+				transition={{ duration: 0.36, ease: 'easeOut' }}
+				loop
+				playsInline
+				muted={isMuted}
+				autoPlay
+			/>
 
 				{/* Close button — top-right, inside PWA safe area */}
 				<button
@@ -325,7 +337,6 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 				<div className="absolute bottom-0 left-0 right-0 h-[3px] z-30 bg-white/10 lg:rounded-b-2xl overflow-hidden">
 					<div ref={progressRef} className="h-full bg-mansion-gold" style={{ width: '0%' }} />
 				</div>
-			</div>
 
 			<div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', bottom: '60px' }}>
 				<div className="flex flex-col items-center">
@@ -385,7 +396,7 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 					<span className="rounded-full border border-white/10 bg-black/28 px-3 py-1 text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Publicar</span>
 				</motion.div>
 			</div>
-		</div>
+		</>
 	);
 }
 
@@ -789,6 +800,7 @@ export default function StoryUploadPage() {
 			: phase === 'uploading'
 				? 'Subida real'
 				: 'Completado';
+	const shellVariant = storyStep === 'pick' ? 'pick' : storyStep === 'preview' ? 'preview' : 'default';
 
 	return (
 		<div className="min-h-screen bg-mansion-base text-text-primary relative overflow-hidden">
@@ -798,18 +810,19 @@ export default function StoryUploadPage() {
 			</div>
 
 			<div className="relative w-full h-[100dvh]">
-				<AnimatePresence mode="wait">
-					{storyStep === 'pick' && (
-						<motion.section
+				<div className={STORY_STAGE_VIEWPORT_CLASS}>
+					<StoryStageShell backgroundImageUrl={storyBackdropUrl} variant={shellVariant}>
+						<AnimatePresence mode="wait" initial={false}>
+							{storyStep === 'pick' && (
+								<motion.section
 							key="pick"
 							initial={{ opacity: 0, y: 24 }}
 							animate={{ opacity: 1, y: 0 }}
 							exit={{ opacity: 0, y: -20 }}
 							transition={{ duration: 0.28, ease: 'easeOut' }}
 							style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-							className={STORY_STAGE_VIEWPORT_CLASS}
+							className="absolute inset-0"
 						>
-							<StoryStageShell>
 								<button
 									type="button"
 									onClick={() => navigate('/perfil')}
@@ -857,21 +870,19 @@ export default function StoryUploadPage() {
 										<p className="text-xs text-mansion-gold/95 mt-4" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7)' }}>Motor de video listo. El procesamiento arrancará más rápido al elegir el archivo.</p>
 									)}
 								</div>
-							</StoryStageShell>
-						</motion.section>
-					)}
+							</motion.section>
+							)}
 
-					{storyStep === 'process' && (
-						<motion.section
+							{storyStep === 'process' && (
+								<motion.section
 							key="process"
 							initial={{ opacity: 0, y: 24 }}
 							animate={{ opacity: 1, y: 0 }}
 							exit={{ opacity: 0, y: -20 }}
 							transition={{ duration: 0.28, ease: 'easeOut' }}
 							style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-							className={STORY_STAGE_VIEWPORT_CLASS}
+							className="absolute inset-0"
 						>
-							<StoryStageShell backgroundImageUrl={storyBackdropUrl}>
 								<div className="flex h-full flex-col px-6 sm:px-8 pt-6 sm:pt-7 pb-8">
 									<div className="flex items-center justify-center gap-2 mb-5">
 										{storySteps.map((step, index) => {
@@ -884,21 +895,42 @@ export default function StoryUploadPage() {
 														{index + 1}
 													</div>
 													{index < storySteps.length - 1 && <div className={`w-8 sm:w-10 h-px ${storyStepIndex > index ? 'bg-mansion-gold/70' : 'bg-white/10'}`} />}
-												</div>
-											);
-										})}
+										</motion.section>
+										)}
+
+										{storyStep === 'preview' && result && (
+											<motion.section
+												key="preview"
+												initial={{ opacity: 0 }}
+												animate={{ opacity: 1 }}
+												exit={{ opacity: 0 }}
+												transition={{ duration: 0.24, ease: 'easeOut' }}
+												className="absolute inset-0"
+											>
+												<StoryPreview
+													videoUrl={result.video_url || result.previewUrl}
+													caption={result.caption}
+													user={user}
+													avatarSize={siteSettings?.videoAvatarSize ?? 52}
+													onClose={resetStoryFlow}
+													onConfirm={() => {
+														setShowPreview(false);
+														setPreviewConfirmed(true);
+													}}
+												/>
+											</motion.section>
+										)}
 									</div>
-									<div className="text-center">
-										<h2 className="font-display text-2xl sm:text-3xl font-semibold text-white" style={{ textShadow: '0 3px 14px rgba(0,0,0,0.78)' }}>Prepará tu historia</h2>
+										{storyStep === 'done' && (
+											<motion.section
 										<p className="text-sm text-white/72 mt-1" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.68)' }}>En cuanto eliges el archivo, empezamos a prepararlo y publicarlo automáticamente.</p>
 									</div>
 
 									<div className="mt-auto mb-6 sm:mb-10">
 										<motion.div
 											initial={{ opacity: 0, y: 12 }}
-											animate={{ opacity: 1, y: 0 }}
+										className="absolute inset-0"
 											transition={{ delay: 0.12, duration: 0.28, ease: 'easeOut' }}
-											style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
 										>
 											{!processing ? (
 												<div className="space-y-3 rounded-[1.75rem] border border-white/10 bg-black/38 backdrop-blur-md p-5 sm:p-6 text-center shadow-[0_12px_40px_rgba(0,0,0,0.22)]">
@@ -1050,25 +1082,12 @@ export default function StoryUploadPage() {
 										</div>
 									</div>
 								</div>
-							</StoryStageShell>
-						</motion.section>
-					)}
-				</AnimatePresence>
+							</motion.section>
+							)}
+						</AnimatePresence>
+					</StoryStageShell>
+				</div>
 			</div>
-
-			{showPreview && result && (
-				<StoryPreview
-					videoUrl={result.video_url || result.previewUrl}
-					caption={result.caption}
-					user={user}
-					avatarSize={siteSettings?.videoAvatarSize ?? 52}
-					onClose={resetStoryFlow}
-					onConfirm={() => {
-						setShowPreview(false);
-						setPreviewConfirmed(true);
-					}}
-				/>
-			)}
 
 			{processing && showProgressHud && (
 				<div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl bg-black/88 border border-white/10 shadow-2xl">
