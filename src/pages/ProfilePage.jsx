@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Settings, Camera, Heart, Shield, LogOut, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film } from 'lucide-react';
 import { useAuth } from '../App';
-import { logout as apiLogout, uploadImage, deletePhoto, getMe, updateProfile, getVisits, getReceivedGifts, deleteOwnStory } from '../lib/api';
+import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getVisits, getReceivedGifts, deleteOwnStory } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
@@ -410,8 +410,19 @@ export default function ProfilePage() {
               onClick={async () => {
                 if (!confirm('¿Eliminar tu historia actual?')) return;
                 try {
-                  await deleteOwnStory('current');
-                  setUser(prev => prev ? { ...prev, has_active_story: false } : prev);
+                  const storiesData = await getStories({ limit: 100 });
+                  const currentStory = (storiesData.stories || []).find((story) => story.user_id === user?.id);
+
+                  if (currentStory?.id) {
+                    await deleteOwnStory(currentStory.id);
+                  }
+
+                  const me = await getMe().catch(() => null);
+                  if (me?.user) {
+                    setUser({ ...me.user, has_active_story: false });
+                  } else {
+                    setUser(prev => prev ? { ...prev, has_active_story: false } : prev);
+                  }
                 } catch { /* best-effort */ }
               }}
               className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/25 text-red-400 font-semibold text-sm hover:bg-red-500/20 transition-colors"
