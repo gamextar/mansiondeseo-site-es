@@ -330,11 +330,13 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 	const [overlayVisible, setOverlayVisible] = useState(overlayDelay === 0);
 
 	useEffect(() => {
-		if (overlayDelay <= 0) { setOverlayVisible(true); return; }
+		// Capture the delay at mount time only — never react to prop changes
+		const delay = overlayDelay;
+		if (delay <= 0) { setOverlayVisible(true); return; }
 		setOverlayVisible(false);
-		const t = setTimeout(() => setOverlayVisible(true), overlayDelay * 1000);
+		const t = setTimeout(() => setOverlayVisible(true), delay * 1000);
 		return () => clearTimeout(t);
-	}, [overlayDelay]);
+	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 	useEffect(() => {
 		const video = videoRef.current;
