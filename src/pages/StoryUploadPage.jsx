@@ -286,10 +286,10 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 					<button
 						type="button"
 						onClick={onClose}
-						className="flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] items-center justify-center rounded-full bg-black/55 border border-white/20 backdrop-blur-md text-white hover:bg-black/65 transition-colors shadow-[0_12px_30px_rgba(0,0,0,0.28)]"
+						className="flex h-[4.75rem] w-[4.75rem] sm:h-[5.25rem] sm:w-[5.25rem] items-center justify-center rounded-full bg-black/55 border border-white/20 backdrop-blur-md text-white hover:bg-black/65 transition-colors shadow-[0_12px_30px_rgba(0,0,0,0.28)]"
 						aria-label="Cambiar historia"
 					>
-						<Upload className="h-7 w-7" />
+						<Upload className="h-8 w-8 sm:h-9 sm:w-9" />
 					</button>
 					<span className="rounded-full border border-white/10 bg-black/28 px-3 py-1 text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Cambiar</span>
 				</motion.div>
@@ -302,12 +302,12 @@ function StoryPreview({ videoUrl, caption, user, onClose, onConfirm, avatarSize 
 					<button
 						type="button"
 						onClick={onConfirm}
-						className="flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] items-center justify-center rounded-full bg-mansion-gold/90 border border-mansion-gold/40 backdrop-blur-md text-mansion-base hover:bg-mansion-gold transition-colors shadow-[0_12px_28px_rgba(212,175,55,0.24)]"
+						className="flex h-[4.75rem] w-[4.75rem] sm:h-[5.25rem] sm:w-[5.25rem] items-center justify-center rounded-full bg-emerald-500/92 border border-emerald-300/35 backdrop-blur-md text-white hover:bg-emerald-400 transition-colors shadow-[0_12px_28px_rgba(16,185,129,0.28)]"
 						aria-label="Confirmar historia"
 					>
-						<CheckCircle2 className="h-7 w-7" />
+						<CheckCircle2 className="h-8 w-8 sm:h-9 sm:w-9" />
 					</button>
-					<span className="rounded-full border border-mansion-gold/15 bg-black/28 px-3 py-1 text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-mansion-gold-light backdrop-blur-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Publicar</span>
+					<span className="rounded-full border border-white/10 bg-black/28 px-3 py-1 text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Publicar</span>
 				</motion.div>
 			</div>
 		</div>
