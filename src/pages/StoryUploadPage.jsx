@@ -159,7 +159,7 @@ async function loadVideoMetadata(fileUrl) {
 
 async function captureVideoPoster(fileUrl, { maxWidth = 720, quality = 0.82 } = {}) {
 	const video = document.createElement('video');
-	video.preload = 'metadata';
+	video.preload = 'auto';
 	video.muted = true;
 	video.playsInline = true;
 	video.setAttribute('playsinline', 'true');
@@ -327,62 +327,31 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 	const progressRef = useRef(null);
 	const rafRef = useRef(null);
 	const [isMuted, setIsMuted] = useState(true);
-	const [isVideoVisible, setIsVideoVisible] = useState(false);
-
-	useEffect(() => {
-		setIsVideoVisible(false);
-	}, [videoUrl, posterUrl]);
 
 	useEffect(() => {
 		const video = videoRef.current;
 		if (!video) return;
-		let revealTimeoutId = null;
-		let hasPreparedInitialFrame = false;
+		let playTimeoutId = null;
+		let started = false;
 
-		const revealVideo = () => {
-			setIsVideoVisible(true);
-		};
-
-		const scheduleRevealFallback = () => {
-			if (revealTimeoutId) clearTimeout(revealTimeoutId);
-			revealTimeoutId = setTimeout(revealVideo, 1200);
-		};
-
-		const startPlaybackAndReveal = () => {
-			video.play()
-				.then(() => {
-					if (typeof video.requestVideoFrameCallback === 'function') {
-						// Wait 3 real rendered frames — guarantees pixels on screen
-						video.requestVideoFrameCallback(() => {
-							video.requestVideoFrameCallback(() => {
-								video.requestVideoFrameCallback(() => {
-									revealVideo();
-								});
-							});
-						});
-					} else {
-						// Safari < 15.4 / iOS PWA: wait enough for several frames
-						setTimeout(revealVideo, 300);
-					}
-				})
-				.catch(() => {
-					revealVideo();
-				});
-		};
-
-		const prepareInitialFrame = () => {
-			if (hasPreparedInitialFrame) return;
-			hasPreparedInitialFrame = true;
-			video.currentTime = 0;
-			video.pause();
-			startPlaybackAndReveal();
+		// Video loads paused at frame 0 (visible immediately via the
+		// shell background poster). Once ready, just call play().
+		// No poster <img> overlay means zero swap = zero flicker.
+		const startPlayback = () => {
+			if (started) return;
+			started = true;
+			video.play().catch(() => {});
 		};
 
 		video.currentTime = 0;
 		video.pause();
-		video.addEventListener('loadeddata', prepareInitialFrame);
-		video.addEventListener('canplay', prepareInitialFrame);
-		scheduleRevealFallback();
+
+		// Start playback as soon as enough data is buffered
+		video.addEventListener('canplay', startPlayback);
+		// Safety: if canplay already fired before we attached
+		if (video.readyState >= 3) startPlayback();
+		// Fallback in case events don't fire
+		playTimeoutId = setTimeout(startPlayback, 600);
 
 		const tick = () => {
 			if (progressRef.current && video.duration) {
@@ -393,31 +362,18 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 		rafRef.current = requestAnimationFrame(tick);
 
 		return () => {
-			if (revealTimeoutId) clearTimeout(revealTimeoutId);
-			video.removeEventListener('loadeddata', prepareInitialFrame);
-			video.removeEventListener('canplay', prepareInitialFrame);
+			if (playTimeoutId) clearTimeout(playTimeoutId);
+			video.removeEventListener('canplay', startPlayback);
 			cancelAnimationFrame(rafRef.current);
 		};
 	}, [videoUrl]);
 
 	return (
 		<>
-			{posterUrl && (
-				<img
-					src={posterUrl}
-					alt=""
-					className="absolute inset-0 h-full w-full object-cover"
-					style={{
-						zIndex: isVideoVisible ? -1 : 1,
-						pointerEvents: 'none',
-					}}
-				/>
-			)}
 			<video
 				ref={videoRef}
 				src={videoUrl}
-				poster={posterUrl || undefined}
-				className="absolute inset-0 z-0 h-full w-full object-cover"
+				className="absolute inset-0 z-[1] h-full w-full object-cover"
 				style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
 				loop
 				playsInline
