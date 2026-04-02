@@ -61,14 +61,19 @@ export default function FeedPage() {
     loadProfiles();
   }, [navigate, loadProfiles]);
 
-  // Reload feed immediately when preferences change (seeking or interests)
+  // Reload feed when navigating back after preference changes
   useEffect(() => {
-    const onInvalidate = () => {
-      sessionStorage.removeItem(FEED_CACHE_KEY);
-      loadProfiles();
+    const onFocus = () => {
+      if (sessionStorage.getItem('mansion_feed_dirty')) {
+        sessionStorage.removeItem('mansion_feed_dirty');
+        sessionStorage.removeItem(FEED_CACHE_KEY);
+        loadProfiles();
+      }
     };
-    window.addEventListener('feed:invalidate', onInvalidate);
-    return () => window.removeEventListener('feed:invalidate', onInvalidate);
+    window.addEventListener('focus', onFocus);
+    // Also check immediately (for in-app navigation without losing focus)
+    onFocus();
+    return () => window.removeEventListener('focus', onFocus);
   }, [loadProfiles]);
 
   const { indicatorRef } = usePullToRefresh(
