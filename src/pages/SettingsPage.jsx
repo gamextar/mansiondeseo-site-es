@@ -1622,6 +1622,57 @@ export default function SettingsPage() {
           </div>
         </section>}
 
+        {/* ── EMAIL (RESEND) ── */}
+        {activeSection === 'email' && <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Mail className="w-4 h-4 text-mansion-gold" />
+            <h2 className="text-xs font-bold text-text-primary uppercase tracking-wider">Email (Resend)</h2>
+          </div>
+          <p className="text-[11px] text-text-dim mb-4">Configuración del servicio de email transaccional (verificación de cuenta, recuperación de contraseña). Si los campos están vacíos se usan las variables de entorno del Worker.</p>
+          <div className="space-y-3">
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Lock className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Resend API Key</h3>
+                  <p className="text-[11px] text-text-dim">Clave de API de Resend para enviar emails. Se obtiene en resend.com/api-keys</p>
+                </div>
+              </div>
+              <input
+                type="password"
+                value={resendApiKey}
+                onChange={e => setResendApiKey(e.target.value)}
+                placeholder="re_xxxxxxxxxxxx..."
+                autoComplete="off"
+                className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary font-mono"
+              />
+            </div>
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Mail className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Email remitente</h3>
+                  <p className="text-[11px] text-text-dim">Dirección &quot;From&quot; de los emails (debe estar verificada en Resend)</p>
+                </div>
+              </div>
+              <input
+                type="email"
+                value={mailFrom}
+                onChange={e => setMailFrom(e.target.value)}
+                placeholder="noreply@tudominio.com"
+                className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary"
+              />
+            </div>
+
+          </div>
+        </section>}
+
         {/* Save button */}
         <button
           onClick={handleSave}

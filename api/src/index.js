@@ -2015,8 +2015,8 @@ async function loadSettings(env) {
     encoderAudioMono: settings.encoder_audio_mono !== '0',
     encoderPreset: settings.encoder_preset || 'superfast',
     encoderShowProgressHud: settings.encoder_show_progress_hud === '1',
-    resendApiKey: settings.resend_api_key || '',
-    mailFrom: settings.mail_from || '',
+    resendApiKey: settings.resend_api_key || env.RESEND_API_KEY || '',
+    mailFrom: settings.mail_from || env.MAIL_FROM || 'noreply@unicoapps.com',
   };
 }
 
