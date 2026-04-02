@@ -7,6 +7,7 @@ const API_BASE = import.meta.env.PROD
   : '/api';
 const TOKEN_KEY = 'mansion_token';
 const USER_KEY = 'mansion_user';
+const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const sharedGetCache = new Map();
 const sessionCache = {
   get(key, ttlMs = 0) {
@@ -48,6 +49,15 @@ function invalidateConversationsCache() {
   sessionCache.delete('conversations');
 }
 
+function invalidateMessageHistoryCache(otherUserId) {
+  const prefix = `messages:${otherUserId}:`;
+  for (const key of sharedGetCache.keys()) {
+    if (String(key).startsWith(prefix)) {
+      sharedGetCache.delete(key);
+    }
+  }
+}
+
 function sharedGet(key, fetcher, { ttlMs = 0 } = {}) {
   const now = Date.now();
   const cached = sharedGetCache.get(key);
@@ -74,6 +84,130 @@ function sharedGet(key, fetcher, { ttlMs = 0 } = {}) {
   });
 
   return promise;
+}
+
+function getApiDebugController() {
+  if (typeof window === 'undefined') return null;
+
+  if (window.__mansionApiDebug) return window.__mansionApiDebug;
+
+  const state = {
+    enabled: localStorage.getItem(API_DEBUG_FLAG_KEY) === '1',
+    currentRoute: window.location.pathname + window.location.search,
+    entries: [],
+    counts: {},
+    routeSummaries: [],
+  };
+
+  const snapshotCounts = () => Object.entries(state.counts)
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([key, value]) => ({
+      key,
+      count: value.count,
+      ok: value.ok,
+      errors: value.errors,
+      totalMs: value.totalMs,
+      avgMs: value.count ? Math.round(value.totalMs / value.count) : 0,
+      lastStatus: value.lastStatus,
+    }));
+
+  const controller = {
+    enable() {
+      state.enabled = true;
+      localStorage.setItem(API_DEBUG_FLAG_KEY, '1');
+      return this.summary();
+    },
+    disable() {
+      state.enabled = false;
+      localStorage.removeItem(API_DEBUG_FLAG_KEY);
+      return this.summary();
+    },
+    isEnabled() {
+      return state.enabled;
+    },
+    reset() {
+      state.entries = [];
+      state.counts = {};
+      state.routeSummaries = [];
+      state.currentRoute = window.location.pathname + window.location.search;
+      return this.summary();
+    },
+    markRoute(route) {
+      if (!state.enabled) {
+        state.currentRoute = route;
+        return;
+      }
+      if (route === state.currentRoute) return;
+
+      const summary = {
+        route: state.currentRoute,
+        totalRequests: state.entries.length,
+        counts: snapshotCounts(),
+      };
+
+      if (summary.totalRequests > 0) {
+        state.routeSummaries.push(summary);
+        console.groupCollapsed(`[api-debug] ${summary.route} -> ${summary.totalRequests} requests`);
+        console.table(summary.counts);
+        console.groupEnd();
+      }
+
+      state.currentRoute = route;
+      state.entries = [];
+      state.counts = {};
+    },
+    record({ method, path, status, durationMs, ok }) {
+      if (!state.enabled) return;
+      const key = `${method} ${path}`;
+      const bucket = state.counts[key] || {
+        count: 0,
+        ok: 0,
+        errors: 0,
+        totalMs: 0,
+        lastStatus: null,
+      };
+
+      bucket.count += 1;
+      bucket.totalMs += durationMs;
+      bucket.lastStatus = status;
+      if (ok) bucket.ok += 1;
+      else bucket.errors += 1;
+      state.counts[key] = bucket;
+
+      state.entries.push({
+        at: new Date().toISOString(),
+        route: state.currentRoute,
+        method,
+        path,
+        status,
+        durationMs,
+        ok,
+      });
+    },
+    summary() {
+      return {
+        enabled: state.enabled,
+        currentRoute: state.currentRoute,
+        totalRequests: state.entries.length,
+        counts: snapshotCounts(),
+        routeSummaries: [...state.routeSummaries],
+      };
+    },
+    entries() {
+      return [...state.entries];
+    },
+  };
+
+  window.__mansionApiDebug = controller;
+  return controller;
+}
+
+export function markApiDebugRoute(route) {
+  getApiDebugController()?.markRoute(route);
+}
+
+export function getApiDebugSummary() {
+  return getApiDebugController()?.summary() || null;
 }
 
 // ── Token management ────────────────────────────────────
@@ -122,6 +256,9 @@ export function clearAuth() {
 async function apiFetch(path, options = {}) {
   const token = getToken();
   const headers = { ...options.headers };
+  const method = options.method || 'GET';
+  const debug = getApiDebugController();
+  const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -135,6 +272,14 @@ async function apiFetch(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
+  });
+  const finishedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  debug?.record({
+    method,
+    path,
+    status: res.status,
+    durationMs: Math.round(finishedAt - startedAt),
+    ok: res.ok,
   });
 
   // Handle 401 — token expired
@@ -384,13 +529,23 @@ export async function getMessages(otherUserId, { before, limit } = {}) {
   if (before) params.set('before', before);
   if (limit) params.set('limit', String(limit));
   const qs = params.toString();
-  return apiFetch(`/messages/${otherUserId}${qs ? `?${qs}` : ''}`);
+  const path = `/messages/${otherUserId}${qs ? `?${qs}` : ''}`;
+
+  // The latest chat page is prone to duplicate mounts/reconnects; collapse
+  // identical fetches briefly so they do not fan out into many Worker hits.
+  if (!before) {
+    const latestLimit = limit || 40;
+    return sharedGet(`messages:${otherUserId}:latest:${latestLimit}`, () => apiFetch(path), { ttlMs: 2_000 });
+  }
+
+  return apiFetch(path);
 }
 
 export async function deleteConversation(otherUserId) {
   return apiFetch(`/messages/${otherUserId}`, {
     method: 'DELETE',
   }).then((data) => {
+    invalidateMessageHistoryCache(otherUserId);
     invalidateConversationsCache();
     invalidateUnreadCountCache();
     return data;
@@ -402,6 +557,7 @@ export async function sendMessage(receiverId, content) {
     method: 'POST',
     body: JSON.stringify({ receiver_id: receiverId, content }),
   }).then((data) => {
+    invalidateMessageHistoryCache(receiverId);
     invalidateConversationsCache();
     invalidateUnreadCountCache();
     return data;

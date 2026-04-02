@@ -398,19 +398,58 @@ export class ChatRoom {
     // Hibernation API: tag the socket with the userId
     this.state.acceptWebSocket(server, [userId]);
 
-    // Send message history to the new connection
-    this.state.waitUntil(this.sendHistory(server));
+    // Send message history to the new connection.
+    this.state.waitUntil(this.sendHistory(server, userId, chatId));
 
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  async sendHistory(ws) {
+  async sendHistory(ws, userId, chatId) {
     try {
+      const partnerId = chatId
+        ? (() => {
+            const id1 = chatId.slice(0, 36);
+            const id2 = chatId.slice(37);
+            return id1 !== userId ? id1 : id2;
+          })()
+        : null;
+
+      if (userId && partnerId) {
+        await this.ensureHiddenConversationsTable();
+        await this.ensureMessageConversationIdColumn();
+
+        const conversationId = this.buildConversationId(userId, partnerId);
+        const hiddenRow = await this.env.DB.prepare(
+          'SELECT hidden_before FROM hidden_conversations WHERE user_id = ? AND partner_id = ?'
+        ).bind(userId, partnerId).first();
+        const hiddenBefore = hiddenRow?.hidden_before || null;
+        const queryLimit = 31;
+
+        const { results } = await this.env.DB.prepare(`
+          SELECT id, sender_id, content, is_read, created_at
+          FROM (
+            SELECT id, sender_id, content, is_read, created_at
+            FROM messages
+            WHERE conversation_id = ?
+              AND (? IS NULL OR created_at > ?)
+            ORDER BY created_at DESC
+            LIMIT ?
+          )
+          ORDER BY created_at ASC
+        `).bind(conversationId, hiddenBefore, hiddenBefore, queryLimit).all();
+
+        const hasMore = results.length > 30;
+        const rows = hasMore ? results.slice(1) : results;
+
+        ws.send(JSON.stringify({ type: 'history', messages: rows, hasMore }));
+        return;
+      }
+
       const rows = this.sql.exec(
         'SELECT id, sender_id, content, is_read, created_at FROM messages ORDER BY created_at DESC LIMIT 30'
       ).toArray().reverse();
 
-      ws.send(JSON.stringify({ type: 'history', messages: rows }));
+      ws.send(JSON.stringify({ type: 'history', messages: rows, hasMore: rows.length >= 30 }));
     } catch (err) {
       console.error('sendHistory error:', err.message);
     }

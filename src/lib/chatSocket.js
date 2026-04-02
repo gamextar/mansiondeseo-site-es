@@ -93,7 +93,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
 
       switch (data.type) {
         case 'history':
-          callbacks.onHistory?.(data.messages || []);
+          callbacks.onHistory?.(data);
           break;
         case 'message':
           callbacks.onMessage?.(data.message);

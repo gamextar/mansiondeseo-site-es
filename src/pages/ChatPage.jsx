@@ -92,7 +92,8 @@ export default function ChatPage() {
   const myUserIdRef = useRef(null);
   const pendingScrollBehaviorRef = useRef(null);
   const restoreScrollAfterPrependRef = useRef(null);
-  const httpHistoryLoadedRef = useRef(false);
+  const initialHistoryLoadedRef = useRef(false);
+  const historyFallbackTimerRef = useRef(null);
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
   const backTarget = location.state?.from || '/mensajes';
@@ -157,7 +158,8 @@ export default function ChatPage() {
 
     const nextCachedChat = readChatCache(partnerId);
     const nextPartnerPreview = partnerPreview;
-    httpHistoryLoadedRef.current = false;
+    initialHistoryLoadedRef.current = false;
+    clearTimeout(historyFallbackTimerRef.current);
     myUserIdRef.current = String(user.id);
     setActiveChatId([String(user.id), partnerId].sort().join('-'));
     setPartner(nextCachedChat?.partner || nextPartnerPreview || null);
@@ -173,39 +175,40 @@ export default function ChatPage() {
     let cancelled = false;
     Promise.all([
       getProfile(partnerId).then(data => data.profile).catch(() => null),
-      apiGetMessages(partnerId, { limit: INITIAL_CHAT_PAGE_SIZE }).then(data => ({
-        messages: normalizeMessages(data.messages || []),
-        hasMore: !!data.hasMore,
-      })).catch(() => ({ messages: [], hasMore: false })),
       getMessageLimit().then(data => data).catch(() => null),
-    ]).then(([partnerData, messageData, limitData]) => {
+    ]).then(([partnerData, limitData]) => {
       if (cancelled) return;
 
       if (partnerData) {
         setPartner(partnerData);
       }
-      setMessages(messageData.messages);
-      setHasOlderMessages(messageData.hasMore);
-      httpHistoryLoadedRef.current = true;
       if (limitData) {
         setApiLimit(limitData);
       }
-      wasAtBottomRef.current = true;
-      requestScrollToBottom('auto');
     }).finally(() => {
-      if (!cancelled) setLoading(false);
+      if (!cancelled && nextCachedChat) setLoading(false);
     });
 
     // Open WebSocket connection for real-time messages
     chatRef.current = createChatSocket(String(user.id), partnerId, token, {
-      onHistory(msgs) {
-        setMessages(prev => {
-          if (msgs.length > 0) {
-            const doMap = new Map(msgs.map(m => [m.id, m.is_read]));
-            return prev.map(m => doMap.has(m.id) ? { ...m, is_read: doMap.get(m.id) } : m);
-          }
-          return prev;
-        });
+      onHistory(payload) {
+        const historyRows = Array.isArray(payload) ? payload : (payload?.messages || []);
+        const formattedHistory = normalizeMessages(historyRows.map((msg) => formatMsg(msg)));
+        const unreadIds = historyRows
+          .filter((msg) => msg.sender_id !== myUserIdRef.current && !msg.is_read)
+          .map((msg) => msg.id);
+
+        initialHistoryLoadedRef.current = true;
+        clearTimeout(historyFallbackTimerRef.current);
+        setMessages(formattedHistory);
+        setHasOlderMessages(Array.isArray(payload) ? historyRows.length >= INITIAL_CHAT_PAGE_SIZE : !!payload?.hasMore);
+        setLoading(false);
+        wasAtBottomRef.current = true;
+        requestScrollToBottom('auto');
+
+        if (unreadIds.length > 0) {
+          chatRef.current?.markRead(unreadIds);
+        }
       },
       onMessage(msg) {
         // Deduplicate: skip if message already exists
@@ -255,8 +258,29 @@ export default function ChatPage() {
       },
     });
 
+    if (!nextCachedChat?.messages?.length) {
+      historyFallbackTimerRef.current = setTimeout(() => {
+        if (cancelled || initialHistoryLoadedRef.current) return;
+
+        apiGetMessages(partnerId, { limit: INITIAL_CHAT_PAGE_SIZE }).then((data) => {
+          if (cancelled || initialHistoryLoadedRef.current) return;
+          initialHistoryLoadedRef.current = true;
+          setMessages(normalizeMessages(data.messages || []));
+          setHasOlderMessages(!!data.hasMore);
+          setLoading(false);
+          wasAtBottomRef.current = true;
+          requestScrollToBottom('auto');
+        }).catch(() => {
+          if (!cancelled) setLoading(false);
+        });
+      }, 2500);
+    } else {
+      setLoading(false);
+    }
+
     return () => {
       cancelled = true;
+      clearTimeout(historyFallbackTimerRef.current);
       setActiveChatId(null);
       chatRef.current?.close();
       chatRef.current = null;
