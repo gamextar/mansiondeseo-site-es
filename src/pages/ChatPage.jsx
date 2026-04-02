@@ -261,7 +261,7 @@ export default function ChatPage() {
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [id, partnerId, navigate, refreshUnread, requestScrollToBottom, setActiveChatId, location.state]);
+  }, [id, partnerId, navigate, requestScrollToBottom, setActiveChatId, location.state]);
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;

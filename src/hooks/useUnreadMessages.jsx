@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createContext, useContext, useCallback } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
 import { getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache } from '../lib/api';
 
 const UnreadContext = createContext({
@@ -278,8 +278,12 @@ export function UnreadProvider({ children }) {
     activeChatIdRef.current = chatId || null;
   }, []);
 
+  const refresh = useCallback(() => fetchUnread({ force: true }), [fetchUnread]);
+
+  const ctxValue = useMemo(() => ({ unreadCount, refresh, subscribe, setActiveChatId }), [unreadCount, refresh, subscribe, setActiveChatId]);
+
   return (
-    <UnreadContext.Provider value={{ unreadCount, refresh: () => fetchUnread({ force: true }), subscribe, setActiveChatId }}>
+    <UnreadContext.Provider value={ctxValue}>
       {children}
       {/* Toast notification */}
       {toast && (
