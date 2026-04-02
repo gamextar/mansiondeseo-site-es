@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard } from 'lucide-react';
+import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail } from 'lucide-react';
 import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, uploadImage } from '../lib/api';
 import { useAuth } from '../App';
 
@@ -18,6 +18,7 @@ export const ADMIN_SECTIONS = [
   { key: 'stories', label: 'Stories', icon: Film },
   { key: 'videos', label: 'Videos', icon: Film },
   { key: 'encoder', label: 'Encoder', icon: Clapperboard },
+  { key: 'email', label: 'Email (Resend)', icon: Mail },
 ];
 
 export default function SettingsPage() {
@@ -97,6 +98,10 @@ export default function SettingsPage() {
   const [encoderAudioMono, setEncoderAudioMono] = useState(true);
   const [encoderPreset, setEncoderPreset] = useState('superfast');
   const [encoderShowProgressHud, setEncoderShowProgressHud] = useState(false);
+
+  // Email (Resend)
+  const [resendApiKey, setResendApiKey] = useState('');
+  const [mailFrom, setMailFrom] = useState('');
 
   // Payment display
   const [paymentTitleVip, setPaymentTitleVip] = useState('Servicios Digitales');
@@ -224,6 +229,8 @@ export default function SettingsPage() {
         setEncoderAudioMono(s.encoderAudioMono ?? true);
         setEncoderPreset(s.encoderPreset || 'superfast');
         setEncoderShowProgressHud(s.encoderShowProgressHud === true);
+        setResendApiKey(s.resendApiKey || '');
+        setMailFrom(s.mailFrom || '');
       })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
@@ -306,6 +313,8 @@ export default function SettingsPage() {
         encoder_audio_mono: encoderAudioMono ? '1' : '0',
         encoder_preset: encoderPreset,
         encoder_show_progress_hud: encoderShowProgressHud ? '1' : '0',
+        resend_api_key: resendApiKey,
+        mail_from: mailFrom,
       });
       const s = data.settings;
       setBlurMobile(s.blurMobile);

@@ -537,8 +537,19 @@ function verificationEmailHTML(code) {
 </div></body></html>`;
 }
 
+async function getResendCredentials(env) {
+  const row = await env.DB.prepare("SELECT key, value FROM site_settings WHERE key IN ('resend_api_key', 'mail_from')").all();
+  const map = {};
+  for (const r of row.results) map[r.key] = r.value;
+  return {
+    apiKey: map.resend_api_key || env.RESEND_API_KEY,
+    mailFrom: map.mail_from || env.MAIL_FROM || 'noreply@unicoapps.com',
+  };
+}
+
 async function sendVerificationEmail(env, toEmail, code) {
-  const fromEmail = env.MAIL_FROM || 'noreply@unicoapps.com';
+  const { apiKey, mailFrom } = await getResendCredentials(env);
+  const fromEmail = mailFrom;
   const fromName = 'Mansión Deseo';
 
   try {
@@ -546,7 +557,7 @@ async function sendVerificationEmail(env, toEmail, code) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         from: `${fromName} <${fromEmail}>`,
@@ -763,7 +774,8 @@ function passwordResetEmailHTML(code) {
 }
 
 async function sendPasswordResetEmail(env, toEmail, code) {
-  const fromEmail = env.MAIL_FROM || 'noreply@unicoapps.com';
+  const { apiKey, mailFrom } = await getResendCredentials(env);
+  const fromEmail = mailFrom;
   const fromName = 'Mansión Deseo';
 
   try {
@@ -771,7 +783,7 @@ async function sendPasswordResetEmail(env, toEmail, code) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         from: `${fromName} <${fromEmail}>`,
@@ -2003,6 +2015,8 @@ async function loadSettings(env) {
     encoderAudioMono: settings.encoder_audio_mono !== '0',
     encoderPreset: settings.encoder_preset || 'superfast',
     encoderShowProgressHud: settings.encoder_show_progress_hud === '1',
+    resendApiKey: settings.resend_api_key || '',
+    mailFrom: settings.mail_from || '',
   };
 }
 
@@ -2135,6 +2149,8 @@ async function handleUpdateSettings(request, env) {
     'encoder_audio_mono',
     'encoder_preset',
     'encoder_show_progress_hud',
+    'resend_api_key',
+    'mail_from',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {
