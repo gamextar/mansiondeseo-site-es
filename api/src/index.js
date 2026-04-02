@@ -615,6 +615,11 @@ async function handleRegister(request, env) {
     return error('El nombre de usuario no puede tener más de 20 caracteres');
   }
 
+  // Validate username format: only letters, numbers, dots, underscores
+  if (!/^[a-zA-Z0-9._]+$/.test(username)) {
+    return error('El nombre de usuario solo puede contener letras, números, puntos y guiones bajos');
+  }
+
   // Check duplicate username
   const existingUsername = await env.DB.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = ?').bind(username, 'verified').first();
   if (existingUsername) {
@@ -900,6 +905,16 @@ async function handleCheckEmail(request, env) {
 
   const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ? AND status = 'verified'")
     .bind(email.toLowerCase()).first();
+
+  return json({ exists: !!existing });
+}
+
+async function handleCheckUsername(request, env) {
+  const { username } = await request.json();
+  if (!username) return error('Username requerido');
+
+  const existing = await env.DB.prepare("SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified'")
+    .bind(username).first();
 
   return json({ exists: !!existing });
 }
@@ -3385,6 +3400,7 @@ async function handleRequest(request, env) {
   if (path === '/api/auth/verify-code' && method === 'POST') return handleVerifyCode(request, env);
   if (path === '/api/auth/resend-code' && method === 'POST') return handleResendCode(request, env);
   if (path === '/api/auth/check-email' && method === 'POST') return handleCheckEmail(request, env);
+  if (path === '/api/auth/check-username' && method === 'POST') return handleCheckUsername(request, env);
   if (path === '/api/auth/forgot-password' && method === 'POST') return handleForgotPassword(request, env);
   if (path === '/api/auth/reset-password' && method === 'POST') return handleResetPassword(request, env);
   if (path === '/api/auth/magic-link' && method === 'POST') return handleMagicLink(request, env);

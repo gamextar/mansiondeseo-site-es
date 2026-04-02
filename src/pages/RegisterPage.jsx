@@ -19,7 +19,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '../App';
-import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail } from '../lib/api';
+import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 
 // ────────────────────────────────────────────
@@ -383,6 +383,7 @@ function FichaPreview({ data, currentStep }) {
 // ────────────────────────────────────────────
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const USERNAME_REGEX = /^[a-zA-Z0-9._]+$/;
 
 function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePasswordDefault, emailStatus, onEmailBlur, onNavigateRecover }) {
   const [showPassword, setShowPassword] = useState(!hidePasswordDefault);
@@ -666,7 +667,7 @@ function StepInterests({ selected, onToggle }) {
   );
 }
 
-function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, selectedCountry, onCountryChange }) {
+function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, selectedCountry, onCountryChange, usernameStatus, onUsernameBlur }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const ARGENTINA_CITIES = [
@@ -697,15 +698,42 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
           <label className="text-text-muted text-xs font-medium mb-1.5 block">
             Nombre (o alias)
           </label>
-          <input
-            type="text"
-            value={data.name}
-            onChange={(e) => onChange({ ...data, name: e.target.value.slice(0, 20) })}
-            placeholder="Tu nombre en la Mansión"
-            maxLength={20}
-            className="w-full"
-          />
-          <p className="text-[10px] text-text-dim text-right mt-0.5">{data.name.length}/20</p>
+          <div className="relative">
+            <input
+              type="text"
+              value={data.name}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^a-zA-Z0-9._]/g, '').slice(0, 20);
+                onChange({ ...data, name: val });
+              }}
+              onBlur={onUsernameBlur}
+              placeholder="Tu nombre en la Mansión"
+              maxLength={20}
+              className={`w-full pr-10 ${
+                usernameStatus === 'valid' ? 'border-green-500/60' :
+                usernameStatus === 'exists' || usernameStatus === 'invalid' ? 'border-mansion-crimson/60' : ''
+              }`}
+            />
+            {usernameStatus === 'checking' && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim animate-spin" />
+            )}
+            {usernameStatus === 'valid' && (
+              <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+            )}
+            {(usernameStatus === 'exists' || usernameStatus === 'invalid') && (
+              <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-mansion-crimson" />
+            )}
+          </div>
+          <div className="flex justify-between mt-0.5">
+            <p className="text-[10px] text-text-dim">Solo letras, números, puntos y _</p>
+            <p className="text-[10px] text-text-dim">{data.name.length}/20</p>
+          </div>
+          {usernameStatus === 'exists' && (
+            <p className="text-mansion-crimson text-[11px] mt-0.5">Este nombre ya está en uso</p>
+          )}
+          {usernameStatus === 'invalid' && (
+            <p className="text-mansion-crimson text-[11px] mt-0.5">Solo letras, números, puntos y guiones bajos</p>
+          )}
         </div>
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">Edad</label>
@@ -1110,6 +1138,7 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
   const [emailStatus, setEmailStatus] = useState('idle'); // idle | checking | valid | exists | invalid
+  const [usernameStatus, setUsernameStatus] = useState('idle'); // idle | checking | valid | exists | invalid
 
   // Country detection
   const [detectedCountry, setDetectedCountry] = useState('');
@@ -1180,7 +1209,7 @@ export default function RegisterPage() {
     if (step === 1) return !!iAm;
     if (step === 2) return seeking.length > 0;
     if (step === 3) return interests.length > 0;
-    if (step === 4) return info.name && info.age && Number(info.age) >= 18 && info.city && (!showCountryPicker || selectedCountry);
+    if (step === 4) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && info.age && Number(info.age) >= 18 && info.city && (!showCountryPicker || selectedCountry);
     return true;
   };
 
@@ -1203,6 +1232,27 @@ export default function RegisterPage() {
     setEmailStatus('idle');
     setApiError('');
   }, [email]);
+
+  // Reset username status when name changes
+  useEffect(() => {
+    setUsernameStatus('idle');
+  }, [info.name]);
+
+  const handleUsernameBlur = useCallback(async () => {
+    const name = info.name.trim();
+    if (!name) return;
+    if (!USERNAME_REGEX.test(name)) {
+      setUsernameStatus('invalid');
+      return;
+    }
+    setUsernameStatus('checking');
+    try {
+      const { exists } = await apiCheckUsername(name);
+      setUsernameStatus(exists ? 'exists' : 'valid');
+    } catch {
+      setUsernameStatus('idle');
+    }
+  }, [info.name]);
 
   const next = async () => {
     // Check email on step 0 if not yet validated
@@ -1383,7 +1433,7 @@ export default function RegisterPage() {
       case 3:
         return <StepInterests selected={interests} onToggle={toggleInterest} />;
       case 4:
-        return <StepBasicInfo data={info} onChange={setInfo} showCountryPicker={showCountryPicker} allowedCountries={allowedCountries} selectedCountry={selectedCountry} onCountryChange={setSelectedCountry} />;
+        return <StepBasicInfo data={info} onChange={setInfo} showCountryPicker={showCountryPicker} allowedCountries={allowedCountries} selectedCountry={selectedCountry} onCountryChange={setSelectedCountry} usernameStatus={usernameStatus} onUsernameBlur={handleUsernameBlur} />;
       case 5:
         return <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />;
       default:

@@ -226,6 +226,13 @@ export async function checkEmail(email) {
   });
 }
 
+export async function checkUsername(username) {
+  return apiFetch('/auth/check-username', {
+    method: 'POST',
+    body: JSON.stringify({ username }),
+  });
+}
+
 export async function forgotPassword(email) {
   return apiFetch('/auth/forgot-password', {
     method: 'POST',
