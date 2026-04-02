@@ -1,4 +1,4 @@
-import { useState, createContext, useContext, useCallback, useEffect, lazy, Suspense } from 'react';
+import { useState, createContext, useContext, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAgeVerified } from './hooks/useAgeVerified';
@@ -199,6 +199,7 @@ export default function App() {
   const [siteSettings, setSiteSettings] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('mansion_site_settings') || '{}'); } catch { return {}; }
   });
+  const bootstrapStartedRef = useRef(false);
 
   const setRegistered = useCallback((val) => {
     if (val) {
@@ -223,6 +224,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (bootstrapStartedRef.current) return;
+    bootstrapStartedRef.current = true;
+
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     if (token) {

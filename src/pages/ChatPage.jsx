@@ -66,7 +66,7 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
-  const { refresh: refreshUnread, setActiveChatId } = useUnreadMessages();
+  const { setActiveChatId } = useUnreadMessages();
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
@@ -156,7 +156,7 @@ export default function ChatPage() {
     if (!token || !user) { navigate('/login'); return; }
 
     const nextCachedChat = readChatCache(partnerId);
-    const nextPartnerPreview = location.state?.partnerPreview || null;
+    const nextPartnerPreview = partnerPreview;
     httpHistoryLoadedRef.current = false;
     myUserIdRef.current = String(user.id);
     setActiveChatId([String(user.id), partnerId].sort().join('-'));
@@ -261,7 +261,7 @@ export default function ChatPage() {
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [id, partnerId, navigate, requestScrollToBottom, setActiveChatId, location.state]);
+  }, [id, navigate, partnerId, partnerPreview, requestScrollToBottom, setActiveChatId]);
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;
