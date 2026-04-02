@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil } from 'lucide-react';
 import { useAuth } from '../App';
-import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getVisits, getReceivedGifts, deleteOwnStory } from '../lib/api';
+import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getVisits, getReceivedGifts, deleteOwnStory, invalidateProfilesCache } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
@@ -726,6 +726,7 @@ export default function ProfilePage() {
                     // Optimistic update
                     setUser(prev => prev ? { ...prev, seeking: newSeeking } : prev);
                     // Mark feed as dirty so it reloads with new seeking
+                    invalidateProfilesCache();
                     try { sessionStorage.setItem('mansion_feed_dirty', '1'); sessionStorage.removeItem('mansion_feed'); } catch {}
                     try {
                       await updateProfile({ seeking: newSeeking });
@@ -778,6 +779,7 @@ export default function ProfilePage() {
                       : [...current, interest.id];
                     setUser(prev => prev ? { ...prev, interests: newInterests } : prev);
                     // Mark feed as dirty so it reloads with new interest priority
+                    invalidateProfilesCache();
                     try { sessionStorage.setItem('mansion_feed_dirty', '1'); sessionStorage.removeItem('mansion_feed'); } catch {}
                     try {
                       await updateProfile({ interests: newInterests });

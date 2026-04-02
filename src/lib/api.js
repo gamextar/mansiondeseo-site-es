@@ -291,6 +291,14 @@ export async function getProfiles({ filter, q } = {}) {
   return sharedGet(`profiles:${filter || 'all'}`, () => apiFetch(`/profiles${qs ? `?${qs}` : ''}`), { ttlMs: 15_000 });
 }
 
+export function invalidateProfilesCache() {
+  for (const key of sharedGetCache.keys()) {
+    if (String(key).startsWith('profiles:')) {
+      sharedGetCache.delete(key);
+    }
+  }
+}
+
 export async function getProfile(id) {
   return sharedGet(`profile:${id}`, () => apiFetch__getProfile(id), { ttlMs: 30_000 });
 }
