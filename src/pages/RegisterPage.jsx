@@ -14,6 +14,9 @@ import {
   Check,
   Heart,
   Globe,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../App';
 import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail } from '../lib/api';
@@ -367,13 +370,17 @@ function FichaPreview({ data, currentStep }) {
 // Step Components
 // ────────────────────────────────────────────
 
-function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePasswordDefault }) {
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePasswordDefault, emailStatus, onEmailBlur, onNavigateRecover }) {
   const [showPassword, setShowPassword] = useState(!hidePasswordDefault);
 
   // Sync with server setting once it arrives (useState only reads initial value once)
   useEffect(() => {
     setShowPassword(!hidePasswordDefault);
   }, [hidePasswordDefault]);
+
+  const borderColor = emailStatus === 'valid' ? 'border-green-500/60' : emailStatus === 'exists' || emailStatus === 'invalid' ? 'border-mansion-crimson/60' : '';
 
   return (
     <div className="text-center">
@@ -400,11 +407,36 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
               type="email"
               value={email}
               onChange={(e) => onEmailChange(e.target.value)}
+              onBlur={onEmailBlur}
               placeholder="tu@email.com"
-              className="w-full pl-10"
+              className={`w-full pl-10 pr-10 ${borderColor}`}
               autoComplete="email"
             />
+            {emailStatus === 'checking' && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim animate-spin" />
+            )}
+            {emailStatus === 'valid' && (
+              <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+            )}
+            {(emailStatus === 'exists' || emailStatus === 'invalid') && (
+              <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-mansion-crimson" />
+            )}
           </div>
+          {emailStatus === 'invalid' && (
+            <p className="text-mansion-crimson text-[11px] mt-1">Ingresa una dirección de email válida</p>
+          )}
+          {emailStatus === 'exists' && (
+            <div className="mt-1">
+              <p className="text-mansion-crimson text-[11px]">Este email ya está registrado.</p>
+              <button
+                type="button"
+                onClick={onNavigateRecover}
+                className="text-mansion-gold text-[11px] font-medium hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          )}
         </div>
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">
@@ -976,6 +1008,7 @@ export default function RegisterPage() {
   const [devCode, setDevCode] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [emailStatus, setEmailStatus] = useState('idle'); // idle | checking | valid | exists | invalid
 
   // Country detection
   const [detectedCountry, setDetectedCountry] = useState('');
@@ -1046,7 +1079,7 @@ export default function RegisterPage() {
   );
 
   const canNext = () => {
-    if (step === 0) return email.includes('@') && password.length >= 6;
+    if (step === 0) return EMAIL_REGEX.test(email) && password.length >= 6 && emailStatus !== 'exists' && emailStatus !== 'invalid';
     if (step === 1) return !!iAm;
     if (step === 2) return !!seeking;
     if (step === 3) return interests.length > 0;
@@ -1054,22 +1087,50 @@ export default function RegisterPage() {
     return true;
   };
 
+  const handleEmailBlur = useCallback(async () => {
+    if (!email || !EMAIL_REGEX.test(email)) {
+      if (email) setEmailStatus('invalid');
+      return;
+    }
+    setEmailStatus('checking');
+    try {
+      const { exists } = await apiCheckEmail(email);
+      setEmailStatus(exists ? 'exists' : 'valid');
+    } catch {
+      setEmailStatus('idle');
+    }
+  }, [email]);
+
+  // Reset email status when email changes
+  useEffect(() => {
+    setEmailStatus('idle');
+    setApiError('');
+  }, [email]);
+
   const next = async () => {
-    // Check email availability before leaving step 0
+    // Check email on step 0 if not yet validated
     if (step === 0) {
-      setSubmitting(true);
-      setApiError('');
-      try {
-        const { exists } = await apiCheckEmail(email);
-        if (exists) {
-          setApiError('EMAIL_EXISTS');
-          setSubmitting(false);
-          return;
-        }
-      } catch {
-        // If check fails, let registration handle it later
+      if (emailStatus === 'exists') {
+        setApiError('EMAIL_EXISTS');
+        return;
       }
-      setSubmitting(false);
+      if (emailStatus !== 'valid') {
+        // Run check now as safety net
+        setSubmitting(true);
+        try {
+          const { exists } = await apiCheckEmail(email);
+          if (exists) {
+            setEmailStatus('exists');
+            setApiError('EMAIL_EXISTS');
+            setSubmitting(false);
+            return;
+          }
+          setEmailStatus('valid');
+        } catch {
+          // Let registration handle it
+        }
+        setSubmitting(false);
+      }
       setDirection(1);
       setStep((s) => s + 1);
       return;
@@ -1193,6 +1254,9 @@ export default function RegisterPage() {
             onEmailChange={setEmail}
             onPasswordChange={setPassword}
             hidePasswordDefault={hidePasswordDefault}
+            emailStatus={emailStatus}
+            onEmailBlur={handleEmailBlur}
+            onNavigateRecover={() => navigate('/recuperar-contrasena')}
           />
         );
       case 1:
