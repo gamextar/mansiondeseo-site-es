@@ -282,86 +282,100 @@ function StoryStageHeader({
 
 function AnimatedPickBackground() {
 	return (
-		<div className="absolute inset-0 overflow-hidden" style={{ background: '#050508' }}>
-			{/* Blob 1 — deep violet, top-left anchor */}
-			<motion.div
-				className="absolute rounded-full pointer-events-none"
-				style={{
-					width: '110%', height: '80%',
-					background: 'radial-gradient(circle at 40% 40%, rgba(99,40,180,0.72) 0%, rgba(68,20,140,0.28) 44%, transparent 70%)',
-					filter: 'blur(72px)',
-					top: '-30%', left: '-18%',
-					willChange: 'transform',
-				}}
-				animate={{ x: [0, 32, -14, 0], y: [0, 28, -10, 0], scale: [1, 1.08, 0.94, 1] }}
-				transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-			/>
-			{/* Blob 2 — electric blue, bottom-right */}
-			<motion.div
-				className="absolute rounded-full pointer-events-none"
-				style={{
-					width: '95%', height: '75%',
-					background: 'radial-gradient(circle at 50% 50%, rgba(24,100,220,0.65) 0%, rgba(14,60,160,0.22) 46%, transparent 72%)',
-					filter: 'blur(68px)',
-					bottom: '-28%', right: '-16%',
-					willChange: 'transform',
-				}}
-				animate={{ x: [0, -28, 18, 0], y: [0, -24, 12, 0], scale: [1, 0.92, 1.1, 1] }}
-				transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut', delay: 2.5 }}
-			/>
-			{/* Blob 3 — teal/cyan, center-right accent */}
-			<motion.div
-				className="absolute rounded-full pointer-events-none"
-				style={{
-					width: '60%', height: '55%',
-					background: 'radial-gradient(circle, rgba(0,200,185,0.44) 0%, rgba(0,160,148,0.12) 50%, transparent 72%)',
-					filter: 'blur(52px)',
-					top: '28%', right: '-8%',
-					willChange: 'transform, opacity',
-				}}
-				animate={{ x: [0, -22, 16, 0], y: [0, 18, -14, 0], opacity: [0.5, 0.95, 0.6, 0.5] }}
-				transition={{ duration: 19, repeat: Infinity, ease: 'easeInOut', delay: 5 }}
-			/>
-			{/* Blob 4 — magenta/pink, lower-left warmth */}
-			<motion.div
-				className="absolute rounded-full pointer-events-none"
-				style={{
-					width: '62%', height: '50%',
-					background: 'radial-gradient(circle, rgba(200,40,160,0.38) 0%, rgba(160,20,120,0.10) 52%, transparent 74%)',
-					filter: 'blur(58px)',
-					bottom: '5%', left: '-10%',
-					willChange: 'transform, opacity',
-				}}
-				animate={{ x: [0, 20, -16, 0], y: [0, -16, 10, 0], opacity: [0.45, 0.85, 0.55, 0.45] }}
-				transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-			/>
-			{/* Noise grain texture */}
-			<div
-				className="absolute inset-0 pointer-events-none"
-				style={{
-					backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.06\'/%3E%3C/svg%3E")',
-					backgroundSize: '160px 160px',
-					opacity: 0.55,
-					mixBlendMode: 'overlay',
-				}}
-			/>
-			{/* Slow horizontal aurora ripple */}
+		<div className="absolute inset-0 overflow-hidden" style={{ background: '#000000' }}>
+			{/* ── Layer 1: Large morphing orbs (Apple mesh-gradient feel) ── */}
 			<motion.div
 				className="absolute pointer-events-none"
 				style={{
-					width: '200%', height: '38%',
-					background: 'linear-gradient(0deg, transparent 0%, rgba(80,40,200,0.10) 30%, rgba(0,190,200,0.13) 55%, rgba(80,40,200,0.08) 75%, transparent 100%)',
-					filter: 'blur(28px)',
-					top: '30%', left: '-50%',
+					width: '140%', height: '140%',
+					top: '-40%', left: '-20%',
+					background: 'conic-gradient(from 180deg at 50% 50%, rgba(120,40,200,0.6) 0deg, rgba(20,80,220,0.55) 72deg, rgba(0,180,190,0.45) 144deg, rgba(200,60,140,0.5) 216deg, rgba(120,40,200,0.6) 360deg)',
+					filter: 'blur(90px)',
+					borderRadius: '50%',
+					willChange: 'transform',
+				}}
+				animate={{
+					rotate: [0, 360],
+					scale: [1, 1.06, 0.97, 1.03, 1],
+				}}
+				transition={{
+					rotate: { duration: 40, repeat: Infinity, ease: 'linear' },
+					scale: { duration: 18, repeat: Infinity, ease: 'easeInOut' },
+				}}
+			/>
+
+			{/* ── Layer 2: Counter-rotating inner ring ── */}
+			<motion.div
+				className="absolute pointer-events-none"
+				style={{
+					width: '120%', height: '120%',
+					top: '-10%', left: '-10%',
+					background: 'conic-gradient(from 0deg at 50% 50%, rgba(60,20,160,0.5) 0deg, rgba(0,160,200,0.4) 120deg, rgba(180,40,120,0.45) 240deg, rgba(60,20,160,0.5) 360deg)',
+					filter: 'blur(80px)',
+					borderRadius: '50%',
+					willChange: 'transform',
+				}}
+				animate={{
+					rotate: [360, 0],
+					scale: [1, 0.94, 1.08, 0.97, 1],
+				}}
+				transition={{
+					rotate: { duration: 30, repeat: Infinity, ease: 'linear' },
+					scale: { duration: 14, repeat: Infinity, ease: 'easeInOut' },
+				}}
+			/>
+
+			{/* ── Layer 3: Floating accent — warm pink pulse ── */}
+			<motion.div
+				className="absolute rounded-full pointer-events-none"
+				style={{
+					width: '50%', height: '45%',
+					background: 'radial-gradient(circle, rgba(255,60,120,0.55) 0%, transparent 70%)',
+					filter: 'blur(60px)',
+					bottom: '8%', right: '5%',
 					willChange: 'transform, opacity',
 				}}
-				animate={{ y: [-50, 50, -50], opacity: [0.6, 1, 0.6] }}
-				transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
+				animate={{
+					x: [0, -30, 20, -10, 0],
+					y: [0, 20, -15, 8, 0],
+					opacity: [0.4, 0.8, 0.5, 0.75, 0.4],
+				}}
+				transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
 			/>
-			{/* Vignette */}
+
+			{/* ── Layer 4: Floating accent — cyan/teal drift ── */}
+			<motion.div
+				className="absolute rounded-full pointer-events-none"
+				style={{
+					width: '45%', height: '40%',
+					background: 'radial-gradient(circle, rgba(0,220,210,0.45) 0%, transparent 68%)',
+					filter: 'blur(55px)',
+					top: '12%', left: '8%',
+					willChange: 'transform, opacity',
+				}}
+				animate={{
+					x: [0, 25, -18, 0],
+					y: [0, -20, 12, 0],
+					opacity: [0.35, 0.7, 0.45, 0.35],
+				}}
+				transition={{ duration: 19, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
+			/>
+
+			{/* ── Layer 5: Subtle noise grain ── */}
 			<div
 				className="absolute inset-0 pointer-events-none"
-				style={{ background: 'radial-gradient(ellipse at 50% 50%, transparent 35%, rgba(0,0,0,0.65) 100%)' }}
+				style={{
+					backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 512 512\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.75\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.04\'/%3E%3C/svg%3E")',
+					backgroundSize: '200px 200px',
+					opacity: 0.5,
+					mixBlendMode: 'overlay',
+				}}
+			/>
+
+			{/* ── Layer 6: Soft vignette ── */}
+			<div
+				className="absolute inset-0 pointer-events-none"
+				style={{ background: 'radial-gradient(ellipse at 50% 48%, transparent 30%, rgba(0,0,0,0.6) 100%)' }}
 			/>
 		</div>
 	);
