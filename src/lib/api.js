@@ -354,7 +354,7 @@ export async function adminChatCleanup() {
 
 export async function uploadImage(file, { purpose = 'asset' } = {}) {
   const qs = purpose ? `?purpose=${encodeURIComponent(purpose)}` : '';
-  const data = await apiFetch(`/upload${qs}`, {
+  const data = await apiUpload(`/upload${qs}`, {
     method: 'POST',
     headers: { 'Content-Type': file.type },
     body: await file.arrayBuffer(),
