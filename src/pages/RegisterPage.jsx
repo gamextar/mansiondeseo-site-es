@@ -239,6 +239,7 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
 
 function FichaPreview({ data, currentStep }) {
   const { role, seeking, interests, name, age, city } = data;
+  const seekingArr = Array.isArray(seeking) ? seeking : (seeking ? [seeking] : []);
 
   if (currentStep < 1 && !role) return null;
 
@@ -258,7 +259,7 @@ function FichaPreview({ data, currentStep }) {
 
         {/* Figures row: Soy ♥ Busco */}
         <AnimatePresence>
-          {(role || seeking) && (
+          {(role || seekingArr.length > 0) && (
             <motion.div
               layout
               initial={{ opacity: 0, scale: 0.8 }}
@@ -277,7 +278,7 @@ function FichaPreview({ data, currentStep }) {
                 </motion.div>
               )}
 
-              {role && seeking && (
+              {role && seekingArr.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -287,14 +288,25 @@ function FichaPreview({ data, currentStep }) {
                 </motion.div>
               )}
 
-              {seeking && (
+              {seekingArr.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, x: 20, scale: 0.5 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
                   transition={{ type: 'spring', stiffness: 300 }}
                   className="flex flex-col items-center"
                 >
-                  <PersonFigure type={seeking} isActive size="sm" />
+                  <div className="flex items-end gap-0.5">
+                    {seekingArr.map((s, i) => (
+                      <motion.div
+                        key={s}
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: i * 0.1 }}
+                      >
+                        <PersonFigure type={s} isActive size="sm" />
+                      </motion.div>
+                    ))}
+                  </div>
                   <span className="text-[10px] text-text-dim mt-0.5">Busco</span>
                 </motion.div>
               )}
@@ -461,6 +473,9 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+          {password.length > 0 && password.length < 12 && (
+            <p className="text-mansion-gold/70 text-[11px] mt-1">Mínimo 12 caracteres ({password.length}/12)</p>
+          )}
         </div>
       </div>
     </div>
