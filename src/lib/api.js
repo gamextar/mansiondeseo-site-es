@@ -199,6 +199,8 @@ export async function verifyCode(email, code) {
   });
   setToken(data.token);
   setStoredUser(data.user);
+  // Invalidate bootstrap cache so next call fetches fresh user data
+  sharedGetCache.delete('bootstrap');
   return data;
 }
 

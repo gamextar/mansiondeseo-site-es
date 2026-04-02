@@ -19,7 +19,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '../App';
-import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername } from '../lib/api';
+import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername, getMe } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 
 // ────────────────────────────────────────────
@@ -1331,10 +1331,12 @@ export default function RegisterPage() {
     // Upload photo if selected (now that we have a token)
     if (photoFile) {
       try {
-        const uploadResult = await uploadImage(photoFile, { purpose: 'avatar' });
-        setUser(prev => prev ? { ...prev, avatar_url: uploadResult.url, avatar_crop: null } : prev);
+        await uploadImage(photoFile, { purpose: 'avatar' });
+        // Fetch canonical user from server so avatar_url is guaranteed in state
+        const fresh = await getMe();
+        if (fresh?.user) setUser(fresh.user);
       } catch {
-        // Photo upload failed silently — user can retry later
+        // Photo upload failed — user can retry later from profile
       }
     }
 
