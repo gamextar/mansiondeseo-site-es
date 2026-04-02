@@ -7,6 +7,7 @@ const WS_BASE = import.meta.env.PROD
   ? 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev'
   : `ws://${window.location.hostname}:8787`;
 const CHAT_PING_MS = 45_000;
+const CHAT_MAX_RETRIES = 5;
 
 /**
  * Creates a managed WebSocket connection to the ChatRoom Durable Object.
@@ -34,6 +35,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   let retryTimer = null;
   let pingTimer = null;
   let closed = false; // true when user explicitly closes
+  let paused = false; // true when tab is in background
 
   function stopPing() {
     clearInterval(pingTimer);
@@ -57,7 +59,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   }
 
   function connect() {
-    if (closed) return;
+    if (closed || paused) return;
     setState('connecting');
 
     try {
@@ -122,8 +124,9 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   }
 
   function scheduleReconnect() {
-    if (closed) return;
-    const delay = Math.min(1000 * Math.pow(2, retryCount), 30_000);
+    if (closed || paused) return;
+    if (retryCount >= CHAT_MAX_RETRIES) return;
+    const delay = Math.min(2000 * Math.pow(2, retryCount), 30_000);
     retryCount++;
     retryTimer = setTimeout(connect, delay);
   }
@@ -165,10 +168,21 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   function handleVisibilityChange() {
     if (closed) return;
     if (document.visibilityState === 'visible') {
-      if (ws?.readyState === WebSocket.OPEN) startPing();
+      paused = false;
+      retryCount = 0;
+      connect();
       return;
     }
+    // Background: disconnect cleanly like notification WS
+    paused = true;
+    clearTimeout(retryTimer);
     stopPing();
+    if (ws) {
+      ws.onclose = null;
+      ws.close(1000, 'client-pause');
+      ws = null;
+    }
+    setState('disconnected');
   }
 
   document.addEventListener('visibilitychange', handleVisibilityChange);
