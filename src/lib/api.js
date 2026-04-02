@@ -219,6 +219,13 @@ export async function login({ email, password }) {
   return data;
 }
 
+export async function checkEmail(email) {
+  return apiFetch('/auth/check-email', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
 export async function forgotPassword(email) {
   return apiFetch('/auth/forgot-password', {
     method: 'POST',

@@ -864,6 +864,18 @@ async function handleResetPassword(request, env) {
   return json({ message: 'Contraseña actualizada correctamente. Ya puedes iniciar sesión.' });
 }
 
+// ── POST /api/auth/check-email ──────────────────────────
+
+async function handleCheckEmail(request, env) {
+  const { email } = await request.json();
+  if (!email) return error('Email requerido');
+
+  const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ? AND status = 'verified'")
+    .bind(email.toLowerCase()).first();
+
+  return json({ exists: !!existing });
+}
+
 // ── POST /api/auth/login ────────────────────────────────
 
 async function handleLogin(request, env) {
@@ -3320,6 +3332,7 @@ async function handleRequest(request, env) {
   if (path === '/api/auth/login' && method === 'POST') return handleLogin(request, env);
   if (path === '/api/auth/verify-code' && method === 'POST') return handleVerifyCode(request, env);
   if (path === '/api/auth/resend-code' && method === 'POST') return handleResendCode(request, env);
+  if (path === '/api/auth/check-email' && method === 'POST') return handleCheckEmail(request, env);
   if (path === '/api/auth/forgot-password' && method === 'POST') return handleForgotPassword(request, env);
   if (path === '/api/auth/reset-password' && method === 'POST') return handleResetPassword(request, env);
   if (path === '/api/auth/magic-link' && method === 'POST') return handleMagicLink(request, env);

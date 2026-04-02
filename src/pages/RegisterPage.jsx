@@ -16,7 +16,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { useAuth } from '../App';
-import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings } from '../lib/api';
+import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 
 // ────────────────────────────────────────────
@@ -1055,6 +1055,26 @@ export default function RegisterPage() {
   };
 
   const next = async () => {
+    // Check email availability before leaving step 0
+    if (step === 0) {
+      setSubmitting(true);
+      setApiError('');
+      try {
+        const { exists } = await apiCheckEmail(email);
+        if (exists) {
+          setApiError('EMAIL_EXISTS');
+          setSubmitting(false);
+          return;
+        }
+      } catch {
+        // If check fails, let registration handle it later
+      }
+      setSubmitting(false);
+      setDirection(1);
+      setStep((s) => s + 1);
+      return;
+    }
+
     if (step === TOTAL_STEPS - 1) {
       setSubmitting(true);
       setApiError('');
