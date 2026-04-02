@@ -821,7 +821,7 @@ async function handleForgotPassword(request, env) {
 
   if (user) {
     // Invalidate old reset codes
-    await env.DB.prepare("UPDATE verification_tokens SET used = 1 WHERE user_id = ? AND purpose = 'password_reset' AND used = 0")
+    await env.DB.prepare("UPDATE verification_tokens SET used = 1 WHERE user_id = ? AND purpose = 'reset' AND used = 0")
       .bind(user.id).run();
 
     const code = generateVerificationCode();
@@ -829,7 +829,7 @@ async function handleForgotPassword(request, env) {
 
     await env.DB.prepare(`
       INSERT INTO verification_tokens (id, user_id, email, token, purpose, expires_at)
-      VALUES (?, ?, ?, ?, 'password_reset', ?)
+      VALUES (?, ?, ?, ?, 'reset', ?)
     `).bind(generateId(), user.id, email.toLowerCase(), code, expiresAt).run();
 
     if (env.ENVIRONMENT === 'production') {
@@ -841,7 +841,8 @@ async function handleForgotPassword(request, env) {
 
   return json({
     message: 'Si el email está registrado, recibirás un código para restablecer tu contraseña.',
-    ...(env.ENVIRONMENT !== 'production' && user ? { devCode: (await env.DB.prepare("SELECT token FROM verification_tokens WHERE user_id = ? AND purpose = 'password_reset' AND used = 0 ORDER BY created_at DESC LIMIT 1").bind(user.id).first())?.token } : {}),
+    ...(env.ENVIRONMENT !== 'production' && user ? { devCode: (await env.DB.prepare("SELECT token FROM verification_tokens WHERE user_id = ? AND purpose = 'reset' AND used = 0 ORDER BY created_at DESC LIMIT 1").bind(user.id).first())?.token } : {}),
+
   });
 }
 
@@ -864,7 +865,7 @@ async function handleResetPassword(request, env) {
 
   const record = await env.DB.prepare(`
     SELECT * FROM verification_tokens
-    WHERE email = ? AND token = ? AND purpose = 'password_reset' AND used = 0 AND expires_at > datetime('now')
+    WHERE email = ? AND token = ? AND purpose = 'reset' AND used = 0 AND expires_at > datetime('now')
     ORDER BY created_at DESC LIMIT 1
   `).bind(email.toLowerCase(), code.trim()).first();
 
