@@ -130,12 +130,22 @@ export default function ForgotPasswordPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  onBlur={handleEmailBlur}
                   placeholder="tu@email.com"
-                  className="w-full pl-10"
+                  className={`w-full pl-10 pr-10 ${emailBorderColor}`}
                   autoComplete="email"
                   autoFocus
                 />
+                {emailStatus === 'valid' && (
+                  <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                )}
+                {emailStatus === 'invalid' && (
+                  <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-mansion-crimson" />
+                )}
               </div>
+              {emailStatus === 'invalid' && (
+                <p className="text-mansion-crimson text-[11px] mt-1">Ingresa una dirección de email válida</p>
+              )}
             </div>
 
             {error && <p className="text-mansion-crimson text-xs text-center">{error}</p>}
@@ -143,7 +153,7 @@ export default function ForgotPasswordPage() {
             <motion.button
               whileTap={{ scale: 0.97 }}
               type="submit"
-              disabled={!email.includes('@') || loading}
+              disabled={!isEmailValid || loading}
               className="btn-gold w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {loading ? 'Enviando...' : 'Enviar código'}
@@ -176,10 +186,11 @@ export default function ForgotPasswordPage() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  onChange={(e) => setNewPassword(e.target.value.slice(0, 50))}
                   placeholder="Mínimo 12 caracteres"
                   className="w-full pl-10 pr-10"
                   autoComplete="new-password"
+                  maxLength={50}
                 />
                 <button
                   type="button"
