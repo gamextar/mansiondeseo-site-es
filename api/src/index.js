@@ -1709,9 +1709,10 @@ async function handleUpload(request, env) {
     return error('La imagen no puede superar 5MB');
   }
 
-  // Generate UUID-only key (no userId in path for VIP privacy)
+  // Keep uploads organized by folder without exposing user IDs in public URLs.
   const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
-  const key = `${generateId()}.${ext}`;
+  const folder = purpose === 'avatar' || purpose === 'gallery' ? 'profiles' : 'assets';
+  const key = `${folder}/${generateId()}.${ext}`;
 
   await env.IMAGES.put(key, imageData, {
     httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
