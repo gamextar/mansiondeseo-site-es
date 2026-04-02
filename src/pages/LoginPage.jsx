@@ -90,7 +90,7 @@ export default function LoginPage() {
           </div>
 
           <div className="flex justify-end">
-            <button type="button" className="text-mansion-gold text-xs hover:underline">
+            <button type="button" onClick={() => navigate('/recuperar-contrasena')} className="text-mansion-gold text-xs hover:underline">
               ¿Olvidaste tu contraseña?
             </button>
           </div>

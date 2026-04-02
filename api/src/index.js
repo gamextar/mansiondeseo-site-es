@@ -589,10 +589,20 @@ async function handleRegister(request, env) {
     return error('La contraseña debe tener al menos 6 caracteres');
   }
 
-  // Check duplicate
+  if (username.length > 20) {
+    return error('El nombre de usuario no puede tener más de 20 caracteres');
+  }
+
+  // Check duplicate username
+  const existingUsername = await env.DB.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = ?').bind(username, 'verified').first();
+  if (existingUsername) {
+    return error('Este nombre de usuario ya está en uso. Elegí otro.', 409);
+  }
+
+  // Check duplicate email
   const existing = await env.DB.prepare('SELECT id, status FROM users WHERE email = ?').bind(email.toLowerCase()).first();
   if (existing && existing.status === 'verified') {
-    return error('Este email ya está registrado', 409);
+    return json({ error: 'Este email ya está registrado', code: 'EMAIL_EXISTS' }, 409);
   }
 
   // If pending user exists, delete and re-create
@@ -721,6 +731,137 @@ async function handleResendCode(request, env) {
     message: 'Nuevo código enviado.',
     ...(env.ENVIRONMENT !== 'production' && { devCode: code }),
   });
+}
+
+// ── POST /api/auth/forgot-password ──────────────────────
+
+function passwordResetEmailHTML(code) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;padding:0;background:#08080E;font-family:'Helvetica Neue',Arial,sans-serif}
+  .wrap{max-width:480px;margin:0 auto;padding:40px 24px}
+  .card{background:#111118;border-radius:16px;padding:40px 32px;border:1px solid rgba(201,168,76,0.15)}
+  .logo{text-align:center;font-size:24px;font-weight:700;color:#C9A84C;letter-spacing:1px;margin-bottom:8px}
+  .sub{text-align:center;color:#8a8a9a;font-size:13px;margin-bottom:32px}
+  .code-box{background:#08080E;border:2px solid rgba(201,168,76,0.3);border-radius:12px;padding:20px;text-align:center;margin:24px 0}
+  .code{font-size:36px;letter-spacing:12px;font-weight:700;color:#C9A84C;font-family:'Courier New',monospace}
+  .msg{color:#c4c4d0;font-size:14px;line-height:1.6;text-align:center}
+  .footer{text-align:center;color:#555;font-size:11px;margin-top:32px}
+  .warn{color:#D4183D;font-size:12px;text-align:center;margin-top:16px}
+</style></head>
+<body><div class="wrap"><div class="card">
+  <div class="logo">MANSIÓN DESEO</div>
+  <div class="sub">Recuperar contraseña</div>
+  <p class="msg">Tu código para restablecer la contraseña es:</p>
+  <div class="code-box"><div class="code">${code}</div></div>
+  <p class="msg">Introduce este código en la app para crear una nueva contraseña. El código expira en <strong>30 minutos</strong>.</p>
+  <p class="warn">Si no solicitaste esto, ignora este email.</p>
+</div>
+<div class="footer">© Mansión Deseo · Este email fue enviado automáticamente</div>
+</div></body></html>`;
+}
+
+async function sendPasswordResetEmail(env, toEmail, code) {
+  const fromEmail = env.MAIL_FROM || 'noreply@unicoapps.com';
+  const fromName = 'Mansión Deseo';
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: `${fromName} <${fromEmail}>`,
+        to: [toEmail],
+        subject: `${code} — Recuperar contraseña`,
+        text: `Tu código para restablecer la contraseña en Mansión Deseo es: ${code}\n\nExpira en 30 minutos.\n\nSi no solicitaste esto, ignora este email.`,
+        html: passwordResetEmailHTML(code),
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`Resend error ${res.status}:`, body);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Resend send failed:', err.message);
+    return false;
+  }
+}
+
+async function handleForgotPassword(request, env) {
+  const { email } = await request.json();
+
+  if (!email) return error('Email requerido');
+
+  // Always return success to avoid email enumeration
+  const user = await env.DB.prepare("SELECT id FROM users WHERE email = ? AND status = 'verified'")
+    .bind(email.toLowerCase()).first();
+
+  if (user) {
+    // Invalidate old reset codes
+    await env.DB.prepare("UPDATE verification_tokens SET used = 1 WHERE user_id = ? AND purpose = 'password_reset' AND used = 0")
+      .bind(user.id).run();
+
+    const code = generateVerificationCode();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+    await env.DB.prepare(`
+      INSERT INTO verification_tokens (id, user_id, email, token, purpose, expires_at)
+      VALUES (?, ?, ?, ?, 'password_reset', ?)
+    `).bind(generateId(), user.id, email.toLowerCase(), code, expiresAt).run();
+
+    if (env.ENVIRONMENT === 'production') {
+      await sendPasswordResetEmail(env, email.toLowerCase(), code);
+    } else {
+      debugLog(env, `🔑 PASSWORD RESET CODE for ${email}: ${code}`);
+    }
+  }
+
+  return json({
+    message: 'Si el email está registrado, recibirás un código para restablecer tu contraseña.',
+    ...(env.ENVIRONMENT !== 'production' && user ? { devCode: (await env.DB.prepare("SELECT token FROM verification_tokens WHERE user_id = ? AND purpose = 'password_reset' AND used = 0 ORDER BY created_at DESC LIMIT 1").bind(user.id).first())?.token } : {}),
+  });
+}
+
+// ── POST /api/auth/reset-password ───────────────────────
+
+async function handleResetPassword(request, env) {
+  const { email, code, newPassword } = await request.json();
+
+  if (!email || !code || !newPassword) {
+    return error('Email, código y nueva contraseña son requeridos');
+  }
+
+  if (newPassword.length < 6) {
+    return error('La contraseña debe tener al menos 6 caracteres');
+  }
+
+  const record = await env.DB.prepare(`
+    SELECT * FROM verification_tokens
+    WHERE email = ? AND token = ? AND purpose = 'password_reset' AND used = 0 AND expires_at > datetime('now')
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(email.toLowerCase(), code.trim()).first();
+
+  if (!record) {
+    return error('Código inválido o expirado', 401);
+  }
+
+  // Mark token as used
+  await env.DB.prepare('UPDATE verification_tokens SET used = 1 WHERE id = ?')
+    .bind(record.id).run();
+
+  // Update password
+  const passwordHash = await hashPassword(newPassword);
+  await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+    .bind(passwordHash, record.user_id).run();
+
+  return json({ message: 'Contraseña actualizada correctamente. Ya puedes iniciar sesión.' });
 }
 
 // ── POST /api/auth/login ────────────────────────────────
@@ -3179,6 +3320,8 @@ async function handleRequest(request, env) {
   if (path === '/api/auth/login' && method === 'POST') return handleLogin(request, env);
   if (path === '/api/auth/verify-code' && method === 'POST') return handleVerifyCode(request, env);
   if (path === '/api/auth/resend-code' && method === 'POST') return handleResendCode(request, env);
+  if (path === '/api/auth/forgot-password' && method === 'POST') return handleForgotPassword(request, env);
+  if (path === '/api/auth/reset-password' && method === 'POST') return handleResetPassword(request, env);
   if (path === '/api/auth/magic-link' && method === 'POST') return handleMagicLink(request, env);
   if (path === '/api/auth/verify' && method === 'GET') return handleVerifyToken(request, env);
   if (path === '/api/auth/me' && method === 'GET') return handleMe(request, env);

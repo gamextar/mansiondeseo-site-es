@@ -219,6 +219,20 @@ export async function login({ email, password }) {
   return data;
 }
 
+export async function forgotPassword(email) {
+  return apiFetch('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(email, code, newPassword) {
+  return apiFetch('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, code, newPassword }),
+  });
+}
+
 export async function requestMagicLink(email) {
   return apiFetch('/auth/magic-link', {
     method: 'POST',

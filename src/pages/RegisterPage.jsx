@@ -567,12 +567,12 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
           <input
             type="text"
             value={data.name}
-            onChange={(e) => onChange({ ...data, name: e.target.value.slice(0, 30) })}
+            onChange={(e) => onChange({ ...data, name: e.target.value.slice(0, 20) })}
             placeholder="Tu nombre en la Mansión"
-            maxLength={30}
+            maxLength={20}
             className="w-full"
           />
-          <p className="text-[10px] text-text-dim text-right mt-0.5">{data.name.length}/30</p>
+          <p className="text-[10px] text-text-dim text-right mt-0.5">{data.name.length}/20</p>
         </div>
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">Edad</label>
@@ -1076,7 +1076,11 @@ export default function RegisterPage() {
         if (regResult.devCode) setDevCode(regResult.devCode);
         setPendingVerification(true);
       } catch (err) {
-        setApiError(err.message || 'Error al registrar. Intenta de nuevo.');
+        if (err.data?.code === 'EMAIL_EXISTS') {
+          setApiError('EMAIL_EXISTS');
+        } else {
+          setApiError(err.message || 'Error al registrar. Intenta de nuevo.');
+        }
       } finally {
         setSubmitting(false);
       }
@@ -1261,8 +1265,19 @@ export default function RegisterPage() {
 
       {/* Bottom CTA */}
       <div className="relative z-10 px-6 pb-10">
-        {apiError && (
+        {apiError && apiError !== 'EMAIL_EXISTS' && (
           <p className="text-mansion-crimson text-xs text-center mb-3">{apiError}</p>
+        )}
+        {apiError === 'EMAIL_EXISTS' && (
+          <div className="text-center mb-3">
+            <p className="text-mansion-crimson text-xs mb-1">Este email ya está registrado.</p>
+            <button
+              onClick={() => navigate('/recuperar-contrasena')}
+              className="text-mansion-gold text-xs font-medium hover:underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
         )}
         <motion.button
           whileTap={{ scale: 0.97 }}

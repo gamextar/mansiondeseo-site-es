@@ -13,6 +13,7 @@ import ChatListPage from './pages/ChatListPage';
 import ChatPage from './pages/ChatPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import WelcomePage from './pages/WelcomePage';
 import ProfilePage from './pages/ProfilePage';
 import FavoritesPage from './pages/FavoritesPage';
@@ -34,7 +35,7 @@ import InstallAppBanner from './components/InstallAppBanner';
 const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
-const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/'];
+const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/'];
 
 // Auth context — exposes registered boolean + user object + setters
 const AuthContext = createContext({
@@ -87,6 +88,7 @@ function AppLayout() {
           <Route path="/bienvenida" element={<WelcomePage />} />
           <Route path="/registro" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/recuperar-contrasena" element={<ForgotPasswordPage />} />
 
           {/* Pagos */}
           <Route path="/vip" element={<VipPage />} />
