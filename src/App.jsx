@@ -234,6 +234,15 @@ export default function App() {
 
     let cancelled = false;
 
+    const hasSessionSettings = !!siteSettings && Object.keys(siteSettings).length > 0;
+    const hasAuthToken = !!getToken();
+
+    if (!hasAuthToken && hasSessionSettings) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     getAppBootstrap().then(data => {
       if (cancelled) return;
 
@@ -256,7 +265,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [setUser]);
+  }, [setUser, siteSettings]);
 
   return (
     <BrowserRouter>

@@ -43,6 +43,11 @@ function invalidateUnreadCountCache() {
   sessionCache.delete('unreadCount');
 }
 
+function invalidateConversationsCache() {
+  sharedGetCache.delete('conversations');
+  sessionCache.delete('conversations');
+}
+
 function sharedGet(key, fetcher, { ttlMs = 0 } = {}) {
   const now = Date.now();
   const cached = sharedGetCache.get(key);
@@ -365,7 +370,13 @@ export async function updateProfile(fields) {
 // ── Messages ────────────────────────────────────────────
 
 export async function getConversations() {
-  return apiFetch('/messages');
+  const cached = sessionCache.get('conversations', 15_000);
+  if (cached) return Promise.resolve(cached);
+
+  return sharedGet('conversations', () => apiFetch('/messages').then((data) => {
+    sessionCache.set('conversations', data);
+    return data;
+  }), { ttlMs: 15_000 });
 }
 
 export async function getMessages(otherUserId, { before, limit } = {}) {
@@ -380,6 +391,7 @@ export async function deleteConversation(otherUserId) {
   return apiFetch(`/messages/${otherUserId}`, {
     method: 'DELETE',
   }).then((data) => {
+    invalidateConversationsCache();
     invalidateUnreadCountCache();
     return data;
   });
@@ -390,6 +402,7 @@ export async function sendMessage(receiverId, content) {
     method: 'POST',
     body: JSON.stringify({ receiver_id: receiverId, content }),
   }).then((data) => {
+    invalidateConversationsCache();
     invalidateUnreadCountCache();
     return data;
   });
