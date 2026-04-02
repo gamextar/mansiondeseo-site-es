@@ -596,6 +596,13 @@ async function handleRegister(request, env) {
     return error('Campos requeridos: email, password, username, role, seeking');
   }
 
+  // Validate seeking: must be array of valid roles
+  const seekingArr = Array.isArray(seeking) ? seeking : [seeking];
+  const validSeeking = ['hombre', 'mujer', 'pareja'];
+  if (!seekingArr.length || seekingArr.some(s => !validSeeking.includes(s))) {
+    return error('Seeking debe contener valores válidos: hombre, mujer, pareja');
+  }
+
   if (password.length < 12) {
     return error('La contraseña debe tener al menos 12 caracteres');
   }
@@ -642,7 +649,7 @@ async function handleRegister(request, env) {
     username,
     passwordHash,
     role,
-    seeking,
+    JSON.stringify(seekingArr),
     JSON.stringify(interests || []),
     age || null,
     city || '',
@@ -1054,9 +1061,14 @@ async function handleProfiles(request, env) {
   let query = `SELECT * FROM users WHERE status = 'verified'`;
   const params = [];
   if (country) { query += ` AND country = ?`; params.push(country); }
-  if (filter === 'hombre') query += ` AND role = 'hombre'`;
-  else if (filter === 'mujer') query += ` AND role = 'mujer'`;
-  else if (filter === 'pareja') query += ` AND role = 'pareja'`;
+  // Support multi-role filter: comma-separated values e.g. filter=hombre,mujer
+  const roleFilters = ['hombre', 'mujer', 'pareja'];
+  const filterParts = filter.split(',').map(f => f.trim()).filter(f => roleFilters.includes(f));
+  if (filterParts.length === 1) {
+    query += ` AND role = '${filterParts[0]}'`;
+  } else if (filterParts.length > 1) {
+    query += ` AND role IN (${filterParts.map(f => `'${f}'`).join(',')})`;  
+  }
   if (search) {
     query += ` AND (username LIKE ? OR city LIKE ? OR bio LIKE ?)`;
     const term = `%${search}%`;
@@ -1819,7 +1831,15 @@ async function handleUpdateProfile(request, env) {
 
   for (const field of allowedFields) {
     if (body[field] !== undefined) {
-      if (field === 'interests' || field === 'photos' || field === 'avatar_crop') {
+      if (field === 'seeking') {
+        // Validate and store seeking as JSON array
+        const seekVal = Array.isArray(body[field]) ? body[field] : [body[field]];
+        const validS = ['hombre', 'mujer', 'pareja'];
+        const filtered = seekVal.filter(s => validS.includes(s));
+        if (filtered.length === 0) continue;
+        updates.push(`${field} = ?`);
+        values.push(JSON.stringify(filtered));
+      } else if (field === 'interests' || field === 'photos' || field === 'avatar_crop') {
         updates.push(`${field} = ?`);
         if (field === 'photos') {
           const effectiveAvatarUrl = body.avatar_url !== undefined ? body.avatar_url : currentUser.avatar_url;
@@ -1892,8 +1912,15 @@ function sanitizeUser(user, env) {
   if (!premiumActive && safe.ghost_mode && env) {
     env.DB.prepare('UPDATE users SET ghost_mode = 0 WHERE id = ?').bind(safe.id).run().catch(() => {});
   }
+  // Parse seeking: handle both old single-value and new JSON array format
+  const seekingRaw = safe.seeking;
+  let seekingParsed;
+  try { seekingParsed = JSON.parse(seekingRaw); } catch { seekingParsed = null; }
+  if (!Array.isArray(seekingParsed)) seekingParsed = seekingRaw ? [seekingRaw] : ['hombre'];
+
   return {
     ...safe,
+    seeking: seekingParsed,
     interests: safeParseJSON(safe.interests, []),
     photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
     avatar_crop: safeParseJSON(safe.avatar_crop, null),

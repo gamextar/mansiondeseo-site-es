@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   username      TEXT NOT NULL,
   password_hash TEXT,                               -- NULL for magic-link-only users
   role          TEXT NOT NULL CHECK(role IN ('hombre','mujer','pareja')),
-  seeking       TEXT NOT NULL CHECK(seeking IN ('hombre','mujer','pareja')),
+  seeking       TEXT NOT NULL DEFAULT '[\"hombre\"]',    -- JSON array of roles: hombre, mujer, pareja
   interests     TEXT DEFAULT '[]',                  -- JSON array of interest IDs
   age           INTEGER CHECK(age >= 18 AND age <= 99),
   city          TEXT,

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import {
   ChevronRight,
   ChevronLeft,
@@ -524,6 +524,91 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
   );
 }
 
+function SeekingGrid({ selected, onToggle, roleImages = {} }) {
+  // Sort: selected items first (in selection order), then unselected
+  const sorted = [...ROLES].sort((a, b) => {
+    const aIdx = selected.indexOf(a.id);
+    const bIdx = selected.indexOf(b.id);
+    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+    if (aIdx !== -1) return -1;
+    if (bIdx !== -1) return 1;
+    return 0;
+  });
+
+  return (
+    <div className="text-center">
+      <h2 className="font-display text-2xl font-bold text-text-primary mb-2">Busco...</h2>
+      <p className="text-text-muted text-sm mb-2">¿Qué tipo de conexión te interesa?</p>
+      <p className="text-text-dim text-xs mb-8">Podés elegir más de uno</p>
+
+      <LayoutGroup>
+        <div className="flex items-end justify-center gap-3">
+          {sorted.map((role) => {
+            const isActive = selected.includes(role.id);
+            const customImg = roleImages[role.id];
+            return (
+              <motion.button
+                key={role.id}
+                layout
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                whileTap={{ scale: 0.93 }}
+                whileHover={{ scale: 1.03 }}
+                onClick={() => onToggle(role.id)}
+                className="flex flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+                style={{
+                  backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
+                  borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
+                }}
+              >
+                {customImg ? (
+                  <div className={`w-20 h-28 rounded-xl overflow-hidden transition-transform duration-300 ${isActive ? 'scale-110' : 'scale-100'}`}>
+                    <img src={customImg} alt={role.label} className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                )}
+                <span
+                  className={`mt-2 font-medium text-sm ${
+                    isActive ? 'text-text-primary' : 'text-text-muted'
+                  }`}
+                >
+                  {role.label}
+                </span>
+                <AnimatePresence>
+                  {isActive && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center shadow-lg"
+                      style={{ backgroundColor: role.color }}
+                    >
+                      <Check className="w-3.5 h-3.5 text-white" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.button>
+            );
+          })}
+        </div>
+      </LayoutGroup>
+
+      <AnimatePresence>
+        {selected.length > 0 && (
+          <motion.p
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 5 }}
+            className="text-mansion-gold/70 text-xs mt-4"
+          >
+            {selected.length === 1 ? '1 seleccionado' : `${selected.length} seleccionados`}
+          </motion.p>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function StepInterests({ selected, onToggle }) {
   return (
     <div className="text-center">
@@ -1000,7 +1085,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [iAm, setIAm] = useState(null);
-  const [seeking, setSeeking] = useState(null);
+  const [seeking, setSeeking] = useState([]);
   const [interests, setInterests] = useState([]);
   const [info, setInfo] = useState({ name: '', age: '', city: 'Buenos Aires', bio: '' });
   const [photoFile, setPhotoFile] = useState(null);
@@ -1065,24 +1150,20 @@ export default function RegisterPage() {
     [iAm]
   );
 
-  const handleSeekingSelect = useCallback(
+  const handleSeekingToggle = useCallback(
     (id) => {
-      const wasEmpty = !seeking;
-      setSeeking(id);
-      if (wasEmpty) {
-        setTimeout(() => {
-          setDirection(1);
-          setStep((s) => s + 1);
-        }, 600);
-      }
+      setSeeking(prev => {
+        if (prev.includes(id)) return prev.filter(s => s !== id);
+        return [...prev, id];
+      });
     },
-    [seeking]
+    []
   );
 
   const canNext = () => {
     if (step === 0) return EMAIL_REGEX.test(email) && password.length >= 12 && emailStatus !== 'exists' && emailStatus !== 'invalid';
     if (step === 1) return !!iAm;
-    if (step === 2) return !!seeking;
+    if (step === 2) return seeking.length > 0;
     if (step === 3) return interests.length > 0;
     if (step === 4) return info.name && info.age && Number(info.age) >= 18 && info.city && (!showCountryPicker || selectedCountry);
     return true;
@@ -1175,6 +1256,12 @@ export default function RegisterPage() {
   const handleVerified = async (data) => {
     setUser(data.user);
     setRegistered(true);
+
+    // Save seeking as feed filter preference
+    if (seeking.length > 0) {
+      const filterVal = seeking.length === 3 ? 'all' : seeking.join(',');
+      localStorage.setItem('mansion_feed_filter', filterVal);
+    }
 
     // Upload photo if selected (now that we have a token)
     if (photoFile) {
@@ -1272,11 +1359,9 @@ export default function RegisterPage() {
         );
       case 2:
         return (
-          <RoleGrid
+          <SeekingGrid
             selected={seeking}
-            onSelect={handleSeekingSelect}
-            title="Busco..."
-            subtitle="¿Qué tipo de conexión te interesa?"
+            onToggle={handleSeekingToggle}
             roleImages={roleImages}
           />
         );

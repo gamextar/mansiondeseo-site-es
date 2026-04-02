@@ -694,6 +694,58 @@ export default function ProfilePage() {
           </motion.div>
         )}
 
+        {/* ── Busco (seeking) ── */}
+        <motion.div variants={fadeUp} className="mb-6 glass-elevated rounded-3xl p-4">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-3 flex items-center gap-1.5">
+            <Heart className="w-3 h-3 text-mansion-crimson/70" />
+            Busco
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'hombre', label: 'Hombres', emoji: '👨', color: 'bg-blue-500/15 text-blue-300 border-blue-500/40' },
+              { id: 'mujer', label: 'Mujeres', emoji: '👩', color: 'bg-pink-500/15 text-pink-300 border-pink-500/40' },
+              { id: 'pareja', label: 'Parejas', emoji: '💑', color: 'bg-purple-500/15 text-purple-300 border-purple-500/40' },
+            ].map(s => {
+              const seekingArr = Array.isArray(user?.seeking) ? user.seeking : (user?.seeking ? [user.seeking] : []);
+              const isActive = seekingArr.includes(s.id);
+              return (
+                <button
+                  key={s.id}
+                  onClick={async () => {
+                    let newSeeking;
+                    if (isActive) {
+                      newSeeking = seekingArr.filter(x => x !== s.id);
+                      if (newSeeking.length === 0) return; // must keep at least 1
+                    } else {
+                      newSeeking = [...seekingArr, s.id];
+                    }
+                    // Optimistic update
+                    setUser(prev => prev ? { ...prev, seeking: newSeeking } : prev);
+                    // Update feed filter
+                    const filterVal = newSeeking.length === 3 ? 'all' : newSeeking.join(',');
+                    localStorage.setItem('mansion_feed_filter', filterVal);
+                    setFeedFilter(filterVal);
+                    try {
+                      await updateProfile({ seeking: newSeeking });
+                    } catch {
+                      // Revert on error
+                      setUser(prev => prev ? { ...prev, seeking: seekingArr } : prev);
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    isActive
+                      ? s.color
+                      : 'bg-mansion-card/60 border border-mansion-border/30 text-text-muted hover:text-text-primary hover:border-mansion-border/50'
+                  } ${isActive ? 'border' : ''}`}
+                >
+                  <span>{s.emoji}</span>
+                  <span>{s.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+
         {/* ── Feed Filter ── */}
         <motion.div variants={fadeUp} className="mb-6 glass-elevated rounded-3xl p-4">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-3 flex items-center gap-1.5">
