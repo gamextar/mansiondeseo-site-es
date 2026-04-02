@@ -233,11 +233,11 @@ export async function getMe() {
 }
 
 export async function getAppBootstrap() {
-  const data = await apiFetch('/app/bootstrap');
-  if (data?.user) {
-    setStoredUser(data.user);
-  }
-  return data;
+  return sharedGet('bootstrap', async () => {
+    const data = await apiFetch('/app/bootstrap');
+    if (data?.user) setStoredUser(data.user);
+    return data;
+  }, { ttlMs: 30_000 });
 }
 
 export async function logout() {
@@ -256,10 +256,16 @@ export async function getProfiles({ filter, q } = {}) {
   if (filter && filter !== 'all') params.set('filter', filter);
   if (q) params.set('q', q);
   const qs = params.toString();
-  return apiFetch(`/profiles${qs ? `?${qs}` : ''}`);
+  // Search queries bypass cache (user expects fresh results), browse is cached 15s
+  if (q) return apiFetch(`/profiles${qs ? `?${qs}` : ''}`);
+  return sharedGet(`profiles:${filter || 'all'}`, () => apiFetch(`/profiles${qs ? `?${qs}` : ''}`), { ttlMs: 15_000 });
 }
 
 export async function getProfile(id) {
+  return sharedGet(`profile:${id}`, () => apiFetch__getProfile(id), { ttlMs: 30_000 });
+}
+
+async function apiFetch__getProfile(id) {
   return apiFetch(`/profiles/${id}`);
 }
 
@@ -270,6 +276,7 @@ export async function updateProfile(fields) {
   });
   if (data?.user) {
     setStoredUser(data.user);
+    sharedGetCache.delete(`profile:${data.user.id}`);
   }
   return data;
 }
@@ -302,7 +309,7 @@ export async function sendMessage(receiverId, content) {
 }
 
 export async function getMessageLimit() {
-  return apiFetch('/messages/limit');
+  return sharedGet('messageLimit', () => apiFetch('/messages/limit'), { ttlMs: 2 * 60_000 });
 }
 
 export async function getUnreadCount() {
@@ -339,7 +346,7 @@ export async function getSettings() {
 }
 
 export async function getPublicSettings() {
-  return apiFetch('/settings/public');
+  return sharedGet('publicSettings', () => apiFetch('/settings/public'), { ttlMs: 5 * 60_000 });
 }
 
 export async function detectCountry() {
@@ -356,7 +363,9 @@ export async function updateSettings(fields) {
 // ── Favorites ───────────────────────────────────────────
 
 export async function toggleFavorite(targetId) {
-  return apiFetch(`/favorites/${targetId}`, { method: 'POST' });
+  const data = await apiFetch(`/favorites/${targetId}`, { method: 'POST' });
+  sharedGetCache.delete('favorites');
+  return data;
 }
 
 export async function toggleStoryLike(storyId) {
@@ -364,7 +373,7 @@ export async function toggleStoryLike(storyId) {
 }
 
 export async function getFavorites() {
-  return apiFetch('/favorites');
+  return sharedGet('favorites', () => apiFetch('/favorites'), { ttlMs: 20_000 });
 }
 
 export async function checkFavorite(targetId) {
@@ -380,18 +389,20 @@ export async function getVisits() {
 // ── Gifts & Coins ───────────────────────────────────────
 
 export async function getGiftCatalog() {
-  return apiFetch('/gifts/catalog');
+  return sharedGet('giftCatalog', () => apiFetch('/gifts/catalog'), { ttlMs: 5 * 60_000 });
 }
 
 export async function sendGift(receiverId, giftId, message = '') {
-  return apiFetch('/gifts/send', {
+  const data = await apiFetch('/gifts/send', {
     method: 'POST',
     body: JSON.stringify({ receiver_id: receiverId, gift_id: giftId, message }),
   });
+  sharedGetCache.delete(`gifts:${receiverId}`);
+  return data;
 }
 
 export async function getReceivedGifts(userId) {
-  return apiFetch(`/gifts/received/${userId}`);
+  return sharedGet(`gifts:${userId}`, () => apiFetch(`/gifts/received/${userId}`), { ttlMs: 60_000 });
 }
 
 export async function getCoins() {
@@ -475,10 +486,17 @@ export async function adminDeleteUser(userId) {
 
 export async function getStories({ page = 1, limit = 100 } = {}) {
   const params = new URLSearchParams({ page, limit });
-  return apiFetch(`/stories?${params}`);
+  return sharedGet(`stories:${page}:${limit}`, () => apiFetch(`/stories?${params}`), { ttlMs: 2 * 60_000 });
+}
+
+export function invalidateStoriesCache() {
+  for (const key of sharedGetCache.keys()) {
+    if (key.startsWith('stories:')) sharedGetCache.delete(key);
+  }
 }
 
 function invalidateStoryFeedCache() {
+  invalidateStoriesCache();
   try {
     sessionStorage.removeItem('vf_stories');
     sessionStorage.removeItem('vf_idx');

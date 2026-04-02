@@ -16,52 +16,60 @@ export class UserNotification {
   }
 
   async fetch(request) {
-    const url = new URL(request.url);
-    this.debug('[UserNotification.fetch] pathname:', url.pathname, 'method:', request.method);
+    try {
+      const url = new URL(request.url);
+      this.debug('[UserNotification.fetch] pathname:', url.pathname, 'method:', request.method);
 
-    // POST /notify — broadcast event to all connected tabs/devices
-    if (url.pathname === '/notify' && request.method === 'POST') {
-      const data = await request.json();
-      const sockets = this.state.getWebSockets();
-      this.debug('[UserNotification.notify] sockets:', sockets.length, 'data:', JSON.stringify(data));
-      const payload = JSON.stringify(data);
-      for (const ws of sockets) {
-        try { ws.send(payload); } catch { /* dead socket */ }
+      // POST /notify — broadcast event to all connected tabs/devices
+      if (url.pathname === '/notify' && request.method === 'POST') {
+        let data;
+        try { data = await request.json(); } catch {
+          return new Response('Bad JSON', { status: 400 });
+        }
+        const sockets = this.state.getWebSockets();
+        this.debug('[UserNotification.notify] sockets:', sockets.length, 'data:', JSON.stringify(data));
+        const payload = JSON.stringify(data);
+        for (const ws of sockets) {
+          try { ws.send(payload); } catch { /* dead socket */ }
+        }
+        return new Response('ok');
       }
-      return new Response('ok');
+
+      // WebSocket upgrade
+      if (request.headers.get('Upgrade') !== 'websocket') {
+        return new Response('Expected WebSocket', { status: 426 });
+      }
+
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair);
+      this.state.acceptWebSocket(server);
+      // Send immediate connected confirmation
+      this.state.waitUntil(Promise.resolve().then(() => {
+        try { server.send(JSON.stringify({ type: 'connected' })); } catch { /* ignore */ }
+      }));
+
+      return new Response(null, { status: 101, webSocket: client });
+    } catch (err) {
+      this.debug('[UserNotification.fetch] ERROR:', err?.message || err);
+      return new Response('Internal error', { status: 500 });
     }
-
-    // WebSocket upgrade
-    if (request.headers.get('Upgrade') !== 'websocket') {
-      return new Response('Expected WebSocket', { status: 426 });
-    }
-
-    const pair = new WebSocketPair();
-    const [client, server] = Object.values(pair);
-    this.state.acceptWebSocket(server);
-    // Send immediate connected confirmation
-    this.state.waitUntil(Promise.resolve().then(() => {
-      try { server.send(JSON.stringify({ type: 'connected' })); } catch { /* ignore */ }
-    }));
-
-    return new Response(null, { status: 101, webSocket: client });
   }
 
   async webSocketMessage(ws, msg) {
-    // Only handle pings to keep connection alive
     try {
       const data = JSON.parse(typeof msg === 'string' ? msg : new TextDecoder().decode(msg));
       if (data.type === 'ping') {
         ws.send(JSON.stringify({ type: 'pong' }));
       }
-    } catch { /* ignore */ }
+    } catch { /* ignore malformed messages */ }
   }
 
   async webSocketClose(ws, code, reason) {
-    try { ws.close(1000, 'Connection closed'); } catch { /* already closed */ }
+    try { ws.close(code || 1000, reason || 'Connection closed'); } catch { /* already closed */ }
   }
 
   async webSocketError(ws, error) {
+    this.debug('[UserNotification.webSocketError]', error?.message || error);
     try { ws.close(1011, 'WebSocket error'); } catch { /* already closed */ }
   }
 }

@@ -1435,11 +1435,14 @@ async function handleNotificationWebSocket(request, env) {
   if (!payload) return error('Token inválido', 401);
 
   debugLog(env, '[handleNotificationWebSocket] userId:', payload.sub);
-  const doId = env.USER_NOTIFICATIONS.idFromName(payload.sub);
-  const stub = env.USER_NOTIFICATIONS.get(doId);
-
-  // Pass the original request directly — recommended pattern for WS proxying to DOs
-  return stub.fetch(request);
+  try {
+    const doId = env.USER_NOTIFICATIONS.idFromName(payload.sub);
+    const stub = env.USER_NOTIFICATIONS.get(doId);
+    return await stub.fetch(request);
+  } catch (err) {
+    console.error('[handleNotificationWebSocket] DO error:', err?.message || err);
+    return error('Notification service unavailable', 503);
+  }
 }
 
 // ── GET /api/unread-count ───────────────────────────────

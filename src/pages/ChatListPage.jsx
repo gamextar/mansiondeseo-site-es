@@ -333,7 +333,8 @@ export default function ChatListPage() {
       window.removeEventListener('focus', onFocus);
       unsubscribe();
     };
-  }, [navigate, fetchConversations, refreshUnread, subscribe, applyConversationUpdate, cachedState.conversations.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate, fetchConversations, refreshUnread, subscribe, applyConversationUpdate]);
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
       {/* Header */}

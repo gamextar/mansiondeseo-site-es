@@ -178,6 +178,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   return (
     <div className="relative w-full h-full bg-black flex items-center justify-center snap-start snap-always">
       <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
+        {/* eslint-disable-next-line */}
         <video
           ref={videoRef}
           src={activeSrc}
@@ -185,11 +186,13 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
           loop
           playsInline
+          webkit-playsinline="true"
           muted={isMuted}
+          autoPlay
           preload={shouldLoad ? 'auto' : 'none'}
           onEnded={handleVideoEnd}
+          onClick={togglePlay}
         />
-        <div className="absolute inset-0 z-10" onClick={togglePlay} />
 
         <AnimatePresence>
           {showPlayIcon && (
@@ -588,7 +591,8 @@ export default function VideoFeedPage() {
     return () => {
       cancelled = true;
     };
-  }, [refreshStories, stories.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshStories]);
 
   useEffect(() => {
     const targetStoryUserId = initialStoryUserIdRef.current;
@@ -871,8 +875,21 @@ export default function VideoFeedPage() {
     );
   }
 
+  const handleCloseVideoFeed = () => {
+    navigate(-1);
+  };
+
   return (
     <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
+      {/* Close button — top-right, PWA safe area aware */}
+      <button
+        onClick={handleCloseVideoFeed}
+        className="fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60 lg:h-14 lg:w-14"
+        style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
+        aria-label="Cerrar"
+      >
+        <X className="w-6 h-6" />
+      </button>
       {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">

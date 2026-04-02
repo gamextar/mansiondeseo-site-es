@@ -52,8 +52,19 @@ export default function ProfilePage() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const lightboxScrollRef = useRef(null);
+  const [lightboxZoom, setLightboxZoom] = useState(1);
+  const [lightboxPan, setLightboxPan] = useState({ x: 0, y: 0 });
+  const lbZoomRef = useRef(1);
+  const lbPanRef = useRef({ x: 0, y: 0 });
+  const lbPinchRef = useRef({ startDist: 0, startZoom: 1, active: false });
+  const lbDragRef = useRef({ startX: 0, startY: 0, startPanX: 0, startPanY: 0, active: false });
+  const lbLastTapRef = useRef(0);
 
-  const closeLightbox = useCallback(() => setLightboxOpen(false), []);
+  const closeLightbox = useCallback(() => {
+    setLightboxOpen(false);
+    setLightboxZoom(1); setLightboxPan({ x: 0, y: 0 });
+    lbZoomRef.current = 1; lbPanRef.current = { x: 0, y: 0 };
+  }, []);
 
   const handleLightboxScroll = useCallback(() => {
     const el = lightboxScrollRef.current;
@@ -62,10 +73,64 @@ export default function ProfilePage() {
     setLightboxIndex(idx);
   }, []);
 
+  const handleLbTouchStart = useCallback((e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lbPinchRef.current = { startDist: Math.hypot(dx, dy), startZoom: lbZoomRef.current, active: true };
+    } else if (e.touches.length === 1 && lbZoomRef.current > 1) {
+      lbDragRef.current = {
+        startX: e.touches[0].clientX, startY: e.touches[0].clientY,
+        startPanX: lbPanRef.current.x, startPanY: lbPanRef.current.y, active: true
+      };
+    }
+  }, []);
+
+  const handleLbTouchMove = useCallback((e) => {
+    if (e.touches.length === 2 && lbPinchRef.current.active) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const z = Math.max(1, Math.min((dist / lbPinchRef.current.startDist) * lbPinchRef.current.startZoom, 5));
+      lbZoomRef.current = z;
+      setLightboxZoom(z);
+      if (z <= 1) { lbPanRef.current = { x: 0, y: 0 }; setLightboxPan({ x: 0, y: 0 }); }
+    } else if (e.touches.length === 1 && lbDragRef.current.active && lbZoomRef.current > 1) {
+      e.preventDefault();
+      const px = lbDragRef.current.startPanX + (e.touches[0].clientX - lbDragRef.current.startX);
+      const py = lbDragRef.current.startPanY + (e.touches[0].clientY - lbDragRef.current.startY);
+      lbPanRef.current = { x: px, y: py };
+      setLightboxPan({ x: px, y: py });
+    }
+  }, []);
+
+  const handleLbTouchEnd = useCallback((e) => {
+    lbPinchRef.current.active = false;
+    lbDragRef.current.active = false;
+    // Double-tap to toggle zoom
+    if (e.changedTouches.length === 1 && e.touches.length === 0) {
+      const now = Date.now();
+      if (now - lbLastTapRef.current < 300) {
+        if (lbZoomRef.current > 1) {
+          lbZoomRef.current = 1; lbPanRef.current = { x: 0, y: 0 };
+          setLightboxZoom(1); setLightboxPan({ x: 0, y: 0 });
+        } else {
+          lbZoomRef.current = 2.5;
+          setLightboxZoom(2.5);
+        }
+      }
+      lbLastTapRef.current = now;
+    }
+  }, []);
+
   useEffect(() => {
     if (lightboxOpen && lightboxScrollRef.current) {
       lightboxScrollRef.current.scrollTo({ left: lightboxIndex * lightboxScrollRef.current.offsetWidth, behavior: 'instant' });
     }
+    setLightboxZoom(1); setLightboxPan({ x: 0, y: 0 });
+    lbZoomRef.current = 1; lbPanRef.current = { x: 0, y: 0 };
   }, [lightboxOpen, lightboxIndex]);
 
   useEffect(() => {
@@ -756,40 +821,79 @@ export default function ProfilePage() {
 
       {/* ── Lightbox ── */}
       {lightboxOpen && (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col" onClick={closeLightbox}>
-          <div className="flex items-center justify-between px-4 py-3 relative z-10">
-            <button
-              onClick={closeLightbox}
-              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
-            >
-              <X className="w-5 h-5 text-white" />
-            </button>
-            <span className="text-sm font-medium text-white/80">
-              {lightboxIndex + 1} / {photos.length}
-            </span>
-            <div className="w-10" />
-          </div>
+        <div className="fixed inset-0 z-[100] bg-black" onClick={closeLightbox}>
+          {/* Close button – top-right, matching story upload style */}
+          <button
+            onClick={(e) => { e.stopPropagation(); closeLightbox(); }}
+            className="absolute z-30 flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+            style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
+          >
+            <X className="w-5 h-5 lg:w-6 lg:h-6" />
+          </button>
 
-          <div className="flex-1 relative min-h-0" onClick={(e) => e.stopPropagation()}>
+          {/* Counter badge – top-left */}
+          {photos.length > 1 && (
+            <div
+              className="absolute z-20 flex items-center justify-center px-3 py-1.5 rounded-full bg-black/45 backdrop-blur-sm"
+              style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', left: 16 }}
+            >
+              <span className="text-sm font-medium text-white/80">
+                {lightboxIndex + 1} / {photos.length}
+              </span>
+            </div>
+          )}
+
+          {/* Image area with pinch-to-zoom */}
+          <div className="absolute inset-0 flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div
               ref={lightboxScrollRef}
               onScroll={handleLightboxScroll}
-              className="absolute inset-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide"
-              style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+              className="flex-1 flex overflow-y-hidden snap-x snap-mandatory scrollbar-hide"
+              style={{
+                scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+                overflowX: lightboxZoom > 1 ? 'hidden' : 'auto',
+              }}
             >
               {photos.map((url, i) => (
-                <div key={i} className="flex-shrink-0 snap-start" style={{ width: '100%', minWidth: '100%', height: '100%' }}>
+                <div
+                  key={i}
+                  className="flex-shrink-0 snap-start flex items-center justify-center overflow-hidden"
+                  style={{ width: '100%', minWidth: '100%', height: '100%', touchAction: lightboxZoom > 1 ? 'none' : 'pan-x' }}
+                  onTouchStart={handleLbTouchStart}
+                  onTouchMove={handleLbTouchMove}
+                  onTouchEnd={handleLbTouchEnd}
+                >
                   <img
                     src={url}
                     alt={`Foto ${i + 1}`}
                     className="w-full h-full object-contain select-none"
                     draggable={false}
+                    style={i === lightboxIndex ? {
+                      transform: `scale(${lightboxZoom}) translate(${lightboxPan.x / lightboxZoom}px, ${lightboxPan.y / lightboxZoom}px)`,
+                      transition: lbPinchRef.current.active || lbDragRef.current.active ? 'none' : 'transform 0.2s ease-out',
+                    } : undefined}
                   />
                 </div>
               ))}
             </div>
+
+            {/* Dots pagination */}
+            {photos.length > 1 && (
+              <div className="flex justify-center gap-1.5 pb-6 pt-2">
+                {photos.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setLightboxIndex(i)}
+                    className={`rounded-full transition-all duration-300 ${
+                      i === lightboxIndex ? 'w-6 h-2 bg-white' : 'w-2 h-2 bg-white/40'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
+          {/* Desktop arrows */}
           {photos.length > 1 && (
             <>
               {lightboxIndex > 0 && (
@@ -809,20 +913,6 @@ export default function ProfilePage() {
                 </button>
               )}
             </>
-          )}
-
-          {photos.length > 1 && (
-            <div className="flex justify-center gap-1.5 pb-6 pt-2" onClick={(e) => e.stopPropagation()}>
-              {photos.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setLightboxIndex(i)}
-                  className={`rounded-full transition-all duration-300 ${
-                    i === lightboxIndex ? 'w-6 h-2 bg-white' : 'w-2 h-2 bg-white/40'
-                  }`}
-                />
-              ))}
-            </div>
           )}
         </div>
       )}

@@ -37,7 +37,8 @@ export default function VipPage() {
       if (s.vipPrice6Months) updated[2] = { ...updated[2], amount: Number(s.vipPrice6Months) };
       setPlanes(updated);
     }).catch(() => {});
-  }, [user, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.premium, navigate]);
 
   const plan = planes.find(p => p.id === planSeleccionado);
 

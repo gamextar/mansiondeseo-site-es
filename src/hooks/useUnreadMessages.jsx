@@ -11,9 +11,10 @@ const UnreadContext = createContext({
 const WS_BASE = import.meta.env.PROD
   ? 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev'
   : `ws://${window.location.hostname}:8787`;
-const NOTIFICATION_PING_MS = 55_000;
-const UNREAD_REFRESH_STALE_MS = 60_000;
+const NOTIFICATION_PING_MS = 4 * 60_000; // 4 min — reduces DO wake-ups from hibernation
+const UNREAD_REFRESH_STALE_MS = 5 * 60_000; // 5 min — HTTP fallback if WS stale
 const UNREAD_FETCH_DEBOUNCE_MS = 4_000;
+const WS_MAX_RETRIES = 5; // backoff: 2,4,8,16,30 ≈ 60s then stop
 
 export function UnreadProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -65,8 +66,10 @@ export function UnreadProvider({ children }) {
       return Promise.resolve({ unread: 0 });
     }
 
-    const now = Date.now();
+    // Always dedup: if a request is already in-flight, piggyback on it
     if (unreadFetchRef.current) return unreadFetchRef.current;
+
+    const now = Date.now();
     if (!force && lastUnreadFetchAtRef.current && now - lastUnreadFetchAtRef.current < UNREAD_FETCH_DEBOUNCE_MS) {
       return Promise.resolve({ unread: prevCountRef.current });
     }
@@ -111,7 +114,8 @@ export function UnreadProvider({ children }) {
     if (!ws) return;
     stopPing(ws);
     ws.onclose = null;
-    ws.close();
+    ws.onerror = null;
+    try { ws.close(1000, 'client-pause'); } catch { /* already closed */ }
     wsRef.current = null;
     wsConnectedRef.current = false;
   }, [stopPing]);
@@ -190,8 +194,8 @@ export function UnreadProvider({ children }) {
         stopPing(ws);
         if (wsRef.current === ws) wsRef.current = null;
         wsConnectedRef.current = false;
-        if (!wsClosedRef.current && !wsPausedRef.current) {
-          const delay = Math.min(1000 * Math.pow(2, wsRetryRef.current), 30_000);
+        if (!wsClosedRef.current && !wsPausedRef.current && wsRetryRef.current < WS_MAX_RETRIES) {
+          const delay = Math.min(2000 * Math.pow(2, wsRetryRef.current), 30_000);
           wsRetryRef.current++;
           setTimeout(connectWs, delay);
         }
@@ -200,9 +204,11 @@ export function UnreadProvider({ children }) {
       ws.onerror = () => { /* onclose will fire */ };
     } catch {
       wsConnectedRef.current = false;
-      const delay = Math.min(1000 * Math.pow(2, wsRetryRef.current), 30_000);
-      wsRetryRef.current++;
-      setTimeout(connectWs, delay);
+      if (wsRetryRef.current < WS_MAX_RETRIES) {
+        const delay = Math.min(2000 * Math.pow(2, wsRetryRef.current), 30_000);
+        wsRetryRef.current++;
+        setTimeout(connectWs, delay);
+      }
     }
   }, [applyUnreadCount, fetchUnread, notifyListeners, startPing, stopPing]);
 
@@ -214,6 +220,7 @@ export function UnreadProvider({ children }) {
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         wsPausedRef.current = false;
+        wsRetryRef.current = 0; // fresh retry budget on foreground
         connectWs();
         if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
         else startPing();
@@ -226,6 +233,7 @@ export function UnreadProvider({ children }) {
     const onFocus = () => {
       if (document.visibilityState !== 'visible') return;
       wsPausedRef.current = false;
+      wsRetryRef.current = 0; // fresh retry budget on focus
       connectWs();
       if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
       else startPing();
