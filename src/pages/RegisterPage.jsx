@@ -1331,9 +1331,11 @@ export default function RegisterPage() {
     // Upload photo if selected (now that we have a token)
     if (photoFile) {
       try {
-        await uploadImage(photoFile, { purpose: 'avatar' });
-        // Fetch canonical user from server so avatar_url is guaranteed in state
-        const fresh = await getMe();
+        const uploadResult = await uploadImage(photoFile, { purpose: 'avatar' });
+        // Immediately update with upload result
+        setUser(prev => prev ? { ...prev, avatar_url: uploadResult.url, avatar_crop: null } : prev);
+        // Then fetch canonical user to ensure state is fully in sync
+        const fresh = await getMe().catch(() => null);
         if (fresh?.user) setUser(fresh.user);
       } catch {
         // Photo upload failed — user can retry later from profile

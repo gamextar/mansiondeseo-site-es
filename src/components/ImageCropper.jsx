@@ -37,7 +37,9 @@ async function cropCircle(file, image, zoom, offsetX, offsetY, containerW, conta
 
 	ctx.drawImage(image, srcX, srcY, srcSize, srcSize, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
 
-	const mimeType = file.type && file.type.startsWith('image/') ? file.type : 'image/jpeg';
+	// Only use canvas-safe MIME types (jpeg/png/webp); anything else (heic, avif, etc.) → jpeg
+	const SAFE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+	const mimeType = SAFE_TYPES.includes(file.type) ? file.type : 'image/jpeg';
 	const blob = await new Promise((resolve, reject) => {
 		canvas.toBlob(
 			(b) => (b ? resolve(b) : reject(new Error('No se pudo exportar la imagen.'))),
@@ -78,6 +80,7 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 	const lastPinchDist = useRef(null);
 
 	useEffect(() => {
+		if (!file) return;
 		const url = URL.createObjectURL(file);
 		setPreviewUrl(url);
 		const img = new Image();
@@ -85,6 +88,9 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 		img.src = url;
 		return () => URL.revokeObjectURL(url);
 	}, [file]);
+
+	// If no file provided, render nothing (prevents crash from legacy positionOnly usage)
+	if (!file) return null;
 
 	const containerW = CIRCLE_SIZE + 40;
 	const containerH = CIRCLE_SIZE + 40;
