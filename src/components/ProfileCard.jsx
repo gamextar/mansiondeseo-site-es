@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { MapPin, Shield, Crown, Lock } from 'lucide-react';
 import { getDisplayPhotos, getPrimaryProfilePhoto } from '../lib/profileMedia';
+import { resolveMediaUrl } from '../lib/media';
 
 // Masquerade mask SVG icon for incognito mode
 const MaskIcon = ({ className = 'w-6 h-6', customSvg = '' }) => {
@@ -64,6 +65,7 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
   const visiblePhotos = profile.visiblePhotos ?? displayPhotos.length;
   const cardBlocked = blurred || visiblePhotos === 0;
   const mainPhoto = getPrimaryProfilePhoto(profile);
+  const resolvedMainPhoto = resolveMediaUrl(mainPhoto);
 
   return (
     <div>
@@ -72,7 +74,7 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
           {/* Photo — use actual photo with blur for blocked cards */}
           {mainPhoto ? (
             <img
-              src={mainPhoto}
+              src={resolvedMainPhoto}
               alt={cardBlocked ? '' : name}
               loading={index < 6 ? 'eager' : 'lazy'}
               fetchPriority={index < 4 ? 'high' : 'auto'}

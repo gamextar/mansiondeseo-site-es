@@ -7,6 +7,7 @@ import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updat
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
+import { resolveMediaUrl } from '../lib/media';
 
 const ROLE_COLOR = {
   Pareja: 'bg-purple-500/15 text-purple-300 border-purple-500/25',
@@ -602,7 +603,7 @@ export default function ProfilePage() {
                   galleryEditing ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
                 }`}
               >
-                <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover pointer-events-none transition-transform duration-300 group-hover:scale-105" />
+                <img src={resolveMediaUrl(url)} alt={`Foto ${i + 1}`} className="w-full h-full object-cover pointer-events-none transition-transform duration-300 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                 {galleryEditing && (
                   <button
@@ -920,7 +921,7 @@ export default function ProfilePage() {
                   onTouchEnd={handleLbTouchEnd}
                 >
                   <img
-                    src={url}
+                    src={resolveMediaUrl(url)}
                     alt={`Foto ${i + 1}`}
                     className="w-full h-full object-contain select-none"
                     draggable={false}

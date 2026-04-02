@@ -1749,15 +1749,14 @@ async function handleUpload(request, env) {
 
 // ── GET /api/image-proxy?url=... ─────────────────────────
 async function handleImageProxy(request, env) {
-  const auth = await authenticate(request, env);
-  if (!auth) return error('No autorizado', 401);
-
   const url = new URL(request.url).searchParams.get('url');
   if (!url) return error('URL requerida', 400);
 
-  // Only allow proxying our own R2 bucket
+  // Only allow proxying our own image bucket domains.
   const r2Base = env.R2_PUBLIC_URL || '';
-  if (!r2Base || !url.startsWith(r2Base)) return error('URL no permitida', 403);
+  const legacyBase = 'https://pub-c0bc1ab6fb294cc1bb2e231bb55b4afb.r2.dev';
+  const allowed = [r2Base, legacyBase].filter(Boolean);
+  if (!allowed.some((base) => url.startsWith(base))) return error('URL no permitida', 403);
 
   const res = await fetch(url);
   if (!res.ok) return error('Imagen no encontrada', 404);
@@ -1765,7 +1764,7 @@ async function handleImageProxy(request, env) {
   return new Response(res.body, {
     headers: {
       'Content-Type': res.headers.get('Content-Type') || 'image/jpeg',
-      'Cache-Control': 'private, max-age=300',
+      'Cache-Control': 'public, max-age=3600',
     },
   });
 }

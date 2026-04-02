@@ -1,3 +1,5 @@
+import { resolveMediaUrl } from '../lib/media';
+
 /**
  * Avatar image with optional crop positioning.
  * crop: { x: number (%), y: number (%), s: number (scale), r: number (aspect ratio w/h) } | null
@@ -14,8 +16,10 @@ export default function AvatarImg({
 }) {
   if (!src) return null;
 
+  const resolvedSrc = resolveMediaUrl(src);
+
   if (!crop || !crop.r) {
-    return <img src={src} alt={alt} className={`${className} ${imgClassName} object-cover`.trim()} style={imgStyle || style} {...imgProps} />;
+    return <img src={resolvedSrc} alt={alt} className={`${className} ${imgClassName} object-cover`.trim()} style={imgStyle || style} {...imgProps} />;
   }
 
   const { x, y, s, r } = crop;
@@ -28,7 +32,7 @@ export default function AvatarImg({
   return (
     <div className={className} style={{ position: 'relative', overflow: 'hidden', ...style }}>
       <img
-        src={src}
+        src={resolvedSrc}
         alt={alt}
         className={imgClassName}
         style={{

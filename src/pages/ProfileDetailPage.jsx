@@ -8,6 +8,7 @@ import {
 import { getProfile, getToken, toggleFavorite, updateProfile, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../App';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
+import { resolveMediaUrl } from '../lib/media';
 
 const ROLE_COLOR = {
   Pareja: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
@@ -444,7 +445,7 @@ export default function ProfileDetailPage() {
                   onClick={() => !blocked && openLightbox(i)}
                 >
                   <img
-                    src={photo}
+                    src={resolveMediaUrl(photo)}
                     alt={blocked ? '' : `${name} ${i + 1}`}
                     className="w-full h-full object-cover"
                     style={blocked ? { filter: `blur(${heroBlur}px)`, transform: 'scale(1.1)' } : undefined}
@@ -692,7 +693,7 @@ export default function ProfileDetailPage() {
                       className="aspect-square rounded-2xl overflow-hidden bg-mansion-card relative group"
                     >
                       <img
-                        src={photo}
+                        src={resolveMediaUrl(photo)}
                         alt=""
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         style={blocked ? { filter: `blur(${thumbBlur}px)`, transform: 'scale(1.1)' } : undefined}
@@ -933,7 +934,7 @@ export default function ProfileDetailPage() {
                     onTouchEnd={handleLbTouchEnd}
                   >
                     <img
-                      src={photo}
+                      src={resolveMediaUrl(photo)}
                       alt={blocked ? '' : `${name} ${i + 1}`}
                       className="w-full h-full object-contain select-none"
                       style={{
