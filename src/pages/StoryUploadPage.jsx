@@ -282,14 +282,14 @@ function StoryStageHeader({
 
 function AnimatedPickBackground() {
 	return (
-		<div className="absolute inset-0 overflow-hidden" style={{ background: '#1a1038' }}>
+		<div className="absolute inset-0 overflow-hidden" style={{ background: '#0c0820' }}>
 			{/* ── Layer 1: Slow-rotating conic mesh — fills entire frame with color ── */}
 			<motion.div
 				className="absolute pointer-events-none"
 				style={{
 					width: '180%', height: '180%',
 					top: '-40%', left: '-40%',
-					background: 'conic-gradient(from 200deg at 50% 50%, #6a3de8 0deg, #2563eb 60deg, #0ea5e9 120deg, #a855f7 180deg, #ec4899 240deg, #8b5cf6 300deg, #6a3de8 360deg)',
+					background: 'conic-gradient(from 200deg at 50% 50%, #4a2ab0 0deg, #1e4fd0 60deg, #0b7fa0 120deg, #7e3dba 180deg, #b03070 240deg, #6840a0 300deg, #4a2ab0 360deg)',
 					filter: 'blur(100px)',
 					borderRadius: '50%',
 					willChange: 'transform',
@@ -304,10 +304,10 @@ function AnimatedPickBackground() {
 				style={{
 					width: '160%', height: '160%',
 					top: '-30%', left: '-30%',
-					background: 'conic-gradient(from 0deg at 50% 50%, #7c3aed 0deg, #06b6d4 90deg, #d946ef 180deg, #3b82f6 270deg, #7c3aed 360deg)',
+					background: 'conic-gradient(from 0deg at 50% 50%, #5a28b0 0deg, #058a9e 90deg, #a030b8 180deg, #2a60c0 270deg, #5a28b0 360deg)',
 					filter: 'blur(90px)',
 					borderRadius: '50%',
-					opacity: 0.7,
+					opacity: 0.55,
 					willChange: 'transform',
 				}}
 				animate={{ rotate: [360, 0], scale: [1, 0.95, 1.05, 1] }}
@@ -322,7 +322,7 @@ function AnimatedPickBackground() {
 				className="absolute rounded-full pointer-events-none"
 				style={{
 					width: '55%', height: '50%',
-					background: 'radial-gradient(circle, rgba(244,63,94,0.7) 0%, rgba(236,72,153,0.3) 50%, transparent 72%)',
+					background: 'radial-gradient(circle, rgba(200,45,75,0.5) 0%, rgba(180,55,120,0.2) 50%, transparent 72%)',
 					filter: 'blur(50px)',
 					bottom: '5%', right: '0%',
 					willChange: 'transform, opacity',
@@ -340,7 +340,7 @@ function AnimatedPickBackground() {
 				className="absolute rounded-full pointer-events-none"
 				style={{
 					width: '50%', height: '45%',
-					background: 'radial-gradient(circle, rgba(6,182,212,0.65) 0%, rgba(56,189,248,0.25) 48%, transparent 70%)',
+					background: 'radial-gradient(circle, rgba(5,140,170,0.45) 0%, rgba(40,145,200,0.18) 48%, transparent 70%)',
 					filter: 'blur(45px)',
 					top: '8%', left: '5%',
 					willChange: 'transform, opacity',
@@ -1309,6 +1309,13 @@ export default function StoryUploadPage() {
 										onClose={deleteAndResetStory}
 										onConfirm={() => {
 											setUser(prev => ({ ...prev, has_active_story: true }));
+											// Remove own ID from viewed set so green ring shows for the new story
+											try {
+												const viewed = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
+												const uid = String(user?.id);
+												const filtered = viewed.filter(id => id !== uid);
+												localStorage.setItem('viewed_story_users', JSON.stringify(filtered));
+											} catch {}
 											navigate('/perfil');
 										}}
 									/>
