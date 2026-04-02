@@ -447,6 +447,7 @@ export default function ProfileDetailPage() {
                   <img
                     src={resolveMediaUrl(photo)}
                     alt={blocked ? '' : `${name} ${i + 1}`}
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
                     style={blocked ? { filter: `blur(${heroBlur}px)`, transform: 'scale(1.1)' } : undefined}
                     draggable={false}
@@ -695,6 +696,7 @@ export default function ProfileDetailPage() {
                       <img
                         src={resolveMediaUrl(photo)}
                         alt=""
+                        referrerPolicy="no-referrer"
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         style={blocked ? { filter: `blur(${thumbBlur}px)`, transform: 'scale(1.1)' } : undefined}
                         draggable={false}
@@ -936,6 +938,7 @@ export default function ProfileDetailPage() {
                     <img
                       src={resolveMediaUrl(photo)}
                       alt={blocked ? '' : `${name} ${i + 1}`}
+                      referrerPolicy="no-referrer"
                       className="w-full h-full object-contain select-none"
                       style={{
                         ...(blocked ? { filter: `blur(${lightboxBlur}px)` } : {}),

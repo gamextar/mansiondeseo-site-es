@@ -76,6 +76,7 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
             <img
               src={resolvedMainPhoto}
               alt={cardBlocked ? '' : name}
+              referrerPolicy="no-referrer"
               loading={index < 6 ? 'eager' : 'lazy'}
               fetchPriority={index < 4 ? 'high' : 'auto'}
               decoding="async"

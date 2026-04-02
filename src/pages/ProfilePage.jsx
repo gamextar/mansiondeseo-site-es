@@ -603,7 +603,7 @@ export default function ProfilePage() {
                   galleryEditing ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
                 }`}
               >
-                <img src={resolveMediaUrl(url)} alt={`Foto ${i + 1}`} className="w-full h-full object-cover pointer-events-none transition-transform duration-300 group-hover:scale-105" />
+                <img src={resolveMediaUrl(url)} alt={`Foto ${i + 1}`} referrerPolicy="no-referrer" className="w-full h-full object-cover pointer-events-none transition-transform duration-300 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                 {galleryEditing && (
                   <button
@@ -923,6 +923,7 @@ export default function ProfilePage() {
                   <img
                     src={resolveMediaUrl(url)}
                     alt={`Foto ${i + 1}`}
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-contain select-none"
                     draggable={false}
                     style={i === lightboxIndex ? {
