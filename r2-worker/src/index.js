@@ -10,6 +10,15 @@ const CORS_ORIGINS = [
   'https://www.mansiondeseo.com',
 ];
 
+// Hotlink protection: returns true if the request is allowed.
+// Allows: no Referer (direct access), or Referer from our own domains.
+// Blocks: Referer from any other site (hotlinking).
+function isAllowedReferer(request) {
+  const referer = request.headers.get('Referer') || '';
+  if (!referer) return true; // direct access or no-referrer policy
+  return CORS_ORIGINS.some((origin) => referer.startsWith(origin));
+}
+
 function corsHeaders(request) {
   const origin = request.headers.get('Origin') || '';
   const allowed = CORS_ORIGINS.includes(origin) ? origin : CORS_ORIGINS[0];
@@ -51,6 +60,9 @@ export default {
 
     // ── GET — Delivery (with edge cache) ────────────
     if (method === 'GET' || method === 'HEAD') {
+      if (!isAllowedReferer(request)) {
+        return new Response('Forbidden', { status: 403 });
+      }
       return handleGet(request, env, key, method);
     }
 
