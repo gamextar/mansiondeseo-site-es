@@ -15,26 +15,21 @@ import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 
-const FEED_CACHE_KEY = 'mansion_feed_';
+const FEED_CACHE_KEY = 'mansion_feed';
 
-function getSavedFilter() {
-  return localStorage.getItem('mansion_feed_filter') || 'all';
-}
-
-function getCachedFeed(filter) {
+function getCachedFeed() {
   try {
-    const raw = sessionStorage.getItem(FEED_CACHE_KEY + filter);
+    const raw = sessionStorage.getItem(FEED_CACHE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
 
-function setCachedFeed(filter, data) {
-  try { sessionStorage.setItem(FEED_CACHE_KEY + filter, JSON.stringify(data)); } catch {}
+function setCachedFeed(data) {
+  try { sessionStorage.setItem(FEED_CACHE_KEY, JSON.stringify(data)); } catch {}
 }
 
 export default function FeedPage() {
-  const savedFilter = getSavedFilter();
-  const cached = getCachedFeed(savedFilter);
+  const cached = getCachedFeed();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
@@ -42,20 +37,20 @@ export default function FeedPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const loadProfiles = useCallback((filter, { silent = false } = {}) => {
-    const c = getCachedFeed(filter);
+  const loadProfiles = useCallback(({ silent = false } = {}) => {
+    const c = getCachedFeed();
     if (!silent && !c) setLoading(true);
     if (!silent && c) {
       setProfiles(c.profiles || []);
       setViewerPremium(c.viewerPremium || false);
       if (c.settings) setSettings(c.settings);
     }
-    return getProfiles({ filter: filter === 'all' ? undefined : filter })
+    return getProfiles()
       .then(data => {
         setProfiles(data.profiles || []);
         setViewerPremium(data.viewerPremium || false);
         if (data.settings) setSettings(data.settings);
-        setCachedFeed(filter, { profiles: data.profiles || [], viewerPremium: data.viewerPremium || false, settings: data.settings || {} });
+        setCachedFeed({ profiles: data.profiles || [], viewerPremium: data.viewerPremium || false, settings: data.settings || {} });
       })
       .catch(() => setProfiles([]))
       .finally(() => setLoading(false));
@@ -63,11 +58,11 @@ export default function FeedPage() {
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
-    loadProfiles(savedFilter);
-  }, [navigate, loadProfiles, savedFilter]);
+    loadProfiles();
+  }, [navigate, loadProfiles]);
 
   const { indicatorRef } = usePullToRefresh(
-    useCallback(() => loadProfiles(savedFilter, { silent: true }), [loadProfiles, savedFilter])
+    useCallback(() => loadProfiles({ silent: true }), [loadProfiles])
   );
 
   const storyCircleSize = settings.storyCircleSize || 88;

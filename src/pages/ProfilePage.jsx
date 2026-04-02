@@ -46,7 +46,6 @@ export default function ProfilePage() {
   const [togglingGhost, setTogglingGhost] = useState(false);
   const [visitors, setVisitors] = useState([]);
   const [receivedGifts, setReceivedGifts] = useState([]);
-  const [feedFilter, setFeedFilter] = useState(() => localStorage.getItem('mansion_feed_filter') || 'all');
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
   const [galleryEditing, setGalleryEditing] = useState(false);
@@ -726,10 +725,8 @@ export default function ProfilePage() {
                     }
                     // Optimistic update
                     setUser(prev => prev ? { ...prev, seeking: newSeeking } : prev);
-                    // Update feed filter
-                    const filterVal = newSeeking.length === 3 ? 'all' : newSeeking.join(',');
-                    localStorage.setItem('mansion_feed_filter', filterVal);
-                    setFeedFilter(filterVal);
+                    // Clear feed cache so it reloads with new seeking
+                    try { sessionStorage.removeItem('mansion_feed'); } catch {}
                     try {
                       await updateProfile({ seeking: newSeeking });
                     } catch {
@@ -751,36 +748,49 @@ export default function ProfilePage() {
           </div>
         </motion.div>
 
-        {/* ── Feed Filter ── */}
+        {/* ── Mis Intereses (secondary, for feed priority) ── */}
         <motion.div variants={fadeUp} className="mb-6 glass-elevated rounded-3xl p-4">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-3 flex items-center gap-1.5">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-1.5 flex items-center gap-1.5">
             <Filter className="w-3 h-3 text-mansion-gold/70" />
-            Mostrar en inicio
+            Mis Intereses
           </h3>
+          <p className="text-[10px] text-text-dim mb-3">Seleccioná tus intereses para ver primero perfiles afines</p>
           <div className="flex flex-wrap gap-2">
             {[
-              { id: 'all', label: 'Todos', emoji: '✨' },
               { id: 'swinger', label: 'Swinger', emoji: '🔄' },
               { id: 'trios', label: 'Tríos', emoji: '🔥' },
               { id: 'cuckold', label: 'Cuckold', emoji: '👀' },
-              { id: 'fetiche', label: 'Fetiche', emoji: '⛓️' },
-              { id: 'pareja', label: 'Parejas', emoji: '💑' },
-              { id: 'mujer', label: 'Mujeres', emoji: '👩' },
-              { id: 'hombre', label: 'Hombres', emoji: '👨' },
-            ].map(f => {
-              const isActive = feedFilter === f.id;
+              { id: 'fetiche', label: 'Fetiches', emoji: '⛓️' },
+              { id: 'voyeur', label: 'Voyeur', emoji: '🕶️' },
+              { id: 'bdsm', label: 'BDSM', emoji: '🖤' },
+              { id: 'exhib', label: 'Exhibicionismo', emoji: '✨' },
+              { id: 'roleplay', label: 'Roleplay', emoji: '🎭' },
+            ].map(interest => {
+              const userInterests = Array.isArray(user?.interests) ? user.interests : [];
+              const isActive = userInterests.includes(interest.id);
               return (
                 <button
-                  key={f.id}
-                  onClick={() => { setFeedFilter(f.id); localStorage.setItem('mansion_feed_filter', f.id); }}
+                  key={interest.id}
+                  onClick={async () => {
+                    const current = Array.isArray(user?.interests) ? user.interests : [];
+                    const newInterests = isActive
+                      ? current.filter(x => x !== interest.id)
+                      : [...current, interest.id];
+                    setUser(prev => prev ? { ...prev, interests: newInterests } : prev);
+                    try {
+                      await updateProfile({ interests: newInterests });
+                    } catch {
+                      setUser(prev => prev ? { ...prev, interests: current } : prev);
+                    }
+                  }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                     isActive
                       ? 'bg-mansion-gold/15 text-mansion-gold border border-mansion-gold/40'
                       : 'bg-mansion-card/60 border border-mansion-border/30 text-text-muted hover:text-text-primary hover:border-mansion-border/50'
                   }`}
                 >
-                  <span>{f.emoji}</span>
-                  <span>{f.label}</span>
+                  <span>{interest.emoji}</span>
+                  <span>{interest.label}</span>
                 </button>
               );
             })}

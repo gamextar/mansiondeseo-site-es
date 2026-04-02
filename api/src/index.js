@@ -1069,20 +1069,30 @@ async function handleProfiles(request, env) {
   const search = url.searchParams.get('q') || '';
 
   // Use the authenticated user's registered country (not cf-ipcountry which changes with VPN)
-  const viewer = await env.DB.prepare('SELECT premium, premium_until, country FROM users WHERE id = ?').bind(auth.sub).first();
+  const viewer = await env.DB.prepare('SELECT premium, premium_until, country, seeking, interests FROM users WHERE id = ?').bind(auth.sub).first();
   const country = viewer?.country || '';
+
+  // Determine role filter: use viewer's seeking from DB, with frontend filter as fallback
+  const viewerSeeking = safeParseJSON(viewer?.seeking, []);
+  const viewerInterests = safeParseJSON(viewer?.interests, []);
 
   // Build profiles query (don't exclude current user — cache is shared, filter later)
   let query = `SELECT * FROM users WHERE status = 'verified'`;
   const params = [];
   if (country) { query += ` AND country = ?`; params.push(country); }
-  // Support multi-role filter: comma-separated values e.g. filter=hombre,mujer
+
+  // Role filter: use server-side seeking, fall back to frontend filter param
   const roleFilters = ['hombre', 'mujer', 'pareja'];
-  const filterParts = filter.split(',').map(f => f.trim()).filter(f => roleFilters.includes(f));
+  let filterParts;
+  if (viewerSeeking.length > 0 && viewerSeeking.length < 3) {
+    filterParts = viewerSeeking.filter(f => roleFilters.includes(f));
+  } else {
+    filterParts = filter.split(',').map(f => f.trim()).filter(f => roleFilters.includes(f));
+  }
   if (filterParts.length === 1) {
     query += ` AND role = '${filterParts[0]}'`;
   } else if (filterParts.length > 1) {
-    query += ` AND role IN (${filterParts.map(f => `'${f}'`).join(',')})`;  
+    query += ` AND role IN (${filterParts.map(f => `'${f}'`).join(',')})`;
   }
   if (search) {
     query += ` AND (username LIKE ? OR city LIKE ? OR bio LIKE ?)`;
@@ -1092,7 +1102,8 @@ async function handleProfiles(request, env) {
   query += ` ORDER BY last_active DESC LIMIT 51`;
 
   // Cache key for profiles query (shared across all users)
-  const profilesCacheKey = `profiles:${filter}:${country}:${search}`;
+  const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
+  const profilesCacheKey = `profiles:${seekingKey}:${country}:${search}`;
 
   // Parallel: cached settings + cached profiles + per-user data (always fresh)
   const [settings, results, { results: favRows }, { results: favByRows }, storyRows] = await Promise.all([
@@ -1108,7 +1119,7 @@ async function handleProfiles(request, env) {
   const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
 
   // Filter out current user (cached query includes everyone) + map to frontend shape
-  const profiles = results.filter(u => u.id !== auth.sub).slice(0, 50).map(u => {
+  let profiles = results.filter(u => u.id !== auth.sub).slice(0, 50).map(u => {
     const profileIsPremium = isPremiumActive(u);
     const hasGhostMode = profileIsPremium && !!u.ghost_mode;
     // Ghost mode blur: blurred unless viewer is premium OR the ghost-mode user has favorited the viewer
@@ -1121,13 +1132,14 @@ async function handleProfiles(request, env) {
       : blurred
         ? 0
         : Math.min(displayPhotos.length, settings.freeVisiblePhotos);
+    const profileInterests = safeParseJSON(u.interests, []);
     return {
       id: u.id,
       name: u.username,
       age: u.age,
       city: u.city,
       role: mapRoleToDisplay(u.role),
-      interests: safeParseJSON(u.interests, []),
+      interests: profileInterests,
       bio: u.bio,
       photos: galleryPhotos,
       totalPhotos: displayPhotos.length,
@@ -1143,8 +1155,18 @@ async function handleProfiles(request, env) {
       avatar_url: u.avatar_url,
       avatar_crop: safeParseJSON(u.avatar_crop, null),
       has_active_story: activeStoryUserIds.has(String(u.id)),
+      _matchingInterests: viewerInterests.length > 0
+        ? profileInterests.filter(i => viewerInterests.includes(i)).length
+        : 0,
     };
   });
+
+  // Sort: profiles with more matching interests first, then by last_active (already sorted by DB)
+  if (viewerInterests.length > 0) {
+    profiles.sort((a, b) => b._matchingInterests - a._matchingInterests);
+  }
+  // Strip internal sort field
+  profiles = profiles.map(({ _matchingInterests, ...p }) => p);
 
   return json({ profiles, viewerPremium: viewerIsPremium, settings });
 }
@@ -1709,9 +1731,9 @@ async function handleUpload(request, env) {
     return error('La imagen no puede superar 5MB');
   }
 
-  // Keep uploads organized by folder without exposing user IDs in public URLs.
+  // Keep uploads organized by user subfolder: profiles/{userId}/{fileId}.ext
   const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
-  const folder = purpose === 'avatar' || purpose === 'gallery' ? 'profiles' : 'assets';
+  const folder = purpose === 'avatar' || purpose === 'gallery' ? `profiles/${auth.sub}` : 'assets';
   const key = `${folder}/${generateId()}.${ext}`;
 
   await env.IMAGES.put(key, imageData, {
