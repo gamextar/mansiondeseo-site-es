@@ -12,6 +12,7 @@ const WS_BASE = import.meta.env.PROD
   ? 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev'
   : `ws://${window.location.hostname}:8787`;
 const NOTIFICATION_PING_MS = 4 * 60_000; // 4 min — reduces DO wake-ups from hibernation
+const NOTIFICATION_BACKGROUND_GRACE_MS = 60_000; // keep WS alive briefly across tab/app switches
 const UNREAD_REFRESH_STALE_MS = 5 * 60_000; // 5 min — HTTP fallback if WS stale
 const UNREAD_FETCH_DEBOUNCE_MS = 4_000;
 const WS_MAX_RETRIES = 5; // backoff: 2,4,8,16,30 ≈ 60s then stop
@@ -26,6 +27,7 @@ export function UnreadProvider({ children }) {
   const wsClosedRef = useRef(false);
   const wsPausedRef = useRef(false);
   const wsConnectedRef = useRef(false);
+  const wsBackgroundTimerRef = useRef(null);
   const unreadFetchRef = useRef(null);
   const lastUnreadFetchAtRef = useRef(0);
   const activeChatIdRef = useRef(null);
@@ -45,6 +47,12 @@ export function UnreadProvider({ children }) {
     if (!socket?._pingTimer) return;
     clearInterval(socket._pingTimer);
     socket._pingTimer = null;
+  }, []);
+
+  const clearBackgroundDisconnectTimer = useCallback(() => {
+    if (!wsBackgroundTimerRef.current) return;
+    clearTimeout(wsBackgroundTimerRef.current);
+    wsBackgroundTimerRef.current = null;
   }, []);
 
   const startPing = useCallback((socket = wsRef.current) => {
@@ -111,6 +119,7 @@ export function UnreadProvider({ children }) {
   // Connect notification WebSocket
   const disconnectWs = useCallback(() => {
     const ws = wsRef.current;
+    clearBackgroundDisconnectTimer();
     if (!ws) return;
     stopPing(ws);
     ws.onclose = null;
@@ -118,7 +127,16 @@ export function UnreadProvider({ children }) {
     try { ws.close(1000, 'client-pause'); } catch { /* already closed */ }
     wsRef.current = null;
     wsConnectedRef.current = false;
-  }, [stopPing]);
+  }, [clearBackgroundDisconnectTimer, stopPing]);
+
+  const scheduleBackgroundDisconnect = useCallback(() => {
+    clearBackgroundDisconnectTimer();
+    wsBackgroundTimerRef.current = setTimeout(() => {
+      if (document.visibilityState === 'visible') return;
+      wsPausedRef.current = true;
+      disconnectWs();
+    }, NOTIFICATION_BACKGROUND_GRACE_MS);
+  }, [clearBackgroundDisconnectTimer, disconnectWs]);
 
   const connectWs = useCallback(() => {
     const token = getToken();
@@ -219,19 +237,20 @@ export function UnreadProvider({ children }) {
 
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        clearBackgroundDisconnectTimer();
         wsPausedRef.current = false;
         wsRetryRef.current = 0; // fresh retry budget on foreground
         connectWs();
         if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
         else startPing();
       } else {
-        wsPausedRef.current = true;
-        disconnectWs();
+        scheduleBackgroundDisconnect();
       }
     };
 
     const onFocus = () => {
       if (document.visibilityState !== 'visible') return;
+      clearBackgroundDisconnectTimer();
       wsPausedRef.current = false;
       wsRetryRef.current = 0; // fresh retry budget on focus
       connectWs();
@@ -246,11 +265,12 @@ export function UnreadProvider({ children }) {
 
     return () => {
       wsClosedRef.current = true;
+      clearBackgroundDisconnectTimer();
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('focus', onFocus);
       disconnectWs();
     };
-  }, [connectWs, disconnectWs, fetchUnread, shouldRefreshUnread, startPing]);
+  }, [clearBackgroundDisconnectTimer, connectWs, disconnectWs, fetchUnread, scheduleBackgroundDisconnect, shouldRefreshUnread, startPing]);
 
   const setActiveChatId = useCallback((chatId) => {
     activeChatIdRef.current = chatId || null;

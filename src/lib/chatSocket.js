@@ -7,6 +7,7 @@ const WS_BASE = import.meta.env.PROD
   ? 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev'
   : `ws://${window.location.hostname}:8787`;
 const CHAT_PING_MS = 45_000;
+const CHAT_BACKGROUND_GRACE_MS = 15_000;
 const CHAT_MAX_RETRIES = 5;
 
 /**
@@ -34,6 +35,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   let retryCount = 0;
   let retryTimer = null;
   let pingTimer = null;
+  let backgroundTimer = null;
   let closed = false; // true when user explicitly closes
   let paused = false; // true when tab is in background
 
@@ -53,6 +55,11 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     }, CHAT_PING_MS);
   }
 
+  function clearBackgroundTimer() {
+    clearTimeout(backgroundTimer);
+    backgroundTimer = null;
+  }
+
   function setState(s) {
     state = s;
     callbacks.onStateChange?.(s);
@@ -60,6 +67,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
 
   function connect() {
     if (closed || paused) return;
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
     setState('connecting');
 
     try {
@@ -152,6 +160,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   function close() {
     closed = true;
     clearTimeout(retryTimer);
+    clearBackgroundTimer();
     stopPing();
     if (ws) {
       ws.onclose = null; // prevent reconnect
@@ -168,21 +177,25 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   function handleVisibilityChange() {
     if (closed) return;
     if (document.visibilityState === 'visible') {
+      clearBackgroundTimer();
       paused = false;
       retryCount = 0;
       connect();
       return;
     }
-    // Background: disconnect cleanly like notification WS
-    paused = true;
-    clearTimeout(retryTimer);
-    stopPing();
-    if (ws) {
-      ws.onclose = null;
-      ws.close(1000, 'client-pause');
-      ws = null;
-    }
-    setState('disconnected');
+    clearBackgroundTimer();
+    backgroundTimer = setTimeout(() => {
+      if (closed || document.visibilityState === 'visible') return;
+      paused = true;
+      clearTimeout(retryTimer);
+      stopPing();
+      if (ws) {
+        ws.onclose = null;
+        ws.close(1000, 'client-pause');
+        ws = null;
+      }
+      setState('disconnected');
+    }, CHAT_BACKGROUND_GRACE_MS);
   }
 
   document.addEventListener('visibilitychange', handleVisibilityChange);
