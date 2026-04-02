@@ -282,84 +282,80 @@ function StoryStageHeader({
 
 function AnimatedPickBackground() {
 	return (
-		<div className="absolute inset-0 overflow-hidden" style={{ background: '#0c0820' }}>
-			{/* ── Layer 1: Slow-rotating conic mesh — fills entire frame with color ── */}
+		<div className="absolute inset-0 overflow-hidden" style={{ background: '#060311' }}>
+			{/* ── Layer 1: Core aurora — centered, smaller so corners stay truly dark ── */}
 			<motion.div
 				className="absolute pointer-events-none"
 				style={{
-					width: '180%', height: '180%',
-					top: '-40%', left: '-40%',
-					background: 'conic-gradient(from 200deg at 50% 50%, #4a2ab0 0deg, #1e4fd0 60deg, #0b7fa0 120deg, #7e3dba 180deg, #b03070 240deg, #6840a0 300deg, #4a2ab0 360deg)',
-					filter: 'blur(100px)',
+					width: '120%', height: '120%',
+					top: '-10%', left: '-10%',
+					background: 'conic-gradient(from 200deg at 50% 50%, #2e0e7a 0deg, #0e2880 60deg, #043858 120deg, #4a1080 180deg, #700e3a 240deg, #32107a 300deg, #2e0e7a 360deg)',
+					filter: 'blur(72px)',
 					borderRadius: '50%',
+					opacity: 0.9,
 					willChange: 'transform',
 				}}
 				animate={{ rotate: [0, 360] }}
-				transition={{ duration: 50, repeat: Infinity, ease: 'linear' }}
+				transition={{ duration: 65, repeat: Infinity, ease: 'linear' }}
 			/>
 
-			{/* ── Layer 2: Counter-rotating inner ring for movement ── */}
+			{/* ── Layer 2: Counter-rotating, tighter ring ── */}
 			<motion.div
 				className="absolute pointer-events-none"
 				style={{
-					width: '160%', height: '160%',
-					top: '-30%', left: '-30%',
-					background: 'conic-gradient(from 0deg at 50% 50%, #5a28b0 0deg, #058a9e 90deg, #a030b8 180deg, #2a60c0 270deg, #5a28b0 360deg)',
-					filter: 'blur(90px)',
+					width: '100%', height: '100%',
+					top: '0%', left: '0%',
+					background: 'conic-gradient(from 0deg at 50% 50%, #28086a 0deg, #023052 90deg, #580870 180deg, #0e1468 270deg, #28086a 360deg)',
+					filter: 'blur(60px)',
 					borderRadius: '50%',
-					opacity: 0.55,
+					opacity: 0.5,
 					willChange: 'transform',
 				}}
-				animate={{ rotate: [360, 0], scale: [1, 0.95, 1.05, 1] }}
-				transition={{
-					rotate: { duration: 35, repeat: Infinity, ease: 'linear' },
-					scale: { duration: 12, repeat: Infinity, ease: 'easeInOut' },
+				animate={{ rotate: [360, 0] }}
+				transition={{ duration: 42, repeat: Infinity, ease: 'linear' }}
+			/>
+
+			{/* ── Layer 3: Edge vignette — kills any light reaching the corners ── */}
+			<div
+				className="absolute inset-0 pointer-events-none"
+				style={{
+					background: 'radial-gradient(ellipse 75% 75% at 50% 50%, transparent 25%, rgba(6,3,17,0.55) 60%, rgba(6,3,17,0.93) 100%)',
 				}}
 			/>
 
-			{/* ── Layer 3: Warm accent — drifting rose/coral ── */}
+			{/* ── Layer 4: Deep rose accent, bottom-right ── */}
 			<motion.div
 				className="absolute rounded-full pointer-events-none"
 				style={{
-					width: '55%', height: '50%',
-					background: 'radial-gradient(circle, rgba(200,45,75,0.5) 0%, rgba(180,55,120,0.2) 50%, transparent 72%)',
-					filter: 'blur(50px)',
-					bottom: '5%', right: '0%',
-					willChange: 'transform, opacity',
+					width: '38%', height: '32%',
+					background: 'radial-gradient(circle, rgba(130,12,48,0.38) 0%, transparent 70%)',
+					filter: 'blur(38px)',
+					bottom: '14%', right: '8%',
 				}}
-				animate={{
-					x: [0, -25, 18, 0],
-					y: [0, 16, -12, 0],
-					opacity: [0.6, 1, 0.65, 0.6],
-				}}
-				transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+				animate={{ x: [0, -18, 10, 0], y: [0, 10, -6, 0], opacity: [0.5, 0.75, 0.5, 0.5] }}
+				transition={{ duration: 17, repeat: Infinity, ease: 'easeInOut' }}
 			/>
 
-			{/* ── Layer 4: Cool accent — drifting cyan ── */}
+			{/* ── Layer 5: Violet accent, top-left ── */}
 			<motion.div
 				className="absolute rounded-full pointer-events-none"
 				style={{
-					width: '50%', height: '45%',
-					background: 'radial-gradient(circle, rgba(5,140,170,0.45) 0%, rgba(40,145,200,0.18) 48%, transparent 70%)',
-					filter: 'blur(45px)',
-					top: '8%', left: '5%',
-					willChange: 'transform, opacity',
+					width: '32%', height: '28%',
+					background: 'radial-gradient(circle, rgba(50,10,120,0.42) 0%, transparent 70%)',
+					filter: 'blur(32px)',
+					top: '10%', left: '6%',
 				}}
-				animate={{
-					x: [0, 22, -16, 0],
-					y: [0, -18, 10, 0],
-					opacity: [0.5, 0.85, 0.55, 0.5],
-				}}
-				transition={{ duration: 17, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+				animate={{ x: [0, 14, -8, 0], y: [0, -10, 6, 0], opacity: [0.4, 0.6, 0.4, 0.4] }}
+				transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
 			/>
 
-			{/* ── Layer 5: Noise grain ── */}
+			{/* ── Layer 6: Film-grain noise ── */}
 			<div
 				className="absolute inset-0 pointer-events-none"
 				style={{
 					backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 512 512\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.75\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.04\'/%3E%3C/svg%3E")',
 					backgroundSize: '200px 200px',
-					opacity: 0.4,
+					opacity: 0.35,
 					mixBlendMode: 'overlay',
 				}}
 			/>

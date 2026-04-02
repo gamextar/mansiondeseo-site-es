@@ -74,9 +74,6 @@ export default function DesktopSidebar() {
             </div>
           </div>
           <p className="mt-3 text-base font-semibold text-text-primary truncate max-w-[80%] text-center">{user.username || user.name}</p>
-          {user.role && (
-            <span className="mt-1 text-[11px] text-text-dim">{user.role}</span>
-          )}
         </Link>
       )}
 
