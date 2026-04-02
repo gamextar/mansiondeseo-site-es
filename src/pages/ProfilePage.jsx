@@ -357,92 +357,93 @@ export default function ProfilePage() {
         className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-2xl lg:mx-auto"
       >
         {/* ── Hero Section ── */}
-        <motion.div variants={fadeUp} className="flex flex-col items-center mb-6 pt-1">
-          {/* Avatar with story ring */}
-          <div className="relative mb-4">
-            <div className={`rounded-full p-[3px] ${user?.has_active_story ? 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400' : 'bg-gradient-to-br from-mansion-gold/50 to-mansion-gold-light/30'}`}>
-              <motion.div
-                initial={{ scale: 0.7, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: 'spring', damping: 15, stiffness: 200, delay: 0.1 }}
+        <motion.div variants={fadeUp} className="mb-4">
+          {/* Avatar + info row */}
+          <div className="flex items-center gap-4 mb-3">
+            {/* Avatar */}
+            <div className="relative flex-shrink-0">
+              <div className={`rounded-full p-[3px] ${user?.has_active_story ? 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400' : 'bg-gradient-to-br from-mansion-gold/50 to-mansion-gold-light/30'}`}>
+                <motion.div
+                  initial={{ scale: 0.7, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: 'spring', damping: 15, stiffness: 200, delay: 0.1 }}
+                  onClick={handleAvatarTap}
+                  className="w-20 h-20 rounded-full bg-mansion-base p-[2.5px] cursor-pointer"
+                >
+                  <div className="w-full h-full rounded-full bg-mansion-card flex items-center justify-center overflow-hidden">
+                    {avatarUrl ? (
+                      <AvatarImg src={avatarUrl} crop={user?.avatar_crop} alt="Mi perfil" className="w-full h-full" />
+                    ) : (
+                      <Camera className="w-7 h-7 text-text-dim" />
+                    )}
+                  </div>
+                </motion.div>
+              </div>
+              <button
                 onClick={handleAvatarTap}
-                className="w-28 h-28 rounded-full bg-mansion-base p-[2.5px] cursor-pointer"
+                className="absolute -bottom-0 -right-0 w-6 h-6 rounded-full bg-mansion-crimson text-white flex items-center justify-center shadow-lg ring-2 ring-mansion-base"
               >
-                <div className="w-full h-full rounded-full bg-mansion-card flex items-center justify-center overflow-hidden">
-                  {avatarUrl ? (
-                    <AvatarImg src={avatarUrl} crop={user?.avatar_crop} alt="Mi perfil" className="w-full h-full" />
-                  ) : (
-                    <Camera className="w-9 h-9 text-text-dim" />
+                <Camera className="w-3 h-3" />
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarSelect} />
+            </div>
+
+            {/* Name + meta + actions */}
+            <div className="flex-1 min-w-0">
+              <h2
+                className="font-display text-xl font-bold text-text-primary cursor-pointer hover:text-mansion-gold transition-colors leading-tight truncate"
+                onClick={() => user?.id && navigate(`/perfiles/${user.id}`, { state: ownProfilePreview ? { preview: ownProfilePreview } : undefined })}
+              >
+                {displayName}
+              </h2>
+
+              {(displayCity || displayRole) && (
+                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                  {displayCity && (
+                    <span className="flex items-center gap-0.5 text-[11px] text-text-dim">
+                      <MapPin className="w-2.5 h-2.5" /> {displayCity}
+                    </span>
+                  )}
+                  {displayCity && displayRole && <span className="text-text-dim/30 text-[11px]">·</span>}
+                  {displayRole && (
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${ROLE_COLOR[displayRole] || 'bg-mansion-card text-text-muted border-mansion-border/30'}`}>
+                      {displayRole}
+                    </span>
                   )}
                 </div>
-              </motion.div>
+              )}
+
+              {/* Coins + quick link */}
+              <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-mansion-gold/10 border border-mansion-gold/20">
+                  <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" fill="#C9A84C" stroke="#A88A3D" strokeWidth="1.5" />
+                    <circle cx="12" cy="12" r="7" fill="none" stroke="#A88A3D" strokeWidth="0.75" />
+                    <text x="12" y="16" textAnchor="middle" fill="#8B7332" fontSize="10" fontWeight="bold" fontFamily="serif">$</text>
+                  </svg>
+                  <span className="text-[11px] font-bold text-mansion-gold">{user?.coins ?? 0}</span>
+                </div>
+                <button
+                  onClick={() => user?.id && navigate(`/perfiles/${user.id}`, { state: ownProfilePreview ? { preview: ownProfilePreview } : undefined })}
+                  className="flex items-center gap-1 text-[11px] text-text-dim hover:text-mansion-gold transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Ver perfil
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handleAvatarTap}
-              className="absolute -bottom-0 -right-0 w-8 h-8 rounded-full bg-mansion-crimson text-white flex items-center justify-center shadow-lg ring-[3px] ring-mansion-base"
-            >
-              <Camera className="w-3.5 h-3.5" />
-            </button>
-            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarSelect} />
           </div>
 
-          {/* Name */}
-          <h2
-            className="font-display text-2xl font-bold text-text-primary cursor-pointer hover:text-mansion-gold transition-colors"
-            onClick={() => user?.id && navigate(`/perfiles/${user.id}`, { state: ownProfilePreview ? { preview: ownProfilePreview } : undefined })}
-          >
-            {displayName}
-          </h2>
-
-          {/* Meta: city + role */}
-          {(displayCity || displayRole) && (
-            <div className="flex items-center gap-2 mt-1.5">
-              {displayCity && (
-                <span className="flex items-center gap-1 text-xs text-text-dim">
-                  <MapPin className="w-3 h-3" /> {displayCity}
-                </span>
-              )}
-              {displayCity && displayRole && <span className="text-text-dim/30 text-xs">·</span>}
-              {displayRole && (
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${ROLE_COLOR[displayRole] || 'bg-mansion-card text-text-muted border-mansion-border/30'}`}>
-                  {displayRole}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Action strip */}
-          <div className="flex items-center gap-2 mt-5 flex-wrap justify-center">
-            {/* View public profile */}
-            <button
-              onClick={() => user?.id && navigate(`/perfiles/${user.id}`, { state: ownProfilePreview ? { preview: ownProfilePreview } : undefined })}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-mansion-card/60 border border-mansion-border/30 text-[11px] font-medium text-text-muted hover:text-text-primary hover:border-mansion-border/60 transition-all"
-            >
-              <ExternalLink className="w-3 h-3" />
-              Ver perfil
-            </button>
-
-            {/* Coins */}
-            <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-mansion-gold/10 border border-mansion-gold/20">
-              <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" fill="#C9A84C" stroke="#A88A3D" strokeWidth="1.5" />
-                <circle cx="12" cy="12" r="7" fill="none" stroke="#A88A3D" strokeWidth="0.75" />
-                <text x="12" y="16" textAnchor="middle" fill="#8B7332" fontSize="10" fontWeight="bold" fontFamily="serif">$</text>
-              </svg>
-              <span className="text-[11px] font-bold text-mansion-gold">{user?.coins ?? 0}</span>
-              <span className="text-[10px] text-mansion-gold/60">monedas</span>
-            </div>
-
-            {/* Upload / manage story */}
+          {/* Action pills row */}
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => navigate('/historia/nueva', { state: { from: '/perfil' } })}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-mansion-crimson/10 border border-mansion-crimson/25 text-[11px] font-medium text-mansion-crimson hover:bg-mansion-crimson/20 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-mansion-crimson/10 border border-mansion-crimson/25 text-[11px] font-medium text-mansion-crimson hover:bg-mansion-crimson/20 transition-all"
             >
               <Film className="w-3 h-3" />
-              {user?.has_active_story ? 'Historia' : 'Subir historia'}
+              {user?.has_active_story ? 'Ver / nueva historia' : 'Subir historia'}
             </button>
 
-            {/* Delete story — only when active */}
             {user?.has_active_story && (
               <button
                 onClick={async () => {
@@ -459,16 +460,17 @@ export default function ProfilePage() {
                     }
                   } catch { /* best-effort */ }
                 }}
-                className="flex items-center gap-1 px-2.5 py-2 rounded-full bg-red-500/10 border border-red-500/20 text-[11px] text-red-400 hover:bg-red-500/15 transition-all"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-[11px] text-red-400 hover:bg-red-500/15 transition-all"
               >
                 <X className="w-3 h-3" />
+                Eliminar historia
               </button>
             )}
           </div>
         </motion.div>
 
         {/* ── Stats Row ── */}
-        <motion.div variants={fadeUp} className="grid grid-cols-3 gap-px mb-6 rounded-2xl overflow-hidden bg-mansion-border/10">
+        <motion.div variants={fadeUp} className="grid grid-cols-3 gap-px mb-5 rounded-2xl overflow-hidden bg-mansion-border/10">
           {[
             { value: photos.length, label: 'Fotos', icon: Image },
             { value: receivedGifts.length, label: 'Regalos', icon: Gift },
