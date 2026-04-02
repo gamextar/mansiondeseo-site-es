@@ -50,18 +50,16 @@ async function cropCircle(file, image, zoom, offsetX, offsetY, containerW, conta
 
 function clampOffset(ox, oy, zoom, imgW, imgH, containerW, containerH) {
 	const radius = CIRCLE_SIZE / 2;
-	const scale = Math.max(containerW / imgW, containerH / imgH) * zoom;
-	const drawW = imgW * scale;
-	const drawH = imgH * scale;
+	const totalScale = Math.max(containerW / imgW, containerH / imgH) * zoom;
+	const drawW = imgW * totalScale;
+	const drawH = imgH * totalScale;
 
-	const minX = containerW / 2 + radius - (containerW + drawW) / 2;
-	const maxX = (containerW + drawW) / 2 - containerW / 2 - radius;
-	const minY = containerH / 2 + radius - (containerH + drawH) / 2;
-	const maxY = (containerH + drawH) / 2 - containerH / 2 - radius;
+	const maxX = Math.max(0, drawW / 2 - radius);
+	const maxY = Math.max(0, drawH / 2 - radius);
 
 	return {
-		x: Math.min(maxX, Math.max(minX, ox)),
-		y: Math.min(maxY, Math.max(minY, oy)),
+		x: Math.min(maxX, Math.max(-maxX, ox)),
+		y: Math.min(maxY, Math.max(-maxY, oy)),
 	};
 }
 
@@ -156,12 +154,15 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 
 	const imgStyle = imgNatural
 		? (() => {
-				const scale = Math.max(containerW / imgNatural.w, containerH / imgNatural.h) * zoom;
+				const totalScale = Math.max(containerW / imgNatural.w, containerH / imgNatural.h) * zoom;
+				const tx = (containerW - imgNatural.w * totalScale) / 2 + offset.x;
+				const ty = (containerH - imgNatural.h * totalScale) / 2 + offset.y;
 				return {
-					width: imgNatural.w * scale,
-					height: imgNatural.h * scale,
-					left: (containerW - imgNatural.w * scale) / 2 + offset.x,
-					top: (containerH - imgNatural.h * scale) / 2 + offset.y,
+					width: imgNatural.w,
+					height: imgNatural.h,
+					transformOrigin: '0 0',
+					transform: `translate(${tx}px, ${ty}px) scale(${totalScale})`,
+					willChange: 'transform',
 				};
 			})()
 		: {};
@@ -224,7 +225,7 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 							<img
 								src={previewUrl}
 								alt="Vista previa"
-								className="absolute pointer-events-none"
+								className="absolute max-w-none pointer-events-none"
 								draggable={false}
 								style={imgStyle}
 							/>
