@@ -8,6 +8,40 @@ const API_BASE = import.meta.env.PROD
 const TOKEN_KEY = 'mansion_token';
 const USER_KEY = 'mansion_user';
 const sharedGetCache = new Map();
+const sessionCache = {
+  get(key, ttlMs = 0) {
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (ttlMs > 0 && Date.now() - (Number(parsed.timestamp) || 0) > ttlMs) return null;
+      return parsed.value;
+    } catch {
+      return null;
+    }
+  },
+  set(key, value) {
+    try {
+      sessionStorage.setItem(key, JSON.stringify({ value, timestamp: Date.now() }));
+    } catch {}
+  },
+  delete(key) {
+    try {
+      sessionStorage.removeItem(key);
+    } catch {}
+  },
+};
+
+function invalidateBootstrapCache() {
+  sharedGetCache.delete('bootstrap');
+  sessionCache.delete('appBootstrap');
+}
+
+function invalidateUnreadCountCache() {
+  sharedGetCache.delete('unreadCount');
+  sessionCache.delete('unreadCount');
+}
 
 function sharedGet(key, fetcher, { ttlMs = 0 } = {}) {
   const now = Date.now();
@@ -49,6 +83,8 @@ export function setToken(token) {
   } else {
     localStorage.removeItem(TOKEN_KEY);
   }
+  invalidateBootstrapCache();
+  invalidateUnreadCountCache();
 }
 
 export function getStoredUser() {
@@ -72,6 +108,8 @@ export function clearAuth() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem('mansion_registered');
+  invalidateBootstrapCache();
+  invalidateUnreadCountCache();
 }
 
 // ── Fetch wrapper ───────────────────────────────────────
@@ -200,7 +238,7 @@ export async function verifyCode(email, code) {
   setToken(data.token);
   setStoredUser(data.user);
   // Invalidate bootstrap cache so next call fetches fresh user data
-  sharedGetCache.delete('bootstrap');
+  invalidateBootstrapCache();
   return data;
 }
 
@@ -263,9 +301,13 @@ export async function getMe() {
 }
 
 export async function getAppBootstrap() {
+  const cached = sessionCache.get('appBootstrap', 2 * 60_000);
+  if (cached) return Promise.resolve(cached);
+
   return sharedGet('bootstrap', async () => {
     const data = await apiFetch('/app/bootstrap');
     if (data?.user) setStoredUser(data.user);
+    sessionCache.set('appBootstrap', data);
     return data;
   }, { ttlMs: 30_000 });
 }
@@ -315,6 +357,7 @@ export async function updateProfile(fields) {
   if (data?.user) {
     setStoredUser(data.user);
     sharedGetCache.delete(`profile:${data.user.id}`);
+    invalidateBootstrapCache();
   }
   return data;
 }
@@ -336,6 +379,9 @@ export async function getMessages(otherUserId, { before, limit } = {}) {
 export async function deleteConversation(otherUserId) {
   return apiFetch(`/messages/${otherUserId}`, {
     method: 'DELETE',
+  }).then((data) => {
+    invalidateUnreadCountCache();
+    return data;
   });
 }
 
@@ -343,6 +389,9 @@ export async function sendMessage(receiverId, content) {
   return apiFetch('/messages/send', {
     method: 'POST',
     body: JSON.stringify({ receiver_id: receiverId, content }),
+  }).then((data) => {
+    invalidateUnreadCountCache();
+    return data;
   });
 }
 
@@ -350,8 +399,25 @@ export async function getMessageLimit() {
   return sharedGet('messageLimit', () => apiFetch('/messages/limit'), { ttlMs: 2 * 60_000 });
 }
 
-export async function getUnreadCount() {
-  return apiFetch('/unread-count');
+export async function getUnreadCount({ force = false } = {}) {
+  if (!force) {
+    const cached = sessionCache.get('unreadCount', 15_000);
+    if (cached) return Promise.resolve(cached);
+  }
+
+  return sharedGet('unreadCount', () => apiFetch('/unread-count').then((data) => {
+    sessionCache.set('unreadCount', data);
+    return data;
+  }), { ttlMs: force ? 0 : 15_000 });
+}
+
+export function setUnreadCountCache(data) {
+  sessionCache.set('unreadCount', data);
+  sharedGetCache.set('unreadCount', { value: data, timestamp: Date.now(), promise: null });
+}
+
+export function invalidateUnreadCache() {
+  invalidateUnreadCountCache();
 }
 
 export async function adminChatCleanup() {
@@ -384,17 +450,35 @@ export async function getSettings() {
 }
 
 export async function getPublicSettings() {
-  return sharedGet('publicSettings', () => apiFetch('/settings/public'), { ttlMs: 5 * 60_000 });
+  const sessionKey = 'publicSettings';
+  const cached = sessionCache.get(sessionKey, 30 * 60_000);
+  if (cached) return Promise.resolve(cached);
+
+  return sharedGet('publicSettings', () => apiFetch('/settings/public').then((data) => {
+    sessionCache.set(sessionKey, data);
+    return data;
+  }), { ttlMs: 5 * 60_000 });
 }
 
 export async function detectCountry() {
-  return apiFetch('/detect-country');
+  const sessionKey = 'detectedCountry';
+  const cached = sessionCache.get(sessionKey, 24 * 60 * 60_000);
+  if (cached) return Promise.resolve(cached);
+
+  return apiFetch('/detect-country').then((data) => {
+    sessionCache.set(sessionKey, data);
+    return data;
+  });
 }
 
 export async function updateSettings(fields) {
   return apiFetch('/settings', {
     method: 'PUT',
     body: JSON.stringify(fields),
+  }).then((data) => {
+    sharedGetCache.delete('publicSettings');
+    sessionCache.delete('publicSettings');
+    return data;
   });
 }
 

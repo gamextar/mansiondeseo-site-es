@@ -2096,14 +2096,18 @@ async function loadSettings(env) {
 // ── GET /api/detect-country ──────────────────────────────
 async function handleDetectCountry(request) {
   const country = request.headers.get('cf-ipcountry') || '';
-  return json({ country });
+  return json({ country }, 200, {
+    'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+  });
 }
 
 // ── GET /api/settings/public ─────────────────────────────
 // Returns non-sensitive settings (VIP prices, blur, etc.)
 async function handleGetPublicSettings(request, env) {
   const settings = await loadSettings(env);
-  return json({ settings: getPublicSettingsPayload(settings) });
+  return json({ settings: getPublicSettingsPayload(settings) }, 200, {
+    'Cache-Control': 'public, max-age=300, s-maxage=300',
+  });
 }
 
 function getPublicSettingsPayload(settings) {

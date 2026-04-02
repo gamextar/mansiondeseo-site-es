@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback } from 'react';
-import { getUnreadCount, getToken } from '../lib/api';
+import { getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache } from '../lib/api';
 
 const UnreadContext = createContext({
   unreadCount: 0,
@@ -41,6 +41,7 @@ export function UnreadProvider({ children }) {
     }
     prevCountRef.current = nextTotal;
     setUnreadCount(nextTotal);
+    setUnreadCountCache({ unread: nextTotal });
   }, []);
 
   const stopPing = useCallback((socket = wsRef.current) => {
@@ -83,7 +84,7 @@ export function UnreadProvider({ children }) {
     }
 
     lastUnreadFetchAtRef.current = now;
-    const request = getUnreadCount()
+    const request = getUnreadCount({ force })
       .then((data) => {
         applyUnreadCount(data.unread || 0, { showToast: true });
         return data;
@@ -182,6 +183,7 @@ export function UnreadProvider({ children }) {
             }
             notifyListeners(data);
           } else if (data.type === 'conversation_deleted') {
+            invalidateUnreadCache();
             if (typeof data.unreadCount === 'number') {
               applyUnreadCount(data.unreadCount);
             } else {
