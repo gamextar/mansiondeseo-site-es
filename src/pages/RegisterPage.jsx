@@ -1357,7 +1357,7 @@ export default function RegisterPage() {
           <div className="text-center mb-3">
             <p className="text-mansion-crimson text-xs mb-1">Este email ya está registrado.</p>
             <button
-              onClick={() => navigate(`/recuperar-contrasena?email=${encodeURIComponent(email)}`)}}
+              onClick={() => navigate(`/recuperar-contrasena?email=${encodeURIComponent(email)}`)}
               className="text-mansion-gold text-xs font-medium hover:underline"
             >
               ¿Olvidaste tu contraseña?
