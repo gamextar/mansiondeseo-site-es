@@ -428,7 +428,7 @@ export default function ProfilePage() {
           {/* Upload story button */}
           <motion.button
             variants={fadeUp}
-            onClick={() => navigate('/historia/nueva')}
+            onClick={() => navigate('/historia/nueva', { state: { from: '/perfil' } })}
             className="mt-4 inline-flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-mansion-crimson/10 border border-mansion-crimson/25 text-mansion-crimson font-semibold text-sm hover:bg-mansion-crimson/20 transition-colors"
           >
             <Film className="w-4 h-4" />

@@ -33,7 +33,7 @@ export default function DesktopSidebar() {
   const [visitors, setVisitors] = useState([]);
   const { user, siteSettings } = useAuth();
   const sidebarAvatarSize = Math.max(72, Math.min(220, Number(siteSettings?.sidebarAvatarSize ?? 154)));
-  const sidebarRingWidth = Math.max(1, Math.round((sidebarAvatarSize * Math.max(1, Math.min(18, Number(siteSettings?.storyCircleBorder ?? 4)))) / 100));
+  const sidebarRingWidth = Math.max(1, Math.round((sidebarAvatarSize * Math.max(1, Math.min(18, Number(siteSettings?.sidebarStoryRingWidth ?? siteSettings?.storyCircleBorder ?? 4)))) / 100));
   const sidebarInnerGap = Math.max(0, Math.round((sidebarAvatarSize * Math.max(0, Math.min(16, Number(siteSettings?.storyCircleInnerGap ?? 3)))) / 100));
 
   useEffect(() => {

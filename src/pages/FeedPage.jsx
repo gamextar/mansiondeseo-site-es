@@ -123,7 +123,7 @@ export default function FeedPage() {
               <div className="relative">
                 <button
                   type="button"
-                  onClick={user.has_active_story ? () => navigate('/videos', { state: { storyUserId: user.id } }) : () => navigate('/historia/nueva')}
+                  onClick={user.has_active_story ? () => navigate('/videos', { state: { storyUserId: user.id } }) : () => navigate('/historia/nueva', { state: { from: '/' } })}
                   className="flex flex-col items-center gap-1 w-full"
                 >
                   <div className={`rounded-full ${
@@ -150,7 +150,7 @@ export default function FeedPage() {
                 {/* Plus badge */}
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva'); }}
+                  onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/' } }); }}
                   className="absolute bottom-4 right-0 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
                 >
                   <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />

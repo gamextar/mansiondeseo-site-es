@@ -858,7 +858,7 @@ export default function VideoFeedPage() {
           <p className="text-sm text-text-dim mb-8">Sé el primero en compartir un momento con la comunidad.</p>
 
           <button
-            onClick={() => navigate('/historia/nueva')}
+            onClick={() => navigate('/historia/nueva', { state: { from: '/videos' } })}
             className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]"
           >
             <Plus className="w-5 h-5" />

@@ -1911,6 +1911,7 @@ function getPublicSettingsPayload(settings) {
     encoderAudioMono: settings.encoderAudioMono,
     encoderPreset: settings.encoderPreset,
     encoderShowProgressHud: settings.encoderShowProgressHud,
+    sidebarStoryRingWidth: settings.sidebarStoryRingWidth,
   };
 }
 

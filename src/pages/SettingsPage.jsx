@@ -78,6 +78,7 @@ export default function SettingsPage() {
   const [storyCircleGap, setStoryCircleGap] = useState(8);
   const [storyCircleBorder, setStoryCircleBorder] = useState(4);
   const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
+  const [sidebarStoryRingWidth, setSidebarStoryRingWidth] = useState(4);
   const [storyPresetEditor, setStoryPresetEditor] = useState('medium');
   const [avatarSizeDraft, setAvatarSizeDraft] = useState('88');
 
@@ -144,7 +145,8 @@ export default function SettingsPage() {
     },
   ];
   const activeStoryPreset = storyPresetOptions.find(option => option.key === storyPresetEditor) || storyPresetOptions[1];
-  const activeStoryPresetRingPx = Math.max(1, Math.round((activeStoryPreset.size * storyCircleBorder) / 100));
+  const activeStoryPresetBorder = storyPresetEditor === 'xl' ? sidebarStoryRingWidth : storyCircleBorder;
+  const activeStoryPresetRingPx = Math.max(1, Math.round((activeStoryPreset.size * activeStoryPresetBorder) / 100));
   const activeStoryPresetInnerGapPx = Math.max(0, Math.round((activeStoryPreset.size * storyCircleInnerGap) / 100));
   const storyCircleGapPx = Math.max(0, Math.round((storyCirclePresetMedium * storyCircleGap) / 100));
   const storyCircleBorderPx = Math.max(1, Math.round((storyCirclePresetMedium * storyCircleBorder) / 100));
@@ -209,6 +211,7 @@ export default function SettingsPage() {
         setStoryCircleGap(s.storyCircleGap ?? 8);
         setStoryCircleBorder(s.storyCircleBorder ?? 4);
         setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
+        setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? 4);
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
         setVideoAvatarSize(s.videoAvatarSize ?? 52);
@@ -290,6 +293,7 @@ export default function SettingsPage() {
         story_circle_gap: storyCircleGap,
         story_circle_border: storyCircleBorder,
         story_circle_inner_gap: storyCircleInnerGap,
+        sidebar_story_ring_width: sidebarStoryRingWidth,
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
         video_avatar_size: videoAvatarSize,
@@ -342,6 +346,7 @@ export default function SettingsPage() {
       setStoryCircleGap(s.storyCircleGap ?? 8);
       setStoryCircleBorder(s.storyCircleBorder ?? 4);
       setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
+      setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? 4);
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
       setVideoAvatarSize(s.videoAvatarSize ?? 52);
@@ -1222,7 +1227,7 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-center overflow-visible py-2">
                     <div className="relative shrink-0 rounded-full bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold" style={{ width: activeStoryPreset.size, height: activeStoryPreset.size, aspectRatio: '1 / 1' }}>
-                      <div className="absolute rounded-full bg-mansion-card" style={{ inset: `${storyCircleBorder}%` }}>
+                      <div className="absolute rounded-full bg-mansion-card" style={{ inset: `${activeStoryPresetBorder}%` }}>
                         <div className="h-full w-full rounded-full bg-mansion-base" style={{ padding: activeStoryPresetInnerGapPx }}>
                           <div className="flex h-full w-full items-center justify-center rounded-full overflow-hidden bg-gradient-to-br from-white/10 to-white/5 text-text-muted">
                             <User className="w-4 h-4" />
@@ -1259,12 +1264,26 @@ export default function SettingsPage() {
                       <div className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
                         <div className="flex items-center justify-between gap-3 mb-2">
                           <div>
-                            <p className="text-xs font-semibold text-text-primary">Grosor global del anillo</p>
-                            <p className="text-[10px] text-text-dim">Comparte el mismo setting entre home y sidebar</p>
+                            <p className="text-xs font-semibold text-text-primary">Grosor del anillo (stories home)</p>
+                            <p className="text-[10px] text-text-dim">Aplicado a los círculos de stories en el feed</p>
                           </div>
                           <span className="text-sm font-semibold text-mansion-gold">{storyCircleBorder}%</span>
                         </div>
                         <input type="range" min="1" max="18" value={storyCircleBorder} onChange={e => setStoryCircleBorder(Number(e.target.value))} className="w-full accent-mansion-gold" />
+                        <div className="mt-1 flex justify-between text-[10px] text-text-dim">
+                          <span>1%</span>
+                          <span>18%</span>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-white/5 bg-mansion-card/40 p-3">
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <div>
+                            <p className="text-xs font-semibold text-text-primary">Grosor del anillo (sidebar desktop)</p>
+                            <p className="text-[10px] text-text-dim">Independiente del grosor de la home</p>
+                          </div>
+                          <span className="text-sm font-semibold text-mansion-gold">{sidebarStoryRingWidth}%</span>
+                        </div>
+                        <input type="range" min="1" max="18" value={sidebarStoryRingWidth} onChange={e => setSidebarStoryRingWidth(Number(e.target.value))} className="w-full accent-mansion-gold" />
                         <div className="mt-1 flex justify-between text-[10px] text-text-dim">
                           <span>1%</span>
                           <span>18%</span>
