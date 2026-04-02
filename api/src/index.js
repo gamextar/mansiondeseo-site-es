@@ -596,8 +596,12 @@ async function handleRegister(request, env) {
     return error('Campos requeridos: email, password, username, role, seeking');
   }
 
-  if (password.length < 6) {
-    return error('La contraseña debe tener al menos 6 caracteres');
+  if (password.length < 12) {
+    return error('La contraseña debe tener al menos 12 caracteres');
+  }
+
+  if (password.length > 50) {
+    return error('La contraseña no puede tener más de 50 caracteres');
   }
 
   if (username.length > 20) {
@@ -850,8 +854,12 @@ async function handleResetPassword(request, env) {
     return error('Email, código y nueva contraseña son requeridos');
   }
 
-  if (newPassword.length < 6) {
-    return error('La contraseña debe tener al menos 6 caracteres');
+  if (newPassword.length < 12) {
+    return error('La contraseña debe tener al menos 12 caracteres');
+  }
+
+  if (newPassword.length > 50) {
+    return error('La contraseña no puede tener más de 50 caracteres');
   }
 
   const record = await env.DB.prepare(`

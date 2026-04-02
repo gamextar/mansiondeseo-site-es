@@ -447,10 +447,11 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
             <input
               type={showPassword ? 'text' : 'password'}
               value={password}
-              onChange={(e) => onPasswordChange(e.target.value)}
-              placeholder="Mínimo 6 caracteres"
+              onChange={(e) => onPasswordChange(e.target.value.slice(0, 50))}
+              placeholder="Mínimo 12 caracteres"
               className="w-full pl-10 pr-10"
               autoComplete="new-password"
+              maxLength={50}
             />
             <button
               type="button"
@@ -1079,7 +1080,7 @@ export default function RegisterPage() {
   );
 
   const canNext = () => {
-    if (step === 0) return EMAIL_REGEX.test(email) && password.length >= 6 && emailStatus !== 'exists' && emailStatus !== 'invalid';
+    if (step === 0) return EMAIL_REGEX.test(email) && password.length >= 12 && emailStatus !== 'exists' && emailStatus !== 'invalid';
     if (step === 1) return !!iAm;
     if (step === 2) return !!seeking;
     if (step === 3) return interests.length > 0;
@@ -1256,7 +1257,7 @@ export default function RegisterPage() {
             hidePasswordDefault={hidePasswordDefault}
             emailStatus={emailStatus}
             onEmailBlur={handleEmailBlur}
-            onNavigateRecover={() => navigate('/recuperar-contrasena')}
+            onNavigateRecover={() => navigate(`/recuperar-contrasena?email=${encodeURIComponent(email)}`)}
           />
         );
       case 1:
@@ -1356,7 +1357,7 @@ export default function RegisterPage() {
           <div className="text-center mb-3">
             <p className="text-mansion-crimson text-xs mb-1">Este email ya está registrado.</p>
             <button
-              onClick={() => navigate('/recuperar-contrasena')}
+              onClick={() => navigate(`/recuperar-contrasena?email=${encodeURIComponent(email)}`)}}
               className="text-mansion-gold text-xs font-medium hover:underline"
             >
               ¿Olvidaste tu contraseña?

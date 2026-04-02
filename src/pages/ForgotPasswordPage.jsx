@@ -1,13 +1,17 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useCallback, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Mail, Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Mail, Lock, Eye, EyeOff, KeyRound, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { forgotPassword, resetPassword } from '../lib/api';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState('email'); // email | code | done
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => searchParams.get('email') || '');
+  const [emailStatus, setEmailStatus] = useState('idle'); // idle | checking | valid | invalid
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -15,9 +19,25 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('');
   const [devCode, setDevCode] = useState(null);
 
+  // Reset email status when email changes
+  useEffect(() => {
+    setEmailStatus('idle');
+  }, [email]);
+
+  const handleEmailBlur = useCallback(() => {
+    if (!email) return;
+    if (!EMAIL_REGEX.test(email)) {
+      setEmailStatus('invalid');
+      return;
+    }
+    setEmailStatus('valid');
+  }, [email]);
+
+  const isEmailValid = EMAIL_REGEX.test(email);
+
   const handleRequestCode = async (e) => {
     e.preventDefault();
-    if (!email.includes('@')) return;
+    if (!isEmailValid) return;
     setLoading(true);
     setError('');
     try {
@@ -33,7 +53,7 @@ export default function ForgotPasswordPage() {
 
   const handleReset = async (e) => {
     e.preventDefault();
-    if (code.length < 6 || newPassword.length < 6) return;
+    if (code.length < 6 || newPassword.length < 12) return;
     setLoading(true);
     setError('');
     try {
@@ -59,6 +79,8 @@ export default function ForgotPasswordPage() {
       setLoading(false);
     }
   };
+
+  const emailBorderColor = emailStatus === 'valid' ? 'border-green-500/60' : emailStatus === 'invalid' ? 'border-mansion-crimson/60' : '';
 
   return (
     <div className="min-h-screen bg-mansion-base flex flex-col items-center justify-center relative overflow-hidden px-6">
@@ -155,7 +177,7 @@ export default function ForgotPasswordPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mínimo 12 caracteres"
                   className="w-full pl-10 pr-10"
                   autoComplete="new-password"
                 />
@@ -174,7 +196,7 @@ export default function ForgotPasswordPage() {
             <motion.button
               whileTap={{ scale: 0.97 }}
               type="submit"
-              disabled={code.length < 6 || newPassword.length < 6 || loading}
+              disabled={code.length < 6 || newPassword.length < 12 || loading}
               className="btn-gold w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {loading ? 'Actualizando...' : 'Cambiar contraseña'}

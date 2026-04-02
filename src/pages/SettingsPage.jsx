@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, Sliders, Eye, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail } from 'lucide-react';
+import { ArrowLeft, Save, Sliders, Eye, EyeOff, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail } from 'lucide-react';
 import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, uploadImage } from '../lib/api';
 import { useAuth } from '../App';
 
@@ -101,6 +101,7 @@ export default function SettingsPage() {
 
   // Email (Resend)
   const [resendApiKey, setResendApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
   const [mailFrom, setMailFrom] = useState('');
 
   // Payment display
@@ -1641,14 +1642,23 @@ export default function SettingsPage() {
                   <p className="text-[11px] text-text-dim">Clave de API de Resend para enviar emails. Se obtiene en resend.com/api-keys</p>
                 </div>
               </div>
-              <input
-                type="password"
-                value={resendApiKey}
-                onChange={e => setResendApiKey(e.target.value)}
-                placeholder="re_xxxxxxxxxxxx..."
-                autoComplete="off"
-                className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary font-mono"
-              />
+              <div className="relative">
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  value={resendApiKey}
+                  onChange={e => setResendApiKey(e.target.value)}
+                  placeholder="re_xxxxxxxxxxxx..."
+                  autoComplete="off"
+                  className="w-full text-sm py-2 px-3 pr-10 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-dim hover:text-text-muted transition-colors"
+                >
+                  {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
