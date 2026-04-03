@@ -7,6 +7,21 @@ name = "mansion-deseo-r2-worker"
 main = "src/index.js"
 compatibility_date = "2024-12-01"
 
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
+
 # ── Custom Domain ─────────────────────────────────────
 routes = [
   { pattern = "videos.unicoapps.com", custom_domain = true }
