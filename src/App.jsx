@@ -28,7 +28,7 @@ import CoinsPage from './pages/CoinsPage';
 import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
 import StoryUploadPage from './pages/StoryUploadPage';
 import VideoFeedPage from './pages/VideoFeedPage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, markApiDebugRoute } from './lib/api';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 
@@ -65,6 +65,7 @@ function AppLayout() {
   const showChrome = !isFullscreen && !isChatDetail;
 
   useEffect(() => {
+    ensureApiDebug();
     markApiDebugRoute(location.pathname + location.search);
   }, [location.pathname, location.search]);
 

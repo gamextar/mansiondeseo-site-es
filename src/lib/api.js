@@ -202,12 +202,20 @@ function getApiDebugController() {
   return controller;
 }
 
+export function ensureApiDebug() {
+  return getApiDebugController();
+}
+
 export function markApiDebugRoute(route) {
   getApiDebugController()?.markRoute(route);
 }
 
 export function getApiDebugSummary() {
   return getApiDebugController()?.summary() || null;
+}
+
+if (typeof window !== 'undefined') {
+  getApiDebugController();
 }
 
 // ── Token management ────────────────────────────────────
