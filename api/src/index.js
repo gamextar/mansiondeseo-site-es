@@ -3412,6 +3412,40 @@ async function handleSyncStoryLikes(request, env) {
   return json({ updates });
 }
 
+async function handleDebugMediaCache(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const body = await request.json().catch(() => ({}));
+  const urls = Array.isArray(body?.urls) ? body.urls.filter((value) => typeof value === 'string' && /^https?:\/\//i.test(value)).slice(0, 24) : [];
+
+  const entries = [];
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+      entries.push({
+        url,
+        status: response.status,
+        cacheStatus: response.headers.get('cf-cache-status') || '',
+        age: response.headers.get('age') || '',
+        cacheControl: response.headers.get('cache-control') || '',
+        contentType: response.headers.get('content-type') || '',
+        contentLength: response.headers.get('content-length') || '',
+      });
+    } catch (err) {
+      entries.push({
+        url,
+        error: err?.message || 'request_failed',
+      });
+    }
+  }
+
+  return json({ entries });
+}
+
 // POST /api/admin/upload-story — admin uploads a video story for any user
 async function handleAdminUploadStory(request, env) {
   const auth = await authenticate(request, env);
@@ -3686,6 +3720,7 @@ async function handleRequest(request, env) {
   if (path === '/api/admin/remove-all-vip' && method === 'POST') return handleAdminRemoveAllVip(request, env);
   if (path === '/api/admin/reset-all-coins' && method === 'POST') return handleAdminResetAllCoins(request, env);
   if (path === '/api/admin/chat-cleanup' && method === 'POST') return handleAdminChatCleanup(request, env);
+  if (path === '/api/debug/media-cache' && method === 'POST') return handleDebugMediaCache(request, env);
 
   // ── Admin: Users
   if (path === '/api/admin/users' && method === 'GET') return handleAdminGetUsers(request, env);

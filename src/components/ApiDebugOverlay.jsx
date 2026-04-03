@@ -1,10 +1,30 @@
 import { useEffect, useState } from 'react';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
 import { estimateRealtimeLoad, getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
+import { getMediaDebugSummary, inspectVisibleMedia, resetMediaDebug, subscribeMediaDebug } from '../lib/mediaDebug';
+import { getDebugPanelPrefs, setDebugPanelPref, subscribeDebugPanelPrefs } from '../lib/debugPanelPrefs';
+
+function TogglePill({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors ${
+        active
+          ? 'border-mansion-gold/30 bg-mansion-gold/20 text-mansion-gold'
+          : 'border-white/10 bg-white/5 text-white/55'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function ApiDebugOverlay() {
   const [summary, setSummary] = useState(() => getApiDebugSummary());
   const [realtimeSummary, setRealtimeSummary] = useState(() => getRealtimeDebugSummary());
+  const [mediaSummary, setMediaSummary] = useState(() => getMediaDebugSummary());
+  const [panelPrefs, setPanelPrefs] = useState(() => getDebugPanelPrefs());
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -27,9 +47,19 @@ export default function ApiDebugOverlay() {
       setRealtimeSummary(nextSummary);
     });
 
+    const unsubscribeMedia = subscribeMediaDebug((nextSummary) => {
+      setMediaSummary(nextSummary);
+    });
+
+    const unsubscribePrefs = subscribeDebugPanelPrefs((nextPrefs) => {
+      setPanelPrefs(nextPrefs);
+    });
+
     return () => {
       unsubscribeApi?.();
       unsubscribeRealtime?.();
+      unsubscribeMedia?.();
+      unsubscribePrefs?.();
     };
   }, []);
 
@@ -70,6 +100,15 @@ export default function ApiDebugOverlay() {
           <p className="text-xs text-white/70">{summary.currentRoute}</p>
         </div>
         <div className="flex items-center gap-2">
+          <TogglePill active={panelPrefs.api} onClick={() => setPanelPrefs(setDebugPanelPref('api', !panelPrefs.api))}>
+            API
+          </TogglePill>
+          <TogglePill active={panelPrefs.realtime} onClick={() => setPanelPrefs(setDebugPanelPref('realtime', !panelPrefs.realtime))}>
+            WS
+          </TogglePill>
+          <TogglePill active={panelPrefs.media} onClick={() => setPanelPrefs(setDebugPanelPref('media', !panelPrefs.media))}>
+            Media
+          </TogglePill>
           <button
             type="button"
             onClick={() => setCollapsed((prev) => !prev)}
@@ -89,43 +128,73 @@ export default function ApiDebugOverlay() {
 
       {!collapsed && (
         <div className="space-y-3 px-3 pt-3">
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-xl bg-white/5 px-3 py-2">
-              <p className="text-white/55">Requests</p>
-              <p className="mt-1 text-lg font-semibold">{summary.totalRequests}</p>
-            </div>
-            <div className="rounded-xl bg-white/5 px-3 py-2">
-              <p className="text-white/55">Sesion</p>
-              <p className="mt-1 text-lg font-semibold">{summary.sessionTotalRequests ?? 0}</p>
-            </div>
-            <div className="rounded-xl bg-white/5 px-3 py-2">
-              <p className="text-white/55">Endpoints</p>
-              <p className="mt-1 text-lg font-semibold">{rows.length}</p>
-            </div>
-            <div className="rounded-xl bg-white/5 px-3 py-2">
-              <p className="text-white/55">Endpoints sesion</p>
-              <p className="mt-1 text-lg font-semibold">{summary.sessionCounts?.length ?? 0}</p>
-            </div>
-          </div>
+          {panelPrefs.api && (
+            <>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-xl bg-white/5 px-3 py-2">
+                  <p className="text-white/55">Requests</p>
+                  <p className="mt-1 text-lg font-semibold">{summary.totalRequests}</p>
+                </div>
+                <div className="rounded-xl bg-white/5 px-3 py-2">
+                  <p className="text-white/55">Sesion</p>
+                  <p className="mt-1 text-lg font-semibold">{summary.sessionTotalRequests ?? 0}</p>
+                </div>
+                <div className="rounded-xl bg-white/5 px-3 py-2">
+                  <p className="text-white/55">Endpoints</p>
+                  <p className="mt-1 text-lg font-semibold">{rows.length}</p>
+                </div>
+                <div className="rounded-xl bg-white/5 px-3 py-2">
+                  <p className="text-white/55">Endpoints sesion</p>
+                  <p className="mt-1 text-lg font-semibold">{summary.sessionCounts?.length ?? 0}</p>
+                </div>
+              </div>
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setSummary(resetApiDebugRoute())}
-              className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-white/80"
-            >
-              Reset ruta
-            </button>
-            <button
-              type="button"
-              onClick={() => setSummary(resetApiDebugSession())}
-              className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-white/80"
-            >
-              Reset sesion
-            </button>
-          </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSummary(resetApiDebugRoute())}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-white/80"
+                >
+                  Reset ruta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSummary(resetApiDebugSession())}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-white/80"
+                >
+                  Reset sesion
+                </button>
+              </div>
 
-          <div className="rounded-xl border border-sky-500/20 overflow-hidden">
+              <div className="max-h-72 overflow-y-auto rounded-xl border border-white/10">
+                {rows.length === 0 ? (
+                  <div className="px-3 py-4 text-xs text-white/60">
+                    Aun no hay requests en esta ruta.
+                  </div>
+                ) : (
+                  rows.map((row) => (
+                    <div key={row.key} className="border-b border-white/10 px-3 py-2 last:border-b-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-[11px] leading-4 text-white/90">{row.key}</p>
+                        <span className="rounded-full bg-mansion-gold/20 px-2 py-0.5 text-[10px] font-semibold text-mansion-gold">
+                          {row.count}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex gap-3 text-[10px] text-white/55">
+                        <span>avg {row.avgMs}ms</span>
+                        <span>ok {row.ok}</span>
+                        <span>err {row.errors}</span>
+                        <span>status {row.lastStatus ?? '-'}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+
+          {panelPrefs.realtime && (
+            <div className="rounded-xl border border-sky-500/20 overflow-hidden">
             <div className="flex items-center justify-between border-b border-sky-500/15 bg-sky-500/5 px-3 py-2">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.18em] text-sky-300/90">Realtime</p>
@@ -172,31 +241,88 @@ export default function ApiDebugOverlay() {
               ))}
             </div>
           </div>
+          )}
 
-          <div className="max-h-72 overflow-y-auto rounded-xl border border-white/10">
-            {rows.length === 0 ? (
-              <div className="px-3 py-4 text-xs text-white/60">
-                Aun no hay requests en esta ruta.
+          {panelPrefs.media && (
+            <div className="rounded-xl border border-emerald-500/20 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-emerald-500/15 bg-emerald-500/5 px-3 py-2">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-300/90">Media Cache</p>
+                  <p className="text-[10px] text-white/55">Inspeccion puntual de media visible para estimar HIT/MISS y posibles Class B.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMediaSummary(resetMediaDebug())}
+                    className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/80"
+                  >
+                    Reset
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setMediaSummary((prev) => ({ ...(prev || {}), loading: true }));
+                      const next = await inspectVisibleMedia({ limit: 24 });
+                      setMediaSummary(next);
+                    }}
+                    className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[11px] font-semibold text-emerald-200"
+                  >
+                    {mediaSummary?.loading ? 'Midiendo...' : 'Probar visibles'}
+                  </button>
+                </div>
               </div>
-            ) : (
-              rows.map((row) => (
-                <div key={row.key} className="border-b border-white/10 px-3 py-2 last:border-b-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-[11px] leading-4 text-white/90">{row.key}</p>
-                    <span className="rounded-full bg-mansion-gold/20 px-2 py-0.5 text-[10px] font-semibold text-mansion-gold">
-                      {row.count}
-                    </span>
+              <div className="space-y-2 px-3 py-3">
+                <div className="grid grid-cols-4 gap-2 text-[10px]">
+                  <div className="rounded-lg bg-white/5 px-2 py-2">
+                    <p className="text-white/50">total</p>
+                    <p className="mt-1 text-base font-semibold text-white">{mediaSummary?.summary?.total ?? 0}</p>
                   </div>
-                  <div className="mt-1 flex gap-3 text-[10px] text-white/55">
-                    <span>avg {row.avgMs}ms</span>
-                    <span>ok {row.ok}</span>
-                    <span>err {row.errors}</span>
-                    <span>status {row.lastStatus ?? '-'}</span>
+                  <div className="rounded-lg bg-emerald-500/10 px-2 py-2">
+                    <p className="text-emerald-200/70">HIT</p>
+                    <p className="mt-1 text-base font-semibold text-emerald-200">{mediaSummary?.summary?.hit ?? 0}</p>
+                  </div>
+                  <div className="rounded-lg bg-amber-500/10 px-2 py-2">
+                    <p className="text-amber-200/70">MISS</p>
+                    <p className="mt-1 text-base font-semibold text-amber-200">{mediaSummary?.summary?.miss ?? 0}</p>
+                  </div>
+                  <div className="rounded-lg bg-rose-500/10 px-2 py-2">
+                    <p className="text-rose-200/70">err</p>
+                    <p className="mt-1 text-base font-semibold text-rose-200">{mediaSummary?.summary?.errors ?? 0}</p>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+                {mediaSummary?.error ? (
+                  <p className="text-[11px] text-rose-300">{mediaSummary.error}</p>
+                ) : null}
+                <div className="max-h-56 overflow-y-auto rounded-xl border border-white/10">
+                  {(mediaSummary?.entries || []).length === 0 ? (
+                    <div className="px-3 py-4 text-xs text-white/60">Todavia no se inspecciono media en esta ruta.</div>
+                  ) : (
+                    (mediaSummary?.entries || []).map((entry) => (
+                      <div key={entry.url} className="border-b border-white/10 px-3 py-2 last:border-b-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-[11px] leading-4 text-white/85 break-all">{entry.url}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            entry.cacheStatus === 'HIT'
+                              ? 'bg-emerald-500/15 text-emerald-200'
+                              : entry.cacheStatus === 'MISS'
+                                ? 'bg-amber-500/15 text-amber-200'
+                                : 'bg-white/10 text-white/70'
+                          }`}>
+                            {entry.cacheStatus || (entry.error ? 'ERR' : '-')}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-white/55">
+                          <span>status {entry.status ?? '-'}</span>
+                          <span>age {entry.age || '-'}</span>
+                          <span>type {entry.contentType || '-'}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <p className="pb-1 text-[10px] text-white/45">
             Activo por URL con <span className="text-white/75">?api_debug=1</span>

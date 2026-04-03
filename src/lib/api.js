@@ -750,6 +750,13 @@ export async function adminChatCleanup() {
   return apiFetch('/admin/chat-cleanup', { method: 'POST' });
 }
 
+export async function debugInspectMediaCache(urls = []) {
+  return apiFetch('/debug/media-cache', {
+    method: 'POST',
+    body: JSON.stringify({ urls }),
+  });
+}
+
 // ── Upload ──────────────────────────────────────────────
 
 export async function uploadImage(file, { purpose = 'asset' } = {}) {

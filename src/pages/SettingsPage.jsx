@@ -5,6 +5,8 @@ import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDelet
 import { useAuth } from '../App';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
 import { estimateRealtimeLoad, getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
+import { getMediaDebugSummary, inspectVisibleMedia, resetMediaDebug, subscribeMediaDebug } from '../lib/mediaDebug';
+import { getDebugPanelPrefs, setDebugPanelPref, subscribeDebugPanelPrefs } from '../lib/debugPanelPrefs';
 
 // Section definitions for sidebar navigation
 export const ADMIN_SECTIONS = [
@@ -123,6 +125,8 @@ export default function SettingsPage() {
   const [newGiftCategory, setNewGiftCategory] = useState('general');
   const [apiDebugSummary, setApiDebugSummary] = useState(() => getApiDebugSummary());
   const [realtimeDebugSummary, setRealtimeDebugSummary] = useState(() => getRealtimeDebugSummary());
+  const [mediaDebugSummary, setMediaDebugSummary] = useState(() => getMediaDebugSummary());
+  const [debugPanelPrefs, setDebugPanelPrefs] = useState(() => getDebugPanelPrefs());
   const realtimeEstimate = estimateRealtimeLoad(realtimeDebugSummary);
 
   const storyPresetOptions = [
@@ -249,6 +253,14 @@ export default function SettingsPage() {
 
   useEffect(() => subscribeRealtimeDebug((nextSummary) => {
     setRealtimeDebugSummary(nextSummary);
+  }), []);
+
+  useEffect(() => subscribeMediaDebug((nextSummary) => {
+    setMediaDebugSummary(nextSummary);
+  }), []);
+
+  useEffect(() => subscribeDebugPanelPrefs((nextPrefs) => {
+    setDebugPanelPrefs(nextPrefs);
   }), []);
 
   useEffect(() => {
@@ -1057,6 +1069,31 @@ export default function SettingsPage() {
             <h2 className="text-xs font-bold text-red-400 uppercase tracking-wider">Debug / Zona peligrosa</h2>
           </div>
           <div className="space-y-3">
+            <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-border/20 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary">Bloques visibles del debug</h3>
+                <p className="text-[11px] text-text-dim">Puedes mostrar u ocultar cada bloque por separado en el overlay para que no ocupe toda la pantalla.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ['api', 'API requests'],
+                  ['realtime', 'WebSockets'],
+                  ['media', 'HIT / MISS media'],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setDebugPanelPrefs(setDebugPanelPref(key, !debugPanelPrefs?.[key]))}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                      debugPanelPrefs?.[key]
+                        ? 'bg-mansion-gold/20 border border-mansion-gold/30 text-mansion-gold'
+                        : 'bg-mansion-card border border-mansion-border/40 text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    {label}: {debugPanelPrefs?.[key] ? 'on' : 'off'}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-gold/20 space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -1127,6 +1164,91 @@ export default function SettingsPage() {
                           </span>
                         </div>
                         <p className="mt-1 text-[11px] text-text-dim">avg {row.avgMs}ms · ok {row.ok} · err {row.errors} · status {row.lastStatus ?? '-'}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="bg-mansion-card rounded-2xl p-4 border border-emerald-500/20 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Media Cache Debug</h3>
+                  <p className="text-[11px] text-text-dim">Inspecciona las imagenes y videos visibles de la pantalla actual para ver `HIT/MISS` y detectar posibles lecturas Clase B. Hace requests puntuales solo cuando lo ejecutas.</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setMediaDebugSummary(resetMediaDebug())}
+                    className="px-4 py-2 rounded-xl bg-mansion-card border border-mansion-border/40 text-text-muted text-sm font-semibold hover:text-text-primary transition-colors"
+                  >
+                    Reset media
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setMediaDebugSummary(prev => ({ ...(prev || {}), loading: true }));
+                      const next = await inspectVisibleMedia({ limit: 24 });
+                      setMediaDebugSummary(next);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm font-semibold hover:text-emerald-200 transition-colors"
+                  >
+                    {mediaDebugSummary?.loading ? 'Midiendo...' : 'Probar media visible'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Total</p>
+                  <p className="mt-1 text-lg font-semibold text-text-primary">{mediaDebugSummary?.summary?.total ?? 0}</p>
+                </div>
+                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-emerald-300/70">HIT</p>
+                  <p className="mt-1 text-lg font-semibold text-emerald-200">{mediaDebugSummary?.summary?.hit ?? 0}</p>
+                </div>
+                <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-amber-300/70">MISS</p>
+                  <p className="mt-1 text-lg font-semibold text-amber-200">{mediaDebugSummary?.summary?.miss ?? 0}</p>
+                </div>
+                <div className="rounded-xl bg-white/5 border border-mansion-border/20 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Other</p>
+                  <p className="mt-1 text-lg font-semibold text-text-primary">{mediaDebugSummary?.summary?.other ?? 0}</p>
+                </div>
+                <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-rose-300/70">Errors</p>
+                  <p className="mt-1 text-lg font-semibold text-rose-200">{mediaDebugSummary?.summary?.errors ?? 0}</p>
+                </div>
+              </div>
+
+              {mediaDebugSummary?.error ? (
+                <p className="text-xs text-rose-300">{mediaDebugSummary.error}</p>
+              ) : null}
+
+              <div className="rounded-xl border border-mansion-border/20 overflow-hidden">
+                <div className="px-3 py-2 border-b border-mansion-border/20 bg-mansion-base/60">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Resultados de media visible</p>
+                  <p className="text-xs text-text-muted truncate">{mediaDebugSummary?.route || 'sin ruta'}</p>
+                </div>
+                <div className="max-h-72 overflow-y-auto">
+                  {(mediaDebugSummary?.entries || []).length === 0 ? (
+                    <p className="px-3 py-4 text-xs text-text-dim">Todavia no se inspecciono media visible.</p>
+                  ) : (
+                    (mediaDebugSummary?.entries || []).map((entry) => (
+                      <div key={entry.url} className="px-3 py-2 border-b border-mansion-border/20 last:border-b-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-xs text-text-primary break-all">{entry.url}</p>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            entry.cacheStatus === 'HIT'
+                              ? 'bg-emerald-500/15 border border-emerald-500/20 text-emerald-200'
+                              : entry.cacheStatus === 'MISS'
+                                ? 'bg-amber-500/15 border border-amber-500/20 text-amber-200'
+                                : 'bg-mansion-border/20 border border-mansion-border/30 text-text-muted'
+                          }`}>
+                            {entry.cacheStatus || (entry.error ? 'ERR' : '-')}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-text-dim">
+                          status {entry.status ?? '-'} · age {entry.age || '-'} · type {entry.contentType || '-'}
+                        </p>
                       </div>
                     ))
                   )}
