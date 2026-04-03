@@ -44,6 +44,49 @@ function error(message, status = 400) {
   return json({ error: message }, status);
 }
 
+function getLegacyMediaBases() {
+  return [
+    'https://pub-c0bc1ab6fb294cc1bb2e231bb55b4afb.r2.dev',
+    'https://videos.unicoapps.com',
+    'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api/images',
+  ];
+}
+
+function extractMediaKey(url, env) {
+  if (!url || typeof url !== 'string') return '';
+
+  const r2Base = String(env?.R2_PUBLIC_URL || '').replace(/\/$/, '');
+  const normalizedUrl = url.trim();
+  const bases = [r2Base, ...getLegacyMediaBases()]
+    .filter(Boolean)
+    .map((base) => String(base).replace(/\/$/, ''));
+
+  for (const base of bases) {
+    if (normalizedUrl.startsWith(`${base}/`)) {
+      return normalizedUrl.slice(base.length + 1);
+    }
+    if (normalizedUrl === base) {
+      return '';
+    }
+  }
+
+  if (normalizedUrl.includes('/api/images/')) {
+    return normalizedUrl.split('/api/images/')[1] || '';
+  }
+
+  return normalizedUrl.replace(/^https?:\/\/[^/]+\//, '');
+}
+
+function normalizeStoryVideoUrl(url, env) {
+  const r2Base = String(env?.R2_PUBLIC_URL || '').replace(/\/$/, '');
+  if (!url || !r2Base) return url;
+  if (url.startsWith(`${r2Base}/`)) return url;
+
+  const key = extractMediaKey(url, env);
+  if (!key) return url;
+  return `${r2Base}/${key}`;
+}
+
 async function ensureHiddenConversationsTable(env) {
   if (!_hiddenConversationsReady) {
     _hiddenConversationsReady = Promise.all([
@@ -3212,7 +3255,7 @@ async function handleGetStories(request, env) {
   const stories = (results || []).map(r => ({
     id: r.id,
     user_id: r.user_id,
-    video_url: r.video_url,
+    video_url: normalizeStoryVideoUrl(r.video_url, env),
     caption: r.caption || '',
     likes: r.likes || 0,
     liked: !!r.liked,
@@ -3321,7 +3364,7 @@ async function handleAdminUploadStory(request, env) {
   ).bind(userId).all();
   for (const old of existingAdmin.results || []) {
     try {
-      const oldKey = old.video_url.replace(/^https?:\/\/[^/]+\//, '');
+      const oldKey = extractMediaKey(old.video_url, env);
       await env.IMAGES.delete(oldKey);
     } catch {}
     await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(old.id).run();
@@ -3355,11 +3398,8 @@ async function handleDeleteOwnStory(request, env, storyId) {
 
   // Best-effort R2 delete
   try {
-    const r2Base = env.R2_PUBLIC_URL || '';
-    if (r2Base && story.video_url && story.video_url.startsWith(r2Base)) {
-      const key = story.video_url.slice(r2Base.length + 1);
-      if (key) await env.IMAGES.delete(key);
-    }
+    const key = extractMediaKey(story.video_url, env);
+    if (key) await env.IMAGES.delete(key);
   } catch {
     // R2 delete is best-effort
   }
@@ -3433,7 +3473,7 @@ async function handleUploadStory(request, env) {
   ).bind(auth.sub).all();
   for (const old of existing.results || []) {
     try {
-      const oldKey = old.video_url.replace(/^https?:\/\/[^/]+\//, '');
+      const oldKey = extractMediaKey(old.video_url, env);
       await env.IMAGES.delete(oldKey);
     } catch {}
     await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(old.id).run();
