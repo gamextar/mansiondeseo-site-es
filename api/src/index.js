@@ -3351,6 +3351,67 @@ async function handleToggleStoryLike(request, env, storyId) {
   return json({ liked, likes: newLikes });
 }
 
+async function handleSyncStoryLikes(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  await ensureStoriesTable(env);
+
+  const body = await request.json().catch(() => ({}));
+  const rawUpdates = Array.isArray(body?.updates) ? body.updates : [];
+  if (rawUpdates.length === 0) return json({ updates: [] });
+
+  const deduped = new Map();
+  for (const update of rawUpdates) {
+    const storyId = typeof update?.story_id === 'string' ? update.story_id : '';
+    if (!storyId) continue;
+    deduped.set(storyId, !!update?.liked);
+  }
+
+  const updates = [];
+  for (const [storyId, desiredLiked] of deduped.entries()) {
+    const story = await env.DB.prepare('SELECT id, user_id, likes FROM stories WHERE id = ?').bind(storyId).first();
+    if (!story) continue;
+
+    const existing = await env.DB.prepare(
+      'SELECT user_id FROM story_likes WHERE user_id = ? AND story_id = ?'
+    ).bind(auth.sub, storyId).first();
+
+    let liked = !!existing;
+    let likes = Number(story.likes || 0);
+
+    if (desiredLiked && !existing) {
+      await env.DB.prepare('INSERT OR IGNORE INTO story_likes (user_id, story_id) VALUES (?, ?)')
+        .bind(auth.sub, storyId).run();
+      await env.DB.prepare('UPDATE stories SET likes = likes + 1 WHERE id = ?').bind(storyId).run();
+      liked = true;
+      likes += 1;
+
+      if (story.user_id !== auth.sub) {
+        try {
+          const liker = await env.DB.prepare('SELECT username FROM users WHERE id = ?').bind(auth.sub).first();
+          await notifyUser(env, story.user_id, {
+            type: 'story_like',
+            senderName: liker?.username || 'Alguien',
+            storyId,
+          });
+        } catch (e) {
+          console.error('[handleSyncStoryLikes] notification error:', e.message);
+        }
+      }
+    } else if (!desiredLiked && existing) {
+      await env.DB.prepare('DELETE FROM story_likes WHERE user_id = ? AND story_id = ?')
+        .bind(auth.sub, storyId).run();
+      await env.DB.prepare('UPDATE stories SET likes = MAX(0, likes - 1) WHERE id = ?').bind(storyId).run();
+      liked = false;
+      likes = Math.max(0, likes - 1);
+    }
+
+    updates.push({ story_id: storyId, liked, likes });
+  }
+
+  return json({ updates });
+}
+
 // POST /api/admin/upload-story — admin uploads a video story for any user
 async function handleAdminUploadStory(request, env) {
   const auth = await authenticate(request, env);
@@ -3640,6 +3701,7 @@ async function handleRequest(request, env) {
   // ── Stories
   if (path === '/api/stories' && method === 'GET') return handleGetStories(request, env);
   // POST /api/stories is handled above (before Turnstile check)
+  if (path === '/api/stories/likes/sync' && method === 'POST') return handleSyncStoryLikes(request, env);
   const storyLikeMatch = path.match(/^\/api\/stories\/([a-f0-9-]+)\/like$/);
   if (storyLikeMatch && method === 'POST') return handleToggleStoryLike(request, env, storyLikeMatch[1]);
   const userStoryMatch = path.match(/^\/api\/stories\/([a-f0-9-]+)$/);

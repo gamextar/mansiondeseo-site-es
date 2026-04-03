@@ -16,16 +16,35 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 
 const FEED_CACHE_KEY = 'mansion_feed';
+const FEED_CACHE_TTL_MS = 5 * 60_000;
 
 function getCachedFeed() {
   try {
     const raw = sessionStorage.getItem(FEED_CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed?.profiles)) return parsed;
+    if (Array.isArray(parsed)) {
+      return { profiles: parsed, viewerPremium: false, settings: {}, timestamp: 0 };
+    }
+    return null;
   } catch { return null; }
 }
 
 function setCachedFeed(data) {
-  try { sessionStorage.setItem(FEED_CACHE_KEY, JSON.stringify(data)); } catch {}
+  try {
+    sessionStorage.setItem(FEED_CACHE_KEY, JSON.stringify({
+      profiles: data.profiles || [],
+      viewerPremium: data.viewerPremium || false,
+      settings: data.settings || {},
+      timestamp: Date.now(),
+    }));
+  } catch {}
+}
+
+function isFeedCacheFresh(cached) {
+  const timestamp = Number(cached?.timestamp) || 0;
+  return timestamp > 0 && Date.now() - timestamp < FEED_CACHE_TTL_MS;
 }
 
 export default function FeedPage() {
@@ -58,7 +77,20 @@ export default function FeedPage() {
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
-    loadProfiles();
+    const cachedFeed = getCachedFeed();
+    if (!cachedFeed) {
+      loadProfiles();
+      return;
+    }
+
+    setProfiles(cachedFeed.profiles || []);
+    setViewerPremium(cachedFeed.viewerPremium || false);
+    if (cachedFeed.settings) setSettings(cachedFeed.settings);
+    setLoading(false);
+
+    if (!isFeedCacheFresh(cachedFeed)) {
+      loadProfiles({ silent: true });
+    }
   }, [navigate, loadProfiles]);
 
   // Reload feed when navigating back after preference changes
@@ -68,6 +100,12 @@ export default function FeedPage() {
         sessionStorage.removeItem('mansion_feed_dirty');
         sessionStorage.removeItem(FEED_CACHE_KEY);
         loadProfiles();
+        return;
+      }
+
+      const cachedFeed = getCachedFeed();
+      if (!isFeedCacheFresh(cachedFeed)) {
+        loadProfiles({ silent: true });
       }
     };
     window.addEventListener('focus', onFocus);

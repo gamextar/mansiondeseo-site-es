@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X } from 'lucide-react';
-import { getStories, toggleStoryLike, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { getStories, getPendingStoryLikes, enqueueStoryLike, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../App';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
@@ -21,6 +21,28 @@ function timeAgo(dateStr) {
 
 // ── Avatar size fallback; real value comes from siteSettings.videoAvatarSize ─
 const AVATAR_SIZE_DEFAULT = 52;
+
+function applyPendingStoryLikeState(inputStories, pendingLikes = {}) {
+  if (!Array.isArray(inputStories) || inputStories.length === 0) return inputStories;
+
+  return inputStories.map((story) => {
+    const pending = pendingLikes?.[story.id];
+    if (!pending || typeof pending.liked !== 'boolean' || story.liked === pending.liked) {
+      return story;
+    }
+
+    const currentLikes = Number(story.likes || 0);
+    const nextLikes = pending.liked
+      ? currentLikes + 1
+      : Math.max(0, currentLikes - 1);
+
+    return {
+      ...story,
+      liked: pending.liked,
+      likes: nextLikes,
+    };
+  });
+}
 
 // ── Floating hearts burst animation ──────────────────────────────────────────
 function HeartBurst({ trigger }) {
@@ -513,7 +535,7 @@ export default function VideoFeedPage() {
     } catch {}
     return [];
   };
-  const initial = cachedStories();
+  const initial = applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
@@ -571,7 +593,7 @@ export default function VideoFeedPage() {
 
   const refreshStories = useCallback(async () => {
     const data = await getStories();
-    const fresh = data.stories || [];
+    const fresh = applyPendingStoryLikeState(data.stories || [], getPendingStoryLikes());
     setStories(fresh);
     persistStories(fresh);
     return fresh;
@@ -634,6 +656,35 @@ export default function VideoFeedPage() {
       });
     });
   }, [persistStories, subscribe]);
+
+  useEffect(() => {
+    const unsubscribeQueue = subscribePendingStoryLikes((pendingLikes) => {
+      setStories((prev) => {
+        const next = applyPendingStoryLikeState(prev, pendingLikes);
+        persistStories(next);
+        return next;
+      });
+    });
+
+    const unsubscribeSync = subscribeStoryLikeSync((updates) => {
+      if (!Array.isArray(updates) || updates.length === 0) return;
+      setStories((prev) => {
+        const next = prev.map((story) => {
+          const synced = updates.find((item) => item.story_id === story.id);
+          return synced
+            ? { ...story, liked: !!synced.liked, likes: Number(synced.likes || 0) }
+            : story;
+        });
+        persistStories(next);
+        return next;
+      });
+    });
+
+    return () => {
+      unsubscribeQueue();
+      unsubscribeSync();
+    };
+  }, [persistStories]);
 
   useLayoutEffect(() => {
     if (isDesktopViewport) return undefined;
@@ -767,35 +818,25 @@ export default function VideoFeedPage() {
     }, 90);
   }, [activeDispIdx, boundaryOverlayIdx, isDesktopViewport, settleInfiniteBoundary, stories.length]);
 
-  const handleLike = useCallback(async (storyId) => {
-    // Optimistic: flip immediately
+  const handleLike = useCallback((storyId) => {
+    let desiredLiked = null;
     setStories(prev => {
       const next = prev.map(s =>
-        s.id === storyId ? { ...s, liked: !s.liked, likes: s.liked ? Math.max(0, s.likes - 1) : s.likes + 1 } : s
+        s.id === storyId
+          ? (() => {
+              desiredLiked = !s.liked;
+              return {
+                ...s,
+                liked: desiredLiked,
+                likes: desiredLiked ? s.likes + 1 : Math.max(0, s.likes - 1),
+              };
+            })()
+          : s
       );
       persistStories(next);
       return next;
     });
-    try {
-      const data = await toggleStoryLike(storyId);
-      // Sync with server truth
-      setStories(prev => {
-        const next = prev.map(s =>
-          s.id === storyId ? { ...s, liked: data.liked, likes: data.likes } : s
-        );
-        persistStories(next);
-        return next;
-      });
-    } catch {
-      // Revert on failure
-      setStories(prev => {
-        const next = prev.map(s =>
-          s.id === storyId ? { ...s, liked: !s.liked, likes: s.liked ? Math.max(0, s.likes - 1) : s.likes + 1 } : s
-        );
-        persistStories(next);
-        return next;
-      });
-    }
+    if (desiredLiked !== null) enqueueStoryLike(storyId, desiredLiked);
   }, [persistStories]);
 
   const scrollByOne = useCallback((dir) => {

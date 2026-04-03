@@ -2,6 +2,8 @@
 // MANSIÓN DESEO — Frontend API client
 // ══════════════════════════════════════════════════════════
 
+import { createMutationQueue } from './mutationQueue';
+
 const LEGACY_PROD_API_BASE = 'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api';
 
 function resolveApiBase() {
@@ -20,6 +22,7 @@ const AUTH_ME_CACHE_KEY = 'authMe';
 const AUTH_ME_CACHE_TTL_MS = 10 * 60_000;
 const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
+const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
 const sharedGetCache = new Map();
 const sessionCache = {
   get(key, ttlMs = 0) {
@@ -632,9 +635,9 @@ export async function getProfiles({ filter, q } = {}) {
   if (filter && filter !== 'all') params.set('filter', filter);
   if (q) params.set('q', q);
   const qs = params.toString();
-  // Search queries bypass cache (user expects fresh results), browse is cached 15s
+  // Search queries bypass cache (user expects fresh results), browse is cached longer.
   if (q) return apiFetch(`/profiles${qs ? `?${qs}` : ''}`);
-  return sharedGet(`profiles:${filter || 'all'}`, () => apiFetch(`/profiles${qs ? `?${qs}` : ''}`), { ttlMs: 15_000 });
+  return sharedGet(`profiles:${filter || 'all'}`, () => apiFetch(`/profiles${qs ? `?${qs}` : ''}`), { ttlMs: 5 * 60_000 });
 }
 
 export function invalidateProfilesCache() {
@@ -958,6 +961,27 @@ function invalidateStoryFeedCache() {
   } catch {}
 }
 
+const storyLikesQueue = createMutationQueue({
+  storageKey: 'mansion_pending_story_likes',
+  flushDelayMs: 2500,
+  flush: async (entries, { keepalive } = {}) => {
+    const data = await apiFetch('/stories/likes/sync', {
+      method: 'POST',
+      keepalive: !!keepalive,
+      body: JSON.stringify({
+        updates: entries.map(({ key, value }) => ({
+          story_id: key,
+          liked: !!value?.liked,
+        })),
+      }),
+    });
+    if (typeof window !== 'undefined' && Array.isArray(data?.updates)) {
+      window.dispatchEvent(new CustomEvent(STORY_LIKE_SYNC_EVENT, { detail: data.updates }));
+    }
+    return data;
+  },
+});
+
 export async function uploadStory(file, { caption = '', onProgress, tokenOverride } = {}) {
   const params = new URLSearchParams();
   if (caption) params.set('caption', caption);
@@ -972,6 +996,33 @@ export async function uploadStory(file, { caption = '', onProgress, tokenOverrid
   });
   invalidateStoryFeedCache();
   return data;
+}
+
+export function getPendingStoryLikes() {
+  return storyLikesQueue.getPending();
+}
+
+export function enqueueStoryLike(storyId, liked) {
+  storyLikesQueue.set(storyId, { liked: !!liked, updatedAt: Date.now() });
+}
+
+export function removePendingStoryLike(storyId) {
+  storyLikesQueue.remove(storyId);
+}
+
+export function flushPendingStoryLikes(options) {
+  return storyLikesQueue.flush(options);
+}
+
+export function subscribePendingStoryLikes(listener) {
+  return storyLikesQueue.subscribe(listener);
+}
+
+export function subscribeStoryLikeSync(listener) {
+  if (typeof window === 'undefined') return () => {};
+  const handler = (event) => listener(event.detail || []);
+  window.addEventListener(STORY_LIKE_SYNC_EVENT, handler);
+  return () => window.removeEventListener(STORY_LIKE_SYNC_EVENT, handler);
 }
 
 export async function adminDeleteStory(storyId) {
