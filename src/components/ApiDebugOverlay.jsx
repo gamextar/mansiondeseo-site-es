@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
-import { getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
+import { estimateRealtimeLoad, getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
 
 export default function ApiDebugOverlay() {
   const [summary, setSummary] = useState(() => getApiDebugSummary());
@@ -36,9 +36,20 @@ export default function ApiDebugOverlay() {
   if (!summary?.enabled) return null;
 
   const rows = summary.counts || [];
+  const realtimeEstimate = estimateRealtimeLoad(realtimeSummary);
   const realtimeRows = [
-    { key: 'notifications', label: 'Notificaciones', data: realtimeSummary?.channels?.notifications },
-    { key: 'chat', label: 'Chat', data: realtimeSummary?.channels?.chat },
+    {
+      key: 'notifications',
+      label: 'Notificaciones',
+      data: realtimeSummary?.channels?.notifications,
+      estimate: realtimeEstimate?.channels?.notifications,
+    },
+    {
+      key: 'chat',
+      label: 'Chat',
+      data: realtimeSummary?.channels?.chat,
+      estimate: realtimeEstimate?.channels?.chat,
+    },
   ];
 
   return (
@@ -111,7 +122,9 @@ export default function ApiDebugOverlay() {
             <div className="flex items-center justify-between border-b border-sky-500/15 bg-sky-500/5 px-3 py-2">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.18em] text-sky-300/90">Realtime</p>
-                <p className="text-[10px] text-white/55">Sockets observados localmente</p>
+                <p className="text-[10px] text-white/55">
+                  Sockets observados localmente · ventana {realtimeEstimate?.elapsedMinutes ?? 0} min
+                </p>
               </div>
               <button
                 type="button"
@@ -140,6 +153,10 @@ export default function ApiDebugOverlay() {
                     <span>in {row.data?.messagesReceived ?? 0}</span>
                     <span>out {row.data?.messagesSent ?? 0}</span>
                     <span>bg {row.data?.backgroundPauses ?? 0}</span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-sky-200/85">
+                    <span>upgrades/h {row.estimate?.upgradeReqPerHour ?? 0}</span>
+                    <span>DO eq/h {row.estimate?.approxDoEqReqPerHour ?? 0}</span>
                   </div>
                 </div>
               ))}
