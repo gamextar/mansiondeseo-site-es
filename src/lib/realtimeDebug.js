@@ -25,6 +25,7 @@ function getRealtimeDebugController() {
   if (window.__mansionRealtimeDebug) return window.__mansionRealtimeDebug;
 
   const state = {
+    startedAt: Date.now(),
     channels: {
       notifications: createChannelState(),
       chat: createChannelState(),
@@ -34,6 +35,8 @@ function getRealtimeDebugController() {
   const emitUpdate = () => {
     window.dispatchEvent(new CustomEvent(REALTIME_DEBUG_EVENT, {
       detail: {
+        startedAt: state.startedAt,
+        elapsedMs: Date.now() - state.startedAt,
         channels: {
           notifications: snapshotChannel(state.channels.notifications),
           chat: snapshotChannel(state.channels.chat),
@@ -61,6 +64,7 @@ function getRealtimeDebugController() {
       emitUpdate();
     },
     reset() {
+      state.startedAt = Date.now();
       state.channels.notifications = createChannelState();
       state.channels.chat = createChannelState();
       emitUpdate();
@@ -68,6 +72,8 @@ function getRealtimeDebugController() {
     },
     summary() {
       return {
+        startedAt: state.startedAt,
+        elapsedMs: Date.now() - state.startedAt,
         channels: {
           notifications: snapshotChannel(state.channels.notifications),
           chat: snapshotChannel(state.channels.chat),
@@ -101,6 +107,41 @@ export function subscribeRealtimeDebug(listener) {
   const handler = (event) => listener(event.detail);
   window.addEventListener(REALTIME_DEBUG_EVENT, handler);
   return () => window.removeEventListener(REALTIME_DEBUG_EVENT, handler);
+}
+
+function ratePerHour(count, elapsedMs) {
+  const safeElapsed = Math.max(1, Number(elapsedMs) || 0);
+  return (Number(count) || 0) * (3_600_000 / safeElapsed);
+}
+
+export function estimateRealtimeLoad(summary) {
+  const elapsedMs = Math.max(1, Number(summary?.elapsedMs) || 0);
+  const channels = summary?.channels || {};
+
+  const buildEstimate = (channel) => {
+    const connectAttempts = Number(channel?.connectAttempts || 0);
+    const outboundFrames = Number(channel?.pingsSent || 0) + Number(channel?.messagesSent || 0);
+    const upgradeReqPerHour = ratePerHour(connectAttempts, elapsedMs);
+    const approxDoEqReqPerHour = ratePerHour(connectAttempts + (outboundFrames / 20), elapsedMs);
+
+    return {
+      upgradeRequests: connectAttempts,
+      upgradeReqPerHour: Number(upgradeReqPerHour.toFixed(1)),
+      outboundFrames,
+      approxDoEqRequests: Number((connectAttempts + (outboundFrames / 20)).toFixed(2)),
+      approxDoEqReqPerHour: Number(approxDoEqReqPerHour.toFixed(1)),
+    };
+  };
+
+  return {
+    startedAt: summary?.startedAt || Date.now(),
+    elapsedMs,
+    elapsedMinutes: Number((elapsedMs / 60_000).toFixed(1)),
+    channels: {
+      notifications: buildEstimate(channels.notifications),
+      chat: buildEstimate(channels.chat),
+    },
+  };
 }
 
 if (typeof window !== 'undefined') {
