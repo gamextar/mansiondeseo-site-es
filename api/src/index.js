@@ -480,13 +480,27 @@ function isOnline(lastActive) {
 
 // ── CORS ────────────────────────────────────────────────
 
+function getAllowedOrigins(env) {
+  const configured = String(env.CORS_ORIGIN || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return configured.length > 0 ? configured : ['*'];
+}
+
+function getPrimaryAppOrigin(env) {
+  const [primary] = getAllowedOrigins(env);
+  return primary && primary !== '*' ? primary : 'http://localhost:5173';
+}
+
 function corsHeaders(env, request) {
   const origin = request?.headers?.get('Origin') || '';
-  // Allow production origin, localhost, and any Pages preview subdomain
-  const allowed = env.CORS_ORIGIN || '*';
-  let acao = allowed;
+  const allowedOrigins = getAllowedOrigins(env);
+  const primaryOrigin = allowedOrigins[0] || '*';
+  let acao = primaryOrigin;
   if (origin && (
-    origin === allowed ||
+    allowedOrigins.includes(origin) ||
     origin === 'http://localhost:5173' ||
     origin.endsWith('.mansiondeseo-site.pages.dev')
   )) {
@@ -1018,7 +1032,7 @@ async function handleVerifyToken(request, env) {
   const jwt = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
 
   // Redirect to frontend with token
-  return Response.redirect(`${env.CORS_ORIGIN}/?token=${jwt}`, 302);
+  return Response.redirect(`${getPrimaryAppOrigin(env)}/?token=${jwt}`, 302);
 }
 
 // ── GET /api/auth/me ────────────────────────────────────
@@ -2702,7 +2716,7 @@ async function handleUalaPaymentCreate(request, auth, env, settings, plan_id, nu
 
   const isCoinPurchase = plan_id && plan_id.startsWith('coins_');
   const externalRef = `${auth.sub}--${plan_id}`;
-  const baseUrl = env.CORS_ORIGIN || 'http://localhost:5173';
+  const baseUrl = getPrimaryAppOrigin(env);
   const workerUrl = new URL(request.url).origin;
 
   const bodyPayload = JSON.stringify({

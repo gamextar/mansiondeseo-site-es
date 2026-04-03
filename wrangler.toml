@@ -6,6 +6,10 @@ name = "mansion-deseo-api-production"
 main = "api/src/index.js"
 compatibility_date = "2024-12-01"
 
+[[routes]]
+pattern = "mansiondeseo.unicoapps.com/api/*"
+zone_name = "unicoapps.com"
+
 # ── Observability (Workers Logs) ─────────────────────
 [observability]
 enabled = true
@@ -40,7 +44,7 @@ new_sqlite_classes = ["UserNotification"]
 # ── Environment Variables ────────────────────────────
 [vars]
 R2_PUBLIC_URL = "https://pub-c0bc1ab6fb294cc1bb2e231bb55b4afb.r2.dev"
-CORS_ORIGIN = "https://mansiondeseo-site.pages.dev"
+CORS_ORIGIN = "https://mansiondeseo.unicoapps.com,https://mansiondeseo-site.pages.dev"
 ENVIRONMENT = "production"
 JWT_SECRET = "78b85a92c0ba6b2ca96d6ba06605371a1f4683c2fa37e7783b818d4f9b7baca7"
 TURNSTILE_SECRET = ""

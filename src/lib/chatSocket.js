@@ -4,9 +4,18 @@
 // ═══════════════════════════════════════════════════════
 import { recordRealtimeDebug, setRealtimeActiveConnections } from './realtimeDebug';
 
-const WS_BASE = import.meta.env.PROD
-  ? 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev'
-  : `ws://${window.location.hostname}:8787`;
+const LEGACY_PROD_WS_BASE = 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev';
+
+function resolveWsBase() {
+  const explicitBase = String(import.meta.env.VITE_WS_BASE || '').trim();
+  if (explicitBase) return explicitBase.replace(/\/$/, '');
+  if (typeof window === 'undefined') return LEGACY_PROD_WS_BASE;
+  if (!import.meta.env.PROD) return `ws://${window.location.hostname}:8787`;
+  if (window.location.hostname.endsWith('.pages.dev')) return LEGACY_PROD_WS_BASE;
+  return `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
+}
+
+const WS_BASE = resolveWsBase();
 const CHAT_PING_MS = 45_000;
 const CHAT_BACKGROUND_GRACE_MS = 15_000;
 const CHAT_MAX_RETRIES = 5;
@@ -85,6 +94,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
       retryCount = 0;
       setState('connected');
       recordRealtimeDebug('chat', 'opens');
+      setRealtimeActiveConnections('chat', 1);
       startPing();
     };
 
@@ -129,6 +139,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     ws.onclose = () => {
       stopPing();
       recordRealtimeDebug('chat', 'closes');
+      setRealtimeActiveConnections('chat', 0);
       if (!closed) {
         setState('disconnected');
         scheduleReconnect();
@@ -208,6 +219,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
         ws.close(1000, 'client-pause');
         ws = null;
       }
+      setRealtimeActiveConnections('chat', 0);
       setState('disconnected');
     }, CHAT_BACKGROUND_GRACE_MS);
   }
@@ -215,6 +227,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
   // Start connection
+  setRealtimeActiveConnections('chat', ws?.readyState === WebSocket.OPEN ? 1 : 0);
   connect();
 
   return {

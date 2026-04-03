@@ -9,9 +9,18 @@ const UnreadContext = createContext({
   setActiveChatId: () => {},
 });
 
-const WS_BASE = import.meta.env.PROD
-  ? 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev'
-  : `ws://${window.location.hostname}:8787`;
+const LEGACY_PROD_WS_BASE = 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev';
+
+function resolveWsBase() {
+  const explicitBase = String(import.meta.env.VITE_WS_BASE || '').trim();
+  if (explicitBase) return explicitBase.replace(/\/$/, '');
+  if (typeof window === 'undefined') return LEGACY_PROD_WS_BASE;
+  if (!import.meta.env.PROD) return `ws://${window.location.hostname}:8787`;
+  if (window.location.hostname.endsWith('.pages.dev')) return LEGACY_PROD_WS_BASE;
+  return `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
+}
+
+const WS_BASE = resolveWsBase();
 const NOTIFICATION_PING_MS = 4 * 60_000; // 4 min — reduces DO wake-ups from hibernation
 const NOTIFICATION_BACKGROUND_GRACE_MS = 60_000; // keep WS alive briefly across tab/app switches
 const UNREAD_REFRESH_STALE_MS = 5 * 60_000; // 5 min — HTTP fallback if WS stale
@@ -130,6 +139,7 @@ export function UnreadProvider({ children }) {
     try { ws.close(1000, 'client-pause'); } catch { /* already closed */ }
     wsRef.current = null;
     wsConnectedRef.current = false;
+    setRealtimeActiveConnections('notifications', 0);
   }, [clearBackgroundDisconnectTimer, stopPing]);
 
   const scheduleBackgroundDisconnect = useCallback(() => {
@@ -159,6 +169,7 @@ export function UnreadProvider({ children }) {
         wsRetryRef.current = 0;
         wsConnectedRef.current = true;
         recordRealtimeDebug('notifications', 'opens');
+        setRealtimeActiveConnections('notifications', 1);
         startPing(ws);
       };
 
@@ -222,6 +233,7 @@ export function UnreadProvider({ children }) {
         if (wsRef.current === ws) wsRef.current = null;
         wsConnectedRef.current = false;
         recordRealtimeDebug('notifications', 'closes');
+        setRealtimeActiveConnections('notifications', 0);
         if (!wsClosedRef.current && !wsPausedRef.current && wsRetryRef.current < WS_MAX_RETRIES) {
           const delay = Math.min(2000 * Math.pow(2, wsRetryRef.current), 30_000);
           wsRetryRef.current++;
@@ -249,6 +261,7 @@ export function UnreadProvider({ children }) {
   useEffect(() => {
     fetchUnread({ force: true }).catch(() => {});
     wsClosedRef.current = false;
+    setRealtimeActiveConnections('notifications', wsRef.current?.readyState === WebSocket.OPEN ? 1 : 0);
 
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {

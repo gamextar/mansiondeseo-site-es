@@ -64,9 +64,13 @@ function getRealtimeDebugController() {
       emitUpdate();
     },
     reset() {
+      const notificationActive = state.channels.notifications.activeConnections;
+      const chatActive = state.channels.chat.activeConnections;
       state.startedAt = Date.now();
       state.channels.notifications = createChannelState();
       state.channels.chat = createChannelState();
+      state.channels.notifications.activeConnections = notificationActive;
+      state.channels.chat.activeConnections = chatActive;
       emitUpdate();
       return this.summary();
     },

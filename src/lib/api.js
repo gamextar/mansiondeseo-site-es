@@ -2,9 +2,18 @@
 // MANSIÓN DESEO — Frontend API client
 // ══════════════════════════════════════════════════════════
 
-const API_BASE = import.meta.env.PROD
-  ? 'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api'
-  : '/api';
+const LEGACY_PROD_API_BASE = 'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api';
+
+function resolveApiBase() {
+  const explicitBase = String(import.meta.env.VITE_API_BASE || '').trim();
+  if (explicitBase) return explicitBase.replace(/\/$/, '');
+  if (!import.meta.env.PROD) return '/api';
+  if (typeof window === 'undefined') return LEGACY_PROD_API_BASE;
+  if (window.location.hostname.endsWith('.pages.dev')) return LEGACY_PROD_API_BASE;
+  return '/api';
+}
+
+const API_BASE = resolveApiBase();
 const TOKEN_KEY = 'mansion_token';
 const USER_KEY = 'mansion_user';
 const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
