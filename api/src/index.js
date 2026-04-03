@@ -21,6 +21,7 @@ let _hiddenConversationsReady = null;
 let _messagingIndexesReady = null;
 let _conversationStateReady = null;
 let _messageConversationIdReady = null;
+let _userBrowseIndexesReady = null;
 
 // ── Helpers ─────────────────────────────────────────────
 
@@ -142,6 +143,27 @@ async function ensureConversationStateTables(env) {
   }
 
   return _conversationStateReady;
+}
+
+async function ensureUserBrowseIndexes(env) {
+  if (!_userBrowseIndexesReady) {
+    _userBrowseIndexesReady = Promise.all([
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_users_status_country_role_active ON users(status, country, role, last_active DESC)'
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_users_status_country_active ON users(status, country, last_active DESC)'
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_users_status_active ON users(status, last_active DESC)'
+      ).run(),
+    ]).catch((err) => {
+      _userBrowseIndexesReady = null;
+      throw err;
+    });
+  }
+
+  return _userBrowseIndexesReady;
 }
 
 async function setConversationState(env, userId, partnerId, { lastMessage, lastMessageAt, unreadCount }) {
@@ -1080,6 +1102,7 @@ async function handleAppBootstrap(request, env) {
 async function handleProfiles(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  await ensureUserBrowseIndexes(env);
 
   const url = new URL(request.url);
   const filter = url.searchParams.get('filter') || 'all';
@@ -1094,7 +1117,26 @@ async function handleProfiles(request, env) {
   const viewerInterests = safeParseJSON(viewer?.interests, []);
 
   // Build profiles query (don't exclude current user — cache is shared, filter later)
-  let query = `SELECT * FROM users WHERE status = 'verified'`;
+  let query = `
+    SELECT
+      id,
+      username,
+      age,
+      city,
+      role,
+      interests,
+      bio,
+      avatar_url,
+      avatar_crop,
+      photos,
+      verified,
+      premium,
+      premium_until,
+      ghost_mode,
+      last_active
+    FROM users
+    WHERE status = 'verified'
+  `;
   const params = [];
   if (country) { query += ` AND country = ?`; params.push(country); }
 
@@ -1690,8 +1732,6 @@ async function handleNotificationWebSocket(request, env) {
 async function handleUnreadCount(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
-  await ensureHiddenConversationsTable(env);
-  await ensureMessagingIndexes(env);
   await ensureConversationStateTables(env);
 
   const row = await env.DB.prepare(

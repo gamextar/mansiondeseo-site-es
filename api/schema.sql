@@ -43,6 +43,9 @@ CREATE INDEX IF NOT EXISTS idx_users_email    ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_country  ON users(country);
 CREATE INDEX IF NOT EXISTS idx_users_role     ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_status   ON users(status);
+CREATE INDEX IF NOT EXISTS idx_users_status_active ON users(status, last_active DESC);
+CREATE INDEX IF NOT EXISTS idx_users_status_country_active ON users(status, country, last_active DESC);
+CREATE INDEX IF NOT EXISTS idx_users_status_country_role_active ON users(status, country, role, last_active DESC);
 
 -- Messages table
 CREATE TABLE IF NOT EXISTS messages (
