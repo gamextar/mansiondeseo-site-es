@@ -38,7 +38,37 @@ export default function DesktopSidebar() {
 
   useEffect(() => {
     if (!getToken()) return;
-    getVisits().then(data => setVisitors(data.visitors || [])).catch(() => {});
+    let cancelled = false;
+    let fallbackTimer = null;
+
+    const loadVisits = () => {
+      getVisits().then((data) => {
+        if (!cancelled) setVisitors(data.visitors || []);
+      }).catch(() => {});
+    };
+
+    // Visitors in the desktop sidebar are nice-to-have, not critical UI.
+    // Delay them so home/chat navigation does not always pay an extra request.
+    if (typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(() => {
+        if (!cancelled && document.visibilityState === 'visible') loadVisits();
+      }, { timeout: 8000 });
+
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback?.(idleId);
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+      };
+    }
+
+    fallbackTimer = setTimeout(() => {
+      if (!cancelled && document.visibilityState === 'visible') loadVisits();
+    }, 8000);
+
+    return () => {
+      cancelled = true;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+    };
   }, []);
 
   // Hide on landing/onboarding/register/login

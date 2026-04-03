@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Sliders, Eye, EyeOff, Image, Crown, MessageCircle, Shi
 import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, uploadImage } from '../lib/api';
 import { useAuth } from '../App';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
+import { getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
 
 // Section definitions for sidebar navigation
 export const ADMIN_SECTIONS = [
@@ -121,6 +122,7 @@ export default function SettingsPage() {
   const [newGiftPrice, setNewGiftPrice] = useState('');
   const [newGiftCategory, setNewGiftCategory] = useState('general');
   const [apiDebugSummary, setApiDebugSummary] = useState(() => getApiDebugSummary());
+  const [realtimeDebugSummary, setRealtimeDebugSummary] = useState(() => getRealtimeDebugSummary());
 
   const storyPresetOptions = [
     {
@@ -242,6 +244,10 @@ export default function SettingsPage() {
 
   useEffect(() => subscribeApiDebug((nextSummary) => {
     setApiDebugSummary(nextSummary);
+  }), []);
+
+  useEffect(() => subscribeRealtimeDebug((nextSummary) => {
+    setRealtimeDebugSummary(nextSummary);
   }), []);
 
   const handleSave = async () => {
@@ -1117,6 +1123,78 @@ export default function SettingsPage() {
                     ))
                   )}
                 </div>
+              </div>
+            </div>
+            <div className="bg-mansion-card rounded-2xl p-4 border border-sky-500/20 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Realtime / WebSocket Debug</h3>
+                  <p className="text-[11px] text-text-dim">Cuenta aperturas, cierres, reconnects, pings y mensajes de los sockets de notificaciones y chat. Esto no agrega requests extra; solo mide eventos locales.</p>
+                </div>
+                <button
+                  onClick={() => setRealtimeDebugSummary(resetRealtimeDebug())}
+                  className="px-4 py-2 rounded-xl bg-mansion-card border border-mansion-border/40 text-text-muted text-sm font-semibold hover:text-text-primary transition-colors"
+                >
+                  Reset realtime
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  { key: 'notifications', label: 'Notificaciones', data: realtimeDebugSummary?.channels?.notifications },
+                  { key: 'chat', label: 'Chat', data: realtimeDebugSummary?.channels?.chat },
+                ].map(({ key, label, data }) => (
+                  <div key={key} className="rounded-xl border border-mansion-border/20 overflow-hidden">
+                    <div className="px-3 py-2 border-b border-mansion-border/20 bg-mansion-base/60 flex items-center justify-between">
+                      <p className="text-xs font-semibold text-text-primary">{label}</p>
+                      <span className="rounded-full bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 text-[10px] font-semibold text-sky-300">
+                        activas {data?.activeConnections ?? 0}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 p-3">
+                      <div className="rounded-lg bg-mansion-base/60 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wider text-text-dim">Connects</p>
+                        <p className="mt-1 text-base font-semibold text-text-primary">{data?.connectAttempts ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg bg-mansion-base/60 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wider text-text-dim">Opens</p>
+                        <p className="mt-1 text-base font-semibold text-text-primary">{data?.opens ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg bg-mansion-base/60 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wider text-text-dim">Closes</p>
+                        <p className="mt-1 text-base font-semibold text-text-primary">{data?.closes ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg bg-mansion-base/60 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wider text-text-dim">Reconnects</p>
+                        <p className="mt-1 text-base font-semibold text-text-primary">{data?.reconnectsScheduled ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg bg-mansion-base/60 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wider text-text-dim">Pings</p>
+                        <p className="mt-1 text-base font-semibold text-text-primary">{data?.pingsSent ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg bg-mansion-base/60 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wider text-text-dim">Pongs</p>
+                        <p className="mt-1 text-base font-semibold text-text-primary">{data?.pongsReceived ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg bg-mansion-base/60 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wider text-text-dim">Msgs in</p>
+                        <p className="mt-1 text-base font-semibold text-text-primary">{data?.messagesReceived ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg bg-mansion-base/60 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wider text-text-dim">Msgs out</p>
+                        <p className="mt-1 text-base font-semibold text-text-primary">{data?.messagesSent ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg bg-mansion-base/60 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wider text-text-dim">Errores</p>
+                        <p className="mt-1 text-base font-semibold text-text-primary">{data?.errors ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg bg-mansion-base/60 px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wider text-text-dim">Pausas bg</p>
+                        <p className="mt-1 text-base font-semibold text-text-primary">{data?.backgroundPauses ?? 0}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="bg-mansion-card rounded-2xl p-4 border border-red-500/20">

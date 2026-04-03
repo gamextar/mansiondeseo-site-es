@@ -785,7 +785,7 @@ export async function checkFavorite(targetId) {
 // ── Visits ──────────────────────────────────────────────
 
 export async function getVisits() {
-  return sharedGet('visits', () => apiFetch('/visits'), { ttlMs: 30_000 });
+  return sharedGet('visits', () => apiFetch('/visits'), { ttlMs: 5 * 60_000 });
 }
 
 // ── Gifts & Coins ───────────────────────────────────────

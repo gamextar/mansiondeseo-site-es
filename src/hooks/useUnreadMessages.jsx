@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
 import { getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache } from '../lib/api';
+import { recordRealtimeDebug, setRealtimeActiveConnections } from '../lib/realtimeDebug';
 
 const UnreadContext = createContext({
   unreadCount: 0,
@@ -62,6 +63,7 @@ export function UnreadProvider({ children }) {
     socket._pingTimer = setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       if (socket.readyState === WebSocket.OPEN) {
+        recordRealtimeDebug('notifications', 'pingsSent');
         socket.send(JSON.stringify({ type: 'ping' }));
       }
     }, NOTIFICATION_PING_MS);
@@ -135,6 +137,7 @@ export function UnreadProvider({ children }) {
     wsBackgroundTimerRef.current = setTimeout(() => {
       if (document.visibilityState === 'visible') return;
       wsPausedRef.current = true;
+      recordRealtimeDebug('notifications', 'backgroundPauses');
       disconnectWs();
     }, NOTIFICATION_BACKGROUND_GRACE_MS);
   }, [clearBackgroundDisconnectTimer, disconnectWs]);
@@ -148,20 +151,24 @@ export function UnreadProvider({ children }) {
 
     const url = `${WS_BASE}/api/notifications/ws?token=${encodeURIComponent(token)}`;
     try {
+      recordRealtimeDebug('notifications', 'connectAttempts');
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
       ws.onopen = () => {
         wsRetryRef.current = 0;
         wsConnectedRef.current = true;
+        recordRealtimeDebug('notifications', 'opens');
         startPing(ws);
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          recordRealtimeDebug('notifications', 'messagesReceived');
           if (data.type === 'connected' || data.type === 'pong') {
             wsConnectedRef.current = true;
+            if (data.type === 'pong') recordRealtimeDebug('notifications', 'pongsReceived');
             return;
           }
           if (data.type === 'new_message') {
@@ -214,19 +221,25 @@ export function UnreadProvider({ children }) {
         stopPing(ws);
         if (wsRef.current === ws) wsRef.current = null;
         wsConnectedRef.current = false;
+        recordRealtimeDebug('notifications', 'closes');
         if (!wsClosedRef.current && !wsPausedRef.current && wsRetryRef.current < WS_MAX_RETRIES) {
           const delay = Math.min(2000 * Math.pow(2, wsRetryRef.current), 30_000);
           wsRetryRef.current++;
+          recordRealtimeDebug('notifications', 'reconnectsScheduled');
           setTimeout(connectWs, delay);
         }
       };
 
-      ws.onerror = () => { /* onclose will fire */ };
+      ws.onerror = () => {
+        recordRealtimeDebug('notifications', 'errors');
+      };
     } catch {
       wsConnectedRef.current = false;
+      recordRealtimeDebug('notifications', 'errors');
       if (wsRetryRef.current < WS_MAX_RETRIES) {
         const delay = Math.min(2000 * Math.pow(2, wsRetryRef.current), 30_000);
         wsRetryRef.current++;
+        recordRealtimeDebug('notifications', 'reconnectsScheduled');
         setTimeout(connectWs, delay);
       }
     }
@@ -267,6 +280,7 @@ export function UnreadProvider({ children }) {
 
     return () => {
       wsClosedRef.current = true;
+      setRealtimeActiveConnections('notifications', 0);
       clearBackgroundDisconnectTimer();
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('focus', onFocus);

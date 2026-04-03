@@ -2,6 +2,7 @@
 // MANSIÓN DESEO — WebSocket Chat Connection Manager
 // Auto-reconnect with exponential backoff
 // ═══════════════════════════════════════════════════════
+import { recordRealtimeDebug, setRealtimeActiveConnections } from './realtimeDebug';
 
 const WS_BASE = import.meta.env.PROD
   ? 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev'
@@ -50,6 +51,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     pingTimer = setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       if (ws?.readyState === WebSocket.OPEN) {
+        recordRealtimeDebug('chat', 'pingsSent');
         ws.send(JSON.stringify({ type: 'ping' }));
       }
     }, CHAT_PING_MS);
@@ -71,8 +73,10 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     setState('connecting');
 
     try {
+      recordRealtimeDebug('chat', 'connectAttempts');
       ws = new WebSocket(url);
     } catch {
+      recordRealtimeDebug('chat', 'errors');
       scheduleReconnect();
       return;
     }
@@ -80,6 +84,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     ws.onopen = () => {
       retryCount = 0;
       setState('connected');
+      recordRealtimeDebug('chat', 'opens');
       startPing();
     };
 
@@ -90,6 +95,8 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
       } catch {
         return;
       }
+
+      recordRealtimeDebug('chat', 'messagesReceived');
 
       switch (data.type) {
         case 'history':
@@ -114,12 +121,14 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
           callbacks.onError?.(data);
           break;
         case 'pong':
+          recordRealtimeDebug('chat', 'pongsReceived');
           break;
       }
     };
 
     ws.onclose = () => {
       stopPing();
+      recordRealtimeDebug('chat', 'closes');
       if (!closed) {
         setState('disconnected');
         scheduleReconnect();
@@ -127,7 +136,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     };
 
     ws.onerror = () => {
-      // onclose will fire after this
+      recordRealtimeDebug('chat', 'errors');
     };
   }
 
@@ -136,23 +145,27 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     if (retryCount >= CHAT_MAX_RETRIES) return;
     const delay = Math.min(2000 * Math.pow(2, retryCount), 30_000);
     retryCount++;
+    recordRealtimeDebug('chat', 'reconnectsScheduled');
     retryTimer = setTimeout(connect, delay);
   }
 
   function send(content) {
     if (ws?.readyState === WebSocket.OPEN) {
+      recordRealtimeDebug('chat', 'messagesSent');
       ws.send(JSON.stringify({ type: 'message', content }));
     }
   }
 
   function sendTyping() {
     if (ws?.readyState === WebSocket.OPEN) {
+      recordRealtimeDebug('chat', 'messagesSent');
       ws.send(JSON.stringify({ type: 'typing' }));
     }
   }
 
   function markRead(messageIds) {
     if (ws?.readyState === WebSocket.OPEN && messageIds.length > 0) {
+      recordRealtimeDebug('chat', 'messagesSent');
       ws.send(JSON.stringify({ type: 'read', messageIds }));
     }
   }
@@ -187,6 +200,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     backgroundTimer = setTimeout(() => {
       if (closed || document.visibilityState === 'visible') return;
       paused = true;
+      recordRealtimeDebug('chat', 'backgroundPauses');
       clearTimeout(retryTimer);
       stopPing();
       if (ws) {
@@ -209,6 +223,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     markRead,
     close: () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      setRealtimeActiveConnections('chat', 0);
       close();
     },
     getState,
