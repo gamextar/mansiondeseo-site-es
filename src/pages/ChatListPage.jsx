@@ -25,7 +25,7 @@ function timeAgo(dateStr) {
 }
 
 const CONV_CACHE_KEY = 'mansion_conversations';
-const CONV_CACHE_TTL_MS = 15_000;
+const CONV_CACHE_TTL_MS = 2 * 60_000;
 
 function getCachedConversations() {
   try {
@@ -241,7 +241,8 @@ export default function ChatListPage() {
       })
       .catch((err) => {
         console.error('Conversations fetch error:', err);
-      });
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const removeConversation = useCallback((partnerId) => {
@@ -278,22 +279,17 @@ export default function ChatListPage() {
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
     const hasFreshCache = isConversationCacheFresh(lastSyncAtRef.current);
-    if (!cachedState.conversations.length) setLoading(true);
+    const hasCachedConversations = cachedState.conversations.length > 0;
+
+    setLoading(!hasCachedConversations);
 
     if (hasFreshCache) {
       setLoading(false);
     } else {
-      getConversations()
-        .then(data => {
-          const convs = data.conversations || [];
-          setConversations(convs);
-          setCachedConversations(convs);
-          lastSyncAtRef.current = Date.now();
-        })
-        .catch((err) => {
-          console.error('Initial conversations fetch error:', err);
-        })
-        .finally(() => setLoading(false));
+      fetchConversations();
+      if (hasCachedConversations) {
+        setLoading(false);
+      }
     }
 
     // Refresh when tab/window gets focus (e.g. returning from another app)
