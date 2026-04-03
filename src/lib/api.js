@@ -8,6 +8,7 @@ const API_BASE = import.meta.env.PROD
 const TOKEN_KEY = 'mansion_token';
 const USER_KEY = 'mansion_user';
 const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
+const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const sharedGetCache = new Map();
 const sessionCache = {
   get(key, ttlMs = 0) {
@@ -111,15 +112,29 @@ function getApiDebugController() {
       lastStatus: value.lastStatus,
     }));
 
+  const emitUpdate = () => {
+    window.dispatchEvent(new CustomEvent(API_DEBUG_UPDATE_EVENT, {
+      detail: {
+        enabled: state.enabled,
+        currentRoute: state.currentRoute,
+        totalRequests: state.entries.length,
+        counts: snapshotCounts(),
+        routeSummaries: [...state.routeSummaries],
+      },
+    }));
+  };
+
   const controller = {
     enable() {
       state.enabled = true;
       localStorage.setItem(API_DEBUG_FLAG_KEY, '1');
+      emitUpdate();
       return this.summary();
     },
     disable() {
       state.enabled = false;
       localStorage.removeItem(API_DEBUG_FLAG_KEY);
+      emitUpdate();
       return this.summary();
     },
     isEnabled() {
@@ -130,11 +145,13 @@ function getApiDebugController() {
       state.counts = {};
       state.routeSummaries = [];
       state.currentRoute = window.location.pathname + window.location.search;
+      emitUpdate();
       return this.summary();
     },
     markRoute(route) {
       if (!state.enabled) {
         state.currentRoute = route;
+        emitUpdate();
         return;
       }
       if (route === state.currentRoute) return;
@@ -155,6 +172,7 @@ function getApiDebugController() {
       state.currentRoute = route;
       state.entries = [];
       state.counts = {};
+      emitUpdate();
     },
     record({ method, path, status, durationMs, ok }) {
       if (!state.enabled) return;
@@ -183,6 +201,7 @@ function getApiDebugController() {
         durationMs,
         ok,
       });
+      emitUpdate();
     },
     summary() {
       return {
@@ -206,12 +225,25 @@ export function ensureApiDebug() {
   return getApiDebugController();
 }
 
+export function setApiDebugEnabled(enabled) {
+  const controller = getApiDebugController();
+  if (!controller) return null;
+  return enabled ? controller.enable() : controller.disable();
+}
+
 export function markApiDebugRoute(route) {
   getApiDebugController()?.markRoute(route);
 }
 
 export function getApiDebugSummary() {
   return getApiDebugController()?.summary() || null;
+}
+
+export function subscribeApiDebug(listener) {
+  if (typeof window === 'undefined') return () => {};
+  const handler = (event) => listener(event.detail);
+  window.addEventListener(API_DEBUG_UPDATE_EVENT, handler);
+  return () => window.removeEventListener(API_DEBUG_UPDATE_EVENT, handler);
 }
 
 if (typeof window !== 'undefined') {

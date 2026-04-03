@@ -31,6 +31,7 @@ import VideoFeedPage from './pages/VideoFeedPage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
+import ApiDebugOverlay from './components/ApiDebugOverlay';
 
 const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
 
@@ -284,6 +285,7 @@ export default function App() {
         {!verified && <AgeVerificationModal onVerify={verify} />}
         <AppLayout />
         <InstallAppBanner />
+        <ApiDebugOverlay />
       </div>
       </UnreadProvider>
       </AuthContext.Provider>
