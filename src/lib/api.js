@@ -16,6 +16,8 @@ function resolveApiBase() {
 const API_BASE = resolveApiBase();
 const TOKEN_KEY = 'mansion_token';
 const USER_KEY = 'mansion_user';
+const AUTH_ME_CACHE_KEY = 'authMe';
+const AUTH_ME_CACHE_TTL_MS = 10 * 60_000;
 const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const sharedGetCache = new Map();
@@ -47,6 +49,25 @@ const sessionCache = {
 function invalidateBootstrapCache() {
   sharedGetCache.delete('bootstrap');
   sessionCache.delete('appBootstrap');
+}
+
+function cacheMeResponse(data) {
+  if (!data?.user) return;
+  setStoredUser(data.user);
+  sessionCache.set(AUTH_ME_CACHE_KEY, data);
+  sharedGetCache.set('me', { value: data, timestamp: Date.now(), promise: null });
+}
+
+function invalidateMeCache() {
+  sharedGetCache.delete('me');
+  sessionCache.delete(AUTH_ME_CACHE_KEY);
+}
+
+function mergeMeCache(partialUser) {
+  if (!partialUser || typeof partialUser !== 'object') return;
+  const currentUser = getStoredUser();
+  if (!currentUser) return;
+  cacheMeResponse({ user: { ...currentUser, ...partialUser } });
 }
 
 function invalidateUnreadCountCache() {
@@ -565,9 +586,17 @@ export async function requestMagicLink(email) {
 }
 
 export async function getMe() {
-  const data = await apiFetch('/auth/me');
-  setStoredUser(data.user);
-  return data;
+  const cached = sessionCache.get(AUTH_ME_CACHE_KEY, AUTH_ME_CACHE_TTL_MS);
+  if (cached?.user) {
+    setStoredUser(cached.user);
+    return Promise.resolve(cached);
+  }
+
+  return sharedGet('me', async () => {
+    const data = await apiFetch('/auth/me');
+    cacheMeResponse(data);
+    return data;
+  }, { ttlMs: AUTH_ME_CACHE_TTL_MS });
 }
 
 export async function getAppBootstrap() {
@@ -579,7 +608,7 @@ export async function getAppBootstrap() {
 
   return sharedGet('bootstrap', async () => {
     const data = await apiFetch('/app/bootstrap');
-    if (data?.user) setStoredUser(data.user);
+    if (data?.user) cacheMeResponse({ user: data.user });
     if (typeof data?.unread === 'number') setUnreadCountCache({ unread: data.unread });
     sessionCache.set('appBootstrap', data);
     return data;
@@ -592,6 +621,7 @@ export async function logout() {
   } catch {
     // Ignore errors on logout
   }
+  invalidateMeCache();
   clearAuth();
 }
 
@@ -629,7 +659,7 @@ export async function updateProfile(fields) {
     body: JSON.stringify(fields),
   });
   if (data?.user) {
-    setStoredUser(data.user);
+    cacheMeResponse({ user: data.user });
     sharedGetCache.delete(`profile:${data.user.id}`);
     invalidateBootstrapCache();
   }
@@ -726,6 +756,11 @@ export async function uploadImage(file, { purpose = 'asset' } = {}) {
     headers: { 'Content-Type': file.type },
     body: await file.arrayBuffer(),
   });
+  if (purpose === 'avatar') {
+    mergeMeCache({ avatar_url: data?.avatar_url || data?.url || '', avatar_crop: null });
+  } else if (purpose === 'gallery' && Array.isArray(data?.photos)) {
+    mergeMeCache({ photos: data.photos, avatar_url: data?.avatar_url });
+  }
   return data;
 }
 
@@ -733,6 +768,11 @@ export async function deletePhoto(url) {
   return apiFetch('/photos', {
     method: 'DELETE',
     body: JSON.stringify({ url }),
+  }).then((data) => {
+    if (Array.isArray(data?.photos)) {
+      mergeMeCache({ photos: data.photos, avatar_url: data?.avatar_url });
+    }
+    return data;
   });
 }
 
@@ -798,7 +838,7 @@ export async function checkFavorite(targetId) {
 // ── Visits ──────────────────────────────────────────────
 
 export async function getVisits() {
-  return sharedGet('visits', () => apiFetch('/visits'), { ttlMs: 5 * 60_000 });
+  return sharedGet('visits', () => apiFetch('/visits'), { ttlMs: 10 * 60_000 });
 }
 
 // ── Gifts & Coins ───────────────────────────────────────
@@ -817,7 +857,7 @@ export async function sendGift(receiverId, giftId, message = '') {
 }
 
 export async function getReceivedGifts(userId) {
-  return sharedGet(`gifts:${userId}`, () => apiFetch(`/gifts/received/${userId}`), { ttlMs: 60_000 });
+  return sharedGet(`gifts:${userId}`, () => apiFetch(`/gifts/received/${userId}`), { ttlMs: 10 * 60_000 });
 }
 
 export async function getCoins() {
