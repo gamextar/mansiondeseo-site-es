@@ -78,13 +78,9 @@ function extractMediaKey(url, env) {
 }
 
 function normalizeStoryVideoUrl(url, env) {
-  const r2Base = String(env?.R2_PUBLIC_URL || '').replace(/\/$/, '');
-  if (!url || !r2Base) return url;
-  if (url.startsWith(`${r2Base}/`)) return url;
-
   const key = extractMediaKey(url, env);
   if (!key) return url;
-  return `${r2Base}/${key}`;
+  return `/api/media?key=${encodeURIComponent(key)}`;
 }
 
 async function ensureHiddenConversationsTable(env) {
@@ -1898,6 +1894,45 @@ async function handleImageProxy(request, env) {
   });
 }
 
+// ── GET /api/media?key=... ──────────────────────────────
+async function handleMediaProxy(request, env) {
+  const key = new URL(request.url).searchParams.get('key');
+  if (!key) return error('key requerida', 400);
+
+  const hasRange = request.headers.has('Range');
+  const object = hasRange
+    ? await env.IMAGES.get(key, { range: request.headers })
+    : await env.IMAGES.get(key);
+
+  if (!object) return error('Media no encontrada', 404);
+
+  const headers = new Headers();
+  if (typeof object.writeHttpMetadata === 'function') {
+    object.writeHttpMetadata(headers);
+  }
+
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream');
+  }
+  headers.set('Cache-Control', object.httpMetadata?.cacheControl || 'public, max-age=3600');
+  headers.set('Accept-Ranges', 'bytes');
+  if (object.httpEtag) headers.set('ETag', object.httpEtag);
+
+  let status = 200;
+  if (hasRange && object.range && typeof object.size === 'number') {
+    status = 206;
+    const start = Number(object.range.offset || 0);
+    const length = Number(object.range.length || 0);
+    const end = Math.max(start, start + Math.max(0, length) - 1);
+    headers.set('Content-Range', `bytes ${start}-${end}/${object.size}`);
+    headers.set('Content-Length', String(length));
+  } else if (typeof object.size === 'number') {
+    headers.set('Content-Length', String(object.size));
+  }
+
+  return new Response(object.body, { status, headers });
+}
+
 // ── DELETE /api/photos ───────────────────────────────────
 
 async function handleDeletePhoto(request, env) {
@@ -3558,6 +3593,7 @@ async function handleRequest(request, env) {
   if (path === '/api/upload' && method === 'POST') return handleUpload(request, env);
   if (path === '/api/photos' && method === 'DELETE') return handleDeletePhoto(request, env);
   if (path === '/api/image-proxy' && method === 'GET') return handleImageProxy(request, env);
+  if (path === '/api/media' && method === 'GET') return handleMediaProxy(request, env);
 
   // ── Settings
   if (path === '/api/detect-country' && method === 'GET') return handleDetectCountry(request);
