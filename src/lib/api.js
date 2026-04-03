@@ -345,6 +345,8 @@ async function apiUpload(path, options = {}) {
   const token = options.tokenOverride ?? getToken();
   const headers = { ...options.headers };
   const method = options.method || 'POST';
+  const debug = getApiDebugController();
+  const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -373,6 +375,14 @@ async function apiUpload(path, options = {}) {
     };
 
     xhr.onerror = () => {
+      const finishedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      debug?.record({
+        method,
+        path,
+        status: xhr.status || 0,
+        durationMs: Math.round(finishedAt - startedAt),
+        ok: false,
+      });
       reject(new Error('Error de red'));
     };
 
@@ -385,6 +395,15 @@ async function apiUpload(path, options = {}) {
         reject(new Error('Respuesta inválida del servidor'));
         return;
       }
+
+      const finishedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      debug?.record({
+        method,
+        path,
+        status: xhr.status,
+        durationMs: Math.round(finishedAt - startedAt),
+        ok: xhr.status >= 200 && xhr.status < 300,
+      });
 
       if (xhr.status === 401 && token) {
         clearAuth();
