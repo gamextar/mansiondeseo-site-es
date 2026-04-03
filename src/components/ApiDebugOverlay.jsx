@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getApiDebugSummary, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
+import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
 
 export default function ApiDebugOverlay() {
   const [summary, setSummary] = useState(() => getApiDebugSummary());
@@ -46,7 +46,7 @@ export default function ApiDebugOverlay() {
           </button>
           <button
             type="button"
-            onClick={() => setSummary(window.__mansionApiDebug.reset())}
+            onClick={() => setSummary(resetApiDebugRoute())}
             className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/80"
           >
             Reset
@@ -62,9 +62,34 @@ export default function ApiDebugOverlay() {
               <p className="mt-1 text-lg font-semibold">{summary.totalRequests}</p>
             </div>
             <div className="rounded-xl bg-white/5 px-3 py-2">
+              <p className="text-white/55">Sesion</p>
+              <p className="mt-1 text-lg font-semibold">{summary.sessionTotalRequests ?? 0}</p>
+            </div>
+            <div className="rounded-xl bg-white/5 px-3 py-2">
               <p className="text-white/55">Endpoints</p>
               <p className="mt-1 text-lg font-semibold">{rows.length}</p>
             </div>
+            <div className="rounded-xl bg-white/5 px-3 py-2">
+              <p className="text-white/55">Endpoints sesion</p>
+              <p className="mt-1 text-lg font-semibold">{summary.sessionCounts?.length ?? 0}</p>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setSummary(resetApiDebugRoute())}
+              className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-white/80"
+            >
+              Reset ruta
+            </button>
+            <button
+              type="button"
+              onClick={() => setSummary(resetApiDebugSession())}
+              className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-white/80"
+            >
+              Reset sesion
+            </button>
           </div>
 
           <div className="max-h-72 overflow-y-auto rounded-xl border border-white/10">

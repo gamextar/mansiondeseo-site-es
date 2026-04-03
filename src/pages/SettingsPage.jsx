@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Save, Sliders, Eye, EyeOff, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail } from 'lucide-react';
 import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, uploadImage } from '../lib/api';
 import { useAuth } from '../App';
+import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
 
 // Section definitions for sidebar navigation
 export const ADMIN_SECTIONS = [
@@ -119,6 +120,7 @@ export default function SettingsPage() {
   const [newGiftEmoji, setNewGiftEmoji] = useState('');
   const [newGiftPrice, setNewGiftPrice] = useState('');
   const [newGiftCategory, setNewGiftCategory] = useState('general');
+  const [apiDebugSummary, setApiDebugSummary] = useState(() => getApiDebugSummary());
 
   const storyPresetOptions = [
     {
@@ -237,6 +239,10 @@ export default function SettingsPage() {
       .finally(() => setLoading(false));
     adminGetGifts().then(data => setGifts(data.gifts || [])).catch(() => {});
   }, [user, navigate]);
+
+  useEffect(() => subscribeApiDebug((nextSummary) => {
+    setApiDebugSummary(nextSummary);
+  }), []);
 
   const handleSave = async () => {
     const parsedDraft = Number(avatarSizeDraft);
@@ -1037,6 +1043,82 @@ export default function SettingsPage() {
             <h2 className="text-xs font-bold text-red-400 uppercase tracking-wider">Debug / Zona peligrosa</h2>
           </div>
           <div className="space-y-3">
+            <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-gold/20 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">API Debug Overlay</h3>
+                  <p className="text-[11px] text-text-dim">Activa el panel de requests sin usar consola. Tambien puedes abrirlo con <span className="text-text-primary">?api_debug=1</span>.</p>
+                </div>
+                <button
+                  onClick={() => setApiDebugSummary(setApiDebugEnabled(!apiDebugSummary?.enabled))}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                    apiDebugSummary?.enabled
+                      ? 'bg-mansion-gold/20 border border-mansion-gold/30 text-mansion-gold'
+                      : 'bg-mansion-card border border-mansion-border/40 text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  {apiDebugSummary?.enabled ? 'Activo' : 'Inactivo'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Ruta actual</p>
+                  <p className="mt-1 text-lg font-semibold text-text-primary">{apiDebugSummary?.totalRequests ?? 0}</p>
+                </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Sesion total</p>
+                  <p className="mt-1 text-lg font-semibold text-text-primary">{apiDebugSummary?.sessionTotalRequests ?? 0}</p>
+                </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Endpoints ruta</p>
+                  <p className="mt-1 text-lg font-semibold text-text-primary">{apiDebugSummary?.counts?.length ?? 0}</p>
+                </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Endpoints sesion</p>
+                  <p className="mt-1 text-lg font-semibold text-text-primary">{apiDebugSummary?.sessionCounts?.length ?? 0}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setApiDebugSummary(resetApiDebugRoute())}
+                  className="px-4 py-2 rounded-xl bg-mansion-card border border-mansion-border/40 text-text-muted text-sm font-semibold hover:text-text-primary transition-colors"
+                >
+                  Reset ruta actual
+                </button>
+                <button
+                  onClick={() => setApiDebugSummary(resetApiDebugSession())}
+                  className="px-4 py-2 rounded-xl bg-mansion-card border border-mansion-border/40 text-text-muted text-sm font-semibold hover:text-text-primary transition-colors"
+                >
+                  Reset sesion
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-mansion-border/20 overflow-hidden">
+                <div className="px-3 py-2 border-b border-mansion-border/20 bg-mansion-base/60">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Top endpoints de la ruta actual</p>
+                  <p className="text-xs text-text-muted truncate">{apiDebugSummary?.currentRoute || 'sin ruta'}</p>
+                </div>
+                <div className="max-h-72 overflow-y-auto">
+                  {(apiDebugSummary?.counts || []).length === 0 ? (
+                    <p className="px-3 py-4 text-xs text-text-dim">Aun no hay requests registrados en esta ruta.</p>
+                  ) : (
+                    (apiDebugSummary?.counts || []).map((row) => (
+                      <div key={row.key} className="px-3 py-2 border-b border-mansion-border/20 last:border-b-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-xs text-text-primary break-all">{row.key}</p>
+                          <span className="shrink-0 rounded-full bg-mansion-gold/15 border border-mansion-gold/20 px-2 py-0.5 text-[10px] font-semibold text-mansion-gold">
+                            {row.count}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-text-dim">avg {row.avgMs}ms · ok {row.ok} · err {row.errors} · status {row.lastStatus ?? '-'}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
             <div className="bg-mansion-card rounded-2xl p-4 border border-red-500/20">
               <div className="flex items-center justify-between">
                 <div>

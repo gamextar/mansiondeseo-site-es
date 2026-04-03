@@ -98,9 +98,23 @@ function getApiDebugController() {
     entries: [],
     counts: {},
     routeSummaries: [],
+    sessionTotalRequests: 0,
+    sessionCounts: {},
   };
 
   const snapshotCounts = () => Object.entries(state.counts)
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([key, value]) => ({
+      key,
+      count: value.count,
+      ok: value.ok,
+      errors: value.errors,
+      totalMs: value.totalMs,
+      avgMs: value.count ? Math.round(value.totalMs / value.count) : 0,
+      lastStatus: value.lastStatus,
+    }));
+
+  const snapshotSessionCounts = () => Object.entries(state.sessionCounts)
     .sort((a, b) => b[1].count - a[1].count)
     .map(([key, value]) => ({
       key,
@@ -120,6 +134,8 @@ function getApiDebugController() {
         totalRequests: state.entries.length,
         counts: snapshotCounts(),
         routeSummaries: [...state.routeSummaries],
+        sessionTotalRequests: state.sessionTotalRequests,
+        sessionCounts: snapshotSessionCounts(),
       },
     }));
   };
@@ -145,6 +161,16 @@ function getApiDebugController() {
       state.counts = {};
       state.routeSummaries = [];
       state.currentRoute = window.location.pathname + window.location.search;
+      emitUpdate();
+      return this.summary();
+    },
+    resetSession() {
+      state.entries = [];
+      state.counts = {};
+      state.routeSummaries = [];
+      state.currentRoute = window.location.pathname + window.location.search;
+      state.sessionTotalRequests = 0;
+      state.sessionCounts = {};
       emitUpdate();
       return this.summary();
     },
@@ -192,6 +218,22 @@ function getApiDebugController() {
       else bucket.errors += 1;
       state.counts[key] = bucket;
 
+      const sessionBucket = state.sessionCounts[key] || {
+        count: 0,
+        ok: 0,
+        errors: 0,
+        totalMs: 0,
+        lastStatus: null,
+      };
+
+      sessionBucket.count += 1;
+      sessionBucket.totalMs += durationMs;
+      sessionBucket.lastStatus = status;
+      if (ok) sessionBucket.ok += 1;
+      else sessionBucket.errors += 1;
+      state.sessionCounts[key] = sessionBucket;
+      state.sessionTotalRequests += 1;
+
       state.entries.push({
         at: new Date().toISOString(),
         route: state.currentRoute,
@@ -210,6 +252,8 @@ function getApiDebugController() {
         totalRequests: state.entries.length,
         counts: snapshotCounts(),
         routeSummaries: [...state.routeSummaries],
+        sessionTotalRequests: state.sessionTotalRequests,
+        sessionCounts: snapshotSessionCounts(),
       };
     },
     entries() {
@@ -229,6 +273,14 @@ export function setApiDebugEnabled(enabled) {
   const controller = getApiDebugController();
   if (!controller) return null;
   return enabled ? controller.enable() : controller.disable();
+}
+
+export function resetApiDebugRoute() {
+  return getApiDebugController()?.reset() || null;
+}
+
+export function resetApiDebugSession() {
+  return getApiDebugController()?.resetSession() || null;
 }
 
 export function markApiDebugRoute(route) {
