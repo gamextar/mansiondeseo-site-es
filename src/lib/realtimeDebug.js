@@ -109,8 +109,10 @@ export function subscribeRealtimeDebug(listener) {
   return () => window.removeEventListener(REALTIME_DEBUG_EVENT, handler);
 }
 
+const REALTIME_RATE_MIN_WINDOW_MS = 60_000;
+
 function ratePerHour(count, elapsedMs) {
-  const safeElapsed = Math.max(1, Number(elapsedMs) || 0);
+  const safeElapsed = Math.max(REALTIME_RATE_MIN_WINDOW_MS, Number(elapsedMs) || 0);
   return (Number(count) || 0) * (3_600_000 / safeElapsed);
 }
 
@@ -137,6 +139,7 @@ export function estimateRealtimeLoad(summary) {
     startedAt: summary?.startedAt || Date.now(),
     elapsedMs,
     elapsedMinutes: Number((elapsedMs / 60_000).toFixed(1)),
+    sampleShort: elapsedMs < REALTIME_RATE_MIN_WINDOW_MS,
     channels: {
       notifications: buildEstimate(channels.notifications),
       chat: buildEstimate(channels.chat),

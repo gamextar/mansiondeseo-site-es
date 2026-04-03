@@ -1131,6 +1131,9 @@ export default function SettingsPage() {
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Realtime / WebSocket Debug</h3>
                   <p className="text-[11px] text-text-dim">Cuenta aperturas, cierres, reconnects, pings y mensajes de los sockets de notificaciones y chat. Esto no agrega requests extra; solo mide eventos locales. Ventana actual: {realtimeEstimate?.elapsedMinutes ?? 0} min.</p>
+                  {realtimeEstimate?.sampleShort && (
+                    <p className="mt-1 text-[11px] text-amber-300/85">Muestra corta: la estimacion por hora se estabiliza tras 1 min.</p>
+                  )}
                 </div>
                 <button
                   onClick={() => setRealtimeDebugSummary(resetRealtimeDebug())}

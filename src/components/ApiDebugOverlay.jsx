@@ -125,6 +125,9 @@ export default function ApiDebugOverlay() {
                 <p className="text-[10px] text-white/55">
                   Sockets observados localmente · ventana {realtimeEstimate?.elapsedMinutes ?? 0} min
                 </p>
+                {realtimeEstimate?.sampleShort && (
+                  <p className="text-[10px] text-amber-300/85">Muestra corta: la estimacion por hora se estabiliza tras 1 min.</p>
+                )}
               </div>
               <button
                 type="button"
