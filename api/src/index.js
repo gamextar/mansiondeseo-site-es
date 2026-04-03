@@ -325,8 +325,11 @@ function recordRouteMetric(env, request, response, durationMs) {
   const flushEveryMs = Number(env.METRICS_FLUSH_MS || 60000);
   const flushEveryRequests = Number(env.METRICS_FLUSH_REQUESTS || 50);
   const now = Date.now();
+  const windowStart = Number.isFinite(_metricsWindowStartedAt) && _metricsWindowStartedAt > 0 && _metricsWindowStartedAt <= now
+    ? _metricsWindowStartedAt
+    : now;
 
-  if (_metricsRequestCount < flushEveryRequests && now - _metricsWindowStartedAt < flushEveryMs) {
+  if (_metricsRequestCount < flushEveryRequests && now - windowStart < flushEveryMs) {
     return;
   }
 
@@ -342,7 +345,7 @@ function recordRouteMetric(env, request, response, durationMs) {
     }));
 
   console.log('[route-metrics]', JSON.stringify({
-    windowMs: now - _metricsWindowStartedAt,
+    windowMs: now - windowStart,
     requestCount: _metricsRequestCount,
     routes,
   }));

@@ -231,7 +231,6 @@ export default function App() {
 
   useEffect(() => {
     if (bootstrapStartedRef.current) return;
-    bootstrapStartedRef.current = true;
 
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
@@ -243,6 +242,7 @@ export default function App() {
     }
 
     let cancelled = false;
+    let detachVisibilityListener = null;
 
     const hasSessionSettings = !!siteSettings && Object.keys(siteSettings).length > 0;
     const hasAuthToken = !!getToken();
@@ -253,27 +253,46 @@ export default function App() {
       };
     }
 
-    getAppBootstrap().then(data => {
-      if (cancelled) return;
+    const runBootstrap = () => {
+      if (bootstrapStartedRef.current || cancelled) return;
+      bootstrapStartedRef.current = true;
 
-      if (data?.user) {
-        setUser(data.user);
-        setRegisteredState(true);
-      }
+      getAppBootstrap().then(data => {
+        if (cancelled) return;
 
-      if (data?.settings) {
-        setSiteSettings(data.settings);
-        try { sessionStorage.setItem('mansion_site_settings', JSON.stringify(data.settings)); } catch {}
-      }
-    }).catch(() => {
-      if (cancelled || !getToken()) return;
-      clearAuth();
-      setUserState(null);
-      setRegisteredState(false);
-    });
+        if (data?.user) {
+          setUser(data.user);
+          setRegisteredState(true);
+        }
+
+        if (data?.settings) {
+          setSiteSettings(data.settings);
+          try { sessionStorage.setItem('mansion_site_settings', JSON.stringify(data.settings)); } catch {}
+        }
+      }).catch(() => {
+        if (cancelled || !getToken()) return;
+        clearAuth();
+        setUserState(null);
+        setRegisteredState(false);
+      });
+    };
+
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      const handleVisibilityChange = () => {
+        if (document.visibilityState !== 'visible') return;
+        window.removeEventListener('visibilitychange', handleVisibilityChange);
+        detachVisibilityListener = null;
+        runBootstrap();
+      };
+      detachVisibilityListener = () => window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('visibilitychange', handleVisibilityChange);
+    } else {
+      runBootstrap();
+    }
 
     return () => {
       cancelled = true;
+      detachVisibilityListener?.();
     };
   }, [setUser, siteSettings]);
 
