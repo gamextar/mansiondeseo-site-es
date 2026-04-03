@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
 import { estimateRealtimeLoad, getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
 import { getMediaDebugSummary, inspectVisibleMedia, resetMediaDebug, subscribeMediaDebug } from '../lib/mediaDebug';
@@ -21,11 +22,14 @@ function TogglePill({ active, onClick, children }) {
 }
 
 export default function ApiDebugOverlay() {
+  const location = useLocation();
   const [summary, setSummary] = useState(() => getApiDebugSummary());
   const [realtimeSummary, setRealtimeSummary] = useState(() => getRealtimeDebugSummary());
   const [mediaSummary, setMediaSummary] = useState(() => getMediaDebugSummary());
   const [panelPrefs, setPanelPrefs] = useState(() => getDebugPanelPrefs());
   const [collapsed, setCollapsed] = useState(false);
+  const mediaAutoTimerRef = useRef(null);
+  const lastMediaAutoKeyRef = useRef('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -69,6 +73,35 @@ export default function ApiDebugOverlay() {
     }, 5_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!panelPrefs.media || collapsed) {
+      if (mediaAutoTimerRef.current) {
+        window.clearTimeout(mediaAutoTimerRef.current);
+        mediaAutoTimerRef.current = null;
+      }
+      lastMediaAutoKeyRef.current = '';
+      return undefined;
+    }
+
+    const routeKey = `${location.pathname}${location.search}`;
+    if (lastMediaAutoKeyRef.current === routeKey) return undefined;
+
+    mediaAutoTimerRef.current = window.setTimeout(async () => {
+      lastMediaAutoKeyRef.current = routeKey;
+      setMediaSummary((prev) => ({ ...(prev || {}), loading: true }));
+      const next = await inspectVisibleMedia({ limit: 24 });
+      setMediaSummary(next);
+      mediaAutoTimerRef.current = null;
+    }, 900);
+
+    return () => {
+      if (mediaAutoTimerRef.current) {
+        window.clearTimeout(mediaAutoTimerRef.current);
+        mediaAutoTimerRef.current = null;
+      }
+    };
+  }, [collapsed, location.pathname, location.search, panelPrefs.media]);
 
   if (!summary?.enabled) return null;
 
@@ -253,7 +286,10 @@ export default function ApiDebugOverlay() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setMediaSummary(resetMediaDebug())}
+                    onClick={() => {
+                      lastMediaAutoKeyRef.current = '';
+                      setMediaSummary(resetMediaDebug());
+                    }}
                     className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/80"
                   >
                     Reset
@@ -263,31 +299,56 @@ export default function ApiDebugOverlay() {
                     onClick={async () => {
                       setMediaSummary((prev) => ({ ...(prev || {}), loading: true }));
                       const next = await inspectVisibleMedia({ limit: 24 });
+                      lastMediaAutoKeyRef.current = `${location.pathname}${location.search}`;
                       setMediaSummary(next);
                     }}
                     className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[11px] font-semibold text-emerald-200"
                   >
-                    {mediaSummary?.loading ? 'Midiendo...' : 'Probar visibles'}
+                    {mediaSummary?.loading ? 'Midiendo...' : 'Actualizar'}
                   </button>
                 </div>
               </div>
               <div className="space-y-2 px-3 py-3">
-                <div className="grid grid-cols-4 gap-2 text-[10px]">
-                  <div className="rounded-lg bg-white/5 px-2 py-2">
-                    <p className="text-white/50">total</p>
-                    <p className="mt-1 text-base font-semibold text-white">{mediaSummary?.summary?.total ?? 0}</p>
+                <div>
+                  <p className="mb-2 text-[10px] uppercase tracking-[0.16em] text-white/45">Ruta actual</p>
+                  <div className="grid grid-cols-4 gap-2 text-[10px]">
+                    <div className="rounded-lg bg-white/5 px-2 py-2">
+                      <p className="text-white/50">total</p>
+                      <p className="mt-1 text-base font-semibold text-white">{mediaSummary?.summary?.total ?? 0}</p>
+                    </div>
+                    <div className="rounded-lg bg-emerald-500/10 px-2 py-2">
+                      <p className="text-emerald-200/70">HIT</p>
+                      <p className="mt-1 text-base font-semibold text-emerald-200">{mediaSummary?.summary?.hit ?? 0}</p>
+                    </div>
+                    <div className="rounded-lg bg-amber-500/10 px-2 py-2">
+                      <p className="text-amber-200/70">MISS</p>
+                      <p className="mt-1 text-base font-semibold text-amber-200">{mediaSummary?.summary?.miss ?? 0}</p>
+                    </div>
+                    <div className="rounded-lg bg-rose-500/10 px-2 py-2">
+                      <p className="text-rose-200/70">err</p>
+                      <p className="mt-1 text-base font-semibold text-rose-200">{mediaSummary?.summary?.errors ?? 0}</p>
+                    </div>
                   </div>
-                  <div className="rounded-lg bg-emerald-500/10 px-2 py-2">
-                    <p className="text-emerald-200/70">HIT</p>
-                    <p className="mt-1 text-base font-semibold text-emerald-200">{mediaSummary?.summary?.hit ?? 0}</p>
-                  </div>
-                  <div className="rounded-lg bg-amber-500/10 px-2 py-2">
-                    <p className="text-amber-200/70">MISS</p>
-                    <p className="mt-1 text-base font-semibold text-amber-200">{mediaSummary?.summary?.miss ?? 0}</p>
-                  </div>
-                  <div className="rounded-lg bg-rose-500/10 px-2 py-2">
-                    <p className="text-rose-200/70">err</p>
-                    <p className="mt-1 text-base font-semibold text-rose-200">{mediaSummary?.summary?.errors ?? 0}</p>
+                </div>
+                <div>
+                  <p className="mb-2 text-[10px] uppercase tracking-[0.16em] text-white/45">Sesion</p>
+                  <div className="grid grid-cols-4 gap-2 text-[10px]">
+                    <div className="rounded-lg bg-white/5 px-2 py-2">
+                      <p className="text-white/50">total</p>
+                      <p className="mt-1 text-base font-semibold text-white">{mediaSummary?.sessionSummary?.total ?? 0}</p>
+                    </div>
+                    <div className="rounded-lg bg-emerald-500/10 px-2 py-2">
+                      <p className="text-emerald-200/70">HIT</p>
+                      <p className="mt-1 text-base font-semibold text-emerald-200">{mediaSummary?.sessionSummary?.hit ?? 0}</p>
+                    </div>
+                    <div className="rounded-lg bg-amber-500/10 px-2 py-2">
+                      <p className="text-amber-200/70">MISS</p>
+                      <p className="mt-1 text-base font-semibold text-amber-200">{mediaSummary?.sessionSummary?.miss ?? 0}</p>
+                    </div>
+                    <div className="rounded-lg bg-rose-500/10 px-2 py-2">
+                      <p className="text-rose-200/70">err</p>
+                      <p className="mt-1 text-base font-semibold text-rose-200">{mediaSummary?.sessionSummary?.errors ?? 0}</p>
+                    </div>
                   </div>
                 </div>
                 {mediaSummary?.error ? (

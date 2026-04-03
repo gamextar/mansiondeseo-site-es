@@ -12,6 +12,7 @@ function createController() {
     route: window.location.pathname + window.location.search,
     entries: [],
     summary: { total: 0, hit: 0, miss: 0, other: 0, errors: 0 },
+    sessionSummary: { total: 0, hit: 0, miss: 0, other: 0, errors: 0 },
     error: '',
   };
 
@@ -23,6 +24,7 @@ function createController() {
         route: state.route,
         entries: [...state.entries],
         summary: { ...state.summary },
+        sessionSummary: { ...state.sessionSummary },
         error: state.error,
       },
     }));
@@ -36,6 +38,7 @@ function createController() {
         route: state.route,
         entries: [...state.entries],
         summary: { ...state.summary },
+        sessionSummary: { ...state.sessionSummary },
         error: state.error,
       };
     },
@@ -44,6 +47,7 @@ function createController() {
       state.inspectedAt = null;
       state.entries = [];
       state.summary = { total: 0, hit: 0, miss: 0, other: 0, errors: 0 };
+      state.sessionSummary = { total: 0, hit: 0, miss: 0, other: 0, errors: 0 };
       state.error = '';
       emit();
       return this.summary();
@@ -91,6 +95,13 @@ function createController() {
 
         state.entries = entries;
         state.summary = summary;
+        state.sessionSummary = {
+          total: state.sessionSummary.total + summary.total,
+          hit: state.sessionSummary.hit + summary.hit,
+          miss: state.sessionSummary.miss + summary.miss,
+          other: state.sessionSummary.other + summary.other,
+          errors: state.sessionSummary.errors + summary.errors,
+        };
         state.inspectedAt = new Date().toISOString();
         state.error = '';
       } catch (error) {

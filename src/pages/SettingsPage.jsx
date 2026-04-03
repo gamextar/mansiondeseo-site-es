@@ -128,6 +128,8 @@ export default function SettingsPage() {
   const [mediaDebugSummary, setMediaDebugSummary] = useState(() => getMediaDebugSummary());
   const [debugPanelPrefs, setDebugPanelPrefs] = useState(() => getDebugPanelPrefs());
   const realtimeEstimate = estimateRealtimeLoad(realtimeDebugSummary);
+  const mediaAutoTimerRef = useRef(null);
+  const lastMediaAutoKeyRef = useRef('');
 
   const storyPresetOptions = [
     {
@@ -442,6 +444,35 @@ export default function SettingsPage() {
 
   const activeSection = searchParams.get('section') || 'fotos';
   const sectionMeta = ADMIN_SECTIONS.find(s => s.key === activeSection) || ADMIN_SECTIONS[0];
+
+  useEffect(() => {
+    if (activeSection !== 'debug' || !debugPanelPrefs?.media) {
+      if (mediaAutoTimerRef.current) {
+        window.clearTimeout(mediaAutoTimerRef.current);
+        mediaAutoTimerRef.current = null;
+      }
+      lastMediaAutoKeyRef.current = '';
+      return undefined;
+    }
+
+    const inspectKey = `${window.location.pathname}${window.location.search}::${activeSection}`;
+    if (lastMediaAutoKeyRef.current === inspectKey) return undefined;
+
+    mediaAutoTimerRef.current = window.setTimeout(async () => {
+      lastMediaAutoKeyRef.current = inspectKey;
+      setMediaDebugSummary(prev => ({ ...(prev || {}), loading: true }));
+      const next = await inspectVisibleMedia({ limit: 24 });
+      setMediaDebugSummary(next);
+      mediaAutoTimerRef.current = null;
+    }, 900);
+
+    return () => {
+      if (mediaAutoTimerRef.current) {
+        window.clearTimeout(mediaAutoTimerRef.current);
+        mediaAutoTimerRef.current = null;
+      }
+    };
+  }, [activeSection, debugPanelPrefs?.media, searchParams]);
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8">
@@ -1174,11 +1205,14 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Media Cache Debug</h3>
-                  <p className="text-[11px] text-text-dim">Inspecciona las imagenes y videos visibles de la pantalla actual para ver `HIT/MISS` y detectar posibles lecturas Clase B. Hace requests puntuales solo cuando lo ejecutas.</p>
+                  <p className="text-[11px] text-text-dim">Inspecciona automaticamente las imagenes y videos visibles al entrar en la seccion de debug y acumula un resumen por sesion. El boton manual queda solo para refrescar al instante.</p>
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setMediaDebugSummary(resetMediaDebug())}
+                    onClick={() => {
+                      lastMediaAutoKeyRef.current = '';
+                      setMediaDebugSummary(resetMediaDebug());
+                    }}
                     className="px-4 py-2 rounded-xl bg-mansion-card border border-mansion-border/40 text-text-muted text-sm font-semibold hover:text-text-primary transition-colors"
                   >
                     Reset media
@@ -1187,35 +1221,65 @@ export default function SettingsPage() {
                     onClick={async () => {
                       setMediaDebugSummary(prev => ({ ...(prev || {}), loading: true }));
                       const next = await inspectVisibleMedia({ limit: 24 });
+                      lastMediaAutoKeyRef.current = `${window.location.pathname}${window.location.search}::${activeSection}`;
                       setMediaDebugSummary(next);
                     }}
                     className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm font-semibold hover:text-emerald-200 transition-colors"
                   >
-                    {mediaDebugSummary?.loading ? 'Midiendo...' : 'Probar media visible'}
+                    {mediaDebugSummary?.loading ? 'Midiendo...' : 'Actualizar ahora'}
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Total</p>
-                  <p className="mt-1 text-lg font-semibold text-text-primary">{mediaDebugSummary?.summary?.total ?? 0}</p>
+              <div>
+                <p className="mb-2 text-[10px] uppercase tracking-wider text-text-dim">Ruta actual</p>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                  <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-text-dim">Total</p>
+                    <p className="mt-1 text-lg font-semibold text-text-primary">{mediaDebugSummary?.summary?.total ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-emerald-300/70">HIT</p>
+                    <p className="mt-1 text-lg font-semibold text-emerald-200">{mediaDebugSummary?.summary?.hit ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-amber-300/70">MISS</p>
+                    <p className="mt-1 text-lg font-semibold text-amber-200">{mediaDebugSummary?.summary?.miss ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 border border-mansion-border/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-text-dim">Other</p>
+                    <p className="mt-1 text-lg font-semibold text-text-primary">{mediaDebugSummary?.summary?.other ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-rose-300/70">Errors</p>
+                    <p className="mt-1 text-lg font-semibold text-rose-200">{mediaDebugSummary?.summary?.errors ?? 0}</p>
+                  </div>
                 </div>
-                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-emerald-300/70">HIT</p>
-                  <p className="mt-1 text-lg font-semibold text-emerald-200">{mediaDebugSummary?.summary?.hit ?? 0}</p>
-                </div>
-                <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-amber-300/70">MISS</p>
-                  <p className="mt-1 text-lg font-semibold text-amber-200">{mediaDebugSummary?.summary?.miss ?? 0}</p>
-                </div>
-                <div className="rounded-xl bg-white/5 border border-mansion-border/20 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Other</p>
-                  <p className="mt-1 text-lg font-semibold text-text-primary">{mediaDebugSummary?.summary?.other ?? 0}</p>
-                </div>
-                <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-rose-300/70">Errors</p>
-                  <p className="mt-1 text-lg font-semibold text-rose-200">{mediaDebugSummary?.summary?.errors ?? 0}</p>
+              </div>
+
+              <div>
+                <p className="mb-2 text-[10px] uppercase tracking-wider text-text-dim">Sesion</p>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                  <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-text-dim">Total</p>
+                    <p className="mt-1 text-lg font-semibold text-text-primary">{mediaDebugSummary?.sessionSummary?.total ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-emerald-300/70">HIT</p>
+                    <p className="mt-1 text-lg font-semibold text-emerald-200">{mediaDebugSummary?.sessionSummary?.hit ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-amber-300/70">MISS</p>
+                    <p className="mt-1 text-lg font-semibold text-amber-200">{mediaDebugSummary?.sessionSummary?.miss ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 border border-mansion-border/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-text-dim">Other</p>
+                    <p className="mt-1 text-lg font-semibold text-text-primary">{mediaDebugSummary?.sessionSummary?.other ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-rose-300/70">Errors</p>
+                    <p className="mt-1 text-lg font-semibold text-rose-200">{mediaDebugSummary?.sessionSummary?.errors ?? 0}</p>
+                  </div>
                 </div>
               </div>
 
