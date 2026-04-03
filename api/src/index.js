@@ -1076,23 +1076,30 @@ async function handleAppBootstrap(request, env) {
   const settingsPromise = cached('settings', 300_000, () => loadSettings(env));
   const authHeader = request.headers.get('Authorization');
   let user = null;
+  let unread = 0;
 
   if (authHeader?.startsWith('Bearer ')) {
     const auth = await authenticate(request, env);
     if (!auth) return error('No autorizado', 401);
+    await ensureConversationStateTables(env);
 
-    const [dbUser, activeStory] = await Promise.all([
+    const [dbUser, activeStory, unreadRow] = await Promise.all([
       env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
       env.DB.prepare('SELECT id FROM stories WHERE user_id = ? AND active = 1 LIMIT 1').bind(auth.sub).first(),
+      env.DB.prepare(
+        'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'
+      ).bind(auth.sub).first(),
     ]);
     if (!dbUser) return error('Usuario no encontrado', 404);
     user = sanitizeUser(dbUser, env);
     user.has_active_story = !!activeStory;
+    unread = Number(unreadRow?.unread || 0);
   }
 
   const settings = await settingsPromise;
   return json({
     user,
+    unread,
     settings: getPublicSettingsPayload(settings),
   });
 }

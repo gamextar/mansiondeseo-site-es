@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
-import { getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache } from '../lib/api';
+import { getAppBootstrap, getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache } from '../lib/api';
 import { recordRealtimeDebug, setRealtimeActiveConnections } from '../lib/realtimeDebug';
 
 const UnreadContext = createContext({
@@ -259,7 +259,22 @@ export function UnreadProvider({ children }) {
 
   // Initial fetch + WebSocket (no polling — real-time only)
   useEffect(() => {
-    fetchUnread({ force: true }).catch(() => {});
+    if (getToken()) {
+      getAppBootstrap()
+        .then((data) => {
+          if (typeof data?.unread === 'number') {
+            lastUnreadFetchAtRef.current = Date.now();
+            applyUnreadCount(data.unread);
+            return;
+          }
+          return fetchUnread({ force: true });
+        })
+        .catch(() => {
+          fetchUnread({ force: true }).catch(() => {});
+        });
+    } else {
+      applyUnreadCount(0);
+    }
     wsClosedRef.current = false;
     setRealtimeActiveConnections('notifications', wsRef.current?.readyState === WebSocket.OPEN ? 1 : 0);
 
@@ -299,7 +314,7 @@ export function UnreadProvider({ children }) {
       window.removeEventListener('focus', onFocus);
       disconnectWs();
     };
-  }, [clearBackgroundDisconnectTimer, connectWs, disconnectWs, fetchUnread, scheduleBackgroundDisconnect, shouldRefreshUnread, startPing]);
+  }, [applyUnreadCount, clearBackgroundDisconnectTimer, connectWs, disconnectWs, fetchUnread, scheduleBackgroundDisconnect, shouldRefreshUnread, startPing]);
 
   const setActiveChatId = useCallback((chatId) => {
     activeChatIdRef.current = chatId || null;

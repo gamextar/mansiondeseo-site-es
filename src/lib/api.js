@@ -572,11 +572,15 @@ export async function getMe() {
 
 export async function getAppBootstrap() {
   const cached = sessionCache.get('appBootstrap', 2 * 60_000);
-  if (cached) return Promise.resolve(cached);
+  if (cached) {
+    if (typeof cached?.unread === 'number') setUnreadCountCache({ unread: cached.unread });
+    return Promise.resolve(cached);
+  }
 
   return sharedGet('bootstrap', async () => {
     const data = await apiFetch('/app/bootstrap');
     if (data?.user) setStoredUser(data.user);
+    if (typeof data?.unread === 'number') setUnreadCountCache({ unread: data.unread });
     sessionCache.set('appBootstrap', data);
     return data;
   }, { ttlMs: 30_000 });
