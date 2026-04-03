@@ -6,8 +6,10 @@
 const CACHE_CONTROL = 'public, max-age=31536000, s-maxage=31536000, immutable';
 const CORS_ORIGINS = [
   'https://mansiondeseo-site.pages.dev',
+  'https://mansiondeseo.unicoapps.com',
   'https://mansiondeseo.com',
   'https://www.mansiondeseo.com',
+  'https://www.mansiondeseo.unicoapps.com',
 ];
 
 // Hotlink protection: returns true if the request is allowed.

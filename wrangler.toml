@@ -43,7 +43,7 @@ new_sqlite_classes = ["UserNotification"]
 
 # ── Environment Variables ────────────────────────────
 [vars]
-R2_PUBLIC_URL = "https://pub-c0bc1ab6fb294cc1bb2e231bb55b4afb.r2.dev"
+R2_PUBLIC_URL = "https://videos.unicoapps.com"
 CORS_ORIGIN = "https://mansiondeseo.unicoapps.com,https://mansiondeseo-site.pages.dev"
 ENVIRONMENT = "production"
 JWT_SECRET = "78b85a92c0ba6b2ca96d6ba06605371a1f4683c2fa37e7783b818d4f9b7baca7"

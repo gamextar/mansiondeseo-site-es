@@ -80,7 +80,8 @@ function extractMediaKey(url, env) {
 function normalizeStoryVideoUrl(url, env) {
   const key = extractMediaKey(url, env);
   if (!key) return url;
-  return `/api/media?key=${encodeURIComponent(key)}`;
+  const r2Base = String(env?.R2_PUBLIC_URL || '').replace(/\/$/, '');
+  return r2Base ? `${r2Base}/${key}` : url;
 }
 
 async function ensureHiddenConversationsTable(env) {
@@ -3457,11 +3458,8 @@ async function handleAdminDeleteStory(request, env, storyId) {
 
   // Best-effort R2 delete
   try {
-    const r2Base = env.R2_PUBLIC_URL || '';
-    if (r2Base && story.video_url.startsWith(r2Base)) {
-      const key = story.video_url.slice(r2Base.length + 1);
-      if (key) await env.IMAGES.delete(key);
-    }
+    const key = extractMediaKey(story.video_url, env);
+    if (key) await env.IMAGES.delete(key);
   } catch {
     // R2 delete is best-effort
   }
