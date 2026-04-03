@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
+import { getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
 
 export default function ApiDebugOverlay() {
   const [summary, setSummary] = useState(() => getApiDebugSummary());
+  const [realtimeSummary, setRealtimeSummary] = useState(() => getRealtimeDebugSummary());
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -17,14 +19,27 @@ export default function ApiDebugOverlay() {
       setSummary(getApiDebugSummary());
     }
 
-    return subscribeApiDebug((nextSummary) => {
+    const unsubscribeApi = subscribeApiDebug((nextSummary) => {
       setSummary(nextSummary);
     });
+
+    const unsubscribeRealtime = subscribeRealtimeDebug((nextSummary) => {
+      setRealtimeSummary(nextSummary);
+    });
+
+    return () => {
+      unsubscribeApi?.();
+      unsubscribeRealtime?.();
+    };
   }, []);
 
   if (!summary?.enabled) return null;
 
   const rows = summary.counts || [];
+  const realtimeRows = [
+    { key: 'notifications', label: 'Notificaciones', data: realtimeSummary?.channels?.notifications },
+    { key: 'chat', label: 'Chat', data: realtimeSummary?.channels?.chat },
+  ];
 
   return (
     <div
@@ -90,6 +105,45 @@ export default function ApiDebugOverlay() {
             >
               Reset sesion
             </button>
+          </div>
+
+          <div className="rounded-xl border border-sky-500/20 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-sky-500/15 bg-sky-500/5 px-3 py-2">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-sky-300/90">Realtime</p>
+                <p className="text-[10px] text-white/55">Sockets observados localmente</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRealtimeSummary(resetRealtimeDebug())}
+                className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/80"
+              >
+                Reset
+              </button>
+            </div>
+            <div className="space-y-2 px-3 py-3">
+              {realtimeRows.map((row) => (
+                <div key={row.key} className="rounded-xl bg-white/5 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[11px] font-semibold text-white/90">{row.label}</p>
+                    <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold text-sky-300">
+                      activas {row.data?.activeConnections ?? 0}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-white/60">
+                    <span>connects {row.data?.connectAttempts ?? 0}</span>
+                    <span>opens {row.data?.opens ?? 0}</span>
+                    <span>closes {row.data?.closes ?? 0}</span>
+                    <span>reconnects {row.data?.reconnectsScheduled ?? 0}</span>
+                    <span>pings {row.data?.pingsSent ?? 0}</span>
+                    <span>pongs {row.data?.pongsReceived ?? 0}</span>
+                    <span>in {row.data?.messagesReceived ?? 0}</span>
+                    <span>out {row.data?.messagesSent ?? 0}</span>
+                    <span>bg {row.data?.backgroundPauses ?? 0}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="max-h-72 overflow-y-auto rounded-xl border border-white/10">
