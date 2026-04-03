@@ -40,7 +40,7 @@ function errorResponse(message, status, request) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const method = request.method;
 
@@ -65,7 +65,7 @@ export default {
       if (!isAllowedReferer(request)) {
         return new Response('Forbidden', { status: 403 });
       }
-      return handleGet(request, env, key, method);
+      return handleGet(request, env, ctx, key, method);
     }
 
     return errorResponse('Method not allowed', 405, request);
@@ -142,7 +142,7 @@ function parseRangeHeader(rangeHeader, totalSize) {
 // ─────────────────────────────────────────────────────
 // GET Handler — Range support + edge cache for full requests
 // ─────────────────────────────────────────────────────
-async function handleGet(request, env, key, method) {
+async function handleGet(request, env, ctx, key, method) {
   const rangeHeader = request.headers.get('Range');
   const isRangeRequest = !!rangeHeader;
 
@@ -183,7 +183,15 @@ async function handleGet(request, env, key, method) {
     // Tee body: one stream for client, one for cache
     const [clientStream, cacheStream] = object.body.tee();
     try {
-      cache.put(cacheKey, new Response(cacheStream, { status: 200, headers: new Headers(headers) }));
+      const cacheWrite = cache.put(
+        cacheKey,
+        new Response(cacheStream, { status: 200, headers: new Headers(headers) })
+      );
+      if (ctx && typeof ctx.waitUntil === 'function') {
+        ctx.waitUntil(cacheWrite);
+      } else {
+        await cacheWrite;
+      }
     } catch {
       // Edge caching is best-effort
     }
