@@ -6,6 +6,7 @@ import { getStories, getPendingStoryLikes, enqueueStoryLike, subscribePendingSto
 import { useAuth } from '../App';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
+import { resolveMediaUrl } from '../lib/media';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -110,7 +111,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   if (shouldLoad && videoSrc) {
     loadedSrcRef.current = videoSrc;
   }
-  const activeSrc = loadedSrcRef.current;
+  const activeSrc = loadedSrcRef.current ? resolveMediaUrl(loadedSrcRef.current) : loadedSrcRef.current;
 
   const attemptPlay = useCallback(() => {
     const video = videoRef.current;
