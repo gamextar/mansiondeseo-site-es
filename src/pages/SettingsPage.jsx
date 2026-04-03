@@ -251,6 +251,13 @@ export default function SettingsPage() {
     setRealtimeDebugSummary(nextSummary);
   }), []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setRealtimeDebugSummary(getRealtimeDebugSummary());
+    }, 5_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const handleSave = async () => {
     const parsedDraft = Number(avatarSizeDraft);
     const committedDraftSize = Number.isFinite(parsedDraft)

@@ -33,6 +33,13 @@ export default function ApiDebugOverlay() {
     };
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setRealtimeSummary(getRealtimeDebugSummary());
+    }, 5_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   if (!summary?.enabled) return null;
 
   const rows = summary.counts || [];
