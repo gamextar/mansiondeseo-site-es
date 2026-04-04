@@ -16,7 +16,6 @@ function resolveWsBase() {
 }
 
 const WS_BASE = resolveWsBase();
-const CHAT_PING_MS = 45_000;
 const CHAT_BACKGROUND_GRACE_MS = 15_000;
 const CHAT_MAX_RETRIES = 5;
 
@@ -44,27 +43,9 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   let state = 'disconnected';
   let retryCount = 0;
   let retryTimer = null;
-  let pingTimer = null;
   let backgroundTimer = null;
   let closed = false; // true when user explicitly closes
   let paused = false; // true when tab is in background
-
-  function stopPing() {
-    clearInterval(pingTimer);
-    pingTimer = null;
-  }
-
-  function startPing() {
-    if (document.visibilityState !== 'visible') return;
-    stopPing();
-    pingTimer = setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      if (ws?.readyState === WebSocket.OPEN) {
-        recordRealtimeDebug('chat', 'pingsSent');
-        ws.send(JSON.stringify({ type: 'ping' }));
-      }
-    }, CHAT_PING_MS);
-  }
 
   function clearBackgroundTimer() {
     clearTimeout(backgroundTimer);
@@ -95,7 +76,6 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
       setState('connected');
       recordRealtimeDebug('chat', 'opens');
       setRealtimeActiveConnections('chat', 1);
-      startPing();
     };
 
     ws.onmessage = (event) => {
@@ -137,7 +117,6 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     };
 
     ws.onclose = () => {
-      stopPing();
       recordRealtimeDebug('chat', 'closes');
       setRealtimeActiveConnections('chat', 0);
       if (!closed) {
@@ -185,7 +164,6 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     closed = true;
     clearTimeout(retryTimer);
     clearBackgroundTimer();
-    stopPing();
     if (ws) {
       ws.onclose = null; // prevent reconnect
       ws.close();
@@ -213,7 +191,6 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
       paused = true;
       recordRealtimeDebug('chat', 'backgroundPauses');
       clearTimeout(retryTimer);
-      stopPing();
       if (ws) {
         ws.onclose = null;
         ws.close(1000, 'client-pause');

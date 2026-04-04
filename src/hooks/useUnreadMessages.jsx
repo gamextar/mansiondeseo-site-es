@@ -21,7 +21,6 @@ function resolveWsBase() {
 }
 
 const WS_BASE = resolveWsBase();
-const NOTIFICATION_PING_MS = 8 * 60_000; // 8 min — reduces DO wake-ups from hibernation
 const NOTIFICATION_BACKGROUND_GRACE_MS = Infinity; // never disconnect in background — DO hibernates anyway
 const UNREAD_REFRESH_STALE_MS = 5 * 60_000; // 5 min — HTTP fallback if WS stale
 const UNREAD_FETCH_DEBOUNCE_MS = 4_000;
@@ -54,29 +53,11 @@ export function UnreadProvider({ children }) {
     setUnreadCountCache({ unread: nextTotal });
   }, []);
 
-  const stopPing = useCallback((socket = wsRef.current) => {
-    if (!socket?._pingTimer) return;
-    clearInterval(socket._pingTimer);
-    socket._pingTimer = null;
-  }, []);
-
   const clearBackgroundDisconnectTimer = useCallback(() => {
     if (!wsBackgroundTimerRef.current) return;
     clearTimeout(wsBackgroundTimerRef.current);
     wsBackgroundTimerRef.current = null;
   }, []);
-
-  const startPing = useCallback((socket = wsRef.current) => {
-    if (!socket || document.visibilityState !== 'visible') return;
-    stopPing(socket);
-    socket._pingTimer = setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      if (socket.readyState === WebSocket.OPEN) {
-        recordRealtimeDebug('notifications', 'pingsSent');
-        socket.send(JSON.stringify({ type: 'ping' }));
-      }
-    }, NOTIFICATION_PING_MS);
-  }, [stopPing]);
 
   const fetchUnread = useCallback(({ force = false } = {}) => {
     const token = getToken();
@@ -138,14 +119,13 @@ export function UnreadProvider({ children }) {
     const ws = wsRef.current;
     clearBackgroundDisconnectTimer();
     if (!ws) return;
-    stopPing(ws);
     ws.onclose = null;
     ws.onerror = null;
     try { ws.close(1000, 'client-pause'); } catch { /* already closed */ }
     wsRef.current = null;
     wsConnectedRef.current = false;
     setRealtimeActiveConnections('notifications', 0);
-  }, [clearBackgroundDisconnectTimer, stopPing]);
+  }, [clearBackgroundDisconnectTimer]);
 
   const scheduleBackgroundDisconnect = useCallback(() => {
     // No-op: keep WS alive in background. The DO hibernates anyway,
@@ -171,7 +151,6 @@ export function UnreadProvider({ children }) {
         wsConnectedRef.current = true;
         recordRealtimeDebug('notifications', 'opens');
         setRealtimeActiveConnections('notifications', 1);
-        startPing(ws);
       };
 
       ws.onmessage = (event) => {
@@ -230,7 +209,6 @@ export function UnreadProvider({ children }) {
       };
 
       ws.onclose = () => {
-        stopPing(ws);
         if (wsRef.current === ws) wsRef.current = null;
         wsConnectedRef.current = false;
         recordRealtimeDebug('notifications', 'closes');
@@ -256,7 +234,7 @@ export function UnreadProvider({ children }) {
         setTimeout(connectWs, delay);
       }
     }
-  }, [applyUnreadCount, fetchUnread, notifyListeners, startPing, stopPing]);
+  }, [applyUnreadCount, fetchUnread, notifyListeners]);
 
   // Initial fetch + WebSocket (no polling — real-time only)
   useEffect(() => {
@@ -289,7 +267,6 @@ export function UnreadProvider({ children }) {
         wsRetryRef.current = 0; // fresh retry budget on foreground
         connectWs();
         if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
-        else startPing();
       } else {
         scheduleBackgroundDisconnect();
       }
@@ -302,7 +279,6 @@ export function UnreadProvider({ children }) {
       wsRetryRef.current = 0; // fresh retry budget on focus
       connectWs();
       if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
-      else startPing();
     };
 
     if (document.visibilityState === 'visible') connectWs();
@@ -318,7 +294,7 @@ export function UnreadProvider({ children }) {
       window.removeEventListener('focus', onFocus);
       disconnectWs();
     };
-  }, [applyUnreadCount, clearBackgroundDisconnectTimer, connectWs, disconnectWs, fetchUnread, scheduleBackgroundDisconnect, shouldRefreshUnread, startPing]);
+  }, [applyUnreadCount, clearBackgroundDisconnectTimer, connectWs, disconnectWs, fetchUnread, scheduleBackgroundDisconnect, shouldRefreshUnread]);
 
   const setActiveChatId = useCallback((chatId) => {
     activeChatIdRef.current = chatId || null;
