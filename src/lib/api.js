@@ -687,6 +687,10 @@ async function apiFetch__getProfile(id) {
   return apiFetch(`/profiles/${id}`);
 }
 
+export async function getProfileWithMessageLimit(id) {
+  return apiFetch(`/profiles/${id}?include=messageLimit`);
+}
+
 export async function updateProfile(fields) {
   const data = await apiFetch('/profile', {
     method: 'PUT',

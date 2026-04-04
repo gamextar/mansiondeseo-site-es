@@ -1419,6 +1419,25 @@ async function handleProfileDetail(request, env, userId) {
      LIMIT 20`
   ).bind(userId).all();
 
+  // Optional: include message limit when ?include=messageLimit (used by ChatPage)
+  const includeParam = new URL(request.url).searchParams.get('include') || '';
+  let messageLimit = undefined;
+  if (includeParam.includes('messageLimit')) {
+    const today = todayUTC();
+    const limitRow = await env.DB.prepare(
+      'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
+    ).bind(auth.sub, today).first();
+    const count = limitRow?.msg_count || 0;
+    const dailyLimit = settings.dailyMessageLimit || 5;
+    const senderPremium = viewerIsPremium;
+    messageLimit = {
+      sent: count,
+      remaining: senderPremium ? 999 : Math.max(0, dailyLimit - count),
+      canSend: senderPremium ? true : count < dailyLimit,
+      max: senderPremium ? 999 : dailyLimit,
+    };
+  }
+
   return json({
     profile: {
       id: user.id,
@@ -1446,6 +1465,7 @@ async function handleProfileDetail(request, env, userId) {
     },
     viewerPremium: viewerIsPremium,
     settings,
+    ...(messageLimit ? { messageLimit } : {}),
   });
 }
 

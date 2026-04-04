@@ -7,7 +7,7 @@ import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import EmojiPicker from '../components/EmojiPicker';
 import AvatarImg from '../components/AvatarImg';
-import { getMessageLimit, getProfile, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage } from '../lib/api';
+import { getMessageLimit, getProfile, getProfileWithMessageLimit, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
@@ -173,19 +173,11 @@ export default function ChatPage() {
     }
 
     let cancelled = false;
-    Promise.all([
-      getProfile(partnerId).then(data => data.profile).catch(() => null),
-      getMessageLimit().then(data => data).catch(() => null),
-    ]).then(([partnerData, limitData]) => {
+    getProfileWithMessageLimit(partnerId).then((data) => {
       if (cancelled) return;
-
-      if (partnerData) {
-        setPartner(partnerData);
-      }
-      if (limitData) {
-        setApiLimit(limitData);
-      }
-    }).finally(() => {
+      if (data?.profile) setPartner(data.profile);
+      if (data?.messageLimit) setApiLimit(data.messageLimit);
+    }).catch(() => {}).finally(() => {
       if (!cancelled && nextCachedChat) setLoading(false);
     });
 
