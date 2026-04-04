@@ -17,7 +17,7 @@ const ROLE_COLOR = {
 };
 
 const PROFILE_DETAIL_CACHE_PREFIX = 'mansion_profile_detail_';
-const PROFILE_DETAIL_CACHE_TTL_MS = 2 * 60_000;
+const PROFILE_DETAIL_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_PROFILE_SETTINGS = { blurLevel: 14, blurMobile: 14, blurDesktop: 8, freeVisiblePhotos: 1, freeOwnPhotos: 3 };
 
 function buildPreviewProfile(preview) {

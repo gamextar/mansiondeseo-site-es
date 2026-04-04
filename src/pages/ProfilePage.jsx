@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil } from 'lucide-react';
 import { useAuth } from '../App';
-import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache } from '../lib/api';
+import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, peekOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
@@ -36,6 +36,7 @@ function timeAgo(dateStr) {
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { setRegistered, setUser, user } = useAuth();
+  const cachedDashboard = peekOwnProfileDashboard();
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -44,8 +45,8 @@ export default function ProfilePage() {
   const [adjustUrl, setAdjustUrl] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [togglingGhost, setTogglingGhost] = useState(false);
-  const [visitors, setVisitors] = useState([]);
-  const [receivedGifts, setReceivedGifts] = useState([]);
+  const [visitors, setVisitors] = useState(() => cachedDashboard?.visitors || []);
+  const [receivedGifts, setReceivedGifts] = useState(() => cachedDashboard?.gifts || []);
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
   const [galleryEditing, setGalleryEditing] = useState(false);
@@ -145,6 +146,15 @@ export default function ProfilePage() {
   }, [lightboxOpen, user]);
 
   useEffect(() => {
+    if (cachedDashboard) {
+      if (cachedDashboard?.user) {
+        setUser((prev) => prev ? { ...prev, ...cachedDashboard.user } : cachedDashboard.user);
+      }
+      setVisitors(cachedDashboard?.visitors || []);
+      setReceivedGifts(cachedDashboard?.gifts || []);
+      return;
+    }
+
     getOwnProfileDashboard()
       .then((data) => {
         if (data?.user) setUser((prev) => prev ? { ...prev, ...data.user } : data.user);
@@ -152,7 +162,7 @@ export default function ProfilePage() {
         setReceivedGifts(data?.gifts || []);
       })
       .catch(() => {});
-  }, [setUser]);
+  }, [cachedDashboard, setUser]);
 
   // Auto-save reordered photos
   const persistOrder = useCallback(async (newPhotos) => {
