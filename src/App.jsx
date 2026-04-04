@@ -28,7 +28,7 @@ import CoinsPage from './pages/CoinsPage';
 import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
 import StoryUploadPage from './pages/StoryUploadPage';
 import VideoFeedPage from './pages/VideoFeedPage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, getOwnProfileDashboard, ensureApiDebug, markApiDebugRoute } from './lib/api';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -251,8 +251,6 @@ export default function App() {
         if (data?.user) {
           setUser(data.user);
           setRegisteredState(true);
-          // Pre-warm profile dashboard cache so /perfil loads with 0 requests
-          getOwnProfileDashboard().catch(() => {});
         }
 
         if (data?.settings) {
