@@ -261,6 +261,9 @@ export function UnreadProvider({ children }) {
   // Initial fetch + WebSocket (no polling — real-time only)
   useEffect(() => {
     if (getToken()) {
+      // Mark as "fetching now" so focus/visibilitychange handlers don't fire a
+      // duplicate GET /api/unread-count while bootstrap is in-flight.
+      lastUnreadFetchAtRef.current = Date.now();
       getAppBootstrap()
         .then((data) => {
           if (typeof data?.unread === 'number') {
