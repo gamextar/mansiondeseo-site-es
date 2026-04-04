@@ -21,8 +21,8 @@ function resolveWsBase() {
 }
 
 const WS_BASE = resolveWsBase();
-const NOTIFICATION_PING_MS = 4 * 60_000; // 4 min — reduces DO wake-ups from hibernation
-const NOTIFICATION_BACKGROUND_GRACE_MS = 60_000; // keep WS alive briefly across tab/app switches
+const NOTIFICATION_PING_MS = 8 * 60_000; // 8 min — reduces DO wake-ups from hibernation
+const NOTIFICATION_BACKGROUND_GRACE_MS = Infinity; // never disconnect in background — DO hibernates anyway
 const UNREAD_REFRESH_STALE_MS = 5 * 60_000; // 5 min — HTTP fallback if WS stale
 const UNREAD_FETCH_DEBOUNCE_MS = 4_000;
 const WS_MAX_RETRIES = 5; // backoff: 2,4,8,16,30 ≈ 60s then stop
@@ -41,6 +41,7 @@ export function UnreadProvider({ children }) {
   const unreadFetchRef = useRef(null);
   const lastUnreadFetchAtRef = useRef(0);
   const activeChatIdRef = useRef(null);
+  const isPremiumRef = useRef(false); // only premium users get notification WS
 
   const applyUnreadCount = useCallback((total, { showToast = false } = {}) => {
     const nextTotal = Math.max(0, Number(total) || 0);
@@ -148,18 +149,17 @@ export function UnreadProvider({ children }) {
   }, [clearBackgroundDisconnectTimer, stopPing]);
 
   const scheduleBackgroundDisconnect = useCallback(() => {
-    clearBackgroundDisconnectTimer();
-    wsBackgroundTimerRef.current = setTimeout(() => {
-      if (document.visibilityState === 'visible') return;
-      wsPausedRef.current = true;
-      recordRealtimeDebug('notifications', 'backgroundPauses');
-      disconnectWs();
-    }, NOTIFICATION_BACKGROUND_GRACE_MS);
-  }, [clearBackgroundDisconnectTimer, disconnectWs]);
+    // No-op: keep WS alive in background. The DO hibernates anyway,
+    // so an idle WebSocket costs nothing. Disconnecting only causes
+    // expensive reconnect cycles when the tab regains focus.
+  }, []);
 
   const connectWs = useCallback(() => {
     const token = getToken();
     if (!token || wsClosedRef.current || wsPausedRef.current) return;
+    // Free users skip notification WS entirely — saves 1 DO per user.
+    // They still get unread count via bootstrap + HTTP refresh on focus.
+    if (!isPremiumRef.current) return;
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -270,12 +270,19 @@ export function UnreadProvider({ children }) {
       lastUnreadFetchAtRef.current = Date.now();
       getAppBootstrap()
         .then((data) => {
+          if (data?.user) {
+            isPremiumRef.current = !!data.user.premium;
+          }
           if (typeof data?.unread === 'number') {
             lastUnreadFetchAtRef.current = Date.now();
             applyUnreadCount(data.unread);
-            return;
+          } else {
+            return fetchUnread({ force: true });
           }
-          return fetchUnread({ force: true });
+        })
+        .then(() => {
+          // Connect WS only after bootstrap resolves (so isPremiumRef is set)
+          if (isPremiumRef.current && document.visibilityState === 'visible') connectWs();
         })
         .catch(() => {
           fetchUnread({ force: true }).catch(() => {});
@@ -291,9 +298,9 @@ export function UnreadProvider({ children }) {
         clearBackgroundDisconnectTimer();
         wsPausedRef.current = false;
         wsRetryRef.current = 0; // fresh retry budget on foreground
-        connectWs();
+        if (isPremiumRef.current) connectWs();
         if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
-        else startPing();
+        else if (isPremiumRef.current) startPing();
       } else {
         scheduleBackgroundDisconnect();
       }
@@ -304,12 +311,13 @@ export function UnreadProvider({ children }) {
       clearBackgroundDisconnectTimer();
       wsPausedRef.current = false;
       wsRetryRef.current = 0; // fresh retry budget on focus
-      connectWs();
+      if (isPremiumRef.current) connectWs();
       if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
-      else startPing();
+      else if (isPremiumRef.current) startPing();
     };
 
-    if (document.visibilityState === 'visible') connectWs();
+    // WS connection is established in the bootstrap .then() above, not here.
+    // This ensures isPremiumRef is set before attempting to connect.
 
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('focus', onFocus);
