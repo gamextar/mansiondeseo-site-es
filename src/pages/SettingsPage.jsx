@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, Sliders, Eye, EyeOff, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail } from 'lucide-react';
+import { ArrowLeft, Save, Sliders, Eye, EyeOff, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail, Activity } from 'lucide-react';
 import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, uploadImage } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
@@ -31,6 +31,7 @@ export default function SettingsPage() {
 
   // Messaging
   const [dailyMessageLimit, setDailyMessageLimit] = useState(5);
+  const [onlineThresholdMinutes, setOnlineThresholdMinutes] = useState(60);
 
   // Site
   const [siteCountry, setSiteCountry] = useState('AR');
@@ -176,6 +177,7 @@ export default function SettingsPage() {
         setFreeVisiblePhotos(s.freeVisiblePhotos);
         setShowVipButton(s.showVipButton);
         setDailyMessageLimit(s.dailyMessageLimit);
+        setOnlineThresholdMinutes(s.onlineThresholdMinutes ?? 60);
         setSiteCountry(s.siteCountry);
         setAllowedCountries(s.allowedCountries || 'AR');
         setHidePasswordRegister(s.hidePasswordRegister);
@@ -281,6 +283,7 @@ export default function SettingsPage() {
         free_visible_photos: freeVisiblePhotos,
         show_vip_button: showVipButton ? '1' : '0',
         daily_message_limit: dailyMessageLimit,
+        online_threshold_minutes: onlineThresholdMinutes,
         site_country: siteCountry,
         allowed_countries: allowedCountries,
         hide_password_register: hidePasswordRegister ? '1' : '0',
@@ -341,6 +344,7 @@ export default function SettingsPage() {
       setFreeVisiblePhotos(s.freeVisiblePhotos);
       setShowVipButton(s.showVipButton);
       setDailyMessageLimit(s.dailyMessageLimit);
+      setOnlineThresholdMinutes(s.onlineThresholdMinutes ?? 60);
       setSiteCountry(s.siteCountry);
       setAllowedCountries(s.allowedCountries || 'AR');
       setHidePasswordRegister(s.hidePasswordRegister);
@@ -587,6 +591,22 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <Counter value={dailyMessageLimit} onChange={setDailyMessageLimit} min={1} max={50} />
+              </div>
+            </div>
+
+            {/* Online threshold */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                    <Activity className="w-4 h-4 text-mansion-gold" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">Umbral de estado online</h3>
+                    <p className="text-[11px] text-text-dim">Minutos de inactividad para considerarse offline</p>
+                  </div>
+                </div>
+                <Counter value={onlineThresholdMinutes} onChange={setOnlineThresholdMinutes} min={5} max={1440} />
               </div>
             </div>
           </div>

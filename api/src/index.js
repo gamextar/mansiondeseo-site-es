@@ -552,11 +552,14 @@ async function authenticate(request, env) {
   return payload; // { sub: userId, email, role }
 }
 
-// Returns true if last_active is within the last hour
+// Configurable online threshold (updated by loadSettings)
+let _onlineThresholdMs = 3600_000; // default: 1 hour
+
+// Returns true if last_active is within the configured threshold
 function isOnline(lastActive) {
   if (!lastActive) return false;
   const ts = new Date(lastActive.endsWith('Z') ? lastActive : lastActive + 'Z').getTime();
-  return (Date.now() - ts) < 3600000; // 1 hour
+  return (Date.now() - ts) < _onlineThresholdMs;
 }
 
 // ── CORS ────────────────────────────────────────────────
@@ -2230,7 +2233,7 @@ async function loadSettings(env) {
   for (const r of results) settings[r.key] = r.value;
   const storyCirclePresetMedium = parseInt(settings.story_circle_preset_medium || settings.story_circle_size || '88', 10);
   const storyCirclePresetXl = parseInt(settings.story_circle_preset_xl || settings.sidebar_avatar_size || '154', 10);
-  return {
+  const result = {
     blurLevel: parseInt(settings.blur_level || '14', 10),
     blurMobile: parseInt(settings.blur_mobile || settings.blur_level || '14', 10),
     blurDesktop: parseInt(settings.blur_desktop || settings.blur_level || '8', 10),
@@ -2293,7 +2296,11 @@ async function loadSettings(env) {
     encoderShowProgressHud: settings.encoder_show_progress_hud === '1',
     resendApiKey: settings.resend_api_key || env.RESEND_API_KEY || '',
     mailFrom: settings.mail_from || env.MAIL_FROM || 'noreply@unicoapps.com',
+    onlineThresholdMinutes: parseInt(settings.online_threshold_minutes || '60', 10),
   };
+  // Keep module-level threshold in sync so isOnline() uses the latest value
+  _onlineThresholdMs = result.onlineThresholdMinutes * 60_000;
+  return result;
 }
 
 // ── GET /api/detect-country ──────────────────────────────
@@ -2431,6 +2438,7 @@ async function handleUpdateSettings(request, env) {
     'encoder_show_progress_hud',
     'resend_api_key',
     'mail_from',
+    'online_threshold_minutes',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {
