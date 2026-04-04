@@ -799,10 +799,6 @@ export function setUnreadCountCache(data) {
   sharedGetCache.set('unreadCount', { value: data, timestamp: Date.now(), promise: null });
 }
 
-export function peekUnreadCountCache() {
-  return sessionCache.get('unreadCount', 15_000);
-}
-
 export function invalidateUnreadCache() {
   invalidateUnreadCountCache();
 }
