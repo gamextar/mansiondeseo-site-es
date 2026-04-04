@@ -207,7 +207,6 @@ async function ensureUserBrowseIndexes(env) {
 }
 
 async function setConversationState(env, userId, partnerId, { lastMessage, lastMessageAt, unreadCount }) {
-  await ensureConversationStateTables(env);
   await env.DB.prepare(
     `INSERT INTO conversation_state (user_id, partner_id, last_message, last_message_at, unread_count, updated_at)
      VALUES (?, ?, ?, ?, ?, datetime('now'))
@@ -220,7 +219,6 @@ async function setConversationState(env, userId, partnerId, { lastMessage, lastM
 }
 
 async function incrementConversationStateUnread(env, userId, partnerId, { lastMessage, lastMessageAt, unreadDelta = 1 }) {
-  await ensureConversationStateTables(env);
   await env.DB.prepare(
     `INSERT INTO conversation_state (user_id, partner_id, last_message, last_message_at, unread_count, updated_at)
      VALUES (?, ?, ?, ?, ?, datetime('now'))
@@ -233,21 +231,18 @@ async function incrementConversationStateUnread(env, userId, partnerId, { lastMe
 }
 
 async function clearConversationStateUnread(env, userId, partnerId) {
-  await ensureConversationStateTables(env);
   await env.DB.prepare(
     'UPDATE conversation_state SET unread_count = 0, updated_at = datetime(\'now\') WHERE user_id = ? AND partner_id = ?'
   ).bind(userId, partnerId).run();
 }
 
 async function deleteConversationState(env, userId, partnerId) {
-  await ensureConversationStateTables(env);
   await env.DB.prepare(
     'DELETE FROM conversation_state WHERE user_id = ? AND partner_id = ?'
   ).bind(userId, partnerId).run();
 }
 
 async function syncConversationStateForMessage(env, senderId, receiverId, msg) {
-  await ensureConversationStateTables(env);
   const lastMessage = (msg.content || '').slice(0, 50);
   await Promise.all([
     setConversationState(env, senderId, receiverId, {
@@ -264,7 +259,6 @@ async function syncConversationStateForMessage(env, senderId, receiverId, msg) {
 }
 
 async function rebuildConversationStateForPair(env, userA, userB) {
-  await ensureConversationStateTables(env);
   await ensureMessageConversationIdColumn(env);
   const conversationId = buildConversationId(userA, userB);
 
@@ -1121,7 +1115,6 @@ async function handleAppBootstrap(request, env) {
   if (authHeader?.startsWith('Bearer ')) {
     const auth = await authenticate(request, env);
     if (!auth) return error('No autorizado', 401);
-    await ensureConversationStateTables(env);
 
     const [dbUser, activeStory, unreadRow] = await Promise.all([
       env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
@@ -1149,7 +1142,6 @@ async function handleAppBootstrap(request, env) {
 async function handleOwnProfileDashboard(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
-  await ensureConversationStateTables(env);
 
   const [dbUser, activeStory, visitRows, giftRows] = await Promise.all([
     env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
@@ -1437,7 +1429,6 @@ async function handleProfileDetail(request, env, userId) {
 async function handleSendMessage(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
-  await ensureConversationStateTables(env);
   await ensureMessageConversationIdColumn(env);
 
   const { receiver_id, content } = await request.json();
@@ -1543,9 +1534,6 @@ async function notifyChatRoom(env, senderId, receiverId, msg) {
 async function handleGetMessages(request, env, otherUserId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
-  await ensureHiddenConversationsTable(env);
-  await ensureMessagingIndexes(env);
-  await ensureConversationStateTables(env);
   await ensureMessageConversationIdColumn(env);
   const conversationId = buildConversationId(auth.sub, otherUserId);
   const url = new URL(request.url);
@@ -1614,9 +1602,6 @@ async function handleGetMessages(request, env, otherUserId) {
 async function handleConversations(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
-  await ensureHiddenConversationsTable(env);
-  await ensureMessagingIndexes(env);
-  await ensureConversationStateTables(env);
 
 
   const { results } = await env.DB.prepare(`
@@ -1653,9 +1638,6 @@ async function handleConversations(request, env) {
 async function handleDeleteConversation(request, env, otherUserId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
-  await ensureHiddenConversationsTable(env);
-  await ensureMessagingIndexes(env);
-  await ensureConversationStateTables(env);
 
   const hiddenBefore = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
@@ -1776,7 +1758,6 @@ async function loadConversationUsers(env, senderId, receiverId) {
 }
 
 async function buildNewMessageEvents(env, senderId, receiverId, msg) {
-  await ensureHiddenConversationsTable(env);
   const chatId = [senderId, receiverId].sort().join('-');
 
   let senderConversation = null;
@@ -1837,7 +1818,6 @@ async function handleNotificationWebSocket(request, env) {
 async function handleUnreadCount(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
-  await ensureConversationStateTables(env);
 
   const row = await env.DB.prepare(
     'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'

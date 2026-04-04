@@ -718,13 +718,13 @@ export function peekOwnProfileDashboard() {
 // ── Messages ────────────────────────────────────────────
 
 export async function getConversations() {
-  const cached = sessionCache.get('conversations', 15_000);
+  const cached = sessionCache.get('conversations', 60 * 60_000);
   if (cached) return Promise.resolve(cached);
 
   return sharedGet('conversations', () => apiFetch('/messages').then((data) => {
     sessionCache.set('conversations', data);
     return data;
-  }), { ttlMs: 15_000 });
+  }), { ttlMs: 60 * 60_000 });
 }
 
 export async function getMessages(otherUserId, { before, limit } = {}) {
