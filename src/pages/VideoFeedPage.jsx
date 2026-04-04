@@ -270,7 +270,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
         )}
       </div>
 
-      <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 350px)', top: '50%', transform: 'translateY(-50%)' }}>
+      <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 350px)', bottom: '60px' }}>
         <DesktopActionButtons story={story} onLike={onLike} navigate={navigate} onGift={onGift} />
       </div>
     </div>
