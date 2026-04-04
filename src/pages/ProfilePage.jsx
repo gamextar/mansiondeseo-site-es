@@ -805,7 +805,7 @@ export default function ProfilePage() {
         <motion.div variants={fadeUp} className="glass-elevated rounded-3xl p-4 mb-3 space-y-1">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-2 px-1">Mi Cuenta</h3>
           {[
-            { icon: Settings, label: 'Configuración', sublabel: 'Privacidad, notificaciones', path: '/configuracion' },
+            { icon: Settings, label: 'Configuración', sublabel: 'Privacidad, notificaciones', path: user?.is_admin ? '/admin/configuracion' : null },
             { icon: Heart, label: 'Mis favoritos', sublabel: 'Perfiles guardados', path: '/favoritos' },
             { icon: Shield, label: 'Verificación', sublabel: 'Verificar mi identidad', path: null },
           ].map(({ icon: Icon, label, sublabel, path }) => (
