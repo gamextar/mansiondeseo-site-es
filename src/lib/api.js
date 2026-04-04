@@ -708,12 +708,7 @@ export async function updateProfile(fields) {
 }
 
 export async function getOwnProfileDashboard() {
-  return sharedGet('ownProfileDashboard', async () => {
-    const data = await apiFetch('/me/dashboard');
-    if (data?.user) cacheMeResponse({ user: data.user });
-    cacheOwnProfileDashboard(data);
-    return data;
-  }, { ttlMs: OWN_PROFILE_DASHBOARD_TTL_MS });
+  return sharedGet('ownProfileDashboard', () => apiFetch('/me/dashboard'), { ttlMs: 10 * 60_000 });
 }
 
 export function peekOwnProfileDashboard() {
