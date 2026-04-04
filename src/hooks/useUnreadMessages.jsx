@@ -113,7 +113,8 @@ export function UnreadProvider({ children }) {
 
   const shouldRefreshUnread = useCallback(() => {
     if (!getToken()) return false;
-    if (!wsConnectedRef.current) return true;
+    if (prevCountRef.current < 0) return true;
+    if (!lastUnreadFetchAtRef.current) return true;
     return Date.now() - lastUnreadFetchAtRef.current > UNREAD_REFRESH_STALE_MS;
   }, []);
 
