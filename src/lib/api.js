@@ -708,12 +708,6 @@ export async function updateProfile(fields) {
 }
 
 export async function getOwnProfileDashboard() {
-  const existing = sharedGetCache.get('ownProfileDashboard');
-  if (existing?.value !== undefined && Date.now() - existing.timestamp < 10 * 60_000) {
-    console.log('[dashboard] cache HIT, age:', Math.round((Date.now() - existing.timestamp) / 1000), 's');
-    return Promise.resolve(existing.value);
-  }
-  console.log('[dashboard] cache MISS, fetching...', existing ? `age: ${Math.round((Date.now() - existing.timestamp) / 1000)}s` : 'no entry');
   return sharedGet('ownProfileDashboard', () => apiFetch('/me/dashboard'), { ttlMs: 10 * 60_000 });
 }
 
