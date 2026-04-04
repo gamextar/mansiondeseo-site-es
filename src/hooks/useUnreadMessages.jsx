@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
-import { getAppBootstrap, getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache } from '../lib/api';
+import { getAppBootstrap, getUnreadCount, getToken, invalidateUnreadCache, peekUnreadCountCache, setUnreadCountCache } from '../lib/api';
 import { recordRealtimeDebug, setRealtimeActiveConnections } from '../lib/realtimeDebug';
 
 const UnreadContext = createContext({
@@ -41,6 +41,15 @@ export function UnreadProvider({ children }) {
   const unreadFetchRef = useRef(null);
   const lastUnreadFetchAtRef = useRef(0);
   const activeChatIdRef = useRef(null);
+  const bootstrapSettledRef = useRef(false);
+
+  useEffect(() => {
+    const cachedUnread = peekUnreadCountCache();
+    if (typeof cachedUnread?.unread === 'number') {
+      lastUnreadFetchAtRef.current = Date.now();
+      applyUnreadCount(cachedUnread.unread);
+    }
+  }, [applyUnreadCount]);
 
   const applyUnreadCount = useCallback((total, { showToast = false } = {}) => {
     const nextTotal = Math.max(0, Number(total) || 0);
@@ -260,21 +269,29 @@ export function UnreadProvider({ children }) {
 
   // Initial fetch + WebSocket (no polling — real-time only)
   useEffect(() => {
+    bootstrapSettledRef.current = false;
+
     if (getToken()) {
       getAppBootstrap()
         .then((data) => {
           if (typeof data?.unread === 'number') {
             lastUnreadFetchAtRef.current = Date.now();
             applyUnreadCount(data.unread);
+            bootstrapSettledRef.current = true;
             return;
           }
-          return fetchUnread({ force: true });
+          return fetchUnread({ force: true }).finally(() => {
+            bootstrapSettledRef.current = true;
+          });
         })
         .catch(() => {
-          fetchUnread({ force: true }).catch(() => {});
+          fetchUnread({ force: true }).catch(() => {}).finally(() => {
+            bootstrapSettledRef.current = true;
+          });
         });
     } else {
       applyUnreadCount(0);
+      bootstrapSettledRef.current = true;
     }
     wsClosedRef.current = false;
     setRealtimeActiveConnections('notifications', wsRef.current?.readyState === WebSocket.OPEN ? 1 : 0);
@@ -285,7 +302,7 @@ export function UnreadProvider({ children }) {
         wsPausedRef.current = false;
         wsRetryRef.current = 0; // fresh retry budget on foreground
         connectWs();
-        if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
+        if (bootstrapSettledRef.current && shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
         else startPing();
       } else {
         scheduleBackgroundDisconnect();
@@ -298,7 +315,7 @@ export function UnreadProvider({ children }) {
       wsPausedRef.current = false;
       wsRetryRef.current = 0; // fresh retry budget on focus
       connectWs();
-      if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
+      if (bootstrapSettledRef.current && shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
       else startPing();
     };
 
