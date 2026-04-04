@@ -708,12 +708,6 @@ export async function updateProfile(fields) {
 }
 
 export async function getOwnProfileDashboard() {
-  const cached = sessionCache.get(OWN_PROFILE_DASHBOARD_CACHE_KEY, OWN_PROFILE_DASHBOARD_TTL_MS);
-  if (cached) {
-    if (cached?.user) cacheMeResponse({ user: cached.user });
-    return Promise.resolve(cached);
-  }
-
   return sharedGet('ownProfileDashboard', async () => {
     const data = await apiFetch('/me/dashboard');
     if (data?.user) cacheMeResponse({ user: data.user });
