@@ -7,23 +7,7 @@ import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDeb
 import { estimateRealtimeLoad, getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
 import { getMediaDebugSummary, inspectVisibleMedia, resetMediaDebug, subscribeMediaDebug } from '../lib/mediaDebug';
 import { getDebugPanelPrefs, setDebugPanelPref, subscribeDebugPanelPrefs } from '../lib/debugPanelPrefs';
-
-// Section definitions for sidebar navigation
-export const ADMIN_SECTIONS = [
-  { key: 'fotos', label: 'Fotos & Blur', icon: Image },
-  { key: 'mensajeria', label: 'Mensajería', icon: MessageCircle },
-  { key: 'vip', label: 'VIP & Monetización', icon: Crown },
-  { key: 'pagos', label: 'Pasarela de Pagos', icon: CreditCard },
-  { key: 'regalos', label: 'Catálogo de Regalos', icon: Gift },
-  { key: 'sitio', label: 'Sitio & Registro', icon: Globe },
-  { key: 'iconografia', label: 'Iconografía', icon: Smile },
-  { key: 'debug', label: 'Zona Peligrosa', icon: Shield },
-  { key: 'navegacion', label: 'Navegación', icon: Navigation },
-  { key: 'stories', label: 'Stories', icon: Film },
-  { key: 'videos', label: 'Videos', icon: Film },
-  { key: 'encoder', label: 'Encoder', icon: Clapperboard },
-  { key: 'email', label: 'Email (Resend)', icon: Mail },
-];
+import { ADMIN_SECTIONS } from '../lib/adminSections';
 
 export default function SettingsPage() {
   const navigate = useNavigate();

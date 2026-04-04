@@ -3,7 +3,7 @@ import { Users, Home, Shield, Film } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../App';
 import { useEffect } from 'react';
-import { ADMIN_SECTIONS } from '../pages/SettingsPage';
+import { ADMIN_SECTIONS } from '../lib/adminSections';
 
 export default function AdminLayout() {
   const { user } = useAuth();

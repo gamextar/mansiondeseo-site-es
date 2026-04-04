@@ -1,0 +1,30 @@
+import {
+  Image,
+  MessageCircle,
+  Crown,
+  CreditCard,
+  Gift,
+  Globe,
+  Smile,
+  Shield,
+  Navigation,
+  Film,
+  Clapperboard,
+  Mail,
+} from 'lucide-react';
+
+export const ADMIN_SECTIONS = [
+  { key: 'fotos', label: 'Fotos & Blur', icon: Image },
+  { key: 'mensajeria', label: 'Mensajería', icon: MessageCircle },
+  { key: 'vip', label: 'VIP & Monetización', icon: Crown },
+  { key: 'pagos', label: 'Pasarela de Pagos', icon: CreditCard },
+  { key: 'regalos', label: 'Catálogo de Regalos', icon: Gift },
+  { key: 'sitio', label: 'Sitio & Registro', icon: Globe },
+  { key: 'iconografia', label: 'Iconografía', icon: Smile },
+  { key: 'debug', label: 'Zona Peligrosa', icon: Shield },
+  { key: 'navegacion', label: 'Navegación', icon: Navigation },
+  { key: 'stories', label: 'Stories', icon: Film },
+  { key: 'videos', label: 'Videos', icon: Film },
+  { key: 'encoder', label: 'Encoder', icon: Clapperboard },
+  { key: 'email', label: 'Email (Resend)', icon: Mail },
+];
