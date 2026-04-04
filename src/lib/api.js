@@ -19,9 +19,9 @@ const API_BASE = resolveApiBase();
 const TOKEN_KEY = 'mansion_token';
 const USER_KEY = 'mansion_user';
 const AUTH_ME_CACHE_KEY = 'authMe';
-const AUTH_ME_CACHE_TTL_MS = 10 * 60_000;
+const AUTH_ME_CACHE_TTL_MS = 60 * 60_000;
 const OWN_PROFILE_DASHBOARD_CACHE_KEY = 'ownProfileDashboard';
-const OWN_PROFILE_DASHBOARD_TTL_MS = 30 * 60_000;
+const OWN_PROFILE_DASHBOARD_TTL_MS = 60 * 60_000;
 const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
@@ -624,7 +624,7 @@ export async function getMe() {
 }
 
 export async function getAppBootstrap() {
-  const cached = sessionCache.get('appBootstrap', 2 * 60_000);
+  const cached = sessionCache.get('appBootstrap', 60 * 60_000);
   if (cached) {
     if (typeof cached?.unread === 'number') setUnreadCountCache({ unread: cached.unread });
     if (cached?.user) {
@@ -645,7 +645,7 @@ export async function getAppBootstrap() {
     if (typeof data?.unread === 'number') setUnreadCountCache({ unread: data.unread });
     sessionCache.set('appBootstrap', data);
     return data;
-  }, { ttlMs: 30_000 });
+  }, { ttlMs: 5 * 60_000 });
 }
 
 export async function logout() {
