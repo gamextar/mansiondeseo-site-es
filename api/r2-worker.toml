@@ -1,0 +1,3 @@
+name = "mansion-deseo-r2-worker"
+main = "src/r2-worker.js"
+compatibility_date = "2025-01-01"
