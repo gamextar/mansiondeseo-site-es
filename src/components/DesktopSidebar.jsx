@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useState } from 'react';
 import { peekOwnProfileDashboard } from '../lib/api';
-import { useAuth } from '../App';
+import { useAuth } from '../lib/authContext';
 import AvatarImg from './AvatarImg';
 
 function timeAgo(dateStr) {

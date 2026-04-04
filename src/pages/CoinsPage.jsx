@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader, Plus } from 'lucide-react';
 import { createPayment, getPublicSettings } from '../lib/api';
-import { useAuth } from '../App';
+import { useAuth } from '../lib/authContext';
 
 // Inline coin SVG matching the Navbar style
 function CoinIcon({ className = 'w-5 h-5' }) {

@@ -2,7 +2,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Film, MessageCircle, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
-import { useAuth } from '../App';
+import { useAuth } from '../lib/authContext';
 
 const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio' },

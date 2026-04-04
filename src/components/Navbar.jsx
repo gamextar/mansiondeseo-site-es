@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAuth } from '../App';
+import { useAuth } from '../lib/authContext';
 
 // Coin icon as inline SVG
 const CoinIcon = ({ className = 'w-4 h-4' }) => (

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Crown, Zap, MessageCircle, Image, EyeOff, Star, ArrowLeft, Loader } from 'lucide-react';
 import { createPayment, getPublicSettings } from '../lib/api';
-import { useAuth } from '../App';
+import { useAuth } from '../lib/authContext';
 
 const DEFAULT_PLANES = [
   { id: 'premium_mensual', label: '1 mes', amount: 2999, popular: false, desc: 'Ideal para probar' },

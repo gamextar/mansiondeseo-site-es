@@ -18,7 +18,7 @@ import {
   CheckCircle2,
   Loader2,
 } from 'lucide-react';
-import { useAuth } from '../App';
+import { useAuth } from '../lib/authContext';
 import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername, getMe } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef, useSyncExternalStore
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Radio, Plus } from 'lucide-react';
-import { useAuth } from '../App';
+import { useAuth } from '../lib/authContext';
 
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.045 } } };
 const storyItem = {

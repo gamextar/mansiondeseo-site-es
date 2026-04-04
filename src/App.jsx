@@ -1,4 +1,4 @@
-import { useState, createContext, useContext, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAgeVerified } from './hooks/useAgeVerified';
@@ -32,24 +32,12 @@ import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBoot
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
+import { AuthContext, useAuth } from './lib/authContext';
 
 const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/'];
-
-// Auth context — exposes registered boolean + user object + setters
-const AuthContext = createContext({
-  registered: false,
-  user: null,
-  siteSettings: {},
-  setRegistered: () => {},
-  setUser: () => {},
-  setSiteSettings: () => {},
-});
-export function useAuth() {
-  return useContext(AuthContext);
-}
 
 function RequireRegistration({ children }) {
   const { registered } = useAuth();

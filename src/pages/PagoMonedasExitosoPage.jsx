@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, ChevronRight } from 'lucide-react';
 import { getMe, confirmPayment } from '../lib/api';
-import { useAuth } from '../App';
+import { useAuth } from '../lib/authContext';
 
 function CoinIcon({ className = 'w-5 h-5' }) {
   return (

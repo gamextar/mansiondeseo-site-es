@@ -1,7 +1,7 @@
 import { NavLink, Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { Users, Home, Shield, Film } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useAuth } from '../App';
+import { useAuth } from '../lib/authContext';
 import { useEffect } from 'react';
 import { ADMIN_SECTIONS } from '../lib/adminSections';
 
