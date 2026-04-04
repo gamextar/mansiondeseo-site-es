@@ -270,7 +270,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
         )}
       </div>
 
-      <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', bottom: '60px' }}>
+      <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', top: '50%', transform: 'translateY(-50%)' }}>
         <DesktopActionButtons story={story} onLike={onLike} navigate={navigate} onGift={onGift} />
       </div>
     </div>
@@ -873,6 +873,16 @@ export default function VideoFeedPage() {
     event.preventDefault();
   }, [isDesktopViewport]);
 
+  useEffect(() => {
+    if (!isDesktopViewport) return undefined;
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowLeft') moveDesktopByOne(-1);
+      else if (e.key === 'ArrowRight') moveDesktopByOne(1);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDesktopViewport, moveDesktopByOne]);
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black flex items-center justify-center z-40">
@@ -1068,17 +1078,17 @@ export default function VideoFeedPage() {
         <>
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(-1) : jumpByOne(-1))}
-            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-16 h-16 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
+            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
             style={{ left: 'calc(50% - 350px)' }}
           >
-            <ChevronLeft className="w-8 h-8 text-white/70" />
+            <ChevronLeft className="w-9 h-9 text-white/70" />
           </button>
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(1) : jumpByOne(1))}
-            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-16 h-16 rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
+            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
             style={{ right: 'calc(50% - 350px)' }}
           >
-            <ChevronRight className="w-8 h-8 text-white/70" />
+            <ChevronRight className="w-9 h-9 text-white/70" />
           </button>
         </>
       )}
