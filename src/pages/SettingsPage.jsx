@@ -417,31 +417,6 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-mansion-base flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-mansion-gold border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  const ToggleSwitch = ({ value, onChange }) => (
-    <button
-      onClick={() => onChange(!value)}
-      className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${value ? 'bg-mansion-gold' : 'bg-mansion-border'}`}
-    >
-      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
-    </button>
-  );
-
-  const Counter = ({ value, onChange, min = 0, max = 99 }) => (
-    <div className="flex items-center gap-3">
-      <button onClick={() => onChange(Math.max(min, value - 1))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">−</button>
-      <span className="text-xl font-bold text-mansion-gold w-10 text-center">{value}</span>
-      <button onClick={() => onChange(Math.min(max, value + 1))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">+</button>
-    </div>
-  );
-
   const activeSection = searchParams.get('section') || 'fotos';
   const sectionMeta = ADMIN_SECTIONS.find(s => s.key === activeSection) || ADMIN_SECTIONS[0];
 
@@ -473,6 +448,31 @@ export default function SettingsPage() {
       }
     };
   }, [activeSection, debugPanelPrefs?.media, searchParams]);
+
+  const ToggleSwitch = ({ value, onChange }) => (
+    <button
+      onClick={() => onChange(!value)}
+      className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${value ? 'bg-mansion-gold' : 'bg-mansion-border'}`}
+    >
+      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
+    </button>
+  );
+
+  const Counter = ({ value, onChange, min = 0, max = 99 }) => (
+    <div className="flex items-center gap-3">
+      <button onClick={() => onChange(Math.max(min, value - 1))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">−</button>
+      <span className="text-xl font-bold text-mansion-gold w-10 text-center">{value}</span>
+      <button onClick={() => onChange(Math.min(max, value + 1))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">+</button>
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-mansion-base flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-mansion-gold border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8">
