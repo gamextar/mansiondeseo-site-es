@@ -118,10 +118,12 @@ export default function FeedPage() {
     useCallback(() => loadProfiles({ silent: true }), [loadProfiles])
   );
 
-  const storyCircleSize = settings.storyCircleSize || 88;
-  const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (settings.storyCircleGap ?? 8)) / 100));
-  const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (settings.storyCircleBorder ?? 4)) / 100));
-  const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (settings.storyCircleInnerGap ?? 3)) / 100));
+  const safeSettings = settings && typeof settings === 'object' ? settings : {};
+  const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
+  const storyCircleSize = safeSettings.storyCircleSize || 88;
+  const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
+  const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
+  const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleInnerGap ?? 3)) / 100));
 
   const viewedRaw = useSyncExternalStore(
     useCallback((cb) => {
@@ -206,7 +208,7 @@ export default function FeedPage() {
               </div>
             </motion.div>
           )}
-          {profiles.filter(p => p.has_active_story).slice(0, 15).map((p) => {
+          {safeProfiles.filter(p => p.has_active_story).slice(0, 15).map((p) => {
             const photo = getPrimaryProfilePhoto(p);
             const photoCrop = getPrimaryProfileCrop(p);
             const isViewed = viewedStoryUsers.has(p.id);
@@ -253,7 +255,7 @@ export default function FeedPage() {
         transition={{ duration: 0.3, delay: 0.25 }}
       >
         <p className="text-text-dim text-xs">
-          {profiles.length} {profiles.length === 1 ? 'usuario' : 'usuarios'} conectados
+          {safeProfiles.length} {safeProfiles.length === 1 ? 'usuario' : 'usuarios'} conectados
         </p>
       </motion.div>
 
@@ -268,10 +270,10 @@ export default function FeedPage() {
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
           </div>
-        ) : profiles.length > 0 ? (
+        ) : safeProfiles.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
-            {profiles.map((profile, index) => (
-              <ProfileCard key={profile.id} profile={profile} index={index} viewerPremium={viewerPremium} settings={settings} />
+            {safeProfiles.map((profile, index) => (
+              <ProfileCard key={profile.id} profile={profile} index={index} viewerPremium={viewerPremium} settings={safeSettings} />
             ))}
           </div>
         ) : (
