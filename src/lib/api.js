@@ -20,6 +20,8 @@ const TOKEN_KEY = 'mansion_token';
 const USER_KEY = 'mansion_user';
 const AUTH_ME_CACHE_KEY = 'authMe';
 const AUTH_ME_CACHE_TTL_MS = 10 * 60_000;
+const OWN_PROFILE_DASHBOARD_CACHE_KEY = 'ownProfileDashboard';
+const OWN_PROFILE_DASHBOARD_TTL_MS = 10 * 60_000;
 const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
@@ -54,11 +56,22 @@ function invalidateBootstrapCache() {
   sessionCache.delete('appBootstrap');
 }
 
+function cacheOwnProfileDashboard(data) {
+  if (!data || typeof data !== 'object') return;
+  sessionCache.set(OWN_PROFILE_DASHBOARD_CACHE_KEY, data);
+  sharedGetCache.set('ownProfileDashboard', { value: data, timestamp: Date.now(), promise: null });
+}
+
 function cacheMeResponse(data) {
   if (!data?.user) return;
   setStoredUser(data.user);
   sessionCache.set(AUTH_ME_CACHE_KEY, data);
   sharedGetCache.set('me', { value: data, timestamp: Date.now(), promise: null });
+}
+
+function invalidateOwnProfileDashboardCache() {
+  sharedGetCache.delete('ownProfileDashboard');
+  sessionCache.delete(OWN_PROFILE_DASHBOARD_CACHE_KEY);
 }
 
 function invalidateMeCache() {
@@ -70,7 +83,15 @@ function mergeMeCache(partialUser) {
   if (!partialUser || typeof partialUser !== 'object') return;
   const currentUser = getStoredUser();
   if (!currentUser) return;
-  cacheMeResponse({ user: { ...currentUser, ...partialUser } });
+  const nextUser = { ...currentUser, ...partialUser };
+  cacheMeResponse({ user: nextUser });
+  const currentDashboard = sessionCache.get(OWN_PROFILE_DASHBOARD_CACHE_KEY, OWN_PROFILE_DASHBOARD_TTL_MS);
+  if (currentDashboard?.user) {
+    cacheOwnProfileDashboard({
+      ...currentDashboard,
+      user: { ...currentDashboard.user, ...nextUser },
+    });
+  }
 }
 
 function invalidateUnreadCountCache() {
@@ -606,6 +627,15 @@ export async function getAppBootstrap() {
   const cached = sessionCache.get('appBootstrap', 2 * 60_000);
   if (cached) {
     if (typeof cached?.unread === 'number') setUnreadCountCache({ unread: cached.unread });
+    if (cached?.user) {
+      const currentDashboard = sessionCache.get(OWN_PROFILE_DASHBOARD_CACHE_KEY, OWN_PROFILE_DASHBOARD_TTL_MS);
+      if (currentDashboard?.user) {
+        cacheOwnProfileDashboard({
+          ...currentDashboard,
+          user: { ...currentDashboard.user, ...cached.user },
+        });
+      }
+    }
     return Promise.resolve(cached);
   }
 
@@ -625,6 +655,7 @@ export async function logout() {
     // Ignore errors on logout
   }
   invalidateMeCache();
+  invalidateOwnProfileDashboardCache();
   clearAuth();
 }
 
@@ -649,7 +680,7 @@ export function invalidateProfilesCache() {
 }
 
 export async function getProfile(id) {
-  return sharedGet(`profile:${id}`, () => apiFetch__getProfile(id), { ttlMs: 30_000 });
+  return sharedGet(`profile:${id}`, () => apiFetch__getProfile(id), { ttlMs: 2 * 60_000 });
 }
 
 async function apiFetch__getProfile(id) {
@@ -665,8 +696,30 @@ export async function updateProfile(fields) {
     cacheMeResponse({ user: data.user });
     sharedGetCache.delete(`profile:${data.user.id}`);
     invalidateBootstrapCache();
+    const currentDashboard = sessionCache.get(OWN_PROFILE_DASHBOARD_CACHE_KEY, OWN_PROFILE_DASHBOARD_TTL_MS);
+    if (currentDashboard) {
+      cacheOwnProfileDashboard({
+        ...currentDashboard,
+        user: { ...(currentDashboard.user || {}), ...data.user },
+      });
+    }
   }
   return data;
+}
+
+export async function getOwnProfileDashboard() {
+  const cached = sessionCache.get(OWN_PROFILE_DASHBOARD_CACHE_KEY, OWN_PROFILE_DASHBOARD_TTL_MS);
+  if (cached) {
+    if (cached?.user) cacheMeResponse({ user: cached.user });
+    return Promise.resolve(cached);
+  }
+
+  return sharedGet('ownProfileDashboard', async () => {
+    const data = await apiFetch('/me/dashboard');
+    if (data?.user) cacheMeResponse({ user: data.user });
+    cacheOwnProfileDashboard(data);
+    return data;
+  }, { ttlMs: OWN_PROFILE_DASHBOARD_TTL_MS });
 }
 
 // ── Messages ────────────────────────────────────────────
@@ -863,6 +916,7 @@ export async function sendGift(receiverId, giftId, message = '') {
     body: JSON.stringify({ receiver_id: receiverId, gift_id: giftId, message }),
   });
   sharedGetCache.delete(`gifts:${receiverId}`);
+  if (getStoredUser()?.id === receiverId) invalidateOwnProfileDashboardCache();
   return data;
 }
 
@@ -1002,6 +1056,7 @@ export async function uploadStory(file, { caption = '', onProgress, tokenOverrid
 	 tokenOverride,
   });
   invalidateStoryFeedCache();
+  mergeMeCache({ has_active_story: true });
   return data;
 }
 
@@ -1041,6 +1096,7 @@ export async function adminDeleteStory(storyId) {
 export async function deleteOwnStory(storyId) {
   const data = await apiFetch(`/stories/${storyId}`, { method: 'DELETE' });
   invalidateStoryFeedCache();
+  mergeMeCache({ has_active_story: false });
   return data;
 }
 

@@ -1144,6 +1144,64 @@ async function handleAppBootstrap(request, env) {
   });
 }
 
+// ── GET /api/me/dashboard ──────────────────────────────
+
+async function handleOwnProfileDashboard(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  await ensureConversationStateTables(env);
+
+  const [dbUser, activeStory, visitRows, giftRows] = await Promise.all([
+    env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
+    env.DB.prepare('SELECT id FROM stories WHERE user_id = ? AND active = 1 LIMIT 1').bind(auth.sub).first(),
+    env.DB.prepare(
+      `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.city, u.role, u.premium, u.last_active,
+              MAX(pv.created_at) as visited_at
+       FROM profile_visits pv
+       JOIN users u ON u.id = pv.visitor_id
+       WHERE pv.visited_id = ?
+       GROUP BY pv.visitor_id
+       ORDER BY visited_at DESC
+       LIMIT 10`
+    ).bind(auth.sub).all(),
+    env.DB.prepare(
+      `SELECT ug.id, ug.message, ug.created_at,
+              gc.name as gift_name, gc.emoji as gift_emoji, gc.price as gift_price,
+              u.id as sender_id, u.username as sender_name, u.avatar_url as sender_avatar
+       FROM user_gifts ug
+       JOIN gift_catalog gc ON gc.id = ug.gift_id
+       JOIN users u ON u.id = ug.sender_id
+       WHERE ug.receiver_id = ?
+       ORDER BY ug.created_at DESC
+       LIMIT 50`
+    ).bind(auth.sub).all(),
+  ]);
+
+  if (!dbUser) return error('Usuario no encontrado', 404);
+
+  const user = sanitizeUser(dbUser, env);
+  user.has_active_story = !!activeStory;
+
+  const visitors = (visitRows?.results || []).map((v) => ({
+    id: v.id,
+    name: v.username,
+    avatar_url: v.avatar_url,
+    avatar_crop: safeParseJSON(v.avatar_crop, null),
+    age: v.age,
+    city: v.city,
+    role: v.role,
+    premium: !!v.premium,
+    online: isOnline(v.last_active),
+    visited_at: v.visited_at,
+  }));
+
+  return json({
+    user,
+    visitors,
+    gifts: giftRows?.results || [],
+  });
+}
+
 // ── GET /api/profiles ───────────────────────────────────
 
 async function handleProfiles(request, env) {
@@ -3666,6 +3724,7 @@ async function handleRequest(request, env) {
   if (path === '/api/auth/me' && method === 'GET') return handleMe(request, env);
   if (path === '/api/auth/logout' && method === 'POST') return handleLogout(request, env);
   if (path === '/api/app/bootstrap' && method === 'GET') return handleAppBootstrap(request, env);
+  if (path === '/api/me/dashboard' && method === 'GET') return handleOwnProfileDashboard(request, env);
 
   // ── Profile routes
   if (path === '/api/profiles' && method === 'GET') return handleProfiles(request, env);

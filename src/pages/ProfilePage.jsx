@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil } from 'lucide-react';
 import { useAuth } from '../App';
-import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getVisits, getReceivedGifts, deleteOwnStory, invalidateProfilesCache } from '../lib/api';
+import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
@@ -145,11 +145,14 @@ export default function ProfilePage() {
   }, [lightboxOpen, user]);
 
   useEffect(() => {
-    getVisits().then(data => setVisitors(data.visitors || [])).catch(() => {});
-    if (user?.id) {
-      getReceivedGifts(user.id).then(data => setReceivedGifts(data.gifts || [])).catch(() => {});
-    }
-  }, [user?.id]);
+    getOwnProfileDashboard()
+      .then((data) => {
+        if (data?.user) setUser((prev) => prev ? { ...prev, ...data.user } : data.user);
+        setVisitors(data?.visitors || []);
+        setReceivedGifts(data?.gifts || []);
+      })
+      .catch(() => {});
+  }, [setUser]);
 
   // Auto-save reordered photos
   const persistOrder = useCallback(async (newPhotos) => {
