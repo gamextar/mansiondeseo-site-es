@@ -2,8 +2,8 @@ import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Film, MessageCircle, User, Crown, Settings, Camera } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
-import { useState, useEffect } from 'react';
-import { getVisits, getToken } from '../lib/api';
+import { useState } from 'react';
+import { peekOwnProfileDashboard } from '../lib/api';
 import { useAuth } from '../App';
 import AvatarImg from './AvatarImg';
 
@@ -30,46 +30,11 @@ export default function DesktopSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
-  const [visitors, setVisitors] = useState([]);
+  const [visitors] = useState(() => peekOwnProfileDashboard()?.visitors || []);
   const { user, siteSettings } = useAuth();
   const sidebarAvatarSize = Math.max(72, Math.min(220, Number(siteSettings?.sidebarAvatarSize ?? 154)));
   const sidebarRingWidth = Math.max(1, Math.round((sidebarAvatarSize * Math.max(1, Math.min(18, Number(siteSettings?.sidebarStoryRingWidth ?? siteSettings?.storyCircleBorder ?? 4)))) / 100));
   const sidebarInnerGap = Math.max(0, Math.round((sidebarAvatarSize * Math.max(0, Math.min(16, Number(siteSettings?.storyCircleInnerGap ?? 3)))) / 100));
-
-  useEffect(() => {
-    if (!getToken()) return;
-    let cancelled = false;
-    let fallbackTimer = null;
-
-    const loadVisits = () => {
-      getVisits().then((data) => {
-        if (!cancelled) setVisitors(data.visitors || []);
-      }).catch(() => {});
-    };
-
-    // Visitors in the desktop sidebar are nice-to-have, not critical UI.
-    // Delay them so home/chat navigation does not always pay an extra request.
-    if (typeof window.requestIdleCallback === 'function') {
-      const idleId = window.requestIdleCallback(() => {
-        if (!cancelled && document.visibilityState === 'visible') loadVisits();
-      }, { timeout: 8000 });
-
-      return () => {
-        cancelled = true;
-        window.cancelIdleCallback?.(idleId);
-        if (fallbackTimer) clearTimeout(fallbackTimer);
-      };
-    }
-
-    fallbackTimer = setTimeout(() => {
-      if (!cancelled && document.visibilityState === 'visible') loadVisits();
-    }, 8000);
-
-    return () => {
-      cancelled = true;
-      if (fallbackTimer) clearTimeout(fallbackTimer);
-    };
-  }, []);
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
