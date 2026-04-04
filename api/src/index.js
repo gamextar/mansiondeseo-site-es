@@ -3324,7 +3324,6 @@ async function ensureStoriesTable(env) {
 
 // GET /api/stories
 async function handleGetStories(request, env) {
-  await ensureStoriesTable(env);
   const url = new URL(request.url);
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
   const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
@@ -3367,7 +3366,6 @@ async function handleGetStories(request, env) {
 async function handleToggleStoryLike(request, env, storyId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
-  await ensureStoriesTable(env);
 
   const story = await env.DB.prepare('SELECT id, user_id, likes FROM stories WHERE id = ?').bind(storyId).first();
   if (!story) return error('Historia no encontrada', 404);
@@ -3412,7 +3410,6 @@ async function handleToggleStoryLike(request, env, storyId) {
 async function handleSyncStoryLikes(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
-  await ensureStoriesTable(env);
 
   const body = await request.json().catch(() => ({}));
   const rawUpdates = Array.isArray(body?.updates) ? body.updates : [];
@@ -3512,7 +3509,6 @@ async function handleAdminUploadStory(request, env) {
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
 
-  await ensureStoriesTable(env);
 
   const url = new URL(request.url);
   const userId = url.searchParams.get('user_id');
@@ -3572,7 +3568,6 @@ async function handleDeleteOwnStory(request, env, storyId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
-  await ensureStoriesTable(env);
 
   let story;
   if (storyId === 'current') {
@@ -3602,7 +3597,6 @@ async function handleAdminDeleteStory(request, env, storyId) {
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
 
-  await ensureStoriesTable(env);
 
   const story = await env.DB.prepare('SELECT id, video_url FROM stories WHERE id = ?').bind(storyId).first();
   if (!story) return error('Historia no encontrada', 404);
@@ -3625,7 +3619,6 @@ async function handleUploadStory(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
-  await ensureStoriesTable(env);
 
   const url = new URL(request.url);
   const caption = url.searchParams.get('caption') || '';
