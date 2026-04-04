@@ -3371,9 +3371,10 @@ async function handleGetStories(request, env) {
     JOIN users u ON u.id = s.user_id
     LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?
     WHERE s.active = 1
+      AND (? IS NULL OR s.user_id != ?)
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
-  `).bind(viewerId || '', limit, offset).all();
+  `).bind(viewerId || '', viewerId, viewerId, limit, offset).all();
 
   const stories = (results || []).map(r => ({
     id: r.id,
