@@ -1737,28 +1737,8 @@ async function handleChatWebSocket(request, env, chatId) {
 
 // ── Notify UserNotification DO ──────────────────────────
 
-// Cache premium status per user in Worker memory to avoid D1 lookups
-const _premiumCache = new Map(); // userId → { isPremium, exp }
-const PREMIUM_CACHE_TTL_MS = 60_000; // 1 min
-
-async function isUserPremium(env, userId) {
-  const now = Date.now();
-  const cached = _premiumCache.get(userId);
-  if (cached && now < cached.exp) return cached.isPremium;
-  const user = await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(userId).first();
-  const isPremium = !!(user && user.premium_until && new Date(user.premium_until.endsWith('Z') ? user.premium_until : user.premium_until + 'Z') > new Date());
-  _premiumCache.set(userId, { isPremium, exp: now + PREMIUM_CACHE_TTL_MS });
-  return isPremium;
-}
-
 async function notifyUser(env, userId, data) {
   try {
-    // Skip DO wake-up for free users — they don't connect notification WS
-    const premium = await isUserPremium(env, userId);
-    if (!premium) {
-      debugLog(env, '[notifyUser] skipping free user:', userId);
-      return;
-    }
     debugLog(env, '[notifyUser] userId:', userId, 'data:', JSON.stringify(data));
     const doId = env.USER_NOTIFICATIONS.idFromName(userId);
     const stub = env.USER_NOTIFICATIONS.get(doId);
@@ -1843,10 +1823,6 @@ async function handleNotificationWebSocket(request, env) {
 
   const payload = await verifyJWT(token, env.JWT_SECRET);
   if (!payload) return error('Token inválido', 401);
-
-  // Only premium users get notification WS — free users use HTTP polling
-  const premium = await isUserPremium(env, payload.sub);
-  if (!premium) return error('Reservado para usuarios VIP', 403);
 
   debugLog(env, '[handleNotificationWebSocket] userId:', payload.sub);
   try {

@@ -41,7 +41,6 @@ export function UnreadProvider({ children }) {
   const unreadFetchRef = useRef(null);
   const lastUnreadFetchAtRef = useRef(0);
   const activeChatIdRef = useRef(null);
-  const isPremiumRef = useRef(false); // only premium users get notification WS
 
   const applyUnreadCount = useCallback((total, { showToast = false } = {}) => {
     const nextTotal = Math.max(0, Number(total) || 0);
@@ -157,9 +156,6 @@ export function UnreadProvider({ children }) {
   const connectWs = useCallback(() => {
     const token = getToken();
     if (!token || wsClosedRef.current || wsPausedRef.current) return;
-    // Free users skip notification WS entirely — saves 1 DO per user.
-    // They still get unread count via bootstrap + HTTP refresh on focus.
-    if (!isPremiumRef.current) return;
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -270,19 +266,12 @@ export function UnreadProvider({ children }) {
       lastUnreadFetchAtRef.current = Date.now();
       getAppBootstrap()
         .then((data) => {
-          if (data?.user) {
-            isPremiumRef.current = !!data.user.premium;
-          }
           if (typeof data?.unread === 'number') {
             lastUnreadFetchAtRef.current = Date.now();
             applyUnreadCount(data.unread);
-          } else {
-            return fetchUnread({ force: true });
+            return;
           }
-        })
-        .then(() => {
-          // Connect WS only after bootstrap resolves (so isPremiumRef is set)
-          if (isPremiumRef.current && document.visibilityState === 'visible') connectWs();
+          return fetchUnread({ force: true });
         })
         .catch(() => {
           fetchUnread({ force: true }).catch(() => {});
@@ -298,9 +287,9 @@ export function UnreadProvider({ children }) {
         clearBackgroundDisconnectTimer();
         wsPausedRef.current = false;
         wsRetryRef.current = 0; // fresh retry budget on foreground
-        if (isPremiumRef.current) connectWs();
+        connectWs();
         if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
-        else if (isPremiumRef.current) startPing();
+        else startPing();
       } else {
         scheduleBackgroundDisconnect();
       }
@@ -311,13 +300,12 @@ export function UnreadProvider({ children }) {
       clearBackgroundDisconnectTimer();
       wsPausedRef.current = false;
       wsRetryRef.current = 0; // fresh retry budget on focus
-      if (isPremiumRef.current) connectWs();
+      connectWs();
       if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
-      else if (isPremiumRef.current) startPing();
+      else startPing();
     };
 
-    // WS connection is established in the bootstrap .then() above, not here.
-    // This ensures isPremiumRef is set before attempting to connect.
+    if (document.visibilityState === 'visible') connectWs();
 
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('focus', onFocus);

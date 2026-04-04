@@ -488,20 +488,15 @@ export class ChatRoom {
         const id2 = chatId.slice(37);
         const receiverId = id1 !== senderId ? id1 : id2;
         if (receiverId && this.shouldNotifyTyping(senderId, receiverId)) {
-          // Only notify UserNotification DO if receiver is premium (has WS connected).
-          // Free users don't connect notification WS, so this would wake a DO for nothing.
-          const receiverStatus = await this.getSenderStatus(receiverId);
-          if (receiverStatus.isPremium) {
-            try {
-              const doId = this.env.USER_NOTIFICATIONS.idFromName(receiverId);
-              const stub = this.env.USER_NOTIFICATIONS.get(doId);
-              stub.fetch('https://do/notify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: 'typing', chatId, userId: senderId }),
-              }).catch(() => {});
-            } catch { /* ignore */ }
-          }
+          try {
+            const doId = this.env.USER_NOTIFICATIONS.idFromName(receiverId);
+            const stub = this.env.USER_NOTIFICATIONS.get(doId);
+            stub.fetch('https://do/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'typing', chatId, userId: senderId }),
+            }).catch(() => {});
+          } catch { /* ignore */ }
         }
       }
     } else if (data.type === 'ping') {
@@ -638,16 +633,9 @@ export class ChatRoom {
         });
         this.debug('[ChatRoom.handleMessage] D1 write done');
         // Notify UserNotification DOs so ChatListPage updates in real-time
-        // Only notify premium users — free users don't connect notification WS,
-        // so waking their DO would be wasted (no sockets to broadcast to).
         const events = await this.buildNewMessageEvents(senderId, receiverId, msg);
         for (const userId of [senderId, receiverId]) {
           try {
-            const userStatus = await this.getSenderStatus(userId);
-            if (!userStatus.isPremium) {
-              this.debug('[ChatRoom.handleMessage] skipping UserNotification for free user:', userId);
-              continue;
-            }
             this.debug('[ChatRoom.handleMessage] notifying UserNotification for:', userId);
             const doId = this.env.USER_NOTIFICATIONS.idFromName(userId);
             const stub = this.env.USER_NOTIFICATIONS.get(doId);
