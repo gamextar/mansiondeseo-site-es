@@ -536,12 +536,7 @@ export default function VideoFeedPage() {
     } catch {}
     return [];
   };
-  const myUserId = user?.id ? String(user.id) : null;
-  const targetIsOwnStory = myUserId && String(location.state?.storyUserId) === myUserId;
-  const rawInitial = applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
-  const initial = myUserId && !targetIsOwnStory
-    ? rawInitial.filter(s => String(s.user_id) !== myUserId)
-    : rawInitial;
+  const initial = applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
@@ -600,15 +595,10 @@ export default function VideoFeedPage() {
   const refreshStories = useCallback(async () => {
     const data = await getStories();
     const fresh = applyPendingStoryLikeState(data.stories || [], getPendingStoryLikes());
-    const myId = user?.id ? String(user.id) : null;
-    const targetIsOwn = myId && String(initialStoryUserIdRef.current) === myId;
-    const feed = myId && !targetIsOwn
-      ? fresh.filter(s => String(s.user_id) !== myId)
-      : fresh;
-    setStories(feed);
-    persistStories(feed);
-    return feed;
-  }, [persistStories, user?.id]);
+    setStories(fresh);
+    persistStories(fresh);
+    return fresh;
+  }, [persistStories]);
 
   useEffect(() => {
     let cancelled = false;
