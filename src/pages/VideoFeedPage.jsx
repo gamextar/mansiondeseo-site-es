@@ -548,7 +548,12 @@ export default function VideoFeedPage() {
     } catch {}
     return [];
   };
-  const initial = applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
+  const isOwnStoryView = !!location.state?.ownStory;
+  let initial = applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
+  // If not navigating to own story, strip own story from stale cache
+  if (!isOwnStoryView && user?.id) {
+    initial = initial.filter(s => String(s.user_id) !== String(user.id));
+  }
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
