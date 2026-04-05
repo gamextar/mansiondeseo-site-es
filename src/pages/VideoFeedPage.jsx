@@ -536,12 +536,7 @@ export default function VideoFeedPage() {
     } catch {}
     return [];
   };
-  const myUserId = user?.id ? String(user.id) : null;
-  const ownStoryRef = useRef(null);
-  const rawInitial = applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
-  const initial = myUserId
-    ? rawInitial.filter(s => String(s.user_id) !== myUserId)
-    : rawInitial;
+  const initial = applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
@@ -600,13 +595,10 @@ export default function VideoFeedPage() {
   const refreshStories = useCallback(async () => {
     const data = await getStories();
     const fresh = applyPendingStoryLikeState(data.stories || [], getPendingStoryLikes());
-    const own = myUserId ? fresh.find(s => String(s.user_id) === myUserId) : null;
-    ownStoryRef.current = own || null;
-    const others = myUserId ? fresh.filter(s => String(s.user_id) !== myUserId) : fresh;
-    setStories(others);
-    persistStories(others);
-    return others;
-  }, [persistStories, myUserId]);
+    setStories(fresh);
+    persistStories(fresh);
+    return fresh;
+  }, [persistStories]);
 
   useEffect(() => {
     let cancelled = false;
@@ -629,25 +621,13 @@ export default function VideoFeedPage() {
     const targetStoryUserId = initialStoryUserIdRef.current;
     if (!targetStoryUserId || stories.length === 0) return;
 
-    if (myUserId && String(targetStoryUserId) === myUserId) {
-      if (!ownStoryRef.current) return; // fetch not done yet
-      setStories(prev => {
-        if (String(prev[0]?.user_id) === myUserId) return prev;
-        return [ownStoryRef.current, ...prev];
-      });
-      setActiveDispIdx(1);
-      setBoundaryOverlayIdx(null);
-      initialStoryUserIdRef.current = null;
-      return;
-    }
-
     const targetIndex = stories.findIndex((story) => String(story.user_id) === String(targetStoryUserId));
     if (targetIndex < 0) return;
 
     setActiveDispIdx(targetIndex + 1);
     setBoundaryOverlayIdx(null);
     initialStoryUserIdRef.current = null;
-  }, [stories, myUserId]);
+  }, [stories]);
 
   useEffect(() => {
     if (!activeStory?.user_id) return;
