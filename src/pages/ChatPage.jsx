@@ -13,7 +13,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
-const CHAT_CACHE_TTL_MS = 120_000;
+const CHAT_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_MESSAGE_LIMIT = 60;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
@@ -35,13 +35,17 @@ function readChatCache(partnerId) {
     const raw = sessionStorage.getItem(getChatCacheKey(partnerId));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed?.cachedAt || Date.now() - parsed.cachedAt > CHAT_CACHE_TTL_MS) {
+    if (!parsed?.cachedAt) return null;
+    // Use cache as placeholder even if slightly stale — WS history will replace it.
+    // Only discard if very old (>30 min) to avoid showing wildly outdated data.
+    if (Date.now() - parsed.cachedAt > 30 * 60_000) {
       sessionStorage.removeItem(getChatCacheKey(partnerId));
       return null;
     }
     return {
       ...parsed,
       messages: normalizeMessages(parsed.messages || []),
+      isStale: Date.now() - parsed.cachedAt > CHAT_CACHE_TTL_MS,
     };
   } catch {
     return null;
@@ -330,7 +334,7 @@ export default function ChatPage() {
         scrollToBottom(behavior);
       });
     }
-  }, [messages, partnerTyping, scrollToBottom]);
+  }, [messages, scrollToBottom]);
 
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
@@ -376,8 +380,10 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!partnerTyping || !wasAtBottomRef.current) return;
-    requestScrollToBottom('smooth');
-  }, [partnerTyping, requestScrollToBottom]);
+    // Small delay so the typing bubble renders first, then scroll gently.
+    const t = setTimeout(() => scrollToBottom('smooth'), 50);
+    return () => clearTimeout(t);
+  }, [partnerTyping, scrollToBottom]);
 
   if (!partner && !loading) {
     return (
@@ -658,7 +664,7 @@ export default function ChatPage() {
         </AnimatePresence>
         <div
           ref={messagesEndRef}
-          className={partnerTyping ? 'h-24 lg:h-10' : 'h-12 lg:h-6'}
+          className="h-6"
           style={{ scrollMarginBottom: '24px' }}
         />
       </div>
