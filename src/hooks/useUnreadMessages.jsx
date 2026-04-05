@@ -164,8 +164,12 @@ export function UnreadProvider({ children }) {
           }
           if (data.type === 'new_message') {
             invalidateConversationsCache();
-            applyCachedConversationWsUpdate(data);
             const isActiveChat = !!activeChatIdRef.current && data.chatId === activeChatIdRef.current;
+            // Only update conversation cache if user is NOT currently reading this chat,
+            // otherwise we'd write unread:1 for a message the user is seeing in real-time
+            if (!isActiveChat) {
+              applyCachedConversationWsUpdate(data);
+            }
             if (typeof data.unreadCount === 'number') {
               applyUnreadCount(
                 isActiveChat ? Math.max(0, data.unreadCount - 1) : data.unreadCount,

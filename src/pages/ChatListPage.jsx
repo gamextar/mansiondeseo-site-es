@@ -189,6 +189,10 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
   );
 }
 
+// Module-level: survives component unmount/remount so we remember
+// which conversations the user already opened this session.
+const _readProfileIds = new Set();
+
 export default function ChatListPage() {
   const cachedState = getCachedConversations();
   const [conversations, setConversations] = useState(cachedState.conversations);
@@ -197,7 +201,6 @@ export default function ChatListPage() {
   const [typingChats, setTypingChats] = useState({});
   const typingTimersRef = useRef({});
   const lastSyncAtRef = useRef(cachedState.timestamp || 0);
-  const readProfileIdsRef = useRef(new Set());
   const navigate = useNavigate();
   const { refresh: refreshUnread, subscribe } = useUnreadMessages();
 
@@ -241,9 +244,9 @@ export default function ChatListPage() {
         let convs = data.conversations || [];
         // Force unread=0 for conversations the user already opened this session,
         // because the server may not have flushed the D1 unread_count yet.
-        if (readProfileIdsRef.current.size > 0) {
+        if (_readProfileIds.size > 0) {
           convs = convs.map(c =>
-            readProfileIdsRef.current.has(c.profileId)
+            _readProfileIds.has(c.profileId)
               ? { ...c, unread: 0 }
               : c
           );
@@ -259,7 +262,7 @@ export default function ChatListPage() {
   }, []);
 
   const markConversationRead = useCallback((profileId) => {
-    readProfileIdsRef.current.add(profileId);
+    _readProfileIds.add(profileId);
     markConversationReadInCache(profileId);
     setConversations((prev) => {
       const idx = prev.findIndex(c => c.profileId === profileId);
@@ -339,7 +342,7 @@ export default function ChatListPage() {
     const unsubscribe = subscribe((event) => {
       if (event?.type === 'new_message') {
         // A new message arrived — clear the read override for this partner
-        if (event.partnerId) readProfileIdsRef.current.delete(event.partnerId);
+        if (event.partnerId) _readProfileIds.delete(event.partnerId);
         const updated = applyConversationUpdate(event);
         if (!updated) fetchConversations();
       } else if (event?.type === 'conversation_deleted' && event.partnerId) {
