@@ -7,7 +7,7 @@ import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import EmojiPicker from '../components/EmojiPicker';
 import AvatarImg from '../components/AvatarImg';
-import { getMessageLimit, getProfile, getProfileWithMessageLimit, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, markConversationReadInCache } from '../lib/api';
+import { getMessageLimit, getProfile, getProfileWithMessageLimit, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
@@ -162,14 +162,11 @@ export default function ChatPage() {
     clearTimeout(historyFallbackTimerRef.current);
     myUserIdRef.current = String(user.id);
     setActiveChatId([String(user.id), partnerId].sort().join('-'));
-    markConversationReadInCache(partnerId);
     setPartner(nextCachedChat?.partner || nextPartnerPreview || null);
     setMessages(nextCachedChat?.messages || []);
     setApiLimit(nextCachedChat?.apiLimit || null);
     setHasOlderMessages(nextCachedChat?.hasOlderMessages || false);
-    // Show loading until we have messages (either from cache or WS onHistory)
-    const hasCachedMessages = (nextCachedChat?.messages || []).length > 0;
-    setLoading(!hasCachedMessages);
+    setLoading(!nextCachedChat && !nextPartnerPreview);
     if ((nextCachedChat?.messages || []).length > 0) {
       wasAtBottomRef.current = true;
       requestScrollToBottom('auto');
@@ -277,7 +274,8 @@ export default function ChatPage() {
       cancelled = true;
       clearTimeout(historyFallbackTimerRef.current);
       setActiveChatId(null);
-      markConversationReadInCache(partnerId);
+      // Refresh global unread count once when leaving the chat.
+      // By now the DO has had time to flush unread_count=0 to D1.
       refreshUnread();
       chatRef.current?.close();
       chatRef.current = null;

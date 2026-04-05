@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, MessageCircle, Trash2 } from 'lucide-react';
-import { deleteConversation, getConversations, getToken, getStoredUser, markConversationReadInCache } from '../lib/api';
+import { deleteConversation, getConversations, getToken, getStoredUser, invalidateConversationsCache } from '../lib/api';
 import AvatarImg from '../components/AvatarImg';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 
@@ -86,8 +86,6 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
           avatar_crop: conv.avatarCrop,
           photos: [],
           online: conv.online,
-          lastMessage: conv.lastMessage,
-          lastMessageTimestamp: conv.timestamp,
         },
       },
     });
@@ -189,10 +187,6 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
   );
 }
 
-// Module-level: survives component unmount/remount so we remember
-// which conversations the user already opened this session.
-const _readProfileIds = new Set();
-
 export default function ChatListPage() {
   const cachedState = getCachedConversations();
   const [conversations, setConversations] = useState(cachedState.conversations);
@@ -204,13 +198,28 @@ export default function ChatListPage() {
   const navigate = useNavigate();
   const { refresh: refreshUnread, subscribe } = useUnreadMessages();
 
+  // Optimistically mark a conversation as read in local state + cache
+  const markConversationRead = useCallback((profileId) => {
+    const pid = String(profileId);
+    setConversations((prev) => {
+      const idx = prev.findIndex(c => String(c.profileId) === pid);
+      if (idx === -1 || prev[idx].unread === 0) return prev;
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], unread: 0 };
+      setCachedConversations(updated);
+      return updated;
+    });
+    // Invalidate API-level conversation cache so next fetch gets fresh data
+    invalidateConversationsCache();
+  }, []);
+
   const applyConversationUpdate = useCallback((event) => {
     const conversation = event?.conversation;
     if (!conversation?.profileId) return false;
     const unreadDelta = Number(event?.conversationUnreadDelta || 0);
-    const pid = String(conversation.profileId);
 
     setConversations((prev) => {
+      const pid = String(conversation.profileId);
       const existing = prev.find((item) => String(item.profileId) === pid);
       const nextUnread = typeof conversation.unread === 'number'
         ? conversation.unread
@@ -228,7 +237,7 @@ export default function ChatListPage() {
 
       const next = [
         nextConversation,
-        ...prev.filter((item) => String(item.profileId) !== pid),
+        ...prev.filter((item) => String(item.profileId) !== String(nextConversation.profileId)),
       ];
 
       setCachedConversations(next);
@@ -242,16 +251,7 @@ export default function ChatListPage() {
     if (!getToken()) return;
     getConversations()
       .then(data => {
-        let convs = data.conversations || [];
-        // Force unread=0 for conversations the user already opened this session,
-        // because the server may not have flushed the D1 unread_count yet.
-        if (_readProfileIds.size > 0) {
-          convs = convs.map(c =>
-            _readProfileIds.has(String(c.profileId))
-              ? { ...c, unread: 0 }
-              : c
-          );
-        }
+        const convs = data.conversations || [];
         setConversations(convs);
         setCachedConversations(convs);
         lastSyncAtRef.current = Date.now();
@@ -262,22 +262,10 @@ export default function ChatListPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const markConversationRead = useCallback((profileId) => {
-    _readProfileIds.add(String(profileId));
-    markConversationReadInCache(profileId);
-    setConversations((prev) => {
-      const pid = String(profileId);
-      const idx = prev.findIndex(c => String(c.profileId) === pid);
-      if (idx === -1 || prev[idx].unread === 0) return prev;
-      const updated = [...prev];
-      updated[idx] = { ...updated[idx], unread: 0 };
-      return updated;
-    });
-  }, []);
-
   const removeConversation = useCallback((partnerId) => {
+    const pid = String(partnerId);
     setConversations((prev) => {
-      const next = prev.filter((item) => item.profileId !== partnerId);
+      const next = prev.filter((item) => String(item.profileId) !== pid);
       setCachedConversations(next);
       return next;
     });
@@ -309,12 +297,10 @@ export default function ChatListPage() {
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
 
-    // Re-read cache at mount time so a logout+login cycle never shows stale data
+    // Re-read cache at mount time so stale component-level initial state is replaced
     const freshCache = getCachedConversations();
     if (freshCache.conversations.length > 0) {
       setConversations(freshCache.conversations);
-    } else {
-      setConversations([]);
     }
     lastSyncAtRef.current = freshCache.timestamp || 0;
 
@@ -343,12 +329,8 @@ export default function ChatListPage() {
     const myId = getStoredUser()?.id;
     const unsubscribe = subscribe((event) => {
       if (event?.type === 'new_message') {
-        // A new message arrived — clear the read override for this partner
-        if (event.partnerId) _readProfileIds.delete(String(event.partnerId));
         const updated = applyConversationUpdate(event);
         if (!updated) fetchConversations();
-      } else if (event?.type === 'conversation_read' && event.partnerId) {
-        markConversationRead(event.partnerId);
       } else if (event?.type === 'conversation_deleted' && event.partnerId) {
         removeConversation(event.partnerId);
       } else if (event?.type === 'typing' && event.chatId && myId) {

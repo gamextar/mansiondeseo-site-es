@@ -301,14 +301,6 @@ export class ChatRoom {
     ).bind(userId, partnerId).run();
   }
 
-  async getUnreadCountForUser(userId) {
-    await this.ensureConversationStateTables();
-    const row = await this.env.DB.prepare(
-      'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'
-    ).bind(userId).first();
-    return Number(row?.unread || 0);
-  }
-
   async rebuildConversationStateForPair(userA, userB) {
     await this.ensureConversationStateTables();
     await this.ensureMessageConversationIdColumn();
@@ -710,22 +702,6 @@ export class ChatRoom {
       }
       if (partnerId) {
         await this.clearConversationStateUnread(readerId, partnerId).catch(() => {});
-        const unreadCount = await this.getUnreadCountForUser(readerId).catch(() => null);
-        try {
-          const doId = this.env.USER_NOTIFICATIONS.idFromName(readerId);
-          const stub = this.env.USER_NOTIFICATIONS.get(doId);
-          await stub.fetch('https://do/notify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'conversation_read',
-              partnerId,
-              unreadCount,
-            }),
-          });
-        } catch (err) {
-          console.error('[ChatRoom.handleRead] UserNotification error for', readerId, ':', err.message);
-        }
       }
     })());
   }

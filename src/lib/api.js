@@ -104,61 +104,6 @@ export function invalidateConversationsCache() {
   sessionCache.delete('conversations');
 }
 
-// Apply a WS new_message event to the ChatListPage sessionStorage cache
-// so it renders instantly even when ChatListPage wasn't mounted during the event.
-const CONV_CACHE_KEY = 'mansion_conversations';
-export function applyCachedConversationWsUpdate(event) {
-  if (!event?.conversation?.profileId) return;
-  try {
-    const raw = sessionStorage.getItem(CONV_CACHE_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    const convs = Array.isArray(parsed?.conversations)
-      ? parsed.conversations
-      : Array.isArray(parsed) ? parsed : [];
-    const conv = event.conversation;
-    const profileId = String(conv.profileId);
-    const existing = convs.find(c => String(c.profileId) === profileId);
-    const unreadDelta = Number(event.conversationUnreadDelta || 0);
-    const nextUnread = typeof conv.unread === 'number'
-      ? conv.unread
-      : Math.max(0, Number(existing?.unread || 0) + unreadDelta);
-    const nextConv = existing
-      ? { ...existing, ...conv, unread: nextUnread }
-      : { unread: nextUnread, ...conv };
-    const nextConvs = [nextConv, ...convs.filter(c => String(c.profileId) !== profileId)];
-    sessionStorage.setItem(CONV_CACHE_KEY, JSON.stringify({
-      conversations: nextConvs,
-      timestamp: Date.now(),
-    }));
-  } catch {}
-}
-
-// Zero out unread count for a conversation when the user opens it.
-export function markConversationReadInCache(profileId) {
-  if (!profileId) return;
-  // Invalidate the api.js conversations cache so fetchConversations()
-  // won't overwrite the zeroed-out unread with stale data
-  sharedGetCache.delete('conversations');
-  sessionCache.delete('conversations');
-  try {
-    const raw = sessionStorage.getItem(CONV_CACHE_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
-    const convs = Array.isArray(parsed?.conversations)
-      ? parsed.conversations
-      : Array.isArray(parsed) ? parsed : [];
-    const pid = String(profileId);
-    const idx = convs.findIndex(c => String(c.profileId) === pid);
-    if (idx === -1 || convs[idx].unread === 0) return;
-    const updated = [...convs];
-    updated[idx] = { ...updated[idx], unread: 0 };
-    sessionStorage.setItem(CONV_CACHE_KEY, JSON.stringify({
-      conversations: updated,
-      timestamp: Date.now(),
-    }));
-  } catch {}
-}
-
 function invalidateMessageHistoryCache(otherUserId) {
   const prefix = `messages:${otherUserId}:`;
   for (const key of sharedGetCache.keys()) {
@@ -448,9 +393,8 @@ export function clearAuth() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem('mansion_registered');
-  // Flush ALL in-memory and session caches so a new login starts clean
-  sharedGetCache.clear();
-  try { sessionStorage.clear(); } catch {}
+  invalidateBootstrapCache();
+  invalidateUnreadCountCache();
 }
 
 // ── Fetch wrapper ───────────────────────────────────────
@@ -778,13 +722,13 @@ export function peekOwnProfileDashboard() {
 // ── Messages ────────────────────────────────────────────
 
 export async function getConversations() {
-  const cached = sessionCache.get('conversations', 5 * 60_000);
+  const cached = sessionCache.get('conversations', 60 * 60_000);
   if (cached) return Promise.resolve(cached);
 
   return sharedGet('conversations', () => apiFetch('/messages').then((data) => {
     sessionCache.set('conversations', data);
     return data;
-  }), { ttlMs: 5 * 60_000 });
+  }), { ttlMs: 60 * 60_000 });
 }
 
 export async function getMessages(otherUserId, { before, limit } = {}) {

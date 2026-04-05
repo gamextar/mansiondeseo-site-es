@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
-import { getAppBootstrap, getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache, invalidateConversationsCache, applyCachedConversationWsUpdate, markConversationReadInCache } from '../lib/api';
+import { getAppBootstrap, getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache } from '../lib/api';
 import { recordRealtimeDebug, setRealtimeActiveConnections } from '../lib/realtimeDebug';
 
 const UnreadContext = createContext({
@@ -163,13 +163,7 @@ export function UnreadProvider({ children }) {
             return;
           }
           if (data.type === 'new_message') {
-            invalidateConversationsCache();
             const isActiveChat = !!activeChatIdRef.current && data.chatId === activeChatIdRef.current;
-            // Only update conversation cache if user is NOT currently reading this chat,
-            // otherwise we'd write unread:1 for a message the user is seeing in real-time
-            if (!isActiveChat) {
-              applyCachedConversationWsUpdate(data);
-            }
             if (typeof data.unreadCount === 'number') {
               applyUnreadCount(
                 isActiveChat ? Math.max(0, data.unreadCount - 1) : data.unreadCount,
@@ -183,15 +177,6 @@ export function UnreadProvider({ children }) {
                 fetchUnread({ force: true }).catch(() => {});
               }
             } else if (!isActiveChat) {
-              fetchUnread({ force: true }).catch(() => {});
-            }
-            notifyListeners(data);
-          } else if (data.type === 'conversation_read') {
-            if (data.partnerId) markConversationReadInCache(data.partnerId);
-            invalidateUnreadCache();
-            if (typeof data.unreadCount === 'number') {
-              applyUnreadCount(data.unreadCount);
-            } else {
               fetchUnread({ force: true }).catch(() => {});
             }
             notifyListeners(data);
