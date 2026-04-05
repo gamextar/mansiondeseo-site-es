@@ -1143,7 +1143,7 @@ async function handleAppBootstrap(request, env) {
 
     const [dbUser, activeStory, unreadRow] = await Promise.all([
       env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
-      env.DB.prepare('SELECT id FROM stories WHERE user_id = ? AND active = 1 LIMIT 1').bind(auth.sub).first(),
+      env.DB.prepare('SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first(),
       env.DB.prepare(
         'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'
       ).bind(auth.sub).first(),
@@ -1151,6 +1151,10 @@ async function handleAppBootstrap(request, env) {
     if (!dbUser) return error('Usuario no encontrado', 404);
     user = sanitizeUser(dbUser, env);
     user.has_active_story = !!activeStory;
+    if (activeStory) {
+      user.active_story_id = activeStory.id;
+      user.active_story_url = normalizeStoryVideoUrl(activeStory.video_url, env);
+    }
     unread = Number(unreadRow?.unread || 0);
   }
 
@@ -1170,7 +1174,7 @@ async function handleOwnProfileDashboard(request, env) {
 
   const [dbUser, activeStory, visitRows, giftRows] = await Promise.all([
     env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
-    env.DB.prepare('SELECT id FROM stories WHERE user_id = ? AND active = 1 LIMIT 1').bind(auth.sub).first(),
+    env.DB.prepare('SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first(),
     env.DB.prepare(
       `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.city, u.role, u.premium, u.last_active,
               MAX(pv.created_at) as visited_at
@@ -1198,6 +1202,10 @@ async function handleOwnProfileDashboard(request, env) {
 
   const user = sanitizeUser(dbUser, env);
   user.has_active_story = !!activeStory;
+  if (activeStory) {
+    user.active_story_id = activeStory.id;
+    user.active_story_url = normalizeStoryVideoUrl(activeStory.video_url, env);
+  }
 
   const visitors = (visitRows?.results || []).map((v) => ({
     id: v.id,
@@ -3370,9 +3378,10 @@ async function handleGetStories(request, env) {
     JOIN users u ON u.id = s.user_id
     LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?
     WHERE s.active = 1
+      AND (s.user_id != ? OR ? = '')
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
-  `).bind(viewerId || '', limit, offset).all();
+  `).bind(viewerId || '', viewerId || '', viewerId || '', limit, offset).all();
 
   const stories = (results || []).map(r => ({
     id: r.id,

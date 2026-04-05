@@ -173,7 +173,21 @@ export default function FeedPage() {
               <div className="relative">
                 <button
                   type="button"
-                  onClick={user.has_active_story ? () => navigate('/videos', { state: { storyUserId: user.id } }) : () => navigate('/historia/nueva', { state: { from: '/' } })}
+                  onClick={user.has_active_story ? () => {
+                    navigate('/videos', { state: { storyUserId: user.id, ownStory: {
+                      id: user.active_story_id,
+                      user_id: user.id,
+                      video_url: user.active_story_url,
+                      caption: '',
+                      likes: 0,
+                      liked: false,
+                      comments: 0,
+                      created_at: new Date().toISOString(),
+                      username: user.username,
+                      avatar_url: user.avatar_url || '',
+                      avatar_crop: user.avatar_crop || null,
+                    } } });
+                  } : () => navigate('/historia/nueva', { state: { from: '/' } })}
                   className="flex flex-col items-center gap-1 w-full"
                 >
                   <div className={`rounded-full ${

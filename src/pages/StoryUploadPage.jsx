@@ -1032,7 +1032,12 @@ export default function StoryUploadPage() {
 			});
 			setUploadProgress(1);
 			setPhase('done');
-			setUser(prev => ({ ...prev, has_active_story: true }));
+			setUser(prev => ({
+				...prev,
+				has_active_story: true,
+				active_story_id: story?.id || null,
+				active_story_url: story?.video_url || null,
+			}));
 			try {
 				const viewed = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
 				const uid = String(user?.id);
