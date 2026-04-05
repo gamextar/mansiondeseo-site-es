@@ -36,7 +36,8 @@ function timeAgo(dateStr) {
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { setRegistered, setUser, user } = useAuth();
+  const { setRegistered, setUser, user, siteSettings } = useAuth();
+  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -998,6 +999,7 @@ export default function ProfilePage() {
             <StoryPreviewOverlay
               videoUrl={user.active_story_url}
               user={user}
+              navBottomOffset={navBottomOffset}
               onDismiss={() => setShowStoryPreview(false)}
             />
           </div>

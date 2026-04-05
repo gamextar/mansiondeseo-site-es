@@ -18,6 +18,7 @@ export default function StoryPreviewOverlay({
   uploading = false,
   uploadProgress = 0,
   avatarSize = 52,
+  navBottomOffset = 0,
 }) {
   const videoRef = useRef(null);
   const progressRef = useRef(null);
@@ -85,7 +86,7 @@ export default function StoryPreviewOverlay({
         )}
 
         {/* Right-side action icons — mobile */}
-        <div className="pointer-events-none absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden" style={{ bottom: 28 }}>
+        <div className="pointer-events-none absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden" style={{ bottom: navBottomOffset + 16 }}>
           <div className="flex flex-col items-center">
             <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
               <Heart className="w-6 h-6 text-white" />
@@ -135,7 +136,7 @@ export default function StoryPreviewOverlay({
         </div>
 
         {/* User info + caption — mobile */}
-        <div className="absolute left-4 right-20 z-20 lg:hidden" style={{ bottom: 20 }}>
+        <div className="absolute left-4 right-20 z-20 lg:hidden" style={{ bottom: navBottomOffset + 8 }}>
           <div className="flex flex-col items-start gap-2.5 mb-1">
             <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
               {user?.avatar_url

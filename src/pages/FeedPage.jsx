@@ -56,7 +56,8 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(!cached);
   const [showOwnStoryPreview, setShowOwnStoryPreview] = useState(false);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, siteSettings } = useAuth();
+  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
 
   const loadProfiles = useCallback(({ silent = false } = {}) => {
     const c = getCachedFeed();
@@ -298,6 +299,7 @@ export default function FeedPage() {
             <StoryPreviewOverlay
               videoUrl={user.active_story_url}
               user={user}
+              navBottomOffset={navBottomOffset}
               onDismiss={() => setShowOwnStoryPreview(false)}
             />
           </div>
