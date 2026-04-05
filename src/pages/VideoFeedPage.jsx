@@ -98,7 +98,7 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
@@ -271,7 +271,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       </div>
 
       <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 350px)', bottom: '60px' }}>
-        <DesktopActionButtons story={story} onLike={onLike} navigate={navigate} onGift={onGift} />
+        <DesktopActionButtons story={story} onLike={onLike} navigate={navigate} onGift={onGift} isOwnStory={isOwnStory} />
       </div>
     </div>
   );
@@ -369,7 +369,7 @@ function MobileOverlayButton({ onPress, scrollContainerRef, className = '', styl
   );
 }
 
-function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, scrollContainerRef, onGift }) {
+function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, scrollContainerRef, onGift, isOwnStory = false }) {
   const [burstTrigger, setBurstTrigger] = useState(0);
 
   const handleHeart = () => {
@@ -379,30 +379,36 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, s
 
   return (
     <>
-      <div className="pointer-events-none flex flex-col items-center">
-        <MobileOverlayButton
-          onPress={handleHeart}
-          scrollContainerRef={scrollContainerRef}
-          className="pointer-events-auto relative"
-          style={{ width: 58, height: 58 }}
-        >
-          <HeartBurst trigger={burstTrigger} />
-          <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 58, height: 58 }}>
-            <Heart className={`w-7.5 h-7.5 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
+      {!isOwnStory && (
+        <div className="pointer-events-none flex flex-col items-center">
+          <MobileOverlayButton
+            onPress={handleHeart}
+            scrollContainerRef={scrollContainerRef}
+            className="pointer-events-auto relative"
+            style={{ width: 58, height: 58 }}
+          >
+            <HeartBurst trigger={burstTrigger} />
+            <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 58, height: 58 }}>
+              <Heart className={`w-7.5 h-7.5 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
+            </div>
+          </MobileOverlayButton>
+          <span className="pointer-events-none text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
+        </div>
+      )}
+      {!isOwnStory && (
+        <MobileOverlayButton onPress={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
+          <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+            <Send className="w-6 h-6 text-white" />
           </div>
         </MobileOverlayButton>
-        <span className="pointer-events-none text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
-      </div>
-      <MobileOverlayButton onPress={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
-        <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
-          <Send className="w-6 h-6 text-white" />
-        </div>
-      </MobileOverlayButton>
-      <MobileOverlayButton onPress={() => onGift(story)} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
-        <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
-          <Gift className="w-6 h-6 text-mansion-gold" />
-        </div>
-      </MobileOverlayButton>
+      )}
+      {!isOwnStory && (
+        <MobileOverlayButton onPress={() => onGift(story)} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
+          <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+            <Gift className="w-6 h-6 text-mansion-gold" />
+          </div>
+        </MobileOverlayButton>
+      )}
       <MobileOverlayButton onPress={onToggleMute} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
         <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
           {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
@@ -412,7 +418,7 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, s
   );
 }
 
-function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, navBottomOffset, avatarSize, scrollContainerRef, onGift }) {
+function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, navBottomOffset, avatarSize, scrollContainerRef, onGift, isOwnStory = false }) {
   if (!story) return null;
 
   return (
@@ -421,7 +427,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
         className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
         style={{ bottom: `${navBottomOffset + 16}px` }}
       >
-        <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} scrollContainerRef={scrollContainerRef} onGift={onGift} />
+        <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} scrollContainerRef={scrollContainerRef} onGift={onGift} isOwnStory={isOwnStory} />
       </div>
 
       <div
@@ -451,7 +457,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
   );
 }
 
-function DesktopActionButtons({ story, onLike, navigate, onGift }) {
+function DesktopActionButtons({ story, onLike, navigate, onGift, isOwnStory = false }) {
   const [burstTrigger, setBurstTrigger] = useState(0);
 
   const handleHeart = () => {
@@ -461,23 +467,29 @@ function DesktopActionButtons({ story, onLike, navigate, onGift }) {
 
   return (
     <>
-      <button onClick={handleHeart} className="flex flex-col items-center group relative">
-        <HeartBurst trigger={burstTrigger} />
-        <div className={`rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-110 ${story.liked ? 'bg-mansion-crimson/25 group-hover:bg-mansion-crimson/40' : 'bg-mansion-card/60 border border-white/10 group-hover:bg-mansion-card/90 group-hover:border-white/25'}`} style={{ width: 72, height: 72 }}>
-          <Heart className={`w-9 h-9 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
-        </div>
-        <span className="text-white text-xs font-semibold mt-1.5 drop-shadow tabular-nums">{story.likes || 0}</span>
-      </button>
-      <button onClick={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} className="flex flex-col items-center group">
-        <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-mansion-card/90 group-hover:border-white/25" style={{ width: 72, height: 72 }}>
-          <Send className="w-8 h-8 text-white" />
-        </div>
-      </button>
-      <button onClick={() => onGift(story)} className="flex flex-col items-center group">
-        <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-mansion-card/90 group-hover:border-white/25" style={{ width: 72, height: 72 }}>
-          <Gift className="w-8 h-8 text-mansion-gold" />
-        </div>
-      </button>
+      {!isOwnStory && (
+        <button onClick={handleHeart} className="flex flex-col items-center group relative">
+          <HeartBurst trigger={burstTrigger} />
+          <div className={`rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-110 ${story.liked ? 'bg-mansion-crimson/25 group-hover:bg-mansion-crimson/40' : 'bg-mansion-card/60 border border-white/10 group-hover:bg-mansion-card/90 group-hover:border-white/25'}`} style={{ width: 72, height: 72 }}>
+            <Heart className={`w-9 h-9 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
+          </div>
+          <span className="text-white text-xs font-semibold mt-1.5 drop-shadow tabular-nums">{story.likes || 0}</span>
+        </button>
+      )}
+      {!isOwnStory && (
+        <button onClick={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} className="flex flex-col items-center group">
+          <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-mansion-card/90 group-hover:border-white/25" style={{ width: 72, height: 72 }}>
+            <Send className="w-8 h-8 text-white" />
+          </div>
+        </button>
+      )}
+      {!isOwnStory && (
+        <button onClick={() => onGift(story)} className="flex flex-col items-center group">
+          <div className="rounded-full bg-mansion-card/60 border border-white/10 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-mansion-card/90 group-hover:border-white/25" style={{ width: 72, height: 72 }}>
+            <Gift className="w-8 h-8 text-mansion-gold" />
+          </div>
+        </button>
+      )}
     </>
   );
 }
@@ -600,6 +612,7 @@ export default function VideoFeedPage() {
     const own = ownStoryRef.current;
     if (own) {
       fresh = [own, ...fresh.filter(s => s.id !== own.id)];
+      ownStoryRef.current = null; // clear after use so subsequent refreshes don't re-prepend
     }
     setStories(fresh);
     persistStories(fresh);
@@ -633,7 +646,6 @@ export default function VideoFeedPage() {
     setActiveDispIdx(targetIndex + 1);
     setBoundaryOverlayIdx(null);
     initialStoryUserIdRef.current = null;
-    ownStoryRef.current = null;
   }, [stories]);
 
   useEffect(() => {
@@ -973,6 +985,7 @@ export default function VideoFeedPage() {
                     gradientOpacity={gradientOpacity}
                     resetOnDeactivate={false}
                     onGift={openGiftModal}
+                    isOwnStory={String(story.user_id) === String(user?.id)}
                   />
                 </div>
               );
@@ -1010,6 +1023,7 @@ export default function VideoFeedPage() {
                   gradientOpacity={gradientOpacity}
                   resetOnDeactivate
                   onGift={openGiftModal}
+                  isOwnStory={String(story.user_id) === String(user?.id)}
                 />
               </div>
             );
@@ -1030,6 +1044,7 @@ export default function VideoFeedPage() {
             navigate={navigate}
             scrollContainerRef={containerRef}
             onGift={openGiftModal}
+            isOwnStory={String(activeStory.user_id) === String(user?.id)}
           />
         </div>
       )}
