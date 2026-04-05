@@ -208,9 +208,10 @@ export default function ChatListPage() {
     const conversation = event?.conversation;
     if (!conversation?.profileId) return false;
     const unreadDelta = Number(event?.conversationUnreadDelta || 0);
+    const pid = String(conversation.profileId);
 
     setConversations((prev) => {
-      const existing = prev.find((item) => item.profileId === conversation.profileId);
+      const existing = prev.find((item) => String(item.profileId) === pid);
       const nextUnread = typeof conversation.unread === 'number'
         ? conversation.unread
         : Math.max(0, Number(existing?.unread || 0) + unreadDelta);
@@ -227,7 +228,7 @@ export default function ChatListPage() {
 
       const next = [
         nextConversation,
-        ...prev.filter((item) => item.profileId !== nextConversation.profileId),
+        ...prev.filter((item) => String(item.profileId) !== pid),
       ];
 
       setCachedConversations(next);
@@ -246,7 +247,7 @@ export default function ChatListPage() {
         // because the server may not have flushed the D1 unread_count yet.
         if (_readProfileIds.size > 0) {
           convs = convs.map(c =>
-            _readProfileIds.has(c.profileId)
+            _readProfileIds.has(String(c.profileId))
               ? { ...c, unread: 0 }
               : c
           );
@@ -262,10 +263,11 @@ export default function ChatListPage() {
   }, []);
 
   const markConversationRead = useCallback((profileId) => {
-    _readProfileIds.add(profileId);
+    _readProfileIds.add(String(profileId));
     markConversationReadInCache(profileId);
     setConversations((prev) => {
-      const idx = prev.findIndex(c => c.profileId === profileId);
+      const pid = String(profileId);
+      const idx = prev.findIndex(c => String(c.profileId) === pid);
       if (idx === -1 || prev[idx].unread === 0) return prev;
       const updated = [...prev];
       updated[idx] = { ...updated[idx], unread: 0 };
@@ -342,7 +344,7 @@ export default function ChatListPage() {
     const unsubscribe = subscribe((event) => {
       if (event?.type === 'new_message') {
         // A new message arrived — clear the read override for this partner
-        if (event.partnerId) _readProfileIds.delete(event.partnerId);
+        if (event.partnerId) _readProfileIds.delete(String(event.partnerId));
         const updated = applyConversationUpdate(event);
         if (!updated) fetchConversations();
       } else if (event?.type === 'conversation_deleted' && event.partnerId) {

@@ -116,8 +116,8 @@ export function applyCachedConversationWsUpdate(event) {
       ? parsed.conversations
       : Array.isArray(parsed) ? parsed : [];
     const conv = event.conversation;
-    const profileId = conv.profileId;
-    const existing = convs.find(c => c.profileId === profileId);
+    const profileId = String(conv.profileId);
+    const existing = convs.find(c => String(c.profileId) === profileId);
     const unreadDelta = Number(event.conversationUnreadDelta || 0);
     const nextUnread = typeof conv.unread === 'number'
       ? conv.unread
@@ -125,7 +125,7 @@ export function applyCachedConversationWsUpdate(event) {
     const nextConv = existing
       ? { ...existing, ...conv, unread: nextUnread }
       : { unread: nextUnread, ...conv };
-    const nextConvs = [nextConv, ...convs.filter(c => c.profileId !== profileId)];
+    const nextConvs = [nextConv, ...convs.filter(c => String(c.profileId) !== profileId)];
     sessionStorage.setItem(CONV_CACHE_KEY, JSON.stringify({
       conversations: nextConvs,
       timestamp: Date.now(),
@@ -147,7 +147,8 @@ export function markConversationReadInCache(profileId) {
     const convs = Array.isArray(parsed?.conversations)
       ? parsed.conversations
       : Array.isArray(parsed) ? parsed : [];
-    const idx = convs.findIndex(c => c.profileId === profileId);
+    const pid = String(profileId);
+    const idx = convs.findIndex(c => String(c.profileId) === pid);
     if (idx === -1 || convs[idx].unread === 0) return;
     const updated = [...convs];
     updated[idx] = { ...updated[idx], unread: 0 };
