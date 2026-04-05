@@ -75,10 +75,13 @@ export default function DesktopSidebar() {
       {/* Nav items */}
       <nav className="flex-1 px-3 py-4 space-y-1">
         {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
+          const viewingOwnStory = location.pathname.startsWith('/videos') && !!location.state?.ownStory;
           const isActive =
             to === '/' || to === '/perfil'
-              ? location.pathname === to
-              : location.pathname.startsWith(to);
+              ? location.pathname === to || (to === '/perfil' && viewingOwnStory)
+              : to === '/videos'
+                ? location.pathname.startsWith(to) && !viewingOwnStory
+                : location.pathname.startsWith(to);
 
           return (
             <NavLink

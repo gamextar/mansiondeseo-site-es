@@ -52,10 +52,13 @@ export default function BottomNav() {
       >
         <div className="flex items-center justify-around px-3" style={{ height: navHeight }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
+            const viewingOwnStory = location.pathname.startsWith('/videos') && !!location.state?.ownStory;
             const isActive =
               to === '/' || to === '/perfil'
-                ? location.pathname === to
-                : location.pathname.startsWith(to);
+                ? location.pathname === to || (to === '/perfil' && viewingOwnStory)
+                : to === '/videos'
+                  ? location.pathname.startsWith(to) && !viewingOwnStory
+                  : location.pathname.startsWith(to);
 
             return (
               <NavLink
