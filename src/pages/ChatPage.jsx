@@ -66,7 +66,7 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
-  const { setActiveChatId } = useUnreadMessages();
+  const { setActiveChatId, refresh: refreshUnread } = useUnreadMessages();
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
@@ -275,10 +275,12 @@ export default function ChatPage() {
       cancelled = true;
       clearTimeout(historyFallbackTimerRef.current);
       setActiveChatId(null);
+      markConversationReadInCache(partnerId);
+      refreshUnread();
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [id, navigate, partnerId, partnerPreview, requestScrollToBottom, setActiveChatId]);
+  }, [id, navigate, partnerId, partnerPreview, requestScrollToBottom, setActiveChatId, refreshUnread]);
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;
