@@ -1831,6 +1831,7 @@ async function buildNewMessageEvents(env, senderId, receiverId, msg) {
       type: 'new_message',
       chatId,
       partnerId: receiverId,
+      unreadDelta: 0,
       conversation: senderConversation,
     },
     receiver: {

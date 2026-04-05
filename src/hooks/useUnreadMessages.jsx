@@ -95,11 +95,11 @@ export function UnreadProvider({ children }) {
   const shouldRefreshUnread = useCallback(() => {
     if (!getToken()) return false;
     // Suppress if a fetch was recently initiated (e.g. bootstrap in-flight).
-    // This check must come before prevCountRef < 0 so that the initial
-    // bootstrap request blocks any concurrent focus/visibilitychange triggers.
     if (lastUnreadFetchAtRef.current && Date.now() - lastUnreadFetchAtRef.current < UNREAD_FETCH_DEBOUNCE_MS) return false;
     if (prevCountRef.current < 0) return true;
     if (!lastUnreadFetchAtRef.current) return true;
+    // If WebSocket is connected, skip HTTP fallback — WS handles real-time updates
+    if (wsConnectedRef.current) return false;
     return Date.now() - lastUnreadFetchAtRef.current > UNREAD_REFRESH_STALE_MS;
   }, []);
 
