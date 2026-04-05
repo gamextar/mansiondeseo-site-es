@@ -336,7 +336,14 @@ export default function ChatPage() {
       return;
     }
 
-    // Only scroll to bottom if user was at bottom before new message
+    // Al entrar al chat (primer render de mensajes), siempre scroll al fondo
+    if (messages.length > 0 && messages.length <= 3) {
+      // Primeros mensajes: forzar scroll
+      scrollToBottom('auto');
+      return;
+    }
+
+    // Si hay un scroll pendiente y el usuario está abajo, scroll suave
     if (pendingScrollBehaviorRef.current && isAtBottom()) {
       const behavior = pendingScrollBehaviorRef.current;
       pendingScrollBehaviorRef.current = null;
@@ -669,8 +676,8 @@ export default function ChatPage() {
         </AnimatePresence>
         <div
           ref={messagesEndRef}
-          className="h-6"
-          style={{ scrollMarginBottom: '24px' }}
+          className="h-32"
+          style={{ scrollMarginBottom: '80px' }}
         />
       </div>
 
