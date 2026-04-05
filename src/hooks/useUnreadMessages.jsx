@@ -179,6 +179,33 @@ export function UnreadProvider({ children }) {
             } else if (!isActiveChat) {
               fetchUnread({ force: true }).catch(() => {});
             }
+            // Always keep sessionStorage conversation list in sync so ChatListPage
+            // shows fresh data when it remounts (especially on mobile where it
+            // unmounts when the user navigates to a chat).
+            if (data.conversation?.profileId) {
+              try {
+                const CONV_KEY = 'mansion_conversations';
+                const raw = sessionStorage.getItem(CONV_KEY);
+                if (raw) {
+                  const parsed = JSON.parse(raw);
+                  const convs = Array.isArray(parsed?.conversations) ? parsed.conversations : (Array.isArray(parsed) ? parsed : []);
+                  const pid = String(data.conversation.profileId);
+                  const existing = convs.find(c => String(c.profileId) === pid);
+                  const unreadDelta = Number(data.conversationUnreadDelta || 0);
+                  const nextUnread = typeof data.conversation.unread === 'number'
+                    ? data.conversation.unread
+                    : Math.max(0, Number(existing?.unread || 0) + (isActiveChat ? 0 : unreadDelta));
+                  const updated = existing
+                    ? { ...existing, ...data.conversation, unread: nextUnread }
+                    : { unread: nextUnread, ...data.conversation };
+                  const next = [updated, ...convs.filter(c => String(c.profileId) !== pid)];
+                  sessionStorage.setItem(CONV_KEY, JSON.stringify({
+                    conversations: next,
+                    timestamp: Date.now(),
+                  }));
+                }
+              } catch { /* ignore */ }
+            }
             notifyListeners(data);
           } else if (data.type === 'conversation_deleted') {
             invalidateUnreadCache();

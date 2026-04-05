@@ -295,22 +295,14 @@ export default function ChatPage() {
       cancelled = true;
       clearTimeout(historyFallbackTimerRef.current);
       setActiveChatId(null);
-      // Bust BOTH caches so ChatListPage re-fetches fresh conversations
+      // Bust API in-memory caches so getConversations() fetches fresh on next call
       invalidateConversationsCache();
-      try {
-        const raw = sessionStorage.getItem('mansion_conversations');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          parsed.timestamp = 0;
-          sessionStorage.setItem('mansion_conversations', JSON.stringify(parsed));
-        }
-      } catch { /* ignore */ }
       // Refresh global unread count once when leaving the chat.
       refreshUnread();
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [id, navigate, partnerId, partnerPreview, requestScrollToBottom, setActiveChatId, refreshUnread]);
+  }, [id, navigate, partnerId, partnerPreview, requestScrollToBottom, setActiveChatId, refreshUnread, decrementUnread]);
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;
