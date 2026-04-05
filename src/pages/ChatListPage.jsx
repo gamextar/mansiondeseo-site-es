@@ -86,10 +86,12 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
           avatar_crop: conv.avatarCrop,
           photos: [],
           online: conv.online,
+          lastMessage: conv.lastMessage,
+          lastMessageTimestamp: conv.timestamp,
         },
       },
     });
-  }, [conv, deleting, navigate]);
+  }, [conv, deleting, navigate, onRead]);
 
   return (
     <div

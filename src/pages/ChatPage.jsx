@@ -167,7 +167,9 @@ export default function ChatPage() {
     setMessages(nextCachedChat?.messages || []);
     setApiLimit(nextCachedChat?.apiLimit || null);
     setHasOlderMessages(nextCachedChat?.hasOlderMessages || false);
-    setLoading(!nextCachedChat && !nextPartnerPreview);
+    // Show loading until we have messages (either from cache or WS onHistory)
+    const hasCachedMessages = (nextCachedChat?.messages || []).length > 0;
+    setLoading(!hasCachedMessages);
     if ((nextCachedChat?.messages || []).length > 0) {
       wasAtBottomRef.current = true;
       requestScrollToBottom('auto');
