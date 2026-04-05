@@ -551,7 +551,6 @@ export default function VideoFeedPage() {
     return window.matchMedia('(min-width: 1024px)').matches;
   });
   const initialStoryUserIdRef = useRef(location.state?.storyUserId || null);
-  const ownStoryRef = useRef(location.state?.ownStory || null);
 
   const persistStories = useCallback((nextStories) => {
     try {
@@ -595,12 +594,7 @@ export default function VideoFeedPage() {
 
   const refreshStories = useCallback(async () => {
     const data = await getStories();
-    let fresh = applyPendingStoryLikeState(data.stories || [], getPendingStoryLikes());
-    // If we navigated here to view own story, prepend it (it's excluded from the feed query)
-    const own = ownStoryRef.current;
-    if (own) {
-      fresh = [own, ...fresh.filter(s => s.id !== own.id)];
-    }
+    const fresh = applyPendingStoryLikeState(data.stories || [], getPendingStoryLikes());
     setStories(fresh);
     persistStories(fresh);
     return fresh;
@@ -633,7 +627,6 @@ export default function VideoFeedPage() {
     setActiveDispIdx(targetIndex + 1);
     setBoundaryOverlayIdx(null);
     initialStoryUserIdRef.current = null;
-    ownStoryRef.current = null;
   }, [stories]);
 
   useEffect(() => {
