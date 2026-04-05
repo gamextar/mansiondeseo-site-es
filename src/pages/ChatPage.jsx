@@ -118,6 +118,15 @@ export default function ChatPage() {
     };
   }
 
+
+  // Helper: is user at bottom?
+  const isAtBottom = useCallback(() => {
+    if (!scrollRef.current) return true;
+    const el = scrollRef.current;
+    // Allow 40px tolerance
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  }, []);
+
   const scrollToBottom = useCallback((behavior = 'auto') => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ block: 'end', behavior });
@@ -327,14 +336,15 @@ export default function ChatPage() {
       return;
     }
 
-    if (pendingScrollBehaviorRef.current) {
+    // Only scroll to bottom if user was at bottom before new message
+    if (pendingScrollBehaviorRef.current && isAtBottom()) {
       const behavior = pendingScrollBehaviorRef.current;
       pendingScrollBehaviorRef.current = null;
       requestAnimationFrame(() => {
         scrollToBottom(behavior);
       });
     }
-  }, [messages, scrollToBottom]);
+  }, [messages, scrollToBottom, isAtBottom]);
 
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
@@ -378,12 +388,7 @@ export default function ChatPage() {
     { threshold: 90, containerRef: scrollRef }
   );
 
-  useEffect(() => {
-    if (!partnerTyping || !wasAtBottomRef.current) return;
-    // Small delay so the typing bubble renders first, then scroll gently.
-    const t = setTimeout(() => scrollToBottom('smooth'), 50);
-    return () => clearTimeout(t);
-  }, [partnerTyping, scrollToBottom]);
+  // Remove typing-triggered scroll: typing indicator never forces scroll
 
   if (!partner && !loading) {
     return (
