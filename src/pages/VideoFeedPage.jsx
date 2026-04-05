@@ -927,21 +927,8 @@ export default function VideoFeedPage() {
     );
   }
 
-  const handleCloseVideoFeed = () => {
-    navigate(-1);
-  };
-
   return (
     <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
-      {/* Close button — top-right, PWA safe area aware */}
-      <button
-        onClick={handleCloseVideoFeed}
-        className="fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60 lg:h-14 lg:w-14"
-        style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
-        aria-label="Cerrar"
-      >
-        <X className="w-6 h-6" />
-      </button>
       {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">
