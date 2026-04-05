@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, MessageCircle, Trash2 } from 'lucide-react';
-import { deleteConversation, getConversations, getToken, getStoredUser } from '../lib/api';
+import { deleteConversation, getConversations, getToken, getStoredUser, markConversationReadInCache } from '../lib/api';
 import AvatarImg from '../components/AvatarImg';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 
@@ -57,7 +57,7 @@ function isConversationCacheFresh(timestamp) {
   return timestamp > 0 && Date.now() - timestamp < CONV_CACHE_TTL_MS;
 }
 
-function ConversationRow({ conv, typing, onDelete, deleting }) {
+function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
   const navigate = useNavigate();
   const [dragX, setDragX] = useState(0);
   const [revealed, setRevealed] = useState(false);
@@ -75,6 +75,7 @@ function ConversationRow({ conv, typing, onDelete, deleting }) {
 
   const handleNavigate = useCallback(() => {
     if (isDraggingRef.current || deleting) return;
+    if (conv.unread > 0) onRead?.(conv.profileId);
     navigate(`/mensajes/${conv.profileId}`, {
       state: {
         from: '/mensajes',
@@ -245,6 +246,17 @@ export default function ChatListPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const markConversationRead = useCallback((profileId) => {
+    markConversationReadInCache(profileId);
+    setConversations((prev) => {
+      const idx = prev.findIndex(c => c.profileId === profileId);
+      if (idx === -1 || prev[idx].unread === 0) return prev;
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], unread: 0 };
+      return updated;
+    });
+  }, []);
+
   const removeConversation = useCallback((partnerId) => {
     setConversations((prev) => {
       const next = prev.filter((item) => item.profileId !== partnerId);
@@ -388,6 +400,7 @@ export default function ChatListPage() {
             typing={!!typingChats[conv.profileId]}
             deleting={deletingId === conv.id}
             onDelete={handleDeleteConversation}
+            onRead={markConversationRead}
           />
         ))
         )}

@@ -7,7 +7,7 @@ import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import EmojiPicker from '../components/EmojiPicker';
 import AvatarImg from '../components/AvatarImg';
-import { getMessageLimit, getProfile, getProfileWithMessageLimit, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage } from '../lib/api';
+import { getMessageLimit, getProfile, getProfileWithMessageLimit, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, markConversationReadInCache } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
@@ -162,6 +162,7 @@ export default function ChatPage() {
     clearTimeout(historyFallbackTimerRef.current);
     myUserIdRef.current = String(user.id);
     setActiveChatId([String(user.id), partnerId].sort().join('-'));
+    markConversationReadInCache(partnerId);
     setPartner(nextCachedChat?.partner || nextPartnerPreview || null);
     setMessages(nextCachedChat?.messages || []);
     setApiLimit(nextCachedChat?.apiLimit || null);

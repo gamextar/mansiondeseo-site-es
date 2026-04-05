@@ -133,6 +133,27 @@ export function applyCachedConversationWsUpdate(event) {
   } catch {}
 }
 
+// Zero out unread count for a conversation when the user opens it.
+export function markConversationReadInCache(profileId) {
+  if (!profileId) return;
+  try {
+    const raw = sessionStorage.getItem(CONV_CACHE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    const convs = Array.isArray(parsed?.conversations)
+      ? parsed.conversations
+      : Array.isArray(parsed) ? parsed : [];
+    const idx = convs.findIndex(c => c.profileId === profileId);
+    if (idx === -1 || convs[idx].unread === 0) return;
+    const updated = [...convs];
+    updated[idx] = { ...updated[idx], unread: 0 };
+    sessionStorage.setItem(CONV_CACHE_KEY, JSON.stringify({
+      conversations: updated,
+      timestamp: parsed?.timestamp || Date.now(),
+    }));
+  } catch {}
+}
+
 function invalidateMessageHistoryCache(otherUserId) {
   const prefix = `messages:${otherUserId}:`;
   for (const key of sharedGetCache.keys()) {
