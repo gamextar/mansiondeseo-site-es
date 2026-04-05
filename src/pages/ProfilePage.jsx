@@ -509,13 +509,7 @@ export default function ProfilePage() {
           {/* Action pills row */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => {
-                if (user?.has_active_story && user?.active_story_url) {
-                  setShowStoryPreview(true);
-                } else {
-                  navigate('/historia/nueva', { state: { from: '/perfil' } });
-                }
-              }}
+              onClick={() => navigate('/historia/nueva', { state: { from: '/perfil' } })}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-mansion-crimson/10 border border-mansion-crimson/25 text-[11px] font-medium text-mansion-crimson hover:bg-mansion-crimson/20 transition-all"
             >
               <Film className="w-3 h-3" />
@@ -999,12 +993,14 @@ export default function ProfilePage() {
       )}
 
       {showStoryPreview && user?.active_story_url && (
-        <div className="fixed inset-0 z-50 bg-black">
-          <StoryPreviewOverlay
-            videoUrl={user.active_story_url}
-            user={user}
-            onDismiss={() => setShowStoryPreview(false)}
-          />
+        <div className="fixed inset-0 z-50 bg-black lg:left-64 xl:left-72 lg:bg-mansion-base">
+          <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
+            <StoryPreviewOverlay
+              videoUrl={user.active_story_url}
+              user={user}
+              onDismiss={() => setShowStoryPreview(false)}
+            />
+          </div>
         </div>
       )}
     </div>

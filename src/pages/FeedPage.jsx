@@ -293,12 +293,14 @@ export default function FeedPage() {
       </motion.div>
 
       {showOwnStoryPreview && user?.active_story_url && (
-        <div className="fixed inset-0 z-50 bg-black">
-          <StoryPreviewOverlay
-            videoUrl={user.active_story_url}
-            user={user}
-            onDismiss={() => setShowOwnStoryPreview(false)}
-          />
+        <div className="fixed inset-0 z-50 bg-black lg:left-64 xl:left-72 lg:bg-mansion-base">
+          <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
+            <StoryPreviewOverlay
+              videoUrl={user.active_story_url}
+              user={user}
+              onDismiss={() => setShowOwnStoryPreview(false)}
+            />
+          </div>
         </div>
       )}
     </div>

@@ -109,30 +109,16 @@ export default function StoryPreviewOverlay({
           </div>
         </div>
 
-        {/* Right-side action icons — desktop */}
-        <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 340px)', bottom: '60px' }}>
-          <div className="flex flex-col items-center">
-            <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
-              <Heart className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">0</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
-              <Send className="w-6 h-6 text-white" />
-            </div>
-          </div>
-          <div className="flex flex-col items-center">
-            <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
-              <Gift className="w-6 h-6 text-mansion-gold" />
-            </div>
-          </div>
-          <div className="flex flex-col items-center" onClick={() => setIsMuted(m => !m)} style={{ cursor: 'pointer' }}>
-            <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
-              {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
-            </div>
-          </div>
-        </div>
+        {/* Desktop mute button (inside card, since there are no action icons to the right) */}
+        <button
+          type="button"
+          onClick={() => setIsMuted(m => !m)}
+          className="hidden lg:flex absolute z-30 h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+          style={{ bottom: 52, right: 16 }}
+          aria-label={isMuted ? 'Activar sonido' : 'Silenciar'}
+        >
+          {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+        </button>
 
         {/* User info + caption — desktop */}
         <div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2.5 max-w-[360px]">
