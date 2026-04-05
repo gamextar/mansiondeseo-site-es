@@ -524,9 +524,11 @@ async function validateTurnstile(token, secret, ip) {
 const _lastActiveCache = new Map(); // userId → timestamp of last D1 UPDATE
 const _accountStatusCache = new Map(); // userId → { status, exp }
 const _viewerCache = new Map(); // userId → { data, exp } — viewer profile data (country, seeking, etc.)
+const _fullUserCache = new Map(); // userId → { data, exp } — full user row for reuse by handlers
 const LAST_ACTIVE_DEBOUNCE_MS = 5 * 60_000; // only UPDATE last_active every 5 min
 const ACCOUNT_STATUS_TTL_MS = 5 * 60_000; // cache account_status for 5 min
 const VIEWER_CACHE_TTL_MS = 2 * 60_000; // cache viewer data for 2 min
+const FULL_USER_CACHE_TTL_MS = 30_000; // cache full user row for 30s (short — used to deduplicate within same request wave)
 
 function getCachedViewer(userId) {
   const entry = _viewerCache.get(userId);
@@ -536,6 +538,16 @@ function getCachedViewer(userId) {
 
 function setCachedViewer(userId, data) {
   _viewerCache.set(userId, { data, exp: Date.now() + VIEWER_CACHE_TTL_MS });
+}
+
+function getCachedFullUser(userId) {
+  const entry = _fullUserCache.get(userId);
+  if (entry && Date.now() < entry.exp) return entry.data;
+  return null;
+}
+
+function setCachedFullUser(userId, data) {
+  _fullUserCache.set(userId, { data, exp: Date.now() + FULL_USER_CACHE_TTL_MS });
 }
 
 async function authenticate(request, env) {
@@ -560,18 +572,18 @@ async function authenticate(request, env) {
   }
 
   // Cache account_status check — avoid D1 read on every request.
-  // Also fetch viewer profile fields (country, seeking, etc.) in the same query so
-  // handleProfiles can skip its own serial viewer D1 round-trip on cache miss.
-  const cached = _accountStatusCache.get(userId);
-  if (cached && now < cached.exp) {
-    if (cached.status === 'suspended') return null;
+  // Fetch SELECT * so the full user row is available for handlers (bootstrap, me, etc.)
+  // that would otherwise do a second serial D1 round-trip to the same user.
+  const cachedStatus = _accountStatusCache.get(userId);
+  if (cachedStatus && now < cachedStatus.exp) {
+    if (cachedStatus.status === 'suspended') return null;
   } else {
-    const userRow = await env.DB.prepare(
-      'SELECT account_status, premium, premium_until, country, seeking, interests FROM users WHERE id = ?'
-    ).bind(userId).first();
+    const userRow = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
     _accountStatusCache.set(userId, { status: userRow?.account_status, exp: now + ACCOUNT_STATUS_TTL_MS });
-    // Populate viewer cache so handleProfiles skips a serial D1 round-trip
-    if (userRow) setCachedViewer(userId, userRow);
+    if (userRow) {
+      setCachedViewer(userId, userRow);
+      setCachedFullUser(userId, userRow);
+    }
     if (userRow?.account_status === 'suspended') return null;
   }
 
@@ -1151,7 +1163,7 @@ async function handleMe(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
-  const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first();
+  const user = getCachedFullUser(auth.sub) || await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first();
   if (!user) return error('Usuario no encontrado', 404);
 
   return json({ user: sanitizeUser(user, env) });
@@ -1167,8 +1179,10 @@ async function handleAppBootstrap(request, env) {
     const auth = await authenticate(request, env);
     if (!auth) return error('No autorizado', 401);
 
+    // authenticate already fetched SELECT * and cached it — reuse to avoid a second D1 round-trip
+    const cachedUser = getCachedFullUser(auth.sub);
     const [dbUser, activeStory, unreadRow] = await Promise.all([
-      env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
+      cachedUser ? Promise.resolve(cachedUser) : env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
       env.DB.prepare('SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first(),
       env.DB.prepare(
         'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'
@@ -1198,8 +1212,9 @@ async function handleOwnProfileDashboard(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
+  const cachedUser = getCachedFullUser(auth.sub);
   const [dbUser, activeStory, visitRows, giftRows] = await Promise.all([
-    env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
+    cachedUser ? Promise.resolve(cachedUser) : env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
     env.DB.prepare('SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first(),
     env.DB.prepare(
       `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.city, u.role, u.premium, u.last_active,
