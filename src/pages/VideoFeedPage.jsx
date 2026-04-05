@@ -551,6 +551,7 @@ export default function VideoFeedPage() {
     return window.matchMedia('(min-width: 1024px)').matches;
   });
   const initialStoryUserIdRef = useRef(location.state?.storyUserId || null);
+  const ownStoryRef = useRef(null);
 
   const persistStories = useCallback((nextStories) => {
     try {
@@ -595,10 +596,14 @@ export default function VideoFeedPage() {
   const refreshStories = useCallback(async () => {
     const data = await getStories();
     const fresh = applyPendingStoryLikeState(data.stories || [], getPendingStoryLikes());
-    setStories(fresh);
-    persistStories(fresh);
-    return fresh;
-  }, [persistStories]);
+    const myId = user?.id ? String(user.id) : null;
+    const own = myId ? fresh.find(s => String(s.user_id) === myId) : null;
+    ownStoryRef.current = own || null;
+    const others = own ? fresh.filter(s => String(s.user_id) !== myId) : fresh;
+    setStories(others);
+    persistStories(others);
+    return others;
+  }, [persistStories, user?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -621,13 +626,26 @@ export default function VideoFeedPage() {
     const targetStoryUserId = initialStoryUserIdRef.current;
     if (!targetStoryUserId || stories.length === 0) return;
 
+    const myId = user?.id ? String(user.id) : null;
+    if (myId && String(targetStoryUserId) === myId && ownStoryRef.current) {
+      // Viewing own story — prepend it so it's at index 0 (dispIdx 1)
+      setStories(prev => {
+        if (prev[0] && String(prev[0].user_id) === myId) return prev;
+        return [ownStoryRef.current, ...prev];
+      });
+      setActiveDispIdx(1);
+      setBoundaryOverlayIdx(null);
+      initialStoryUserIdRef.current = null;
+      return;
+    }
+
     const targetIndex = stories.findIndex((story) => String(story.user_id) === String(targetStoryUserId));
     if (targetIndex < 0) return;
 
     setActiveDispIdx(targetIndex + 1);
     setBoundaryOverlayIdx(null);
     initialStoryUserIdRef.current = null;
-  }, [stories]);
+  }, [stories, user?.id]);
 
   useEffect(() => {
     if (!activeStory?.user_id) return;
