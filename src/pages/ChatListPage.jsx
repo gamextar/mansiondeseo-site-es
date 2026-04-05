@@ -197,6 +197,7 @@ export default function ChatListPage() {
   const [typingChats, setTypingChats] = useState({});
   const typingTimersRef = useRef({});
   const lastSyncAtRef = useRef(cachedState.timestamp || 0);
+  const readProfileIdsRef = useRef(new Set());
   const navigate = useNavigate();
   const { refresh: refreshUnread, subscribe } = useUnreadMessages();
 
@@ -237,7 +238,16 @@ export default function ChatListPage() {
     if (!getToken()) return;
     getConversations()
       .then(data => {
-        const convs = data.conversations || [];
+        let convs = data.conversations || [];
+        // Force unread=0 for conversations the user already opened this session,
+        // because the server may not have flushed the D1 unread_count yet.
+        if (readProfileIdsRef.current.size > 0) {
+          convs = convs.map(c =>
+            readProfileIdsRef.current.has(c.profileId)
+              ? { ...c, unread: 0 }
+              : c
+          );
+        }
         setConversations(convs);
         setCachedConversations(convs);
         lastSyncAtRef.current = Date.now();
@@ -249,6 +259,7 @@ export default function ChatListPage() {
   }, []);
 
   const markConversationRead = useCallback((profileId) => {
+    readProfileIdsRef.current.add(profileId);
     markConversationReadInCache(profileId);
     setConversations((prev) => {
       const idx = prev.findIndex(c => c.profileId === profileId);
@@ -327,6 +338,8 @@ export default function ChatListPage() {
     const myId = getStoredUser()?.id;
     const unsubscribe = subscribe((event) => {
       if (event?.type === 'new_message') {
+        // A new message arrived — clear the read override for this partner
+        if (event.partnerId) readProfileIdsRef.current.delete(event.partnerId);
         const updated = applyConversationUpdate(event);
         if (!updated) fetchConversations();
       } else if (event?.type === 'conversation_deleted' && event.partnerId) {
