@@ -536,7 +536,12 @@ export default function VideoFeedPage() {
     } catch {}
     return [];
   };
-  const initial = applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
+  const myUserId = user?.id ? String(user.id) : null;
+  const targetIsOwnStory = myUserId && String(location.state?.storyUserId) === myUserId;
+  const rawInitial = applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
+  const initial = myUserId && !targetIsOwnStory
+    ? rawInitial.filter(s => String(s.user_id) !== myUserId)
+    : rawInitial;
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
@@ -551,7 +556,6 @@ export default function VideoFeedPage() {
     return window.matchMedia('(min-width: 1024px)').matches;
   });
   const initialStoryUserIdRef = useRef(location.state?.storyUserId || null);
-  const ownStoryRef = useRef(null);
 
   const persistStories = useCallback((nextStories) => {
     try {
@@ -597,12 +601,13 @@ export default function VideoFeedPage() {
     const data = await getStories();
     const fresh = applyPendingStoryLikeState(data.stories || [], getPendingStoryLikes());
     const myId = user?.id ? String(user.id) : null;
-    const own = myId ? fresh.find(s => String(s.user_id) === myId) : null;
-    ownStoryRef.current = own || null;
-    const others = own ? fresh.filter(s => String(s.user_id) !== myId) : fresh;
-    setStories(others);
-    persistStories(others);
-    return others;
+    const targetIsOwn = myId && String(initialStoryUserIdRef.current) === myId;
+    const feed = myId && !targetIsOwn
+      ? fresh.filter(s => String(s.user_id) !== myId)
+      : fresh;
+    setStories(feed);
+    persistStories(feed);
+    return feed;
   }, [persistStories, user?.id]);
 
   useEffect(() => {
@@ -626,26 +631,13 @@ export default function VideoFeedPage() {
     const targetStoryUserId = initialStoryUserIdRef.current;
     if (!targetStoryUserId || stories.length === 0) return;
 
-    const myId = user?.id ? String(user.id) : null;
-    if (myId && String(targetStoryUserId) === myId && ownStoryRef.current) {
-      // Viewing own story — prepend it so it's at index 0 (dispIdx 1)
-      setStories(prev => {
-        if (prev[0] && String(prev[0].user_id) === myId) return prev;
-        return [ownStoryRef.current, ...prev];
-      });
-      setActiveDispIdx(1);
-      setBoundaryOverlayIdx(null);
-      initialStoryUserIdRef.current = null;
-      return;
-    }
-
     const targetIndex = stories.findIndex((story) => String(story.user_id) === String(targetStoryUserId));
     if (targetIndex < 0) return;
 
     setActiveDispIdx(targetIndex + 1);
     setBoundaryOverlayIdx(null);
     initialStoryUserIdRef.current = null;
-  }, [stories, user?.id]);
+  }, [stories]);
 
   useEffect(() => {
     if (!activeStory?.user_id) return;
