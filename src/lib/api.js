@@ -136,6 +136,10 @@ export function applyCachedConversationWsUpdate(event) {
 // Zero out unread count for a conversation when the user opens it.
 export function markConversationReadInCache(profileId) {
   if (!profileId) return;
+  // Invalidate the api.js conversations cache so fetchConversations()
+  // won't overwrite the zeroed-out unread with stale data
+  sharedGetCache.delete('conversations');
+  sessionCache.delete('conversations');
   try {
     const raw = sessionStorage.getItem(CONV_CACHE_KEY);
     if (!raw) return;
@@ -149,7 +153,7 @@ export function markConversationReadInCache(profileId) {
     updated[idx] = { ...updated[idx], unread: 0 };
     sessionStorage.setItem(CONV_CACHE_KEY, JSON.stringify({
       conversations: updated,
-      timestamp: parsed?.timestamp || Date.now(),
+      timestamp: Date.now(),
     }));
   } catch {}
 }
