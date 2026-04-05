@@ -7,7 +7,7 @@ import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import EmojiPicker from '../components/EmojiPicker';
 import AvatarImg from '../components/AvatarImg';
-import { getMessageLimit, getProfile, getProfileWithMessageLimit, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage } from '../lib/api';
+import { getMessageLimit, getProfile, getProfileWithMessageLimit, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, invalidateConversationsCache } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
@@ -66,7 +66,7 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
-  const { setActiveChatId, refresh: refreshUnread } = useUnreadMessages();
+  const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
@@ -162,6 +162,27 @@ export default function ChatPage() {
     clearTimeout(historyFallbackTimerRef.current);
     myUserIdRef.current = String(user.id);
     setActiveChatId([String(user.id), partnerId].sort().join('-'));
+
+    // Optimistically clear the global badge for this conversation immediately.
+    // Read the conversation list cache to find how many unreads this conversation had.
+    try {
+      const raw = sessionStorage.getItem('mansion_conversations');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const convs = Array.isArray(parsed?.conversations) ? parsed.conversations : (Array.isArray(parsed) ? parsed : []);
+        const conv = convs.find(c => String(c.profileId) === String(partnerId));
+        if (conv && conv.unread > 0) {
+          decrementUnread(conv.unread);
+          // Also zero it in the cache
+          conv.unread = 0;
+          const nextConvs = Array.isArray(parsed?.conversations)
+            ? { ...parsed, conversations: convs }
+            : convs;
+          sessionStorage.setItem('mansion_conversations', JSON.stringify(Array.isArray(parsed?.conversations) ? nextConvs : { conversations: convs, timestamp: parsed?.timestamp || 0 }));
+        }
+      }
+    } catch { /* ignore */ }
+
     setPartner(nextCachedChat?.partner || nextPartnerPreview || null);
     setMessages(nextCachedChat?.messages || []);
     setApiLimit(nextCachedChat?.apiLimit || null);
@@ -274,8 +295,8 @@ export default function ChatPage() {
       cancelled = true;
       clearTimeout(historyFallbackTimerRef.current);
       setActiveChatId(null);
-      // Invalidate conversation list cache so ChatListPage re-fetches fresh data
-      // (new messages, updated timestamps, etc.) when it re-mounts.
+      // Bust BOTH caches so ChatListPage re-fetches fresh conversations
+      invalidateConversationsCache();
       try {
         const raw = sessionStorage.getItem('mansion_conversations');
         if (raw) {

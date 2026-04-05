@@ -201,16 +201,19 @@ export default function ChatListPage() {
   // Optimistically mark a conversation as read in local state + cache + global badge
   const markConversationRead = useCallback((profileId) => {
     const pid = String(profileId);
+    let delta = 0;
     setConversations((prev) => {
       const idx = prev.findIndex(c => String(c.profileId) === pid);
       if (idx === -1 || prev[idx].unread === 0) return prev;
-      // Decrement global sidebar/bottomnav badge immediately
-      decrementUnread(prev[idx].unread);
+      delta = prev[idx].unread;
       const updated = [...prev];
       updated[idx] = { ...updated[idx], unread: 0 };
       setCachedConversations(updated);
       return updated;
     });
+    // Decrement global sidebar/bottomnav badge outside the state updater
+    // so it's never skipped by React batching.
+    if (delta > 0) decrementUnread(delta);
     // Invalidate API-level conversation cache so next fetch gets fresh data
     invalidateConversationsCache();
   }, [decrementUnread]);
