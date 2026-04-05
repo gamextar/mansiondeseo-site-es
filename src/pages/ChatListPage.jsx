@@ -41,7 +41,7 @@ function getCachedConversations() {
       conversations: Array.isArray(parsed?.conversations) ? parsed.conversations : [],
       timestamp: Number(parsed?.timestamp) || 0,
     };
-  } catch { return []; }
+  } catch { return { conversations: [], timestamp: 0 }; }
 }
 
 function setCachedConversations(convs) {
@@ -278,8 +278,18 @@ export default function ChatListPage() {
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
-    const hasFreshCache = isConversationCacheFresh(lastSyncAtRef.current);
-    const hasCachedConversations = cachedState.conversations.length > 0;
+
+    // Re-read cache at mount time so a logout+login cycle never shows stale data
+    const freshCache = getCachedConversations();
+    if (freshCache.conversations.length > 0) {
+      setConversations(freshCache.conversations);
+    } else {
+      setConversations([]);
+    }
+    lastSyncAtRef.current = freshCache.timestamp || 0;
+
+    const hasFreshCache = isConversationCacheFresh(freshCache.timestamp);
+    const hasCachedConversations = freshCache.conversations.length > 0;
 
     setLoading(!hasCachedConversations);
 

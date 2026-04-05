@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
-import { getAppBootstrap, getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache } from '../lib/api';
+import { getAppBootstrap, getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache, invalidateConversationsCache } from '../lib/api';
 import { recordRealtimeDebug, setRealtimeActiveConnections } from '../lib/realtimeDebug';
 
 const UnreadContext = createContext({
@@ -163,6 +163,7 @@ export function UnreadProvider({ children }) {
             return;
           }
           if (data.type === 'new_message') {
+            invalidateConversationsCache();
             const isActiveChat = !!activeChatIdRef.current && data.chatId === activeChatIdRef.current;
             if (typeof data.unreadCount === 'number') {
               applyUnreadCount(
