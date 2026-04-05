@@ -411,7 +411,7 @@ function StoryStageShell({ backgroundImageUrl, children, variant = 'default' }) 
 }
 
 // ── Feed-style fullscreen story preview ─────────────────────────────────────
-function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, avatarSize = 52, overlayDelay = 0 }) {
+function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onDismiss, onConfirm, avatarSize = 52, overlayDelay = 0 }) {
 	const videoRef = useRef(null);
 	const progressRef = useRef(null);
 	const rafRef = useRef(null);
@@ -493,7 +493,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onConfirm, 
 				{/* Close button — top-right, inside PWA safe area */}
 				<button
 					type="button"
-					onClick={onClose}
+					onClick={onDismiss}
 					className={STORY_STAGE_CLOSE_BUTTON_CLASS}
 					style={STORY_STAGE_CLOSE_BUTTON_STYLE}
 					aria-label="Cerrar vista previa"
@@ -1305,6 +1305,7 @@ export default function StoryUploadPage() {
 										avatarSize={siteSettings?.videoAvatarSize ?? 52}
 										overlayDelay={showFinalizingOverlay ? 2.4 : 0}
 										onClose={deleteAndResetStory}
+										onDismiss={async () => { await deleteAndResetStory(); navigate(returnPath); }}
 										onConfirm={() => {
 											setUser(prev => ({ ...prev, has_active_story: true }));
 											// Remove own ID from viewed set so green ring shows for the new story
