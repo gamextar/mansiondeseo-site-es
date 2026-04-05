@@ -274,8 +274,17 @@ export default function ChatPage() {
       cancelled = true;
       clearTimeout(historyFallbackTimerRef.current);
       setActiveChatId(null);
+      // Invalidate conversation list cache so ChatListPage re-fetches fresh data
+      // (new messages, updated timestamps, etc.) when it re-mounts.
+      try {
+        const raw = sessionStorage.getItem('mansion_conversations');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          parsed.timestamp = 0;
+          sessionStorage.setItem('mansion_conversations', JSON.stringify(parsed));
+        }
+      } catch { /* ignore */ }
       // Refresh global unread count once when leaving the chat.
-      // By now the DO has had time to flush unread_count=0 to D1.
       refreshUnread();
       chatRef.current?.close();
       chatRef.current = null;

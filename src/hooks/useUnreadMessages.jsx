@@ -300,9 +300,17 @@ export function UnreadProvider({ children }) {
     activeChatIdRef.current = chatId || null;
   }, []);
 
+  // Immediately subtract `amount` from the global badge (optimistic).
+  const decrementUnread = useCallback((amount) => {
+    const delta = Math.max(0, Number(amount) || 0);
+    if (delta === 0) return;
+    const next = Math.max(0, prevCountRef.current - delta);
+    applyUnreadCount(next);
+  }, [applyUnreadCount]);
+
   const refresh = useCallback(() => fetchUnread({ force: true }), [fetchUnread]);
 
-  const ctxValue = useMemo(() => ({ unreadCount, refresh, subscribe, setActiveChatId }), [unreadCount, refresh, subscribe, setActiveChatId]);
+  const ctxValue = useMemo(() => ({ unreadCount, refresh, subscribe, setActiveChatId, decrementUnread }), [unreadCount, refresh, subscribe, setActiveChatId, decrementUnread]);
 
   return (
     <UnreadContext.Provider value={ctxValue}>

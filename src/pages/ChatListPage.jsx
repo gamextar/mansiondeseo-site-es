@@ -196,14 +196,16 @@ export default function ChatListPage() {
   const typingTimersRef = useRef({});
   const lastSyncAtRef = useRef(cachedState.timestamp || 0);
   const navigate = useNavigate();
-  const { refresh: refreshUnread, subscribe } = useUnreadMessages();
+  const { refresh: refreshUnread, subscribe, decrementUnread } = useUnreadMessages();
 
-  // Optimistically mark a conversation as read in local state + cache
+  // Optimistically mark a conversation as read in local state + cache + global badge
   const markConversationRead = useCallback((profileId) => {
     const pid = String(profileId);
     setConversations((prev) => {
       const idx = prev.findIndex(c => String(c.profileId) === pid);
       if (idx === -1 || prev[idx].unread === 0) return prev;
+      // Decrement global sidebar/bottomnav badge immediately
+      decrementUnread(prev[idx].unread);
       const updated = [...prev];
       updated[idx] = { ...updated[idx], unread: 0 };
       setCachedConversations(updated);
@@ -211,7 +213,7 @@ export default function ChatListPage() {
     });
     // Invalidate API-level conversation cache so next fetch gets fresh data
     invalidateConversationsCache();
-  }, []);
+  }, [decrementUnread]);
 
   const applyConversationUpdate = useCallback((event) => {
     const conversation = event?.conversation;
