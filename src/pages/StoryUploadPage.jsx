@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle2, Clock, Download, Eye, Film, Gift, Heart, LayoutDashboard, Send, Upload, Volume2, VolumeX, X } from 'lucide-react';
+import { CheckCircle2, Clock, Film, Gift, Heart, Send, Upload, Volume2, VolumeX, X } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import AvatarImg from '../components/AvatarImg';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
-import { getToken, uploadStory, deleteOwnStory } from '../lib/api';
+import { getToken, uploadStory } from '../lib/api';
 
 const LANDSCAPE_WIDTH = 1280;
 const LANDSCAPE_HEIGHT = 720;
@@ -411,21 +411,11 @@ function StoryStageShell({ backgroundImageUrl, children, variant = 'default' }) 
 }
 
 // ── Feed-style fullscreen story preview ─────────────────────────────────────
-function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onDismiss, onConfirm, avatarSize = 52, overlayDelay = 0 }) {
+function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onDismiss, onConfirm, uploading = false, uploadProgress = 0, avatarSize = 52 }) {
 	const videoRef = useRef(null);
 	const progressRef = useRef(null);
 	const rafRef = useRef(null);
 	const [isMuted, setIsMuted] = useState(true);
-	const [overlayVisible, setOverlayVisible] = useState(overlayDelay === 0);
-
-	useEffect(() => {
-		// Capture the delay at mount time only — never react to prop changes
-		const delay = overlayDelay;
-		if (delay <= 0) { setOverlayVisible(true); return; }
-		setOverlayVisible(false);
-		const t = setTimeout(() => setOverlayVisible(true), delay * 1000);
-		return () => clearTimeout(t);
-	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 	useEffect(() => {
 		const video = videoRef.current;
@@ -480,17 +470,10 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onDismiss, 
 				muted={isMuted}
 			/>
 
-			{/* All overlays — fade in after delay controlled by state */}
-			<AnimatePresence>
-			{overlayVisible && (
-			<motion.div
-				key="preview-overlays"
-				className="absolute inset-0 z-20"
-				initial={{ opacity: 0 }}
-				animate={{ opacity: 1 }}
-				transition={{ duration: 0.5, ease: 'easeOut' }}
-			>
+			{/* All overlays */}
+			<div className="absolute inset-0 z-20">
 				{/* Close button — top-right, inside PWA safe area */}
+				{!uploading && (
 				<button
 					type="button"
 					onClick={onDismiss}
@@ -500,6 +483,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onDismiss, 
 				>
 					<X className="h-7 w-7 text-white" />
 				</button>
+				)}
 
 				{/* Right-side action icons (visual only, matching feed) */}
 				<div className="pointer-events-none absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden" style={{ bottom: 28 }}>
@@ -596,6 +580,7 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onDismiss, 
 				</div>
 			</div>
 
+			{!uploading && (
 			<div className="absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-10 sm:gap-14" style={{ top: '50%', transform: 'translate(-50%, -50%)' }}>
 				<motion.div
 					initial={{ opacity: 0, y: 12 }}
@@ -630,10 +615,42 @@ function StoryPreview({ videoUrl, posterUrl, caption, user, onClose, onDismiss, 
 					<span className="rounded-full border border-white/10 bg-black/28 px-3 py-1 text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Publicar</span>
 				</motion.div>
 			</div>
+			)}
 
-				</motion.div>/* end delayed overlays */
+			{/* Upload progress overlay */}
+			<AnimatePresence>
+				{uploading && (
+					<motion.div
+						key="upload-overlay"
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						transition={{ duration: 0.3, ease: 'easeOut' }}
+						className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/55 backdrop-blur-sm"
+					>
+						<div className="relative w-24 h-24">
+							<svg className="w-full h-full -rotate-90" viewBox="0 0 56 56">
+								<circle cx="28" cy="28" r="23" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
+								<circle cx="28" cy="28" r="23" fill="none" stroke="url(#uploadGrad)" strokeWidth="4" strokeLinecap="round"
+									strokeDasharray={`${uploadProgress * 144.5} 144.5`}
+									className="transition-[stroke-dasharray] duration-300"
+								/>
+								<defs>
+									<linearGradient id="uploadGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+										<stop offset="0%" stopColor="#d4af37" />
+										<stop offset="100%" stopColor="#f0d060" />
+									</linearGradient>
+								</defs>
+							</svg>
+							<span className="absolute inset-0 flex items-center justify-center text-xl font-bold text-mansion-gold tabular-nums">{Math.round(uploadProgress * 100)}%</span>
+						</div>
+						<p className="mt-5 text-base font-semibold text-white" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>Publicando historia…</p>
+						<p className="mt-1.5 text-sm text-white/55">No cierres esta pantalla</p>
+					</motion.div>
 				)}
-				</AnimatePresence>
+			</AnimatePresence>
+
+			</div>/* end overlays */
 		</>
 	);
 }
@@ -657,6 +674,7 @@ export default function StoryUploadPage() {
 	const uploadTokenRef = useRef('');
 	const resultPreviewUrlRef = useRef('');
 	const resultPosterUrlRef = useRef('');
+	const encodedFileRef = useRef(null);
 	const activeEncodeDurationRef = useRef(0);
 	const isTranscodingRef = useRef(false);
 	const timerIntervalRef = useRef(null);
@@ -664,7 +682,6 @@ export default function StoryUploadPage() {
 
 	const [encodingProgress, setEncodingProgress] = useState(0);
 	const [uploadProgress, setUploadProgress] = useState(0);
-	const [finalizingProgress, setFinalizingProgress] = useState(0);
 	const [phase, setPhase] = useState('idle');
 	const [sourceFile, setSourceFile] = useState(null);
 	const [sourceDuration, setSourceDuration] = useState(0);
@@ -674,13 +691,12 @@ export default function StoryUploadPage() {
 	const [errorMessage, setErrorMessage] = useState('');
 	const [elapsedSeconds, setElapsedSeconds] = useState(0);
 	const [showPreview, setShowPreview] = useState(false);
-	const [showFinalizingOverlay, setShowFinalizingOverlay] = useState(false);
 	const [previewConfirmed, setPreviewConfirmed] = useState(false);
 	const [engineStatus, setEngineStatus] = useState('idle');
 	const [storyBackdropUrl, setStoryBackdropUrl] = useState('');
 
 	const outputProfile = getOutputProfile(sourceResolution);
-	const storyStep = result?.id ? (showPreview ? 'preview' : previewConfirmed ? 'done' : 'preview') : sourceFile ? 'process' : 'pick';
+	const storyStep = result ? (showPreview ? 'preview' : previewConfirmed ? 'done' : 'preview') : sourceFile ? 'process' : 'pick';
 	const storyStepIndex = storyStep === 'pick' ? 0 : storyStep === 'process' ? 1 : 2;
 	const storySteps = [
 		{ id: 'pick', label: 'Elegir' },
@@ -791,15 +807,14 @@ export default function StoryUploadPage() {
 	const resetStoryFlow = () => {
 		resetResult();
 		resetStoryBackdrop();
+		encodedFileRef.current = null;
 		setSourceFile(null);
 		setSourceDuration(0);
 		setSourceResolution(null);
 		setEncodingProgress(0);
 		setUploadProgress(0);
-		setFinalizingProgress(0);
 		setElapsedSeconds(0);
 		setShowPreview(false);
-		setShowFinalizingOverlay(false);
 		setPreviewConfirmed(false);
 		uploadTokenRef.current = '';
 		setPhase('idle');
@@ -836,7 +851,6 @@ export default function StoryUploadPage() {
 		uploadTokenRef.current = getToken() || '';
 		setEncodingProgress(0);
 		setUploadProgress(0);
-		setFinalizingProgress(0);
 		setPhase('preparing');
 		setProcessing(true);
 		startElapsedTimer();
@@ -971,7 +985,6 @@ export default function StoryUploadPage() {
 			isTranscodingRef.current = true;
 			setEncodingProgress(0);
 			setUploadProgress(0);
-			setFinalizingProgress(0);
 
 			const encoded = await encodeStoryVideo({ file, duration, resolution });
 			const processingElapsedSeconds = (performance.now() - timerStartRef.current) / 1000;
@@ -983,18 +996,10 @@ export default function StoryUploadPage() {
 
 			resultPreviewUrlRef.current = encoded.previewUrl;
 			resultPosterUrlRef.current = encodedPosterUrl;
+			encodedFileRef.current = encoded.file;
 			setEncodingProgress(1);
-			setPhase('uploading');
-
-			const story = await uploadStory(encoded.file, {
-				tokenOverride: uploadTokenRef.current || getToken() || undefined,
-				onProgress: (progress) => setUploadProgress(clamp(progress, 0, 1)),
-			});
-
-			setUploadProgress(1);
-			setPhase('done');
+			setPhase('encoded');
 			setResult({
-				...story,
 				previewUrl: encoded.previewUrl,
 				posterUrl: encodedPosterUrl,
 				fileName: encoded.fileName,
@@ -1004,22 +1009,9 @@ export default function StoryUploadPage() {
 				processingTimeLabel: formatElapsedSeconds(processingElapsedSeconds),
 			});
 			setPreviewConfirmed(false);
-			// Show preview immediately so the video starts buffering in the background.
-			// The finalizing overlay sits on top and animates the last 5% of the bar
-			// over ~10 seconds — by the time it fades, the video is ready to play.
 			setShowPreview(true);
-			setShowFinalizingOverlay(true);
-			const _finStart = performance.now();
-			const _finDuration = 1900;
-			const _finTick = (now) => {
-				const t = Math.min((now - _finStart) / _finDuration, 1);
-				setFinalizingProgress(t);
-				if (t < 1) requestAnimationFrame(_finTick);
-				else setShowFinalizingOverlay(false);
-			};
-			requestAnimationFrame(_finTick);
 		} catch (error) {
-			setErrorMessage(error?.message || 'No se pudo publicar la historia.');
+			setErrorMessage(error?.message || 'No se pudo preparar la historia.');
 			setPhase('idle');
 		} finally {
 			stopElapsedTimer();
@@ -1029,67 +1021,58 @@ export default function StoryUploadPage() {
 		}
 	};
 
+	const handlePublish = async () => {
+		if (!encodedFileRef.current) return;
+		try {
+			setPhase('uploading');
+			setUploadProgress(0);
+			const story = await uploadStory(encodedFileRef.current, {
+				tokenOverride: uploadTokenRef.current || getToken() || undefined,
+				onProgress: (progress) => setUploadProgress(clamp(progress, 0, 1)),
+			});
+			setUploadProgress(1);
+			setPhase('done');
+			setUser(prev => ({ ...prev, has_active_story: true }));
+			try {
+				const viewed = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
+				const uid = String(user?.id);
+				const filtered = viewed.filter(id => id !== uid);
+				localStorage.setItem('viewed_story_users', JSON.stringify(filtered));
+			} catch {}
+			encodedFileRef.current = null;
+			navigate(returnPath);
+		} catch (error) {
+			setErrorMessage(error?.message || 'No se pudo publicar la historia.');
+			setPhase('encoded');
+		}
+	};
+
 	const maskedEncodingProgress = clamp(encodingProgress, 0, 1);
-	const maskedUploadProgress = clamp(uploadProgress, 0, 1);
-	const verificationEncodingShare = 0.8;
 	const loadingStoryProgress = phase === 'preparing'
 		? 0
 		: clamp(maskedEncodingProgress * 2, 0, 1);
-	const verificationProgress = phase === 'preparing'
-		? 0
-		: phase === 'encoding'
-			? clamp(((maskedEncodingProgress - 0.5) * 2) * verificationEncodingShare, 0, verificationEncodingShare)
-			: phase === 'uploading'
-				? verificationEncodingShare + (maskedUploadProgress * 0.1)
-				: phase === 'done'
-					? 0.9 + (finalizingProgress * 0.1)
-				: 0;
-	const showVerificationProgress = phase === 'encoding'
-		? maskedEncodingProgress >= 0.5
-		: phase === 'uploading' || phase === 'done';
 	const loadingStoryPercent = Math.round(loadingStoryProgress * 100);
-	const verificationPercent = Math.round(verificationProgress * 100);
-	const progressValue = phase === 'preparing'
-		? 0
-		: showVerificationProgress
-				? verificationProgress
-				: loadingStoryProgress;
+	const progressValue = loadingStoryProgress;
 	const progressLabel = phase === 'preparing'
 		? 'Iniciando historia'
-		: phase === 'uploading'
-			? 'Publicando historia'
-			: showVerificationProgress
-				? 'Verificando historia'
-				: 'Cargando historia';
+		: 'Cargando historia';
 	const debugProgressValue = phase === 'preparing'
 		? 0
 		: phase === 'encoding'
 			? maskedEncodingProgress
-			: phase === 'uploading'
-				? maskedUploadProgress
-				: phase === 'done'
-					? 1
-					: 0;
+			: phase === 'encoded' || phase === 'done'
+				? 1
+				: 0;
 	const debugProgressLabel = phase === 'preparing'
 		? 'Preparando motor'
 		: phase === 'encoding'
 			? 'Encoding real'
-			: phase === 'uploading'
-				? 'Subida real'
-				: 'Completado';
+			: 'Completado';
 	const shellVariant = storyStep === 'pick' ? 'pick' : storyStep === 'preview' ? 'preview' : 'default';
 	const activeShellBackgroundUrl = storyBackdropUrl;
 	const location = useLocation();
 	const returnPath = location.state?.from || '/perfil';
 	const closeStoryUpload = () => navigate(returnPath);
-
-	const deleteAndResetStory = async () => {
-		if (result?.id) {
-			try { await deleteOwnStory(result.id); } catch { /* best-effort */ }
-		}
-		setUser(prev => ({ ...prev, has_active_story: false }));
-		resetStoryFlow();
-	};
 
 	const headerConfig = storyStep === 'pick'
 		? {
@@ -1102,7 +1085,7 @@ export default function StoryUploadPage() {
 		: storyStep === 'process'
 			? {
 				title: 'Prepará tu historia',
-				subtitle: 'En cuanto eliges el archivo, empezamos a prepararlo y publicarlo automáticamente.',
+				subtitle: 'En cuanto eliges el archivo, empezamos a prepararlo automáticamente.',
 				showClose: true,
 				onClose: closeStoryUpload,
 				closeLabel: 'Cerrar',
@@ -1116,7 +1099,7 @@ export default function StoryUploadPage() {
 					closeLabel: 'Cerrar vista previa de historia',
 				}
 				: {
-					title: 'Historia confirmada',
+					title: 'Historia publicada',
 					subtitle: 'La historia ya está publicada.',
 					showClose: true,
 					onClose: () => navigate(returnPath),
@@ -1238,14 +1221,10 @@ export default function StoryUploadPage() {
 															</div>
 															<div className="flex-1 min-w-0">
 																<p className="text-base font-semibold text-white leading-snug">
-																	{phase === 'preparing' ? 'Preparando…' : phase === 'encoding' ? 'Optimizando video…' : phase === 'uploading' ? 'Publicando…' : 'Procesando…'}
+																	{phase === 'preparing' ? 'Preparando…' : 'Optimizando video…'}
 																</p>
 																<p className="text-sm text-white/50 mt-1 truncate">
-																	{phase === 'preparing'
-																		? 'Cargando motor de video'
-																		: phase === 'encoding'
-																			? showVerificationProgress ? 'Revisando detalles finales' : 'Comprimiendo y optimizando'
-																			: 'Subiendo a los servidores'}
+																	{phase === 'preparing' ? 'Cargando motor de video' : 'Comprimiendo y optimizando'}
 																</p>
 															</div>
 														</div>
@@ -1259,26 +1238,6 @@ export default function StoryUploadPage() {
 																<div className="h-full rounded-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light transition-all duration-300" style={{ width: `${loadingStoryPercent}%` }} />
 															</div>
 														</div>
-														<AnimatePresence initial={false}>
-															{showVerificationProgress && (
-																<motion.div
-																	initial={{ opacity: 0, y: 10, scaleY: 0.92 }}
-																	animate={{ opacity: 1, y: 0, scaleY: 1 }}
-																	exit={{ opacity: 0, y: -6, scaleY: 0.96 }}
-																	transition={{ duration: 0.24, ease: 'easeOut' }}
-																	style={{ originY: 0, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-																	className="mt-4 space-y-2"
-																>
-																	<div className="flex items-center justify-between text-sm text-white/55">
-																		<span>Verificando</span>
-																		<span className="tabular-nums font-medium">{verificationPercent}%</span>
-																	</div>
-																	<div className="h-2.5 w-full rounded-full bg-white/8 overflow-hidden">
-																		<div className="h-full rounded-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${verificationPercent}%` }} />
-																	</div>
-																</motion.div>
-															)}
-														</AnimatePresence>
 													</div>
 												)}
 											</motion.div>
@@ -1298,125 +1257,18 @@ export default function StoryUploadPage() {
 									className="absolute inset-0"
 								>
 									<StoryPreview
-										videoUrl={result.video_url || result.previewUrl}
+										videoUrl={result.previewUrl}
 										posterUrl={result.posterUrl || storyBackdropUrl}
 										caption={result.caption}
 										user={user}
 										avatarSize={siteSettings?.videoAvatarSize ?? 52}
-										overlayDelay={showFinalizingOverlay ? 2.4 : 0}
-										onClose={deleteAndResetStory}
-										onDismiss={async () => { await deleteAndResetStory(); navigate(returnPath); }}
-										onConfirm={() => {
-											setUser(prev => ({ ...prev, has_active_story: true }));
-											// Remove own ID from viewed set so green ring shows for the new story
-											try {
-												const viewed = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
-												const uid = String(user?.id);
-												const filtered = viewed.filter(id => id !== uid);
-												localStorage.setItem('viewed_story_users', JSON.stringify(filtered));
-											} catch {}
-											navigate(returnPath);
-										}}
+										uploading={phase === 'uploading'}
+										uploadProgress={uploadProgress}
+										onClose={resetStoryFlow}
+										onDismiss={() => { resetStoryFlow(); navigate(returnPath); }}
+										onConfirm={handlePublish}
 									/>
 								</motion.section>
-							)}
-
-							{storyStep === 'done' && (
-								<motion.section
-									key="done"
-									initial={{ opacity: 0, scale: 0.96 }}
-									animate={{ opacity: 1, scale: 1 }}
-									exit={{ opacity: 0, y: -20 }}
-									transition={{ duration: 0.3, ease: 'easeOut' }}
-									style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-									className="absolute inset-0"
-								>
-									<div className="flex h-full flex-col px-6 pb-8 pt-44 sm:px-8 sm:pt-48">
-										<div className="mt-auto mb-auto rounded-[1.75rem] border border-white/10 bg-black/42 backdrop-blur-md p-6 sm:p-7 text-center shadow-[0_12px_40px_rgba(0,0,0,0.24)]">
-											<motion.div
-												initial={{ scale: 0.5, opacity: 0 }}
-												animate={{ scale: 1, opacity: 1 }}
-												transition={{ delay: 0.08, duration: 0.24, ease: 'easeOut' }}
-												style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
-												className="w-14 h-14 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-4"
-											>
-												<CheckCircle2 className="w-7 h-7 text-green-400" />
-											</motion.div>
-											<h2 className="font-display text-2xl font-bold text-white" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.82), 0 0 3px rgba(0,0,0,0.62)' }}>Historia confirmada</h2>
-											<p className="text-white/74 mt-1 text-sm" style={{ textShadow: '0 3px 12px rgba(0,0,0,0.72), 0 0 3px rgba(0,0,0,0.48)' }}>La historia ya está publicada. Puedes revisarla otra vez, volver a tu perfil o subir otra.</p>
-											<div className="mt-5 flex flex-col gap-3">
-												<button type="button" onClick={() => setShowPreview(true)} className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-mansion-gold text-mansion-base font-semibold text-lg hover:bg-mansion-gold-light transition-colors shadow-[0_12px_30px_rgba(212,175,55,0.18)]">
-													<Eye className="w-5 h-5" />
-													Ver de nuevo
-												</button>
-												<button type="button" onClick={resetStoryFlow} className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-medium hover:bg-white/10 transition-colors">
-													<Upload className="w-5 h-5" />
-													Subir otra historia
-												</button>
-												<button type="button" onClick={() => navigate(returnPath)} className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white/72 font-medium hover:bg-white/10 transition-colors">
-													<LayoutDashboard className="w-5 h-5" />
-													Volver
-												</button>
-											</div>
-										</div>
-									</div>
-								</motion.section>
-							)}
-						</AnimatePresence>
-
-						{/* Finalizing overlay — sits on top of StoryPreview while video buffers in background */}
-						<AnimatePresence>
-							{showFinalizingOverlay && (
-								<motion.div
-									key="finalizing-overlay"
-									initial={{ opacity: 1 }}
-									exit={{ opacity: 0 }}
-									transition={{ duration: 0.5, ease: 'easeOut' }}
-									className="absolute inset-0 z-50 flex flex-col px-6 pb-8 pt-44 sm:px-8 sm:pt-48"
-									style={{ background: 'inherit' }}
-								>
-									<div className="mt-auto mb-6 sm:mb-10">
-										<div className="rounded-[2rem] border border-white/12 bg-black/50 backdrop-blur-xl p-7 sm:p-8 shadow-[0_20px_56px_rgba(0,0,0,0.38)]">
-											<div className="flex items-center gap-5 mb-7">
-												<div className="relative flex-shrink-0">
-													<svg className="w-16 h-16 -rotate-90" viewBox="0 0 56 56">
-														<circle cx="28" cy="28" r="23" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
-														<circle cx="28" cy="28" r="23" fill="none" stroke="url(#finGrad)" strokeWidth="4" strokeLinecap="round" strokeDasharray="144.5 144.5" />
-														<defs>
-															<linearGradient id="finGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-																<stop offset="0%" stopColor="#d4af37" />
-																<stop offset="100%" stopColor="#f0d060" />
-															</linearGradient>
-														</defs>
-													</svg>
-													<span className="absolute inset-0 flex items-center justify-center text-[13px] font-bold text-mansion-gold tabular-nums">100%</span>
-												</div>
-												<div className="flex-1 min-w-0">
-													<p className="text-base font-semibold text-white leading-snug">Preparando reproducción…</p>
-													<p className="text-sm text-white/50 mt-1 truncate">Optimizando para reproducción</p>
-												</div>
-											</div>
-											<div className="space-y-2">
-												<div className="flex items-center justify-between text-sm text-white/55">
-													<span>Procesando</span>
-													<span className="tabular-nums font-medium">100%</span>
-												</div>
-												<div className="h-2.5 w-full rounded-full bg-white/8 overflow-hidden">
-													<div className="h-full rounded-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light" style={{ width: '100%' }} />
-												</div>
-											</div>
-											<div className="mt-4 space-y-2">
-												<div className="flex items-center justify-between text-sm text-white/55">
-													<span>Verificando</span>
-													<span className="tabular-nums font-medium">{verificationPercent}%</span>
-												</div>
-												<div className="h-2.5 w-full rounded-full bg-white/8 overflow-hidden">
-													<div className="h-full rounded-full bg-gradient-to-r from-mansion-crimson to-mansion-gold transition-all duration-300" style={{ width: `${verificationPercent}%` }} />
-												</div>
-											</div>
-										</div>
-									</div>
-								</motion.div>
 							)}
 						</AnimatePresence>
 
