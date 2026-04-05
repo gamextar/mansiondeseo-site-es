@@ -474,17 +474,25 @@ async function signJWT(payload, secret) {
   return `${unsigned}.${sigStr}`;
 }
 
+let _jwtKeyCache = null; // { secret, key } — reuse across requests in the same isolate
+
 async function verifyJWT(token, secret) {
   try {
     const [headerB64, payloadB64, sigB64] = token.split('.');
     if (!headerB64 || !payloadB64 || !sigB64) return null;
     const unsigned = `${headerB64}.${payloadB64}`;
     const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
-    );
+    // Cache the CryptoKey — importKey is expensive and the secret never changes
+    if (!_jwtKeyCache || _jwtKeyCache.secret !== secret) {
+      _jwtKeyCache = {
+        secret,
+        key: await crypto.subtle.importKey(
+          'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+        ),
+      };
+    }
     const sigBytes = Uint8Array.from(atob(sigB64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, encoder.encode(unsigned));
+    const valid = await crypto.subtle.verify('HMAC', _jwtKeyCache.key, sigBytes, encoder.encode(unsigned));
     if (!valid) return null;
     const payload = JSON.parse(base64UrlDecode(payloadB64));
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
@@ -515,8 +523,20 @@ async function validateTurnstile(token, secret, ip) {
 // In-memory caches to reduce D1 queries per request
 const _lastActiveCache = new Map(); // userId → timestamp of last D1 UPDATE
 const _accountStatusCache = new Map(); // userId → { status, exp }
+const _viewerCache = new Map(); // userId → { data, exp } — viewer profile data (country, seeking, etc.)
 const LAST_ACTIVE_DEBOUNCE_MS = 5 * 60_000; // only UPDATE last_active every 5 min
 const ACCOUNT_STATUS_TTL_MS = 5 * 60_000; // cache account_status for 5 min
+const VIEWER_CACHE_TTL_MS = 2 * 60_000; // cache viewer data for 2 min
+
+function getCachedViewer(userId) {
+  const entry = _viewerCache.get(userId);
+  if (entry && Date.now() < entry.exp) return entry.data;
+  return null;
+}
+
+function setCachedViewer(userId, data) {
+  _viewerCache.set(userId, { data, exp: Date.now() + VIEWER_CACHE_TTL_MS });
+}
 
 async function authenticate(request, env) {
   const authHeader = request.headers.get('Authorization');
@@ -1237,8 +1257,12 @@ async function handleProfiles(request, env) {
   const filter = url.searchParams.get('filter') || 'all';
   const search = url.searchParams.get('q') || '';
 
-  // Use the authenticated user's registered country (not cf-ipcountry which changes with VPN)
-  const viewer = await env.DB.prepare('SELECT premium, premium_until, country, seeking, interests FROM users WHERE id = ?').bind(auth.sub).first();
+  // Use cached viewer data when available to avoid a serial D1 round-trip
+  let viewer = getCachedViewer(auth.sub);
+  if (!viewer) {
+    viewer = await env.DB.prepare('SELECT premium, premium_until, country, seeking, interests FROM users WHERE id = ?').bind(auth.sub).first();
+    if (viewer) setCachedViewer(auth.sub, viewer);
+  }
   const country = viewer?.country || '';
 
   // Determine role filter: use viewer's seeking from DB, with frontend filter as fallback
@@ -1293,17 +1317,16 @@ async function handleProfiles(request, env) {
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
   const profilesCacheKey = `profiles:${seekingKey}:${country}:${search}`;
 
-  // Parallel: cached settings + cached profiles + per-user data (always fresh)
-  const [settings, results, { results: favRows }, { results: favByRows }, storyRows] = await Promise.all([
+  // Parallel: cached settings + cached profiles + combined favorites + active stories
+  const [settings, results, { results: allFavRows }, storyRows] = await Promise.all([
     cached('settings', 300_000, () => loadSettings(env)),  // 5 min
     cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results)),  // 30s
-    env.DB.prepare('SELECT target_id FROM favorites WHERE user_id = ?').bind(auth.sub).all(),
-    env.DB.prepare('SELECT user_id FROM favorites WHERE target_id = ?').bind(auth.sub).all(),
+    env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?').bind(auth.sub, auth.sub).all(),
     cached('active_story_users', 30_000, () => env.DB.prepare('SELECT DISTINCT user_id FROM stories WHERE active = 1').all().then(r => r.results).catch(() => [])),  // 30s
   ]);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
-  const viewerFavorites = new Set(favRows.map(r => r.target_id));
-  const favoritedBySet = new Set(favByRows.map(r => r.user_id));
+  const viewerFavorites = new Set(allFavRows.filter(r => r.user_id === auth.sub).map(r => r.target_id));
+  const favoritedBySet = new Set(allFavRows.filter(r => r.target_id === auth.sub).map(r => r.user_id));
   const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
 
   // Filter out current user (cached query includes everyone) + map to frontend shape
