@@ -6,6 +6,7 @@ import { useAuth } from '../lib/authContext';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
+import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
 import { resolveMediaUrl } from '../lib/media';
 
@@ -58,6 +59,7 @@ export default function ProfilePage() {
   const lbPanRef = useRef({ x: 0, y: 0 });
   const lbPinchRef = useRef({ startDist: 0, startZoom: 1, active: false });
   const lbDragRef = useRef({ startX: 0, startY: 0, startPanX: 0, startPanY: 0, active: false });
+  const [showStoryPreview, setShowStoryPreview] = useState(false);
   const lbLastTapRef = useRef(0);
 
   const closeLightbox = useCallback(() => {
@@ -507,7 +509,13 @@ export default function ProfilePage() {
           {/* Action pills row */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => navigate('/historia/nueva', { state: { from: '/perfil' } })}
+              onClick={() => {
+                if (user?.has_active_story && user?.active_story_url) {
+                  setShowStoryPreview(true);
+                } else {
+                  navigate('/historia/nueva', { state: { from: '/perfil' } });
+                }
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-mansion-crimson/10 border border-mansion-crimson/25 text-[11px] font-medium text-mansion-crimson hover:bg-mansion-crimson/20 transition-all"
             >
               <Film className="w-3 h-3" />
@@ -987,6 +995,16 @@ export default function ProfilePage() {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {showStoryPreview && user?.active_story_url && (
+        <div className="fixed inset-0 z-50 bg-black">
+          <StoryPreviewOverlay
+            videoUrl={user.active_story_url}
+            user={user}
+            onDismiss={() => setShowStoryPreview(false)}
+          />
         </div>
       )}
     </div>
