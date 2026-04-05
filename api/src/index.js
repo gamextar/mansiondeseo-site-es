@@ -559,14 +559,20 @@ async function authenticate(request, env) {
     env.DB.prepare("UPDATE users SET last_active = datetime('now'), last_ip = ? WHERE id = ?").bind(ip, userId).run().catch(() => {});
   }
 
-  // Cache account_status check — avoid D1 read on every request
+  // Cache account_status check — avoid D1 read on every request.
+  // Also fetch viewer profile fields (country, seeking, etc.) in the same query so
+  // handleProfiles can skip its own serial viewer D1 round-trip on cache miss.
   const cached = _accountStatusCache.get(userId);
   if (cached && now < cached.exp) {
     if (cached.status === 'suspended') return null;
   } else {
-    const userStatus = await env.DB.prepare('SELECT account_status FROM users WHERE id = ?').bind(userId).first();
-    _accountStatusCache.set(userId, { status: userStatus?.account_status, exp: now + ACCOUNT_STATUS_TTL_MS });
-    if (userStatus?.account_status === 'suspended') return null;
+    const userRow = await env.DB.prepare(
+      'SELECT account_status, premium, premium_until, country, seeking, interests FROM users WHERE id = ?'
+    ).bind(userId).first();
+    _accountStatusCache.set(userId, { status: userRow?.account_status, exp: now + ACCOUNT_STATUS_TTL_MS });
+    // Populate viewer cache so handleProfiles skips a serial D1 round-trip
+    if (userRow) setCachedViewer(userId, userRow);
+    if (userRow?.account_status === 'suspended') return null;
   }
 
   return payload; // { sub: userId, email, role }
