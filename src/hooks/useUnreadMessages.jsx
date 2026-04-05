@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
-import { getAppBootstrap, getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache, invalidateConversationsCache, applyCachedConversationWsUpdate } from '../lib/api';
+import { getAppBootstrap, getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache, invalidateConversationsCache, applyCachedConversationWsUpdate, markConversationReadInCache } from '../lib/api';
 import { recordRealtimeDebug, setRealtimeActiveConnections } from '../lib/realtimeDebug';
 
 const UnreadContext = createContext({
@@ -183,6 +183,15 @@ export function UnreadProvider({ children }) {
                 fetchUnread({ force: true }).catch(() => {});
               }
             } else if (!isActiveChat) {
+              fetchUnread({ force: true }).catch(() => {});
+            }
+            notifyListeners(data);
+          } else if (data.type === 'conversation_read') {
+            if (data.partnerId) markConversationReadInCache(data.partnerId);
+            invalidateUnreadCache();
+            if (typeof data.unreadCount === 'number') {
+              applyUnreadCount(data.unreadCount);
+            } else {
               fetchUnread({ force: true }).catch(() => {});
             }
             notifyListeners(data);

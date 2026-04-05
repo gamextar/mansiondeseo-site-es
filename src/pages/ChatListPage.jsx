@@ -347,6 +347,8 @@ export default function ChatListPage() {
         if (event.partnerId) _readProfileIds.delete(String(event.partnerId));
         const updated = applyConversationUpdate(event);
         if (!updated) fetchConversations();
+      } else if (event?.type === 'conversation_read' && event.partnerId) {
+        markConversationRead(event.partnerId);
       } else if (event?.type === 'conversation_deleted' && event.partnerId) {
         removeConversation(event.partnerId);
       } else if (event?.type === 'typing' && event.chatId && myId) {
