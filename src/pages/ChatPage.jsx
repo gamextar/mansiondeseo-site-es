@@ -600,21 +600,22 @@ export default function ChatPage() {
       </div>
 
       {/* Messages area */}
-      <div
-        ref={scrollRef}
-        onScroll={() => {
-          const el = scrollRef.current;
-          if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-        }}
-        className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-4 pt-24 pb-5 space-y-5 lg:px-6 lg:pt-24 max-w-4xl lg:mx-auto w-full"
-      >
+      <div className="relative flex-1 min-h-0 max-w-4xl lg:mx-auto w-full">
         <div
-          ref={indicatorRef}
-          className="sticky top-0 z-10 flex justify-center py-2 pointer-events-none"
-          style={{ transform: 'translateY(-100%)', opacity: 0, transition: 'transform 0.2s, opacity 0.2s' }}
+          ref={scrollRef}
+          onScroll={() => {
+            const el = scrollRef.current;
+            if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          }}
+          className="h-full overflow-y-auto overscroll-y-contain px-4 pt-24 pb-5 space-y-5 lg:px-6 lg:pt-24"
         >
-          <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
-        </div>
+          <div
+            ref={indicatorRef}
+            className="sticky top-0 z-10 flex justify-center py-2 pointer-events-none"
+            style={{ transform: 'translateY(-100%)', opacity: 0, transition: 'transform 0.2s, opacity 0.2s' }}
+          >
+            <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+          </div>
 
         {hasOlderMessages && (
           <div className="flex justify-center">
@@ -692,31 +693,36 @@ export default function ChatPage() {
         </AnimatePresence>
 
         {/* Typing indicator bubble */}
+          <div
+            ref={messagesEndRef}
+            className="h-32"
+            style={{ scrollMarginBottom: '80px' }}
+          />
+        </div>
+
         <AnimatePresence>
           {partnerTyping && (
             <motion.div
-              layout="position"
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 6, transition: { duration: 0.12 } }}
-              className="flex items-end gap-2 justify-start pb-3"
+              exit={{ opacity: 0, y: 4, transition: { duration: 0.1 } }}
+              className="pointer-events-none absolute left-4 right-4 bottom-3 lg:left-6 lg:right-6"
             >
-              <div className="flex-shrink-0 w-[50px] h-[50px] mb-0.5" aria-hidden="true" />
-              <div className="bg-mansion-elevated border border-mansion-border/30 rounded-2xl rounded-bl-sm px-4 py-3">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              <div className="flex items-end gap-2 justify-start">
+                <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5 opacity-90">
+                  <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
+                </div>
+                <div className="bg-mansion-elevated/95 border border-mansion-border/30 rounded-2xl rounded-bl-sm px-4 py-3 shadow-lg backdrop-blur-sm">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-        <div
-          ref={messagesEndRef}
-          className="h-32"
-          style={{ scrollMarginBottom: '80px' }}
-        />
       </div>
 
       {/* Input area */}
