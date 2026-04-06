@@ -655,7 +655,7 @@ export default function ChatPage() {
           </div>
         )}
 
-        <AnimatePresence initial={false} mode="popLayout">
+        <AnimatePresence initial={false}>
           {messages.map((msg) => {
             const isMe = msg.senderId === 'me';
             const isPopped = poppedMessageIds.has(msg.id);
@@ -663,7 +663,6 @@ export default function ChatPage() {
             return (
               <motion.div
                 key={msg.id}
-                layout="position"
                 initial={skipIntroAnimation ? false : { opacity: 0, y: 8, scale: 0.97 }}
                 animate={{
                   opacity: 1,
@@ -680,7 +679,6 @@ export default function ChatPage() {
                   </div>
                 )}
                 <motion.div
-                  layout
                   className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                     isMe
                       ? 'bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white rounded-br-sm'
@@ -706,27 +704,27 @@ export default function ChatPage() {
           })}
         </AnimatePresence>
 
-        {/* Typing indicator bubble */}
+        {partnerTyping && (
+          <div className="flex items-end gap-2 justify-start pb-3">
+            <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
+              <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
+            </div>
+            <div className="bg-mansion-elevated border border-mansion-border/30 rounded-2xl rounded-bl-sm px-4 py-3">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          </div>
+        )}
+
           <div
             ref={messagesEndRef}
             className="h-32"
             style={{ scrollMarginBottom: '80px' }}
           />
         </div>
-
-        {partnerTyping && (
-          <div className="pointer-events-none absolute left-4 right-4 bottom-3 lg:left-6 lg:right-6">
-            <div className="flex items-end gap-2 justify-start">
-              <div className="bg-mansion-elevated/95 border border-mansion-border/30 rounded-2xl rounded-bl-sm px-4 py-3 shadow-lg backdrop-blur-sm">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Input area */}
