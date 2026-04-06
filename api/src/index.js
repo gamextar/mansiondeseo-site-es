@@ -1598,10 +1598,9 @@ async function handleSendMessage(request, env) {
 
   const events = await buildNewMessageEvents(env, auth.sub, receiver_id, msg);
 
-  // Notify receiver's notification channel (updates ChatListPage in real-time)
+  // Notify receiver's notification channel (updates ChatListPage in real-time).
+  // The sender tab updates its own conversation preview locally.
   notifyUser(env, receiver_id, events.receiver).catch(() => {});
-  // Also notify sender (so their own ChatListPage updates if open in another tab)
-  notifyUser(env, auth.sub, events.sender).catch(() => {});
 
   return json({ message: msg }, 201);
 }
