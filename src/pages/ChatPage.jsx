@@ -91,13 +91,16 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const chatRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const incomingMessageTimersRef = useRef(new Map());
   const lastTypingSentRef = useRef(0);
   const wasAtBottomRef = useRef(true);
   const myUserIdRef = useRef(null);
   const pendingScrollBehaviorRef = useRef(null);
+  const pendingScrollForceRef = useRef(false);
   const restoreScrollAfterPrependRef = useRef(null);
   const initialHistoryLoadedRef = useRef(false);
   const historyFallbackTimerRef = useRef(null);
+  const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
   const backTarget = location.state?.from || '/mensajes';
@@ -137,8 +140,29 @@ export default function ChatPage() {
     }
   }, []);
 
-  const requestScrollToBottom = useCallback((behavior = 'auto') => {
+  const requestScrollToBottom = useCallback((behavior = 'auto', { force = true } = {}) => {
     pendingScrollBehaviorRef.current = behavior;
+    pendingScrollForceRef.current = force;
+  }, []);
+
+  const markMessagePopped = useCallback((messageId) => {
+    if (!messageId) return;
+    setPoppedMessageIds((prev) => {
+      const next = new Set(prev);
+      next.add(messageId);
+      return next;
+    });
+    const currentTimer = incomingMessageTimersRef.current.get(messageId);
+    if (currentTimer) clearTimeout(currentTimer);
+    const timer = setTimeout(() => {
+      setPoppedMessageIds((prev) => {
+        const next = new Set(prev);
+        next.delete(messageId);
+        return next;
+      });
+      incomingMessageTimersRef.current.delete(messageId);
+    }, 900);
+    incomingMessageTimersRef.current.set(messageId, timer);
   }, []);
 
   useEffect(() => {
@@ -230,19 +254,21 @@ export default function ChatPage() {
         setHasOlderMessages(Array.isArray(payload) ? historyRows.length >= INITIAL_CHAT_PAGE_SIZE : !!payload?.hasMore);
         setLoading(false);
         wasAtBottomRef.current = true;
-        requestScrollToBottom('auto');
+        requestScrollToBottom('auto', { force: true });
 
         if (unreadIds.length > 0) {
           chatRef.current?.markRead(unreadIds);
         }
       },
       onMessage(msg) {
+        const shouldStickToBottom = wasAtBottomRef.current;
         // Deduplicate: skip if message already exists
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
-          if (wasAtBottomRef.current) requestScrollToBottom('auto');
           return [...prev, formatMsg(msg)];
         });
+        if (shouldStickToBottom) requestScrollToBottom('smooth', { force: true });
+        markMessagePopped(msg.id);
         setPartnerTyping(false);
         // Auto mark as read since we're viewing the chat
         chatRef.current?.markRead([msg.id]);
@@ -295,7 +321,7 @@ export default function ChatPage() {
           setHasOlderMessages(!!data.hasMore);
           setLoading(false);
           wasAtBottomRef.current = true;
-          requestScrollToBottom('auto');
+          requestScrollToBottom('auto', { force: true });
         }).catch(() => {
           if (!cancelled) setLoading(false);
         });
@@ -307,6 +333,8 @@ export default function ChatPage() {
     return () => {
       cancelled = true;
       clearTimeout(historyFallbackTimerRef.current);
+      incomingMessageTimersRef.current.forEach((timer) => clearTimeout(timer));
+      incomingMessageTimersRef.current.clear();
       setActiveChatId(null);
       // Bust API in-memory caches so getConversations() fetches fresh on next call
       invalidateConversationsCache();
@@ -336,22 +364,17 @@ export default function ChatPage() {
       return;
     }
 
-    // Al entrar al chat (primer render de mensajes), siempre scroll al fondo
-    if (messages.length > 0 && messages.length <= 3) {
-      // Primeros mensajes: forzar scroll
-      scrollToBottom('auto');
-      return;
-    }
-
-    // Si hay un scroll pendiente y el usuario está abajo, scroll suave
-    if (pendingScrollBehaviorRef.current && isAtBottom()) {
+    if (pendingScrollBehaviorRef.current) {
       const behavior = pendingScrollBehaviorRef.current;
+      const force = pendingScrollForceRef.current;
       pendingScrollBehaviorRef.current = null;
+      pendingScrollForceRef.current = false;
+      if (!force && !wasAtBottomRef.current) return;
       requestAnimationFrame(() => {
         scrollToBottom(behavior);
       });
     }
-  }, [messages, scrollToBottom, isAtBottom]);
+  }, [messages, scrollToBottom]);
 
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
@@ -432,7 +455,7 @@ export default function ChatPage() {
     };
 
     wasAtBottomRef.current = true;
-    requestScrollToBottom('auto');
+    requestScrollToBottom('auto', { force: true });
     setMessages((prev) => [...prev, newMsg]);
     setInput('');
     setPartnerTyping(false);
@@ -612,12 +635,17 @@ export default function ChatPage() {
         <AnimatePresence initial={false}>
           {messages.map((msg) => {
             const isMe = msg.senderId === 'me';
+            const isPopped = poppedMessageIds.has(msg.id);
             return (
               <motion.div
                 key={msg.id}
                 initial={{ opacity: 0, y: 8, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.18 }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                  scale: isPopped ? [1, 1.035, 1] : 1,
+                }}
+                transition={isPopped ? { duration: 0.35, times: [0, 0.45, 1] } : { duration: 0.18 }}
                 className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
               >
                 {/* Partner avatar next to received messages */}
@@ -626,11 +654,12 @@ export default function ChatPage() {
                     <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
                   </div>
                 )}
-                <div
+                <motion.div
+                  layout
                   className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                     isMe
                       ? 'bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white rounded-br-sm'
-                      : 'bg-mansion-elevated text-text-primary border border-mansion-border/30 rounded-bl-sm'
+                      : `text-text-primary border rounded-bl-sm ${isPopped ? 'bg-mansion-gold/10 border-mansion-gold/30 shadow-[0_0_0_1px_rgba(212,175,55,0.08)]' : 'bg-mansion-elevated border-mansion-border/30'}`
                   }`}
                 >
                   <p className="text-[15px] leading-relaxed">{msg.text}</p>
@@ -646,7 +675,7 @@ export default function ChatPage() {
                       </span>
                     )}
                   </p>
-                </div>
+                </motion.div>
               </motion.div>
             );
           })}
