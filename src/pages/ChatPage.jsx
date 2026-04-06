@@ -131,12 +131,14 @@ export default function ChatPage() {
   }, []);
 
   const scrollToBottom = useCallback((behavior = 'auto') => {
+    if (scrollRef.current) {
+      const el = scrollRef.current;
+      el.scrollTo({ top: el.scrollHeight, behavior });
+      return;
+    }
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ block: 'end', behavior });
       return;
-    }
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, []);
 
@@ -262,6 +264,7 @@ export default function ChatPage() {
       },
       onMessage(msg) {
         const shouldStickToBottom = wasAtBottomRef.current;
+        const shouldReplaceTyping = partnerTyping;
         // Deduplicate: skip if message already exists
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
@@ -269,7 +272,11 @@ export default function ChatPage() {
         });
         if (shouldStickToBottom) requestScrollToBottom('smooth', { force: true });
         markMessagePopped(msg.id);
-        setPartnerTyping(false);
+        if (shouldReplaceTyping) {
+          requestAnimationFrame(() => setPartnerTyping(false));
+        } else {
+          setPartnerTyping(false);
+        }
         // Auto mark as read since we're viewing the chat
         chatRef.current?.markRead([msg.id]);
       },
@@ -371,7 +378,9 @@ export default function ChatPage() {
       pendingScrollForceRef.current = false;
       if (!force && !wasAtBottomRef.current) return;
       requestAnimationFrame(() => {
-        scrollToBottom(behavior);
+        requestAnimationFrame(() => {
+          scrollToBottom(behavior);
+        });
       });
     }
   }, [messages, scrollToBottom]);
@@ -632,13 +641,14 @@ export default function ChatPage() {
           </div>
         )}
 
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={false} mode="popLayout">
           {messages.map((msg) => {
             const isMe = msg.senderId === 'me';
             const isPopped = poppedMessageIds.has(msg.id);
             return (
               <motion.div
                 key={msg.id}
+                layout="position"
                 initial={{ opacity: 0, y: 8, scale: 0.97 }}
                 animate={{
                   opacity: 1,
@@ -685,9 +695,10 @@ export default function ChatPage() {
         <AnimatePresence>
           {partnerTyping && (
             <motion.div
+              layout="position"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
+              exit={{ opacity: 0, y: 6, transition: { duration: 0.12 } }}
               className="flex items-end gap-2 justify-start pb-3"
             >
               <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
