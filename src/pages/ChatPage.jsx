@@ -701,9 +701,7 @@ export default function ChatPage() {
               exit={{ opacity: 0, y: 6, transition: { duration: 0.12 } }}
               className="flex items-end gap-2 justify-start pb-3"
             >
-              <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
-                <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
-              </div>
+              <div className="flex-shrink-0 w-[50px] h-[50px] mb-0.5" aria-hidden="true" />
               <div className="bg-mansion-elevated border border-mansion-border/30 rounded-2xl rounded-bl-sm px-4 py-3">
                 <div className="flex gap-1">
                   <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
