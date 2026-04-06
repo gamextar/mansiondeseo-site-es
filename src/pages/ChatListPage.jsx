@@ -5,6 +5,7 @@ import { Search, MessageCircle, Trash2 } from 'lucide-react';
 import { deleteConversation, getConversations, getToken, getStoredUser, invalidateConversationsCache } from '../lib/api';
 import AvatarImg from '../components/AvatarImg';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
+import { subscribeLocalConversationUpdates } from '../lib/localConversationEvents';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -252,6 +253,27 @@ export default function ChatListPage() {
     return true;
   }, []);
 
+  const applyLocalConversationPreview = useCallback((event) => {
+    const conversation = event?.conversation;
+    if (!conversation?.profileId) return false;
+
+    setConversations((prev) => {
+      const nextConversation = {
+        ...prev.find((item) => String(item.profileId) === String(conversation.profileId)),
+        ...conversation,
+        unread: 0,
+      };
+      const next = [
+        nextConversation,
+        ...prev.filter((item) => String(item.profileId) !== String(conversation.profileId)),
+      ];
+      setCachedConversations(next);
+      return next;
+    });
+
+    return true;
+  }, []);
+
   const fetchConversations = useCallback(() => {
     if (!getToken()) return;
     getConversations()
@@ -356,12 +378,19 @@ export default function ChatListPage() {
       }
     });
 
+    const unsubscribeLocal = subscribeLocalConversationUpdates((event) => {
+      if (event?.type === 'conversation_preview') {
+        applyLocalConversationPreview(event);
+      }
+    });
+
     return () => {
       window.removeEventListener('focus', onFocus);
       unsubscribe();
+      unsubscribeLocal();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate, fetchConversations, subscribe, applyConversationUpdate]);
+  }, [navigate, fetchConversations, subscribe, applyConversationUpdate, applyLocalConversationPreview]);
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
       {/* Header */}

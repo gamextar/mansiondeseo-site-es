@@ -11,6 +11,7 @@ import { getMessageLimit, getProfile, getProfileWithMessageLimit, getToken, getS
 import { createChatSocket } from '../lib/chatSocket';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
+import { publishLocalConversationUpdate } from '../lib/localConversationEvents';
 
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const CHAT_CACHE_TTL_MS = 10 * 60_000;
@@ -62,6 +63,47 @@ function writeChatCache(partnerId, payload) {
     }));
   } catch {
     // Silently fail
+  }
+}
+
+function updateConversationPreviewCache(partnerId, partner, message) {
+  if (typeof window === 'undefined' || !partnerId || !message?.text) return;
+
+  try {
+    const raw = sessionStorage.getItem('mansion_conversations');
+    const parsed = raw ? JSON.parse(raw) : { conversations: [], timestamp: 0 };
+    const conversations = Array.isArray(parsed?.conversations)
+      ? parsed.conversations
+      : (Array.isArray(parsed) ? parsed : []);
+
+    const nextConversation = {
+      id: `conv-${partnerId}`,
+      profileId: partnerId,
+      name: partner?.username || partner?.name || '',
+      avatar: partner?.avatar_url || partner?.avatar || '',
+      avatarCrop: partner?.avatar_crop ?? partner?.avatarCrop ?? null,
+      lastMessage: String(message.text || '').slice(0, 50),
+      timestamp: message.createdAt || new Date().toISOString().replace('T', ' ').slice(0, 19),
+      unread: 0,
+      online: Boolean(partner?.online),
+    };
+
+    const next = [
+      nextConversation,
+      ...conversations.filter((item) => String(item.profileId) !== String(partnerId)),
+    ];
+
+    sessionStorage.setItem('mansion_conversations', JSON.stringify({
+      conversations: next,
+      timestamp: Date.now(),
+    }));
+
+    publishLocalConversationUpdate({
+      type: 'conversation_preview',
+      conversation: nextConversation,
+    });
+  } catch {
+    // ignore cache sync failures
   }
 }
 
@@ -268,29 +310,33 @@ export default function ChatPage() {
         suppressTypingUntilRef.current = Date.now() + 1500;
         clearTimeout(typingTimeoutRef.current);
         setPartnerTyping(false);
+        const formatted = formatMsg(msg);
         // Deduplicate: skip if message already exists
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
-          return [...prev, formatMsg(msg)];
+          return [...prev, formatted];
         });
+        updateConversationPreviewCache(partnerId, partner, formatted);
         if (shouldStickToBottom) requestScrollToBottom('smooth', { force: true });
         markMessagePopped(msg.id);
         // Auto mark as read since we're viewing the chat
         chatRef.current?.markRead([msg.id]);
       },
       onAck(msg) {
+        const formatted = formatMsg(msg);
         // Replace optimistic temp message with real one from DO
         setMessages(prev => {
           const tempIdx = prev.findIndex(m => m.id?.startsWith('temp-') && m.senderId === 'me');
           if (tempIdx !== -1) {
             const updated = [...prev];
-            updated[tempIdx] = formatMsg(msg);
+            updated[tempIdx] = formatted;
             return updated;
           }
           // If no temp found, just add (deduplicated)
           if (prev.some(m => m.id === msg.id)) return prev;
-          return [...prev, formatMsg(msg)];
+          return [...prev, formatted];
         });
+        updateConversationPreviewCache(partnerId, partner, formatted);
       },
       onRead(messageIds) {
         setMessages(prev => prev.map(m =>
@@ -471,6 +517,7 @@ export default function ChatPage() {
     wasAtBottomRef.current = true;
     requestScrollToBottom('auto', { force: true });
     setMessages((prev) => [...prev, newMsg]);
+    updateConversationPreviewCache(partnerId, partner, newMsg);
     setInput('');
     setPartnerTyping(false);
     localSendMessage();

@@ -1600,8 +1600,6 @@ async function handleSendMessage(request, env) {
 
   // Notify receiver's notification channel (updates ChatListPage in real-time)
   notifyUser(env, receiver_id, events.receiver).catch(() => {});
-  // Also notify sender (so their own ChatListPage updates if open in another tab)
-  notifyUser(env, auth.sub, events.sender).catch(() => {});
 
   return json({ message: msg }, 201);
 }
