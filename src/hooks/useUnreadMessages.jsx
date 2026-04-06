@@ -40,6 +40,7 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
   const unreadFetchRef = useRef(null);
   const lastUnreadFetchAtRef = useRef(0);
   const activeChatIdRef = useRef(null);
+  const lastSyncedActiveChatRef = useRef(undefined);
 
   const applyUnreadCount = useCallback((total, { showToast = false } = {}) => {
     const nextTotal = Math.max(0, Number(total) || 0);
@@ -110,17 +111,22 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
   }, []);
 
   const shouldKeepRealtimeConnected = useCallback(() => {
-    return listenersRef.current.size > 0 || !!activeChatIdRef.current;
+    return !!getToken();
   }, []);
 
   const syncActiveChatToNotifications = useCallback(() => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const nextChatId = activeChatIdRef.current || null;
+    const prevChatId = lastSyncedActiveChatRef.current;
+    if (prevChatId === nextChatId) return;
+    if (nextChatId == null && prevChatId == null) return;
     try {
       ws.send(JSON.stringify({
         type: 'active_chat',
-        chatId: activeChatIdRef.current || null,
+        chatId: nextChatId,
       }));
+      lastSyncedActiveChatRef.current = nextChatId;
     } catch {
       // ignore sync failures
     }
@@ -135,6 +141,7 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
     ws.onerror = null;
     try { ws.close(1000, 'client-pause'); } catch { /* already closed */ }
     wsRef.current = null;
+    lastSyncedActiveChatRef.current = undefined;
     wsConnectedRef.current = false;
     setRealtimeActiveConnections('notifications', 0);
   }, [clearBackgroundDisconnectTimer]);
@@ -161,6 +168,7 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
       ws.onopen = () => {
         wsRetryRef.current = 0;
         wsConnectedRef.current = true;
+        lastSyncedActiveChatRef.current = undefined;
         recordRealtimeDebug('notifications', 'opens');
         setRealtimeActiveConnections('notifications', 1);
         syncActiveChatToNotifications();
