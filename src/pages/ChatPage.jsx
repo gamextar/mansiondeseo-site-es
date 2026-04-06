@@ -656,22 +656,22 @@ export default function ChatPage() {
               className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
             >
               {!isMe && (
-                <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
+                <div className={`flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5 ${isPopped ? 'chat-avatar-highlight' : ''}`}>
                   <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
                 </div>
               )}
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 transition-colors duration-300 ${
+                className={`chat-bubble max-w-[80%] rounded-2xl px-4 py-3 transition-[color,background-color,border-color,box-shadow] duration-300 ${
                   isMe
-                    ? 'bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white rounded-br-sm'
-                    : `text-text-primary border rounded-bl-sm ${isPopped ? 'bg-mansion-gold/10 border-mansion-gold/30 shadow-[0_0_0_1px_rgba(212,175,55,0.08)]' : 'bg-mansion-elevated border-mansion-border/30'}`
+                    ? 'chat-bubble-outgoing bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white rounded-br-sm shadow-[0_10px_28px_rgba(96,14,30,0.22)]'
+                    : `text-text-primary border rounded-bl-sm ${isPopped ? 'chat-bubble-highlight bg-mansion-gold/10 border-mansion-gold/30 shadow-[0_0_0_1px_rgba(212,175,55,0.08)]' : 'bg-mansion-elevated border-mansion-border/30'}`
                 }`}
               >
                 <p className="text-[15px] leading-relaxed">{msg.text}</p>
                 <p className={`text-[11px] mt-1.5 flex items-center ${isMe ? 'justify-end text-white/50 gap-1' : 'justify-end text-text-dim'}`}>
                   {msg.timestamp}
                   {isMe && (
-                    <span className={`inline-flex ${msg.is_read ? 'text-blue-400' : 'text-white/40'}`}>
+                    <span className={`chat-read-check inline-flex ${msg.is_read ? 'is-read text-blue-400' : 'text-white/40'}`}>
                       {msg.is_read ? (
                         <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M0.5 5.5L4 9L4.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3.5 5.5L7 9L15 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M8.5 5.5L12 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       ) : (
@@ -690,11 +690,11 @@ export default function ChatPage() {
             <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
               <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
             </div>
-            <div className="max-w-[80%] rounded-2xl rounded-bl-sm px-4 py-3 bg-mansion-elevated border border-mansion-border/30 text-text-primary">
+            <div className="chat-bubble max-w-[80%] rounded-2xl rounded-bl-sm px-4 py-3 bg-mansion-elevated border border-mansion-border/30 text-text-primary shadow-[0_6px_18px_rgba(8,8,14,0.18)]">
               <div className="flex items-center gap-1.5 h-6">
-                <span className="w-2 h-2 rounded-full bg-mansion-gold/75 animate-pulse [animation-delay:0ms]" />
-                <span className="w-2 h-2 rounded-full bg-mansion-gold/75 animate-pulse [animation-delay:150ms]" />
-                <span className="w-2 h-2 rounded-full bg-mansion-gold/75 animate-pulse [animation-delay:300ms]" />
+                <span className="chat-typing-dot" style={{ animationDelay: '0ms' }} />
+                <span className="chat-typing-dot" style={{ animationDelay: '150ms' }} />
+                <span className="chat-typing-dot" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           </div>

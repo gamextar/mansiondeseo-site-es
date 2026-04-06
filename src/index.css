@@ -154,3 +154,120 @@ input, textarea, select {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* ═══════════════════════════════════════════
+   Chat micro-interactions
+   ═══════════════════════════════════════════ */
+
+@keyframes chatBubbleGlow {
+  0% {
+    box-shadow: 0 0 0 rgba(201, 168, 76, 0);
+    background-color: rgba(201, 168, 76, 0.02);
+  }
+  35% {
+    box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.16), 0 10px 26px rgba(201, 168, 76, 0.12);
+    background-color: rgba(201, 168, 76, 0.09);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(201, 168, 76, 0);
+    background-color: rgba(201, 168, 76, 0.03);
+  }
+}
+
+@keyframes chatAvatarHalo {
+  0% {
+    box-shadow: 0 0 0 0 rgba(201, 168, 76, 0);
+    filter: saturate(1);
+  }
+  40% {
+    box-shadow: 0 0 0 4px rgba(201, 168, 76, 0.14), 0 0 24px rgba(201, 168, 76, 0.18);
+    filter: saturate(1.08);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 168, 76, 0);
+    filter: saturate(1);
+  }
+}
+
+@keyframes chatBubbleSheen {
+  0%, 18% {
+    transform: translateX(-150%);
+    opacity: 0;
+  }
+  24% {
+    opacity: 0.28;
+  }
+  38% {
+    transform: translateX(170%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(170%);
+    opacity: 0;
+  }
+}
+
+@keyframes chatTypingDot {
+  0%, 75%, 100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  35% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+@keyframes chatReadGlow {
+  0% {
+    opacity: 0.45;
+    filter: drop-shadow(0 0 0 rgba(96, 165, 250, 0));
+  }
+  45% {
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.35));
+  }
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 0 rgba(96, 165, 250, 0));
+  }
+}
+
+.chat-bubble {
+  position: relative;
+  overflow: hidden;
+}
+
+.chat-bubble-outgoing::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.05) 38%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0.05) 62%, transparent 100%);
+  transform: translateX(-150%);
+  animation: chatBubbleSheen 8.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.chat-bubble-highlight {
+  animation: chatBubbleGlow 0.95s ease-out;
+}
+
+.chat-avatar-highlight {
+  animation: chatAvatarHalo 0.95s ease-out;
+}
+
+.chat-typing-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, rgba(224, 201, 122, 0.95), rgba(201, 168, 76, 0.72));
+  animation: chatTypingDot 1.15s ease-in-out infinite;
+}
+
+.chat-read-check {
+  transition: color 200ms ease, opacity 200ms ease;
+}
+
+.chat-read-check.is-read {
+  animation: chatReadGlow 0.45s ease-out;
+}
