@@ -217,7 +217,6 @@ export default function ChatPage() {
     clearTimeout(typingIdleTimerRef.current);
     if (!typingActiveRef.current) return;
     typingActiveRef.current = false;
-    chatRef.current?.sendTypingStop?.();
   }, []);
 
   const scheduleTypingStop = useCallback(() => {
@@ -396,10 +395,6 @@ export default function ChatPage() {
         setPartnerTyping(true);
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 5500);
-      },
-      onTypingStop() {
-        clearTimeout(typingTimeoutRef.current);
-        setPartnerTyping(false);
       },
     });
 

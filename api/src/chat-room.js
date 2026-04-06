@@ -485,13 +485,6 @@ export class ChatRoom {
           try { sock.send(JSON.stringify({ type: 'typing', userId: senderId })); } catch {}
         }
       }
-    } else if (data.type === 'typing_stop') {
-      for (const sock of this.state.getWebSockets()) {
-        const [tag] = this.state.getTags(sock);
-        if (tag !== senderId) {
-          try { sock.send(JSON.stringify({ type: 'typing_stop', userId: senderId })); } catch {}
-        }
-      }
     } else if (data.type === 'ping') {
       ws.send(JSON.stringify({ type: 'pong' }));
     }
