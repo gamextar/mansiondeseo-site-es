@@ -190,6 +190,8 @@ export default function App() {
     () => !!getToken() || localStorage.getItem('mansion_registered') === 'true'
   );
   const [user, setUserState] = useState(() => getStoredUser());
+  const [bootstrapUnread, setBootstrapUnread] = useState(null);
+  const [bootstrapResolved, setBootstrapResolved] = useState(() => !getToken());
   const [siteSettings, setSiteSettings] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('mansion_site_settings') || '{}'); } catch { return {}; }
   });
@@ -236,6 +238,8 @@ export default function App() {
     const hasAuthToken = !!getToken();
 
     if (!hasAuthToken && hasSessionSettings) {
+      setBootstrapUnread(null);
+      setBootstrapResolved(true);
       return () => {
         cancelled = true;
       };
@@ -253,11 +257,16 @@ export default function App() {
           setRegisteredState(true);
         }
 
+        setBootstrapUnread(typeof data?.unread === 'number' ? data.unread : null);
+        setBootstrapResolved(true);
+
         if (data?.settings) {
           setSiteSettings(data.settings);
           try { sessionStorage.setItem('mansion_site_settings', JSON.stringify(data.settings)); } catch {}
         }
       }).catch(() => {
+        setBootstrapUnread(null);
+        setBootstrapResolved(true);
         if (cancelled || !getToken()) return;
         clearAuth();
         setUserState(null);
@@ -287,7 +296,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthContext.Provider value={{ registered, setRegistered, user, setUser, siteSettings, setSiteSettings }}>
-      <UnreadProvider>
+      <UnreadProvider initialUnread={bootstrapUnread} bootstrapResolved={bootstrapResolved}>
       <div className="relative min-h-screen">
         {!verified && <AgeVerificationModal onVerify={verify} />}
         <AppLayout />

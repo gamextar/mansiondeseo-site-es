@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
-import { getAppBootstrap, getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache } from '../lib/api';
+import { getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache } from '../lib/api';
 import { recordRealtimeDebug, setRealtimeActiveConnections } from '../lib/realtimeDebug';
 
 const UnreadContext = createContext({
@@ -26,7 +26,7 @@ const UNREAD_REFRESH_STALE_MS = 5 * 60_000; // 5 min — HTTP fallback if WS sta
 const UNREAD_FETCH_DEBOUNCE_MS = 4_000;
 const WS_MAX_RETRIES = 5; // backoff: 2,4,8,16,30 ≈ 60s then stop
 
-export function UnreadProvider({ children }) {
+export function UnreadProvider({ children, initialUnread = null, bootstrapResolved = false }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [toast, setToast] = useState(null); // string or { text, icon }
   const prevCountRef = useRef(-1); // -1 = not yet loaded
@@ -108,6 +108,10 @@ export function UnreadProvider({ children }) {
     listenersRef.current.forEach(cb => cb(event));
   }, []);
 
+  const shouldKeepRealtimeConnected = useCallback(() => {
+    return listenersRef.current.size > 0 || !!activeChatIdRef.current;
+  }, []);
+
   const syncActiveChatToNotifications = useCallback(() => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -119,12 +123,6 @@ export function UnreadProvider({ children }) {
     } catch {
       // ignore sync failures
     }
-  }, []);
-
-  // Subscribe to real-time notification events. Returns unsubscribe function.
-  const subscribe = useCallback((callback) => {
-    listenersRef.current.add(callback);
-    return () => listenersRef.current.delete(callback);
   }, []);
 
   // Connect notification WebSocket
@@ -148,7 +146,7 @@ export function UnreadProvider({ children }) {
 
   const connectWs = useCallback(() => {
     const token = getToken();
-    if (!token || wsClosedRef.current || wsPausedRef.current) return;
+    if (!token || wsClosedRef.current || wsPausedRef.current || !bootstrapResolved || !shouldKeepRealtimeConnected()) return;
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -275,29 +273,45 @@ export function UnreadProvider({ children }) {
         setTimeout(connectWs, delay);
       }
     }
-  }, [applyUnreadCount, fetchUnread, notifyListeners, syncActiveChatToNotifications]);
+  }, [applyUnreadCount, bootstrapResolved, fetchUnread, notifyListeners, shouldKeepRealtimeConnected, syncActiveChatToNotifications]);
 
-  // Initial fetch + WebSocket (no polling — real-time only)
-  useEffect(() => {
-    if (getToken()) {
-      // Mark as "fetching now" so focus/visibilitychange handlers don't fire a
-      // duplicate GET /api/unread-count while bootstrap is in-flight.
-      lastUnreadFetchAtRef.current = Date.now();
-      getAppBootstrap()
-        .then((data) => {
-          if (typeof data?.unread === 'number') {
-            lastUnreadFetchAtRef.current = Date.now();
-            applyUnreadCount(data.unread);
-            return;
-          }
-          return fetchUnread({ force: true });
-        })
-        .catch(() => {
-          fetchUnread({ force: true }).catch(() => {});
-        });
-    } else {
-      applyUnreadCount(0);
+  // Subscribe to real-time notification events. Returns unsubscribe function.
+  const subscribe = useCallback((callback) => {
+    listenersRef.current.add(callback);
+    if (document.visibilityState === 'visible' && bootstrapResolved) {
+      connectWs();
     }
+    return () => {
+      listenersRef.current.delete(callback);
+      if (!shouldKeepRealtimeConnected()) {
+        disconnectWs();
+      }
+    };
+  }, [bootstrapResolved, connectWs, disconnectWs, shouldKeepRealtimeConnected]);
+
+  // Hydrate unread count from app bootstrap/cache without duplicating bootstrap.
+  useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      applyUnreadCount(0);
+      return;
+    }
+
+    if (!bootstrapResolved) return;
+
+    if (typeof initialUnread === 'number') {
+      lastUnreadFetchAtRef.current = Date.now();
+      applyUnreadCount(initialUnread);
+      return;
+    }
+
+    if (prevCountRef.current < 0) {
+      fetchUnread({ force: false }).catch(() => {});
+    }
+  }, [applyUnreadCount, bootstrapResolved, fetchUnread, initialUnread]);
+
+  // Focus/visibility lifecycle for unread fallback + optional realtime socket.
+  useEffect(() => {
     wsClosedRef.current = false;
     setRealtimeActiveConnections('notifications', wsRef.current?.readyState === WebSocket.OPEN ? 1 : 0);
 
@@ -306,7 +320,7 @@ export function UnreadProvider({ children }) {
         clearBackgroundDisconnectTimer();
         wsPausedRef.current = false;
         wsRetryRef.current = 0; // fresh retry budget on foreground
-        connectWs();
+        if (shouldKeepRealtimeConnected()) connectWs();
         if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
       } else {
         scheduleBackgroundDisconnect();
@@ -318,11 +332,11 @@ export function UnreadProvider({ children }) {
       clearBackgroundDisconnectTimer();
       wsPausedRef.current = false;
       wsRetryRef.current = 0; // fresh retry budget on focus
-      connectWs();
+      if (shouldKeepRealtimeConnected()) connectWs();
       if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
     };
 
-    if (document.visibilityState === 'visible') connectWs();
+    if (document.visibilityState === 'visible' && shouldKeepRealtimeConnected()) connectWs();
 
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('focus', onFocus);
@@ -340,7 +354,12 @@ export function UnreadProvider({ children }) {
   const setActiveChatId = useCallback((chatId) => {
     activeChatIdRef.current = chatId || null;
     syncActiveChatToNotifications();
-  }, [syncActiveChatToNotifications]);
+    if (document.visibilityState === 'visible' && activeChatIdRef.current) {
+      connectWs();
+    } else if (!activeChatIdRef.current && listenersRef.current.size === 0) {
+      disconnectWs();
+    }
+  }, [connectWs, disconnectWs, syncActiveChatToNotifications]);
 
   // Immediately subtract `amount` from the global badge (optimistic).
   const decrementUnread = useCallback((amount) => {

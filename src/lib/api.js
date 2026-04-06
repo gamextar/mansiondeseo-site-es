@@ -3,6 +3,7 @@
 // ══════════════════════════════════════════════════════════
 
 import { createMutationQueue } from './mutationQueue';
+import { recordD1WriteEstimate } from './d1Debug';
 
 const LEGACY_PROD_API_BASE = 'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api';
 
@@ -752,6 +753,7 @@ export async function deleteConversation(otherUserId) {
   return apiFetch(`/messages/${otherUserId}`, {
     method: 'DELETE',
   }).then((data) => {
+    recordD1WriteEstimate('chat_delete', 2);
     invalidateMessageHistoryCache(otherUserId);
     invalidateConversationsCache();
     invalidateUnreadCountCache();

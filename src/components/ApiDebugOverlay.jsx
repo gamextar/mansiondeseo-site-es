@@ -4,6 +4,7 @@ import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDeb
 import { estimateRealtimeLoad, getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
 import { getMediaDebugSummary, inspectVisibleMedia, resetMediaDebug, subscribeMediaDebug } from '../lib/mediaDebug';
 import { getDebugPanelPrefs, setDebugPanelPref, subscribeDebugPanelPrefs } from '../lib/debugPanelPrefs';
+import { getD1DebugSummary, resetD1Debug, subscribeD1Debug } from '../lib/d1Debug';
 
 function TogglePill({ active, onClick, children }) {
   return (
@@ -25,6 +26,7 @@ export default function ApiDebugOverlay() {
   const location = useLocation();
   const [summary, setSummary] = useState(() => getApiDebugSummary());
   const [realtimeSummary, setRealtimeSummary] = useState(() => getRealtimeDebugSummary());
+  const [d1Summary, setD1Summary] = useState(() => getD1DebugSummary());
   const [mediaSummary, setMediaSummary] = useState(() => getMediaDebugSummary());
   const [panelPrefs, setPanelPrefs] = useState(() => getDebugPanelPrefs());
   const [collapsed, setCollapsed] = useState(false);
@@ -55,6 +57,10 @@ export default function ApiDebugOverlay() {
       setMediaSummary(nextSummary);
     });
 
+    const unsubscribeD1 = subscribeD1Debug((nextSummary) => {
+      setD1Summary(nextSummary);
+    });
+
     const unsubscribePrefs = subscribeDebugPanelPrefs((nextPrefs) => {
       setPanelPrefs(nextPrefs);
     });
@@ -63,6 +69,7 @@ export default function ApiDebugOverlay() {
       unsubscribeApi?.();
       unsubscribeRealtime?.();
       unsubscribeMedia?.();
+      unsubscribeD1?.();
       unsubscribePrefs?.();
     };
   }, []);
@@ -120,6 +127,12 @@ export default function ApiDebugOverlay() {
       data: realtimeSummary?.channels?.chat,
       estimate: realtimeEstimate?.channels?.chat,
     },
+  ];
+  const d1Rows = [
+    { key: 'chat_message_ws', label: 'Chat msg WS', data: d1Summary?.actions?.chat_message_ws },
+    { key: 'chat_message_http', label: 'Chat msg HTTP', data: d1Summary?.actions?.chat_message_http },
+    { key: 'chat_read', label: 'Read receipts', data: d1Summary?.actions?.chat_read },
+    { key: 'chat_delete', label: 'Delete conv', data: d1Summary?.actions?.chat_delete },
   ];
 
   return (
@@ -227,53 +240,98 @@ export default function ApiDebugOverlay() {
           )}
 
           {panelPrefs.realtime && (
-            <div className="rounded-xl border border-sky-500/20 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-sky-500/15 bg-sky-500/5 px-3 py-2">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-sky-300/90">Realtime</p>
-                <p className="text-[10px] text-white/55">
-                  Sockets observados localmente · ventana {realtimeEstimate?.elapsedMinutes ?? 0} min
-                </p>
-                {realtimeEstimate?.sampleShort && (
-                  <p className="text-[10px] text-amber-300/85">Muestra corta: la estimacion por hora se estabiliza tras 1 min.</p>
-                )}
+            <div className="space-y-3">
+              <div className="rounded-xl border border-sky-500/20 overflow-hidden">
+                <div className="flex items-center justify-between border-b border-sky-500/15 bg-sky-500/5 px-3 py-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-sky-300/90">Realtime</p>
+                    <p className="text-[10px] text-white/55">
+                      Sockets observados localmente · ventana {realtimeEstimate?.elapsedMinutes ?? 0} min
+                    </p>
+                    {realtimeEstimate?.sampleShort && (
+                      <p className="text-[10px] text-amber-300/85">Muestra corta: la estimacion por hora se estabiliza tras 1 min.</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRealtimeSummary(resetRealtimeDebug())}
+                    className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/80"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <div className="space-y-2 px-3 py-3">
+                  {realtimeRows.map((row) => (
+                    <div key={row.key} className="rounded-xl bg-white/5 px-3 py-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[11px] font-semibold text-white/90">{row.label}</p>
+                        <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold text-sky-300">
+                          activas {row.data?.activeConnections ?? 0}
+                        </span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-white/60">
+                        <span>connects {row.data?.connectAttempts ?? 0}</span>
+                        <span>opens {row.data?.opens ?? 0}</span>
+                        <span>closes {row.data?.closes ?? 0}</span>
+                        <span>reconnects {row.data?.reconnectsScheduled ?? 0}</span>
+                        <span>pings {row.data?.pingsSent ?? 0}</span>
+                        <span>pongs {row.data?.pongsReceived ?? 0}</span>
+                        <span>in {row.data?.messagesReceived ?? 0}</span>
+                        <span>out {row.data?.messagesSent ?? 0}</span>
+                        <span>bg {row.data?.backgroundPauses ?? 0}</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-sky-200/85">
+                        <span>upgrades/h {row.estimate?.upgradeReqPerHour ?? 0}</span>
+                        <span>DO eq/h {row.estimate?.approxDoEqReqPerHour ?? 0}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setRealtimeSummary(resetRealtimeDebug())}
-                className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/80"
-              >
-                Reset
-              </button>
-            </div>
-            <div className="space-y-2 px-3 py-3">
-              {realtimeRows.map((row) => (
-                <div key={row.key} className="rounded-xl bg-white/5 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-semibold text-white/90">{row.label}</p>
-                    <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold text-sky-300">
-                      activas {row.data?.activeConnections ?? 0}
-                    </span>
+
+              <div className="rounded-xl border border-emerald-500/20 overflow-hidden">
+                <div className="flex items-center justify-between border-b border-emerald-500/15 bg-emerald-500/5 px-3 py-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-300/90">D1 estimado</p>
+                    <p className="text-[10px] text-white/55">Writes locales estimadas por accion de chat. No reemplaza logs del backend.</p>
                   </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-white/60">
-                    <span>connects {row.data?.connectAttempts ?? 0}</span>
-                    <span>opens {row.data?.opens ?? 0}</span>
-                    <span>closes {row.data?.closes ?? 0}</span>
-                    <span>reconnects {row.data?.reconnectsScheduled ?? 0}</span>
-                    <span>pings {row.data?.pingsSent ?? 0}</span>
-                    <span>pongs {row.data?.pongsReceived ?? 0}</span>
-                    <span>in {row.data?.messagesReceived ?? 0}</span>
-                    <span>out {row.data?.messagesSent ?? 0}</span>
-                    <span>bg {row.data?.backgroundPauses ?? 0}</span>
+                  <button
+                    type="button"
+                    onClick={() => setD1Summary(resetD1Debug())}
+                    className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/80"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <div className="space-y-2 px-3 py-3">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-xl bg-white/5 px-3 py-2">
+                      <p className="text-white/55">Writes sesion</p>
+                      <p className="mt-1 text-lg font-semibold">{d1Summary?.totals?.estimatedWrites ?? 0}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/5 px-3 py-2">
+                      <p className="text-white/55">Acciones</p>
+                      <p className="mt-1 text-lg font-semibold">
+                        {d1Rows.reduce((sum, row) => sum + Number(row.data?.count || 0), 0)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-sky-200/85">
-                    <span>upgrades/h {row.estimate?.upgradeReqPerHour ?? 0}</span>
-                    <span>DO eq/h {row.estimate?.approxDoEqReqPerHour ?? 0}</span>
+                  <div className="rounded-xl border border-white/10 overflow-hidden">
+                    {d1Rows.map((row) => (
+                      <div key={row.key} className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2 text-[11px] last:border-b-0">
+                        <div>
+                          <p className="text-white/90">{row.label}</p>
+                          <p className="text-[10px] text-white/55">acciones {row.data?.count ?? 0}</p>
+                        </div>
+                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+                          writes {row.data?.estimatedWrites ?? 0}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
           )}
 
           {panelPrefs.media && (

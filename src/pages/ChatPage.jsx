@@ -12,6 +12,7 @@ import { createChatSocket } from '../lib/chatSocket';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { publishLocalConversationUpdate } from '../lib/localConversationEvents';
+import { recordD1WriteEstimate } from '../lib/d1Debug';
 
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const CHAT_CACHE_TTL_MS = 10 * 60_000;
@@ -524,11 +525,14 @@ export default function ChatPage() {
 
     // Send via WebSocket (same channel as typing — proven real-time)
     // The DO handles: save to SQLite + D1, limit check, broadcast to receiver, ack to sender
+    const estimatedMessageWrites = effectiveMax >= 999 ? 3 : 4;
     if (chatRef.current?.getState() === 'connected') {
+      recordD1WriteEstimate('chat_message_ws', estimatedMessageWrites);
       chatRef.current.send(text);
     } else {
       // Fallback: HTTP when WS is disconnected
       try {
+        recordD1WriteEstimate('chat_message_http', estimatedMessageWrites);
         await apiSendMessage(partnerId, text);
         getMessageLimit().then(data => setApiLimit(data)).catch(() => {});
       } catch (err) {

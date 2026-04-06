@@ -3,6 +3,7 @@
 // Auto-reconnect with exponential backoff
 // ═══════════════════════════════════════════════════════
 import { recordRealtimeDebug, setRealtimeActiveConnections } from './realtimeDebug';
+import { recordD1WriteEstimate } from './d1Debug';
 
 const LEGACY_PROD_WS_BASE = 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev';
 
@@ -156,6 +157,11 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   function markRead(messageIds) {
     if (ws?.readyState === WebSocket.OPEN && messageIds.length > 0) {
       recordRealtimeDebug('chat', 'messagesSent');
+      const chunkCount = Math.max(1, Math.ceil(messageIds.length / 50));
+      // D1 read-path estimate:
+      // - UPDATE messages ... WHERE id IN (...) per chunk
+      // - UPDATE conversation_state unread reset once
+      recordD1WriteEstimate('chat_read', chunkCount + 1);
       ws.send(JSON.stringify({ type: 'read', messageIds }));
     }
   }
