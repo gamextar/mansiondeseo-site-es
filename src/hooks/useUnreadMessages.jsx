@@ -94,6 +94,7 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
 
   const shouldRefreshUnread = useCallback(() => {
     if (!getToken()) return false;
+    if (!bootstrapResolved) return false;
     // Suppress if a fetch was recently initiated (e.g. bootstrap in-flight).
     if (lastUnreadFetchAtRef.current && Date.now() - lastUnreadFetchAtRef.current < UNREAD_FETCH_DEBOUNCE_MS) return false;
     if (prevCountRef.current < 0) return true;
@@ -101,7 +102,7 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
     // If WebSocket is connected, skip HTTP fallback — WS handles real-time updates
     if (wsConnectedRef.current) return false;
     return Date.now() - lastUnreadFetchAtRef.current > UNREAD_REFRESH_STALE_MS;
-  }, []);
+  }, [bootstrapResolved]);
 
   // Notify all subscribers (e.g. ChatListPage) of a new event
   const notifyListeners = useCallback((event) => {
