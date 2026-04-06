@@ -632,21 +632,22 @@ export class ChatRoom {
           });
         });
         this.debug('[ChatRoom.handleMessage] D1 write done');
-        // Notify receiver's UserNotification DO so unread/list updates in real-time.
-        // The sender chat tab already updates its own conversation preview locally.
+        // Notify UserNotification DOs so ChatListPage updates in real-time
         const events = await this.buildNewMessageEvents(senderId, receiverId, msg);
-        try {
-          this.debug('[ChatRoom.handleMessage] notifying UserNotification for:', receiverId);
-          const doId = this.env.USER_NOTIFICATIONS.idFromName(receiverId);
-          const stub = this.env.USER_NOTIFICATIONS.get(doId);
-          const res = await stub.fetch('https://do/notify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(events.receiver),
-          });
-          this.debug('[ChatRoom.handleMessage] UserNotification response:', res.status, 'for:', receiverId);
-        } catch (err) {
-          console.error('[ChatRoom.handleMessage] UserNotification error for', receiverId, ':', err.message);
+        for (const userId of [senderId, receiverId]) {
+          try {
+            this.debug('[ChatRoom.handleMessage] notifying UserNotification for:', userId);
+            const doId = this.env.USER_NOTIFICATIONS.idFromName(userId);
+            const stub = this.env.USER_NOTIFICATIONS.get(doId);
+            const res = await stub.fetch('https://do/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(userId === senderId ? events.sender : events.receiver),
+            });
+            this.debug('[ChatRoom.handleMessage] UserNotification response:', res.status, 'for:', userId);
+          } catch (err) {
+            console.error('[ChatRoom.handleMessage] UserNotification error for', userId, ':', err.message);
+          }
         }
         this.debug('[ChatRoom.handleMessage] waitUntil done');
       })());
