@@ -136,6 +136,8 @@ export default function ChatPage() {
   const typingTimeoutRef = useRef(null);
   const incomingMessageTimersRef = useRef(new Map());
   const lastTypingSentRef = useRef(0);
+  const typingActiveRef = useRef(false);
+  const typingIdleTimerRef = useRef(null);
   const wasAtBottomRef = useRef(true);
   const myUserIdRef = useRef(null);
   const pendingScrollBehaviorRef = useRef(null);
@@ -210,6 +212,40 @@ export default function ChatPage() {
     }, 900);
     incomingMessageTimersRef.current.set(messageId, timer);
   }, []);
+
+  const stopTypingSignal = useCallback(() => {
+    clearTimeout(typingIdleTimerRef.current);
+    if (!typingActiveRef.current) return;
+    typingActiveRef.current = false;
+    chatRef.current?.sendTypingStop?.();
+  }, []);
+
+  const scheduleTypingStop = useCallback(() => {
+    clearTimeout(typingIdleTimerRef.current);
+    typingIdleTimerRef.current = setTimeout(() => {
+      stopTypingSignal();
+    }, 3000);
+  }, [stopTypingSignal]);
+
+  const handleTypingInput = useCallback((nextValue) => {
+    const hasContent = nextValue.trim().length > 0;
+    if (!hasContent) {
+      stopTypingSignal();
+      return;
+    }
+
+    const now = Date.now();
+    if (!typingActiveRef.current) {
+      typingActiveRef.current = true;
+      lastTypingSentRef.current = now;
+      chatRef.current?.sendTyping?.();
+    } else if (now - lastTypingSentRef.current >= 5000) {
+      lastTypingSentRef.current = now;
+      chatRef.current?.sendTyping?.();
+    }
+
+    scheduleTypingStop();
+  }, [scheduleTypingStop, stopTypingSignal]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -359,7 +395,11 @@ export default function ChatPage() {
         if (Date.now() < suppressTypingUntilRef.current) return;
         setPartnerTyping(true);
         clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 3000);
+        typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 5500);
+      },
+      onTypingStop() {
+        clearTimeout(typingTimeoutRef.current);
+        setPartnerTyping(false);
       },
     });
 
@@ -387,6 +427,7 @@ export default function ChatPage() {
       cancelled = true;
       clearTimeout(historyFallbackTimerRef.current);
       clearTimeout(typingTimeoutRef.current);
+      stopTypingSignal();
       incomingMessageTimersRef.current.forEach((timer) => clearTimeout(timer));
       incomingMessageTimersRef.current.clear();
       setActiveChatId(null);
@@ -397,7 +438,7 @@ export default function ChatPage() {
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [id, navigate, partnerId, partnerPreview, requestScrollToBottom, setActiveChatId, refreshUnread, decrementUnread]);
+  }, [id, navigate, partnerId, partnerPreview, requestScrollToBottom, setActiveChatId, refreshUnread, decrementUnread, stopTypingSignal]);
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;
@@ -520,6 +561,7 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, newMsg]);
     updateConversationPreviewCache(partnerId, partner, newMsg);
     setInput('');
+    stopTypingSignal();
     setPartnerTyping(false);
     localSendMessage();
 
@@ -562,6 +604,12 @@ export default function ChatPage() {
       el.focus();
       el.selectionStart = el.selectionEnd = start + emoji.length;
     });
+  };
+
+  const handleInputChange = (e) => {
+    const nextValue = e.target.value;
+    setInput(nextValue);
+    handleTypingInput(nextValue);
   };
 
   return (
@@ -774,15 +822,8 @@ export default function ChatPage() {
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={(e) => {
-                  setInput(e.target.value);
-                  // Send typing indicator (throttled to once per 2s)
-                  const now = Date.now();
-                  if (now - lastTypingSentRef.current > 2000) {
-                    lastTypingSentRef.current = now;
-                    chatRef.current?.sendTyping();
-                  }
-                }}
+                onChange={handleInputChange}
+                onBlur={stopTypingSignal}
                 onKeyDown={handleKeyDown}
                 onFocus={() => setShowEmojis(false)}
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}

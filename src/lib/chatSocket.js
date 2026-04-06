@@ -105,6 +105,9 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
         case 'typing':
           callbacks.onTyping?.();
           break;
+        case 'typing_stop':
+          callbacks.onTypingStop?.();
+          break;
         case 'limit':
           callbacks.onLimit?.(data);
           break;
@@ -151,6 +154,13 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
     if (ws?.readyState === WebSocket.OPEN) {
       recordRealtimeDebug('chat', 'messagesSent');
       ws.send(JSON.stringify({ type: 'typing' }));
+    }
+  }
+
+  function sendTypingStop() {
+    if (ws?.readyState === WebSocket.OPEN) {
+      recordRealtimeDebug('chat', 'messagesSent');
+      ws.send(JSON.stringify({ type: 'typing_stop' }));
     }
   }
 
@@ -216,6 +226,7 @@ export function createChatSocket(myUserId, partnerId, token, callbacks) {
   return {
     send,
     sendTyping,
+    sendTypingStop,
     markRead,
     close: () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
