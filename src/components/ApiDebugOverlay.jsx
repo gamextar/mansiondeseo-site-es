@@ -299,7 +299,7 @@ export default function ApiDebugOverlay() {
               <div className="flex items-center justify-between border-b border-emerald-500/15 bg-emerald-500/5 px-3 py-2">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-300/90">D1 estimado</p>
-                  <p className="text-[10px] text-white/55">Writes locales estimadas por accion de chat. No reemplaza logs del backend.</p>
+                  <p className="text-[10px] text-white/55">Estimacion base en frontend por accion de chat. El backend real puede escribir menos por coalescing.</p>
                 </div>
                 <button
                   type="button"
@@ -312,7 +312,7 @@ export default function ApiDebugOverlay() {
               <div className="space-y-2 px-3 py-3">
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-xl bg-white/5 px-3 py-2">
-                    <p className="text-white/55">Writes sesion</p>
+                    <p className="text-white/55">Writes base sesion</p>
                     <p className="mt-1 text-lg font-semibold">{d1Summary?.totals?.estimatedWrites ?? 0}</p>
                   </div>
                   <div className="rounded-xl bg-white/5 px-3 py-2">
@@ -330,7 +330,7 @@ export default function ApiDebugOverlay() {
                         <p className="text-[10px] text-white/55">acciones {row.data?.count ?? 0}</p>
                       </div>
                       <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-                        writes {row.data?.estimatedWrites ?? 0}
+                        base {row.data?.estimatedWrites ?? 0}
                       </span>
                     </div>
                   ))}
