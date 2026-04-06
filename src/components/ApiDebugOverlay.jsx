@@ -152,6 +152,9 @@ export default function ApiDebugOverlay() {
           <TogglePill active={panelPrefs.realtime} onClick={() => setPanelPrefs(setDebugPanelPref('realtime', !panelPrefs.realtime))}>
             WS
           </TogglePill>
+          <TogglePill active={panelPrefs.d1 !== false} onClick={() => setPanelPrefs(setDebugPanelPref('d1', panelPrefs.d1 === false))}>
+            D1
+          </TogglePill>
           <TogglePill active={panelPrefs.media} onClick={() => setPanelPrefs(setDebugPanelPref('media', !panelPrefs.media))}>
             Media
           </TogglePill>
@@ -288,47 +291,49 @@ export default function ApiDebugOverlay() {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
 
-              <div className="rounded-xl border border-emerald-500/20 overflow-hidden">
-                <div className="flex items-center justify-between border-b border-emerald-500/15 bg-emerald-500/5 px-3 py-2">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-300/90">D1 estimado</p>
-                    <p className="text-[10px] text-white/55">Writes locales estimadas por accion de chat. No reemplaza logs del backend.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setD1Summary(resetD1Debug())}
-                    className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/80"
-                  >
-                    Reset
-                  </button>
+          {panelPrefs.d1 !== false && (
+            <div className="rounded-xl border border-emerald-500/20 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-emerald-500/15 bg-emerald-500/5 px-3 py-2">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-300/90">D1 estimado</p>
+                  <p className="text-[10px] text-white/55">Writes locales estimadas por accion de chat. No reemplaza logs del backend.</p>
                 </div>
-                <div className="space-y-2 px-3 py-3">
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-xl bg-white/5 px-3 py-2">
-                      <p className="text-white/55">Writes sesion</p>
-                      <p className="mt-1 text-lg font-semibold">{d1Summary?.totals?.estimatedWrites ?? 0}</p>
-                    </div>
-                    <div className="rounded-xl bg-white/5 px-3 py-2">
-                      <p className="text-white/55">Acciones</p>
-                      <p className="mt-1 text-lg font-semibold">
-                        {d1Rows.reduce((sum, row) => sum + Number(row.data?.count || 0), 0)}
-                      </p>
-                    </div>
+                <button
+                  type="button"
+                  onClick={() => setD1Summary(resetD1Debug())}
+                  className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/80"
+                >
+                  Reset
+                </button>
+              </div>
+              <div className="space-y-2 px-3 py-3">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-xl bg-white/5 px-3 py-2">
+                    <p className="text-white/55">Writes sesion</p>
+                    <p className="mt-1 text-lg font-semibold">{d1Summary?.totals?.estimatedWrites ?? 0}</p>
                   </div>
-                  <div className="rounded-xl border border-white/10 overflow-hidden">
-                    {d1Rows.map((row) => (
-                      <div key={row.key} className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2 text-[11px] last:border-b-0">
-                        <div>
-                          <p className="text-white/90">{row.label}</p>
-                          <p className="text-[10px] text-white/55">acciones {row.data?.count ?? 0}</p>
-                        </div>
-                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-                          writes {row.data?.estimatedWrites ?? 0}
-                        </span>
+                  <div className="rounded-xl bg-white/5 px-3 py-2">
+                    <p className="text-white/55">Acciones</p>
+                    <p className="mt-1 text-lg font-semibold">
+                      {d1Rows.reduce((sum, row) => sum + Number(row.data?.count || 0), 0)}
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/10 overflow-hidden">
+                  {d1Rows.map((row) => (
+                    <div key={row.key} className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2 text-[11px] last:border-b-0">
+                      <div>
+                        <p className="text-white/90">{row.label}</p>
+                        <p className="text-[10px] text-white/55">acciones {row.data?.count ?? 0}</p>
                       </div>
-                    ))}
-                  </div>
+                      <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+                        writes {row.data?.estimatedWrites ?? 0}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
