@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
-import { getUnreadCount, getToken, invalidateUnreadCache, setUnreadCountCache } from '../lib/api';
+import { getUnreadCount, getToken, invalidateUnreadCache, peekUnreadCountCache, setUnreadCountCache } from '../lib/api';
 import { recordRealtimeDebug, setRealtimeActiveConnections } from '../lib/realtimeDebug';
 
 const UnreadContext = createContext({
@@ -311,6 +311,13 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
     if (typeof initialUnread === 'number') {
       lastUnreadFetchAtRef.current = Date.now();
       applyUnreadCount(initialUnread);
+      return;
+    }
+
+    const cachedUnread = peekUnreadCountCache(60 * 60_000);
+    if (typeof cachedUnread?.unread === 'number') {
+      lastUnreadFetchAtRef.current = Date.now();
+      applyUnreadCount(cachedUnread.unread);
       return;
     }
 
