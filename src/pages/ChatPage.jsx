@@ -100,6 +100,7 @@ export default function ChatPage() {
   const restoreScrollAfterPrependRef = useRef(null);
   const initialHistoryLoadedRef = useRef(false);
   const historyFallbackTimerRef = useRef(null);
+  const typingReplacementMessageIdRef = useRef(null);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
@@ -265,15 +266,18 @@ export default function ChatPage() {
       onMessage(msg) {
         const shouldStickToBottom = wasAtBottomRef.current;
         const shouldReplaceTyping = partnerTyping;
+        if (shouldReplaceTyping) {
+          typingReplacementMessageIdRef.current = msg.id;
+          setPartnerTyping(false);
+        }
         // Deduplicate: skip if message already exists
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
           return [...prev, formatMsg(msg)];
         });
         if (shouldStickToBottom) requestScrollToBottom('smooth', { force: true });
-        markMessagePopped(msg.id);
-        if (shouldReplaceTyping) {
-          requestAnimationFrame(() => setPartnerTyping(false));
+        if (!shouldReplaceTyping) {
+          markMessagePopped(msg.id);
         } else {
           setPartnerTyping(false);
         }
@@ -384,6 +388,15 @@ export default function ChatPage() {
       });
     }
   }, [messages, scrollToBottom]);
+
+  useEffect(() => {
+    if (!typingReplacementMessageIdRef.current) return;
+    if (!messages.some((msg) => msg.id === typingReplacementMessageIdRef.current)) return;
+    const frame = requestAnimationFrame(() => {
+      typingReplacementMessageIdRef.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [messages]);
 
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
@@ -646,17 +659,18 @@ export default function ChatPage() {
           {messages.map((msg) => {
             const isMe = msg.senderId === 'me';
             const isPopped = poppedMessageIds.has(msg.id);
+            const skipIntroAnimation = typingReplacementMessageIdRef.current === msg.id;
             return (
               <motion.div
                 key={msg.id}
                 layout="position"
-                initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                initial={skipIntroAnimation ? false : { opacity: 0, y: 8, scale: 0.97 }}
                 animate={{
                   opacity: 1,
                   y: 0,
-                  scale: isPopped ? [1, 1.035, 1] : 1,
+                  scale: isPopped && !skipIntroAnimation ? [1, 1.035, 1] : 1,
                 }}
-                transition={isPopped ? { duration: 0.35, times: [0, 0.45, 1] } : { duration: 0.18 }}
+                transition={skipIntroAnimation ? { duration: 0 } : isPopped ? { duration: 0.35, times: [0, 0.45, 1] } : { duration: 0.18 }}
                 className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
               >
                 {/* Partner avatar next to received messages */}
@@ -700,29 +714,19 @@ export default function ChatPage() {
           />
         </div>
 
-        <AnimatePresence>
-          {partnerTyping && (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 4, transition: { duration: 0.1 } }}
-              className="pointer-events-none absolute left-4 right-4 bottom-3 lg:left-6 lg:right-6"
-            >
-              <div className="flex items-end gap-2 justify-start">
-                <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5 opacity-90">
-                  <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
-                </div>
-                <div className="bg-mansion-elevated/95 border border-mansion-border/30 rounded-2xl rounded-bl-sm px-4 py-3 shadow-lg backdrop-blur-sm">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
+        {partnerTyping && (
+          <div className="pointer-events-none absolute left-4 right-4 bottom-3 lg:left-6 lg:right-6">
+            <div className="flex items-end gap-2 justify-start">
+              <div className="bg-mansion-elevated/95 border border-mansion-border/30 rounded-2xl rounded-bl-sm px-4 py-3 shadow-lg backdrop-blur-sm">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-text-dim rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input area */}
