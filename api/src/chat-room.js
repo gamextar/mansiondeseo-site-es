@@ -15,16 +15,6 @@ export class ChatRoom {
     this.userStatusCache = new Map();
     this.userPreviewCache = new Map();
     this.messageConversationIdReady = null;
-    this.typingNotifyCache = new Map();
-  }
-
-  shouldNotifyTyping(senderId, receiverId) {
-    const key = `${senderId}:${receiverId}`;
-    const now = Date.now();
-    const lastSentAt = this.typingNotifyCache.get(key) || 0;
-    if (now - lastSentAt < 3000) return false;
-    this.typingNotifyCache.set(key, now);
-    return true;
   }
 
   buildConversationId(userA, userB) {
@@ -479,24 +469,6 @@ export class ChatRoom {
         const [tag] = this.state.getTags(sock);
         if (tag !== senderId) {
           try { sock.send(JSON.stringify({ type: 'typing', userId: senderId })); } catch {}
-        }
-      }
-
-      const chatId = await this.getChatId();
-      if (chatId) {
-        const id1 = chatId.slice(0, 36);
-        const id2 = chatId.slice(37);
-        const receiverId = id1 !== senderId ? id1 : id2;
-        if (receiverId && this.shouldNotifyTyping(senderId, receiverId)) {
-          try {
-            const doId = this.env.USER_NOTIFICATIONS.idFromName(receiverId);
-            const stub = this.env.USER_NOTIFICATIONS.get(doId);
-            stub.fetch('https://do/notify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'typing', chatId, userId: senderId }),
-            }).catch(() => {});
-          } catch { /* ignore */ }
         }
       }
     } else if (data.type === 'ping') {
