@@ -108,6 +108,19 @@ export function UnreadProvider({ children }) {
     listenersRef.current.forEach(cb => cb(event));
   }, []);
 
+  const syncActiveChatToNotifications = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    try {
+      ws.send(JSON.stringify({
+        type: 'active_chat',
+        chatId: activeChatIdRef.current || null,
+      }));
+    } catch {
+      // ignore sync failures
+    }
+  }, []);
+
   // Subscribe to real-time notification events. Returns unsubscribe function.
   const subscribe = useCallback((callback) => {
     listenersRef.current.add(callback);
@@ -151,6 +164,7 @@ export function UnreadProvider({ children }) {
         wsConnectedRef.current = true;
         recordRealtimeDebug('notifications', 'opens');
         setRealtimeActiveConnections('notifications', 1);
+        syncActiveChatToNotifications();
       };
 
       ws.onmessage = (event) => {
@@ -261,7 +275,7 @@ export function UnreadProvider({ children }) {
         setTimeout(connectWs, delay);
       }
     }
-  }, [applyUnreadCount, fetchUnread, notifyListeners]);
+  }, [applyUnreadCount, fetchUnread, notifyListeners, syncActiveChatToNotifications]);
 
   // Initial fetch + WebSocket (no polling — real-time only)
   useEffect(() => {
@@ -325,7 +339,8 @@ export function UnreadProvider({ children }) {
 
   const setActiveChatId = useCallback((chatId) => {
     activeChatIdRef.current = chatId || null;
-  }, []);
+    syncActiveChatToNotifications();
+  }, [syncActiveChatToNotifications]);
 
   // Immediately subtract `amount` from the global badge (optimistic).
   const decrementUnread = useCallback((amount) => {

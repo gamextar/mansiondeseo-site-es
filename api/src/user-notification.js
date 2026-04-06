@@ -30,7 +30,13 @@ export class UserNotification {
         this.debug('[UserNotification.notify] sockets:', sockets.length, 'data:', JSON.stringify(data));
         const payload = JSON.stringify(data);
         for (const ws of sockets) {
-          try { ws.send(payload); } catch { /* dead socket */ }
+          try {
+            const attachment = this.getSocketAttachment(ws);
+            if (data?.type === 'new_message' && data?.chatId && attachment?.activeChatId === data.chatId) {
+              continue;
+            }
+            ws.send(payload);
+          } catch { /* dead socket */ }
         }
         return new Response('ok');
       }
@@ -43,6 +49,7 @@ export class UserNotification {
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
       this.state.acceptWebSocket(server);
+      this.setSocketAttachment(server, { activeChatId: null });
       // Send immediate connected confirmation
       this.state.waitUntil(Promise.resolve().then(() => {
         try { server.send(JSON.stringify({ type: 'connected' })); } catch { /* ignore */ }
@@ -60,6 +67,11 @@ export class UserNotification {
       const data = JSON.parse(typeof msg === 'string' ? msg : new TextDecoder().decode(msg));
       if (data.type === 'ping') {
         ws.send(JSON.stringify({ type: 'pong' }));
+      } else if (data.type === 'active_chat') {
+        this.setSocketAttachment(ws, {
+          ...this.getSocketAttachment(ws),
+          activeChatId: data.chatId || null,
+        });
       }
     } catch { /* ignore malformed messages */ }
   }
@@ -71,5 +83,21 @@ export class UserNotification {
   async webSocketError(ws, error) {
     this.debug('[UserNotification.webSocketError]', error?.message || error);
     try { ws.close(1011, 'WebSocket error'); } catch { /* already closed */ }
+  }
+
+  getSocketAttachment(ws) {
+    try {
+      return ws.deserializeAttachment?.() || {};
+    } catch {
+      return {};
+    }
+  }
+
+  setSocketAttachment(ws, value) {
+    try {
+      ws.serializeAttachment?.(value);
+    } catch {
+      // ignore on platforms without attachment support
+    }
   }
 }
