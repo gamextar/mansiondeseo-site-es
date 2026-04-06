@@ -100,7 +100,6 @@ export default function ChatPage() {
   const restoreScrollAfterPrependRef = useRef(null);
   const initialHistoryLoadedRef = useRef(false);
   const historyFallbackTimerRef = useRef(null);
-  const typingReplacementMessageIdRef = useRef(null);
   const suppressTypingUntilRef = useRef(0);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const partnerPhoto = getPrimaryProfilePhoto(partner);
@@ -266,24 +265,16 @@ export default function ChatPage() {
       },
       onMessage(msg) {
         const shouldStickToBottom = wasAtBottomRef.current;
-        const shouldReplaceTyping = partnerTyping;
         suppressTypingUntilRef.current = Date.now() + 1500;
         clearTimeout(typingTimeoutRef.current);
-        if (shouldReplaceTyping) {
-          typingReplacementMessageIdRef.current = msg.id;
-          setPartnerTyping(false);
-        }
+        setPartnerTyping(false);
         // Deduplicate: skip if message already exists
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
           return [...prev, formatMsg(msg)];
         });
         if (shouldStickToBottom) requestScrollToBottom('smooth', { force: true });
-        if (!shouldReplaceTyping) {
-          markMessagePopped(msg.id);
-        } else {
-          setPartnerTyping(false);
-        }
+        markMessagePopped(msg.id);
         // Auto mark as read since we're viewing the chat
         chatRef.current?.markRead([msg.id]);
       },
@@ -393,15 +384,6 @@ export default function ChatPage() {
       });
     }
   }, [messages, scrollToBottom]);
-
-  useEffect(() => {
-    if (!typingReplacementMessageIdRef.current) return;
-    if (!messages.some((msg) => msg.id === typingReplacementMessageIdRef.current)) return;
-    const frame = requestAnimationFrame(() => {
-      typingReplacementMessageIdRef.current = null;
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [messages]);
 
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
