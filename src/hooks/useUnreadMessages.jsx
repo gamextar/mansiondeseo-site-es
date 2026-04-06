@@ -371,12 +371,10 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
   const setActiveChatId = useCallback((chatId) => {
     activeChatIdRef.current = chatId || null;
     syncActiveChatToNotifications();
-    if (document.visibilityState === 'visible' && activeChatIdRef.current) {
+    if (document.visibilityState === 'visible' && shouldKeepRealtimeConnected()) {
       connectWs();
-    } else if (!activeChatIdRef.current && listenersRef.current.size === 0) {
-      disconnectWs();
     }
-  }, [connectWs, disconnectWs, syncActiveChatToNotifications]);
+  }, [connectWs, shouldKeepRealtimeConnected, syncActiveChatToNotifications]);
 
   // Immediately subtract `amount` from the global badge (optimistic).
   const decrementUnread = useCallback((amount) => {
