@@ -337,10 +337,17 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
       if (shouldRefreshUnread()) fetchUnread({ force: true }).catch(() => {});
     };
 
+    const onPageHide = () => {
+      wsClosedRef.current = true;
+      wsPausedRef.current = true;
+      disconnectWs();
+    };
+
     if (document.visibilityState === 'visible' && shouldKeepRealtimeConnected()) connectWs();
 
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('focus', onFocus);
+    window.addEventListener('pagehide', onPageHide);
 
     return () => {
       wsClosedRef.current = true;
@@ -348,6 +355,7 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
       clearBackgroundDisconnectTimer();
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('pagehide', onPageHide);
       disconnectWs();
     };
   }, [applyUnreadCount, clearBackgroundDisconnectTimer, connectWs, disconnectWs, fetchUnread, scheduleBackgroundDisconnect, shouldRefreshUnread]);
