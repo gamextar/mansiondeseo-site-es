@@ -101,6 +101,7 @@ export default function ChatPage() {
   const initialHistoryLoadedRef = useRef(false);
   const historyFallbackTimerRef = useRef(null);
   const typingReplacementMessageIdRef = useRef(null);
+  const suppressTypingUntilRef = useRef(0);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
@@ -266,6 +267,8 @@ export default function ChatPage() {
       onMessage(msg) {
         const shouldStickToBottom = wasAtBottomRef.current;
         const shouldReplaceTyping = partnerTyping;
+        suppressTypingUntilRef.current = Date.now() + 1500;
+        clearTimeout(typingTimeoutRef.current);
         if (shouldReplaceTyping) {
           typingReplacementMessageIdRef.current = msg.id;
           setPartnerTyping(false);
@@ -315,6 +318,7 @@ export default function ChatPage() {
         setWsState(state);
       },
       onTyping() {
+        if (Date.now() < suppressTypingUntilRef.current) return;
         setPartnerTyping(true);
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 3000);
@@ -344,6 +348,7 @@ export default function ChatPage() {
     return () => {
       cancelled = true;
       clearTimeout(historyFallbackTimerRef.current);
+      clearTimeout(typingTimeoutRef.current);
       incomingMessageTimersRef.current.forEach((timer) => clearTimeout(timer));
       incomingMessageTimersRef.current.clear();
       setActiveChatId(null);
