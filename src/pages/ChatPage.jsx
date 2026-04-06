@@ -385,6 +385,11 @@ export default function ChatPage() {
     }
   }, [messages, scrollToBottom]);
 
+  useEffect(() => {
+    if (!partnerTyping || !wasAtBottomRef.current) return;
+    requestScrollToBottom('smooth');
+  }, [partnerTyping]);
+
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
     const oldestMessage = messages.find((message) => message.createdAt);
@@ -679,6 +684,21 @@ export default function ChatPage() {
             </div>
           );
         })}
+
+        {partnerTyping && (
+          <div className="flex items-end gap-2 justify-start">
+            <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
+              <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
+            </div>
+            <div className="max-w-[80%] rounded-2xl rounded-bl-sm px-4 py-3 bg-mansion-elevated border border-mansion-border/30 text-text-primary">
+              <div className="flex items-center gap-1.5 h-6">
+                <span className="w-2 h-2 rounded-full bg-mansion-gold/75 animate-pulse [animation-delay:0ms]" />
+                <span className="w-2 h-2 rounded-full bg-mansion-gold/75 animate-pulse [animation-delay:150ms]" />
+                <span className="w-2 h-2 rounded-full bg-mansion-gold/75 animate-pulse [animation-delay:300ms]" />
+              </div>
+            </div>
+          </div>
+        )}
 
           <div
             ref={messagesEndRef}
