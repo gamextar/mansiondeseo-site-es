@@ -15,6 +15,7 @@ export class ChatRoom {
     this.userStatusCache = new Map();
     this.userPreviewCache = new Map();
     this.messageConversationIdReady = null;
+    this.senderConversationStateWriteAt = new Map();
   }
 
   buildConversationId(userA, userB) {
@@ -262,16 +263,12 @@ export class ChatRoom {
   async syncConversationStateForMessage(senderId, receiverId, msg) {
     await this.ensureConversationStateTables();
     const lastMessage = (msg.content || '').slice(0, 50);
-    await Promise.all([
-      this.env.DB.prepare(
-        `INSERT INTO conversation_state (user_id, partner_id, last_message, last_message_at, unread_count, updated_at)
-         VALUES (?, ?, ?, ?, 0, datetime('now'))
-         ON CONFLICT(user_id, partner_id) DO UPDATE SET
-           last_message = excluded.last_message,
-           last_message_at = excluded.last_message_at,
-           unread_count = 0,
-           updated_at = excluded.updated_at`
-      ).bind(senderId, receiverId, lastMessage, msg.created_at).run(),
+    const senderKey = `${senderId}:${receiverId}`;
+    const nowMs = Date.now();
+    const lastSenderWriteAt = this.senderConversationStateWriteAt.get(senderKey) || 0;
+    const shouldWriteSender = (nowMs - lastSenderWriteAt) >= 2_000;
+
+    const writes = [
       this.env.DB.prepare(
         `INSERT INTO conversation_state (user_id, partner_id, last_message, last_message_at, unread_count, updated_at)
          VALUES (?, ?, ?, ?, 1, datetime('now'))
@@ -281,7 +278,24 @@ export class ChatRoom {
            unread_count = conversation_state.unread_count + 1,
            updated_at = excluded.updated_at`
       ).bind(receiverId, senderId, lastMessage, msg.created_at).run(),
-    ]);
+    ];
+
+    if (shouldWriteSender) {
+      this.senderConversationStateWriteAt.set(senderKey, nowMs);
+      writes.push(
+        this.env.DB.prepare(
+          `INSERT INTO conversation_state (user_id, partner_id, last_message, last_message_at, unread_count, updated_at)
+           VALUES (?, ?, ?, ?, 0, datetime('now'))
+           ON CONFLICT(user_id, partner_id) DO UPDATE SET
+             last_message = excluded.last_message,
+             last_message_at = excluded.last_message_at,
+             unread_count = 0,
+             updated_at = excluded.updated_at`
+        ).bind(senderId, receiverId, lastMessage, msg.created_at).run()
+      );
+    }
+
+    await Promise.all(writes);
   }
 
   async clearConversationStateUnread(userId, partnerId) {
