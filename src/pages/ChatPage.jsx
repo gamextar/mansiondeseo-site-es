@@ -660,54 +660,43 @@ export default function ChatPage() {
           </div>
         )}
 
-        <AnimatePresence initial={false}>
-          {messages.map((msg) => {
-            const isMe = msg.senderId === 'me';
-            const isPopped = poppedMessageIds.has(msg.id);
-            const skipIntroAnimation = typingReplacementMessageIdRef.current === msg.id;
-            return (
-              <motion.div
-                key={msg.id}
-                initial={skipIntroAnimation ? false : { opacity: 0, y: 8, scale: 0.97 }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                  scale: isPopped && !skipIntroAnimation ? [1, 1.035, 1] : 1,
-                }}
-                transition={skipIntroAnimation ? { duration: 0 } : isPopped ? { duration: 0.35, times: [0, 0.45, 1] } : { duration: 0.18 }}
-                className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
+        {messages.map((msg) => {
+          const isMe = msg.senderId === 'me';
+          const isPopped = poppedMessageIds.has(msg.id);
+          return (
+            <div
+              key={msg.id}
+              className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
+            >
+              {!isMe && (
+                <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
+                  <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
+                </div>
+              )}
+              <div
+                className={`max-w-[80%] rounded-2xl px-4 py-3 transition-colors duration-300 ${
+                  isMe
+                    ? 'bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white rounded-br-sm'
+                    : `text-text-primary border rounded-bl-sm ${isPopped ? 'bg-mansion-gold/10 border-mansion-gold/30 shadow-[0_0_0_1px_rgba(212,175,55,0.08)]' : 'bg-mansion-elevated border-mansion-border/30'}`
+                }`}
               >
-                {/* Partner avatar next to received messages */}
-                {!isMe && (
-                  <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
-                    <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
-                  </div>
-                )}
-                <motion.div
-                  className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                    isMe
-                      ? 'bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white rounded-br-sm'
-                      : `text-text-primary border rounded-bl-sm ${isPopped ? 'bg-mansion-gold/10 border-mansion-gold/30 shadow-[0_0_0_1px_rgba(212,175,55,0.08)]' : 'bg-mansion-elevated border-mansion-border/30'}`
-                  }`}
-                >
-                  <p className="text-[15px] leading-relaxed">{msg.text}</p>
-                  <p className={`text-[11px] mt-1.5 flex items-center ${isMe ? 'justify-end text-white/50 gap-1' : 'justify-end text-text-dim'}`}>
-                    {msg.timestamp}
-                    {isMe && (
-                      <span className={`inline-flex ${msg.is_read ? 'text-blue-400' : 'text-white/40'}`}>
-                        {msg.is_read ? (
-                          <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M0.5 5.5L4 9L4.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3.5 5.5L7 9L15 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M8.5 5.5L12 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        ) : (
-                          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 5.5L4.5 9L10 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        )}
-                      </span>
-                    )}
-                  </p>
-                </motion.div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+                <p className="text-[15px] leading-relaxed">{msg.text}</p>
+                <p className={`text-[11px] mt-1.5 flex items-center ${isMe ? 'justify-end text-white/50 gap-1' : 'justify-end text-text-dim'}`}>
+                  {msg.timestamp}
+                  {isMe && (
+                    <span className={`inline-flex ${msg.is_read ? 'text-blue-400' : 'text-white/40'}`}>
+                      {msg.is_read ? (
+                        <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M0.5 5.5L4 9L4.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3.5 5.5L7 9L15 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M8.5 5.5L12 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      ) : (
+                        <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 5.5L4.5 9L10 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      )}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+          );
+        })}
 
           <div
             ref={messagesEndRef}
