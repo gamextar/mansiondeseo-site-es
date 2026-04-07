@@ -35,11 +35,11 @@ export default function DesktopSidebar() {
   const sidebarAvatarSize = Math.max(72, Math.min(220, Number(siteSettings?.sidebarAvatarSize ?? 154)));
   const sidebarRingWidth = Math.max(1, Math.round((sidebarAvatarSize * Math.max(1, Math.min(18, Number(siteSettings?.sidebarStoryRingWidth ?? siteSettings?.storyCircleBorder ?? 4)))) / 100));
   const sidebarInnerGap = Math.max(0, Math.round((sidebarAvatarSize * Math.max(0, Math.min(16, Number(siteSettings?.storyCircleInnerGap ?? 3)))) / 100));
-  const sidebarProfileWidth = Math.round(sidebarAvatarSize * 0.84);
-  const sidebarProfileHeight = Math.round(sidebarAvatarSize * 1.08);
-  const sidebarFrameRadius = Math.max(22, Math.round(sidebarProfileWidth * 0.24));
+  const sidebarProfileWidth = Math.round(sidebarAvatarSize * 1.02);
+  const sidebarProfileHeight = Math.round(sidebarAvatarSize * 1.1);
+  const sidebarFrameRadius = Math.max(24, Math.round(sidebarProfileWidth * 0.28));
   const sidebarInnerRadius = Math.max(18, sidebarFrameRadius - Math.max(6, sidebarRingWidth + sidebarInnerGap));
-  const sidebarFrameClip = 'polygon(12% 0%, 100% 0%, 100% 86%, 88% 100%, 0% 100%, 0% 14%)';
+  const sidebarFrameClip = 'polygon(8% 0%, 100% 0%, 100% 92%, 93% 100%, 0% 100%, 0% 10%)';
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
