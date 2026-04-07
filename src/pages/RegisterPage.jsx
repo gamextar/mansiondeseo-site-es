@@ -655,7 +655,7 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
               whileTap={{ scale: 0.93 }}
               whileHover={{ scale: 1.03 }}
               onClick={() => onSelect(role.id)}
-              className="flex flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+              className="flex w-[132px] flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
               style={{
                 backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
                 borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
@@ -666,10 +666,12 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
                   <img src={customImg} alt={role.label} className="w-full h-full object-cover" />
                 </div>
               ) : (
-                <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                <div className="w-20 h-28 flex items-center justify-center">
+                  <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                </div>
               )}
               <span
-                className={`mt-2 font-medium text-sm ${
+                className={`mt-2 font-medium text-sm text-center leading-tight ${
                   isActive ? 'text-text-primary' : 'text-text-muted'
                 }`}
               >
@@ -727,7 +729,9 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
                       borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
                     }}
                   >
-                    <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                    <div className="w-20 h-28 flex items-center justify-center">
+                      <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                    </div>
                     <span className={`mt-2 font-medium text-sm leading-tight ${isActive ? 'text-text-primary' : 'text-text-muted'}`}>
                       {role.label}
                     </span>
@@ -1398,6 +1402,7 @@ export default function RegisterPage() {
       turnstileWidgetRef.current = window.turnstile.render(turnstileContainerRef.current, {
         sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA',
         theme: 'dark',
+        size: 'compact',
         callback: (token) => setTurnstileTokenBoth(token),
         'expired-callback': () => setTurnstileTokenBoth(''),
         'error-callback': () => setTurnstileTokenBoth(''),
@@ -1681,7 +1686,7 @@ export default function RegisterPage() {
               onNavigateRecover={() => navigate(`/recuperar-contrasena?email=${encodeURIComponent(email)}`)}
             />
             {/* Turnstile widget renders here on mount — invisible challenge */}
-            <div ref={turnstileContainerRef} className="flex justify-center mt-4" />
+            <div ref={turnstileContainerRef} className="flex justify-center mt-8" />
           </>
         );
       case 1:
