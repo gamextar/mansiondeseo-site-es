@@ -42,7 +42,7 @@ Campos soportados por perfil:
   role                requerido: hombre | mujer | pareja
   seeking             requerido: array de roles
   interests           opcional: array
-  age, province, locality, country, bio
+  age, birthdate, province, locality, country, bio
   premium             opcional boolean
   premiumUntil        opcional string YYYY-MM-DD HH:MM:SS
   avatarPath          opcional path local o URL
@@ -269,6 +269,51 @@ function ensureLocalityColumn() {
   }
 }
 
+function ensureBirthdateColumn() {
+  if (dryRun) return
+  try {
+    executeSql('ALTER TABLE users ADD COLUMN birthdate TEXT')
+  } catch (error) {
+    const message = String(error?.message || error || '').toLowerCase()
+    if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+      throw error
+    }
+  }
+}
+
+function normalizeBirthdate(value) {
+  const raw = String(value || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return ''
+  const [yearStr, monthStr, dayStr] = raw.split('-')
+  const year = Number(yearStr)
+  const month = Number(monthStr)
+  const day = Number(dayStr)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return ''
+  }
+  return raw
+}
+
+function calculateAgeFromBirthdate(birthdate) {
+  const normalized = normalizeBirthdate(birthdate)
+  if (!normalized) return null
+  const [yearStr, monthStr, dayStr] = normalized.split('-')
+  const year = Number(yearStr)
+  const month = Number(monthStr)
+  const day = Number(dayStr)
+  const now = new Date()
+  let age = now.getUTCFullYear() - year
+  if ((now.getUTCMonth() + 1) < month || ((now.getUTCMonth() + 1) === month && now.getUTCDate() < day)) {
+    age -= 1
+  }
+  return age
+}
+
 function uploadToR2(key, filePath) {
   const args = ['r2', 'object', 'put', `${wranglerConfig.bucketName}/${key}`, '--file', filePath]
   if (useRemote) args.push('--remote')
@@ -348,6 +393,10 @@ async function upsertProfile(profile, manifestDir) {
   const lastActive = profile.lastActive || nowSql()
   const createdAt = profile.createdAt || nowSql()
   const avatarCrop = profile.avatarCrop ? JSON.stringify(profile.avatarCrop) : null
+  const birthdate = normalizeBirthdate(profile.birthdate || '')
+  const age = Number.isFinite(calculateAgeFromBirthdate(birthdate))
+    ? calculateAgeFromBirthdate(birthdate)
+    : (profile.age ?? null)
 
   const baseFields = {
     email,
@@ -355,7 +404,8 @@ async function upsertProfile(profile, manifestDir) {
     role: profile.role,
     seeking: JSON.stringify(seeking),
     interests: JSON.stringify(interests),
-    age: profile.age ?? null,
+    age,
+    birthdate: birthdate || null,
     city: profile.province || profile.city || '',
     locality: profile.locality || '',
     country: profile.country || 'AR',
@@ -452,6 +502,7 @@ async function main() {
 
   ensureFakeColumn()
   ensureLocalityColumn()
+  ensureBirthdateColumn()
 
   const results = []
   for (let index = 0; index < filtered.length; index += 1) {

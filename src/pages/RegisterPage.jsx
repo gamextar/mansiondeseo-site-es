@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername, getMe } from '../lib/api';
+import { calculateAgeFromBirthdate, getLatestAdultBirthdate, isAdultBirthdate } from '../lib/birthdate';
 import { formatLocation } from '../lib/location';
 import ImageCropper from '../components/ImageCropper';
 
@@ -239,9 +240,10 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
 // ────────────────────────────────────────────
 
 function FichaPreview({ data, currentStep }) {
-  const { role, seeking, interests, name, age } = data;
+  const { role, seeking, interests, name } = data;
   const seekingArr = Array.isArray(seeking) ? seeking : (seeking ? [seeking] : []);
   const locationText = formatLocation(data);
+  const previewAge = calculateAgeFromBirthdate(data.birthdate);
 
   if (currentStep < 1 && !role) return null;
 
@@ -326,7 +328,7 @@ function FichaPreview({ data, currentStep }) {
             >
               <p className="text-text-primary font-display text-sm font-semibold">
                 {name}
-                {age ? `, ${age}` : ''}
+                {previewAge ? `, ${previewAge}` : ''}
               </p>
               {locationText && (
                 <p className="text-text-dim text-[11px] flex items-center justify-center gap-1">
@@ -671,6 +673,8 @@ function StepInterests({ selected, onToggle }) {
 
 function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, selectedCountry, onCountryChange, usernameStatus, onUsernameBlur }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const latestAdultBirthdate = getLatestAdultBirthdate();
+  const enteredAge = calculateAgeFromBirthdate(data.birthdate);
 
   const ARGENTINA_PROVINCES = [
     'Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba',
@@ -734,21 +738,18 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
           )}
         </div>
         <div>
-          <label className="text-text-muted text-xs font-medium mb-1.5 block">Edad</label>
+          <label className="text-text-muted text-xs font-medium mb-1.5 block">Fecha de nacimiento</label>
           <input
-            type="number"
-            value={data.age}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, '').slice(0, 2);
-              onChange({ ...data, age: val });
-            }}
-            placeholder="25"
-            min="18"
-            max="99"
-            inputMode="numeric"
+            type="date"
+            value={data.birthdate}
+            onChange={(e) => onChange({ ...data, birthdate: e.target.value })}
+            max={latestAdultBirthdate}
             className="w-full"
           />
-          {data.age && Number(data.age) < 18 && (
+          {enteredAge && (
+            <p className="text-[10px] text-text-dim mt-0.5">Edad actual: {enteredAge} años</p>
+          )}
+          {data.birthdate && !isAdultBirthdate(data.birthdate) && (
             <p className="text-[10px] text-mansion-crimson mt-0.5">Debes ser mayor de 18 años</p>
           )}
         </div>
@@ -1142,7 +1143,7 @@ export default function RegisterPage() {
   const [iAm, setIAm] = useState(null);
   const [seeking, setSeeking] = useState([]);
   const [interests, setInterests] = useState([]);
-  const [info, setInfo] = useState({ name: '', age: '', province: '', locality: '', bio: '' });
+  const [info, setInfo] = useState({ name: '', birthdate: '', province: '', locality: '', bio: '' });
   const [photoFile, setPhotoFile] = useState(null);
   const [completed, setCompleted] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
@@ -1221,7 +1222,7 @@ export default function RegisterPage() {
     if (step === 1) return !!iAm;
     if (step === 2) return seeking.length > 0;
     if (step === 3) return interests.length > 0;
-    if (step === 4) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && info.age && Number(info.age) >= 18 && info.province && (!showCountryPicker || selectedCountry);
+    if (step === 4) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && isAdultBirthdate(info.birthdate) && info.province && (!showCountryPicker || selectedCountry);
     return true;
   };
 
@@ -1306,7 +1307,7 @@ export default function RegisterPage() {
           role: iAm,
           seeking,
           interests,
-          age: info.age,
+          birthdate: info.birthdate,
           province: info.province,
           locality: info.locality,
           bio: info.bio,
@@ -1404,7 +1405,7 @@ export default function RegisterPage() {
     seeking,
     interests,
     name: info.name,
-    age: info.age,
+    birthdate: info.birthdate,
     province: info.province,
     locality: info.locality,
   };

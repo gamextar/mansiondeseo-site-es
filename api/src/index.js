@@ -24,6 +24,7 @@ let _messageConversationIdReady = null;
 let _userBrowseIndexesReady = null;
 let _userFakeColumnReady = null;
 let _userLocalityColumnReady = null;
+let _userBirthdateColumnReady = null;
 
 // ── Helpers ─────────────────────────────────────────────
 
@@ -254,6 +255,28 @@ async function ensureUsersLocalityColumn(env) {
   }
 
   return _userLocalityColumnReady;
+}
+
+async function ensureUsersBirthdateColumn(env) {
+  if (!_userBirthdateColumnReady) {
+    _userBirthdateColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          'ALTER TABLE users ADD COLUMN birthdate TEXT'
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+    })().catch((err) => {
+      _userBirthdateColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userBirthdateColumnReady;
 }
 
 async function setConversationState(env, userId, partnerId, { lastMessage, lastMessageAt, unreadCount }) {
@@ -774,14 +797,69 @@ function generateVerificationCode() {
   return String(array[0] % 1000000).padStart(6, '0');
 }
 
+function normalizeBirthdate(value) {
+  const raw = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '';
+  const [yearStr, monthStr, dayStr] = raw.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return '';
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return '';
+  }
+  return raw;
+}
+
+function calculateAgeFromBirthdate(birthdate) {
+  const normalized = normalizeBirthdate(birthdate);
+  if (!normalized) return null;
+
+  const [yearStr, monthStr, dayStr] = normalized.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  const now = new Date();
+  let age = now.getUTCFullYear() - year;
+  const currentMonth = now.getUTCMonth() + 1;
+  const currentDay = now.getUTCDate();
+  if (currentMonth < month || (currentMonth === month && currentDay < day)) {
+    age -= 1;
+  }
+  return age;
+}
+
 async function handleRegister(request, env) {
   const body = await request.json();
-  const { email, password, username, role, seeking, interests, age, city, province, locality, bio } = body;
+  const { email, password, username, role, seeking, interests, age, birthdate, city, province, locality, bio } = body;
   const provinceValue = String(province ?? city ?? '').trim();
   const localityValue = String(locality || '').trim();
+  const normalizedBirthdate = normalizeBirthdate(birthdate);
+  const fallbackAge = age === '' || age == null ? NaN : Number(age);
+  const computedAge = calculateAgeFromBirthdate(normalizedBirthdate);
+  const ageValue = Number.isFinite(computedAge)
+    ? computedAge
+    : (Number.isFinite(fallbackAge) ? fallbackAge : null);
 
   if (!email || !password || !username || !role || !seeking) {
     return error('Campos requeridos: email, password, username, role, seeking');
+  }
+
+  if (!normalizedBirthdate && !Number.isFinite(fallbackAge)) {
+    return error('Fecha de nacimiento requerida');
+  }
+
+  if (normalizedBirthdate && computedAge == null) {
+    return error('Fecha de nacimiento inválida');
+  }
+
+  if (ageValue != null && ageValue < 18) {
+    return error('Debes ser mayor de 18 años');
   }
 
   // Validate seeking: must be array of valid roles
@@ -834,8 +912,8 @@ async function handleRegister(request, env) {
   const country = body.country || detectedCountry;
 
   await env.DB.prepare(`
-    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, city, locality, country, bio, status, coins)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0)
+    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, birthdate, city, locality, country, bio, status, coins)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0)
   `).bind(
     userId,
     email.toLowerCase(),
@@ -844,7 +922,8 @@ async function handleRegister(request, env) {
     role,
     JSON.stringify(seekingArr),
     JSON.stringify(interests || []),
-    age || null,
+    ageValue,
+    normalizedBirthdate || null,
     provinceValue,
     localityValue,
     country,
@@ -1270,7 +1349,7 @@ async function handleOwnProfileDashboard(request, env) {
     cachedUser ? Promise.resolve(cachedUser) : env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
     env.DB.prepare('SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first(),
     env.DB.prepare(
-      `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.city, u.locality, u.role, u.premium, u.last_active,
+      `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, u.role, u.premium, u.last_active,
               MAX(pv.created_at) as visited_at
        FROM profile_visits pv
        JOIN users u ON u.id = pv.visitor_id
@@ -1306,7 +1385,7 @@ async function handleOwnProfileDashboard(request, env) {
     name: v.username,
     avatar_url: v.avatar_url,
     avatar_crop: safeParseJSON(v.avatar_crop, null),
-    age: v.age,
+    age: getPublicAge(v),
     ...getLocationFields(v),
     role: v.role,
     premium: !!v.premium,
@@ -1350,6 +1429,7 @@ async function handleProfiles(request, env) {
       id,
       username,
       age,
+      birthdate,
       city,
       locality,
       role,
@@ -1424,7 +1504,7 @@ async function handleProfiles(request, env) {
     return {
       id: u.id,
       name: u.username,
-      age: u.age,
+      age: getPublicAge(u),
       ...getLocationFields(u),
       role: mapRoleToDisplay(u.role),
       interests: profileInterests,
@@ -1550,7 +1630,7 @@ async function handleProfileDetail(request, env, userId) {
     profile: {
       id: user.id,
       name: user.username,
-      age: user.age,
+      age: getPublicAge(user),
       ...getLocationFields(user),
       role: mapRoleToDisplay(user.role),
       interests: safeParseJSON(user.interests, []),
@@ -1583,7 +1663,7 @@ async function handleChatBootstrap(request, env, userId) {
 
   const [user, sender, settings] = await Promise.all([
     env.DB.prepare(
-      'SELECT id, username, age, city, locality, role, avatar_url, avatar_crop, last_active, premium, premium_until FROM users WHERE id = ?'
+      'SELECT id, username, age, birthdate, city, locality, role, avatar_url, avatar_crop, last_active, premium, premium_until FROM users WHERE id = ?'
     ).bind(userId).first(),
     env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
     cached('settings', 300_000, () => loadSettings(env)),
@@ -1604,7 +1684,7 @@ async function handleChatBootstrap(request, env, userId) {
     partner: {
       id: user.id,
       name: user.username,
-      age: user.age,
+      age: getPublicAge(user),
       ...getLocationFields(user),
       role: mapRoleToDisplay(user.role),
       photos: [],
@@ -2229,8 +2309,16 @@ async function handleUpdateProfile(request, env) {
   if (normalizedBody.province !== undefined && normalizedBody.city === undefined) {
     normalizedBody.city = normalizedBody.province;
   }
+  if (normalizedBody.birthdate !== undefined) {
+    const normalizedBirthdate = normalizeBirthdate(normalizedBody.birthdate);
+    if (!normalizedBirthdate) return error('Fecha de nacimiento inválida', 400);
+    const derivedAge = calculateAgeFromBirthdate(normalizedBirthdate);
+    if (!Number.isFinite(derivedAge) || derivedAge < 18) return error('Debes ser mayor de 18 años', 400);
+    normalizedBody.birthdate = normalizedBirthdate;
+    normalizedBody.age = derivedAge;
+  }
 
-  const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'city', 'locality', 'bio', 'avatar_url', 'avatar_crop', 'premium'];
+  const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'birthdate', 'city', 'locality', 'bio', 'avatar_url', 'avatar_crop', 'premium'];
   const currentUser = await env.DB.prepare('SELECT premium, premium_until, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
   if (!currentUser) return error('Usuario no encontrado', 404);
 
@@ -2337,11 +2425,20 @@ function getLocationFields(record) {
   };
 }
 
+function getPublicAge(record) {
+  const derivedAge = calculateAgeFromBirthdate(record?.birthdate);
+  if (Number.isFinite(derivedAge)) return derivedAge;
+  const rawAge = Number(record?.age);
+  return Number.isFinite(rawAge) ? rawAge : null;
+}
+
 function sanitizeUser(user, env) {
   if (!user) return null;
   const { password_hash, ...safe } = user;
   const premiumActive = isPremiumActive(safe);
   const location = getLocationFields(safe);
+  const age = getPublicAge(safe);
+  const birthdate = normalizeBirthdate(safe.birthdate) || '';
   // Auto-disable ghost_mode if premium has expired
   const ghostMode = premiumActive ? !!safe.ghost_mode : false;
   if (!premiumActive && safe.ghost_mode && env) {
@@ -2356,6 +2453,8 @@ function sanitizeUser(user, env) {
   return {
     ...safe,
     ...location,
+    age,
+    birthdate,
     seeking: seekingParsed,
     interests: safeParseJSON(safe.interests, []),
     photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
@@ -2390,7 +2489,7 @@ async function handleGetVisits(request, env) {
   if (!auth) return error('No autorizado', 401);
 
   const { results } = await env.DB.prepare(
-    `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.city, u.locality, u.role, u.premium, u.last_active,
+    `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, u.role, u.premium, u.last_active,
             MAX(pv.created_at) as visited_at
      FROM profile_visits pv
      JOIN users u ON u.id = pv.visitor_id
@@ -2405,7 +2504,7 @@ async function handleGetVisits(request, env) {
     name: v.username,
     avatar_url: v.avatar_url,
     avatar_crop: safeParseJSON(v.avatar_crop, null),
-    age: v.age,
+    age: getPublicAge(v),
     ...getLocationFields(v),
     role: v.role,
     premium: !!v.premium,
@@ -2696,7 +2795,7 @@ async function handleGetFavorites(request, env) {
     return {
       id: u.id,
       name: u.username,
-      age: u.age,
+      age: getPublicAge(u),
       ...getLocationFields(u),
       role: mapRoleToDisplay(u.role),
       interests: safeParseJSON(u.interests, []),
@@ -2928,7 +3027,7 @@ async function handleAdminGetUsers(request, env) {
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
-  let dataQuery = `SELECT id, email, username, role, seeking, age, city, locality, country, avatar_url, status,
+  let dataQuery = `SELECT id, email, username, role, seeking, age, birthdate, city, locality, country, avatar_url, status,
     premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, account_status, last_active, last_ip, created_at,
     (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id
     FROM users`;
@@ -2955,6 +3054,8 @@ async function handleAdminGetUsers(request, env) {
   return json({
     users: dataRes.results.map(u => ({
       ...u,
+      age: getPublicAge(u),
+      birthdate: normalizeBirthdate(u.birthdate) || '',
       province: u.city || '',
       locality: u.locality || '',
       premium: isPremiumActive(u),
@@ -2985,6 +3086,8 @@ async function handleAdminGetUser(request, env, userId) {
   return json({
     user: {
       ...safe,
+      age: getPublicAge(safe),
+      birthdate: normalizeBirthdate(safe.birthdate) || '',
       province: safe.city || '',
       locality: safe.locality || '',
       interests: safeParseJSON(safe.interests, []),
@@ -3037,6 +3140,8 @@ async function handleAdminUpdateUser(request, env, userId) {
   return json({
     user: {
       ...safe,
+      age: getPublicAge(safe),
+      birthdate: normalizeBirthdate(safe.birthdate) || '',
       province: safe.city || '',
       locality: safe.locality || '',
       interests: safeParseJSON(safe.interests, []),
@@ -3888,6 +3993,7 @@ async function handleRequest(request, env) {
 
   await ensureUsersFakeColumn(env);
   await ensureUsersLocalityColumn(env);
+  await ensureUsersBirthdateColumn(env);
 
   // CORS preflight
   if (method === 'OPTIONS') return handleOptions(env, request);

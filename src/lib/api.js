@@ -537,8 +537,9 @@ async function apiUpload(path, options = {}) {
 
 // ── Auth ────────────────────────────────────────────────
 
-export async function register({ email, password, username, role, seeking, interests, age, province, locality, city, bio, country }) {
+export async function register({ email, password, username, role, seeking, interests, age, birthdate, province, locality, city, bio, country }) {
   const normalizedProvince = province ?? city ?? '';
+  const normalizedAge = age === '' || age == null ? undefined : Number(age);
   const data = await apiFetch('/auth/register', {
     method: 'POST',
     body: JSON.stringify({
@@ -548,7 +549,8 @@ export async function register({ email, password, username, role, seeking, inter
       role,
       seeking,
       interests,
-      age: Number(age),
+      ...(Number.isFinite(normalizedAge) ? { age: normalizedAge } : {}),
+      birthdate: birthdate || '',
       province: normalizedProvince,
       locality: locality || '',
       city: normalizedProvince,
