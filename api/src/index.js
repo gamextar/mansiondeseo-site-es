@@ -1273,6 +1273,7 @@ async function handleOwnProfileDashboard(request, env) {
 async function handleProfiles(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  await ensureUserBrowseIndexes(env);
 
   const url = new URL(request.url);
   const filter = url.searchParams.get('filter') || 'all';
