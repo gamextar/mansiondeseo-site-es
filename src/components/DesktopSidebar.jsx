@@ -35,6 +35,11 @@ export default function DesktopSidebar() {
   const sidebarAvatarSize = Math.max(72, Math.min(220, Number(siteSettings?.sidebarAvatarSize ?? 154)));
   const sidebarRingWidth = Math.max(1, Math.round((sidebarAvatarSize * Math.max(1, Math.min(18, Number(siteSettings?.sidebarStoryRingWidth ?? siteSettings?.storyCircleBorder ?? 4)))) / 100));
   const sidebarInnerGap = Math.max(0, Math.round((sidebarAvatarSize * Math.max(0, Math.min(16, Number(siteSettings?.storyCircleInnerGap ?? 3)))) / 100));
+  const sidebarProfileWidth = Math.round(sidebarAvatarSize * 0.84);
+  const sidebarProfileHeight = Math.round(sidebarAvatarSize * 1.08);
+  const sidebarFrameRadius = Math.max(22, Math.round(sidebarProfileWidth * 0.24));
+  const sidebarInnerRadius = Math.max(18, sidebarFrameRadius - Math.max(6, sidebarRingWidth + sidebarInnerGap));
+  const sidebarFrameClip = 'polygon(12% 0%, 100% 0%, 100% 86%, 88% 100%, 0% 100%, 0% 14%)';
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
@@ -55,16 +60,47 @@ export default function DesktopSidebar() {
       {/* Profile avatar + name */}
       {user && (
         <Link to="/perfil" className="flex flex-col items-center py-6 border-b border-mansion-border/20 hover:opacity-90 transition-opacity">
-          <div className={`shrink-0 rounded-full ${user.has_active_story ? 'bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold' : 'bg-gradient-to-br from-mansion-gold/60 to-mansion-gold-light/40'}`} style={{ width: sidebarAvatarSize, height: sidebarAvatarSize, padding: sidebarRingWidth }}>
-            <div className="w-full h-full rounded-full bg-mansion-card" style={{ padding: sidebarInnerGap }}>
-              <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
+          <div className="relative shrink-0">
+            <div
+              className={`${user.has_active_story ? 'bg-gradient-to-br from-mansion-gold via-mansion-crimson to-mansion-gold-light' : 'bg-gradient-to-br from-mansion-gold/70 via-mansion-gold-light/60 to-mansion-gold/40'} shadow-[0_18px_36px_rgba(6,6,12,0.24)]`}
+              style={{
+                width: sidebarProfileWidth,
+                height: sidebarProfileHeight,
+                padding: sidebarRingWidth,
+                borderRadius: `${sidebarFrameRadius}px`,
+                clipPath: sidebarFrameClip,
+              }}
+            >
+              <div
+                className="w-full h-full bg-mansion-card"
+                style={{
+                  padding: sidebarInnerGap,
+                  borderRadius: `${Math.max(18, sidebarFrameRadius - sidebarRingWidth)}px`,
+                  clipPath: sidebarFrameClip,
+                }}
+              >
+                <div
+                  className="relative w-full h-full overflow-hidden bg-mansion-elevated"
+                  style={{
+                    borderRadius: `${sidebarInnerRadius}px`,
+                    clipPath: sidebarFrameClip,
+                  }}
+                >
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),transparent_28%,transparent_68%,rgba(0,0,0,0.18))] pointer-events-none z-10" />
+                  <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/40 to-transparent pointer-events-none z-10" />
                 {user.avatar_url ? (
-                  <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
+                    <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-text-dim">
-                    <User className="w-8 h-8" />
-                  </div>
+                    <div className="w-full h-full flex items-center justify-center text-text-dim">
+                      <User className="w-8 h-8" />
+                    </div>
                 )}
+                  {user.has_active_story && (
+                    <span className="absolute left-3 bottom-3 z-20 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm">
+                      Story
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
