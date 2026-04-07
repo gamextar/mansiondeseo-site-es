@@ -147,8 +147,82 @@ function parseSeeking(raw) {
 }
 
 function parseAge(raw) {
-  const match = String(raw || '').match(/(\d{2})/)
+  const match = String(raw || '').match(/(\d{1,2})/)
   return match ? Number(match[1]) : null
+}
+
+function parsePersonalInfo(raw) {
+  const normalized = String(raw || '').replace(/\s+/g, ' ').trim()
+  const parts = normalized
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  const mainPart = parts[0] || ''
+  const extras = parts.slice(1)
+  const role = parseSpanishRole(mainPart)
+  const age = parseAge(mainPart)
+
+  const orientationValues = new Set([
+    'heterosexual',
+    'bisexual',
+    'gay',
+    'lesbiana',
+    'lesbico',
+    'curioso/a',
+    'curioso',
+    'curiosa',
+    'pansexual',
+    'asexual',
+    'demisexual',
+    'queer',
+  ])
+
+  const maritalValues = new Set([
+    'soltero/a',
+    'soltero',
+    'soltera',
+    'casado/a',
+    'casado',
+    'casada',
+    'separado/a',
+    'separado',
+    'separada',
+    'divorciado/a',
+    'divorciado',
+    'divorciada',
+    'viudo/a',
+    'viudo',
+    'viuda',
+    'en pareja',
+    'complicado/a',
+    'complicado',
+    'complicada',
+    'abierto/a',
+    'abierto',
+    'abierta',
+  ])
+
+  let sexualOrientation = ''
+  let maritalStatus = ''
+
+  if (extras.length >= 2) {
+    sexualOrientation = extras[0] || ''
+    maritalStatus = extras[1] || ''
+  } else if (extras.length === 1) {
+    const single = extras[0]
+    const key = single.toLowerCase()
+    if (maritalValues.has(key)) maritalStatus = single
+    else if (orientationValues.has(key)) sexualOrientation = single
+    else sexualOrientation = single
+  }
+
+  return {
+    role,
+    age,
+    sexual_orientation: sexualOrientation,
+    marital_status: maritalStatus,
+  }
 }
 
 function pickExtension(url, contentType = '') {
@@ -249,14 +323,7 @@ async function extractProfileData(page, requestContext, url) {
     }
   })
 
-  const personalParts = extracted.personalInfo
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)
-  const roleLabel = personalParts[0] || ''
-  const ageValue = parseAge(personalParts.find((part) => /\d+\s*años/i.test(part)) || '')
-  const sexualOrientation = personalParts.find((part) => !/\d+\s*años/i.test(part) && !/^de$/i.test(part) && part !== roleLabel) || ''
-  const maritalStatus = personalParts.slice(3).join(', ').trim() || personalParts[2] || ''
+  const personalInfo = parsePersonalInfo(extracted.personalInfo)
 
   const locationParts = extracted.location
     .split(',')
@@ -349,10 +416,10 @@ async function extractProfileData(page, requestContext, url) {
     userId: extracted.userId,
     username: extracted.username,
     online: extracted.online,
-    role: parseSpanishRole(roleLabel),
-    age: ageValue,
-    sexual_orientation: sexualOrientation,
-    marital_status: maritalStatus,
+    role: personalInfo.role,
+    age: personalInfo.age,
+    sexual_orientation: personalInfo.sexual_orientation,
+    marital_status: personalInfo.marital_status,
     locality,
     province,
     country,
