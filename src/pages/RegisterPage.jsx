@@ -1563,22 +1563,10 @@ export default function RegisterPage() {
     }
   }, [email]);
 
-  // Reset email status when email changes + debounce-check after user stops typing
-  // (debounce covers cases where onBlur fires early, e.g. Turnstile widget stealing focus)
+  // Reset email status when email changes
   useEffect(() => {
     setEmailStatus('idle');
     setApiError('');
-    if (!EMAIL_REGEX.test(email)) return;
-    const timer = setTimeout(async () => {
-      setEmailStatus('checking');
-      try {
-        const { exists } = await apiCheckEmail(email);
-        setEmailStatus(exists ? 'exists' : 'valid');
-      } catch {
-        setEmailStatus('idle');
-      }
-    }, 800);
-    return () => clearTimeout(timer);
   }, [email]);
 
   // Reset username status when name changes
