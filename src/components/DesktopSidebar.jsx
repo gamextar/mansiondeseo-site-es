@@ -35,10 +35,10 @@ export default function DesktopSidebar() {
   const sidebarAvatarSize = Math.max(72, Math.min(220, Number(siteSettings?.sidebarAvatarSize ?? 154)));
   const sidebarRingWidth = Math.max(1, Math.round((sidebarAvatarSize * Math.max(1, Math.min(18, Number(siteSettings?.sidebarStoryRingWidth ?? siteSettings?.storyCircleBorder ?? 4)))) / 100));
   const sidebarInnerGap = Math.max(0, Math.round((sidebarAvatarSize * Math.max(0, Math.min(16, Number(siteSettings?.storyCircleInnerGap ?? 3)))) / 100));
-  const sidebarProfileWidth = Math.round(sidebarAvatarSize * 1.02);
-  const sidebarProfileHeight = Math.round(sidebarAvatarSize * 1.24);
+  const sidebarProfileWidth = Math.round(sidebarAvatarSize * 1.04);
+  const sidebarProfileHeight = Math.round(sidebarAvatarSize * 1.22);
   const sidebarFrameRadius = Math.max(28, Math.round(sidebarProfileWidth * 0.18));
-  const sidebarInnerRadius = Math.max(20, sidebarFrameRadius - Math.max(6, sidebarRingWidth + sidebarInnerGap));
+  const sidebarInnerRadius = Math.max(22, sidebarFrameRadius - Math.max(6, sidebarRingWidth + sidebarInnerGap));
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
@@ -59,18 +59,19 @@ export default function DesktopSidebar() {
       {/* Profile avatar + name */}
       {user && (
         <Link to="/perfil" className="flex flex-col items-center py-6 border-b border-mansion-border/20 hover:opacity-90 transition-opacity">
-          <div className="relative shrink-0 pl-2 pt-1">
+          <div className="relative shrink-0 pl-3 pt-2">
             <div
-              className={`absolute rounded-[30px] border ${user.has_active_story ? 'border-mansion-gold/30 bg-[linear-gradient(160deg,rgba(255,229,159,0.16),rgba(98,25,33,0.18))]' : 'border-white/8 bg-[linear-gradient(160deg,rgba(255,255,255,0.05),rgba(28,24,34,0.22))]'} shadow-[0_18px_34px_rgba(6,6,12,0.16)]`}
+              className={`${user.has_active_story ? 'bg-[linear-gradient(160deg,rgba(255,225,148,0.16),rgba(120,22,46,0.18))]' : 'bg-[linear-gradient(160deg,rgba(255,255,255,0.06),rgba(30,24,36,0.24))]'} absolute rounded-[32px] shadow-[0_20px_36px_rgba(6,6,12,0.14)]`}
               style={{
-                width: sidebarProfileWidth,
-                height: sidebarProfileHeight,
-                top: 10,
-                left: -10,
+                width: Math.round(sidebarProfileWidth * 0.92),
+                height: Math.round(sidebarProfileHeight * 0.98),
+                top: 16,
+                left: -14,
+                borderRadius: `${Math.max(26, sidebarFrameRadius + 2)}px`,
               }}
             />
             <div
-              className={`relative overflow-hidden border ${user.has_active_story ? 'border-mansion-gold/35 bg-[linear-gradient(155deg,rgba(255,232,184,0.9),rgba(214,80,98,0.78))]' : 'border-white/10 bg-[linear-gradient(155deg,rgba(250,241,218,0.72),rgba(160,146,122,0.28))]'} shadow-[0_24px_40px_rgba(6,6,12,0.22)]`}
+              className={`${user.has_active_story ? 'bg-[linear-gradient(155deg,rgba(248,227,176,0.92),rgba(214,84,98,0.74))]' : 'bg-[linear-gradient(155deg,rgba(248,239,215,0.76),rgba(165,149,126,0.26))]'} relative overflow-hidden shadow-[0_28px_42px_rgba(6,6,12,0.22)]`}
               style={{
                 width: sidebarProfileWidth,
                 height: sidebarProfileHeight,
@@ -78,9 +79,8 @@ export default function DesktopSidebar() {
                 borderRadius: `${sidebarFrameRadius}px`,
               }}
             >
-              <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/65" />
-              <div className="pointer-events-none absolute right-4 top-4 h-7 w-7 rounded-full border border-white/15 bg-white/10 blur-[1px]" />
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.2),transparent_40%)]" />
+              <div className="pointer-events-none absolute inset-x-6 top-0.5 h-px bg-white/55" />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_38%)]" />
               <div
                 className="relative h-full w-full overflow-hidden bg-[linear-gradient(180deg,rgba(18,17,24,0.99),rgba(19,17,26,0.94))]"
                 style={{
@@ -88,9 +88,8 @@ export default function DesktopSidebar() {
                   borderRadius: `${Math.max(18, sidebarFrameRadius - sidebarRingWidth)}px`,
                 }}
               >
-                <div className="pointer-events-none absolute left-4 top-5 bottom-5 z-20 w-px bg-gradient-to-b from-mansion-gold/0 via-mansion-gold/75 to-mansion-gold/0" />
-                <div className="pointer-events-none absolute left-6 top-5 text-[9px] font-semibold uppercase tracking-[0.3em] text-white/60">
-                  Portrait
+                <div className="pointer-events-none absolute left-6 top-5 z-20 text-[9px] font-semibold uppercase tracking-[0.32em] text-white/55">
+                  Editorial
                 </div>
                 <div
                   className="relative h-full w-full overflow-hidden bg-mansion-elevated"
@@ -100,6 +99,7 @@ export default function DesktopSidebar() {
                 >
                   <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),transparent_22%,transparent_64%,rgba(0,0,0,0.24))]" />
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-t from-black/55 via-black/12 to-transparent" />
+                  <div className="pointer-events-none absolute -left-6 bottom-8 z-20 h-24 w-12 rounded-full bg-white/8 blur-2xl" />
                   {user.avatar_url ? (
                     <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
                   ) : (
@@ -108,7 +108,7 @@ export default function DesktopSidebar() {
                     </div>
                   )}
                   {user.has_active_story && (
-                    <span className="absolute right-3 top-3 z-20 inline-flex items-center gap-1 rounded-sm border border-white/15 bg-black/40 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-white/90 backdrop-blur-sm">
+                    <span className="absolute right-3 top-3 z-20 inline-flex items-center gap-1 rounded-sm bg-black/38 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-white/90 backdrop-blur-sm">
                       Story
                     </span>
                   )}
