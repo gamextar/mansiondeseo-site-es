@@ -9,6 +9,8 @@
       "birthdate": "1998-06-14",
       "province": "Buenos Aires",
       "locality": "Palermo",
+      "marital_status": "Soltera",
+      "sexual_orientation": "Bisexual",
       "country": "AR",
       "bio": "Placeholder de ejemplo para importar desde assets locales.",
       "premium": true,
@@ -34,6 +36,8 @@
       "birthdate": "1995-09-22",
       "province": "CABA",
       "locality": "Recoleta",
+      "marital_status": "En pareja",
+      "sexual_orientation": "Bisexual",
       "country": "AR",
       "bio": "Ejemplo de pareja de mujeres para pruebas de importación.",
       "premium": true

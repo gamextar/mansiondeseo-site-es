@@ -42,7 +42,7 @@ Campos soportados por perfil:
   role                requerido: hombre | mujer | pareja | pareja_hombres | pareja_mujeres | trans
   seeking             requerido: array de roles (hombre | mujer | pareja)
   interests           opcional: array
-  age, birthdate, province, locality, country, bio
+  age, birthdate, province, locality, marital_status, sexual_orientation, country, bio
   premium             opcional boolean
   premiumUntil        opcional string YYYY-MM-DD HH:MM:SS
   avatarPath          opcional path local o URL
@@ -281,6 +281,30 @@ function ensureBirthdateColumn() {
   }
 }
 
+function ensureMaritalStatusColumn() {
+  if (dryRun) return
+  try {
+    executeSql('ALTER TABLE users ADD COLUMN marital_status TEXT')
+  } catch (error) {
+    const message = String(error?.message || error || '').toLowerCase()
+    if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+      throw error
+    }
+  }
+}
+
+function ensureSexualOrientationColumn() {
+  if (dryRun) return
+  try {
+    executeSql('ALTER TABLE users ADD COLUMN sexual_orientation TEXT')
+  } catch (error) {
+    const message = String(error?.message || error || '').toLowerCase()
+    if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+      throw error
+    }
+  }
+}
+
 function normalizeBirthdate(value) {
   const raw = String(value || '').trim()
   if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return ''
@@ -409,6 +433,8 @@ async function upsertProfile(profile, manifestDir) {
     birthdate: birthdate || null,
     city: profile.province || profile.city || '',
     locality: profile.locality || '',
+    marital_status: profile.marital_status || profile.maritalStatus || '',
+    sexual_orientation: profile.sexual_orientation || profile.sexualOrientation || '',
     country: profile.country || 'AR',
     bio: profile.bio || '',
     status: 'verified',
@@ -504,6 +530,8 @@ async function main() {
   ensureFakeColumn()
   ensureLocalityColumn()
   ensureBirthdateColumn()
+  ensureMaritalStatusColumn()
+  ensureSexualOrientationColumn()
 
   const results = []
   for (let index = 0; index < filtered.length; index += 1) {

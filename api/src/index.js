@@ -25,6 +25,8 @@ let _userBrowseIndexesReady = null;
 let _userFakeColumnReady = null;
 let _userLocalityColumnReady = null;
 let _userBirthdateColumnReady = null;
+let _userMaritalStatusColumnReady = null;
+let _userSexualOrientationColumnReady = null;
 
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
@@ -281,6 +283,50 @@ async function ensureUsersBirthdateColumn(env) {
   }
 
   return _userBirthdateColumnReady;
+}
+
+async function ensureUsersMaritalStatusColumn(env) {
+  if (!_userMaritalStatusColumnReady) {
+    _userMaritalStatusColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          'ALTER TABLE users ADD COLUMN marital_status TEXT'
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+    })().catch((err) => {
+      _userMaritalStatusColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userMaritalStatusColumnReady;
+}
+
+async function ensureUsersSexualOrientationColumn(env) {
+  if (!_userSexualOrientationColumnReady) {
+    _userSexualOrientationColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          'ALTER TABLE users ADD COLUMN sexual_orientation TEXT'
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+    })().catch((err) => {
+      _userSexualOrientationColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userSexualOrientationColumnReady;
 }
 
 async function setConversationState(env, userId, partnerId, { lastMessage, lastMessageAt, unreadCount }) {
@@ -840,7 +886,7 @@ function calculateAgeFromBirthdate(birthdate) {
 
 async function handleRegister(request, env) {
   const body = await request.json();
-  const { email, password, username, role, seeking, interests, age, birthdate, city, province, locality, bio, turnstileToken } = body;
+  const { email, password, username, role, seeking, interests, age, birthdate, city, province, locality, bio, marital_status, sexual_orientation, turnstileToken } = body;
 
   // Validate Cloudflare Turnstile token (if secret is configured)
   if (env.TURNSTILE_SECRET) {
@@ -859,6 +905,8 @@ async function handleRegister(request, env) {
   }
   const provinceValue = String(province ?? city ?? '').trim();
   const localityValue = String(locality || '').trim();
+  const maritalStatusValue = String(marital_status || '').trim();
+  const sexualOrientationValue = String(sexual_orientation || '').trim();
   const normalizedBirthdate = normalizeBirthdate(birthdate);
   const fallbackAge = age === '' || age == null ? NaN : Number(age);
   const computedAge = calculateAgeFromBirthdate(normalizedBirthdate);
@@ -935,8 +983,8 @@ async function handleRegister(request, env) {
   const country = body.country || detectedCountry;
 
   await env.DB.prepare(`
-    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, birthdate, city, locality, country, bio, status, coins)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0)
+    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, birthdate, city, locality, marital_status, sexual_orientation, country, bio, status, coins)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0)
   `).bind(
     userId,
     email.toLowerCase(),
@@ -949,6 +997,8 @@ async function handleRegister(request, env) {
     normalizedBirthdate || null,
     provinceValue,
     localityValue,
+    maritalStatusValue,
+    sexualOrientationValue,
     country,
     bio || ''
   ).run();
@@ -1466,6 +1516,8 @@ async function handleProfiles(request, env) {
       premium_until,
       ghost_mode,
       fake,
+      marital_status,
+      sexual_orientation,
       last_active
     FROM users
     WHERE status = 'verified'
@@ -1543,6 +1595,8 @@ async function handleProfiles(request, env) {
       premium_until: u.premium_until || null,
       ghost_mode: hasGhostMode,
       fake: !!u.fake,
+      marital_status: u.marital_status || '',
+      sexual_orientation: u.sexual_orientation || '',
       blurred,
       isFavorited: viewerFavorites.has(u.id),
       lastActive: u.last_active,
@@ -2343,7 +2397,7 @@ async function handleUpdateProfile(request, env) {
     normalizedBody.age = derivedAge;
   }
 
-  const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'birthdate', 'city', 'locality', 'bio', 'avatar_url', 'avatar_crop', 'premium'];
+  const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'birthdate', 'city', 'locality', 'marital_status', 'sexual_orientation', 'bio', 'avatar_url', 'avatar_crop', 'premium'];
   const currentUser = await env.DB.prepare('SELECT premium, premium_until, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
   if (!currentUser) return error('Usuario no encontrado', 404);
 
@@ -2483,6 +2537,8 @@ function sanitizeUser(user, env) {
     ...location,
     age,
     birthdate,
+    marital_status: String(safe.marital_status || '').trim(),
+    sexual_orientation: String(safe.sexual_orientation || '').trim(),
     seeking: seekingParsed,
     interests: safeParseJSON(safe.interests, []),
     photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
@@ -3062,7 +3118,7 @@ async function handleAdminGetUsers(request, env) {
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
-  let dataQuery = `SELECT id, email, username, role, seeking, age, birthdate, city, locality, country, avatar_url, status,
+  let dataQuery = `SELECT id, email, username, role, seeking, age, birthdate, city, locality, marital_status, sexual_orientation, country, avatar_url, status,
     premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, account_status, last_active, last_ip, created_at,
     (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id
     FROM users`;
@@ -3093,6 +3149,8 @@ async function handleAdminGetUsers(request, env) {
       birthdate: normalizeBirthdate(u.birthdate) || '',
       province: u.city || '',
       locality: u.locality || '',
+      marital_status: u.marital_status || '',
+      sexual_orientation: u.sexual_orientation || '',
       premium: isPremiumActive(u),
       online: isOnline(u.last_active),
       is_admin: !!u.is_admin,
@@ -3125,6 +3183,8 @@ async function handleAdminGetUser(request, env, userId) {
       birthdate: normalizeBirthdate(safe.birthdate) || '',
       province: safe.city || '',
       locality: safe.locality || '',
+      marital_status: safe.marital_status || '',
+      sexual_orientation: safe.sexual_orientation || '',
       interests: safeParseJSON(safe.interests, []),
       photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
       avatar_crop: safeParseJSON(safe.avatar_crop, null),
@@ -3160,6 +3220,8 @@ async function handleAdminUpdateUser(request, env, userId) {
   if (body.verified !== undefined) { updates.push('verified = ?'); vals.push(body.verified ? 1 : 0); }
   if (body.ghost_mode !== undefined) { updates.push('ghost_mode = ?'); vals.push(body.ghost_mode ? 1 : 0); }
   if (body.fake !== undefined) { updates.push('fake = ?'); vals.push(body.fake ? 1 : 0); }
+  if (body.marital_status !== undefined) { updates.push('marital_status = ?'); vals.push(body.marital_status || ''); }
+  if (body.sexual_orientation !== undefined) { updates.push('sexual_orientation = ?'); vals.push(body.sexual_orientation || ''); }
   if (body.status !== undefined && ['pending', 'verified'].includes(body.status)) { updates.push('status = ?'); vals.push(body.status); }
   if (body.account_status !== undefined && ['active', 'under_review', 'suspended'].includes(body.account_status)) {
     updates.push('account_status = ?'); vals.push(body.account_status);
@@ -3179,6 +3241,8 @@ async function handleAdminUpdateUser(request, env, userId) {
       birthdate: normalizeBirthdate(safe.birthdate) || '',
       province: safe.city || '',
       locality: safe.locality || '',
+      marital_status: safe.marital_status || '',
+      sexual_orientation: safe.sexual_orientation || '',
       interests: safeParseJSON(safe.interests, []),
       photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
       avatar_crop: safeParseJSON(safe.avatar_crop, null),
@@ -4029,6 +4093,8 @@ async function handleRequest(request, env) {
   await ensureUsersFakeColumn(env);
   await ensureUsersLocalityColumn(env);
   await ensureUsersBirthdateColumn(env);
+  await ensureUsersMaritalStatusColumn(env);
+  await ensureUsersSexualOrientationColumn(env);
 
   // CORS preflight
   if (method === 'OPTIONS') return handleOptions(env, request);
