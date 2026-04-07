@@ -86,6 +86,7 @@ const OTHER_ROLES = [
 ];
 
 const ALL_ROLE_OPTIONS = [...ROLES, ...OTHER_ROLES];
+const ALL_SEEKING_OPTIONS = [...ROLES, ...OTHER_ROLES];
 
 const INTERESTS = [
   { id: 'swinger', label: 'Swinger', emoji: '🔄' },
@@ -117,12 +118,14 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
   const roleData = ALL_ROLE_OPTIONS.find((r) => r.id === type) || ROLES[0];
   const color = isActive ? roleData.color : dimColor;
   const colorDark = isActive ? roleData.colorDark : dimColorDark;
+  const soloSizeClass = size === 'lg' ? 'w-[68px] h-[96px]' : 'w-8 h-11';
+  const pairSizeClass = size === 'lg' ? 'w-[78px] h-[96px]' : 'w-12 h-11';
 
   if (type === 'hombre') {
     return (
       <svg
         viewBox="0 0 80 120"
-        className={`${size === 'lg' ? 'w-20 h-28' : 'w-8 h-11'} transition-transform duration-300 ${
+        className={`${soloSizeClass} transition-transform duration-300 ${
           isActive ? 'scale-110' : 'scale-100'
         }`}
       >
@@ -166,7 +169,7 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
     return (
       <svg
         viewBox="0 0 80 120"
-        className={`${size === 'lg' ? 'w-20 h-28' : 'w-8 h-11'} transition-transform duration-300 ${
+        className={`${soloSizeClass} transition-transform duration-300 ${
           isActive ? 'scale-110' : 'scale-100'
         }`}
       >
@@ -212,7 +215,7 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
     return (
       <svg
         viewBox="0 0 80 120"
-        className={`${size === 'lg' ? 'w-20 h-28' : 'w-8 h-11'} transition-transform duration-300 ${
+        className={`${soloSizeClass} transition-transform duration-300 ${
           isActive ? 'scale-110' : 'scale-100'
         }`}
       >
@@ -258,7 +261,7 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
     return (
       <svg
         viewBox="0 0 120 120"
-        className={`${size === 'lg' ? 'w-28 h-28' : 'w-12 h-11'} transition-transform duration-300 ${
+        className={`${pairSizeClass} transition-transform duration-300 ${
           isActive ? 'scale-105' : 'scale-100'
         }`}
       >
@@ -291,7 +294,7 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
     return (
       <svg
         viewBox="0 0 120 120"
-        className={`${size === 'lg' ? 'w-28 h-28' : 'w-12 h-11'} transition-transform duration-300 ${
+        className={`${pairSizeClass} transition-transform duration-300 ${
           isActive ? 'scale-105' : 'scale-100'
         }`}
       >
@@ -326,7 +329,7 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
   return (
     <svg
       viewBox="0 0 120 120"
-      className={`${size === 'lg' ? 'w-28 h-28' : 'w-12 h-11'} transition-transform duration-300 ${
+      className={`${pairSizeClass} transition-transform duration-300 ${
         isActive ? 'scale-105' : 'scale-100'
       }`}
     >
@@ -645,7 +648,7 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
       <h2 className="font-display text-2xl font-bold text-text-primary mb-2">{title}</h2>
       <p className="text-text-muted text-sm mb-8">{subtitle}</p>
 
-      <div className="flex items-end justify-center gap-3 flex-wrap">
+      <div className="grid grid-cols-3 gap-3 justify-center max-w-[420px] mx-auto">
         {ROLES.map((role) => {
           const isActive = selected === role.id;
           const customImg = roleImages[role.id];
@@ -655,7 +658,7 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
               whileTap={{ scale: 0.93 }}
               whileHover={{ scale: 1.03 }}
               onClick={() => onSelect(role.id)}
-              className="flex w-[132px] flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+              className="flex min-h-[172px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
               style={{
                 backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
                 borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
@@ -714,7 +717,7 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
             exit={{ opacity: 0, height: 0, y: -8 }}
             className="overflow-hidden"
           >
-            <div className="mt-4 flex items-end justify-center gap-3 flex-wrap">
+            <div className="mt-4 grid grid-cols-3 gap-3 justify-center max-w-[420px] mx-auto">
               {OTHER_ROLES.map((role) => {
                 const isActive = selected === role.id;
                 return (
@@ -723,7 +726,7 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
                     whileTap={{ scale: 0.93 }}
                     whileHover={{ scale: 1.03 }}
                     onClick={() => onSelect(role.id)}
-                    className="flex w-[132px] flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+                    className="flex min-h-[172px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
                     style={{
                       backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
                       borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
@@ -785,7 +788,7 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
       <p className="text-text-dim text-xs mb-8">Podés elegir más de uno</p>
 
       <LayoutGroup>
-        <div className="flex items-end justify-center gap-3 flex-wrap">
+        <div className="grid grid-cols-3 gap-3 justify-center max-w-[420px] mx-auto">
           {sorted.map((role) => {
             const isActive = selected.includes(role.id);
             const customImg = roleImages[role.id];
@@ -797,7 +800,7 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
                 whileTap={{ scale: 0.93 }}
                 whileHover={{ scale: 1.03 }}
                 onClick={() => onToggle(role.id)}
-                className="flex w-[132px] flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+                className="flex min-h-[172px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
                 style={{
                   backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
                   borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
@@ -857,7 +860,7 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
             exit={{ opacity: 0, height: 0, y: -8 }}
             className="overflow-hidden"
           >
-            <div className="mt-4 flex items-end justify-center gap-3 flex-wrap">
+            <div className="mt-4 grid grid-cols-3 gap-3 justify-center max-w-[420px] mx-auto">
               {OTHER_ROLES.map((role) => {
                 const isActive = selected.includes(role.id);
                 return (
@@ -866,7 +869,7 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
                     whileTap={{ scale: 0.93 }}
                     whileHover={{ scale: 1.03 }}
                     onClick={() => onToggle(role.id)}
-                    className="flex w-[132px] flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+                    className="flex min-h-[172px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
                     style={{
                       backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
                       borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
@@ -1662,7 +1665,7 @@ export default function RegisterPage() {
 
     // Save seeking as feed filter preference
     if (seeking.length > 0) {
-      const filterVal = seeking.length === 3 ? 'all' : seeking.join(',');
+      const filterVal = seeking.length === ALL_SEEKING_OPTIONS.length ? 'all' : seeking.join(',');
       localStorage.setItem('mansion_feed_filter', filterVal);
     }
 
@@ -1796,8 +1799,20 @@ export default function RegisterPage() {
         <div className="absolute bottom-1/3 left-0 w-64 h-64 bg-mansion-gold/5 rounded-full blur-3xl" />
       </div>
 
+      {/* Progress bar */}
+      <div className="relative z-10 px-6 pt-[calc(env(safe-area-inset-top)+12px)] mb-3">
+        <div className="h-1 bg-mansion-elevated rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light rounded-full"
+            initial={false}
+            animate={{ width: `${((step + 1) / TOTAL_STEPS) * 100}%` }}
+            transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+          />
+        </div>
+      </div>
+
       {/* Top bar */}
-      <div className="relative z-10 flex items-center justify-between p-4 pt-6">
+      <div className="relative z-10 flex items-center justify-between px-4 mb-4">
         <button
           onClick={prev}
           className="text-text-muted hover:text-text-primary transition-colors p-2"
@@ -1808,18 +1823,6 @@ export default function RegisterPage() {
           {step + 1} / {TOTAL_STEPS}
         </span>
         <div className="w-9" />
-      </div>
-
-      {/* Progress bar */}
-      <div className="relative z-10 px-6 mb-4">
-        <div className="h-1 bg-mansion-elevated rounded-full overflow-hidden">
-          <motion.div
-            className="h-full bg-gradient-to-r from-mansion-gold to-mansion-gold-light rounded-full"
-            initial={false}
-            animate={{ width: `${((step + 1) / TOTAL_STEPS) * 100}%` }}
-            transition={{ type: 'spring', stiffness: 200, damping: 25 }}
-          />
-        </div>
       </div>
 
       {/* Profile Card Preview */}
