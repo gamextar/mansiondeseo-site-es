@@ -58,7 +58,7 @@ export default function DesktopSidebar() {
         <Link to="/perfil" className="flex flex-col items-center py-6 border-b border-mansion-border/20 hover:opacity-90 transition-opacity">
           <div className="relative shrink-0 pl-3 pt-2">
             <div
-              className="pointer-events-none absolute left-0 top-6 z-0 bg-[linear-gradient(155deg,rgba(255,234,188,0.18),rgba(163,24,62,0.2))] shadow-[0_20px_38px_rgba(6,6,12,0.12)]"
+              className="pointer-events-none absolute left-0 top-6 z-0 border border-mansion-gold/24 bg-[linear-gradient(155deg,rgba(255,234,188,0.18),rgba(163,24,62,0.2))] shadow-[0_20px_38px_rgba(6,6,12,0.12)]"
               style={{
                 width: Math.round(sidebarProfileWidth * 0.82),
                 height: Math.round(sidebarProfileHeight * 0.88),
@@ -67,7 +67,7 @@ export default function DesktopSidebar() {
               }}
             />
             <div
-              className="pointer-events-none absolute -right-2 bottom-2 z-0 bg-[linear-gradient(165deg,rgba(255,255,255,0.05),rgba(30,24,36,0.22))] shadow-[0_16px_30px_rgba(6,6,12,0.12)]"
+              className="pointer-events-none absolute -right-2 bottom-2 z-0 border border-white/8 bg-[linear-gradient(165deg,rgba(255,255,255,0.05),rgba(30,24,36,0.22))] shadow-[0_16px_30px_rgba(6,6,12,0.12)]"
               style={{
                 width: Math.round(sidebarProfileWidth * 0.72),
                 height: Math.round(sidebarProfileHeight * 0.78),
@@ -86,6 +86,8 @@ export default function DesktopSidebar() {
               }}
             >
               <div className="pointer-events-none absolute inset-x-8 top-0.5 z-20 h-px bg-white/38" />
+              <div className="pointer-events-none absolute left-4 top-4 z-20 h-10 w-10 rounded-tl-[18px] border-l border-t border-[#f3ddaa]/45" />
+              <div className="pointer-events-none absolute bottom-4 right-4 z-20 h-12 w-12 rounded-br-[18px] border-b border-r border-white/22" />
               <div className="pointer-events-none absolute inset-0 z-20 bg-[linear-gradient(180deg,rgba(255,255,255,0.2),transparent_20%,transparent_64%,rgba(0,0,0,0.3))]" />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-28 bg-gradient-to-t from-black/65 via-black/12 to-transparent" />
               <div className="pointer-events-none absolute -right-10 top-8 z-20 h-20 w-24 rotate-12 bg-white/12 blur-2xl" />
