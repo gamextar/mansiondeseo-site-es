@@ -1402,7 +1402,6 @@ export default function RegisterPage() {
       turnstileWidgetRef.current = window.turnstile.render(turnstileContainerRef.current, {
         sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA',
         theme: 'dark',
-        size: 'compact',
         callback: (token) => setTurnstileTokenBoth(token),
         'expired-callback': () => setTurnstileTokenBoth(''),
         'error-callback': () => setTurnstileTokenBoth(''),
@@ -1493,10 +1492,22 @@ export default function RegisterPage() {
     }
   }, [email]);
 
-  // Reset email status when email changes
+  // Reset email status when email changes + debounce-check after user stops typing
+  // (debounce covers cases where onBlur fires early, e.g. Turnstile widget stealing focus)
   useEffect(() => {
     setEmailStatus('idle');
     setApiError('');
+    if (!EMAIL_REGEX.test(email)) return;
+    const timer = setTimeout(async () => {
+      setEmailStatus('checking');
+      try {
+        const { exists } = await apiCheckEmail(email);
+        setEmailStatus(exists ? 'exists' : 'valid');
+      } catch {
+        setEmailStatus('idle');
+      }
+    }, 800);
+    return () => clearTimeout(timer);
   }, [email]);
 
   // Reset username status when name changes
@@ -1686,7 +1697,7 @@ export default function RegisterPage() {
               onNavigateRecover={() => navigate(`/recuperar-contrasena?email=${encodeURIComponent(email)}`)}
             />
             {/* Turnstile widget renders here on mount — invisible challenge */}
-            <div ref={turnstileContainerRef} className="flex justify-center mt-8" />
+            <div ref={turnstileContainerRef} className="flex justify-center mt-10" />
           </>
         );
       case 1:
