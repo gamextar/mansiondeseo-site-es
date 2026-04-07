@@ -4,6 +4,7 @@ import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import {
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Camera,
   Mail,
   Lock,
@@ -57,6 +58,35 @@ const ROLES = [
   },
 ];
 
+const OTHER_ROLES = [
+  {
+    id: 'pareja_hombres',
+    label: 'Pareja de Hombres',
+    color: '#60A5FA',
+    colorDark: '#2563EB',
+    bg: 'rgba(96,165,250,0.12)',
+    border: 'rgba(96,165,250,0.4)',
+  },
+  {
+    id: 'pareja_mujeres',
+    label: 'Pareja de Mujeres',
+    color: '#F472B6',
+    colorDark: '#DB2777',
+    bg: 'rgba(244,114,182,0.12)',
+    border: 'rgba(244,114,182,0.4)',
+  },
+  {
+    id: 'trans',
+    label: 'Trans',
+    color: '#2DD4BF',
+    colorDark: '#0F766E',
+    bg: 'rgba(45,212,191,0.12)',
+    border: 'rgba(45,212,191,0.4)',
+  },
+];
+
+const ALL_ROLE_OPTIONS = [...ROLES, ...OTHER_ROLES];
+
 const INTERESTS = [
   { id: 'swinger', label: 'Swinger', emoji: '🔄' },
   { id: 'trios', label: 'Tríos', emoji: '🔥' },
@@ -84,7 +114,7 @@ const COUNTRY_NAMES = {
 function PersonFigure({ type, isActive, size = 'lg' }) {
   const dimColor = '#3A3A4A';
   const dimColorDark = '#2A2A38';
-  const roleData = ROLES.find((r) => r.id === type);
+  const roleData = ALL_ROLE_OPTIONS.find((r) => r.id === type) || ROLES[0];
   const color = isActive ? roleData.color : dimColor;
   const colorDark = isActive ? roleData.colorDark : dimColorDark;
 
@@ -171,6 +201,120 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
             strokeWidth="1"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: [1, 1.4], opacity: [0.4, 0] }}
+            transition={{ duration: 1.8, repeat: Infinity }}
+          />
+        )}
+      </svg>
+    );
+  }
+
+  if (type === 'trans') {
+    return (
+      <svg
+        viewBox="0 0 80 120"
+        className={`${size === 'lg' ? 'w-20 h-28' : 'w-8 h-11'} transition-transform duration-300 ${
+          isActive ? 'scale-110' : 'scale-100'
+        }`}
+      >
+        <motion.circle
+          cx="40"
+          cy="22"
+          r="13"
+          fill={color}
+          animate={{ r: isActive ? 15 : 13 }}
+          transition={{ type: 'spring', stiffness: 300 }}
+        />
+        <motion.path
+          d="M27 20 Q32 8 40 8 Q48 8 53 20"
+          fill="none"
+          stroke={color}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+        <motion.path
+          d="M28 40 Q30 34 40 34 Q50 34 52 40 L48 82 Q47 88 40 88 Q33 88 32 82 Z"
+          fill={color}
+        />
+        <rect x="30" y="88" width="10" height="22" rx="5" fill={colorDark} />
+        <rect x="40" y="88" width="10" height="22" rx="5" fill={colorDark} />
+        {isActive && (
+          <motion.circle
+            cx="40"
+            cy="60"
+            r="45"
+            fill="none"
+            stroke={color}
+            strokeWidth="1"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: [1, 1.4], opacity: [0.4, 0] }}
+            transition={{ duration: 1.8, repeat: Infinity }}
+          />
+        )}
+      </svg>
+    );
+  }
+
+  if (type === 'pareja_hombres') {
+    return (
+      <svg
+        viewBox="0 0 120 120"
+        className={`${size === 'lg' ? 'w-28 h-28' : 'w-12 h-11'} transition-transform duration-300 ${
+          isActive ? 'scale-105' : 'scale-100'
+        }`}
+      >
+        <motion.circle cx="38" cy="22" r="11" fill={color} animate={{ r: isActive ? 12 : 11 }} />
+        <motion.rect x="27" y="38" width="22" height="30" rx="5" fill={color} />
+        <rect x="28" y="70" width="9" height="22" rx="4" fill={colorDark} />
+        <rect x="41" y="70" width="9" height="22" rx="4" fill={colorDark} />
+        <motion.circle cx="82" cy="22" r="11" fill={color} animate={{ r: isActive ? 12 : 11 }} />
+        <motion.rect x="71" y="38" width="22" height="30" rx="5" fill={color} />
+        <rect x="72" y="70" width="9" height="22" rx="4" fill={colorDark} />
+        <rect x="85" y="70" width="9" height="22" rx="4" fill={colorDark} />
+        {isActive && (
+          <motion.circle
+            cx="60"
+            cy="58"
+            r="44"
+            fill="none"
+            stroke={color}
+            strokeWidth="1"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: [1, 1.35], opacity: [0.4, 0] }}
+            transition={{ duration: 1.8, repeat: Infinity }}
+          />
+        )}
+      </svg>
+    );
+  }
+
+  if (type === 'pareja_mujeres') {
+    return (
+      <svg
+        viewBox="0 0 120 120"
+        className={`${size === 'lg' ? 'w-28 h-28' : 'w-12 h-11'} transition-transform duration-300 ${
+          isActive ? 'scale-105' : 'scale-100'
+        }`}
+      >
+        <motion.circle cx="38" cy="22" r="11" fill={color} animate={{ r: isActive ? 12 : 11 }} />
+        <motion.path d="M28 18 Q32 8 38 8 Q44 8 48 18" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
+        <motion.path d="M28 38 L26 70 Q26 74 32 74 L44 74 Q50 74 50 70 L48 38 Q46 34 38 34 Q30 34 28 38 Z" fill={color} />
+        <rect x="29" y="74" width="8" height="18" rx="4" fill={colorDark} />
+        <rect x="39" y="74" width="8" height="18" rx="4" fill={colorDark} />
+        <motion.circle cx="82" cy="22" r="11" fill={color} animate={{ r: isActive ? 12 : 11 }} />
+        <motion.path d="M72 18 Q76 8 82 8 Q88 8 92 18" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
+        <motion.path d="M72 38 L70 70 Q70 74 76 74 L88 74 Q94 74 94 70 L92 38 Q90 34 82 34 Q74 34 72 38 Z" fill={color} />
+        <rect x="73" y="74" width="8" height="18" rx="4" fill={colorDark} />
+        <rect x="83" y="74" width="8" height="18" rx="4" fill={colorDark} />
+        {isActive && (
+          <motion.circle
+            cx="60"
+            cy="58"
+            r="44"
+            fill="none"
+            stroke={color}
+            strokeWidth="1"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: [1, 1.35], opacity: [0.4, 0] }}
             transition={{ duration: 1.8, repeat: Infinity }}
           />
         )}
@@ -488,12 +632,20 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
 }
 
 function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
+  const [showOtherRoles, setShowOtherRoles] = useState(() => OTHER_ROLES.some((role) => role.id === selected));
+
+  useEffect(() => {
+    if (OTHER_ROLES.some((role) => role.id === selected)) {
+      setShowOtherRoles(true);
+    }
+  }, [selected]);
+
   return (
     <div className="text-center">
       <h2 className="font-display text-2xl font-bold text-text-primary mb-2">{title}</h2>
       <p className="text-text-muted text-sm mb-8">{subtitle}</p>
 
-      <div className="flex items-end justify-center gap-3">
+      <div className="flex items-end justify-center gap-3 flex-wrap">
         {ROLES.map((role) => {
           const isActive = selected === role.id;
           const customImg = roleImages[role.id];
@@ -540,6 +692,65 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
           );
         })}
       </div>
+
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={() => setShowOtherRoles((prev) => !prev)}
+          className="mx-auto inline-flex items-center gap-2 rounded-full border border-mansion-border/60 bg-mansion-card/70 px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:text-text-primary"
+        >
+          Otros
+          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showOtherRoles ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      <AnimatePresence initial={false}>
+        {showOtherRoles && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, y: -8 }}
+            animate={{ opacity: 1, height: 'auto', y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -8 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-4 flex items-end justify-center gap-3 flex-wrap">
+              {OTHER_ROLES.map((role) => {
+                const isActive = selected === role.id;
+                return (
+                  <motion.button
+                    key={role.id}
+                    whileTap={{ scale: 0.93 }}
+                    whileHover={{ scale: 1.03 }}
+                    onClick={() => onSelect(role.id)}
+                    className="flex w-[132px] flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+                    style={{
+                      backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
+                      borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
+                    }}
+                  >
+                    <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                    <span className={`mt-2 font-medium text-sm leading-tight ${isActive ? 'text-text-primary' : 'text-text-muted'}`}>
+                      {role.label}
+                    </span>
+                    <AnimatePresence>
+                      {isActive && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          exit={{ scale: 0 }}
+                          className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center shadow-lg"
+                          style={{ backgroundColor: role.color }}
+                        >
+                          <Check className="w-3.5 h-3.5 text-white" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

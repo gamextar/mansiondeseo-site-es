@@ -26,6 +26,10 @@ let _userFakeColumnReady = null;
 let _userLocalityColumnReady = null;
 let _userBirthdateColumnReady = null;
 
+const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
+const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja'];
+const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
+
 // ── Helpers ─────────────────────────────────────────────
 
 function generateId() {
@@ -866,6 +870,10 @@ async function handleRegister(request, env) {
     return error('Campos requeridos: email, password, username, role, seeking');
   }
 
+  if (!REGISTER_ROLE_IDS.includes(role)) {
+    return error('Role inválido');
+  }
+
   if (!normalizedBirthdate && !Number.isFinite(fallbackAge)) {
     return error('Fecha de nacimiento requerida');
   }
@@ -880,8 +888,7 @@ async function handleRegister(request, env) {
 
   // Validate seeking: must be array of valid roles
   const seekingArr = Array.isArray(seeking) ? seeking : [seeking];
-  const validSeeking = ['hombre', 'mujer', 'pareja'];
-  if (!seekingArr.length || seekingArr.some(s => !validSeeking.includes(s))) {
+  if (!seekingArr.length || seekingArr.some(s => !SEEKING_ROLE_IDS.includes(s))) {
     return error('Seeking debe contener valores válidos: hombre, mujer, pareja');
   }
 
@@ -1467,7 +1474,7 @@ async function handleProfiles(request, env) {
   if (country) { query += ` AND country = ?`; params.push(country); }
 
   // Role filter: use server-side seeking, fall back to frontend filter param
-  const roleFilters = ['hombre', 'mujer', 'pareja'];
+  const roleFilters = SEEKING_ROLE_IDS;
   let filterParts;
   if (viewerSeeking.length > 0 && viewerSeeking.length < 3) {
     filterParts = viewerSeeking.filter(f => roleFilters.includes(f));
@@ -1475,9 +1482,11 @@ async function handleProfiles(request, env) {
     filterParts = filter.split(',').map(f => f.trim()).filter(f => roleFilters.includes(f));
   }
   if (filterParts.length === 1) {
-    query += ` AND role = '${filterParts[0]}'`;
+    const roleValues = filterParts[0] === 'pareja' ? PAIR_ROLE_IDS : [filterParts[0]];
+    query += ` AND role IN (${roleValues.map(f => `'${f}'`).join(',')})`;
   } else if (filterParts.length > 1) {
-    query += ` AND role IN (${filterParts.map(f => `'${f}'`).join(',')})`;
+    const roleValues = [...new Set(filterParts.flatMap((f) => (f === 'pareja' ? PAIR_ROLE_IDS : [f])))];
+    query += ` AND role IN (${roleValues.map(f => `'${f}'`).join(',')})`;
   }
   if (search) {
     query += ` AND (username LIKE ? OR city LIKE ? OR locality LIKE ? OR bio LIKE ?)`;
@@ -2362,11 +2371,14 @@ async function handleUpdateProfile(request, env) {
       if (field === 'seeking') {
         // Validate and store seeking as JSON array
         const seekVal = Array.isArray(normalizedBody[field]) ? normalizedBody[field] : [normalizedBody[field]];
-        const validS = ['hombre', 'mujer', 'pareja'];
-        const filtered = seekVal.filter(s => validS.includes(s));
+        const filtered = seekVal.filter(s => SEEKING_ROLE_IDS.includes(s));
         if (filtered.length === 0) continue;
         updates.push(`${field} = ?`);
         values.push(JSON.stringify(filtered));
+      } else if (field === 'role') {
+        if (!REGISTER_ROLE_IDS.includes(normalizedBody[field])) continue;
+        updates.push(`${field} = ?`);
+        values.push(normalizedBody[field]);
       } else if (field === 'interests' || field === 'photos' || field === 'avatar_crop') {
         updates.push(`${field} = ?`);
         if (field === 'photos') {
@@ -2487,7 +2499,14 @@ function sanitizeUser(user, env) {
 }
 
 function mapRoleToDisplay(role) {
-  const map = { hombre: 'Hombre Solo', mujer: 'Mujer Sola', pareja: 'Pareja' };
+  const map = {
+    hombre: 'Hombre Solo',
+    mujer: 'Mujer Sola',
+    pareja: 'Pareja',
+    pareja_hombres: 'Pareja de Hombres',
+    pareja_mujeres: 'Pareja de Mujeres',
+    trans: 'Trans',
+  };
   return map[role] || role;
 }
 

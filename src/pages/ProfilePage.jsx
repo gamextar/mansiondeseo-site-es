@@ -13,8 +13,20 @@ import { resolveMediaUrl } from '../lib/media';
 
 const ROLE_COLOR = {
   Pareja: 'bg-purple-500/15 text-purple-300 border-purple-500/25',
+  'Pareja de Hombres': 'bg-sky-500/15 text-sky-300 border-sky-500/25',
+  'Pareja de Mujeres': 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/25',
+  Trans: 'bg-teal-500/15 text-teal-300 border-teal-500/25',
   'Hombre Solo': 'bg-blue-500/15 text-blue-300 border-blue-500/25',
   'Mujer Sola': 'bg-pink-500/15 text-pink-300 border-pink-500/25',
+};
+
+const ROLE_LABELS = {
+  hombre: 'Hombre Solo',
+  mujer: 'Mujer Sola',
+  pareja: 'Pareja',
+  pareja_hombres: 'Pareja de Hombres',
+  pareja_mujeres: 'Pareja de Mujeres',
+  trans: 'Trans',
 };
 
 const stagger = { animate: { transition: { staggerChildren: 0.06 } } };
@@ -344,7 +356,7 @@ export default function ProfilePage() {
   // Use real user data or fallback
   const displayName = user?.username || 'Tu Perfil';
   const displayLocation = formatLocation(user);
-  const displayRole = user?.role || '';
+  const displayRole = ROLE_LABELS[user?.role] || user?.role || '';
   const avatarUrl = user?.avatar_url || '';
   const photos = getGalleryPhotos(user);
   const displayPhotos = getDisplayPhotos(user);
@@ -355,7 +367,7 @@ export default function ProfilePage() {
     city: user.city,
     province: user.province,
     locality: user.locality,
-    role: user.role,
+    role: displayRole,
     photos,
     avatar_url: user.avatar_url || '',
     avatar_crop: user.avatar_crop || null,

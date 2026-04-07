@@ -17,7 +17,14 @@ function timeAgo(dateStr) {
 }
 
 function roleBadge(role) {
-  const map = { hombre: '♂', mujer: '♀', pareja: '♂♀' };
+  const map = {
+    hombre: '♂',
+    mujer: '♀',
+    pareja: '♂♀',
+    pareja_hombres: '♂♂',
+    pareja_mujeres: '♀♀',
+    trans: '⚧',
+  };
   return map[role] || role;
 }
 

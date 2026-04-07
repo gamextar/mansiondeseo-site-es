@@ -19,12 +19,18 @@ const MaskIcon = ({ className = 'w-6 h-6', customSvg = '' }) => {
 
 const ROLE_COLORS = {
   Pareja: 'from-purple-500/80 to-purple-700/80',
+  'Pareja de Hombres': 'from-sky-500/80 to-blue-700/80',
+  'Pareja de Mujeres': 'from-fuchsia-500/80 to-pink-700/80',
+  Trans: 'from-teal-500/80 to-cyan-700/80',
   'Hombre Solo': 'from-blue-500/80 to-blue-700/80',
   'Mujer Sola': 'from-pink-500/80 to-pink-700/80',
 };
 
 const ROLE_BG = {
   Pareja: 'bg-purple-500/20 text-purple-300',
+  'Pareja de Hombres': 'bg-sky-500/20 text-sky-300',
+  'Pareja de Mujeres': 'bg-fuchsia-500/20 text-fuchsia-300',
+  Trans: 'bg-teal-500/20 text-teal-300',
   'Hombre Solo': 'bg-blue-500/20 text-blue-300',
   'Mujer Sola': 'bg-pink-500/20 text-pink-300',
 };
@@ -33,6 +39,8 @@ const ROLE_IMG_KEYS = {
   'Hombre Solo': 'galleryHombreImg',
   'Mujer Sola': 'galleryMujerImg',
   'Pareja': 'galleryParejaImg',
+  'Pareja de Hombres': 'galleryParejaImg',
+  'Pareja de Mujeres': 'galleryParejaImg',
 };
 
 const RoleFallbackIcon = ({ role }) => {
@@ -44,6 +52,11 @@ const RoleFallbackIcon = ({ role }) => {
   if (role === 'Mujer Sola') return (
     <span className="flex items-center justify-center w-7 h-7 rounded-full bg-pink-500/80 text-white shrink-0">
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4Z"/></svg>
+    </span>
+  );
+  if (role === 'Trans') return (
+    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-teal-500/80 text-white shrink-0">
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm-4 12c0-1.8 1.8-3 4-3s4 1.2 4 3v1H8v-1Zm4 3a3 3 0 0 0-3 3h6a3 3 0 0 0-3-3Z"/></svg>
     </span>
   );
   return (
