@@ -399,7 +399,7 @@ function FichaPreview({ data, currentStep }) {
       initial={{ opacity: 0, y: -20, scaleY: 0.8 }}
       animate={{ opacity: 1, y: 0, scaleY: 1 }}
       transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-      className="mx-auto w-full max-w-[300px] mb-4"
+      className="mx-auto w-full max-w-[360px] sm:max-w-[420px] mb-4"
     >
       <motion.div
         layout
@@ -415,7 +415,7 @@ function FichaPreview({ data, currentStep }) {
               layout
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center justify-center gap-3"
+              className="flex items-center justify-center gap-2 sm:gap-3"
             >
               {role && (
                 <motion.div
@@ -446,7 +446,7 @@ function FichaPreview({ data, currentStep }) {
                   transition={{ type: 'spring', stiffness: 300 }}
                   className="flex flex-col items-center"
                 >
-                  <div className="flex items-end gap-0.5">
+                  <div className="flex max-w-[210px] flex-wrap items-end justify-center gap-0.5">
                     {seekingArr.map((s, i) => (
                       <motion.div
                         key={s}
@@ -517,13 +517,6 @@ function FichaPreview({ data, currentStep }) {
           )}
         </AnimatePresence>
 
-        {/* Member tag */}
-        <div className="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-mansion-border/20">
-          <Sparkles className="w-2.5 h-2.5 text-mansion-gold" />
-          <span className="text-[9px] text-text-dim font-medium tracking-wider uppercase">
-            Mansión Deseo
-          </span>
-        </div>
       </motion.div>
     </motion.div>
   );
@@ -658,18 +651,18 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
               whileTap={{ scale: 0.93 }}
               whileHover={{ scale: 1.03 }}
               onClick={() => onSelect(role.id)}
-              className="flex min-h-[172px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+              className="flex min-h-[167px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
               style={{
                 backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
                 borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
               }}
             >
               {customImg ? (
-                <div className={`w-20 h-28 rounded-xl overflow-hidden transition-transform duration-300 ${isActive ? 'scale-110' : 'scale-100'}`}>
+                <div className={`w-20 h-[107px] rounded-xl overflow-hidden transition-transform duration-300 ${isActive ? 'scale-110' : 'scale-100'}`}>
                   <img src={customImg} alt={role.label} className="w-full h-full object-cover" />
                 </div>
               ) : (
-                <div className="w-20 h-28 flex items-center justify-center">
+                <div className="w-20 h-[107px] flex items-center justify-center">
                   <PersonFigure type={role.id} isActive={isActive} size="lg" />
                 </div>
               )}
@@ -726,13 +719,13 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
                     whileTap={{ scale: 0.93 }}
                     whileHover={{ scale: 1.03 }}
                     onClick={() => onSelect(role.id)}
-                    className="flex min-h-[172px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+                    className="flex min-h-[167px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
                     style={{
                       backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
                       borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
                     }}
                   >
-                    <div className="w-20 h-28 flex items-center justify-center">
+                    <div className="w-20 h-[107px] flex items-center justify-center">
                       <PersonFigure type={role.id} isActive={isActive} size="lg" />
                     </div>
                     <span className={`mt-2 font-medium text-sm leading-tight ${isActive ? 'text-text-primary' : 'text-text-muted'}`}>
@@ -800,18 +793,18 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
                 whileTap={{ scale: 0.93 }}
                 whileHover={{ scale: 1.03 }}
                 onClick={() => onToggle(role.id)}
-                className="flex min-h-[172px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+                className="flex min-h-[167px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
                 style={{
                   backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
                   borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
                 }}
               >
                 {customImg ? (
-                  <div className={`w-20 h-28 rounded-xl overflow-hidden transition-transform duration-300 ${isActive ? 'scale-110' : 'scale-100'}`}>
+                  <div className={`w-20 h-[107px] rounded-xl overflow-hidden transition-transform duration-300 ${isActive ? 'scale-110' : 'scale-100'}`}>
                     <img src={customImg} alt={role.label} className="w-full h-full object-cover" />
                   </div>
                 ) : (
-                  <div className="w-20 h-28 flex items-center justify-center">
+                  <div className="w-20 h-[107px] flex items-center justify-center">
                     <PersonFigure type={role.id} isActive={isActive} size="lg" />
                   </div>
                 )}
@@ -869,13 +862,13 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
                     whileTap={{ scale: 0.93 }}
                     whileHover={{ scale: 1.03 }}
                     onClick={() => onToggle(role.id)}
-                    className="flex min-h-[172px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+                    className="flex min-h-[167px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
                     style={{
                       backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
                       borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
                     }}
                   >
-                    <div className="w-20 h-28 flex items-center justify-center">
+                    <div className="w-20 h-[107px] flex items-center justify-center">
                       <PersonFigure type={role.id} isActive={isActive} size="lg" />
                     </div>
                     <span className={`mt-2 font-medium text-sm text-center leading-tight ${isActive ? 'text-text-primary' : 'text-text-muted'}`}>
