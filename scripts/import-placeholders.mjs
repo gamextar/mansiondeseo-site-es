@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { randomUUID } from 'node:crypto'
+import { pbkdf2Sync, randomBytes, randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
@@ -11,6 +11,8 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, '..')
 const wranglerTomlPath = path.join(repoRoot, 'wrangler.toml')
+const DEFAULT_IMPORTED_EMAIL_DOMAIN = 'gamextar.com'
+const DEFAULT_IMPORTED_PASSWORD = 'mansiondeseo26'
 
 const rawArgs = process.argv.slice(2)
 
@@ -38,7 +40,7 @@ Formato del manifest:
 
 Campos soportados por perfil:
   username            requerido
-  email               opcional (si falta, se genera)
+  email               opcional (si falta, se genera como username@gamextar.com)
   role                requerido: hombre | mujer | pareja | pareja_hombres | pareja_mujeres | trans
   seeking             requerido: array de roles (hombre | mujer | pareja | pareja_hombres | pareja_mujeres | trans)
   interests           opcional: array
@@ -51,6 +53,10 @@ Campos soportados por perfil:
   storyVideoPath      opcional path local o URL
   storyCaption        opcional string
   lastActive          opcional string YYYY-MM-DD HH:MM:SS
+
+Notas:
+  - Las cuentas importadas se fuerzan como fake = 1
+  - La contraseña importada por default es: mansiondeseo26
 `)
 }
 
@@ -155,6 +161,12 @@ function nowSql() {
 
 function futureSql(days) {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+}
+
+function hashPassword(password) {
+  const salt = randomBytes(16)
+  const hash = pbkdf2Sync(password, salt, 100000, 32, 'sha256')
+  return `${salt.toString('hex')}:${hash.toString('hex')}`
 }
 
 function extFromPath(filePath) {
@@ -390,7 +402,8 @@ async function upsertProfile(profile, manifestDir) {
 
   const username = String(profile.username).trim()
   const normalizedUsername = slugifyUsername(username)
-  const email = String(profile.email || `placeholder+${normalizedUsername}@mansiondeseo.local`).toLowerCase()
+  const email = String(profile.email || `${normalizedUsername}@${DEFAULT_IMPORTED_EMAIL_DOMAIN}`).toLowerCase()
+  const passwordHash = hashPassword(profile.password || DEFAULT_IMPORTED_PASSWORD)
   const existing = dryRun
     ? null
     : (queryRows(
@@ -425,6 +438,7 @@ async function upsertProfile(profile, manifestDir) {
 
   const baseFields = {
     email,
+    password_hash: passwordHash,
     username,
     role: profile.role,
     seeking: JSON.stringify(seeking),
@@ -457,6 +471,7 @@ async function upsertProfile(profile, manifestDir) {
 
   if (dryRun) {
     console.log(`\n[dry-run] ${existing ? 'update' : 'insert'} user ${username} (${userId})`)
+    console.log(`  email: ${email}`)
     console.log(`  avatar: ${avatarUrl || '-'}`)
     console.log(`  photos: ${photoUrls.length}`)
   } else if (existing) {
