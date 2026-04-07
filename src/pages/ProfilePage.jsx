@@ -7,6 +7,7 @@ import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updat
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
 import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
+import { formatLocation } from '../lib/location';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
 import { resolveMediaUrl } from '../lib/media';
 
@@ -342,7 +343,7 @@ export default function ProfilePage() {
 
   // Use real user data or fallback
   const displayName = user?.username || 'Tu Perfil';
-  const displayCity = user?.city || '';
+  const displayLocation = formatLocation(user);
   const displayRole = user?.role || '';
   const avatarUrl = user?.avatar_url || '';
   const photos = getGalleryPhotos(user);
@@ -352,6 +353,8 @@ export default function ProfilePage() {
     name: user.username,
     age: user.age,
     city: user.city,
+    province: user.province,
+    locality: user.locality,
     role: user.role,
     photos,
     avatar_url: user.avatar_url || '',
@@ -470,14 +473,14 @@ export default function ProfilePage() {
                 {displayName}
               </h2>
 
-              {(displayCity || displayRole) && (
+              {(displayLocation || displayRole) && (
                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                  {displayCity && (
+                  {displayLocation && (
                     <span className="flex items-center gap-0.5 text-[11px] text-text-dim">
-                      <MapPin className="w-2.5 h-2.5" /> {displayCity}
+                      <MapPin className="w-2.5 h-2.5" /> {displayLocation}
                     </span>
                   )}
-                  {displayCity && displayRole && <span className="text-text-dim/30 text-[11px]">·</span>}
+                  {displayLocation && displayRole && <span className="text-text-dim/30 text-[11px]">·</span>}
                   {displayRole && (
                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${ROLE_COLOR[displayRole] || 'bg-mansion-card text-text-muted border-mansion-border/30'}`}>
                       {displayRole}
@@ -678,7 +681,7 @@ export default function ProfilePage() {
                   initial={{ opacity: 0, x: -12 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  onClick={() => navigate(`/perfiles/${v.id}`, { state: { preview: { id: v.id, name: v.name, age: v.age, city: v.city, role: v.role, photos: [], avatar_url: v.avatar_url, avatar_crop: v.avatar_crop || null, online: v.online, premium: v.premium } } })}
+                  onClick={() => navigate(`/perfiles/${v.id}`, { state: { preview: { id: v.id, name: v.name, age: v.age, city: v.city, province: v.province, locality: v.locality, role: v.role, photos: [], avatar_url: v.avatar_url, avatar_crop: v.avatar_crop || null, online: v.online, premium: v.premium } } })}
                   className="w-full flex items-center gap-3 p-3 rounded-2xl bg-mansion-card/30 hover:bg-mansion-card/60 transition-all group"
                 >
                   <div className="w-10 h-10 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0">

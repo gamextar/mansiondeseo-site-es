@@ -537,10 +537,24 @@ async function apiUpload(path, options = {}) {
 
 // ── Auth ────────────────────────────────────────────────
 
-export async function register({ email, password, username, role, seeking, interests, age, city, bio, country }) {
+export async function register({ email, password, username, role, seeking, interests, age, province, locality, city, bio, country }) {
+  const normalizedProvince = province ?? city ?? '';
   const data = await apiFetch('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password, username, role, seeking, interests, age: Number(age), city, bio, country }),
+    body: JSON.stringify({
+      email,
+      password,
+      username,
+      role,
+      seeking,
+      interests,
+      age: Number(age),
+      province: normalizedProvince,
+      locality: locality || '',
+      city: normalizedProvince,
+      bio,
+      country,
+    }),
   });
   // Registration now returns needsVerification instead of token
   return data;

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername, getMe } from '../lib/api';
+import { formatLocation } from '../lib/location';
 import ImageCropper from '../components/ImageCropper';
 
 // ────────────────────────────────────────────
@@ -238,8 +239,9 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
 // ────────────────────────────────────────────
 
 function FichaPreview({ data, currentStep }) {
-  const { role, seeking, interests, name, age, city } = data;
+  const { role, seeking, interests, name, age } = data;
   const seekingArr = Array.isArray(seeking) ? seeking : (seeking ? [seeking] : []);
+  const locationText = formatLocation(data);
 
   if (currentStep < 1 && !role) return null;
 
@@ -326,9 +328,9 @@ function FichaPreview({ data, currentStep }) {
                 {name}
                 {age ? `, ${age}` : ''}
               </p>
-              {city && (
+              {locationText && (
                 <p className="text-text-dim text-[11px] flex items-center justify-center gap-1">
-                  <MapPin className="w-2.5 h-2.5" /> {city}
+                  <MapPin className="w-2.5 h-2.5" /> {locationText}
                 </p>
               )}
             </motion.div>
@@ -670,21 +672,17 @@ function StepInterests({ selected, onToggle }) {
 function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, selectedCountry, onCountryChange, usernameStatus, onUsernameBlur }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const ARGENTINA_CITIES = [
-    'Buenos Aires', 'CABA', 'Córdoba', 'Rosario', 'Mendoza', 'San Miguel de Tucumán',
-    'La Plata', 'Mar del Plata', 'Salta', 'Santa Fe', 'San Juan', 'Resistencia',
-    'Neuquén', 'Santiago del Estero', 'Corrientes', 'Bahía Blanca', 'Posadas',
-    'San Salvador de Jujuy', 'Paraná', 'Formosa', 'San Luis', 'La Rioja',
-    'Catamarca', 'Río Gallegos', 'Ushuaia', 'Rawson', 'Viedma', 'Santa Rosa',
-    'Río Cuarto', 'Tandil', 'Pilar', 'Tigre', 'Quilmes', 'Lanús', 'Avellaneda',
-    'López', 'Lomas de Zamora', 'Moreno', 'Merlo', 'Florencio Varela',
-    'San Isidro', 'Vicente López', 'San Fernando', 'Tres de Febrero',
-    'Comodoro Rivadavia', 'Bariloche', 'Villa Carlos Paz', 'Zárate',
+  const ARGENTINA_PROVINCES = [
+    'Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba',
+    'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja',
+    'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 'Salta', 'San Juan',
+    'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero',
+    'Tierra del Fuego', 'Tucumán',
   ];
 
-  const filtered = data.city
-    ? ARGENTINA_CITIES.filter(c =>
-        c.toLowerCase().includes(data.city.toLowerCase()) && c.toLowerCase() !== data.city.toLowerCase()
+  const filtered = data.province && selectedCountry === 'AR'
+    ? ARGENTINA_PROVINCES.filter(province =>
+        province.toLowerCase().includes(data.province.toLowerCase()) && province.toLowerCase() !== data.province.toLowerCase()
       ).slice(0, 5)
     : [];
 
@@ -755,14 +753,14 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
           )}
         </div>
         <div>
-          <label className="text-text-muted text-xs font-medium mb-1.5 block">Ciudad</label>
+          <label className="text-text-muted text-xs font-medium mb-1.5 block">Provincia</label>
           <div className="relative">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" />
             <input
               type="text"
-              value={data.city}
+              value={data.province}
               onChange={(e) => {
-                onChange({ ...data, city: e.target.value.slice(0, 40) });
+                onChange({ ...data, province: e.target.value.slice(0, 40) });
                 setShowSuggestions(true);
               }}
               onFocus={() => setShowSuggestions(true)}
@@ -773,22 +771,36 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
             />
             {showSuggestions && filtered.length > 0 && (
               <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-mansion-card border border-mansion-border/40 rounded-xl overflow-hidden shadow-lg">
-                {filtered.map((city) => (
+                {filtered.map((province) => (
                   <button
-                    key={city}
+                    key={province}
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
-                      onChange({ ...data, city });
+                      onChange({ ...data, province });
                       setShowSuggestions(false);
                     }}
                     className="w-full text-left px-4 py-2.5 text-sm text-text-primary hover:bg-mansion-elevated/50 transition-colors"
                   >
-                    {city}
+                    {province}
                   </button>
                 ))}
               </div>
             )}
+          </div>
+        </div>
+        <div>
+          <label className="text-text-muted text-xs font-medium mb-1.5 block">Localidad / Zona</label>
+          <div className="relative">
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" />
+            <input
+              type="text"
+              value={data.locality}
+              onChange={(e) => onChange({ ...data, locality: e.target.value.slice(0, 40) })}
+              placeholder="Palermo, San Isidro, Zona Norte..."
+              maxLength={40}
+              className="w-full pl-10"
+            />
           </div>
         </div>
         <div>
@@ -1130,7 +1142,7 @@ export default function RegisterPage() {
   const [iAm, setIAm] = useState(null);
   const [seeking, setSeeking] = useState([]);
   const [interests, setInterests] = useState([]);
-  const [info, setInfo] = useState({ name: '', age: '', city: 'Buenos Aires', bio: '' });
+  const [info, setInfo] = useState({ name: '', age: '', province: '', locality: '', bio: '' });
   const [photoFile, setPhotoFile] = useState(null);
   const [completed, setCompleted] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
@@ -1209,7 +1221,7 @@ export default function RegisterPage() {
     if (step === 1) return !!iAm;
     if (step === 2) return seeking.length > 0;
     if (step === 3) return interests.length > 0;
-    if (step === 4) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && info.age && Number(info.age) >= 18 && info.city && (!showCountryPicker || selectedCountry);
+    if (step === 4) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && info.age && Number(info.age) >= 18 && info.province && (!showCountryPicker || selectedCountry);
     return true;
   };
 
@@ -1295,7 +1307,8 @@ export default function RegisterPage() {
           seeking,
           interests,
           age: info.age,
-          city: info.city,
+          province: info.province,
+          locality: info.locality,
           bio: info.bio,
           country: selectedCountry || undefined,
         });
@@ -1392,7 +1405,8 @@ export default function RegisterPage() {
     interests,
     name: info.name,
     age: info.age,
-    city: info.city,
+    province: info.province,
+    locality: info.locality,
   };
 
   const slideVariants = {

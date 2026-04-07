@@ -41,7 +41,7 @@ export default function ExplorePage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Ciudad, nombre, interés..."
+              placeholder="Provincia, localidad, nombre, interés..."
               className="w-full pl-10 py-2.5 text-sm"
             />
           </div>

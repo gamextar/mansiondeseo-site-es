@@ -23,6 +23,7 @@ let _conversationStateReady = null;
 let _messageConversationIdReady = null;
 let _userBrowseIndexesReady = null;
 let _userFakeColumnReady = null;
+let _userLocalityColumnReady = null;
 
 // ── Helpers ─────────────────────────────────────────────
 
@@ -231,6 +232,28 @@ async function ensureUsersFakeColumn(env) {
   }
 
   return _userFakeColumnReady;
+}
+
+async function ensureUsersLocalityColumn(env) {
+  if (!_userLocalityColumnReady) {
+    _userLocalityColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          'ALTER TABLE users ADD COLUMN locality TEXT'
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+    })().catch((err) => {
+      _userLocalityColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userLocalityColumnReady;
 }
 
 async function setConversationState(env, userId, partnerId, { lastMessage, lastMessageAt, unreadCount }) {
@@ -753,7 +776,9 @@ function generateVerificationCode() {
 
 async function handleRegister(request, env) {
   const body = await request.json();
-  const { email, password, username, role, seeking, interests, age, city, bio } = body;
+  const { email, password, username, role, seeking, interests, age, city, province, locality, bio } = body;
+  const provinceValue = String(province ?? city ?? '').trim();
+  const localityValue = String(locality || '').trim();
 
   if (!email || !password || !username || !role || !seeking) {
     return error('Campos requeridos: email, password, username, role, seeking');
@@ -809,8 +834,8 @@ async function handleRegister(request, env) {
   const country = body.country || detectedCountry;
 
   await env.DB.prepare(`
-    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, city, country, bio, status, coins)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0)
+    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, city, locality, country, bio, status, coins)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0)
   `).bind(
     userId,
     email.toLowerCase(),
@@ -820,7 +845,8 @@ async function handleRegister(request, env) {
     JSON.stringify(seekingArr),
     JSON.stringify(interests || []),
     age || null,
-    city || '',
+    provinceValue,
+    localityValue,
     country,
     bio || ''
   ).run();
@@ -1244,7 +1270,7 @@ async function handleOwnProfileDashboard(request, env) {
     cachedUser ? Promise.resolve(cachedUser) : env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
     env.DB.prepare('SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first(),
     env.DB.prepare(
-      `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.city, u.role, u.premium, u.last_active,
+      `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.city, u.locality, u.role, u.premium, u.last_active,
               MAX(pv.created_at) as visited_at
        FROM profile_visits pv
        JOIN users u ON u.id = pv.visitor_id
@@ -1281,7 +1307,7 @@ async function handleOwnProfileDashboard(request, env) {
     avatar_url: v.avatar_url,
     avatar_crop: safeParseJSON(v.avatar_crop, null),
     age: v.age,
-    city: v.city,
+    ...getLocationFields(v),
     role: v.role,
     premium: !!v.premium,
     online: isOnline(v.last_active),
@@ -1325,6 +1351,7 @@ async function handleProfiles(request, env) {
       username,
       age,
       city,
+      locality,
       role,
       interests,
       bio,
@@ -1357,9 +1384,9 @@ async function handleProfiles(request, env) {
     query += ` AND role IN (${filterParts.map(f => `'${f}'`).join(',')})`;
   }
   if (search) {
-    query += ` AND (username LIKE ? OR city LIKE ? OR bio LIKE ?)`;
+    query += ` AND (username LIKE ? OR city LIKE ? OR locality LIKE ? OR bio LIKE ?)`;
     const term = `%${search}%`;
-    params.push(term, term, term);
+    params.push(term, term, term, term);
   }
   query += ` ORDER BY last_active DESC LIMIT 51`;
 
@@ -1398,7 +1425,7 @@ async function handleProfiles(request, env) {
       id: u.id,
       name: u.username,
       age: u.age,
-      city: u.city,
+      ...getLocationFields(u),
       role: mapRoleToDisplay(u.role),
       interests: profileInterests,
       bio: u.bio,
@@ -1524,7 +1551,7 @@ async function handleProfileDetail(request, env, userId) {
       id: user.id,
       name: user.username,
       age: user.age,
-      city: user.city,
+      ...getLocationFields(user),
       role: mapRoleToDisplay(user.role),
       interests: safeParseJSON(user.interests, []),
       bio: user.bio,
@@ -1556,7 +1583,7 @@ async function handleChatBootstrap(request, env, userId) {
 
   const [user, sender, settings] = await Promise.all([
     env.DB.prepare(
-      'SELECT id, username, age, city, role, avatar_url, avatar_crop, last_active, premium, premium_until FROM users WHERE id = ?'
+      'SELECT id, username, age, city, locality, role, avatar_url, avatar_crop, last_active, premium, premium_until FROM users WHERE id = ?'
     ).bind(userId).first(),
     env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
     cached('settings', 300_000, () => loadSettings(env)),
@@ -1578,7 +1605,7 @@ async function handleChatBootstrap(request, env, userId) {
       id: user.id,
       name: user.username,
       age: user.age,
-      city: user.city,
+      ...getLocationFields(user),
       role: mapRoleToDisplay(user.role),
       photos: [],
       avatar_url: user.avatar_url,
@@ -2198,7 +2225,12 @@ async function handleUpdateProfile(request, env) {
   if (!auth) return error('No autorizado', 401);
 
   const body = await request.json();
-  const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'city', 'bio', 'avatar_url', 'avatar_crop', 'premium'];
+  const normalizedBody = { ...body };
+  if (normalizedBody.province !== undefined && normalizedBody.city === undefined) {
+    normalizedBody.city = normalizedBody.province;
+  }
+
+  const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'city', 'locality', 'bio', 'avatar_url', 'avatar_crop', 'premium'];
   const currentUser = await env.DB.prepare('SELECT premium, premium_until, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
   if (!currentUser) return error('Usuario no encontrado', 404);
 
@@ -2222,10 +2254,10 @@ async function handleUpdateProfile(request, env) {
   const values = [];
 
   for (const field of allowedFields) {
-    if (body[field] !== undefined) {
+    if (normalizedBody[field] !== undefined) {
       if (field === 'seeking') {
         // Validate and store seeking as JSON array
-        const seekVal = Array.isArray(body[field]) ? body[field] : [body[field]];
+        const seekVal = Array.isArray(normalizedBody[field]) ? normalizedBody[field] : [normalizedBody[field]];
         const validS = ['hombre', 'mujer', 'pareja'];
         const filtered = seekVal.filter(s => validS.includes(s));
         if (filtered.length === 0) continue;
@@ -2234,17 +2266,17 @@ async function handleUpdateProfile(request, env) {
       } else if (field === 'interests' || field === 'photos' || field === 'avatar_crop') {
         updates.push(`${field} = ?`);
         if (field === 'photos') {
-          const effectiveAvatarUrl = body.avatar_url !== undefined ? body.avatar_url : currentUser.avatar_url;
-          values.push(JSON.stringify(normalizeGalleryPhotos(body[field], effectiveAvatarUrl)));
+          const effectiveAvatarUrl = normalizedBody.avatar_url !== undefined ? normalizedBody.avatar_url : currentUser.avatar_url;
+          values.push(JSON.stringify(normalizeGalleryPhotos(normalizedBody[field], effectiveAvatarUrl)));
         } else {
-          values.push(JSON.stringify(body[field]));
+          values.push(JSON.stringify(normalizedBody[field]));
         }
       } else if (field === 'ghost_mode' || field === 'premium') {
         updates.push(`${field} = ?`);
-        values.push(body[field] ? 1 : 0);
+        values.push(normalizedBody[field] ? 1 : 0);
       } else {
         updates.push(`${field} = ?`);
-        values.push(body[field]);
+        values.push(normalizedBody[field]);
       }
     }
   }
@@ -2295,10 +2327,21 @@ function activatePremium(currentPremiumUntil, planId) {
   return base.toISOString().replace('Z', '').split('.')[0]; // datetime format for D1
 }
 
+function getLocationFields(record) {
+  const province = String(record?.city || '').trim();
+  const locality = String(record?.locality || '').trim();
+  return {
+    city: province,
+    province,
+    locality,
+  };
+}
+
 function sanitizeUser(user, env) {
   if (!user) return null;
   const { password_hash, ...safe } = user;
   const premiumActive = isPremiumActive(safe);
+  const location = getLocationFields(safe);
   // Auto-disable ghost_mode if premium has expired
   const ghostMode = premiumActive ? !!safe.ghost_mode : false;
   if (!premiumActive && safe.ghost_mode && env) {
@@ -2312,6 +2355,7 @@ function sanitizeUser(user, env) {
 
   return {
     ...safe,
+    ...location,
     seeking: seekingParsed,
     interests: safeParseJSON(safe.interests, []),
     photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
@@ -2346,7 +2390,7 @@ async function handleGetVisits(request, env) {
   if (!auth) return error('No autorizado', 401);
 
   const { results } = await env.DB.prepare(
-    `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.city, u.role, u.premium, u.last_active,
+    `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.city, u.locality, u.role, u.premium, u.last_active,
             MAX(pv.created_at) as visited_at
      FROM profile_visits pv
      JOIN users u ON u.id = pv.visitor_id
@@ -2362,7 +2406,7 @@ async function handleGetVisits(request, env) {
     avatar_url: v.avatar_url,
     avatar_crop: safeParseJSON(v.avatar_crop, null),
     age: v.age,
-    city: v.city,
+    ...getLocationFields(v),
     role: v.role,
     premium: !!v.premium,
     online: isOnline(v.last_active),
@@ -2653,7 +2697,7 @@ async function handleGetFavorites(request, env) {
       id: u.id,
       name: u.username,
       age: u.age,
-      city: u.city,
+      ...getLocationFields(u),
       role: mapRoleToDisplay(u.role),
       interests: safeParseJSON(u.interests, []),
       photos: galleryPhotos,
@@ -2884,7 +2928,7 @@ async function handleAdminGetUsers(request, env) {
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
-  let dataQuery = `SELECT id, email, username, role, seeking, age, city, country, avatar_url, status,
+  let dataQuery = `SELECT id, email, username, role, seeking, age, city, locality, country, avatar_url, status,
     premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, account_status, last_active, last_ip, created_at,
     (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id
     FROM users`;
@@ -2911,6 +2955,8 @@ async function handleAdminGetUsers(request, env) {
   return json({
     users: dataRes.results.map(u => ({
       ...u,
+      province: u.city || '',
+      locality: u.locality || '',
       premium: isPremiumActive(u),
       online: isOnline(u.last_active),
       is_admin: !!u.is_admin,
@@ -2939,6 +2985,8 @@ async function handleAdminGetUser(request, env, userId) {
   return json({
     user: {
       ...safe,
+      province: safe.city || '',
+      locality: safe.locality || '',
       interests: safeParseJSON(safe.interests, []),
       photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
       avatar_crop: safeParseJSON(safe.avatar_crop, null),
@@ -2989,6 +3037,8 @@ async function handleAdminUpdateUser(request, env, userId) {
   return json({
     user: {
       ...safe,
+      province: safe.city || '',
+      locality: safe.locality || '',
       interests: safeParseJSON(safe.interests, []),
       photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
       avatar_crop: safeParseJSON(safe.avatar_crop, null),
@@ -3837,6 +3887,7 @@ async function handleRequest(request, env) {
   const method = request.method;
 
   await ensureUsersFakeColumn(env);
+  await ensureUsersLocalityColumn(env);
 
   // CORS preflight
   if (method === 'OPTIONS') return handleOptions(env, request);

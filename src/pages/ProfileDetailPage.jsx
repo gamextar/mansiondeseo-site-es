@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getProfile, getToken, toggleFavorite, updateProfile, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
+import { formatLocation } from '../lib/location';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
 import { resolveMediaUrl } from '../lib/media';
 
@@ -399,7 +400,8 @@ export default function ProfileDetailPage() {
     );
   }
 
-  const { name, age, city, role, interests, bio, totalPhotos, verified, online, premium, blurred, isOwnProfile, receivedGifts } = profile;
+  const { name, age, role, interests, bio, totalPhotos, verified, online, premium, blurred, isOwnProfile, receivedGifts } = profile;
+  const locationText = formatLocation(profile);
   const galleryPhotos = getGalleryPhotos(profile);
   const displayPhotos = getDisplayPhotos(profile);
   const avatarDisplayOffset = profile.avatar_url ? 1 : 0;
@@ -551,9 +553,11 @@ export default function ProfileDetailPage() {
                 <span className="text-text-muted text-xl font-light">{age}</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1 text-sm text-text-muted">
-                  <MapPin className="w-3.5 h-3.5" /> {city}
-                </span>
+                {locationText && (
+                  <span className="flex items-center gap-1 text-sm text-text-muted">
+                    <MapPin className="w-3.5 h-3.5" /> {locationText}
+                  </span>
+                )}
                 <div className="flex items-center gap-1.5">
                   {verified && <Shield className="w-4 h-4 text-green-400" />}
                   {premium && <Crown className="w-4 h-4 text-mansion-gold" />}

@@ -42,7 +42,7 @@ Campos soportados por perfil:
   role                requerido: hombre | mujer | pareja
   seeking             requerido: array de roles
   interests           opcional: array
-  age, city, country, bio
+  age, province, locality, country, bio
   premium             opcional boolean
   premiumUntil        opcional string YYYY-MM-DD HH:MM:SS
   avatarPath          opcional path local o URL
@@ -257,6 +257,18 @@ function ensureFakeColumn() {
   executeSql('CREATE INDEX IF NOT EXISTS idx_users_fake ON users(fake)')
 }
 
+function ensureLocalityColumn() {
+  if (dryRun) return
+  try {
+    executeSql('ALTER TABLE users ADD COLUMN locality TEXT')
+  } catch (error) {
+    const message = String(error?.message || error || '').toLowerCase()
+    if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+      throw error
+    }
+  }
+}
+
 function uploadToR2(key, filePath) {
   const args = ['r2', 'object', 'put', `${wranglerConfig.bucketName}/${key}`, '--file', filePath]
   if (useRemote) args.push('--remote')
@@ -344,7 +356,8 @@ async function upsertProfile(profile, manifestDir) {
     seeking: JSON.stringify(seeking),
     interests: JSON.stringify(interests),
     age: profile.age ?? null,
-    city: profile.city || '',
+    city: profile.province || profile.city || '',
+    locality: profile.locality || '',
     country: profile.country || 'AR',
     bio: profile.bio || '',
     status: 'verified',
@@ -438,6 +451,7 @@ async function main() {
   console.log(`R2: ${wranglerConfig.bucketName}`)
 
   ensureFakeColumn()
+  ensureLocalityColumn()
 
   const results = []
   for (let index = 0; index < filtered.length; index += 1) {

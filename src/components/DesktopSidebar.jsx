@@ -173,7 +173,7 @@ export default function DesktopSidebar() {
             {visitors.slice(0, 5).map((v) => (
               <button
                 key={v.id}
-                onClick={() => navigate(`/perfiles/${v.id}`, { state: { preview: { id: v.id, name: v.name, age: v.age, city: v.city, role: v.role, photos: [], avatar_url: v.avatar_url, avatar_crop: v.avatar_crop || null, online: v.online, premium: v.premium } } })}
+                onClick={() => navigate(`/perfiles/${v.id}`, { state: { preview: { id: v.id, name: v.name, age: v.age, city: v.city, province: v.province, locality: v.locality, role: v.role, photos: [], avatar_url: v.avatar_url, avatar_crop: v.avatar_crop || null, online: v.online, premium: v.premium } } })}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-mansion-elevated/50 transition-all group"
               >
                 <div className="w-8 h-8 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0">

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { MapPin, Shield, Crown, Lock } from 'lucide-react';
 import { getDisplayPhotos, getPrimaryProfilePhoto } from '../lib/profileMedia';
+import { formatLocation } from '../lib/location';
 import { resolveMediaUrl } from '../lib/media';
 
 // Masquerade mask SVG icon for incognito mode
@@ -53,8 +54,9 @@ const RoleFallbackIcon = ({ role }) => {
 };
 
 export default function ProfileCard({ profile, index = 0, viewerPremium = false, settings = {} }) {
-  const { id, name, age, city, role, interests, photos = [], verified, online, premium, blurred } = profile;
+  const { id, name, age, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const roleImg = settings[ROLE_IMG_KEYS[role]] || null;
+  const locationText = formatLocation(profile);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
   const baseBlur = isMobile ? (settings.blurMobile ?? settings.blurLevel ?? 14) : (settings.blurDesktop ?? settings.blurLevel ?? 8);
   // Profile cards are medium-sized — use base value as-is
@@ -69,7 +71,7 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
 
   return (
     <div>
-      <Link to={`/perfiles/${id}`} state={{ preview: { id, name, age, city, role, photos, avatar_url: profile.avatar_url, avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode } }} className="block group">
+      <Link to={`/perfiles/${id}`} state={{ preview: { id, name, age, city: profile.city, province: profile.province, locality: profile.locality, role, photos, avatar_url: profile.avatar_url, avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode } }} className="block group">
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">
           {/* Photo — use actual photo with blur for blocked cards */}
           {mainPhoto ? (
@@ -129,10 +131,12 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
                 <h3 className="font-display text-lg font-semibold text-white leading-tight">
                   {name}<span className="text-text-muted font-body text-sm ml-1">{age}</span>
                 </h3>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <MapPin className="w-3 h-3 text-text-muted" />
-                  <span className="text-xs text-text-muted">{city}</span>
-                </div>
+                {locationText && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <MapPin className="w-3 h-3 text-text-muted" />
+                    <span className="text-xs text-text-muted">{locationText}</span>
+                  </div>
+                )}
               </div>
 
               {roleImg
