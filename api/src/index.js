@@ -22,6 +22,7 @@ let _messagingIndexesReady = null;
 let _conversationStateReady = null;
 let _messageConversationIdReady = null;
 let _userBrowseIndexesReady = null;
+let _userFakeColumnReady = null;
 
 // ── Helpers ─────────────────────────────────────────────
 
@@ -204,6 +205,32 @@ async function ensureUserBrowseIndexes(env) {
   }
 
   return _userBrowseIndexesReady;
+}
+
+async function ensureUsersFakeColumn(env) {
+  if (!_userFakeColumnReady) {
+    _userFakeColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          'ALTER TABLE users ADD COLUMN fake INTEGER NOT NULL DEFAULT 0'
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+
+      await env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_users_fake ON users(fake)'
+      ).run();
+    })().catch((err) => {
+      _userFakeColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userFakeColumnReady;
 }
 
 async function setConversationState(env, userId, partnerId, { lastMessage, lastMessageAt, unreadCount }) {
@@ -1308,6 +1335,7 @@ async function handleProfiles(request, env) {
       premium,
       premium_until,
       ghost_mode,
+      fake,
       last_active
     FROM users
     WHERE status = 'verified'
@@ -1382,6 +1410,7 @@ async function handleProfiles(request, env) {
       premium: profileIsPremium,
       premium_until: u.premium_until || null,
       ghost_mode: hasGhostMode,
+      fake: !!u.fake,
       blurred,
       isFavorited: viewerFavorites.has(u.id),
       lastActive: u.last_active,
@@ -2293,6 +2322,7 @@ function sanitizeUser(user, env) {
     premium_until: safe.premium_until || null,
     ghost_mode: ghostMode,
     is_admin: !!safe.is_admin,
+    fake: !!safe.fake,
     coins: safe.coins || 0,
   };
 }
@@ -2855,7 +2885,7 @@ async function handleAdminGetUsers(request, env) {
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
   let dataQuery = `SELECT id, email, username, role, seeking, age, city, country, avatar_url, status,
-    premium, premium_until, ghost_mode, verified, online, coins, is_admin, account_status, last_active, last_ip, created_at,
+    premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, account_status, last_active, last_ip, created_at,
     (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id
     FROM users`;
   const bindings = [];
@@ -2884,6 +2914,7 @@ async function handleAdminGetUsers(request, env) {
       premium: isPremiumActive(u),
       online: isOnline(u.last_active),
       is_admin: !!u.is_admin,
+      fake: !!u.fake,
       story_id: u.story_id || null,
       interests: undefined,
       photos: undefined,
@@ -2914,6 +2945,7 @@ async function handleAdminGetUser(request, env, userId) {
       premium: isPremiumActive(safe),
       online: isOnline(safe.last_active),
       is_admin: !!safe.is_admin,
+      fake: !!safe.fake,
     }
   });
 }
@@ -2941,6 +2973,7 @@ async function handleAdminUpdateUser(request, env, userId) {
   if (body.coins !== undefined) { updates.push('coins = ?'); vals.push(Math.max(0, Number(body.coins))); }
   if (body.verified !== undefined) { updates.push('verified = ?'); vals.push(body.verified ? 1 : 0); }
   if (body.ghost_mode !== undefined) { updates.push('ghost_mode = ?'); vals.push(body.ghost_mode ? 1 : 0); }
+  if (body.fake !== undefined) { updates.push('fake = ?'); vals.push(body.fake ? 1 : 0); }
   if (body.status !== undefined && ['pending', 'verified'].includes(body.status)) { updates.push('status = ?'); vals.push(body.status); }
   if (body.account_status !== undefined && ['active', 'under_review', 'suspended'].includes(body.account_status)) {
     updates.push('account_status = ?'); vals.push(body.account_status);
@@ -2962,6 +2995,7 @@ async function handleAdminUpdateUser(request, env, userId) {
       premium: isPremiumActive(safe),
       online: isOnline(safe.last_active),
       is_admin: !!safe.is_admin,
+      fake: !!safe.fake,
     }
   });
 }
@@ -3801,6 +3835,8 @@ async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
+
+  await ensureUsersFakeColumn(env);
 
   // CORS preflight
   if (method === 'OPTIONS') return handleOptions(env, request);

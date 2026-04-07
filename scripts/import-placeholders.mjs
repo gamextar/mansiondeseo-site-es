@@ -243,6 +243,20 @@ function executeSql(sqlCommand) {
   return runWrangler(d1Args(sqlCommand, false))
 }
 
+function ensureFakeColumn() {
+  if (dryRun) return
+  try {
+    executeSql('ALTER TABLE users ADD COLUMN fake INTEGER NOT NULL DEFAULT 0')
+  } catch (error) {
+    const message = String(error?.message || error || '').toLowerCase()
+    if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+      throw error
+    }
+  }
+
+  executeSql('CREATE INDEX IF NOT EXISTS idx_users_fake ON users(fake)')
+}
+
 function uploadToR2(key, filePath) {
   const args = ['r2', 'object', 'put', `${wranglerConfig.bucketName}/${key}`, '--file', filePath]
   if (useRemote) args.push('--remote')
@@ -342,6 +356,7 @@ async function upsertProfile(profile, manifestDir) {
     premium: premium ? 1 : 0,
     premium_until: premiumUntil,
     ghost_mode: profile.ghostMode ? 1 : 0,
+    fake: 1,
     coins: Number.isFinite(Number(profile.coins)) ? Number(profile.coins) : 0,
     is_admin: profile.isAdmin ? 1 : 0,
     last_active: lastActive,
@@ -421,6 +436,8 @@ async function main() {
   console.log(`Destino: ${useRemote ? 'remote' : 'local'}${dryRun ? ' (dry-run)' : ''}`)
   console.log(`DB: ${wranglerConfig.dbName}`)
   console.log(`R2: ${wranglerConfig.bucketName}`)
+
+  ensureFakeColumn()
 
   const results = []
   for (let index = 0; index < filtered.length; index += 1) {
