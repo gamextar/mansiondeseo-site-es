@@ -112,7 +112,7 @@ const COUNTRY_NAMES = {
 // Person Figure SVG
 // ────────────────────────────────────────────
 
-function PersonFigure({ type, isActive, size = 'lg' }) {
+function PersonFigure({ type, isActive, size = 'lg', optimizeMotion = false }) {
   const dimColor = '#3A3A4A';
   const dimColorDark = '#2A2A38';
   const roleData = ALL_ROLE_OPTIONS.find((r) => r.id === type) || ROLES[0];
@@ -120,22 +120,27 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
   const colorDark = isActive ? roleData.colorDark : dimColorDark;
   const soloSizeClass = size === 'lg' ? 'w-[68px] h-[96px]' : 'w-8 h-11';
   const pairSizeClass = size === 'lg' ? 'w-[78px] h-[96px]' : 'w-12 h-11';
+  const shellTransition = optimizeMotion
+    ? { duration: 0.22, ease: 'easeOut' }
+    : { type: 'spring', stiffness: 300, damping: 22 };
+  const shellScale = isActive ? (size === 'lg' ? 1.05 : 1.03) : 1;
 
   if (type === 'hombre') {
     return (
-      <svg
-        viewBox="0 0 80 120"
-        className={`${soloSizeClass} transition-transform duration-300 ${
-          isActive ? 'scale-110' : 'scale-100'
-        }`}
+      <motion.div
+        className="relative flex items-center justify-center transform-gpu"
+        style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+        animate={{ scale: shellScale }}
+        transition={shellTransition}
       >
+      <svg viewBox="0 0 80 120" className={soloSizeClass}>
         <motion.circle
           cx="40"
           cy="22"
           r="13"
           fill={color}
-          animate={{ r: isActive ? 15 : 13 }}
-          transition={{ type: 'spring', stiffness: 300 }}
+          animate={optimizeMotion ? undefined : { r: isActive ? 15 : 13 }}
+          transition={optimizeMotion ? undefined : { type: 'spring', stiffness: 300 }}
         />
         <motion.rect
           x="23"
@@ -144,11 +149,11 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
           height="38"
           rx="8"
           fill={color}
-          animate={{ y: isActive ? 38 : 40 }}
+          animate={optimizeMotion ? undefined : { y: isActive ? 38 : 40 }}
         />
         <rect x="24" y="78" width="13" height="30" rx="6" fill={colorDark} />
         <rect x="43" y="78" width="13" height="30" rx="6" fill={colorDark} />
-        {isActive && (
+        {isActive && !optimizeMotion && (
           <motion.circle
             cx="40"
             cy="60"
@@ -162,24 +167,35 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
           />
         )}
       </svg>
+      {isActive && optimizeMotion && (
+        <motion.span
+          className="pointer-events-none absolute inset-[14px] rounded-full border"
+          style={{ borderColor: `${color}55`, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+          initial={{ opacity: 0.18, scale: 0.94 }}
+          animate={{ opacity: [0.18, 0], scale: [1, 1.12] }}
+          transition={{ duration: 1.35, repeat: Infinity, ease: 'easeOut' }}
+        />
+      )}
+      </motion.div>
     );
   }
 
   if (type === 'mujer') {
     return (
-      <svg
-        viewBox="0 0 80 120"
-        className={`${soloSizeClass} transition-transform duration-300 ${
-          isActive ? 'scale-110' : 'scale-100'
-        }`}
+      <motion.div
+        className="relative flex items-center justify-center transform-gpu"
+        style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+        animate={{ scale: shellScale }}
+        transition={shellTransition}
       >
+      <svg viewBox="0 0 80 120" className={soloSizeClass}>
         <motion.circle
           cx="40"
           cy="22"
           r="13"
           fill={color}
-          animate={{ r: isActive ? 15 : 13 }}
-          transition={{ type: 'spring', stiffness: 300 }}
+          animate={optimizeMotion ? undefined : { r: isActive ? 15 : 13 }}
+          transition={optimizeMotion ? undefined : { type: 'spring', stiffness: 300 }}
         />
         <motion.path
           d="M27 19 Q31 6 40 6 Q49 6 53 19"
@@ -194,7 +210,7 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
         />
         <rect x="28" y="88" width="11" height="22" rx="5" fill={colorDark} />
         <rect x="41" y="88" width="11" height="22" rx="5" fill={colorDark} />
-        {isActive && (
+        {isActive && !optimizeMotion && (
           <motion.circle
             cx="40"
             cy="60"
@@ -208,24 +224,35 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
           />
         )}
       </svg>
+      {isActive && optimizeMotion && (
+        <motion.span
+          className="pointer-events-none absolute inset-[14px] rounded-full border"
+          style={{ borderColor: `${color}55`, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+          initial={{ opacity: 0.18, scale: 0.94 }}
+          animate={{ opacity: [0.18, 0], scale: [1, 1.12] }}
+          transition={{ duration: 1.35, repeat: Infinity, ease: 'easeOut' }}
+        />
+      )}
+      </motion.div>
     );
   }
 
   if (type === 'trans') {
     return (
-      <svg
-        viewBox="0 0 80 120"
-        className={`${soloSizeClass} transition-transform duration-300 ${
-          isActive ? 'scale-110' : 'scale-100'
-        }`}
+      <motion.div
+        className="relative flex items-center justify-center transform-gpu"
+        style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+        animate={{ scale: shellScale }}
+        transition={shellTransition}
       >
+      <svg viewBox="0 0 80 120" className={soloSizeClass}>
         <motion.circle
           cx="40"
           cy="22"
           r="13"
           fill={color}
-          animate={{ r: isActive ? 15 : 13 }}
-          transition={{ type: 'spring', stiffness: 300 }}
+          animate={optimizeMotion ? undefined : { r: isActive ? 15 : 13 }}
+          transition={optimizeMotion ? undefined : { type: 'spring', stiffness: 300 }}
         />
         <motion.path
           d="M27 20 Q32 8 40 8 Q48 8 53 20"
@@ -240,7 +267,7 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
         />
         <rect x="30" y="88" width="10" height="22" rx="5" fill={colorDark} />
         <rect x="40" y="88" width="10" height="22" rx="5" fill={colorDark} />
-        {isActive && (
+        {isActive && !optimizeMotion && (
           <motion.circle
             cx="40"
             cy="60"
@@ -254,26 +281,37 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
           />
         )}
       </svg>
+      {isActive && optimizeMotion && (
+        <motion.span
+          className="pointer-events-none absolute inset-[14px] rounded-full border"
+          style={{ borderColor: `${color}55`, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+          initial={{ opacity: 0.18, scale: 0.94 }}
+          animate={{ opacity: [0.18, 0], scale: [1, 1.12] }}
+          transition={{ duration: 1.35, repeat: Infinity, ease: 'easeOut' }}
+        />
+      )}
+      </motion.div>
     );
   }
 
   if (type === 'pareja_hombres') {
     return (
-      <svg
-        viewBox="0 0 120 120"
-        className={`${pairSizeClass} transition-transform duration-300 ${
-          isActive ? 'scale-105' : 'scale-100'
-        }`}
+      <motion.div
+        className="relative flex items-center justify-center transform-gpu"
+        style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+        animate={{ scale: shellScale }}
+        transition={shellTransition}
       >
-        <motion.circle cx="38" cy="22" r="11" fill={color} animate={{ r: isActive ? 12 : 11 }} />
+      <svg viewBox="0 0 120 120" className={pairSizeClass}>
+        <motion.circle cx="38" cy="22" r="11" fill={color} animate={optimizeMotion ? undefined : { r: isActive ? 12 : 11 }} />
         <motion.rect x="27" y="38" width="22" height="30" rx="5" fill={color} />
         <rect x="28" y="70" width="9" height="22" rx="4" fill={colorDark} />
         <rect x="41" y="70" width="9" height="22" rx="4" fill={colorDark} />
-        <motion.circle cx="82" cy="22" r="11" fill={color} animate={{ r: isActive ? 12 : 11 }} />
+        <motion.circle cx="82" cy="22" r="11" fill={color} animate={optimizeMotion ? undefined : { r: isActive ? 12 : 11 }} />
         <motion.rect x="71" y="38" width="22" height="30" rx="5" fill={color} />
         <rect x="72" y="70" width="9" height="22" rx="4" fill={colorDark} />
         <rect x="85" y="70" width="9" height="22" rx="4" fill={colorDark} />
-        {isActive && (
+        {isActive && !optimizeMotion && (
           <motion.circle
             cx="60"
             cy="58"
@@ -287,28 +325,39 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
           />
         )}
       </svg>
+      {isActive && optimizeMotion && (
+        <motion.span
+          className="pointer-events-none absolute inset-[10px] rounded-full border"
+          style={{ borderColor: `${color}55`, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+          initial={{ opacity: 0.16, scale: 0.95 }}
+          animate={{ opacity: [0.16, 0], scale: [1, 1.1] }}
+          transition={{ duration: 1.35, repeat: Infinity, ease: 'easeOut' }}
+        />
+      )}
+      </motion.div>
     );
   }
 
   if (type === 'pareja_mujeres') {
     return (
-      <svg
-        viewBox="0 0 120 120"
-        className={`${pairSizeClass} transition-transform duration-300 ${
-          isActive ? 'scale-105' : 'scale-100'
-        }`}
+      <motion.div
+        className="relative flex items-center justify-center transform-gpu"
+        style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+        animate={{ scale: shellScale }}
+        transition={shellTransition}
       >
-        <motion.circle cx="38" cy="22" r="11" fill={color} animate={{ r: isActive ? 12 : 11 }} />
+      <svg viewBox="0 0 120 120" className={pairSizeClass}>
+        <motion.circle cx="38" cy="22" r="11" fill={color} animate={optimizeMotion ? undefined : { r: isActive ? 12 : 11 }} />
         <motion.path d="M28 18 Q32 8 38 8 Q44 8 48 18" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
         <motion.path d="M28 38 L26 70 Q26 74 32 74 L44 74 Q50 74 50 70 L48 38 Q46 34 38 34 Q30 34 28 38 Z" fill={color} />
         <rect x="29" y="74" width="8" height="18" rx="4" fill={colorDark} />
         <rect x="39" y="74" width="8" height="18" rx="4" fill={colorDark} />
-        <motion.circle cx="82" cy="22" r="11" fill={color} animate={{ r: isActive ? 12 : 11 }} />
+        <motion.circle cx="82" cy="22" r="11" fill={color} animate={optimizeMotion ? undefined : { r: isActive ? 12 : 11 }} />
         <motion.path d="M72 18 Q76 8 82 8 Q88 8 92 18" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
         <motion.path d="M72 38 L70 70 Q70 74 76 74 L88 74 Q94 74 94 70 L92 38 Q90 34 82 34 Q74 34 72 38 Z" fill={color} />
         <rect x="73" y="74" width="8" height="18" rx="4" fill={colorDark} />
         <rect x="83" y="74" width="8" height="18" rx="4" fill={colorDark} />
-        {isActive && (
+        {isActive && !optimizeMotion && (
           <motion.circle
             cx="60"
             cy="58"
@@ -322,23 +371,34 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
           />
         )}
       </svg>
+      {isActive && optimizeMotion && (
+        <motion.span
+          className="pointer-events-none absolute inset-[10px] rounded-full border"
+          style={{ borderColor: `${color}55`, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+          initial={{ opacity: 0.16, scale: 0.95 }}
+          animate={{ opacity: [0.16, 0], scale: [1, 1.1] }}
+          transition={{ duration: 1.35, repeat: Infinity, ease: 'easeOut' }}
+        />
+      )}
+      </motion.div>
     );
   }
 
   // Pareja
   return (
-    <svg
-      viewBox="0 0 120 120"
-      className={`${pairSizeClass} transition-transform duration-300 ${
-        isActive ? 'scale-105' : 'scale-100'
-      }`}
+    <motion.div
+      className="relative flex items-center justify-center transform-gpu"
+      style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+      animate={{ scale: shellScale }}
+      transition={shellTransition}
     >
-      <motion.circle cx="38" cy="22" r="11" fill={color} animate={{ r: isActive ? 12 : 11 }} />
+    <svg viewBox="0 0 120 120" className={pairSizeClass}>
+      <motion.circle cx="38" cy="22" r="11" fill={color} animate={optimizeMotion ? undefined : { r: isActive ? 12 : 11 }} />
       <motion.rect x="27" y="38" width="22" height="30" rx="5" fill={color} />
       <rect x="28" y="70" width="9" height="22" rx="4" fill={colorDark} />
       <rect x="41" y="70" width="9" height="22" rx="4" fill={colorDark} />
 
-      <motion.circle cx="82" cy="22" r="11" fill={color} animate={{ r: isActive ? 12 : 11 }} />
+      <motion.circle cx="82" cy="22" r="11" fill={color} animate={optimizeMotion ? undefined : { r: isActive ? 12 : 11 }} />
       <motion.path
         d="M69 19 Q73 8 82 8 Q91 8 95 19"
         fill="none"
@@ -353,7 +413,7 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
       <rect x="72" y="74" width="9" height="20" rx="4" fill={colorDark} />
       <rect x="85" y="74" width="9" height="20" rx="4" fill={colorDark} />
 
-      {isActive && (
+      {isActive && !optimizeMotion && (
         <motion.g
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: [0, 1.3, 1], opacity: 1 }}
@@ -364,7 +424,7 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
           </text>
         </motion.g>
       )}
-      {isActive && (
+      {isActive && !optimizeMotion && (
         <motion.ellipse
           cx="60"
           cy="55"
@@ -379,6 +439,16 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
         />
       )}
     </svg>
+    {isActive && optimizeMotion && (
+      <motion.span
+        className="pointer-events-none absolute inset-[10px] rounded-full border"
+        style={{ borderColor: `${color}55`, willChange: 'transform, opacity', transform: 'translateZ(0)' }}
+        initial={{ opacity: 0.16, scale: 0.95 }}
+        animate={{ opacity: [0.16, 0], scale: [1, 1.1] }}
+        transition={{ duration: 1.35, repeat: Infinity, ease: 'easeOut' }}
+      />
+    )}
+    </motion.div>
   );
 }
 
@@ -386,7 +456,7 @@ function PersonFigure({ type, isActive, size = 'lg' }) {
 // Profile Card Preview ("Ficha")
 // ────────────────────────────────────────────
 
-function FichaPreview({ data, currentStep }) {
+function FichaPreview({ data, currentStep, optimizeMotion = false }) {
   const { role, seeking, interests, name } = data;
   const seekingArr = Array.isArray(seeking) ? seeking : (seeking ? [seeking] : []);
   const locationText = formatLocation(data);
@@ -398,11 +468,12 @@ function FichaPreview({ data, currentStep }) {
     <motion.div
       initial={{ opacity: 0, y: -20, scaleY: 0.8 }}
       animate={{ opacity: 1, y: 0, scaleY: 1 }}
-      transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-      className="mx-auto w-full max-w-[390px] sm:max-w-[420px] mb-4"
+      transition={optimizeMotion ? { duration: 0.22, ease: 'easeOut' } : { type: 'spring', stiffness: 200, damping: 20 }}
+      className="mx-auto mb-4 w-full max-w-[390px] sm:max-w-[420px] transform-gpu"
+      style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
     >
       <motion.div
-        layout
+        layout={optimizeMotion ? undefined : true}
         className="bg-mansion-card/90 backdrop-blur-sm rounded-2xl border border-mansion-border/40 p-3 relative overflow-hidden"
       >
         {/* Gold accent line */}
@@ -412,19 +483,20 @@ function FichaPreview({ data, currentStep }) {
         <AnimatePresence>
           {(role || seekingArr.length > 0) && (
             <motion.div
-              layout
+              layout={optimizeMotion ? undefined : true}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
+              transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : undefined}
               className="flex items-center justify-center gap-2 sm:gap-3"
             >
               {role && (
                 <motion.div
                   initial={{ opacity: 0, x: -20, scale: 0.5 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 300 }}
+                  transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
                   className="flex flex-col items-center"
                 >
-                  <PersonFigure type={role} isActive size="sm" />
+                  <PersonFigure type={role} isActive size="sm" optimizeMotion={optimizeMotion} />
                   <span className="text-[10px] text-text-dim mt-0.5">Soy</span>
                 </motion.div>
               )}
@@ -433,7 +505,7 @@ function FichaPreview({ data, currentStep }) {
                 <motion.div
                   initial={{ opacity: 0, scale: 0 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: 'spring', delay: 0.1 }}
+                  transition={optimizeMotion ? { duration: 0.18, delay: 0.04, ease: 'easeOut' } : { type: 'spring', delay: 0.1 }}
                 >
                   <Heart className="w-3.5 h-3.5 text-mansion-crimson fill-mansion-crimson" />
                 </motion.div>
@@ -443,20 +515,22 @@ function FichaPreview({ data, currentStep }) {
                 <motion.div
                   initial={{ opacity: 0, x: 20, scale: 0.5 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 300 }}
+                  transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
                   className="flex flex-col items-center"
                 >
-                  <div className="flex max-w-[210px] flex-wrap items-end justify-center gap-0.5">
+                  <div className="max-w-[240px] overflow-x-auto overflow-y-hidden overscroll-x-contain scrollbar-hide [-webkit-overflow-scrolling:touch]">
+                    <div className="inline-flex min-w-max items-end justify-start gap-0.5 px-1 pb-1">
                     {seekingArr.map((s, i) => (
                       <motion.div
                         key={s}
                         initial={{ opacity: 0, scale: 0 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: i * 0.1 }}
+                        transition={optimizeMotion ? { duration: 0.18, delay: i * 0.04, ease: 'easeOut' } : { delay: i * 0.1 }}
                       >
-                        <PersonFigure type={s} isActive size="sm" />
+                        <PersonFigure type={s} isActive size="sm" optimizeMotion={optimizeMotion} />
                       </motion.div>
                     ))}
+                    </div>
                   </div>
                   <span className="text-[10px] text-text-dim mt-0.5">Busco</span>
                 </motion.div>
@@ -627,7 +701,7 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
   );
 }
 
-function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
+function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {}, optimizeMotion = false }) {
   const [showOtherRoles, setShowOtherRoles] = useState(() => OTHER_ROLES.some((role) => role.id === selected));
 
   useEffect(() => {
@@ -649,7 +723,7 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
             <motion.button
               key={role.id}
               whileTap={{ scale: 0.93 }}
-              whileHover={{ scale: 1.03 }}
+              whileHover={optimizeMotion ? undefined : { scale: 1.03 }}
               onClick={() => onSelect(role.id)}
               className="flex min-h-[162px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
               style={{
@@ -663,7 +737,7 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
                 </div>
               ) : (
                 <div className="w-20 h-[102px] flex items-center justify-center">
-                  <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                  <PersonFigure type={role.id} isActive={isActive} size="lg" optimizeMotion={optimizeMotion} />
                 </div>
               )}
               <span
@@ -717,7 +791,7 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
                   <motion.button
                     key={role.id}
                     whileTap={{ scale: 0.93 }}
-                    whileHover={{ scale: 1.03 }}
+                    whileHover={optimizeMotion ? undefined : { scale: 1.03 }}
                     onClick={() => onSelect(role.id)}
                     className="flex min-h-[162px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
                     style={{
@@ -726,7 +800,7 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
                     }}
                   >
                     <div className="w-20 h-[102px] flex items-center justify-center">
-                      <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                      <PersonFigure type={role.id} isActive={isActive} size="lg" optimizeMotion={optimizeMotion} />
                     </div>
                     <span className={`mt-2 font-medium text-sm leading-tight ${isActive ? 'text-text-primary' : 'text-text-muted'}`}>
                       {role.label}
@@ -755,7 +829,7 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
   );
 }
 
-function SeekingGrid({ selected, onToggle, roleImages = {} }) {
+function SeekingGrid({ selected, onToggle, roleImages = {}, optimizeMotion = false }) {
   const [showOtherRoles, setShowOtherRoles] = useState(() => OTHER_ROLES.some((role) => selected.includes(role.id)));
 
   useEffect(() => {
@@ -787,10 +861,10 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
             return (
               <motion.button
                 key={role.id}
-                layout
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                layout={optimizeMotion ? undefined : true}
+                transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 400, damping: 30 }}
                 whileTap={{ scale: 0.93 }}
-                whileHover={{ scale: 1.03 }}
+                whileHover={optimizeMotion ? undefined : { scale: 1.03 }}
                 onClick={() => onToggle(role.id)}
                 className="flex min-h-[162px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
                 style={{
@@ -804,7 +878,7 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
                   </div>
                 ) : (
                   <div className="w-20 h-[102px] flex items-center justify-center">
-                    <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                    <PersonFigure type={role.id} isActive={isActive} size="lg" optimizeMotion={optimizeMotion} />
                   </div>
                 )}
                 <span
@@ -859,7 +933,7 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
                   <motion.button
                     key={role.id}
                     whileTap={{ scale: 0.93 }}
-                    whileHover={{ scale: 1.03 }}
+                    whileHover={optimizeMotion ? undefined : { scale: 1.03 }}
                     onClick={() => onToggle(role.id)}
                     className="flex min-h-[162px] w-full flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
                     style={{
@@ -868,7 +942,7 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
                     }}
                   >
                     <div className="w-20 h-[102px] flex items-center justify-center">
-                      <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                      <PersonFigure type={role.id} isActive={isActive} size="lg" optimizeMotion={optimizeMotion} />
                     </div>
                     <span className={`mt-2 font-medium text-sm text-center leading-tight ${isActive ? 'text-text-primary' : 'text-text-muted'}`}>
                       {role.label}
@@ -1433,6 +1507,39 @@ export default function RegisterPage() {
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [hidePasswordDefault, setHidePasswordDefault] = useState(true);
   const [roleImages, setRoleImages] = useState({});
+  const [optimizeOnboardingMotion, setOptimizeOnboardingMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+
+    const coarseMq = window.matchMedia('(pointer: coarse)');
+    const narrowMq = window.matchMedia('(max-width: 768px)');
+    const reducedMq = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    const applyMotionProfile = () => {
+      setOptimizeOnboardingMotion(coarseMq.matches || narrowMq.matches || reducedMq.matches);
+    };
+
+    const addListener = (mq, handler) => {
+      if (typeof mq.addEventListener === 'function') mq.addEventListener('change', handler);
+      else mq.addListener(handler);
+    };
+    const removeListener = (mq, handler) => {
+      if (typeof mq.removeEventListener === 'function') mq.removeEventListener('change', handler);
+      else mq.removeListener(handler);
+    };
+
+    applyMotionProfile();
+    addListener(coarseMq, applyMotionProfile);
+    addListener(narrowMq, applyMotionProfile);
+    addListener(reducedMq, applyMotionProfile);
+
+    return () => {
+      removeListener(coarseMq, applyMotionProfile);
+      removeListener(narrowMq, applyMotionProfile);
+      removeListener(reducedMq, applyMotionProfile);
+    };
+  }, []);
 
   // Load Turnstile script once
   useEffect(() => {
@@ -1750,6 +1857,7 @@ export default function RegisterPage() {
             title="Soy un..."
             subtitle="Selecciona tu perfil"
             roleImages={roleImages}
+            optimizeMotion={optimizeOnboardingMotion}
           />
         );
       case 2:
@@ -1758,6 +1866,7 @@ export default function RegisterPage() {
             selected={seeking}
             onToggle={handleSeekingToggle}
             roleImages={roleImages}
+            optimizeMotion={optimizeOnboardingMotion}
           />
         );
       case 3:
@@ -1807,7 +1916,7 @@ export default function RegisterPage() {
 
       {/* Profile Card Preview */}
       <div className="relative z-10 px-6">
-        <FichaPreview data={fichaData} currentStep={step} />
+        <FichaPreview data={fichaData} currentStep={step} optimizeMotion={optimizeOnboardingMotion} />
       </div>
 
       {/* Content */}
@@ -1820,8 +1929,9 @@ export default function RegisterPage() {
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="w-full max-w-md"
+            transition={optimizeOnboardingMotion ? { duration: 0.2, ease: 'easeOut' } : { duration: 0.3, ease: 'easeInOut' }}
+            className="w-full max-w-md transform-gpu"
+            style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
           >
             {renderStep()}
           </motion.div>
