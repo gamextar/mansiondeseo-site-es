@@ -1,0 +1,28 @@
+{
+  "profiles": [
+    {
+      "username": "sofia.noir",
+      "email": "placeholder+sofia.noir@mansiondeseo.local",
+      "role": "mujer",
+      "seeking": ["hombre"],
+      "interests": ["lujo", "cenas", "viajes"],
+      "age": 27,
+      "city": "Buenos Aires",
+      "country": "AR",
+      "bio": "Placeholder de ejemplo para importar desde assets locales.",
+      "premium": true,
+      "avatarPath": "./seed-assets/sofia/avatar.jpg",
+      "photoPaths": [
+        "./seed-assets/sofia/gallery-1.jpg",
+        "./seed-assets/sofia/gallery-2.jpg"
+      ],
+      "storyVideoPath": "./seed-assets/sofia/story.mp4",
+      "storyCaption": "Noche de lujo",
+      "avatarCrop": {
+        "x": 50,
+        "y": 50,
+        "scale": 1
+      }
+    }
+  ]
+}
