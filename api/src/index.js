@@ -4042,29 +4042,11 @@ async function handleRequest(request, env) {
     return handleNotificationWebSocket(request, env);
   }
 
-  // ── Rutas server-to-server (bypass Turnstile) — autenticadas con HMAC o verificación API)
+  // ── Rutas server-to-server — autenticadas con HMAC o verificación API
   if (path === '/api/payment/approved' && method === 'POST') return handlePaymentApproved(request, env);
   if (path === '/api/payment/uala-approved' && method === 'POST') return handleUalaApproved(request, env);
 
-  // Story upload is JWT-authenticated and sends large binary bodies — skip Turnstile
   if (path === '/api/stories' && method === 'POST') return handleUploadStory(request, env);
-
-  // Pre-auth checks have no side effects — skip Turnstile (token doesn't exist yet at blur time)
-  if (path === '/api/auth/check-email' && method === 'POST') return handleCheckEmail(request, env);
-  if (path === '/api/auth/check-username' && method === 'POST') return handleCheckUsername(request, env);
-
-  // Turnstile validation for mutations (skip for GET and dev)
-  if (['POST', 'PUT', 'DELETE'].includes(method) && env.TURNSTILE_SECRET) {
-    const turnstileToken = request.headers.get('X-Turnstile-Token');
-    if (!turnstileToken) {
-      return error('Verificación de Turnstile requerida', 403);
-    }
-    const ip = request.headers.get('CF-Connecting-IP');
-    const valid = await validateTurnstile(turnstileToken, env.TURNSTILE_SECRET, ip);
-    if (!valid) {
-      return error('Verificación de Turnstile fallida', 403);
-    }
-  }
 
   // ── Auth routes
   if (path === '/api/auth/register' && method === 'POST') return handleRegister(request, env);
