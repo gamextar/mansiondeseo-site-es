@@ -30,6 +30,7 @@ Opciones:
   --page-end <n>                 Página final
   --max-profiles <n>             Máximo de perfiles a extraer en esta corrida
   --profile-url <url>            Extrae un solo perfil
+  --force                        Reextrae perfiles aunque ya estén marcados en el state
   --delay-ms <n>                 Espera entre perfiles/páginas
   --fresh-session                Ignora la sesión guardada y obliga nuevo login
   --help                         Muestra esta ayuda
@@ -63,6 +64,7 @@ const manualLogin = hasFlag('--manual-login')
 const explicitHeadless = hasFlag('--headless')
 const headed = hasFlag('--headed')
 const freshSession = hasFlag('--fresh-session')
+const force = hasFlag('--force')
 const pageStart = Number.parseInt(takeFlag('--page-start', '1'), 10)
 const pageEnd = Number.parseInt(takeFlag('--page-end', String(pageStart)), 10)
 const maxProfiles = Number.parseInt(takeFlag('--max-profiles', '0'), 10)
@@ -470,7 +472,7 @@ async function main() {
       urls.push(profileUrl)
     } else {
       for (let pageNo = pageStart; pageNo <= pageEnd; pageNo += 1) {
-        if (state.processedPages.includes(pageNo)) {
+        if (!force && state.processedPages.includes(pageNo)) {
           console.log(`Saltando page ${pageNo} (ya procesada)`)
           continue
         }
@@ -478,9 +480,9 @@ async function main() {
         console.log(`Leyendo listado ${listUrl}`)
         const links = await getProfileLinksFromList(page, listUrl)
         for (const link of links) {
-          if (!state.processedProfiles[link]) urls.push(link)
+          if (force || !state.processedProfiles[link]) urls.push(link)
         }
-        state.processedPages.push(pageNo)
+        if (!state.processedPages.includes(pageNo)) state.processedPages.push(pageNo)
         await writeJson(statePath, state)
         if (delayMs > 0) await delay(delayMs)
       }
@@ -489,7 +491,10 @@ async function main() {
     let processedThisRun = 0
     for (const url of urls) {
       if (maxProfiles > 0 && processedThisRun >= maxProfiles) break
-      if (state.processedProfiles[url]) continue
+      if (!force && state.processedProfiles[url]) {
+        console.log(`Saltando perfil ya procesado: ${url}`)
+        continue
+      }
 
       console.log(`Extrayendo ${url}`)
       const profile = await extractProfileData(page, context.request, url)
