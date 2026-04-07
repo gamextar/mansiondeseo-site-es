@@ -298,7 +298,7 @@ async function extractProfileData(page, requestContext, url) {
           const videoMatch = html.match(/<video[^>]+src=["']([^"']+)["']/i)
           const imageMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i)
           const styleMatch = html.match(/url\((["']?)(.*?)\1\)/i)
-          const candidate = sourceMatch?.[1] || videoMatch?.[1] || imageMatch?.[1] || styleMatch?.[2] || fallback
+          const candidate = sourceMatch?.[1] || videoMatch?.[1] || styleMatch?.[2] || imageMatch?.[1] || fallback
           finalUrl = absolutize(absoluteZoom, candidate)
           mediaType = /(mp4|webm|mov)(\?|$)/i.test(finalUrl) ? 'video' : 'image'
         } else if (contentType.includes('video/') || contentType.includes('image/')) {
@@ -368,6 +368,12 @@ async function downloadFile(requestContext, fileUrl, destinationPath) {
   await fs.writeFile(destinationPath, buffer)
 }
 
+async function inferRemoteExtension(requestContext, fileUrl) {
+  const response = await requestContext.get(fileUrl, { failOnStatusCode: false })
+  const contentType = String(response.headers()['content-type'] || '').toLowerCase()
+  return pickExtension(fileUrl, contentType)
+}
+
 function manifestRelativePath(filePath) {
   return path.relative(path.dirname(outputPath), filePath)
 }
@@ -383,7 +389,7 @@ async function materializeProfileAssets(profile, requestContext) {
 
   let avatarPath = ''
   if (avatar?.url) {
-    const ext = pickExtension(avatar.url)
+    const ext = await inferRemoteExtension(requestContext, avatar.url)
     const absolute = path.join(userDir, `avatar.${ext}`)
     await downloadFile(requestContext, avatar.url, absolute)
     avatarPath = manifestRelativePath(absolute)
@@ -392,7 +398,7 @@ async function materializeProfileAssets(profile, requestContext) {
   const photoPaths = []
   for (let index = 0; index < gallery.length; index += 1) {
     const item = gallery[index]
-    const ext = pickExtension(item.url)
+    const ext = await inferRemoteExtension(requestContext, item.url)
     const absolute = path.join(userDir, `photo-${String(index + 1).padStart(2, '0')}.${ext}`)
     await downloadFile(requestContext, item.url, absolute)
     photoPaths.push(manifestRelativePath(absolute))
@@ -401,7 +407,7 @@ async function materializeProfileAssets(profile, requestContext) {
   let storyVideoPath = ''
   const firstStory = stories[0]
   if (firstStory?.url) {
-    const ext = pickExtension(firstStory.url)
+    const ext = await inferRemoteExtension(requestContext, firstStory.url)
     const absolute = path.join(userDir, `story.${ext}`)
     await downloadFile(requestContext, firstStory.url, absolute)
     storyVideoPath = manifestRelativePath(absolute)
