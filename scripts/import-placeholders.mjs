@@ -175,6 +175,25 @@ function extFromPath(filePath) {
   return ext || 'bin'
 }
 
+function sanitizeKeySegment(input, fallback = 'media') {
+  return String(input || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64) || fallback
+}
+
+function stableProfileMediaKey(username, filePath, kind, index = 0) {
+  const ext = extFromPath(filePath)
+  const slug = sanitizeKeySegment(username, 'user')
+  if (kind === 'story') return `stories/${slug}.${ext}`
+  if (kind === 'avatar') return `profiles/${slug}/avatar.${ext}`
+  return `profiles/${slug}/photo-${String(index + 1).padStart(2, '0')}.${ext}`
+}
+
 function guessContentType(filePath) {
   const ext = extFromPath(filePath)
   switch (ext) {
@@ -371,7 +390,7 @@ function uploadToR2(key, filePath) {
   return `${wranglerConfig.publicUrl}/${key}`
 }
 
-async function resolveMediaReference(baseDir, userId, input, kind) {
+async function resolveMediaReference(baseDir, username, input, kind, index = 0) {
   if (!input) return null
   if (isRemoteUrl(input)) return input
 
@@ -380,10 +399,7 @@ async function resolveMediaReference(baseDir, userId, input, kind) {
     throw new Error(`No existe archivo: ${absolutePath}`)
   }
 
-  const ext = extFromPath(absolutePath)
-  const key = kind === 'story'
-    ? `stories/${randomUUID()}.${ext}`
-    : `profiles/${userId}/${randomUUID()}.${ext}`
+  const key = stableProfileMediaKey(username, absolutePath, kind, index)
 
   if (dryRun) {
     return `${wranglerConfig.publicUrl}/${key}`
@@ -422,10 +438,10 @@ async function upsertProfile(profile, manifestDir) {
       )[0] || null)
   const userId = existing?.id || profile.id || randomUUID()
 
-  const uploadedAvatar = await resolveMediaReference(manifestDir, userId, profile.avatarPath || null, 'avatar')
+  const uploadedAvatar = await resolveMediaReference(manifestDir, username, profile.avatarPath || null, 'avatar')
   const uploadedPhotos = []
-  for (const photoPath of ensureArray(profile.photoPaths)) {
-    uploadedPhotos.push(await resolveMediaReference(manifestDir, userId, photoPath, 'gallery'))
+  for (const [index, photoPath] of ensureArray(profile.photoPaths).entries()) {
+    uploadedPhotos.push(await resolveMediaReference(manifestDir, username, photoPath, 'gallery', index))
   }
 
   let avatarUrl = uploadedAvatar || ''
@@ -512,7 +528,7 @@ async function upsertProfile(profile, manifestDir) {
   const storySource = profile.storyVideoPath || null
   if (!storySource) return { userId, username, created: !existing }
 
-  const storyUrl = await resolveMediaReference(manifestDir, userId, storySource, 'story')
+  const storyUrl = await resolveMediaReference(manifestDir, username, storySource, 'story')
   const storyCaption = profile.storyCaption || ''
 
   if (dryRun) {
