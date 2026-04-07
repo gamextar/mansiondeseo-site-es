@@ -39,8 +39,8 @@ Formato del manifest:
 Campos soportados por perfil:
   username            requerido
   email               opcional (si falta, se genera)
-  role                requerido: hombre | mujer | pareja
-  seeking             requerido: array de roles
+  role                requerido: hombre | mujer | pareja | pareja_hombres | pareja_mujeres | trans
+  seeking             requerido: array de roles (hombre | mujer | pareja)
   interests           opcional: array
   age, birthdate, province, locality, country, bio
   premium             opcional boolean
@@ -349,13 +349,14 @@ function validateProfile(profile) {
   if (!profile?.username) throw new Error('Cada perfil necesita username')
   if (!profile?.role) throw new Error(`Falta role en ${profile.username}`)
 
-  const validRoles = new Set(['hombre', 'mujer', 'pareja'])
+  const validRoles = new Set(['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'])
+  const validSeekingRoles = new Set(['hombre', 'mujer', 'pareja'])
   if (!validRoles.has(profile.role)) {
     throw new Error(`role inválido en ${profile.username}: ${profile.role}`)
   }
 
   const seeking = ensureArray(profile.seeking)
-  if (seeking.length === 0 || seeking.some((value) => !validRoles.has(value))) {
+  if (seeking.length === 0 || seeking.some((value) => !validSeekingRoles.has(value))) {
     throw new Error(`seeking inválido en ${profile.username}`)
   }
 }

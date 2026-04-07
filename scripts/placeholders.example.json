@@ -24,6 +24,19 @@
         "y": 50,
         "scale": 1
       }
+    },
+    {
+      "username": "velvet.duo",
+      "email": "placeholder+velvet.duo@mansiondeseo.local",
+      "role": "pareja_mujeres",
+      "seeking": ["hombre", "pareja"],
+      "interests": ["swinger", "lujo", "trios"],
+      "birthdate": "1995-09-22",
+      "province": "CABA",
+      "locality": "Recoleta",
+      "country": "AR",
+      "bio": "Ejemplo de pareja de mujeres para pruebas de importación.",
+      "premium": true
     }
   ]
 }
