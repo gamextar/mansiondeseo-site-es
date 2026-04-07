@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import {
@@ -1150,6 +1150,9 @@ export default function RegisterPage() {
   const [devCode, setDevCode] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileWidgetRef = useRef(null);
+  const turnstileContainerRef = useRef(null);
   const [emailStatus, setEmailStatus] = useState('idle'); // idle | checking | valid | exists | invalid
   const [usernameStatus, setUsernameStatus] = useState('idle'); // idle | checking | valid | exists | invalid
 
@@ -1160,6 +1163,44 @@ export default function RegisterPage() {
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [hidePasswordDefault, setHidePasswordDefault] = useState(true);
   const [roleImages, setRoleImages] = useState({});
+
+  // Load Turnstile script once
+  useEffect(() => {
+    if (document.getElementById('cf-turnstile-script')) return;
+    const script = document.createElement('script');
+    script.id = 'cf-turnstile-script';
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+  }, []);
+
+  // Render Turnstile widget when reaching last step
+  useEffect(() => {
+    if (step !== TOTAL_STEPS - 1) return;
+    if (!turnstileContainerRef.current) return;
+
+    const tryRender = () => {
+      if (!window.turnstile) { setTimeout(tryRender, 100); return; }
+      if (turnstileWidgetRef.current != null) return; // already rendered
+      turnstileWidgetRef.current = window.turnstile.render(turnstileContainerRef.current, {
+        sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA', // fallback = always-pass test key
+        theme: 'dark',
+        callback: (token) => setTurnstileToken(token),
+        'expired-callback': () => setTurnstileToken(''),
+        'error-callback': () => setTurnstileToken(''),
+      });
+    };
+    tryRender();
+
+    return () => {
+      if (turnstileWidgetRef.current != null && window.turnstile) {
+        window.turnstile.remove(turnstileWidgetRef.current);
+        turnstileWidgetRef.current = null;
+        setTurnstileToken('');
+      }
+    };
+  }, [step]);
 
   useEffect(() => {
     Promise.all([
@@ -1312,6 +1353,7 @@ export default function RegisterPage() {
           locality: info.locality,
           bio: info.bio,
           country: selectedCountry || undefined,
+          turnstileToken: turnstileToken || undefined,
         });
 
         // Show verification screen
@@ -1454,7 +1496,13 @@ export default function RegisterPage() {
       case 4:
         return <StepBasicInfo data={info} onChange={setInfo} showCountryPicker={showCountryPicker} allowedCountries={allowedCountries} selectedCountry={selectedCountry} onCountryChange={setSelectedCountry} usernameStatus={usernameStatus} onUsernameBlur={handleUsernameBlur} />;
       case 5:
-        return <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />;
+        return (
+          <>
+            <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />
+            {/* Turnstile widget — renders invisibly below the photo step */}
+            <div ref={turnstileContainerRef} className="flex justify-center mt-4" />
+          </>
+        );
       default:
         return null;
     }
