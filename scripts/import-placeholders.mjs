@@ -40,7 +40,7 @@ Campos soportados por perfil:
   username            requerido
   email               opcional (si falta, se genera)
   role                requerido: hombre | mujer | pareja | pareja_hombres | pareja_mujeres | trans
-  seeking             requerido: array de roles (hombre | mujer | pareja)
+  seeking             requerido: array de roles (hombre | mujer | pareja | pareja_hombres | pareja_mujeres | trans)
   interests           opcional: array
   age, birthdate, province, locality, marital_status, sexual_orientation, country, bio
   premium             opcional boolean
@@ -374,7 +374,7 @@ function validateProfile(profile) {
   if (!profile?.role) throw new Error(`Falta role en ${profile.username}`)
 
   const validRoles = new Set(['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'])
-  const validSeekingRoles = new Set(['hombre', 'mujer', 'pareja'])
+  const validSeekingRoles = new Set(['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'])
   if (!validRoles.has(profile.role)) {
     throw new Error(`role inválido en ${profile.username}: ${profile.role}`)
   }

@@ -1,0 +1,502 @@
+#!/usr/bin/env node
+
+import fs from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+import process from 'node:process'
+import readline from 'node:readline/promises'
+import { stdin as input, stdout as output } from 'node:process'
+import { chromium } from 'playwright'
+
+function printUsage() {
+  console.log(`Uso:
+  node scripts/extract-contactossex.mjs --manual-login --page-start 1 --page-end 1
+  node scripts/extract-contactossex.mjs --page-start 22 --page-end 24 --max-profiles 12
+  node scripts/extract-contactossex.mjs --profile-url https://contactossex.com/members/profile/BiCuriosa91
+
+Descripción:
+  Extrae perfiles desde contactossex.com y genera un manifest compatible con import-placeholders.
+
+Opciones:
+  --manual-login                 Abre el navegador y espera login manual antes de extraer
+  --headed                       Fuerza navegador visible
+  --headless                     Fuerza navegador oculto
+  --session <path>               Archivo de storage state de Playwright
+  --state <path>                 Archivo de estado incremental
+  --output <path>                Manifest JSON de salida
+  --assets-dir <path>            Carpeta donde guardar fotos/videos descargados
+  --list-url-template <url>      URL de listados con {page}. Default: https://contactossex.com/members?page={page}
+  --page-start <n>               Página inicial
+  --page-end <n>                 Página final
+  --max-profiles <n>             Máximo de perfiles a extraer en esta corrida
+  --profile-url <url>            Extrae un solo perfil
+  --delay-ms <n>                 Espera entre perfiles/páginas
+  --fresh-session                Ignora la sesión guardada y obliga nuevo login
+  --help                         Muestra esta ayuda
+`)
+}
+
+const rawArgs = process.argv.slice(2)
+
+function takeFlag(name, fallback = null) {
+  const index = rawArgs.indexOf(name)
+  if (index === -1) return fallback
+  const value = rawArgs[index + 1]
+  rawArgs.splice(index, 2)
+  return value ?? fallback
+}
+
+function hasFlag(name) {
+  const index = rawArgs.indexOf(name)
+  if (index === -1) return false
+  rawArgs.splice(index, 1)
+  return true
+}
+
+if (rawArgs.includes('--help') || rawArgs.includes('-h')) {
+  printUsage()
+  process.exit(0)
+}
+
+const repoRoot = process.cwd()
+const manualLogin = hasFlag('--manual-login')
+const explicitHeadless = hasFlag('--headless')
+const headed = hasFlag('--headed')
+const freshSession = hasFlag('--fresh-session')
+const pageStart = Number.parseInt(takeFlag('--page-start', '1'), 10)
+const pageEnd = Number.parseInt(takeFlag('--page-end', String(pageStart)), 10)
+const maxProfiles = Number.parseInt(takeFlag('--max-profiles', '0'), 10)
+const delayMs = Number.parseInt(takeFlag('--delay-ms', '1200'), 10)
+const listUrlTemplate = takeFlag('--list-url-template', 'https://contactossex.com/members?page={page}')
+const profileUrl = takeFlag('--profile-url', '')
+const sessionPath = path.resolve(repoRoot, takeFlag('--session', './data/contactossex-session.json'))
+const statePath = path.resolve(repoRoot, takeFlag('--state', './data/contactossex-extract-state.json'))
+const outputPath = path.resolve(repoRoot, takeFlag('--output', './data/contactossex-placeholders.json'))
+const assetsDir = path.resolve(repoRoot, takeFlag('--assets-dir', './data/contactossex-assets'))
+const headless = explicitHeadless ? true : !headed && !manualLogin
+
+if (rawArgs.length > 0) {
+  console.error(`Argumentos no reconocidos: ${rawArgs.join(' ')}`)
+  printUsage()
+  process.exit(1)
+}
+
+async function ensureDir(dirPath) {
+  await fs.mkdir(dirPath, { recursive: true })
+}
+
+async function readJson(filePath, fallback) {
+  if (!existsSync(filePath)) return fallback
+  try {
+    const raw = await fs.readFile(filePath, 'utf8')
+    return JSON.parse(raw)
+  } catch {
+    return fallback
+  }
+}
+
+async function writeJson(filePath, value) {
+  await ensureDir(path.dirname(filePath))
+  await fs.writeFile(filePath, JSON.stringify(value, null, 2))
+}
+
+function slugifySegment(value, fallback = 'profile') {
+  const slug = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return slug || fallback
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function parseSpanishRole(raw) {
+  const value = String(raw || '').trim().toLowerCase()
+  if (!value) return 'mujer'
+  if (value.includes('pareja de hombres')) return 'pareja_hombres'
+  if (value.includes('pareja de mujeres')) return 'pareja_mujeres'
+  if (value.includes('trans')) return 'trans'
+  if (value.includes('pareja')) return 'pareja'
+  if (value.includes('hombre')) return 'hombre'
+  if (value.includes('mujer')) return 'mujer'
+  return 'mujer'
+}
+
+function parseSeeking(raw) {
+  const tokens = String(raw || '')
+    .split(',')
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean)
+
+  const mapped = []
+  for (const token of tokens) {
+    if (token.includes('pareja de hombres')) mapped.push('pareja_hombres')
+    else if (token.includes('pareja de mujeres')) mapped.push('pareja_mujeres')
+    else if (token.includes('parejas') || token.includes('pareja')) mapped.push('pareja')
+    else if (token.includes('mujeres') || token.includes('mujer')) mapped.push('mujer')
+    else if (token.includes('hombres') || token.includes('hombre')) mapped.push('hombre')
+    else if (token.includes('trans')) mapped.push('trans')
+  }
+
+  return [...new Set(mapped)]
+}
+
+function parseAge(raw) {
+  const match = String(raw || '').match(/(\d{2})/)
+  return match ? Number(match[1]) : null
+}
+
+function pickExtension(url, contentType = '') {
+  const clean = String(url || '').split('?')[0].split('#')[0]
+  const ext = path.extname(clean).replace('.', '').toLowerCase()
+  if (ext) return ext
+  const normalizedType = String(contentType || '').toLowerCase()
+  if (normalizedType.includes('jpeg')) return 'jpg'
+  if (normalizedType.includes('png')) return 'png'
+  if (normalizedType.includes('webp')) return 'webp'
+  if (normalizedType.includes('gif')) return 'gif'
+  if (normalizedType.includes('mp4')) return 'mp4'
+  if (normalizedType.includes('webm')) return 'webm'
+  return 'bin'
+}
+
+function absolutize(base, maybeRelative) {
+  try {
+    return new URL(maybeRelative, base).toString()
+  } catch {
+    return ''
+  }
+}
+
+function unique(items) {
+  return [...new Set(items.filter(Boolean))]
+}
+
+async function promptForEnter(message) {
+  const rl = readline.createInterface({ input, output })
+  try {
+    await rl.question(`${message}\n`)
+  } finally {
+    rl.close()
+  }
+}
+
+async function ensureAuthenticated(page, context) {
+  await page.goto('https://contactossex.com', { waitUntil: 'domcontentloaded' })
+  await delay(1200)
+  if (!manualLogin && !freshSession && existsSync(sessionPath)) return
+
+  console.log('\nLogin manual requerido.')
+  console.log('1. Inicia sesión en la ventana del navegador.')
+  console.log('2. Navega a una página autenticada que muestre miembros.')
+  console.log('3. Vuelve aquí y presiona Enter para continuar.')
+  await promptForEnter('Presiona Enter cuando el login esté completo...')
+
+  await ensureDir(path.dirname(sessionPath))
+  await context.storageState({ path: sessionPath })
+  console.log(`Sesión guardada en ${sessionPath}`)
+}
+
+async function getProfileLinksFromList(page, url) {
+  await page.goto(url, { waitUntil: 'domcontentloaded' })
+  await delay(Math.max(400, delayMs))
+  return page.evaluate(() => {
+    const anchors = Array.from(document.querySelectorAll('a[href*="/members/profile/"]'))
+    return [...new Set(anchors.map((a) => a.href).filter(Boolean))]
+  })
+}
+
+async function extractProfileData(page, requestContext, url) {
+  await page.goto(url, { waitUntil: 'domcontentloaded' })
+  await delay(Math.max(500, delayMs))
+
+  const extracted = await page.evaluate(() => {
+    const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim()
+    const textByHeading = (heading) => {
+      const cards = Array.from(document.querySelectorAll('article.card-info-general .item'))
+      const found = cards.find((item) => clean(item.querySelector('h3')?.textContent).toLowerCase() === heading.toLowerCase())
+      return clean(found?.querySelector('p')?.textContent || '')
+    }
+    const description = clean(document.querySelector('.description-wrapper .description p')?.textContent || '')
+    const username = clean(document.querySelector('.profile-bar h3 span')?.textContent || '')
+    const online = !!document.querySelector('.tag-online')
+    const chatButton = document.querySelector('.btn-chat')
+    const mainPictureLink = document.querySelector('a[data-fancybox="gallery"][href*="/members/picture-zoom"]')
+    const mainPictureStyle = document.querySelector('.main-picture')?.getAttribute('style') || ''
+    const backgroundMatch = mainPictureStyle.match(/url\((["']?)(.*?)\1\)/i)
+    const galleryItems = Array.from(document.querySelectorAll('.card-multimedia a[href*="/members/picture-zoom"]')).map((anchor) => ({
+      href: anchor.href,
+      thumb: anchor.querySelector('img')?.src || '',
+    }))
+
+    return {
+      url: window.location.href,
+      username,
+      userId: chatButton?.getAttribute('data-user-id') || '',
+      online,
+      personalInfo: textByHeading('Información Personal'),
+      location: textByHeading('Ubicación'),
+      seeking: textByHeading('Buscando'),
+      bio: description,
+      mainPictureHref: mainPictureLink?.href || '',
+      mainPictureThumb: backgroundMatch?.[2] || '',
+      galleryItems,
+    }
+  })
+
+  const personalParts = extracted.personalInfo
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+  const roleLabel = personalParts[0] || ''
+  const ageValue = parseAge(personalParts.find((part) => /\d+\s*años/i.test(part)) || '')
+  const sexualOrientation = personalParts.find((part) => !/\d+\s*años/i.test(part) && !/^de$/i.test(part) && part !== roleLabel) || ''
+  const maritalStatus = personalParts.slice(3).join(', ').trim() || personalParts[2] || ''
+
+  const locationParts = extracted.location
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+  const locality = locationParts[0] || ''
+  const province = locationParts[1] || ''
+  const country = locationParts[2] || 'Argentina'
+
+  const mediaRefs = []
+  if (extracted.mainPictureHref || extracted.mainPictureThumb) {
+    mediaRefs.push({
+      zoomUrl: extracted.mainPictureHref,
+      fallbackUrl: extracted.mainPictureThumb,
+      kind: 'avatar',
+    })
+  }
+  for (const item of extracted.galleryItems) {
+    mediaRefs.push({
+      zoomUrl: item.href,
+      fallbackUrl: item.thumb,
+      kind: 'gallery',
+    })
+  }
+
+  const resolvedMedia = []
+  for (const ref of mediaRefs) {
+    const absoluteZoom = absolutize(extracted.url, ref.zoomUrl)
+    const fallback = absolutize(extracted.url, ref.fallbackUrl)
+    let finalUrl = fallback
+    let mediaType = fallback.match(/\.(mp4|webm|mov)(\?|$)/i) ? 'video' : 'image'
+
+    if (absoluteZoom) {
+      try {
+        const response = await requestContext.get(absoluteZoom, { failOnStatusCode: false })
+        const contentType = String(response.headers()['content-type'] || '').toLowerCase()
+        if (contentType.includes('text/html')) {
+          const html = await response.text()
+          const sourceMatch = html.match(/<source[^>]+src=["']([^"']+)["']/i)
+          const videoMatch = html.match(/<video[^>]+src=["']([^"']+)["']/i)
+          const imageMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i)
+          const styleMatch = html.match(/url\((["']?)(.*?)\1\)/i)
+          const candidate = sourceMatch?.[1] || videoMatch?.[1] || imageMatch?.[1] || styleMatch?.[2] || fallback
+          finalUrl = absolutize(absoluteZoom, candidate)
+          mediaType = /(mp4|webm|mov)(\?|$)/i.test(finalUrl) ? 'video' : 'image'
+        } else if (contentType.includes('video/') || contentType.includes('image/')) {
+          finalUrl = absoluteZoom
+          mediaType = contentType.includes('video/') ? 'video' : 'image'
+        }
+      } catch {
+        finalUrl = fallback
+      }
+    }
+
+    if (finalUrl) {
+      resolvedMedia.push({
+        url: finalUrl,
+        type: mediaType,
+        kind: ref.kind,
+      })
+    }
+  }
+
+  return {
+    sourceUrl: extracted.url,
+    userId: extracted.userId,
+    username: extracted.username,
+    online: extracted.online,
+    role: parseSpanishRole(roleLabel),
+    age: ageValue,
+    sexual_orientation: sexualOrientation,
+    marital_status: maritalStatus,
+    locality,
+    province,
+    country,
+    seeking: parseSeeking(extracted.seeking),
+    bio: extracted.bio,
+    media: unique(resolvedMedia.map((item) => JSON.stringify(item))).map((item) => JSON.parse(item)),
+  }
+}
+
+async function downloadFile(requestContext, fileUrl, destinationPath) {
+  if (existsSync(destinationPath)) return
+  const response = await requestContext.get(fileUrl, { failOnStatusCode: true })
+  const buffer = Buffer.from(await response.body())
+  await ensureDir(path.dirname(destinationPath))
+  await fs.writeFile(destinationPath, buffer)
+}
+
+function manifestRelativePath(filePath) {
+  return path.relative(path.dirname(outputPath), filePath)
+}
+
+async function materializeProfileAssets(profile, requestContext) {
+  const usernameSlug = slugifySegment(profile.username, profile.userId || 'user')
+  const userDir = path.join(assetsDir, usernameSlug)
+  await ensureDir(userDir)
+
+  const avatar = profile.media.find((item) => item.kind === 'avatar') || null
+  const gallery = profile.media.filter((item) => item.kind === 'gallery' && item.type === 'image')
+  const stories = profile.media.filter((item) => item.type === 'video')
+
+  let avatarPath = ''
+  if (avatar?.url) {
+    const ext = pickExtension(avatar.url)
+    const absolute = path.join(userDir, `avatar.${ext}`)
+    await downloadFile(requestContext, avatar.url, absolute)
+    avatarPath = manifestRelativePath(absolute)
+  }
+
+  const photoPaths = []
+  for (let index = 0; index < gallery.length; index += 1) {
+    const item = gallery[index]
+    const ext = pickExtension(item.url)
+    const absolute = path.join(userDir, `photo-${String(index + 1).padStart(2, '0')}.${ext}`)
+    await downloadFile(requestContext, item.url, absolute)
+    photoPaths.push(manifestRelativePath(absolute))
+  }
+
+  let storyVideoPath = ''
+  const firstStory = stories[0]
+  if (firstStory?.url) {
+    const ext = pickExtension(firstStory.url)
+    const absolute = path.join(userDir, `story.${ext}`)
+    await downloadFile(requestContext, firstStory.url, absolute)
+    storyVideoPath = manifestRelativePath(absolute)
+  }
+
+  return {
+    avatarPath,
+    photoPaths,
+    storyVideoPath,
+  }
+}
+
+function toManifestProfile(profile, assets) {
+  return {
+    username: profile.username,
+    role: profile.role,
+    seeking: profile.seeking.length > 0 ? profile.seeking : ['hombre'],
+    age: profile.age,
+    province: profile.province,
+    locality: profile.locality,
+    country: profile.country === 'Argentina' ? 'AR' : profile.country,
+    bio: profile.bio,
+    marital_status: profile.marital_status,
+    sexual_orientation: profile.sexual_orientation,
+    avatarPath: assets.avatarPath || undefined,
+    photoPaths: assets.photoPaths,
+    storyVideoPath: assets.storyVideoPath || undefined,
+  }
+}
+
+function upsertManifestProfile(manifest, profile) {
+  const index = manifest.profiles.findIndex((item) => item.username?.toLowerCase() === profile.username?.toLowerCase())
+  if (index >= 0) manifest.profiles[index] = profile
+  else manifest.profiles.push(profile)
+}
+
+async function main() {
+  await ensureDir(path.dirname(outputPath))
+  await ensureDir(path.dirname(statePath))
+  await ensureDir(assetsDir)
+
+  const state = await readJson(statePath, {
+    processedPages: [],
+    processedProfiles: {},
+  })
+  const manifest = await readJson(outputPath, { profiles: [] })
+
+  const browser = await chromium.launch({ headless })
+  const context = await browser.newContext({
+    storageState: !freshSession && existsSync(sessionPath) ? sessionPath : undefined,
+    viewport: { width: 1440, height: 960 },
+  })
+  const page = await context.newPage()
+
+  try {
+    await ensureAuthenticated(page, context)
+
+    const urls = []
+    if (profileUrl) {
+      urls.push(profileUrl)
+    } else {
+      for (let pageNo = pageStart; pageNo <= pageEnd; pageNo += 1) {
+        if (state.processedPages.includes(pageNo)) {
+          console.log(`Saltando page ${pageNo} (ya procesada)`)
+          continue
+        }
+        const listUrl = listUrlTemplate.replace('{page}', String(pageNo))
+        console.log(`Leyendo listado ${listUrl}`)
+        const links = await getProfileLinksFromList(page, listUrl)
+        for (const link of links) {
+          if (!state.processedProfiles[link]) urls.push(link)
+        }
+        state.processedPages.push(pageNo)
+        await writeJson(statePath, state)
+        if (delayMs > 0) await delay(delayMs)
+      }
+    }
+
+    let processedThisRun = 0
+    for (const url of urls) {
+      if (maxProfiles > 0 && processedThisRun >= maxProfiles) break
+      if (state.processedProfiles[url]) continue
+
+      console.log(`Extrayendo ${url}`)
+      const profile = await extractProfileData(page, context.request, url)
+      if (!profile.username) {
+        console.log(`Saltado: no se pudo leer username en ${url}`)
+        state.processedProfiles[url] = { skipped: true, reason: 'missing_username', at: new Date().toISOString() }
+        await writeJson(statePath, state)
+        continue
+      }
+
+      const assets = await materializeProfileAssets(profile, context.request)
+      const manifestProfile = toManifestProfile(profile, assets)
+      upsertManifestProfile(manifest, manifestProfile)
+
+      state.processedProfiles[url] = {
+        username: profile.username,
+        userId: profile.userId || '',
+        at: new Date().toISOString(),
+      }
+
+      await writeJson(outputPath, manifest)
+      await writeJson(statePath, state)
+
+      processedThisRun += 1
+      if (delayMs > 0) await delay(delayMs)
+    }
+
+    await context.storageState({ path: sessionPath })
+    console.log(`\nListo. Manifest: ${outputPath}`)
+    console.log(`Assets: ${assetsDir}`)
+    console.log(`Estado: ${statePath}`)
+  } finally {
+    await browser.close()
+  }
+}
+
+main().catch((error) => {
+  console.error(error)
+  process.exit(1)
+})
