@@ -57,6 +57,7 @@ Campos soportados por perfil:
 Notas:
   - Las cuentas importadas se fuerzan como fake = 1
   - La contraseña importada por default es: mansiondeseo26
+  - Si falta birthdate pero hay age, se estima una fecha de nacimiento aproximada
 `)
 }
 
@@ -350,6 +351,16 @@ function calculateAgeFromBirthdate(birthdate) {
   return age
 }
 
+function estimateBirthdateFromAge(ageValue) {
+  const age = Number(ageValue)
+  if (!Number.isFinite(age) || age <= 0) return ''
+  const now = new Date()
+  const year = now.getUTCFullYear() - Math.floor(age)
+  const month = now.getUTCMonth() + 1
+  const day = now.getUTCDate()
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
 function uploadToR2(key, filePath) {
   const args = ['r2', 'object', 'put', `${wranglerConfig.bucketName}/${key}`, '--file', filePath]
   if (useRemote) args.push('--remote')
@@ -431,7 +442,9 @@ async function upsertProfile(profile, manifestDir) {
   const lastActive = profile.lastActive || nowSql()
   const createdAt = profile.createdAt || nowSql()
   const avatarCrop = profile.avatarCrop ? JSON.stringify(profile.avatarCrop) : null
-  const birthdate = normalizeBirthdate(profile.birthdate || '')
+  const explicitBirthdate = normalizeBirthdate(profile.birthdate || '')
+  const derivedBirthdate = !explicitBirthdate ? estimateBirthdateFromAge(profile.age) : ''
+  const birthdate = explicitBirthdate || derivedBirthdate
   const age = Number.isFinite(calculateAgeFromBirthdate(birthdate))
     ? calculateAgeFromBirthdate(birthdate)
     : (profile.age ?? null)
@@ -472,6 +485,7 @@ async function upsertProfile(profile, manifestDir) {
   if (dryRun) {
     console.log(`\n[dry-run] ${existing ? 'update' : 'insert'} user ${username} (${userId})`)
     console.log(`  email: ${email}`)
+    if (!explicitBirthdate && birthdate) console.log(`  birthdate estimada: ${birthdate}`)
     console.log(`  avatar: ${avatarUrl || '-'}`)
     console.log(`  photos: ${photoUrls.length}`)
   } else if (existing) {
