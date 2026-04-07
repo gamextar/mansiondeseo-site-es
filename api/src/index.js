@@ -4053,6 +4053,8 @@ async function handleRequest(request, env) {
   if (path === '/api/auth/login' && method === 'POST') return handleLogin(request, env);
   if (path === '/api/auth/verify-code' && method === 'POST') return handleVerifyCode(request, env);
   if (path === '/api/auth/resend-code' && method === 'POST') return handleResendCode(request, env);
+  if (path === '/api/auth/check-email' && method === 'POST') return handleCheckEmail(request, env);
+  if (path === '/api/auth/check-username' && method === 'POST') return handleCheckUsername(request, env);
   if (path === '/api/auth/forgot-password' && method === 'POST') return handleForgotPassword(request, env);
   if (path === '/api/auth/reset-password' && method === 'POST') return handleResetPassword(request, env);
   if (path === '/api/auth/magic-link' && method === 'POST') return handleMagicLink(request, env);
