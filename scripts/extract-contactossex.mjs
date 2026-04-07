@@ -281,6 +281,7 @@ async function extractProfileData(page, requestContext, url) {
   }
 
   const resolvedMedia = []
+  const seenMediaUrls = new Set()
   for (const ref of mediaRefs) {
     const absoluteZoom = absolutize(extracted.url, ref.zoomUrl)
     const fallback = absolutize(extracted.url, ref.fallbackUrl)
@@ -309,12 +310,35 @@ async function extractProfileData(page, requestContext, url) {
       }
     }
 
-    if (finalUrl) {
+    let chosenUrl = finalUrl || fallback
+    let chosenType = mediaType
+
+    if (
+      ref.kind === 'gallery' &&
+      chosenUrl &&
+      fallback &&
+      chosenType === 'image' &&
+      seenMediaUrls.has(chosenUrl) &&
+      !seenMediaUrls.has(fallback)
+    ) {
+      chosenUrl = fallback
+      chosenType = 'image'
+    }
+
+    if (chosenUrl && !seenMediaUrls.has(chosenUrl)) {
       resolvedMedia.push({
-        url: finalUrl,
-        type: mediaType,
+        url: chosenUrl,
+        type: chosenType,
         kind: ref.kind,
       })
+      seenMediaUrls.add(chosenUrl)
+    } else if (fallback && !seenMediaUrls.has(fallback)) {
+      resolvedMedia.push({
+        url: fallback,
+        type: fallback.match(/\.(mp4|webm|mov)(\?|$)/i) ? 'video' : 'image',
+        kind: ref.kind,
+      })
+      seenMediaUrls.add(fallback)
     }
   }
 
@@ -332,7 +356,7 @@ async function extractProfileData(page, requestContext, url) {
     country,
     seeking: parseSeeking(extracted.seeking),
     bio: extracted.bio,
-    media: unique(resolvedMedia.map((item) => JSON.stringify(item))).map((item) => JSON.parse(item)),
+    media: resolvedMedia,
   }
 }
 
