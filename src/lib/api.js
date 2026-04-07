@@ -1031,7 +1031,7 @@ function invalidateStoryFeedCache() {
 
 const storyLikesQueue = createMutationQueue({
   storageKey: 'mansion_pending_story_likes',
-  flushDelayMs: 2500,
+  flushDelayMs: 30000,
   flush: async (entries, { keepalive } = {}) => {
     const data = await apiFetch('/stories/likes/sync', {
       method: 'POST',
