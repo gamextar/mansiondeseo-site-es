@@ -27,7 +27,7 @@ let _userLocalityColumnReady = null;
 let _userBirthdateColumnReady = null;
 
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
-const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja'];
+const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 
 // ── Helpers ─────────────────────────────────────────────
@@ -889,7 +889,7 @@ async function handleRegister(request, env) {
   // Validate seeking: must be array of valid roles
   const seekingArr = Array.isArray(seeking) ? seeking : [seeking];
   if (!seekingArr.length || seekingArr.some(s => !SEEKING_ROLE_IDS.includes(s))) {
-    return error('Seeking debe contener valores válidos: hombre, mujer, pareja');
+    return error('Seeking contiene valores inválidos');
   }
 
   if (password.length < 12) {
@@ -1476,7 +1476,7 @@ async function handleProfiles(request, env) {
   // Role filter: use server-side seeking, fall back to frontend filter param
   const roleFilters = SEEKING_ROLE_IDS;
   let filterParts;
-  if (viewerSeeking.length > 0 && viewerSeeking.length < 3) {
+  if (viewerSeeking.length > 0 && viewerSeeking.length < SEEKING_ROLE_IDS.length) {
     filterParts = viewerSeeking.filter(f => roleFilters.includes(f));
   } else {
     filterParts = filter.split(',').map(f => f.trim()).filter(f => roleFilters.includes(f));

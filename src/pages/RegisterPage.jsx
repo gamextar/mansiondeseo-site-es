@@ -760,6 +760,14 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {} }) {
 }
 
 function SeekingGrid({ selected, onToggle, roleImages = {} }) {
+  const [showOtherRoles, setShowOtherRoles] = useState(() => OTHER_ROLES.some((role) => selected.includes(role.id)));
+
+  useEffect(() => {
+    if (OTHER_ROLES.some((role) => selected.includes(role.id))) {
+      setShowOtherRoles(true);
+    }
+  }, [selected]);
+
   // Sort: selected items first (in selection order), then unselected
   const sorted = [...ROLES].sort((a, b) => {
     const aIdx = selected.indexOf(a.id);
@@ -777,7 +785,7 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
       <p className="text-text-dim text-xs mb-8">Podés elegir más de uno</p>
 
       <LayoutGroup>
-        <div className="flex items-end justify-center gap-3">
+        <div className="flex items-end justify-center gap-3 flex-wrap">
           {sorted.map((role) => {
             const isActive = selected.includes(role.id);
             const customImg = roleImages[role.id];
@@ -789,7 +797,7 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
                 whileTap={{ scale: 0.93 }}
                 whileHover={{ scale: 1.03 }}
                 onClick={() => onToggle(role.id)}
-                className="flex flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+                className="flex w-[132px] flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
                 style={{
                   backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
                   borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
@@ -800,10 +808,12 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
                     <img src={customImg} alt={role.label} className="w-full h-full object-cover" />
                   </div>
                 ) : (
-                  <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                  <div className="w-20 h-28 flex items-center justify-center">
+                    <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                  </div>
                 )}
                 <span
-                  className={`mt-2 font-medium text-sm ${
+                  className={`mt-2 font-medium text-sm text-center leading-tight ${
                     isActive ? 'text-text-primary' : 'text-text-muted'
                   }`}
                 >
@@ -827,6 +837,67 @@ function SeekingGrid({ selected, onToggle, roleImages = {} }) {
           })}
         </div>
       </LayoutGroup>
+
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={() => setShowOtherRoles((prev) => !prev)}
+          className="mx-auto inline-flex items-center gap-2 rounded-full border border-mansion-border/60 bg-mansion-card/70 px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:text-text-primary"
+        >
+          Otros
+          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showOtherRoles ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      <AnimatePresence initial={false}>
+        {showOtherRoles && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, y: -8 }}
+            animate={{ opacity: 1, height: 'auto', y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -8 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-4 flex items-end justify-center gap-3 flex-wrap">
+              {OTHER_ROLES.map((role) => {
+                const isActive = selected.includes(role.id);
+                return (
+                  <motion.button
+                    key={role.id}
+                    whileTap={{ scale: 0.93 }}
+                    whileHover={{ scale: 1.03 }}
+                    onClick={() => onToggle(role.id)}
+                    className="flex w-[132px] flex-col items-center p-3 rounded-2xl transition-colors duration-300 border-2 relative"
+                    style={{
+                      backgroundColor: isActive ? role.bg : 'rgba(17,17,24,0.5)',
+                      borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
+                    }}
+                  >
+                    <div className="w-20 h-28 flex items-center justify-center">
+                      <PersonFigure type={role.id} isActive={isActive} size="lg" />
+                    </div>
+                    <span className={`mt-2 font-medium text-sm text-center leading-tight ${isActive ? 'text-text-primary' : 'text-text-muted'}`}>
+                      {role.label}
+                    </span>
+                    <AnimatePresence>
+                      {isActive && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          exit={{ scale: 0 }}
+                          className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center shadow-lg"
+                          style={{ backgroundColor: role.color }}
+                        >
+                          <Check className="w-3.5 h-3.5 text-white" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {selected.length > 0 && (

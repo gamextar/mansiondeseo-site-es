@@ -728,6 +728,9 @@ export default function ProfilePage() {
               { id: 'hombre', label: 'Hombres', emoji: '👨', color: 'bg-blue-500/15 text-blue-300 border-blue-500/40' },
               { id: 'mujer', label: 'Mujeres', emoji: '👩', color: 'bg-pink-500/15 text-pink-300 border-pink-500/40' },
               { id: 'pareja', label: 'Parejas', emoji: '💑', color: 'bg-purple-500/15 text-purple-300 border-purple-500/40' },
+              { id: 'pareja_hombres', label: 'Pareja de Hombres', emoji: '👬', color: 'bg-sky-500/15 text-sky-300 border-sky-500/40' },
+              { id: 'pareja_mujeres', label: 'Pareja de Mujeres', emoji: '👭', color: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/40' },
+              { id: 'trans', label: 'Trans', emoji: '⚧', color: 'bg-teal-500/15 text-teal-300 border-teal-500/40' },
             ].map(s => {
               const seekingArr = Array.isArray(user?.seeking) ? user.seeking : (user?.seeking ? [user.seeking] : []);
               const isActive = seekingArr.includes(s.id);
