@@ -1520,6 +1520,55 @@ async function handleProfileDetail(request, env, userId) {
   });
 }
 
+async function handleChatBootstrap(request, env, userId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const [user, sender, settings] = await Promise.all([
+    env.DB.prepare(
+      'SELECT id, username, age, city, role, avatar_url, avatar_crop, last_active, premium, premium_until FROM users WHERE id = ?'
+    ).bind(userId).first(),
+    env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
+    cached('settings', 300_000, () => loadSettings(env)),
+  ]);
+
+  if (!user) return error('Perfil no encontrado', 404);
+
+  const today = todayUTC();
+  const limitRow = await env.DB.prepare(
+    'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
+  ).bind(auth.sub, today).first();
+
+  const count = limitRow?.msg_count || 0;
+  const dailyLimit = settings.dailyMessageLimit || 5;
+  const senderPremium = isPremiumActive(sender);
+
+  return json({
+    partner: {
+      id: user.id,
+      name: user.username,
+      age: user.age,
+      city: user.city,
+      role: mapRoleToDisplay(user.role),
+      photos: [],
+      avatar_url: user.avatar_url,
+      avatar_crop: safeParseJSON(user.avatar_crop, null),
+      online: isOnline(user.last_active),
+      premium: isPremiumActive(user),
+      premium_until: user.premium_until || null,
+      blurred: false,
+      visiblePhotos: user.avatar_url ? 1 : 0,
+      lastActive: user.last_active,
+    },
+    messageLimit: {
+      sent: count,
+      remaining: senderPremium ? 999 : Math.max(0, dailyLimit - count),
+      canSend: senderPremium ? true : count < dailyLimit,
+      max: senderPremium ? 999 : dailyLimit,
+    },
+  });
+}
+
 // ── POST /api/messages/send ─────────────────────────────
 
 async function handleSendMessage(request, env) {
@@ -3803,6 +3852,8 @@ async function handleRequest(request, env) {
   // ── Profile routes
   if (path === '/api/profiles' && method === 'GET') return handleProfiles(request, env);
   if (path === '/api/profile' && method === 'PUT') return handleUpdateProfile(request, env);
+  const chatBootstrapMatch = path.match(/^\/api\/chat\/bootstrap\/([a-f0-9-]+)$/);
+  if (chatBootstrapMatch && method === 'GET') return handleChatBootstrap(request, env, chatBootstrapMatch[1]);
   const profileMatch = path.match(/^\/api\/profiles\/([a-f0-9-]+)$/);
   if (profileMatch && method === 'GET') return handleProfileDetail(request, env, profileMatch[1]);
 

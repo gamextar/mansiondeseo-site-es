@@ -7,7 +7,7 @@ import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import EmojiPicker from '../components/EmojiPicker';
 import AvatarImg from '../components/AvatarImg';
-import { getMessageLimit, getProfile, getProfileWithMessageLimit, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, invalidateConversationsCache } from '../lib/api';
+import { getMessageLimit, getChatBootstrap, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, invalidateConversationsCache } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
@@ -312,9 +312,9 @@ export default function ChatPage() {
     }
 
     let cancelled = false;
-    getProfileWithMessageLimit(partnerId).then((data) => {
+    getChatBootstrap(partnerId).then((data) => {
       if (cancelled) return;
-      if (data?.profile) setPartner(data.profile);
+      if (data?.partner) setPartner((prev) => ({ ...(prev || {}), ...data.partner }));
       if (data?.messageLimit) setApiLimit(data.messageLimit);
     }).catch(() => {}).finally(() => {
       if (!cancelled && nextCachedChat) setLoading(false);

@@ -692,6 +692,10 @@ export async function getProfileWithMessageLimit(id) {
   return apiFetch(`/profiles/${id}?include=messageLimit`);
 }
 
+export async function getChatBootstrap(id) {
+  return sharedGet(`chatBootstrap:${id}`, () => apiFetch(`/chat/bootstrap/${id}`), { ttlMs: 60_000 });
+}
+
 export async function updateProfile(fields) {
   const data = await apiFetch('/profile', {
     method: 'PUT',
