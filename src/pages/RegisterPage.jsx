@@ -1153,6 +1153,7 @@ export default function RegisterPage() {
   const [turnstileToken, setTurnstileToken] = useState('');
   const turnstileWidgetRef = useRef(null);
   const turnstileContainerRef = useRef(null);
+  const setTurnstileTokenBoth = (t) => { setTurnstileToken(t); };
   const [emailStatus, setEmailStatus] = useState('idle'); // idle | checking | valid | exists | invalid
   const [usernameStatus, setUsernameStatus] = useState('idle'); // idle | checking | valid | exists | invalid
 
@@ -1175,31 +1176,26 @@ export default function RegisterPage() {
     document.head.appendChild(script);
   }, []);
 
-  // Render Turnstile widget when reaching last step
+  // Render Turnstile widget on step 0 (email/password) — blocks bots before any backend request
   useEffect(() => {
-    if (step !== TOTAL_STEPS - 1) return;
+    if (step !== 0) return;
     if (!turnstileContainerRef.current) return;
 
     const tryRender = () => {
       if (!window.turnstile) { setTimeout(tryRender, 100); return; }
       if (turnstileWidgetRef.current != null) return; // already rendered
       turnstileWidgetRef.current = window.turnstile.render(turnstileContainerRef.current, {
-        sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA', // fallback = always-pass test key
+        sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA',
         theme: 'dark',
-        callback: (token) => setTurnstileToken(token),
-        'expired-callback': () => setTurnstileToken(''),
-        'error-callback': () => setTurnstileToken(''),
+        callback: (token) => setTurnstileTokenBoth(token),
+        'expired-callback': () => setTurnstileTokenBoth(''),
+        'error-callback': () => setTurnstileTokenBoth(''),
       });
     };
     tryRender();
 
-    return () => {
-      if (turnstileWidgetRef.current != null && window.turnstile) {
-        window.turnstile.remove(turnstileWidgetRef.current);
-        turnstileWidgetRef.current = null;
-        setTurnstileToken('');
-      }
-    };
+    // Do NOT destroy the widget when leaving step 0 — token must survive to submit
+    return () => {};
   }, [step]);
 
   useEffect(() => {
@@ -1259,7 +1255,7 @@ export default function RegisterPage() {
   );
 
   const canNext = () => {
-    if (step === 0) return EMAIL_REGEX.test(email) && password.length >= 12 && emailStatus !== 'exists' && emailStatus !== 'invalid';
+    if (step === 0) return EMAIL_REGEX.test(email) && password.length >= 12 && emailStatus !== 'exists' && emailStatus !== 'invalid' && !!turnstileToken;
     if (step === 1) return !!iAm;
     if (step === 2) return seeking.length > 0;
     if (step === 3) return interests.length > 0;
@@ -1462,16 +1458,20 @@ export default function RegisterPage() {
     switch (step) {
       case 0:
         return (
-          <StepEmail
-            email={email}
-            password={password}
-            onEmailChange={setEmail}
-            onPasswordChange={setPassword}
-            hidePasswordDefault={hidePasswordDefault}
-            emailStatus={emailStatus}
-            onEmailBlur={handleEmailBlur}
-            onNavigateRecover={() => navigate(`/recuperar-contrasena?email=${encodeURIComponent(email)}`)}
-          />
+          <>
+            <StepEmail
+              email={email}
+              password={password}
+              onEmailChange={setEmail}
+              onPasswordChange={setPassword}
+              hidePasswordDefault={hidePasswordDefault}
+              emailStatus={emailStatus}
+              onEmailBlur={handleEmailBlur}
+              onNavigateRecover={() => navigate(`/recuperar-contrasena?email=${encodeURIComponent(email)}`)}
+            />
+            {/* Turnstile widget renders here on mount — invisible challenge */}
+            <div ref={turnstileContainerRef} className="flex justify-center mt-4" />
+          </>
         );
       case 1:
         return (
@@ -1496,13 +1496,7 @@ export default function RegisterPage() {
       case 4:
         return <StepBasicInfo data={info} onChange={setInfo} showCountryPicker={showCountryPicker} allowedCountries={allowedCountries} selectedCountry={selectedCountry} onCountryChange={setSelectedCountry} usernameStatus={usernameStatus} onUsernameBlur={handleUsernameBlur} />;
       case 5:
-        return (
-          <>
-            <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />
-            {/* Turnstile widget — renders invisibly below the photo step */}
-            <div ref={turnstileContainerRef} className="flex justify-center mt-4" />
-          </>
-        );
+        return <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />;
       default:
         return null;
     }
