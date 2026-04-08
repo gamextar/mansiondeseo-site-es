@@ -330,20 +330,62 @@ async function promptForEnter(message) {
   }
 }
 
-async function ensureAuthenticated(page, context) {
-  await page.goto('https://contactossex.com', { waitUntil: 'domcontentloaded' })
-  await delay(1200)
-  if (!manualLogin && !freshSession && existsSync(sessionPath)) return
+async function pageLooksAuthenticated(page) {
+  try {
+    return await page.evaluate(() => {
+      const href = window.location.href || ''
+      const hasMemberSignals =
+        !!document.querySelector('a[href*="/members/profile/"]') ||
+        !!document.querySelector('.btn-chat') ||
+        !!document.querySelector('.profile-bar')
+      return href.includes('/members/') || hasMemberSignals
+    })
+  } catch {
+    return false
+  }
+}
 
-  console.log('\nLogin manual requerido.')
-  console.log('1. Inicia sesión en la ventana del navegador.')
-  console.log('2. Navega a una página autenticada que muestre miembros.')
-  console.log('3. Vuelve aquí y presiona Enter para continuar.')
-  await promptForEnter('Presiona Enter cuando el login esté completo...')
+async function waitForManualLogin(page, context) {
+  const timeoutMs = 10 * 60 * 1000
+  const startedAt = Date.now()
+
+  if (process.stdin.isTTY) {
+    await promptForEnter('Presiona Enter cuando el login esté completo...')
+  } else {
+    console.log('Esperando a que completes el login en la ventana del navegador...')
+    console.log('Cuando quedes dentro de una página autenticada, el extractor seguirá solo.')
+    while (Date.now() - startedAt < timeoutMs) {
+      if (await pageLooksAuthenticated(page)) break
+      await delay(1500)
+    }
+    if (!(await pageLooksAuthenticated(page))) {
+      throw new Error('Timeout esperando el login manual. No se detectó una página autenticada.')
+    }
+  }
 
   await ensureDir(path.dirname(sessionPath))
   await context.storageState({ path: sessionPath })
   console.log(`Sesión guardada en ${sessionPath}`)
+}
+
+async function ensureAuthenticated(page, context) {
+  await page.goto('https://contactossex.com', { waitUntil: 'domcontentloaded' })
+  await delay(1200)
+  if (!freshSession && existsSync(sessionPath)) {
+    await page.goto(listUrlTemplate.replace('{page}', '1'), { waitUntil: 'domcontentloaded' })
+    await delay(1200)
+    if (await pageLooksAuthenticated(page)) return
+  }
+
+  console.log('\nLogin manual requerido.')
+  console.log('1. Inicia sesión en la ventana del navegador.')
+  console.log('2. Navega a una página autenticada que muestre miembros.')
+  if (process.stdin.isTTY) {
+    console.log('3. Vuelve aquí y presiona Enter para continuar.')
+  } else {
+    console.log('3. No hace falta tocar la terminal: cuando el login termine seguirá automáticamente.')
+  }
+  await waitForManualLogin(page, context)
 }
 
 async function getProfileLinksFromList(page, url) {
