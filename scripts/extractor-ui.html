@@ -367,6 +367,28 @@
 
             <div class="row-2">
               <label>
+                Assets del grupo
+                <input id="resolvedAssetsDir" value="./data/contactossex-assets/mujer" readonly />
+              </label>
+              <label>
+                Manifest acumulado del grupo
+                <input id="resolvedManifestPath" value="./data/contactossex-placeholders/mujer.json" readonly />
+              </label>
+            </div>
+
+            <div class="row-2">
+              <label>
+                State incremental del grupo
+                <input id="resolvedStatePath" value="./data/contactossex-state/mujer.json" readonly />
+              </label>
+              <label>
+                Sesión / browser profile del grupo
+                <input id="resolvedSessionPath" value="./data/contactossex-session-mujer.json + ./data/contactossex-browser-profile-mujer" readonly />
+              </label>
+            </div>
+
+            <div class="row-2">
+              <label>
                 Usuario de la cuenta
                 <input id="loginUsername" autocomplete="username" placeholder="Solo para re-login automático" />
               </label>
@@ -595,6 +617,10 @@
         const base = document.getElementById('batchDir').value || './data/contactossex-batches'
         const roleGroup = document.getElementById('roleGroup').value || 'mixto'
         document.getElementById('resolvedBatchDir').value = `${base.replace(/\/+$/, '')}/${roleGroup}`
+        document.getElementById('resolvedAssetsDir').value = `./data/contactossex-assets/${roleGroup}`
+        document.getElementById('resolvedManifestPath').value = `./data/contactossex-placeholders/${roleGroup}.json`
+        document.getElementById('resolvedStatePath').value = `./data/contactossex-state/${roleGroup}.json`
+        document.getElementById('resolvedSessionPath').value = `./data/contactossex-session-${roleGroup}.json + ./data/contactossex-browser-profile-${roleGroup}`
       }
 
       function renderBatches(batches) {
