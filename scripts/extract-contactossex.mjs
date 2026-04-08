@@ -158,15 +158,21 @@ function parseMessageBlockRoles(raw) {
   if (!normalized) return []
   if (normalized.includes('acepta todos los mensajes')) return []
 
+  const exactMap = new Map([
+    ['hombres', 'hombre'],
+    ['mujeres', 'mujer'],
+    ['crossdressers', 'trans'],
+    ['trans', 'trans'],
+    ['parejas', 'pareja'],
+    ['parejas de hombres', 'pareja_hombres'],
+    ['parejas de mujeres', 'pareja_mujeres'],
+  ])
+
   const mapped = []
   const tokens = normalized.split(',').map((part) => part.trim()).filter(Boolean)
   for (const token of tokens) {
-    if (token.includes('pareja de hombres') || token.includes('parejas de hombres')) mapped.push('pareja_hombres')
-    else if (token.includes('pareja de mujeres') || token.includes('parejas de mujeres')) mapped.push('pareja_mujeres')
-    else if (token.includes('parejas') || token.includes('pareja')) mapped.push('pareja')
-    else if (token.includes('mujeres') || token.includes('mujer')) mapped.push('mujer')
-    else if (token.includes('hombres') || token.includes('hombre')) mapped.push('hombre')
-    else if (token.includes('trans') || token.includes('crossdresser')) mapped.push('trans')
+    const mappedValue = exactMap.get(token)
+    if (mappedValue) mapped.push(mappedValue)
   }
   return [...new Set(mapped)]
 }
