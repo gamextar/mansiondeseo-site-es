@@ -302,6 +302,30 @@ function runWrangler(args, { json = false } = {}) {
   }
 }
 
+function formatRoleLabel(role) {
+  switch (String(role || '').trim().toLowerCase()) {
+    case 'hombre':
+      return 'Hombre'
+    case 'mujer':
+      return 'Mujer'
+    case 'pareja':
+      return 'Pareja'
+    case 'pareja_hombres':
+      return 'Pareja de Hombres'
+    case 'pareja_mujeres':
+      return 'Pareja de Mujeres'
+    case 'trans':
+      return 'Trans'
+    default:
+      return role || '-'
+  }
+}
+
+function formatRoleList(values) {
+  if (!Array.isArray(values) || values.length === 0) return '-'
+  return values.map((value) => formatRoleLabel(value)).join(', ')
+}
+
 function extractRows(payload) {
   if (Array.isArray(payload)) {
     for (const entry of payload) {
@@ -605,6 +629,11 @@ async function upsertProfile(profile, manifestDir) {
     console.log(`\n[dry-run] ${existing ? 'update' : 'insert'} user ${username} (${userId})`)
     console.log(`  email: ${email}`)
     if (!explicitBirthdate && birthdate) console.log(`  birthdate estimada: ${birthdate}`)
+    console.log(`  rol: ${formatRoleLabel(profile.role)}`)
+    console.log(`  buscando: ${formatRoleList(seeking)}`)
+    console.log(`  ubicación: ${[baseFields.locality, baseFields.city].filter(Boolean).join(', ') || '-'}`)
+    console.log(`  premium: ${premium ? 'sí' : 'no'}`)
+    console.log(`  fake: sí`)
     console.log(`  avatar: ${avatarUrl || '-'}`)
     console.log(`  photos: ${photoUrls.length}`)
     console.log(`  seguidores: ${followersTotal}`)
