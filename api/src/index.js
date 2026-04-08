@@ -3273,6 +3273,7 @@ async function handleAdminGetUsers(request, env) {
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
   const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
   const q = (url.searchParams.get('q') || '').trim();
+  const fakeFilter = url.searchParams.get('fake');
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
@@ -3281,13 +3282,23 @@ async function handleAdminGetUsers(request, env) {
     premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, account_status, last_active, last_ip, created_at,
     (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id
     FROM users`;
+  const filters = [];
   const bindings = [];
 
   if (q) {
-    const filter = ` WHERE email LIKE ? OR username LIKE ? OR id = ?`;
-    countQuery += filter;
-    dataQuery += filter;
+    filters.push('(email LIKE ? OR username LIKE ? OR id = ?)');
     bindings.push(`%${q}%`, `%${q}%`, q);
+  }
+
+  if (fakeFilter === '1' || fakeFilter === '0') {
+    filters.push('fake = ?');
+    bindings.push(Number(fakeFilter));
+  }
+
+  if (filters.length > 0) {
+    const whereClause = ` WHERE ${filters.join(' AND ')}`;
+    countQuery += whereClause;
+    dataQuery += whereClause;
   }
 
   dataQuery += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';

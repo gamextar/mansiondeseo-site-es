@@ -46,6 +46,7 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [query, setQuery] = useState('');
+  const [fakeFilter, setFakeFilter] = useState('all');
   const [searchInput, setSearchInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -55,10 +56,10 @@ export default function AdminUsersPage() {
   const [storyCaption, setStoryCaption] = useState('');
   const storyInputRef = useRef(null);
 
-  const fetchUsers = useCallback(async (p = page, q = query) => {
+  const fetchUsers = useCallback(async (p = page, q = query, fake = fakeFilter) => {
     setLoading(true);
     try {
-      const data = await adminGetUsers({ page: p, limit: 20, q });
+      const data = await adminGetUsers({ page: p, limit: 20, q, fake: fake === 'all' ? '' : fake });
       setUsers(data.users);
       setTotal(data.total);
       setPage(data.page);
@@ -69,13 +70,18 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, query]);
+  }, [page, query, fakeFilter]);
 
-  useEffect(() => { fetchUsers(1, query); }, [query]); // eslint-disable-line
+  useEffect(() => { fetchUsers(1, query, fakeFilter); }, [query, fakeFilter]); // eslint-disable-line
 
   const handleSearch = (e) => {
     e.preventDefault();
     setQuery(searchInput);
+  };
+
+  const handleSelectVisibleFakes = () => {
+    const visibleFakeIds = users.filter((u) => u.fake).map((u) => u.id);
+    setSelectedIds((prev) => [...new Set([...prev, ...visibleFakeIds])]);
   };
 
   const handleAction = async (userId, fields) => {
@@ -233,6 +239,35 @@ export default function AdminUsersPage() {
             )}
           </div>
         </form>
+
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {[
+            { id: 'all', label: 'Todos' },
+            { id: '1', label: 'Solo fake' },
+            { id: '0', label: 'Solo reales' },
+          ].map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setFakeFilter(option.id)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
+                fakeFilter === option.id
+                  ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
+                  : 'bg-mansion-card border-mansion-border/20 text-text-dim hover:text-text-primary'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+
+          <button
+            type="button"
+            onClick={handleSelectVisibleFakes}
+            className="px-3 py-2 rounded-xl bg-mansion-card border border-mansion-border/20 text-text-dim hover:text-mansion-gold text-xs font-semibold transition-colors"
+          >
+            Seleccionar fake visibles
+          </button>
+        </div>
 
         {/* Table */}
         <div className="bg-mansion-card rounded-2xl border border-white/5 overflow-hidden">

@@ -1003,9 +1003,10 @@ export async function adminResetAllCoins() {
 
 // ── Admin: Users ────────────────────────────────────────
 
-export async function adminGetUsers({ page = 1, limit = 20, q = '' } = {}) {
+export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (q) params.set('q', q);
+  if (fake === '1' || fake === '0') params.set('fake', fake);
   return apiFetch(`/admin/users?${params}`);
 }
 
