@@ -261,6 +261,17 @@
                 <input id="maxProfiles" type="number" min="1" value="6" />
               </label>
               <label>
+                Máximo de fotos por perfil
+                <input id="maxPhotos" type="number" min="0" value="12" />
+              </label>
+            </div>
+
+            <div class="row-2">
+              <label>
+                Máximo de videos por perfil
+                <input id="maxVideos" type="number" min="0" value="3" />
+              </label>
+              <label>
                 Delay entre perfiles (ms)
                 <input id="delayMs" type="number" min="0" step="100" value="10000" />
               </label>
@@ -348,6 +359,8 @@
           pageStart: document.getElementById('pageStart').value,
           pageEnd: document.getElementById('pageEnd').value,
           maxProfiles: document.getElementById('maxProfiles').value,
+          maxPhotos: document.getElementById('maxPhotos').value,
+          maxVideos: document.getElementById('maxVideos').value,
           delayMs: document.getElementById('delayMs').value,
           mediaDelayMs: document.getElementById('mediaDelayMs').value,
           excludeUsernames: document.getElementById('excludeUsernames').value,

@@ -72,6 +72,8 @@ function buildArgs(config) {
   const pageStart = intValue(config.pageStart, 1)
   const pageEnd = intValue(config.pageEnd, pageStart)
   const maxProfiles = intValue(config.maxProfiles, 6)
+  const maxPhotos = intValue(config.maxPhotos, 12)
+  const maxVideos = intValue(config.maxVideos, 3)
   const delayMs = intValue(config.delayMs, 10000)
   const mediaDelayMs = intValue(config.mediaDelayMs, 750)
   const excludeUsernames = stringValue(config.excludeUsernames, '')
@@ -86,6 +88,8 @@ function buildArgs(config) {
   args.push('--page-start', String(pageStart))
   args.push('--page-end', String(pageEnd))
   args.push('--max-profiles', String(maxProfiles))
+  args.push('--max-photos', String(maxPhotos))
+  args.push('--max-videos', String(maxVideos))
   args.push('--delay-ms', String(delayMs))
   args.push('--media-delay-ms', String(mediaDelayMs))
 

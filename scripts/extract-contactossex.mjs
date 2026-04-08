@@ -8,8 +8,8 @@ import readline from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import { chromium } from 'playwright'
 
-const MAX_PHOTOS_PER_PROFILE = 12
-const MAX_VIDEOS_PER_PROFILE = 3
+const DEFAULT_MAX_PHOTOS_PER_PROFILE = 12
+const DEFAULT_MAX_VIDEOS_PER_PROFILE = 3
 
 function printUsage() {
   console.log(`Uso:
@@ -33,6 +33,8 @@ Opciones:
   --page-end <n>                 Página final
   --max-profiles <n>             Máximo de perfiles a extraer en esta corrida
   --profile-url <url>            Extrae un solo perfil
+  --max-photos <n>               Máximo de fotos por perfil. Default: 12
+  --max-videos <n>               Máximo de videos por perfil. Default: 3
   --exclude-usernames <csv>      Usernames a excluir del manifest/listado
   --force                        Reextrae perfiles aunque ya estén marcados en el state
   --delay-ms <n>                 Espera entre perfiles/páginas
@@ -74,6 +76,8 @@ const force = hasFlag('--force')
 const pageStart = Number.parseInt(takeFlag('--page-start', '1'), 10)
 const pageEnd = Number.parseInt(takeFlag('--page-end', String(pageStart)), 10)
 const maxProfiles = Number.parseInt(takeFlag('--max-profiles', '0'), 10)
+const maxPhotos = Number.parseInt(takeFlag('--max-photos', String(DEFAULT_MAX_PHOTOS_PER_PROFILE)), 10)
+const maxVideos = Number.parseInt(takeFlag('--max-videos', String(DEFAULT_MAX_VIDEOS_PER_PROFILE)), 10)
 const delayMs = Number.parseInt(takeFlag('--delay-ms', '1200'), 10)
 const mediaDelayMs = Number.parseInt(takeFlag('--media-delay-ms', '350'), 10)
 const listUrlTemplate = takeFlag('--list-url-template', 'https://contactossex.com/members/search?page={page}')
@@ -551,10 +555,10 @@ async function materializeProfileAssets(profile, requestContext) {
   const avatar = profile.media.find((item) => item.kind === 'avatar') || null
   const gallery = profile.media
     .filter((item) => item.kind === 'gallery' && item.type === 'image')
-    .slice(0, MAX_PHOTOS_PER_PROFILE)
+    .slice(0, Math.max(0, maxPhotos))
   const stories = profile.media
     .filter((item) => item.type === 'video')
-    .slice(0, MAX_VIDEOS_PER_PROFILE)
+    .slice(0, Math.max(0, maxVideos))
 
   let avatarPath = ''
   if (avatar?.url) {
