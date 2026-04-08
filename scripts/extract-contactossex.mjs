@@ -8,6 +8,9 @@ import readline from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import { chromium } from 'playwright'
 
+const MAX_PHOTOS_PER_PROFILE = 12
+const MAX_VIDEOS_PER_PROFILE = 3
+
 function printUsage() {
   console.log(`Uso:
   node scripts/extract-contactossex.mjs --manual-login --page-start 1 --page-end 1
@@ -526,8 +529,12 @@ async function materializeProfileAssets(profile, requestContext) {
   await ensureDir(userDir)
 
   const avatar = profile.media.find((item) => item.kind === 'avatar') || null
-  const gallery = profile.media.filter((item) => item.kind === 'gallery' && item.type === 'image')
-  const stories = profile.media.filter((item) => item.type === 'video')
+  const gallery = profile.media
+    .filter((item) => item.kind === 'gallery' && item.type === 'image')
+    .slice(0, MAX_PHOTOS_PER_PROFILE)
+  const stories = profile.media
+    .filter((item) => item.type === 'video')
+    .slice(0, MAX_VIDEOS_PER_PROFILE)
 
   let avatarPath = ''
   if (avatar?.url) {
@@ -548,20 +555,22 @@ async function materializeProfileAssets(profile, requestContext) {
     photoLikes.push(Number.isFinite(Number(item.likes)) ? Number(item.likes) : 0)
   }
 
-  let storyVideoPath = ''
-  const firstStory = stories[0]
-  if (firstStory?.url) {
-    const ext = await inferRemoteExtension(requestContext, firstStory.url)
-    const absolute = path.join(userDir, `story.${ext}`)
-    await downloadFile(requestContext, firstStory.url, absolute)
-    storyVideoPath = manifestRelativePath(absolute)
+  const storyVideoPaths = []
+  for (let index = 0; index < stories.length; index += 1) {
+    const item = stories[index]
+    const ext = await inferRemoteExtension(requestContext, item.url)
+    const suffix = index === 0 ? '' : `-${String(index + 1).padStart(2, '0')}`
+    const absolute = path.join(userDir, `story${suffix}.${ext}`)
+    await downloadFile(requestContext, item.url, absolute)
+    storyVideoPaths.push(manifestRelativePath(absolute))
   }
 
   return {
     avatarPath,
     photoPaths,
     photoLikes,
-    storyVideoPath,
+    storyVideoPath: storyVideoPaths[0] || '',
+    storyVideoPaths,
   }
 }
 
@@ -586,6 +595,7 @@ function toManifestProfile(profile, assets) {
     photoPaths: assets.photoPaths,
     photoLikes: assets.photoLikes,
     storyVideoPath: assets.storyVideoPath || undefined,
+    storyVideoPaths: assets.storyVideoPaths,
   }
 }
 
