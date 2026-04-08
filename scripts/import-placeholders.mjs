@@ -31,6 +31,7 @@ Opciones:
   --local             Usa bindings locales de wrangler
   --dry-run           No sube ni escribe; solo muestra el plan
   --only <username>   Importa solo un username
+  --skip-existing-users  Salta usuarios que ya existan en Mansion Deseo
   --replace-story     Borra stories existentes del usuario antes de insertar la nueva (default)
   --keep-story        Conserva stories existentes
   --help              Muestra esta ayuda
@@ -86,6 +87,7 @@ const onlyUsername = takeFlag('--only', '')
 const dryRun = hasFlag('--dry-run')
 const useLocal = hasFlag('--local')
 const useRemote = !useLocal || hasFlag('--remote')
+const skipExistingUsers = hasFlag('--skip-existing-users')
 const replaceStory = !hasFlag('--keep-story')
 
 if (!manifestArg) {
@@ -441,6 +443,14 @@ async function upsertProfile(profile, manifestDir) {
     : (queryRows(
         `SELECT id, email, username FROM users WHERE email = ${sql(email)} OR LOWER(username) = LOWER(${sql(username)}) LIMIT 1`
       )[0] || null)
+
+  if (existing && skipExistingUsers) {
+    const actionLabel = dryRun ? '[dry-run] saltando existente' : 'Saltando existente'
+    console.log(`\n${actionLabel} user ${username} (${existing.id})`)
+    console.log(`  email: ${existing.email || email}`)
+    return { userId: existing.id, username, created: false, skipped: true }
+  }
+
   const userId = existing?.id || profile.id || randomUUID()
 
   const uploadedAvatar = await resolveMediaReference(manifestDir, username, profile.avatarPath || null, 'avatar')
