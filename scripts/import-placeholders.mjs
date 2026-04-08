@@ -243,7 +243,27 @@ function isRemoteUrl(value) {
 }
 
 function resolveLocalPath(baseDir, inputPath) {
-  return path.isAbsolute(inputPath) ? inputPath : path.resolve(baseDir, inputPath)
+  if (path.isAbsolute(inputPath)) return inputPath
+
+  const candidates = [
+    path.resolve(baseDir, inputPath),
+  ]
+
+  const normalized = String(inputPath || '').replace(/\\/g, '/')
+  if (normalized.startsWith('data/') || normalized.startsWith('./data/')) {
+    candidates.push(path.resolve(repoRoot, normalized.replace(/^\.\//, '')))
+  }
+
+  const stripped = normalized.replace(/^(\.\.\/)+/, '')
+  if (stripped && stripped !== normalized) {
+    candidates.push(path.resolve(repoRoot, 'data', stripped))
+  }
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+
+  return candidates[0]
 }
 
 function runWrangler(args, { json = false } = {}) {

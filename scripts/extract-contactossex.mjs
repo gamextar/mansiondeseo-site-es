@@ -808,8 +808,24 @@ async function inferRemoteExtension(requestContext, fileUrl, mediaType = 'image'
   }
 }
 
-function manifestRelativePath(filePath) {
-  return path.relative(path.dirname(outputPath), filePath)
+function manifestRelativePath(filePath, manifestFilePath = outputPath) {
+  return path.relative(path.dirname(manifestFilePath), filePath)
+}
+
+function mapManifestPathsForTarget(manifestProfile, manifestFilePath) {
+  const mapPath = (value) => {
+    if (!value) return value
+    const absolute = path.resolve(path.dirname(outputPath), value)
+    return manifestRelativePath(absolute, manifestFilePath)
+  }
+
+  return {
+    ...manifestProfile,
+    avatarPath: mapPath(manifestProfile.avatarPath),
+    photoPaths: Array.isArray(manifestProfile.photoPaths) ? manifestProfile.photoPaths.map(mapPath) : [],
+    storyVideoPath: mapPath(manifestProfile.storyVideoPath),
+    storyVideoPaths: Array.isArray(manifestProfile.storyVideoPaths) ? manifestProfile.storyVideoPaths.map(mapPath) : [],
+  }
 }
 
 function isVideoExtension(ext) {
@@ -1052,7 +1068,7 @@ async function main() {
       }
       const manifestProfile = toManifestProfile(profile, assets)
       upsertManifestProfile(manifest, manifestProfile)
-      upsertManifestProfile(batchManifest, manifestProfile)
+      upsertManifestProfile(batchManifest, mapManifestPathsForTarget(manifestProfile, batchPath))
 
       state.processedProfiles[url] = {
         username: profile.username,
