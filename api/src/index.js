@@ -3564,12 +3564,12 @@ async function handleAdminGetUsers(request, env) {
     dataQuery += whereClause;
   }
 
-  dataQuery += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  dataQuery += ' ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?';
 
-  const countStmt = q
+  const countStmt = bindings.length
     ? env.DB.prepare(countQuery).bind(...bindings)
     : env.DB.prepare(countQuery);
-  const dataStmt = q
+  const dataStmt = bindings.length
     ? env.DB.prepare(dataQuery).bind(...bindings, limit, offset)
     : env.DB.prepare(dataQuery).bind(limit, offset);
 
