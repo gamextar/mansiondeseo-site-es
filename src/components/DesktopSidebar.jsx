@@ -1,5 +1,5 @@
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Film, MessageCircle, User, Crown, Settings, Camera } from 'lucide-react';
+import { Home, Film, MessageCircle, User, Crown, Settings, Camera, Trophy, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useState } from 'react';
@@ -163,6 +163,42 @@ export default function DesktopSidebar() {
             </NavLink>
           );
         })}
+
+        <div className="px-2 pt-4">
+          <p className="px-2 pb-2 text-[10px] uppercase tracking-[0.22em] text-text-dim">Descubrir</p>
+          <NavLink
+            to="/ranking"
+            className="group relative block overflow-hidden rounded-[1.15rem]"
+          >
+            {location.pathname.startsWith('/ranking') && (
+              <motion.div
+                layoutId="sidebar-ranking-active"
+                className="absolute inset-0 rounded-[1.15rem] border border-mansion-gold/25 bg-mansion-gold/10"
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              />
+            )}
+            <div className="relative overflow-hidden rounded-[1.15rem] border border-mansion-border/20 bg-[radial-gradient(circle_at_top_left,rgba(201,168,76,0.18),transparent_30%),linear-gradient(180deg,rgba(30,24,36,0.82),rgba(16,14,22,0.9))] px-4 py-4">
+              <div className="pointer-events-none absolute -right-5 top-0 h-16 w-16 rounded-full bg-mansion-gold/10 blur-2xl" />
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-mansion-gold">
+                    <Trophy className="h-3.5 w-3.5" />
+                    Top 100
+                  </div>
+                  <p className="mt-1 text-sm font-semibold text-text-primary group-hover:text-mansion-gold transition-colors">
+                    Perfiles más vistos
+                  </p>
+                  <p className="mt-1 text-xs text-text-dim">
+                    Ranking vivo por visitas públicas
+                  </p>
+                </div>
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-mansion-gold/20 bg-black/20 text-mansion-gold">
+                  <Eye className="h-5 w-5" />
+                </div>
+              </div>
+            </div>
+          </NavLink>
+        </div>
       </nav>
 
       {/* Recent visitors */}
