@@ -460,13 +460,22 @@ async function extractProfileData(page, requestContext, url) {
       const posterImage = card.querySelector('video')?.getAttribute('poster') || ''
       const style = card.querySelector('[style*="background-image"]')?.getAttribute('style') || ''
       const styleMatch = style.match(/url\((["']?)(.*?)\1\)/i)
+      const iconClasses = Array.from(card.querySelectorAll('i')).map((node) => node.className.toLowerCase())
+      const classSignals = Array.from(card.querySelectorAll('*'))
+        .flatMap((node) => String(node.className || '').toLowerCase().split(/\s+/))
+        .filter(Boolean)
+      const textSignals = clean(card.textContent || '').toLowerCase()
+      const hasPlaySignal =
+        iconClasses.some((value) => value.includes('play') || value.includes('video')) ||
+        classSignals.some((value) => value.includes('play') || value.includes('video')) ||
+        textSignals.includes('video')
       return {
         href: anchor?.href || '',
         thumb: thumbImage || posterImage || styleMatch?.[2] || '',
         declaredType:
           anchor?.href?.includes('/video-zoom') || anchor?.href?.includes('/video/')
             ? 'video'
-            : (card.querySelector('video') ? 'video' : 'image'),
+            : (card.querySelector('video') || hasPlaySignal ? 'video' : 'image'),
         likes: Number.isFinite(likes) ? likes : 0,
       }
     }).filter((item) => item.href || item.thumb)
