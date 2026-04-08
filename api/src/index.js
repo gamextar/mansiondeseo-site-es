@@ -1784,6 +1784,7 @@ async function handleProfileDetail(request, env, userId) {
       age: getPublicAge(user),
       ...getLocationFields(user),
       role: mapRoleToDisplay(user.role),
+      seeking: normalizeRoleArray(safeParseJSON(user.seeking, []), SEEKING_ROLE_IDS, ['hombre']),
       message_block_roles: normalizeRoleArray(safeParseJSON(user.message_block_roles, []), SEEKING_ROLE_IDS, []),
       interests: safeParseJSON(user.interests, []),
       bio: user.bio,

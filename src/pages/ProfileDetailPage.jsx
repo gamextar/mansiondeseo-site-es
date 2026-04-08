@@ -131,8 +131,6 @@ export default function ProfileDetailPage() {
     setIsFavorited(nextInitialProfile?.isFavorited ?? false);
     setLoading(!nextInitialProfile);
 
-    if (nextCachedDetail) return;
-
     getProfile(id)
       .then(data => {
         const nextSettings = data.settings || DEFAULT_PROFILE_SETTINGS;
