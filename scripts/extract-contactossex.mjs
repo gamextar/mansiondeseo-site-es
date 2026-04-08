@@ -30,6 +30,7 @@ Opciones:
   --page-end <n>                 Página final
   --max-profiles <n>             Máximo de perfiles a extraer en esta corrida
   --profile-url <url>            Extrae un solo perfil
+  --exclude-usernames <csv>      Usernames a excluir del manifest/listado
   --force                        Reextrae perfiles aunque ya estén marcados en el state
   --delay-ms <n>                 Espera entre perfiles/páginas
   --fresh-session                Ignora la sesión guardada y obliga nuevo login
@@ -71,6 +72,12 @@ const maxProfiles = Number.parseInt(takeFlag('--max-profiles', '0'), 10)
 const delayMs = Number.parseInt(takeFlag('--delay-ms', '1200'), 10)
 const listUrlTemplate = takeFlag('--list-url-template', 'https://contactossex.com/members?page={page}')
 const profileUrl = takeFlag('--profile-url', '')
+const excludedUsernames = new Set(
+  String(takeFlag('--exclude-usernames', '') || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+)
 const sessionPath = path.resolve(repoRoot, takeFlag('--session', './data/contactossex-session.json'))
 const statePath = path.resolve(repoRoot, takeFlag('--state', './data/contactossex-extract-state.json'))
 const outputPath = path.resolve(repoRoot, takeFlag('--output', './data/contactossex-placeholders.json'))
@@ -135,8 +142,8 @@ function parseSeeking(raw) {
 
   const mapped = []
   for (const token of tokens) {
-    if (token.includes('pareja de hombres')) mapped.push('pareja_hombres')
-    else if (token.includes('pareja de mujeres')) mapped.push('pareja_mujeres')
+    if (token.includes('pareja de hombres') || token.includes('parejas de hombres')) mapped.push('pareja_hombres')
+    else if (token.includes('pareja de mujeres') || token.includes('parejas de mujeres')) mapped.push('pareja_mujeres')
     else if (token.includes('parejas') || token.includes('pareja')) mapped.push('pareja')
     else if (token.includes('mujeres') || token.includes('mujer')) mapped.push('mujer')
     else if (token.includes('hombres') || token.includes('hombre')) mapped.push('hombre')
@@ -152,12 +159,15 @@ function parseMessageBlockRoles(raw) {
   if (normalized.includes('acepta todos los mensajes')) return []
 
   const mapped = []
-  if (normalized.includes('pareja de hombres')) mapped.push('pareja_hombres')
-  if (normalized.includes('pareja de mujeres')) mapped.push('pareja_mujeres')
-  if (normalized.includes('parejas') || normalized.includes('pareja')) mapped.push('pareja')
-  if (normalized.includes('mujeres') || normalized.includes('mujer')) mapped.push('mujer')
-  if (normalized.includes('hombres') || normalized.includes('hombre')) mapped.push('hombre')
-  if (normalized.includes('trans')) mapped.push('trans')
+  const tokens = normalized.split(',').map((part) => part.trim()).filter(Boolean)
+  for (const token of tokens) {
+    if (token.includes('pareja de hombres') || token.includes('parejas de hombres')) mapped.push('pareja_hombres')
+    else if (token.includes('pareja de mujeres') || token.includes('parejas de mujeres')) mapped.push('pareja_mujeres')
+    else if (token.includes('parejas') || token.includes('pareja')) mapped.push('pareja')
+    else if (token.includes('mujeres') || token.includes('mujer')) mapped.push('mujer')
+    else if (token.includes('hombres') || token.includes('hombre')) mapped.push('hombre')
+    else if (token.includes('trans') || token.includes('crossdresser')) mapped.push('trans')
+  }
   return [...new Set(mapped)]
 }
 
@@ -568,6 +578,7 @@ function toManifestProfile(profile, assets) {
 }
 
 function upsertManifestProfile(manifest, profile) {
+  if (excludedUsernames.has(String(profile.username || '').trim().toLowerCase())) return
   const index = manifest.profiles.findIndex((item) => item.username?.toLowerCase() === profile.username?.toLowerCase())
   if (index >= 0) manifest.profiles[index] = profile
   else manifest.profiles.push(profile)
@@ -628,6 +639,17 @@ async function main() {
       if (!profile.username) {
         console.log(`Saltado: no se pudo leer username en ${url}`)
         state.processedProfiles[url] = { skipped: true, reason: 'missing_username', at: new Date().toISOString() }
+        await writeJson(statePath, state)
+        continue
+      }
+      if (excludedUsernames.has(String(profile.username || '').trim().toLowerCase())) {
+        console.log(`Saltando username excluido: ${profile.username}`)
+        state.processedProfiles[url] = {
+          username: profile.username,
+          skipped: true,
+          reason: 'excluded_username',
+          at: new Date().toISOString(),
+        }
         await writeJson(statePath, state)
         continue
       }
