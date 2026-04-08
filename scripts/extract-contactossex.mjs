@@ -135,6 +135,16 @@ function parseSpanishRole(raw) {
 }
 
 function parseSeeking(raw) {
+  const exactMap = new Map([
+    ['hombres', 'hombre'],
+    ['mujeres', 'mujer'],
+    ['crossdressers', 'trans'],
+    ['trans', 'trans'],
+    ['parejas', 'pareja'],
+    ['parejas de hombres', 'pareja_hombres'],
+    ['parejas de mujeres', 'pareja_mujeres'],
+  ])
+
   const tokens = String(raw || '')
     .split(',')
     .map((part) => part.trim().toLowerCase())
@@ -142,12 +152,8 @@ function parseSeeking(raw) {
 
   const mapped = []
   for (const token of tokens) {
-    if (token.includes('pareja de hombres') || token.includes('parejas de hombres')) mapped.push('pareja_hombres')
-    else if (token.includes('pareja de mujeres') || token.includes('parejas de mujeres')) mapped.push('pareja_mujeres')
-    else if (token.includes('parejas') || token.includes('pareja')) mapped.push('pareja')
-    else if (token.includes('mujeres') || token.includes('mujer')) mapped.push('mujer')
-    else if (token.includes('hombres') || token.includes('hombre')) mapped.push('hombre')
-    else if (token.includes('trans')) mapped.push('trans')
+    const mappedValue = exactMap.get(token)
+    if (mappedValue) mapped.push(mappedValue)
   }
 
   return [...new Set(mapped)]
