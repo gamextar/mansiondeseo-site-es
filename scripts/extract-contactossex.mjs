@@ -402,9 +402,41 @@ async function getProfileLinksFromList(page, url) {
   })
 }
 
+async function scrollProfileMedia(page) {
+  const maxPasses = 8
+  let previousCount = -1
+
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const currentCount = await page.evaluate(() => {
+      return document.querySelectorAll('.card-multimedia-parent').length
+    })
+
+    await page.evaluate(() => {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' })
+    })
+    await delay(900)
+
+    const nextCount = await page.evaluate(() => {
+      return document.querySelectorAll('.card-multimedia-parent').length
+    })
+
+    if (nextCount === currentCount && nextCount === previousCount) {
+      break
+    }
+
+    previousCount = nextCount
+  }
+
+  await page.evaluate(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  })
+  await delay(250)
+}
+
 async function extractProfileData(page, requestContext, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded' })
   await delay(Math.max(500, delayMs))
+  await scrollProfileMedia(page)
 
   const extracted = await page.evaluate(() => {
     const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim()
