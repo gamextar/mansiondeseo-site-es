@@ -93,6 +93,8 @@ function buildArgs(config) {
   const excludeUsernames = stringValue(config.excludeUsernames, '')
   const batchName = stringValue(config.batchName, '')
   const batchDir = stringValue(config.batchDir, './data/contactossex-batches')
+  const roleGroup = stringValue(config.roleGroup, 'mixto')
+  const effectiveBatchDir = path.join(batchDir, roleGroup)
 
   if (boolValue(config.manualLogin, true)) args.push('--manual-login')
   if (boolValue(config.useChrome, true)) args.push('--chrome')
@@ -110,7 +112,8 @@ function buildArgs(config) {
   args.push('--max-videos', String(maxVideos))
   args.push('--delay-ms', String(delayMs))
   args.push('--media-delay-ms', String(mediaDelayMs))
-  args.push('--batch-dir', batchDir)
+  args.push('--batch-dir', effectiveBatchDir)
+  args.push('--role-group', roleGroup)
 
   if (profileUrl) args.push('--profile-url', profileUrl)
   if (excludeUsernames) args.push('--exclude-usernames', excludeUsernames)
@@ -137,6 +140,7 @@ function buildImportArgs(config) {
   const args = [importerScript]
   const manifestPath = stringValue(config.manifestPath, '')
   const onlyUsername = stringValue(config.onlyUsername, '')
+  const onlyRoleGroup = stringValue(config.onlyRoleGroup, '')
 
   if (!manifestPath) {
     throw new Error('Falta manifestPath para la importación.')
@@ -149,6 +153,7 @@ function buildImportArgs(config) {
   if (boolValue(config.skipExistingUsers, true)) args.push('--skip-existing-users')
   if (boolValue(config.keepStory, false)) args.push('--keep-story')
   if (onlyUsername) args.push('--only', onlyUsername)
+  if (onlyRoleGroup && onlyRoleGroup !== 'all') args.push('--only-role-group', onlyRoleGroup)
 
   return args
 }
@@ -179,22 +184,29 @@ async function serveHtml(res) {
 }
 
 async function listBatchFiles() {
+  async function walk(dirPath) {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true })
+    const items = []
+    for (const entry of entries) {
+      const absolutePath = path.join(dirPath, entry.name)
+      if (entry.isDirectory()) {
+        items.push(...await walk(absolutePath))
+        continue
+      }
+      if (!entry.isFile() || !entry.name.endsWith('.json')) continue
+      const stat = await fs.stat(absolutePath)
+      items.push({
+        name: path.relative(defaultBatchDir, absolutePath),
+        path: path.relative(repoRoot, absolutePath),
+        modifiedAt: stat.mtime.toISOString(),
+        size: stat.size,
+      })
+    }
+    return items
+  }
+
   try {
-    const entries = await fs.readdir(defaultBatchDir, { withFileTypes: true })
-    const items = await Promise.all(
-      entries
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
-        .map(async (entry) => {
-          const absolutePath = path.join(defaultBatchDir, entry.name)
-          const stat = await fs.stat(absolutePath)
-          return {
-            name: entry.name,
-            path: path.relative(repoRoot, absolutePath),
-            modifiedAt: stat.mtime.toISOString(),
-            size: stat.size,
-          }
-        })
-    )
+    const items = await walk(defaultBatchDir)
     return items.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt))
   } catch {
     return []

@@ -33,6 +33,7 @@ Opciones:
   --batch-dir <path>             Carpeta donde guardar manifests por corrida
   --batch-name <name>            Nombre del batch actual; si falta, se genera uno automáticamente
   --no-batch-output              Desactiva la escritura del manifest separado por batch
+  --role-group <value>           Grupo destino: mujer | hombre | pareja | mixto
   --login-username <value>       Username para re-login automático
   --login-password <value>       Password para re-login automático
   --login-creds-file <path>      Archivo local donde guardar/leer credenciales
@@ -95,6 +96,7 @@ const listUrlTemplate = takeFlag('--list-url-template', 'https://contactossex.co
 const profileUrl = takeFlag('--profile-url', '')
 const overwriteAssets = hasFlag('--overwrite-assets')
 const noBatchOutput = hasFlag('--no-batch-output')
+const roleGroup = slugifySegment(takeFlag('--role-group', 'mixto'), 'mixto')
 const saveLoginCreds = hasFlag('--save-login-creds') || String(process.env.CONTACTOSSEX_SAVE_LOGIN_CREDS || '') === '1'
 const excludedUsernames = new Set(
   String(takeFlag('--exclude-usernames', '') || '')
@@ -102,14 +104,14 @@ const excludedUsernames = new Set(
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean)
 )
-const sessionPath = path.resolve(repoRoot, takeFlag('--session', './data/contactossex-session.json'))
+const sessionPath = path.resolve(repoRoot, takeFlag('--session', `./data/contactossex-session-${roleGroup}.json`))
 const browserProfileDir = path.resolve(
   repoRoot,
-  takeFlag('--browser-profile-dir', './data/contactossex-browser-profile')
+  takeFlag('--browser-profile-dir', `./data/contactossex-browser-profile-${roleGroup}`)
 )
-const statePath = path.resolve(repoRoot, takeFlag('--state', './data/contactossex-extract-state.json'))
-const outputPath = path.resolve(repoRoot, takeFlag('--output', './data/contactossex-placeholders.json'))
-const batchDir = path.resolve(repoRoot, takeFlag('--batch-dir', './data/contactossex-batches'))
+const statePath = path.resolve(repoRoot, takeFlag('--state', `./data/contactossex-state/${roleGroup}.json`))
+const outputPath = path.resolve(repoRoot, takeFlag('--output', `./data/contactossex-placeholders/${roleGroup}.json`))
+const batchDir = path.resolve(repoRoot, takeFlag('--batch-dir', `./data/contactossex-batches/${roleGroup}`))
 const requestedBatchName = takeFlag('--batch-name', '')
 const loginCredsPath = path.resolve(
   repoRoot,
@@ -117,7 +119,7 @@ const loginCredsPath = path.resolve(
 )
 const providedLoginUsername = takeFlag('--login-username', process.env.CONTACTOSSEX_LOGIN_USERNAME || '')
 const providedLoginPassword = takeFlag('--login-password', process.env.CONTACTOSSEX_LOGIN_PASSWORD || '')
-const assetsDir = path.resolve(repoRoot, takeFlag('--assets-dir', './data/contactossex-assets'))
+const assetsDir = path.resolve(repoRoot, takeFlag('--assets-dir', `./data/contactossex-assets/${roleGroup}`))
 const headless = explicitHeadless ? true : !headed && !manualLogin
 const batchOutputEnabled = !noBatchOutput
 
@@ -220,6 +222,22 @@ function parseSpanishRole(raw) {
   if (value.includes('hombre')) return 'hombre'
   if (value.includes('mujer')) return 'mujer'
   return 'mujer'
+}
+
+function normalizeRoleGroup(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (normalized === 'mujer') return 'mujer'
+  if (normalized === 'hombre') return 'hombre'
+  if (normalized === 'pareja') return 'pareja'
+  return 'mixto'
+}
+
+function roleToGroup(role) {
+  const normalized = String(role || '').trim().toLowerCase()
+  if (normalized === 'mujer') return 'mujer'
+  if (normalized === 'hombre' || normalized === 'trans') return 'hombre'
+  if (normalized === 'pareja' || normalized === 'pareja_hombres' || normalized === 'pareja_mujeres') return 'pareja'
+  return 'mixto'
 }
 
 function parseSeeking(raw) {
@@ -900,6 +918,7 @@ async function main() {
   const batchName = await buildBatchName()
   const batchPath = path.join(batchDir, `${batchName}.json`)
   const batchManifest = { profiles: [] }
+  const selectedRoleGroup = normalizeRoleGroup(roleGroup)
 
   if (freshSession && existsSync(browserProfileDir)) {
     await removeDir(browserProfileDir)
@@ -938,6 +957,7 @@ async function main() {
     let skippedExcludedUsername = 0
     let skippedExistingAssets = 0
     let skippedExistingKnownProfile = 0
+    let skippedRoleMismatch = 0
     for (const url of urls) {
       if (maxProfiles > 0 && processedThisRun >= maxProfiles) break
       if (!force && !overwriteAssets) {
@@ -971,6 +991,20 @@ async function main() {
         await writeJson(statePath, state)
         skippedThisRun += 1
         skippedExcludedUsername += 1
+        continue
+      }
+      if (selectedRoleGroup !== 'mixto' && roleToGroup(profile.role) !== selectedRoleGroup) {
+        console.log(`Saltando ${profile.username} por grupo de rol: ${profile.role} no entra en ${selectedRoleGroup}`)
+        state.processedProfiles[url] = {
+          username: profile.username,
+          userId: profile.userId || '',
+          skipped: true,
+          reason: 'role_group_mismatch',
+          at: new Date().toISOString(),
+        }
+        await writeJson(statePath, state)
+        skippedThisRun += 1
+        skippedRoleMismatch += 1
         continue
       }
 
@@ -1015,11 +1049,13 @@ async function main() {
         skippedProfiles: skippedThisRun,
         batchProfiles: batchManifest.profiles.length,
         batchManifestPath: batchOutputEnabled ? batchPath : null,
+        roleGroup: selectedRoleGroup,
         skippedBreakdown: {
           existingKnownProfile: skippedExistingKnownProfile,
           existingAssetsDir: skippedExistingAssets,
           excludedUsername: skippedExcludedUsername,
           missingUsername: skippedMissingUsername,
+          roleGroupMismatch: skippedRoleMismatch,
         },
       })}`
     )

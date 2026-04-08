@@ -326,12 +326,28 @@
 
             <div class="row-2">
               <label>
+                Grupo / sexo a extraer
+                <select id="roleGroup">
+                  <option value="mujer" selected>Mujeres</option>
+                  <option value="hombre">Hombres / Trans</option>
+                  <option value="pareja">Parejas</option>
+                  <option value="mixto">Mixto</option>
+                </select>
+              </label>
+              <label>
                 Delay entre fotos/videos (ms)
                 <input id="mediaDelayMs" type="number" min="0" step="50" value="250" />
               </label>
+            </div>
+
+            <div class="row-2">
               <label>
                 Excluir usernames
                 <input id="excludeUsernames" value="Conejita1988" />
+              </label>
+              <label>
+                Carpeta de batches base
+                <input id="batchDir" value="./data/contactossex-batches" />
               </label>
             </div>
 
@@ -341,8 +357,8 @@
                 <input id="batchName" placeholder="Vacío = batch-01, batch-02, ..." />
               </label>
               <label>
-                Carpeta de batches
-                <input id="batchDir" value="./data/contactossex-batches" />
+                Carpeta final esperada
+                <input id="resolvedBatchDir" value="./data/contactossex-batches/mujer" readonly />
               </label>
             </div>
 
@@ -437,13 +453,25 @@
 
             <div class="row-2">
               <label>
+                Grupo / sexo a importar
+                <select id="onlyRoleGroup">
+                  <option value="all" selected>Todo el batch</option>
+                  <option value="mujer">Solo Mujeres</option>
+                  <option value="hombre">Solo Hombres / Trans</option>
+                  <option value="pareja">Solo Parejas</option>
+                </select>
+              </label>
+              <label>
                 Username puntual
                 <input id="onlyUsername" placeholder="Vacío = importar todo el batch" />
               </label>
+            </div>
+            <div class="row-2">
               <label>
                 Ruta manual del manifest
                 <input id="customManifestPath" placeholder="./data/contactossex-batches/batch-01.json" />
               </label>
+              <div></div>
             </div>
 
             <div class="checks">
@@ -517,6 +545,7 @@
         return {
           listUrlTemplate: document.getElementById('listUrlTemplate').value,
           profileUrl: document.getElementById('profileUrl').value,
+          roleGroup: document.getElementById('roleGroup').value,
           batchName: document.getElementById('batchName').value,
           batchDir: document.getElementById('batchDir').value,
           loginUsername: document.getElementById('loginUsername').value,
@@ -542,6 +571,7 @@
       function importPayload() {
         return {
           manifestPath: customManifestPath.value || manifestPathSelect.value,
+          onlyRoleGroup: document.getElementById('onlyRoleGroup').value,
           onlyUsername: document.getElementById('onlyUsername').value,
           dryRun: document.getElementById('importDryRun').checked,
           skipExistingUsers: document.getElementById('skipExistingUsers').checked,
@@ -553,6 +583,12 @@
         const response = await fetch('/api/batches')
         const data = await response.json()
         renderBatches(data.batches || [])
+      }
+
+      function updateResolvedBatchDir() {
+        const base = document.getElementById('batchDir').value || './data/contactossex-batches'
+        const roleGroup = document.getElementById('roleGroup').value || 'mixto'
+        document.getElementById('resolvedBatchDir').value = `${base.replace(/\/+$/, '')}/${roleGroup}`
       }
 
       function renderBatches(batches) {
@@ -685,9 +721,12 @@
 
       refreshButton.addEventListener('click', fetchStatus)
       refreshBatchesButton.addEventListener('click', fetchBatches)
+      document.getElementById('batchDir').addEventListener('input', updateResolvedBatchDir)
+      document.getElementById('roleGroup').addEventListener('change', updateResolvedBatchDir)
 
       fetchStatus()
       fetchBatches()
+      updateResolvedBatchDir()
       setInterval(fetchStatus, 1500)
     </script>
   </body>

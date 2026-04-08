@@ -31,6 +31,7 @@ Opciones:
   --local             Usa bindings locales de wrangler
   --dry-run           No sube ni escribe; solo muestra el plan
   --only <username>   Importa solo un username
+  --only-role-group <group>  Importa solo un grupo: mujer | hombre | pareja
   --skip-existing-users  Salta usuarios que ya existan en Mansion Deseo
   --replace-story     Borra stories existentes del usuario antes de insertar la nueva (default)
   --keep-story        Conserva stories existentes
@@ -84,6 +85,7 @@ if (rawArgs.includes('--help') || rawArgs.includes('-h')) {
 
 const manifestArg = takeFlag('--manifest', null) || rawArgs.shift() || null
 const onlyUsername = takeFlag('--only', '')
+const onlyRoleGroup = takeFlag('--only-role-group', '')
 const dryRun = hasFlag('--dry-run')
 const useLocal = hasFlag('--local')
 const useRemote = !useLocal || hasFlag('--remote')
@@ -143,6 +145,14 @@ function slugifyUsername(input) {
     .replace(/[^a-z0-9._]+/g, '.')
     .replace(/^\.+|\.+$/g, '')
     .slice(0, 20)
+}
+
+function roleToGroup(role) {
+  const normalized = String(role || '').trim().toLowerCase()
+  if (normalized === 'mujer') return 'mujer'
+  if (normalized === 'hombre' || normalized === 'trans') return 'hombre'
+  if (normalized === 'pareja' || normalized === 'pareja_hombres' || normalized === 'pareja_mujeres') return 'pareja'
+  return ''
 }
 
 function ensureArray(value) {
@@ -630,9 +640,16 @@ async function upsertProfile(profile, manifestDir) {
 async function main() {
   const profiles = loadManifest(manifestPath)
   const manifestDir = path.dirname(manifestPath)
-  const filtered = onlyUsername
-    ? profiles.filter((profile) => String(profile.username || '').toLowerCase() === onlyUsername.toLowerCase())
-    : profiles
+  const normalizedRoleGroup = String(onlyRoleGroup || '').trim().toLowerCase()
+  const filtered = profiles.filter((profile) => {
+    if (onlyUsername && String(profile.username || '').toLowerCase() !== onlyUsername.toLowerCase()) {
+      return false
+    }
+    if (normalizedRoleGroup && roleToGroup(profile.role) !== normalizedRoleGroup) {
+      return false
+    }
+    return true
+  })
 
   if (filtered.length === 0) {
     throw new Error('No hay perfiles para importar con los filtros actuales')
