@@ -16,47 +16,68 @@ const htmlPath = path.join(__dirname, 'extractor-ui.html')
 const port = Number.parseInt(process.env.EXTRACTOR_UI_PORT || '4318', 10)
 const defaultBatchDir = path.join(repoRoot, 'data', 'contactossex-batches')
 
-let activeChild = null
-let activeCommand = []
-let activeJobType = 'idle'
-let logBuffer = []
-let lastExitCode = null
-let lastStatus = 'idle'
-let startedAt = null
-let finishedAt = null
-let lastSummary = null
+function createJobState(jobType) {
+  return {
+    jobType,
+    activeChild: null,
+    activeCommand: [],
+    logBuffer: [],
+    lastExitCode: null,
+    lastStatus: 'idle',
+    startedAt: null,
+    finishedAt: null,
+    lastSummary: null,
+  }
+}
 
-function appendLog(line) {
+const jobs = {
+  extract: createJobState('extract'),
+  import: createJobState('import'),
+}
+
+function appendLog(jobType, line) {
+  const job = jobs[jobType]
+  if (!job) return
   const text = String(line || '').replace(/\r/g, '')
   for (const part of text.split('\n')) {
     if (!part) continue
     if (part.startsWith('__SUMMARY__ ')) {
       try {
-        lastSummary = JSON.parse(part.slice('__SUMMARY__ '.length))
+        job.lastSummary = JSON.parse(part.slice('__SUMMARY__ '.length))
       } catch {
         // ignore malformed summary lines and keep normal logs flowing
       }
       continue
     }
-    logBuffer.push(`[${new Date().toISOString()}] ${part}`)
+    job.logBuffer.push(`[${new Date().toISOString()}] ${part}`)
   }
-  if (logBuffer.length > 1000) {
-    logBuffer = logBuffer.slice(-1000)
+  if (job.logBuffer.length > 1000) {
+    job.logBuffer = job.logBuffer.slice(-1000)
+  }
+}
+
+function jobStatus(jobType) {
+  const job = jobs[jobType]
+  if (!job) return null
+  return {
+    running: Boolean(job.activeChild),
+    pid: job.activeChild?.pid || null,
+    status: job.lastStatus,
+    jobType,
+    startedAt: job.startedAt,
+    finishedAt: job.finishedAt,
+    lastExitCode: job.lastExitCode,
+    command: job.activeCommand,
+    summary: job.lastSummary,
+    logs: job.logBuffer.slice(-300),
   }
 }
 
 function currentStatus() {
   return {
-    running: Boolean(activeChild),
-    pid: activeChild?.pid || null,
-    status: lastStatus,
-    jobType: activeJobType,
-    startedAt,
-    finishedAt,
-    lastExitCode,
-    command: activeCommand,
-    summary: lastSummary,
-    logs: logBuffer.slice(-300),
+    running: Object.values(jobs).some((job) => Boolean(job.activeChild)),
+    extract: jobStatus('extract'),
+    import: jobStatus('import'),
   }
 }
 
@@ -214,35 +235,38 @@ async function listBatchFiles() {
 }
 
 function startProcess(jobType, argsBuilder, config) {
-  if (activeChild) {
-    throw new Error('Ya hay un proceso corriendo.')
+  const job = jobs[jobType]
+  if (!job) {
+    throw new Error(`Tipo de job inválido: ${jobType}`)
+  }
+  if (job.activeChild) {
+    throw new Error(`Ya hay una ${jobType === 'import' ? 'importación' : 'extracción'} corriendo.`)
   }
 
-  activeCommand = [process.execPath, ...argsBuilder(config)]
-  activeJobType = jobType
-  logBuffer = []
-  lastExitCode = null
-  lastStatus = 'running'
-  lastSummary = null
-  startedAt = new Date().toISOString()
-  finishedAt = null
+  job.activeCommand = [process.execPath, ...argsBuilder(config)]
+  job.logBuffer = []
+  job.lastExitCode = null
+  job.lastStatus = 'running'
+  job.lastSummary = null
+  job.startedAt = new Date().toISOString()
+  job.finishedAt = null
 
-  appendLog(`Iniciando ${jobType === 'import' ? 'importador' : 'extractor'} con ${activeCommand.slice(1).join(' ')}`)
+  appendLog(jobType, `Iniciando ${jobType === 'import' ? 'importador' : 'extractor'} con ${job.activeCommand.slice(1).join(' ')}`)
 
-  activeChild = spawn(process.execPath, activeCommand.slice(1), {
+  job.activeChild = spawn(process.execPath, job.activeCommand.slice(1), {
     cwd: repoRoot,
     env: buildChildEnv(jobType, config),
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 
-  activeChild.stdout.on('data', (chunk) => appendLog(chunk))
-  activeChild.stderr.on('data', (chunk) => appendLog(chunk))
-  activeChild.on('exit', (code) => {
-    lastExitCode = code
-    lastStatus = code === 0 ? 'completed' : 'failed'
-    finishedAt = new Date().toISOString()
-    appendLog(`${jobType === 'import' ? 'Importador' : 'Extractor'} finalizado con código ${code}`)
-    activeChild = null
+  job.activeChild.stdout.on('data', (chunk) => appendLog(jobType, chunk))
+  job.activeChild.stderr.on('data', (chunk) => appendLog(jobType, chunk))
+  job.activeChild.on('exit', (code) => {
+    job.lastExitCode = code
+    job.lastStatus = code === 0 ? 'completed' : 'failed'
+    job.finishedAt = new Date().toISOString()
+    appendLog(jobType, `${jobType === 'import' ? 'Importador' : 'Extractor'} finalizado con código ${code}`)
+    job.activeChild = null
   })
 }
 
@@ -254,10 +278,11 @@ function startImport(config) {
   startProcess('import', buildImportArgs, config)
 }
 
-function stopExtraction() {
-  if (!activeChild) return false
-  appendLog(`Deteniendo ${activeJobType === 'import' ? 'importación' : 'extracción'} por pedido del usuario...`)
-  activeChild.kill('SIGTERM')
+function stopProcess(jobType) {
+  const job = jobs[jobType]
+  if (!job?.activeChild) return false
+  appendLog(jobType, `Deteniendo ${jobType === 'import' ? 'importación' : 'extracción'} por pedido del usuario...`)
+  job.activeChild.kill('SIGTERM')
   return true
 }
 
@@ -295,7 +320,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/stop') {
-      const stopped = stopExtraction()
+      const body = await readBody(req)
+      const requestedJobType = stringValue(body.jobType, '')
+      const targets = requestedJobType && requestedJobType !== 'all'
+        ? [requestedJobType]
+        : ['extract', 'import']
+      const stopped = targets.some((jobType) => stopProcess(jobType))
       respondJson(res, 200, { stopped, ...currentStatus() })
       return
     }

@@ -171,6 +171,28 @@
         grid-column: 1 / -1;
       }
 
+      .status-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .job-card {
+        display: grid;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.06);
+      }
+
+      .job-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
       .pill {
         display: inline-flex;
         align-items: center;
@@ -274,6 +296,7 @@
 
       @media (max-width: 960px) {
         .grid { grid-template-columns: 1fr; }
+        .status-grid { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -513,15 +536,36 @@
         </section>
 
         <section class="panel status-card">
-          <h2>Estado y Log</h2>
-          <div id="status-pill" class="pill"><span class="dot"></span><span id="status-text">idle</span></div>
-          <div class="meta" id="meta"></div>
-          <div class="summary" id="summary" hidden>
-            <h3>Resumen de la última corrida</h3>
-            <div class="summary-grid" id="summary-grid"></div>
-            <div class="summary-list" id="summary-list"></div>
+          <h2>Estado y Logs</h2>
+          <div class="status-grid">
+            <div class="job-card">
+              <div class="job-head">
+                <div id="extract-status-pill" class="pill"><span class="dot"></span><span id="extract-status-text">idle</span></div>
+                <button type="button" class="danger" id="stop-extract-button">Detener extracción</button>
+              </div>
+              <div class="meta" id="extract-meta"></div>
+              <div class="summary" id="extract-summary" hidden>
+                <h3>Resumen de extracción</h3>
+                <div class="summary-grid" id="extract-summary-grid"></div>
+                <div class="summary-list" id="extract-summary-list"></div>
+              </div>
+              <pre id="extract-logs">Esperando una extracción...</pre>
+            </div>
+
+            <div class="job-card">
+              <div class="job-head">
+                <div id="import-status-pill" class="pill"><span class="dot"></span><span id="import-status-text">idle</span></div>
+                <button type="button" class="danger" id="stop-import-button">Detener importación</button>
+              </div>
+              <div class="meta" id="import-meta"></div>
+              <div class="summary" id="import-summary" hidden>
+                <h3>Resumen de importación</h3>
+                <div class="summary-grid" id="import-summary-grid"></div>
+                <div class="summary-list" id="import-summary-list"></div>
+              </div>
+              <pre id="import-logs">Esperando una importación...</pre>
+            </div>
           </div>
-          <pre id="logs">Esperando una corrida...</pre>
         </section>
       </div>
     </div>
@@ -529,14 +573,23 @@
     <script>
       const form = document.getElementById('extract-form')
       const importForm = document.getElementById('import-form')
-      const logs = document.getElementById('logs')
-      const statusText = document.getElementById('status-text')
-      const statusPill = document.getElementById('status-pill')
-      const meta = document.getElementById('meta')
-      const summary = document.getElementById('summary')
-      const summaryGrid = document.getElementById('summary-grid')
-      const summaryList = document.getElementById('summary-list')
       const stopButton = document.getElementById('stop-button')
+      const extractStatusText = document.getElementById('extract-status-text')
+      const extractStatusPill = document.getElementById('extract-status-pill')
+      const extractMeta = document.getElementById('extract-meta')
+      const extractSummary = document.getElementById('extract-summary')
+      const extractSummaryGrid = document.getElementById('extract-summary-grid')
+      const extractSummaryList = document.getElementById('extract-summary-list')
+      const extractLogs = document.getElementById('extract-logs')
+      const importStatusText = document.getElementById('import-status-text')
+      const importStatusPill = document.getElementById('import-status-pill')
+      const importMeta = document.getElementById('import-meta')
+      const importSummary = document.getElementById('import-summary')
+      const importSummaryGrid = document.getElementById('import-summary-grid')
+      const importSummaryList = document.getElementById('import-summary-list')
+      const importLogs = document.getElementById('import-logs')
+      const stopExtractButton = document.getElementById('stop-extract-button')
+      const stopImportButton = document.getElementById('stop-import-button')
       const refreshButton = document.getElementById('refresh-button')
       const refreshBatchesButton = document.getElementById('refresh-batches-button')
       const manifestPathSelect = document.getElementById('manifestPath')
@@ -616,25 +669,35 @@
         renderStatus(data)
       }
 
-      function renderStatus(data) {
-        statusText.textContent = data.status || 'idle'
-        statusPill.className = `pill ${data.status || 'idle'}`
+      function renderJobStatus(job, elements, emptyMessage) {
+        const {
+          statusText,
+          statusPill,
+          meta,
+          summary,
+          summaryGrid,
+          summaryList,
+          logs,
+          stopButton,
+        } = elements
+
+        const status = job?.status || 'idle'
+        statusText.textContent = status
+        statusPill.className = `pill ${status}`
+        stopButton.disabled = !job?.running
 
         const bits = []
-        if (data.pid) bits.push(`PID: ${data.pid}`)
-        if (data.startedAt) bits.push(`Inicio: ${new Date(data.startedAt).toLocaleString()}`)
-        if (data.finishedAt) bits.push(`Fin: ${new Date(data.finishedAt).toLocaleString()}`)
-        if (data.lastExitCode !== null) bits.push(`Exit code: ${data.lastExitCode}`)
-        if (Array.isArray(data.command) && data.command.length) {
-          bits.push(`Comando: ${data.command.join(' ')}`)
-        }
-        if (data.jobType) {
-          bits.unshift(`Tipo: ${data.jobType === 'import' ? 'importación' : data.jobType === 'extract' ? 'extracción' : data.jobType}`)
+        if (job?.pid) bits.push(`PID: ${job.pid}`)
+        if (job?.startedAt) bits.push(`Inicio: ${new Date(job.startedAt).toLocaleString()}`)
+        if (job?.finishedAt) bits.push(`Fin: ${new Date(job.finishedAt).toLocaleString()}`)
+        if (job?.lastExitCode !== null && job?.lastExitCode !== undefined) bits.push(`Exit code: ${job.lastExitCode}`)
+        if (Array.isArray(job?.command) && job.command.length) {
+          bits.push(`Comando: ${job.command.join(' ')}`)
         }
         meta.innerHTML = bits.map((bit) => `<div>${bit}</div>`).join('')
 
-        if (data.summary) {
-          const s = data.summary
+        if (job?.summary) {
+          const s = job.summary
           summary.hidden = false
           if (s.type === 'import') {
             summaryGrid.innerHTML = [
@@ -683,10 +746,44 @@
         }
 
         const wasNearBottom = (logs.scrollHeight - logs.scrollTop - logs.clientHeight) < 24
-        logs.textContent = (data.logs || []).join('\n') || 'Sin logs todavía.'
+        logs.textContent = (job?.logs || []).join('\n') || emptyMessage
         if (wasNearBottom) {
           logs.scrollTop = logs.scrollHeight
         }
+      }
+
+      function renderStatus(data) {
+        renderJobStatus(data.extract, {
+          statusText: extractStatusText,
+          statusPill: extractStatusPill,
+          meta: extractMeta,
+          summary: extractSummary,
+          summaryGrid: extractSummaryGrid,
+          summaryList: extractSummaryList,
+          logs: extractLogs,
+          stopButton: stopExtractButton,
+        }, 'Esperando una extracción...')
+
+        renderJobStatus(data.import, {
+          statusText: importStatusText,
+          statusPill: importStatusPill,
+          meta: importMeta,
+          summary: importSummary,
+          summaryGrid: importSummaryGrid,
+          summaryList: importSummaryList,
+          logs: importLogs,
+          stopButton: stopImportButton,
+        }, 'Esperando una importación...')
+      }
+
+      async function stopJob(jobType) {
+        const response = await fetch('/api/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobType }),
+        })
+        const data = await response.json()
+        renderStatus(data)
       }
 
       form.addEventListener('submit', async (event) => {
@@ -711,11 +808,9 @@
         renderStatus(data)
       })
 
-      stopButton.addEventListener('click', async () => {
-        const response = await fetch('/api/stop', { method: 'POST' })
-        const data = await response.json()
-        renderStatus(data)
-      })
+      stopButton.addEventListener('click', () => stopJob('extract'))
+      stopExtractButton.addEventListener('click', () => stopJob('extract'))
+      stopImportButton.addEventListener('click', () => stopJob('import'))
 
       refreshButton.addEventListener('click', fetchStatus)
       refreshBatchesButton.addEventListener('click', fetchBatches)
