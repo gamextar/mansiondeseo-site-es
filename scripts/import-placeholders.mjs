@@ -191,7 +191,7 @@ function sanitizeKeySegment(input, fallback = 'media') {
 function stableProfileMediaKey(username, filePath, kind, index = 0) {
   const ext = extFromPath(filePath)
   const slug = sanitizeKeySegment(username, 'user')
-  if (kind === 'story') return `stories/${slug}.${ext}`
+  if (kind === 'story') return `profiles/${slug}/stories/story-${String(index + 1).padStart(2, '0')}.${ext}`
   if (kind === 'avatar') return `profiles/${slug}/avatar.${ext}`
   return `profiles/${slug}/photo-${String(index + 1).padStart(2, '0')}.${ext}`
 }
