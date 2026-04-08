@@ -27,6 +27,7 @@ let _userLocalityColumnReady = null;
 let _userBirthdateColumnReady = null;
 let _userMaritalStatusColumnReady = null;
 let _userSexualOrientationColumnReady = null;
+let _userMessageBlockRolesColumnReady = null;
 
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
@@ -327,6 +328,74 @@ async function ensureUsersSexualOrientationColumn(env) {
   }
 
   return _userSexualOrientationColumnReady;
+}
+
+async function ensureUsersMessageBlockRolesColumn(env) {
+  if (!_userMessageBlockRolesColumnReady) {
+    _userMessageBlockRolesColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          'ALTER TABLE users ADD COLUMN message_block_roles TEXT'
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+    })().catch((err) => {
+      _userMessageBlockRolesColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userMessageBlockRolesColumnReady;
+}
+
+function normalizeRoleArray(rawValue, validValues, fallback = []) {
+  const arr = Array.isArray(rawValue) ? rawValue : (rawValue ? [rawValue] : []);
+  const filtered = arr
+    .map((value) => String(value || '').trim())
+    .filter((value) => validValues.includes(value));
+  return [...new Set(filtered.length ? filtered : fallback)];
+}
+
+async function getReceiverMessageBlockInfo(env, receiverId) {
+  await ensureUsersMessageBlockRolesColumn(env);
+  const receiver = await env.DB.prepare(
+    'SELECT id, role, message_block_roles FROM users WHERE id = ?'
+  ).bind(receiverId).first();
+  if (!receiver) return null;
+  return {
+    id: receiver.id,
+    role: receiver.role,
+    messageBlockRoles: normalizeRoleArray(safeParseJSON(receiver.message_block_roles, []), SEEKING_ROLE_IDS, []),
+  };
+}
+
+async function assertMessagingAllowed(env, senderId, receiverId) {
+  const [sender, receiver] = await Promise.all([
+    env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(senderId).first(),
+    getReceiverMessageBlockInfo(env, receiverId),
+  ]);
+
+  if (!receiver) return { ok: false, status: 404, message: 'Destinatario no encontrado' };
+  if (!sender) return { ok: false, status: 404, message: 'Remitente no encontrado' };
+
+  const senderRole = String(sender.role || '').trim();
+  if (!senderRole) return { ok: true };
+
+  if (receiver.messageBlockRoles.includes(senderRole)) {
+    const senderRoleLabel = mapRoleToDisplay(senderRole);
+    return {
+      ok: false,
+      status: 403,
+      code: 'MESSAGE_ROLE_BLOCKED',
+      message: `Este usuario no recibe mensajes de ${senderRoleLabel}.`,
+    };
+  }
+
+  return { ok: true };
 }
 
 async function setConversationState(env, userId, partnerId, { lastMessage, lastMessageAt, unreadCount }) {
@@ -886,7 +955,8 @@ function calculateAgeFromBirthdate(birthdate) {
 
 async function handleRegister(request, env) {
   const body = await request.json();
-  const { email, password, username, role, seeking, interests, age, birthdate, city, province, locality, bio, marital_status, sexual_orientation, turnstileToken } = body;
+  const { email, password, username, role, seeking, interests, age, birthdate, city, province, locality, bio, marital_status, sexual_orientation, message_block_roles, turnstileToken } = body;
+  await ensureUsersMessageBlockRolesColumn(env);
 
   // Validate Cloudflare Turnstile token (if secret is configured)
   if (env.TURNSTILE_SECRET) {
@@ -907,6 +977,7 @@ async function handleRegister(request, env) {
   const localityValue = String(locality || '').trim();
   const maritalStatusValue = String(marital_status || '').trim();
   const sexualOrientationValue = String(sexual_orientation || '').trim();
+  const messageBlockRolesValue = normalizeRoleArray(message_block_roles, SEEKING_ROLE_IDS, []);
   const normalizedBirthdate = normalizeBirthdate(birthdate);
   const fallbackAge = age === '' || age == null ? NaN : Number(age);
   const computedAge = calculateAgeFromBirthdate(normalizedBirthdate);
@@ -983,8 +1054,8 @@ async function handleRegister(request, env) {
   const country = body.country || detectedCountry;
 
   await env.DB.prepare(`
-    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, birthdate, city, locality, marital_status, sexual_orientation, country, bio, status, coins)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0)
+    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, birthdate, city, locality, marital_status, sexual_orientation, message_block_roles, country, bio, status, coins)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0)
   `).bind(
     userId,
     email.toLowerCase(),
@@ -999,6 +1070,7 @@ async function handleRegister(request, env) {
     localityValue,
     maritalStatusValue,
     sexualOrientationValue,
+    JSON.stringify(messageBlockRolesValue),
     country,
     bio || ''
   ).run();
@@ -1791,15 +1863,17 @@ async function handleSendMessage(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   await ensureMessageConversationIdColumn(env);
+  await ensureUsersMessageBlockRolesColumn(env);
 
   const { receiver_id, content } = await request.json();
   if (!receiver_id || !content || !content.trim()) {
     return error('receiver_id y content requeridos');
   }
 
-  // Verify receiver exists
-  const receiver = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(receiver_id).first();
-  if (!receiver) return error('Destinatario no encontrado', 404);
+  const messagingAllowed = await assertMessagingAllowed(env, auth.sub, receiver_id);
+  if (!messagingAllowed.ok) {
+    return json({ error: messagingAllowed.message, code: messagingAllowed.code || 'MESSAGE_BLOCKED' }, messagingAllowed.status || 403);
+  }
 
   // Check daily message limit
   const today = todayUTC();
@@ -2397,7 +2471,8 @@ async function handleUpdateProfile(request, env) {
     normalizedBody.age = derivedAge;
   }
 
-  const allowedFields = ['username', 'role', 'seeking', 'interests', 'age', 'birthdate', 'city', 'locality', 'marital_status', 'sexual_orientation', 'bio', 'avatar_url', 'avatar_crop', 'premium'];
+  await ensureUsersMessageBlockRolesColumn(env);
+  const allowedFields = ['username', 'role', 'seeking', 'interests', 'message_block_roles', 'age', 'birthdate', 'city', 'locality', 'marital_status', 'sexual_orientation', 'bio', 'avatar_url', 'avatar_crop', 'premium'];
   const currentUser = await env.DB.prepare('SELECT premium, premium_until, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
   if (!currentUser) return error('Usuario no encontrado', 404);
 
@@ -2427,6 +2502,10 @@ async function handleUpdateProfile(request, env) {
         const seekVal = Array.isArray(normalizedBody[field]) ? normalizedBody[field] : [normalizedBody[field]];
         const filtered = seekVal.filter(s => SEEKING_ROLE_IDS.includes(s));
         if (filtered.length === 0) continue;
+        updates.push(`${field} = ?`);
+        values.push(JSON.stringify(filtered));
+      } else if (field === 'message_block_roles') {
+        const filtered = normalizeRoleArray(normalizedBody[field], SEEKING_ROLE_IDS, []);
         updates.push(`${field} = ?`);
         values.push(JSON.stringify(filtered));
       } else if (field === 'role') {
@@ -2540,6 +2619,7 @@ function sanitizeUser(user, env) {
     marital_status: String(safe.marital_status || '').trim(),
     sexual_orientation: String(safe.sexual_orientation || '').trim(),
     seeking: seekingParsed,
+    message_block_roles: normalizeRoleArray(safeParseJSON(safe.message_block_roles, []), SEEKING_ROLE_IDS, []),
     interests: safeParseJSON(safe.interests, []),
     photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
     avatar_crop: safeParseJSON(safe.avatar_crop, null),

@@ -16,6 +16,27 @@ export class ChatRoom {
     this.userPreviewCache = new Map();
     this.messageConversationIdReady = null;
     this.senderConversationStateWriteAt = new Map();
+    this.userMessageBlockRolesColumnReady = null;
+  }
+
+  normalizeRoleArray(rawValue, validValues, fallback = []) {
+    const arr = Array.isArray(rawValue) ? rawValue : (rawValue ? [rawValue] : []);
+    const filtered = arr
+      .map((value) => String(value || '').trim())
+      .filter((value) => validValues.includes(value));
+    return [...new Set(filtered.length ? filtered : fallback)];
+  }
+
+  mapRoleToDisplay(role) {
+    const map = {
+      hombre: 'Hombre Solo',
+      mujer: 'Mujer Sola',
+      pareja: 'Pareja',
+      pareja_hombres: 'Pareja de Hombres',
+      pareja_mujeres: 'Pareja de Mujeres',
+      trans: 'Trans',
+    };
+    return map[role] || role;
   }
 
   buildConversationId(userA, userB) {
@@ -101,6 +122,54 @@ export class ChatRoom {
     }
 
     return this.hiddenConversationsReady;
+  }
+
+  async ensureUsersMessageBlockRolesColumn() {
+    if (!this.userMessageBlockRolesColumnReady) {
+      this.userMessageBlockRolesColumnReady = (async () => {
+        try {
+          await this.env.DB.prepare(
+            'ALTER TABLE users ADD COLUMN message_block_roles TEXT'
+          ).run();
+        } catch (err) {
+          const message = String(err?.message || err || '').toLowerCase();
+          if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+            throw err;
+          }
+        }
+      })().catch((err) => {
+        this.userMessageBlockRolesColumnReady = null;
+        throw err;
+      });
+    }
+
+    return this.userMessageBlockRolesColumnReady;
+  }
+
+  async assertMessagingAllowed(senderId, receiverId) {
+    await this.ensureUsersMessageBlockRolesColumn();
+    const [sender, receiver] = await Promise.all([
+      this.env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(senderId).first(),
+      this.env.DB.prepare('SELECT id, message_block_roles FROM users WHERE id = ?').bind(receiverId).first(),
+    ]);
+
+    if (!receiver) {
+      return { ok: false, code: 'RECEIVER_NOT_FOUND', message: 'Destinatario no encontrado.' };
+    }
+    if (!sender?.role) {
+      return { ok: true };
+    }
+
+    const blockedRoles = this.normalizeRoleArray(this.safeParseJSON(receiver.message_block_roles, []), ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'], []);
+    if (blockedRoles.includes(sender.role)) {
+      return {
+        ok: false,
+        code: 'MESSAGE_ROLE_BLOCKED',
+        message: `Este usuario no recibe mensajes de ${this.mapRoleToDisplay(sender.role)}.`,
+      };
+    }
+
+    return { ok: true };
   }
 
   async buildNewMessageEvents(senderId, receiverId, msg) {
@@ -516,6 +585,18 @@ export class ChatRoom {
         const id1 = chatId.slice(0, 36);
         const id2 = chatId.slice(37);
         receiverId = id1 !== senderId ? id1 : id2;
+      }
+    }
+
+    if (receiverId) {
+      const messagingAllowed = await this.assertMessagingAllowed(senderId, receiverId);
+      if (!messagingAllowed.ok) {
+        ws.send(JSON.stringify({
+          type: 'error',
+          code: messagingAllowed.code || 'MESSAGE_BLOCKED',
+          message: messagingAllowed.message || 'No se pudo enviar el mensaje.',
+        }));
+        return;
       }
     }
 

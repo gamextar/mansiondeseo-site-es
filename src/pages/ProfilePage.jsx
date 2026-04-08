@@ -29,6 +29,15 @@ const ROLE_LABELS = {
   trans: 'Trans',
 };
 
+const SEEKING_OPTIONS = [
+  { id: 'hombre', label: 'Hombres', emoji: '👨', color: 'bg-blue-500/15 text-blue-300 border-blue-500/40' },
+  { id: 'mujer', label: 'Mujeres', emoji: '👩', color: 'bg-pink-500/15 text-pink-300 border-pink-500/40' },
+  { id: 'pareja', label: 'Parejas', emoji: '💑', color: 'bg-purple-500/15 text-purple-300 border-purple-500/40' },
+  { id: 'pareja_hombres', label: 'Pareja de Hombres', emoji: '👬', color: 'bg-sky-500/15 text-sky-300 border-sky-500/40' },
+  { id: 'pareja_mujeres', label: 'Pareja de Mujeres', emoji: '👭', color: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/40' },
+  { id: 'trans', label: 'Trans', emoji: '⚧', color: 'bg-teal-500/15 text-teal-300 border-teal-500/40' },
+];
+
 const stagger = { animate: { transition: { staggerChildren: 0.06 } } };
 const fadeUp = {
   initial: { opacity: 0, y: 16 },
@@ -724,14 +733,7 @@ export default function ProfilePage() {
             Busco
           </h3>
           <div className="flex flex-wrap gap-2">
-            {[
-              { id: 'hombre', label: 'Hombres', emoji: '👨', color: 'bg-blue-500/15 text-blue-300 border-blue-500/40' },
-              { id: 'mujer', label: 'Mujeres', emoji: '👩', color: 'bg-pink-500/15 text-pink-300 border-pink-500/40' },
-              { id: 'pareja', label: 'Parejas', emoji: '💑', color: 'bg-purple-500/15 text-purple-300 border-purple-500/40' },
-              { id: 'pareja_hombres', label: 'Pareja de Hombres', emoji: '👬', color: 'bg-sky-500/15 text-sky-300 border-sky-500/40' },
-              { id: 'pareja_mujeres', label: 'Pareja de Mujeres', emoji: '👭', color: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/40' },
-              { id: 'trans', label: 'Trans', emoji: '⚧', color: 'bg-teal-500/15 text-teal-300 border-teal-500/40' },
-            ].map(s => {
+            {SEEKING_OPTIONS.map(s => {
               const seekingArr = Array.isArray(user?.seeking) ? user.seeking : (user?.seeking ? [user.seeking] : []);
               const isActive = seekingArr.includes(s.id);
               return (
@@ -765,6 +767,45 @@ export default function ProfilePage() {
                 >
                   <span>{s.emoji}</span>
                   <span>{s.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        <motion.div variants={fadeUp} className="mb-6 glass-elevated rounded-3xl p-4">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-1.5 flex items-center gap-1.5">
+            <Shield className="w-3 h-3 text-mansion-gold/70" />
+            Bloquear Mensajes De
+          </h3>
+          <p className="text-[10px] text-text-dim mb-3">Si seleccionas opciones, esos roles no podrán iniciarte chat.</p>
+          <div className="flex flex-wrap gap-2">
+            {SEEKING_OPTIONS.map((option) => {
+              const currentBlocked = Array.isArray(user?.message_block_roles) ? user.message_block_roles : [];
+              const isActive = currentBlocked.includes(option.id);
+              return (
+                <button
+                  key={option.id}
+                  onClick={async () => {
+                    const previous = Array.isArray(user?.message_block_roles) ? user.message_block_roles : [];
+                    const nextBlocked = isActive
+                      ? previous.filter((value) => value !== option.id)
+                      : [...previous, option.id];
+                    setUser(prev => prev ? { ...prev, message_block_roles: nextBlocked } : prev);
+                    try {
+                      await updateProfile({ message_block_roles: nextBlocked });
+                    } catch {
+                      setUser(prev => prev ? { ...prev, message_block_roles: previous } : prev);
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    isActive
+                      ? 'bg-mansion-gold/15 text-mansion-gold border border-mansion-gold/40'
+                      : 'bg-mansion-card/60 border border-mansion-border/30 text-text-muted hover:text-text-primary hover:border-mansion-border/50'
+                  }`}
+                >
+                  <span>{option.emoji}</span>
+                  <span>{option.label}</span>
                 </button>
               );
             })}
