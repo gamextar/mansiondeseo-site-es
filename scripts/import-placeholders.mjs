@@ -151,6 +151,10 @@ function ensureArray(value) {
   return [value]
 }
 
+function hasOwn(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj || {}, key)
+}
+
 function sql(value) {
   if (value == null) return 'NULL'
   if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'NULL'
@@ -465,6 +469,11 @@ async function upsertProfile(profile, manifestDir) {
     : (queryRows(
         `SELECT id, email, username FROM users WHERE email = ${sql(email)} OR LOWER(username) = LOWER(${sql(username)}) LIMIT 1`
       )[0] || null)
+  const existingStats = existing
+    ? (queryRows(
+        `SELECT visits_total, followers_total FROM profile_stats WHERE user_id = ${sql(existing.id)} LIMIT 1`
+      )[0] || null)
+    : null
 
   if (existing && skipExistingUsers) {
     const actionLabel = dryRun ? '[dry-run] saltando existente' : 'Saltando existente'
@@ -495,8 +504,12 @@ async function upsertProfile(profile, manifestDir) {
   const premiumUntil = premium ? (profile.premiumUntil || futureSql(365)) : null
   const lastActive = profile.lastActive || nowSql()
   const createdAt = profile.createdAt || nowSql()
-  const visitsTotal = Math.max(0, Number(profile.visits) || 0)
-  const followersTotal = Math.max(0, Number(profile.followers) || 0)
+  const importedVisits = Math.max(0, Number(profile.visits) || 0)
+  const importedFollowers = Math.max(0, Number(profile.followers) || 0)
+  const visitsProvided = hasOwn(profile, 'visits')
+  const followersProvided = hasOwn(profile, 'followers')
+  const visitsTotal = visitsProvided ? importedVisits : Math.max(0, Number(existingStats?.visits_total) || 0)
+  const followersTotal = followersProvided ? importedFollowers : Math.max(0, Number(existingStats?.followers_total) || 0)
   const avatarCrop = profile.avatarCrop ? JSON.stringify(profile.avatarCrop) : null
   const explicitBirthdate = normalizeBirthdate(profile.birthdate || '')
   const derivedBirthdate = !explicitBirthdate ? estimateBirthdateFromAge(profile.age) : ''
