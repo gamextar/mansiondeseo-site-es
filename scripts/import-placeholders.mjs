@@ -623,7 +623,11 @@ async function upsertProfile(profile, manifestDir) {
   }
 
   const columns = Object.keys(baseFields)
-  const storySource = profile.storyVideoPath || null
+  const storySources = ensureArray(profile.storyVideoPaths)
+  if (storySources.length === 0 && profile.storyVideoPath) {
+    storySources.push(profile.storyVideoPath)
+  }
+  const storySource = storySources[0] || null
 
   if (dryRun) {
     console.log(`\n[dry-run] ${existing ? 'update' : 'insert'} user ${username} (${userId})`)
@@ -636,12 +640,16 @@ async function upsertProfile(profile, manifestDir) {
     console.log(`  fake: sí`)
     console.log(`  avatar: ${avatarUrl || '-'}`)
     console.log(`  photos: ${photoUrls.length}`)
+    console.log(`  videos en manifest: ${storySources.length}`)
     console.log(`  seguidores: ${followersTotal}`)
     console.log(`  visitas: ${visitsTotal}`)
     const baseResult = { userId, username, created: !existing, updated: !!existing, skipped: false, skippedExisting: false, storyImported: false }
     if (!storySource) return baseResult
     const storyUrl = await resolveMediaReference(manifestDir, username, storySource, 'story')
     console.log(`  story: ${storyUrl}`)
+    if (storySources.length > 1) {
+      console.log(`  videos extra no importados hoy: ${storySources.length - 1}`)
+    }
     return { ...baseResult, storyImported: !!storyUrl }
   } else if (existing) {
     const updates = columns.map((column) => `${column} = ${sql(baseFields[column])}`).join(',\n      ')
