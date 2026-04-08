@@ -33,7 +33,7 @@ Opciones:
   --batch-dir <path>             Carpeta donde guardar manifests por corrida
   --batch-name <name>            Nombre del batch actual; si falta, se genera uno automáticamente
   --no-batch-output              Desactiva la escritura del manifest separado por batch
-  --role-group <value>           Grupo destino: mujer | hombre | pareja | mixto
+  --role-group <value>           Grupo destino: mujer | hombre | pareja | pareja_hombres | pareja_mujeres | trans | mixto
   --login-username <value>       Username para re-login automático
   --login-password <value>       Password para re-login automático
   --login-creds-file <path>      Archivo local donde guardar/leer credenciales
@@ -229,14 +229,20 @@ function normalizeRoleGroup(value) {
   if (normalized === 'mujer') return 'mujer'
   if (normalized === 'hombre') return 'hombre'
   if (normalized === 'pareja') return 'pareja'
+  if (normalized === 'pareja_hombres') return 'pareja_hombres'
+  if (normalized === 'pareja_mujeres') return 'pareja_mujeres'
+  if (normalized === 'trans') return 'trans'
   return 'mixto'
 }
 
 function roleToGroup(role) {
   const normalized = String(role || '').trim().toLowerCase()
   if (normalized === 'mujer') return 'mujer'
-  if (normalized === 'hombre' || normalized === 'trans') return 'hombre'
-  if (normalized === 'pareja' || normalized === 'pareja_hombres' || normalized === 'pareja_mujeres') return 'pareja'
+  if (normalized === 'hombre') return 'hombre'
+  if (normalized === 'pareja') return 'pareja'
+  if (normalized === 'pareja_hombres') return 'pareja_hombres'
+  if (normalized === 'pareja_mujeres') return 'pareja_mujeres'
+  if (normalized === 'trans') return 'trans'
   return 'mixto'
 }
 

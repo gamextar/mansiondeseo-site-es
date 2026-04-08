@@ -31,7 +31,7 @@ Opciones:
   --local             Usa bindings locales de wrangler
   --dry-run           No sube ni escribe; solo muestra el plan
   --only <username>   Importa solo un username
-  --only-role-group <group>  Importa solo un grupo: mujer | hombre | pareja
+  --only-role-group <group>  Importa solo un grupo: mujer | hombre | pareja | pareja_hombres | pareja_mujeres | trans
   --skip-existing-users  Salta usuarios que ya existan en Mansion Deseo
   --replace-story     Borra stories existentes del usuario antes de insertar la nueva (default)
   --keep-story        Conserva stories existentes
@@ -150,8 +150,11 @@ function slugifyUsername(input) {
 function roleToGroup(role) {
   const normalized = String(role || '').trim().toLowerCase()
   if (normalized === 'mujer') return 'mujer'
-  if (normalized === 'hombre' || normalized === 'trans') return 'hombre'
-  if (normalized === 'pareja' || normalized === 'pareja_hombres' || normalized === 'pareja_mujeres') return 'pareja'
+  if (normalized === 'hombre') return 'hombre'
+  if (normalized === 'pareja') return 'pareja'
+  if (normalized === 'pareja_hombres') return 'pareja_hombres'
+  if (normalized === 'pareja_mujeres') return 'pareja_mujeres'
+  if (normalized === 'trans') return 'trans'
   return ''
 }
 
