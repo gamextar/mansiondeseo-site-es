@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../lib/authContext';
 
+const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
+
 const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio' },
   { to: '/videos', icon: Film, label: 'Videos' },
@@ -62,6 +64,9 @@ export default function BottomNav() {
                 key={to}
                 to={to}
                 onClick={(e) => {
+                  if (to === '/' && location.pathname === '/') {
+                    window.dispatchEvent(new CustomEvent(HOME_FEED_FOCUS_EVENT));
+                  }
                   if (to === '/perfil' && location.pathname !== '/perfil') {
                     e.preventDefault();
                     navigateTo('/perfil');

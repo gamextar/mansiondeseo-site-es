@@ -18,6 +18,7 @@ import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMed
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const FEED_CACHE_TTL_MS = 5 * 60_000;
+const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 
 function getCachedFeed() {
   try {
@@ -95,6 +96,14 @@ export default function FeedPage() {
       loadProfiles({ silent: true });
     }
   }, [navigate, loadProfiles]);
+
+  useEffect(() => {
+    const handleHomeFocus = () => {
+      setShowOwnStoryPreview(false);
+    };
+    window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
+    return () => window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
+  }, []);
 
   // Reload feed when navigating back after preference changes
   useEffect(() => {

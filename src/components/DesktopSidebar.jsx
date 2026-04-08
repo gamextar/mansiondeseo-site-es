@@ -7,6 +7,8 @@ import { peekOwnProfileDashboard } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import AvatarImg from './AvatarImg';
 
+const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
+
 function timeAgo(dateStr) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr + 'Z').getTime();
@@ -132,6 +134,11 @@ export default function DesktopSidebar() {
             <NavLink
               key={to}
               to={to}
+              onClick={() => {
+                if (to === '/' && location.pathname === '/') {
+                  window.dispatchEvent(new CustomEvent(HOME_FEED_FOCUS_EVENT));
+                }
+              }}
               className="relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all group"
             >
               {isActive && (
