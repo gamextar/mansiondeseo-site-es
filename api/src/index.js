@@ -584,24 +584,38 @@ function getProfileVisitDedupeWindowMinutes(env) {
 
 async function ensureProfileVisitStructures(env) {
   if (!_profileVisitStructuresReady) {
-    _profileVisitStructuresReady = Promise.all([
-      env.DB.prepare(`
+    _profileVisitStructuresReady = (async () => {
+      await env.DB.prepare(`
         CREATE TABLE IF NOT EXISTS profile_stats (
           user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
           visits_total INTEGER NOT NULL DEFAULT 0,
+          followers_total INTEGER NOT NULL DEFAULT 0,
           updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
-      `).run(),
-      env.DB.prepare(
-        'CREATE INDEX IF NOT EXISTS idx_profile_visits_visited_created ON profile_visits(visited_id, created_at DESC)'
-      ).run(),
-      env.DB.prepare(
-        'CREATE INDEX IF NOT EXISTS idx_profile_visits_visitor_visited_created ON profile_visits(visitor_id, visited_id, created_at DESC)'
-      ).run(),
-      env.DB.prepare(
-        'CREATE INDEX IF NOT EXISTS idx_profile_stats_visits_total ON profile_stats(visits_total DESC, updated_at DESC)'
-      ).run(),
-    ]).catch((err) => {
+      `).run();
+      try {
+        await env.DB.prepare('ALTER TABLE profile_stats ADD COLUMN followers_total INTEGER NOT NULL DEFAULT 0').run();
+      } catch (error) {
+        const message = String(error?.message || error || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw error;
+        }
+      }
+      await Promise.all([
+        env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_profile_visits_visited_created ON profile_visits(visited_id, created_at DESC)'
+        ).run(),
+        env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_profile_visits_visitor_visited_created ON profile_visits(visitor_id, visited_id, created_at DESC)'
+        ).run(),
+        env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_profile_stats_visits_total ON profile_stats(visits_total DESC, updated_at DESC)'
+        ).run(),
+        env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_profile_stats_followers_total ON profile_stats(followers_total DESC, updated_at DESC)'
+        ).run(),
+      ]);
+    })().catch((err) => {
       _profileVisitStructuresReady = null;
       throw err;
     });
@@ -610,15 +624,26 @@ async function ensureProfileVisitStructures(env) {
   await _profileVisitStructuresReady;
 
   if (!_profileStatsBackfillReady) {
-    _profileStatsBackfillReady = env.DB.prepare(`
-      INSERT INTO profile_stats (user_id, visits_total, updated_at)
-      SELECT visited_id, COUNT(*), datetime('now')
-      FROM profile_visits
-      GROUP BY visited_id
-      ON CONFLICT(user_id) DO UPDATE SET
-        visits_total = MAX(profile_stats.visits_total, excluded.visits_total),
-        updated_at = datetime('now')
-    `).run().catch((err) => {
+    _profileStatsBackfillReady = Promise.all([
+      env.DB.prepare(`
+        INSERT INTO profile_stats (user_id, visits_total, updated_at)
+        SELECT visited_id, COUNT(*), datetime('now')
+        FROM profile_visits
+        GROUP BY visited_id
+        ON CONFLICT(user_id) DO UPDATE SET
+          visits_total = MAX(profile_stats.visits_total, excluded.visits_total),
+          updated_at = datetime('now')
+      `).run(),
+      env.DB.prepare(`
+        INSERT INTO profile_stats (user_id, followers_total, updated_at)
+        SELECT target_id, COUNT(*), datetime('now')
+        FROM favorites
+        GROUP BY target_id
+        ON CONFLICT(user_id) DO UPDATE SET
+          followers_total = MAX(profile_stats.followers_total, excluded.followers_total),
+          updated_at = datetime('now')
+      `).run(),
+    ]).catch((err) => {
       _profileStatsBackfillReady = null;
       throw err;
     });
@@ -632,12 +657,34 @@ async function incrementProfileVisitStat(env, userId, increment = 1) {
   if (!amount) return;
   await ensureProfileVisitStructures(env);
   await env.DB.prepare(`
-    INSERT INTO profile_stats (user_id, visits_total, updated_at)
-    VALUES (?, ?, datetime('now'))
+    INSERT INTO profile_stats (user_id, visits_total, followers_total, updated_at)
+    VALUES (?, ?, 0, datetime('now'))
     ON CONFLICT(user_id) DO UPDATE SET
       visits_total = profile_stats.visits_total + excluded.visits_total,
       updated_at = datetime('now')
   `).bind(userId, amount).run();
+}
+
+async function incrementProfileFollowerStat(env, userId, increment = 1) {
+  const amount = Math.trunc(Number(increment) || 0);
+  if (!amount) return;
+  const initialAmount = Math.max(0, amount);
+  await ensureProfileVisitStructures(env);
+  await env.DB.prepare(`
+    INSERT INTO profile_stats (user_id, visits_total, followers_total, updated_at)
+    VALUES (?, 0, ?, datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET
+      followers_total = MAX(0, profile_stats.followers_total + excluded.followers_total),
+      updated_at = datetime('now')
+  `).bind(userId, initialAmount).run();
+  if (amount !== initialAmount) {
+    await env.DB.prepare(`
+      UPDATE profile_stats
+      SET followers_total = MAX(0, followers_total + ?),
+          updated_at = datetime('now')
+      WHERE user_id = ?
+    `).bind(amount, userId).run();
+  }
 }
 
 function normalizeGalleryPhotos(rawPhotos, avatarUrl = '') {
@@ -1653,13 +1700,14 @@ async function handleOwnProfileDashboard(request, env) {
        ORDER BY ug.created_at DESC
        LIMIT 50`
     ).bind(auth.sub).all(),
-    env.DB.prepare('SELECT visits_total FROM profile_stats WHERE user_id = ?').bind(auth.sub).first(),
+    env.DB.prepare('SELECT visits_total, followers_total FROM profile_stats WHERE user_id = ?').bind(auth.sub).first(),
   ]);
 
   if (!dbUser) return error('Usuario no encontrado', 404);
 
   const user = sanitizeUser(dbUser, env);
   user.visits_total = Number(visitStatRow?.visits_total || 0);
+  user.followers_total = Number(visitStatRow?.followers_total || 0);
   user.has_active_story = !!activeStory;
   if (activeStory) {
     user.active_story_id = activeStory.id;
@@ -1846,13 +1894,14 @@ async function handleProfileDetail(request, env, userId) {
     cached('settings', 300_000, () => loadSettings(env)),
     env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(auth.sub, userId).first(),
     env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(userId, auth.sub).first(),
-    env.DB.prepare('SELECT visits_total FROM profile_stats WHERE user_id = ?').bind(userId).first(),
+    env.DB.prepare('SELECT visits_total, followers_total FROM profile_stats WHERE user_id = ?').bind(userId).first(),
   ]);
   if (!user) return error('Perfil no encontrado', 404);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
   const isFavorited = !!favRow;
   const profileFavoritedViewer = !!favByRow;
   let visitsTotal = Number(visitStatRow?.visits_total || 0);
+  let followersTotal = Number(visitStatRow?.followers_total || 0);
 
   const hasGhostMode = isPremiumActive(user) && !!user.ghost_mode;
   const isOwnProfile = auth.sub === userId;
@@ -1951,6 +2000,7 @@ async function handleProfileDetail(request, env, userId) {
       avatar_url: user.avatar_url,
       avatar_crop: safeParseJSON(user.avatar_crop, null),
       visits_total: visitsTotal,
+      followers_total: followersTotal,
       receivedGifts: giftResults,
     },
     viewerPremium: viewerIsPremium,
@@ -3155,11 +3205,15 @@ async function handleToggleFavorite(request, env, targetId) {
   if (existing) {
     await env.DB.prepare('DELETE FROM favorites WHERE user_id = ? AND target_id = ?')
       .bind(auth.sub, targetId).run();
-    return json({ favorited: false });
+    await incrementProfileFollowerStat(env, targetId, -1);
+    const statRow = await env.DB.prepare('SELECT followers_total FROM profile_stats WHERE user_id = ?').bind(targetId).first();
+    return json({ favorited: false, followers_total: Number(statRow?.followers_total || 0) });
   } else {
     await env.DB.prepare('INSERT INTO favorites (user_id, target_id) VALUES (?, ?)')
       .bind(auth.sub, targetId).run();
-    return json({ favorited: true });
+    await incrementProfileFollowerStat(env, targetId, 1);
+    const statRow = await env.DB.prepare('SELECT followers_total FROM profile_stats WHERE user_id = ?').bind(targetId).first();
+    return json({ favorited: true, followers_total: Number(statRow?.followers_total || 0) });
   }
 }
 

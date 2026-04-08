@@ -189,7 +189,11 @@ export default function ProfileDetailPage() {
       setIsFavorited(data.favorited);
       setProfile(prev => {
         if (!prev) return prev;
-        const nextProfile = { ...prev, isFavorited: data.favorited };
+        const nextProfile = {
+          ...prev,
+          isFavorited: data.favorited,
+          followers_total: Number(data?.followers_total ?? prev.followers_total ?? 0),
+        };
         writeProfileDetailCache(id, {
           profile: nextProfile,
           viewerPremium,
@@ -411,6 +415,7 @@ export default function ProfileDetailPage() {
 
   const { name, age, role, interests, bio, totalPhotos, verified, online, premium, blurred, isOwnProfile, receivedGifts } = profile;
   const visitsTotal = Number(profile?.visits_total || 0);
+  const followersTotal = Number(profile?.followers_total || 0);
   const seeking = Array.isArray(profile?.seeking) ? profile.seeking : (profile?.seeking ? [profile.seeking] : []);
   const messageBlockRoles = Array.isArray(profile?.message_block_roles) ? profile.message_block_roles : [];
   const locationText = formatLocation(profile);
@@ -600,10 +605,17 @@ export default function ProfileDetailPage() {
             transition={{ delay: 0.32 }}
             className="mt-4 mb-6"
           >
-            <div className="inline-flex items-center gap-2 rounded-full border border-mansion-border/30 bg-mansion-card/50 px-3 py-2 text-sm text-text-primary">
-              <Eye className="w-4 h-4 text-mansion-gold" />
-              <span className="font-semibold tabular-nums">{visitsTotal.toLocaleString('es-AR')}</span>
-              <span className="text-text-dim">visitas al perfil</span>
+            <div className="flex flex-wrap items-center gap-2.5 text-sm text-text-primary">
+              <div className="inline-flex items-center gap-2 rounded-full border border-mansion-border/30 bg-mansion-card/50 px-3 py-2">
+                <Heart className="w-4 h-4 text-mansion-crimson" fill="currentColor" />
+                <span className="font-semibold tabular-nums">{followersTotal.toLocaleString('es-AR')}</span>
+                <span className="text-text-dim">seguidores</span>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-mansion-border/30 bg-mansion-card/50 px-3 py-2">
+                <Eye className="w-4 h-4 text-mansion-gold" />
+                <span className="font-semibold tabular-nums">{visitsTotal.toLocaleString('es-AR')}</span>
+                <span className="text-text-dim">visitas al perfil</span>
+              </div>
             </div>
           </motion.div>
 

@@ -45,7 +45,7 @@ Campos soportados por perfil:
   role                requerido: hombre | mujer | pareja | pareja_hombres | pareja_mujeres | trans
   seeking             requerido: array de roles (hombre | mujer | pareja | pareja_hombres | pareja_mujeres | trans)
   interests           opcional: array
-  age, birthdate, province, locality, marital_status, sexual_orientation, country, bio, visits
+  age, birthdate, province, locality, marital_status, sexual_orientation, country, bio, visits, followers
   premium             opcional boolean
   premiumUntil        opcional string YYYY-MM-DD HH:MM:SS
   avatarPath          opcional path local o URL
@@ -345,10 +345,20 @@ function ensureProfileStatsTable() {
     CREATE TABLE IF NOT EXISTS profile_stats (
       user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       visits_total INTEGER NOT NULL DEFAULT 0,
+      followers_total INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
+  try {
+    executeSql('ALTER TABLE profile_stats ADD COLUMN followers_total INTEGER NOT NULL DEFAULT 0')
+  } catch (error) {
+    const message = String(error?.message || error || '').toLowerCase()
+    if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+      throw error
+    }
+  }
   executeSql('CREATE INDEX IF NOT EXISTS idx_profile_stats_visits_total ON profile_stats(visits_total DESC, updated_at DESC)')
+  executeSql('CREATE INDEX IF NOT EXISTS idx_profile_stats_followers_total ON profile_stats(followers_total DESC, updated_at DESC)')
 }
 
 function normalizeBirthdate(value) {
@@ -486,6 +496,7 @@ async function upsertProfile(profile, manifestDir) {
   const lastActive = profile.lastActive || nowSql()
   const createdAt = profile.createdAt || nowSql()
   const visitsTotal = Math.max(0, Number(profile.visits) || 0)
+  const followersTotal = Math.max(0, Number(profile.followers) || 0)
   const avatarCrop = profile.avatarCrop ? JSON.stringify(profile.avatarCrop) : null
   const explicitBirthdate = normalizeBirthdate(profile.birthdate || '')
   const derivedBirthdate = !explicitBirthdate ? estimateBirthdateFromAge(profile.age) : ''
@@ -535,6 +546,7 @@ async function upsertProfile(profile, manifestDir) {
     if (!explicitBirthdate && birthdate) console.log(`  birthdate estimada: ${birthdate}`)
     console.log(`  avatar: ${avatarUrl || '-'}`)
     console.log(`  photos: ${photoUrls.length}`)
+    console.log(`  seguidores: ${followersTotal}`)
     console.log(`  visitas: ${visitsTotal}`)
     const baseResult = { userId, username, created: !existing, updated: !!existing, skipped: false, skippedExisting: false, storyImported: false }
     if (!storySource) return baseResult
@@ -563,12 +575,16 @@ async function upsertProfile(profile, manifestDir) {
   }
 
   executeSql(`
-    INSERT INTO profile_stats (user_id, visits_total, updated_at)
-    VALUES (${sql(userId)}, ${sql(visitsTotal)}, datetime('now'))
+    INSERT INTO profile_stats (user_id, visits_total, followers_total, updated_at)
+    VALUES (${sql(userId)}, ${sql(visitsTotal)}, ${sql(followersTotal)}, datetime('now'))
     ON CONFLICT(user_id) DO UPDATE SET
       visits_total = ${sql(visitsTotal)},
+      followers_total = ${sql(followersTotal)},
       updated_at = datetime('now')
   `)
+  if (followersTotal > 0) {
+    console.log(`  seguidores importados: ${followersTotal}`)
+  }
   if (visitsTotal > 0) {
     console.log(`  visitas importadas: ${visitsTotal}`)
   }
