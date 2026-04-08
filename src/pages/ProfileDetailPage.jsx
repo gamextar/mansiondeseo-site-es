@@ -17,6 +17,15 @@ const ROLE_COLOR = {
   'Mujer Sola': 'bg-pink-500/20 text-pink-300 border-pink-500/30',
 };
 
+const SEEKING_META = {
+  hombre: { label: 'Hombres', emoji: '👨', className: 'bg-blue-500/15 text-blue-300 border-blue-500/30' },
+  mujer: { label: 'Mujeres', emoji: '👩', className: 'bg-pink-500/15 text-pink-300 border-pink-500/30' },
+  pareja: { label: 'Parejas', emoji: '💑', className: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
+  pareja_hombres: { label: 'Pareja de Hombres', emoji: '👬', className: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
+  pareja_mujeres: { label: 'Pareja de Mujeres', emoji: '👭', className: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30' },
+  trans: { label: 'Trans', emoji: '⚧', className: 'bg-teal-500/15 text-teal-300 border-teal-500/30' },
+};
+
 const PROFILE_DETAIL_CACHE_PREFIX = 'mansion_profile_detail_';
 const PROFILE_DETAIL_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_PROFILE_SETTINGS = { blurLevel: 14, blurMobile: 14, blurDesktop: 8, freeVisiblePhotos: 1, freeOwnPhotos: 3 };
@@ -401,6 +410,7 @@ export default function ProfileDetailPage() {
   }
 
   const { name, age, role, interests, bio, totalPhotos, verified, online, premium, blurred, isOwnProfile, receivedGifts } = profile;
+  const seeking = Array.isArray(profile?.seeking) ? profile.seeking : (profile?.seeking ? [profile.seeking] : []);
   const locationText = formatLocation(profile);
   const galleryPhotos = getGalleryPhotos(profile);
   const displayPhotos = getDisplayPhotos(profile);
@@ -597,28 +607,59 @@ export default function ProfileDetailPage() {
             </div>
           </motion.div>
 
+          {/* Seeking */}
+          {seeking.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="mb-6"
+            >
+              <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Busco</h3>
+              <div className="flex flex-wrap gap-2">
+                {seeking.map((value, idx) => {
+                  const meta = SEEKING_META[value] || { label: value, emoji: '✨', className: 'bg-mansion-card/60 text-text-primary border-mansion-border/30' };
+                  return (
+                    <motion.span
+                      key={value}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.45 + idx * 0.04 }}
+                      className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border ${meta.className}`}
+                    >
+                      <span>{meta.emoji}</span>
+                      <span>{meta.label}</span>
+                    </motion.span>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+
           {/* Interests */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="mb-6"
-          >
-            <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Intereses</h3>
-            <div className="flex flex-wrap gap-2">
-              {interests.map((tag, idx) => (
-                <motion.span
-                  key={tag}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.45 + idx * 0.04 }}
-                  className="text-xs font-medium px-3 py-1.5 rounded-full bg-mansion-gold/10 text-mansion-gold border border-mansion-gold/20 hover:bg-mansion-gold/15 transition-colors"
-                >
-                  {tag}
-                </motion.span>
-              ))}
-            </div>
-          </motion.div>
+          {interests.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+              className="mb-6"
+            >
+              <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Intereses</h3>
+              <div className="flex flex-wrap gap-2">
+                {interests.map((tag, idx) => (
+                  <motion.span
+                    key={tag}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.5 + idx * 0.04 }}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full bg-mansion-gold/10 text-mansion-gold border border-mansion-gold/20 hover:bg-mansion-gold/15 transition-colors"
+                  >
+                    {tag}
+                  </motion.span>
+                ))}
+              </div>
+            </motion.div>
+          )}
 
           {/* Received Gifts */}
           {receivedGifts && receivedGifts.length > 0 && (
