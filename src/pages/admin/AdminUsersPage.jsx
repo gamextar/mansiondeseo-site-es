@@ -28,6 +28,18 @@ function roleBadge(role) {
   return map[role] || role;
 }
 
+function roleLabel(role) {
+  const map = {
+    hombre: 'Hombres',
+    mujer: 'Mujeres',
+    pareja: 'Parejas',
+    pareja_hombres: 'Pareja de Hombres',
+    pareja_mujeres: 'Pareja de Mujeres',
+    trans: 'Trans',
+  };
+  return map[role] || role;
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
@@ -290,6 +302,23 @@ export default function AdminUsersPage() {
                 <div className="bg-mansion-elevated rounded-xl p-3">
                   <p className="text-text-dim text-[10px] uppercase tracking-wider mb-1">Rol</p>
                   <p className="text-text-primary">{selected.role} → {selected.seeking}</p>
+                </div>
+                <div className="bg-mansion-elevated rounded-xl p-3 col-span-2">
+                  <p className="text-text-dim text-[10px] uppercase tracking-wider mb-1">Bloqueo de mensajes</p>
+                  {Array.isArray(selected.message_block_roles) && selected.message_block_roles.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selected.message_block_roles.map((role) => (
+                        <span
+                          key={role}
+                          className="px-2 py-1 rounded-lg bg-mansion-gold/10 border border-mansion-gold/20 text-mansion-gold text-[10px] font-semibold"
+                        >
+                          {roleLabel(role)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-text-primary">Acepta mensajes de todos</p>
+                  )}
                 </div>
                 <div className="bg-mansion-elevated rounded-xl p-3">
                   <p className="text-text-dim text-[10px] uppercase tracking-wider mb-1">País</p>

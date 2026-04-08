@@ -1784,6 +1784,7 @@ async function handleProfileDetail(request, env, userId) {
       age: getPublicAge(user),
       ...getLocationFields(user),
       role: mapRoleToDisplay(user.role),
+      message_block_roles: normalizeRoleArray(safeParseJSON(user.message_block_roles, []), SEEKING_ROLE_IDS, []),
       interests: safeParseJSON(user.interests, []),
       bio: user.bio,
       photos: galleryPhotos,
@@ -3198,7 +3199,8 @@ async function handleAdminGetUsers(request, env) {
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
-  let dataQuery = `SELECT id, email, username, role, seeking, age, birthdate, city, locality, marital_status, sexual_orientation, country, avatar_url, status,
+  await ensureUsersMessageBlockRolesColumn(env);
+  let dataQuery = `SELECT id, email, username, role, seeking, message_block_roles, age, birthdate, city, locality, marital_status, sexual_orientation, country, avatar_url, status,
     premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, account_status, last_active, last_ip, created_at,
     (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id
     FROM users`;
@@ -3231,6 +3233,7 @@ async function handleAdminGetUsers(request, env) {
       locality: u.locality || '',
       marital_status: u.marital_status || '',
       sexual_orientation: u.sexual_orientation || '',
+      message_block_roles: normalizeRoleArray(safeParseJSON(u.message_block_roles, []), SEEKING_ROLE_IDS, []),
       premium: isPremiumActive(u),
       online: isOnline(u.last_active),
       is_admin: !!u.is_admin,
@@ -3247,6 +3250,7 @@ async function handleAdminGetUsers(request, env) {
 
 // ── Admin: GET /api/admin/users/:id ─────────────────────
 async function handleAdminGetUser(request, env, userId) {
+  await ensureUsersMessageBlockRolesColumn(env);
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -3265,6 +3269,7 @@ async function handleAdminGetUser(request, env, userId) {
       locality: safe.locality || '',
       marital_status: safe.marital_status || '',
       sexual_orientation: safe.sexual_orientation || '',
+      message_block_roles: normalizeRoleArray(safeParseJSON(safe.message_block_roles, []), SEEKING_ROLE_IDS, []),
       interests: safeParseJSON(safe.interests, []),
       photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
       avatar_crop: safeParseJSON(safe.avatar_crop, null),
@@ -3278,6 +3283,7 @@ async function handleAdminGetUser(request, env, userId) {
 
 // ── Admin: PUT /api/admin/users/:id ─────────────────────
 async function handleAdminUpdateUser(request, env, userId) {
+  await ensureUsersMessageBlockRolesColumn(env);
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -3323,6 +3329,7 @@ async function handleAdminUpdateUser(request, env, userId) {
       locality: safe.locality || '',
       marital_status: safe.marital_status || '',
       sexual_orientation: safe.sexual_orientation || '',
+      message_block_roles: normalizeRoleArray(safeParseJSON(safe.message_block_roles, []), SEEKING_ROLE_IDS, []),
       interests: safeParseJSON(safe.interests, []),
       photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
       avatar_crop: safeParseJSON(safe.avatar_crop, null),

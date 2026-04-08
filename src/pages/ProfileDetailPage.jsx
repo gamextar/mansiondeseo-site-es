@@ -26,6 +26,8 @@ const SEEKING_META = {
   trans: { label: 'Trans', emoji: '⚧', className: 'bg-teal-500/15 text-teal-300 border-teal-500/30' },
 };
 
+const MESSAGE_BLOCK_META = SEEKING_META;
+
 const PROFILE_DETAIL_CACHE_PREFIX = 'mansion_profile_detail_';
 const PROFILE_DETAIL_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_PROFILE_SETTINGS = { blurLevel: 14, blurMobile: 14, blurDesktop: 8, freeVisiblePhotos: 1, freeOwnPhotos: 3 };
@@ -411,6 +413,7 @@ export default function ProfileDetailPage() {
 
   const { name, age, role, interests, bio, totalPhotos, verified, online, premium, blurred, isOwnProfile, receivedGifts } = profile;
   const seeking = Array.isArray(profile?.seeking) ? profile.seeking : (profile?.seeking ? [profile.seeking] : []);
+  const messageBlockRoles = Array.isArray(profile?.message_block_roles) ? profile.message_block_roles : [];
   const locationText = formatLocation(profile);
   const galleryPhotos = getGalleryPhotos(profile);
   const displayPhotos = getDisplayPhotos(profile);
@@ -625,6 +628,35 @@ export default function ProfileDetailPage() {
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.45 + idx * 0.04 }}
+                      className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border ${meta.className}`}
+                    >
+                      <span>{meta.emoji}</span>
+                      <span>{meta.label}</span>
+                    </motion.span>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+
+          {messageBlockRoles.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.425 }}
+              className="mb-6"
+            >
+              <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Privacidad de Mensajes</h3>
+              <p className="text-text-dim text-xs mb-2.5">No recibe mensajes de:</p>
+              <div className="flex flex-wrap gap-2">
+                {messageBlockRoles.map((value, idx) => {
+                  const meta = MESSAGE_BLOCK_META[value] || { label: value, emoji: '⛔', className: 'bg-mansion-card/60 text-text-primary border-mansion-border/30' };
+                  return (
+                    <motion.span
+                      key={value}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.47 + idx * 0.04 }}
                       className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border ${meta.className}`}
                     >
                       <span>{meta.emoji}</span>
