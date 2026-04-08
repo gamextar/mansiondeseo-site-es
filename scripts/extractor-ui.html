@@ -335,7 +335,26 @@
               </label>
             </div>
 
+            <div class="row-2">
+              <label>
+                Nombre del batch
+                <input id="batchName" placeholder="Se genera solo si lo dejas vacío" />
+              </label>
+              <label>
+                Carpeta de batches
+                <input id="batchDir" value="./data/contactossex-batches" />
+              </label>
+            </div>
+
             <div class="checks">
+              <label class="check">
+                <input id="batchOutput" type="checkbox" checked />
+                <span>
+                  <strong>Guardar manifest separado por batch</strong>
+                  Crea un JSON nuevo por corrida con solo los perfiles bajados en ese lote.
+                </span>
+              </label>
+
               <label class="check">
                 <input id="manualLogin" type="checkbox" checked />
                 <span>
@@ -419,6 +438,8 @@
         return {
           listUrlTemplate: document.getElementById('listUrlTemplate').value,
           profileUrl: document.getElementById('profileUrl').value,
+          batchName: document.getElementById('batchName').value,
+          batchDir: document.getElementById('batchDir').value,
           pageStart: document.getElementById('pageStart').value,
           pageEnd: document.getElementById('pageEnd').value,
           maxProfiles: document.getElementById('maxProfiles').value,
@@ -427,6 +448,7 @@
           delayMs: document.getElementById('delayMs').value,
           mediaDelayMs: document.getElementById('mediaDelayMs').value,
           excludeUsernames: document.getElementById('excludeUsernames').value,
+          batchOutput: document.getElementById('batchOutput').checked,
           manualLogin: document.getElementById('manualLogin').checked,
           useChrome: document.getElementById('useChrome').checked,
           headed: document.getElementById('headed').checked,
@@ -479,6 +501,7 @@
             `Saltados por assets ya existentes: ${skippedBreakdown.existingAssetsDir ?? 0}`,
             `Saltados por username excluido: ${skippedBreakdown.excludedUsername ?? 0}`,
             `Saltados por username faltante: ${skippedBreakdown.missingUsername ?? 0}`,
+            s.batchManifestPath ? `Batch guardado en: ${s.batchManifestPath}` : 'Batch separado: desactivado',
           ]
             .map((line) => `<div>${line}</div>`)
             .join('')

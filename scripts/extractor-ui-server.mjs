@@ -87,6 +87,8 @@ function buildArgs(config) {
   const delayMs = intValue(config.delayMs, 10000)
   const mediaDelayMs = intValue(config.mediaDelayMs, 750)
   const excludeUsernames = stringValue(config.excludeUsernames, '')
+  const batchName = stringValue(config.batchName, '')
+  const batchDir = stringValue(config.batchDir, './data/contactossex-batches')
 
   if (boolValue(config.manualLogin, true)) args.push('--manual-login')
   if (boolValue(config.useChrome, true)) args.push('--chrome')
@@ -94,6 +96,7 @@ function buildArgs(config) {
   if (boolValue(config.force, false)) args.push('--force')
   if (boolValue(config.freshSession, false)) args.push('--fresh-session')
   if (boolValue(config.overwriteAssets, false)) args.push('--overwrite-assets')
+  if (!boolValue(config.batchOutput, true)) args.push('--no-batch-output')
 
   args.push('--list-url-template', listUrlTemplate)
   args.push('--page-start', String(pageStart))
@@ -103,9 +106,11 @@ function buildArgs(config) {
   args.push('--max-videos', String(maxVideos))
   args.push('--delay-ms', String(delayMs))
   args.push('--media-delay-ms', String(mediaDelayMs))
+  args.push('--batch-dir', batchDir)
 
   if (profileUrl) args.push('--profile-url', profileUrl)
   if (excludeUsernames) args.push('--exclude-usernames', excludeUsernames)
+  if (batchName) args.push('--batch-name', batchName)
 
   return args
 }

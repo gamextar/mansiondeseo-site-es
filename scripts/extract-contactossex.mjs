@@ -29,6 +29,9 @@ Opciones:
   --browser-profile-dir <path>   Perfil persistente de Chromium para conservar mejor la sesión
   --state <path>                 Archivo de estado incremental
   --output <path>                Manifest JSON de salida
+  --batch-dir <path>             Carpeta donde guardar manifests por corrida
+  --batch-name <name>            Nombre del batch actual; si falta, se genera uno automáticamente
+  --no-batch-output              Desactiva la escritura del manifest separado por batch
   --assets-dir <path>            Carpeta donde guardar fotos/videos descargados
   --list-url-template <url>      URL de listados con {page}. Default: https://contactossex.com/members/search?page={page}
   --page-start <n>               Página inicial
@@ -86,6 +89,7 @@ const mediaDelayMs = Number.parseInt(takeFlag('--media-delay-ms', '350'), 10)
 const listUrlTemplate = takeFlag('--list-url-template', 'https://contactossex.com/members/search?page={page}')
 const profileUrl = takeFlag('--profile-url', '')
 const overwriteAssets = hasFlag('--overwrite-assets')
+const noBatchOutput = hasFlag('--no-batch-output')
 const excludedUsernames = new Set(
   String(takeFlag('--exclude-usernames', '') || '')
     .split(',')
@@ -99,8 +103,11 @@ const browserProfileDir = path.resolve(
 )
 const statePath = path.resolve(repoRoot, takeFlag('--state', './data/contactossex-extract-state.json'))
 const outputPath = path.resolve(repoRoot, takeFlag('--output', './data/contactossex-placeholders.json'))
+const batchDir = path.resolve(repoRoot, takeFlag('--batch-dir', './data/contactossex-batches'))
+const requestedBatchName = takeFlag('--batch-name', '')
 const assetsDir = path.resolve(repoRoot, takeFlag('--assets-dir', './data/contactossex-assets'))
 const headless = explicitHeadless ? true : !headed && !manualLogin
+const batchOutputEnabled = !noBatchOutput
 
 if (rawArgs.length > 0) {
   console.error(`Argumentos no reconocidos: ${rawArgs.join(' ')}`)
@@ -138,6 +145,27 @@ function slugifySegment(value, fallback = 'profile') {
     .replace(/[^a-zA-Z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '')
   return slug || fallback
+}
+
+function timestampBatchName() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hour = String(now.getHours()).padStart(2, '0')
+  const minute = String(now.getMinutes()).padStart(2, '0')
+  const second = String(now.getSeconds()).padStart(2, '0')
+  return `batch-${year}${month}${day}-${hour}${minute}${second}`
+}
+
+function buildBatchName() {
+  if (requestedBatchName) return slugifySegment(requestedBatchName, timestampBatchName())
+  if (profileUrl) {
+    const fromUrl = profileUrl.split('/').filter(Boolean).pop()
+    return slugifySegment(`batch-${fromUrl}`, timestampBatchName())
+  }
+  if (pageStart === pageEnd) return `batch-page-${pageStart}-${timestampBatchName()}`
+  return `batch-pages-${pageStart}-${pageEnd}-${timestampBatchName()}`
 }
 
 function delay(ms) {
@@ -760,12 +788,16 @@ async function main() {
   await ensureDir(path.dirname(statePath))
   await ensureDir(assetsDir)
   await ensureDir(path.dirname(browserProfileDir))
+  if (batchOutputEnabled) await ensureDir(batchDir)
 
   const state = await readJson(statePath, {
     processedPages: [],
     processedProfiles: {},
   })
   const manifest = await readJson(outputPath, { profiles: [] })
+  const batchName = buildBatchName()
+  const batchPath = path.join(batchDir, `${batchName}.json`)
+  const batchManifest = { profiles: [] }
 
   if (freshSession && existsSync(browserProfileDir)) {
     await removeDir(browserProfileDir)
@@ -857,6 +889,7 @@ async function main() {
       }
       const manifestProfile = toManifestProfile(profile, assets)
       upsertManifestProfile(manifest, manifestProfile)
+      upsertManifestProfile(batchManifest, manifestProfile)
 
       state.processedProfiles[url] = {
         username: profile.username,
@@ -865,6 +898,7 @@ async function main() {
       }
 
       await writeJson(outputPath, manifest)
+      if (batchOutputEnabled) await writeJson(batchPath, batchManifest)
       await writeJson(statePath, state)
 
       processedThisRun += 1
@@ -877,6 +911,8 @@ async function main() {
         discoveredProfiles: urls.length,
         downloadedProfiles: processedThisRun,
         skippedProfiles: skippedThisRun,
+        batchProfiles: batchManifest.profiles.length,
+        batchManifestPath: batchOutputEnabled ? batchPath : null,
         skippedBreakdown: {
           existingKnownProfile: skippedExistingKnownProfile,
           existingAssetsDir: skippedExistingAssets,
@@ -886,6 +922,7 @@ async function main() {
       })}`
     )
     console.log(`\nListo. Manifest: ${outputPath}`)
+    if (batchOutputEnabled) console.log(`Batch manifest: ${batchPath}`)
     console.log(`Assets: ${assetsDir}`)
     console.log(`Estado: ${statePath}`)
   } finally {
