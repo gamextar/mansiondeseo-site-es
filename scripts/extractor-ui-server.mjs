@@ -79,6 +79,7 @@ function buildArgs(config) {
   const excludeUsernames = stringValue(config.excludeUsernames, '')
 
   if (boolValue(config.manualLogin, true)) args.push('--manual-login')
+  if (boolValue(config.useChrome, true)) args.push('--chrome')
   if (boolValue(config.headed, true)) args.push('--headed')
   if (boolValue(config.force, false)) args.push('--force')
   if (boolValue(config.freshSession, false)) args.push('--fresh-session')

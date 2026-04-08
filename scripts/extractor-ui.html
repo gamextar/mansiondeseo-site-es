@@ -298,6 +298,14 @@
               </label>
 
               <label class="check">
+                <input id="useChrome" type="checkbox" checked />
+                <span>
+                  <strong>Usar Google Chrome</strong>
+                  Abre Chrome real en vez del Chromium integrado de Playwright. Suele sentirse más natural para mantener sesión.
+                </span>
+              </label>
+
+              <label class="check">
                 <input id="headed" type="checkbox" checked />
                 <span>
                   <strong>Navegador visible</strong>
@@ -365,6 +373,7 @@
           mediaDelayMs: document.getElementById('mediaDelayMs').value,
           excludeUsernames: document.getElementById('excludeUsernames').value,
           manualLogin: document.getElementById('manualLogin').checked,
+          useChrome: document.getElementById('useChrome').checked,
           headed: document.getElementById('headed').checked,
           force: document.getElementById('force').checked,
           overwriteAssets: document.getElementById('overwriteAssets').checked,

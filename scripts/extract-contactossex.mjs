@@ -22,6 +22,7 @@ Descripción:
 
 Opciones:
   --manual-login                 Abre el navegador y espera login manual antes de extraer
+  --chrome                       Usa Google Chrome en vez del Chromium integrado de Playwright
   --headed                       Fuerza navegador visible
   --headless                     Fuerza navegador oculto
   --session <path>               Archivo de storage state de Playwright
@@ -70,6 +71,7 @@ if (rawArgs.includes('--help') || rawArgs.includes('-h')) {
 
 const repoRoot = process.cwd()
 const manualLogin = hasFlag('--manual-login')
+const useChrome = hasFlag('--chrome')
 const explicitHeadless = hasFlag('--headless')
 const headed = hasFlag('--headed')
 const freshSession = hasFlag('--fresh-session')
@@ -770,6 +772,7 @@ async function main() {
   }
 
   const context = await chromium.launchPersistentContext(browserProfileDir, {
+    channel: useChrome ? 'chrome' : undefined,
     headless,
     viewport: { width: 1440, height: 960 },
   })
