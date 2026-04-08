@@ -146,6 +146,21 @@ function parseSeeking(raw) {
   return [...new Set(mapped)]
 }
 
+function parseMessageBlockRoles(raw) {
+  const normalized = String(raw || '').replace(/\s+/g, ' ').trim().toLowerCase()
+  if (!normalized) return []
+  if (normalized.includes('acepta todos los mensajes')) return []
+
+  const mapped = []
+  if (normalized.includes('pareja de hombres')) mapped.push('pareja_hombres')
+  if (normalized.includes('pareja de mujeres')) mapped.push('pareja_mujeres')
+  if (normalized.includes('parejas') || normalized.includes('pareja')) mapped.push('pareja')
+  if (normalized.includes('mujeres') || normalized.includes('mujer')) mapped.push('mujer')
+  if (normalized.includes('hombres') || normalized.includes('hombre')) mapped.push('hombre')
+  if (normalized.includes('trans')) mapped.push('trans')
+  return [...new Set(mapped)]
+}
+
 function parseAge(raw) {
   const match = String(raw || '').match(/(\d{1,2})/)
   return match ? Number(match[1]) : null
@@ -342,6 +357,7 @@ async function extractProfileData(page, requestContext, url) {
       location: textByHeading('Ubicación'),
       stats: textByHeading('Estadísticas'),
       seeking: textByHeading('Buscando'),
+      messagePrivacy: textByHeading('Bloqueando'),
       bio: description,
       mainPictureHref: mainPictureLink?.href || '',
       mainPictureThumb: backgroundMatch?.[2] || '',
@@ -458,6 +474,7 @@ async function extractProfileData(page, requestContext, url) {
     province,
     country,
     seeking: parseSeeking(extracted.seeking),
+    message_block_roles: parseMessageBlockRoles(extracted.messagePrivacy),
     bio: extracted.bio,
     media: resolvedMedia,
   }
@@ -540,6 +557,7 @@ function toManifestProfile(profile, assets) {
     followers: Number.isFinite(Number(profile.followers)) ? Number(profile.followers) : 0,
     following: Number.isFinite(Number(profile.following)) ? Number(profile.following) : 0,
     visits: Number.isFinite(Number(profile.visits)) ? Number(profile.visits) : 0,
+    message_block_roles: Array.isArray(profile.message_block_roles) ? profile.message_block_roles : [],
     marital_status: profile.marital_status,
     sexual_orientation: profile.sexual_orientation,
     avatarPath: assets.avatarPath || undefined,
