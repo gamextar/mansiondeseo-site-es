@@ -421,12 +421,20 @@ async function extractProfileData(page, requestContext, url) {
     const mainPictureStyle = document.querySelector('.main-picture')?.getAttribute('style') || ''
     const backgroundMatch = mainPictureStyle.match(/url\((["']?)(.*?)\1\)/i)
     const galleryItems = Array.from(document.querySelectorAll('.card-multimedia-parent')).map((card) => {
-      const anchor = card.querySelector('a[href*="/members/picture-zoom"]')
+      const anchor = card.querySelector('a[href*="/members/"]')
       const likesText = clean(card.querySelector('.ranking-heart span')?.textContent || '')
       const likes = Number.parseInt(likesText.replace(/[^\d]/g, ''), 10)
+      const thumbImage = card.querySelector('img')?.src || ''
+      const posterImage = card.querySelector('video')?.getAttribute('poster') || ''
+      const style = card.querySelector('[style*="background-image"]')?.getAttribute('style') || ''
+      const styleMatch = style.match(/url\((["']?)(.*?)\1\)/i)
       return {
         href: anchor?.href || '',
-        thumb: anchor?.querySelector('img')?.src || '',
+        thumb: thumbImage || posterImage || styleMatch?.[2] || '',
+        declaredType:
+          anchor?.href?.includes('/video-zoom') || anchor?.href?.includes('/video/')
+            ? 'video'
+            : (card.querySelector('video') ? 'video' : 'image'),
         likes: Number.isFinite(likes) ? likes : 0,
       }
     }).filter((item) => item.href || item.thumb)
@@ -473,6 +481,7 @@ async function extractProfileData(page, requestContext, url) {
       zoomUrl: item.href,
       fallbackUrl: item.thumb,
       kind: 'gallery',
+      declaredType: item.declaredType || 'image',
       likes: item.likes || 0,
     })
   }
@@ -483,7 +492,7 @@ async function extractProfileData(page, requestContext, url) {
     const absoluteZoom = absolutize(extracted.url, ref.zoomUrl)
     const fallback = absolutize(extracted.url, ref.fallbackUrl)
     let finalUrl = fallback
-    let mediaType = fallback.match(/\.(mp4|webm|mov)(\?|$)/i) ? 'video' : 'image'
+    let mediaType = ref.declaredType === 'video' || fallback.match(/\.(mp4|webm|mov)(\?|$)/i) ? 'video' : 'image'
 
     if (absoluteZoom) {
       try {
