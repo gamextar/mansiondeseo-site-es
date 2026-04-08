@@ -452,8 +452,10 @@ async function extractProfileData(page, requestContext, url) {
     const mainPictureLink = document.querySelector('a[data-fancybox="gallery"][href*="/members/picture-zoom"]')
     const mainPictureStyle = document.querySelector('.main-picture')?.getAttribute('style') || ''
     const backgroundMatch = mainPictureStyle.match(/url\((["']?)(.*?)\1\)/i)
-    const galleryItems = Array.from(document.querySelectorAll('.card-multimedia-parent')).map((card) => {
-      const anchor = card.querySelector('a[href*="/members/"]')
+    const galleryItems = Array.from(
+      document.querySelectorAll('a[href*="/members/picture-zoom"], a[href*="/members/video-zoom"]')
+    ).map((anchor) => {
+      const card = anchor.closest('.card-multimedia-parent, .card-multimedia, .card-multimedia-container') || anchor.parentElement || anchor
       const likesText = clean(card.querySelector('.ranking-heart span')?.textContent || '')
       const likes = Number.parseInt(likesText.replace(/[^\d]/g, ''), 10)
       const thumbImage = card.querySelector('img')?.src || ''
