@@ -1010,6 +1010,13 @@ export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '' } 
   return apiFetch(`/admin/users?${params}`);
 }
 
+export async function adminGetUserIds({ q = '', fake = '' } = {}) {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (fake === '1' || fake === '0') params.set('fake', fake);
+  return apiFetch(`/admin/users/ids?${params}`);
+}
+
 export async function adminGetUser(userId) {
   return apiFetch(`/admin/users/${userId}`);
 }

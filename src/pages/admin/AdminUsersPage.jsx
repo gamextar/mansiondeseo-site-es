@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, Ghost, Ban, AlertTriangle, Pause, Play, Film } from 'lucide-react';
-import { adminGetUsers, adminUpdateUser, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory } from '../../lib/api';
+import { adminGetUsers, adminGetUserIds, adminUpdateUser, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 
 function timeAgo(dateStr) {
@@ -52,6 +52,7 @@ export default function AdminUsersPage() {
   const [selected, setSelected] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
+  const [selectionLoading, setSelectionLoading] = useState(false);
   const [storyUploading, setStoryUploading] = useState(false);
   const [storyCaption, setStoryCaption] = useState('');
   const storyInputRef = useRef(null);
@@ -82,6 +83,18 @@ export default function AdminUsersPage() {
   const handleSelectVisibleFakes = () => {
     const visibleFakeIds = users.filter((u) => u.fake).map((u) => u.id);
     setSelectedIds((prev) => [...new Set([...prev, ...visibleFakeIds])]);
+  };
+
+  const handleSelectMatchingFakes = async () => {
+    setSelectionLoading(true);
+    try {
+      const data = await adminGetUserIds({ q: query, fake: '1' });
+      setSelectedIds(data.ids || []);
+    } catch (err) {
+      alert(err.message || 'Error al seleccionar usuarios fake');
+    } finally {
+      setSelectionLoading(false);
+    }
   };
 
   const handleAction = async (userId, fields) => {
@@ -266,6 +279,15 @@ export default function AdminUsersPage() {
             className="px-3 py-2 rounded-xl bg-mansion-card border border-mansion-border/20 text-text-dim hover:text-mansion-gold text-xs font-semibold transition-colors"
           >
             Seleccionar fake visibles
+          </button>
+
+          <button
+            type="button"
+            disabled={selectionLoading}
+            onClick={handleSelectMatchingFakes}
+            className="px-3 py-2 rounded-xl bg-mansion-card border border-mansion-border/20 text-text-dim hover:text-mansion-gold text-xs font-semibold transition-colors disabled:opacity-60"
+          >
+            {selectionLoading ? 'Seleccionando...' : 'Seleccionar fake del resultado'}
           </button>
         </div>
 

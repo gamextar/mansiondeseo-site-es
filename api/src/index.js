@@ -3336,6 +3336,46 @@ async function handleAdminGetUsers(request, env) {
   });
 }
 
+async function handleAdminGetUserIds(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const url = new URL(request.url);
+  const q = (url.searchParams.get('q') || '').trim();
+  const fakeFilter = url.searchParams.get('fake');
+
+  let query = 'SELECT id, fake FROM users';
+  const filters = [];
+  const bindings = [];
+
+  if (q) {
+    filters.push('(email LIKE ? OR username LIKE ? OR id = ?)');
+    bindings.push(`%${q}%`, `%${q}%`, q);
+  }
+
+  if (fakeFilter === '1' || fakeFilter === '0') {
+    filters.push('fake = ?');
+    bindings.push(Number(fakeFilter));
+  }
+
+  if (filters.length > 0) {
+    query += ` WHERE ${filters.join(' AND ')}`;
+  }
+
+  query += ' ORDER BY created_at DESC LIMIT 5000';
+
+  const rows = bindings.length
+    ? await env.DB.prepare(query).bind(...bindings).all()
+    : await env.DB.prepare(query).all();
+
+  return json({
+    ids: (rows.results || []).map((row) => row.id),
+    total: (rows.results || []).length,
+  });
+}
+
 // ── Admin: GET /api/admin/users/:id ─────────────────────
 async function handleAdminGetUser(request, env, userId) {
   await ensureUsersMessageBlockRolesColumn(env);
@@ -4393,6 +4433,7 @@ async function handleRequest(request, env) {
 
   // ── Admin: Users
   if (path === '/api/admin/users' && method === 'GET') return handleAdminGetUsers(request, env);
+  if (path === '/api/admin/users/ids' && method === 'GET') return handleAdminGetUserIds(request, env);
   if (path === '/api/admin/users/bulk-delete' && method === 'POST') return handleAdminBulkDeleteUsers(request, env);
   const adminUserMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)$/);
   if (adminUserMatch && method === 'GET') return handleAdminGetUser(request, env, adminUserMatch[1]);
