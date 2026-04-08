@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "check:media-cache": "node scripts/check-media-cache.mjs",
     "import:placeholders": "node scripts/import-placeholders.mjs",
-    "extract:contactossex": "node scripts/extract-contactossex.mjs"
+    "extract:contactossex": "node scripts/extract-contactossex.mjs",
+    "extract:contactossex:ui": "node scripts/extractor-ui-server.mjs"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",

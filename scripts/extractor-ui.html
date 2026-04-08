@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Extractor ContactosSex</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #120f12;
+        --panel: #1d171c;
+        --panel-2: #241d23;
+        --line: rgba(255, 255, 255, 0.08);
+        --text: #f6ecef;
+        --muted: #bbaeb3;
+        --accent: #d3ad7a;
+        --accent-2: #7d2f44;
+        --danger: #b44a5d;
+        --ok: #6fb38b;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        background:
+          radial-gradient(circle at top left, rgba(211, 173, 122, 0.16), transparent 30%),
+          radial-gradient(circle at top right, rgba(125, 47, 68, 0.22), transparent 28%),
+          linear-gradient(180deg, #100d10 0%, #171217 100%);
+        color: var(--text);
+      }
+
+      .wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 28px 18px 36px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(28px, 5vw, 44px);
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+
+      .sub {
+        margin: 0 0 24px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+        gap: 18px;
+      }
+
+      .panel {
+        background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 18px;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 24px 70px rgba(0,0,0,0.24);
+      }
+
+      .panel h2 {
+        margin: 0 0 14px;
+        font-size: 18px;
+        font-weight: 600;
+      }
+
+      .fields {
+        display: grid;
+        gap: 12px;
+      }
+
+      .row-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      input, textarea {
+        width: 100%;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.09);
+        background: var(--panel-2);
+        color: var(--text);
+        padding: 11px 12px;
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 76px;
+        resize: vertical;
+      }
+
+      .checks {
+        display: grid;
+        gap: 10px;
+        margin-top: 4px;
+      }
+
+      .check {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 10px 12px;
+        border-radius: 16px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.06);
+      }
+
+      .check input {
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+      }
+
+      .check strong {
+        display: block;
+        color: var(--text);
+        font-size: 14px;
+        margin-bottom: 3px;
+      }
+
+      .check span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 16px;
+        font: inherit;
+        cursor: pointer;
+        color: #140f12;
+        background: linear-gradient(135deg, var(--accent), #f1d3a8);
+        font-weight: 700;
+      }
+
+      button.secondary {
+        color: var(--text);
+        background: rgba(255,255,255,0.08);
+      }
+
+      button.danger {
+        color: #fff;
+        background: linear-gradient(135deg, #7d2f44, var(--danger));
+      }
+
+      .status-card {
+        display: grid;
+        gap: 14px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.05);
+        width: fit-content;
+        font-size: 13px;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--muted);
+      }
+
+      .running .dot { background: var(--accent); }
+      .completed .dot { background: var(--ok); }
+      .failed .dot { background: var(--danger); }
+
+      .meta {
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      pre {
+        margin: 0;
+        min-height: 420px;
+        max-height: 68vh;
+        overflow: auto;
+        padding: 16px;
+        border-radius: 18px;
+        background: #0e0b0e;
+        border: 1px solid rgba(255,255,255,0.06);
+        color: #efe4e8;
+        font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        white-space: pre-wrap;
+      }
+
+      .hint {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      @media (max-width: 960px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Extractor Local de ContactosSex</h1>
+      <p class="sub">Lanza corridas chicas, con delays configurables y control explícito sobre carpetas locales ya existentes.</p>
+
+      <div class="grid">
+        <section class="panel">
+          <h2>Configuración</h2>
+          <form id="extract-form" class="fields">
+            <label>
+              URL de listados
+              <input id="listUrlTemplate" value="https://contactossex.com/members/search?page={page}" />
+            </label>
+
+            <label>
+              URL de un perfil puntual
+              <input id="profileUrl" placeholder="https://contactossex.com/members/profile/BiCuriosa91" />
+            </label>
+
+            <div class="row-2">
+              <label>
+                Página inicial
+                <input id="pageStart" type="number" min="1" value="1" />
+              </label>
+              <label>
+                Página final
+                <input id="pageEnd" type="number" min="1" value="1" />
+              </label>
+            </div>
+
+            <div class="row-2">
+              <label>
+                Cantidad máxima de perfiles
+                <input id="maxProfiles" type="number" min="1" value="6" />
+              </label>
+              <label>
+                Delay entre perfiles (ms)
+                <input id="delayMs" type="number" min="0" step="100" value="10000" />
+              </label>
+            </div>
+
+            <div class="row-2">
+              <label>
+                Delay entre fotos/videos (ms)
+                <input id="mediaDelayMs" type="number" min="0" step="50" value="750" />
+              </label>
+              <label>
+                Excluir usernames
+                <input id="excludeUsernames" value="Conejita1988" />
+              </label>
+            </div>
+
+            <div class="checks">
+              <label class="check">
+                <input id="manualLogin" type="checkbox" checked />
+                <span>
+                  <strong>Login manual</strong>
+                  Usa una ventana visible para que tú hagas el login y el extractor guarde la sesión.
+                </span>
+              </label>
+
+              <label class="check">
+                <input id="headed" type="checkbox" checked />
+                <span>
+                  <strong>Navegador visible</strong>
+                  Deja Chromium abierto en pantalla mientras corre la extracción.
+                </span>
+              </label>
+
+              <label class="check">
+                <input id="force" type="checkbox" />
+                <span>
+                  <strong>Forzar relectura</strong>
+                  Relee perfiles aunque ya estén marcados como procesados en el state.
+                </span>
+              </label>
+
+              <label class="check">
+                <input id="overwriteAssets" type="checkbox" />
+                <span>
+                  <strong>Sobrescribir carpeta local si ya existe</strong>
+                  Si no está marcado, el extractor salta ese perfil localmente y no pisa sus archivos.
+                </span>
+              </label>
+            </div>
+
+            <div class="actions">
+              <button type="submit">Iniciar Extracción</button>
+              <button type="button" class="secondary" id="refresh-button">Actualizar Estado</button>
+              <button type="button" class="danger" id="stop-button">Detener</button>
+            </div>
+          </form>
+
+          <div class="hint">
+            Consejo: si usas una URL de perfil puntual, la página inicial/final queda solo como respaldo visual; el extractor prioriza ese perfil.
+          </div>
+        </section>
+
+        <section class="panel status-card">
+          <h2>Estado y Log</h2>
+          <div id="status-pill" class="pill"><span class="dot"></span><span id="status-text">idle</span></div>
+          <div class="meta" id="meta"></div>
+          <pre id="logs">Esperando una corrida...</pre>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      const form = document.getElementById('extract-form')
+      const logs = document.getElementById('logs')
+      const statusText = document.getElementById('status-text')
+      const statusPill = document.getElementById('status-pill')
+      const meta = document.getElementById('meta')
+      const stopButton = document.getElementById('stop-button')
+      const refreshButton = document.getElementById('refresh-button')
+
+      function formPayload() {
+        return {
+          listUrlTemplate: document.getElementById('listUrlTemplate').value,
+          profileUrl: document.getElementById('profileUrl').value,
+          pageStart: document.getElementById('pageStart').value,
+          pageEnd: document.getElementById('pageEnd').value,
+          maxProfiles: document.getElementById('maxProfiles').value,
+          delayMs: document.getElementById('delayMs').value,
+          mediaDelayMs: document.getElementById('mediaDelayMs').value,
+          excludeUsernames: document.getElementById('excludeUsernames').value,
+          manualLogin: document.getElementById('manualLogin').checked,
+          headed: document.getElementById('headed').checked,
+          force: document.getElementById('force').checked,
+          overwriteAssets: document.getElementById('overwriteAssets').checked,
+        }
+      }
+
+      async function fetchStatus() {
+        const response = await fetch('/api/status')
+        const data = await response.json()
+        renderStatus(data)
+      }
+
+      function renderStatus(data) {
+        statusText.textContent = data.status || 'idle'
+        statusPill.className = `pill ${data.status || 'idle'}`
+
+        const bits = []
+        if (data.pid) bits.push(`PID: ${data.pid}`)
+        if (data.startedAt) bits.push(`Inicio: ${new Date(data.startedAt).toLocaleString()}`)
+        if (data.finishedAt) bits.push(`Fin: ${new Date(data.finishedAt).toLocaleString()}`)
+        if (data.lastExitCode !== null) bits.push(`Exit code: ${data.lastExitCode}`)
+        if (Array.isArray(data.command) && data.command.length) {
+          bits.push(`Comando: ${data.command.join(' ')}`)
+        }
+        meta.innerHTML = bits.map((bit) => `<div>${bit}</div>`).join('')
+        logs.textContent = (data.logs || []).join('\n') || 'Sin logs todavía.'
+        logs.scrollTop = logs.scrollHeight
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        const response = await fetch('/api/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formPayload()),
+        })
+        const data = await response.json()
+        renderStatus(data)
+      })
+
+      stopButton.addEventListener('click', async () => {
+        const response = await fetch('/api/stop', { method: 'POST' })
+        const data = await response.json()
+        renderStatus(data)
+      })
+
+      refreshButton.addEventListener('click', fetchStatus)
+
+      fetchStatus()
+      setInterval(fetchStatus, 1500)
+    </script>
+  </body>
+</html>

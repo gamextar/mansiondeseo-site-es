@@ -28,7 +28,7 @@ Opciones:
   --state <path>                 Archivo de estado incremental
   --output <path>                Manifest JSON de salida
   --assets-dir <path>            Carpeta donde guardar fotos/videos descargados
-  --list-url-template <url>      URL de listados con {page}. Default: https://contactossex.com/members?page={page}
+  --list-url-template <url>      URL de listados con {page}. Default: https://contactossex.com/members/search?page={page}
   --page-start <n>               Página inicial
   --page-end <n>                 Página final
   --max-profiles <n>             Máximo de perfiles a extraer en esta corrida
@@ -36,6 +36,8 @@ Opciones:
   --exclude-usernames <csv>      Usernames a excluir del manifest/listado
   --force                        Reextrae perfiles aunque ya estén marcados en el state
   --delay-ms <n>                 Espera entre perfiles/páginas
+  --media-delay-ms <n>           Espera entre descargas de fotos/videos
+  --overwrite-assets             Si la carpeta local del perfil existe, la reemplaza
   --fresh-session                Ignora la sesión guardada y obliga nuevo login
   --help                         Muestra esta ayuda
 `)
@@ -73,8 +75,10 @@ const pageStart = Number.parseInt(takeFlag('--page-start', '1'), 10)
 const pageEnd = Number.parseInt(takeFlag('--page-end', String(pageStart)), 10)
 const maxProfiles = Number.parseInt(takeFlag('--max-profiles', '0'), 10)
 const delayMs = Number.parseInt(takeFlag('--delay-ms', '1200'), 10)
-const listUrlTemplate = takeFlag('--list-url-template', 'https://contactossex.com/members?page={page}')
+const mediaDelayMs = Number.parseInt(takeFlag('--media-delay-ms', '350'), 10)
+const listUrlTemplate = takeFlag('--list-url-template', 'https://contactossex.com/members/search?page={page}')
 const profileUrl = takeFlag('--profile-url', '')
+const overwriteAssets = hasFlag('--overwrite-assets')
 const excludedUsernames = new Set(
   String(takeFlag('--exclude-usernames', '') || '')
     .split(',')
@@ -95,6 +99,10 @@ if (rawArgs.length > 0) {
 
 async function ensureDir(dirPath) {
   await fs.mkdir(dirPath, { recursive: true })
+}
+
+async function removeDir(dirPath) {
+  await fs.rm(dirPath, { recursive: true, force: true })
 }
 
 async function readJson(filePath, fallback) {
@@ -511,6 +519,7 @@ async function downloadFile(requestContext, fileUrl, destinationPath) {
   const buffer = Buffer.from(await response.body())
   await ensureDir(path.dirname(destinationPath))
   await fs.writeFile(destinationPath, buffer)
+  if (mediaDelayMs > 0) await delay(mediaDelayMs)
 }
 
 async function inferRemoteExtension(requestContext, fileUrl) {
@@ -526,6 +535,17 @@ function manifestRelativePath(filePath) {
 async function materializeProfileAssets(profile, requestContext) {
   const usernameSlug = slugifySegment(profile.username, profile.userId || 'user')
   const userDir = path.join(assetsDir, usernameSlug)
+  const userDirExists = existsSync(userDir)
+  const userDirHasFiles = userDirExists ? (await fs.readdir(userDir)).length > 0 : false
+  if (userDirHasFiles && !overwriteAssets) {
+    return {
+      skipped: true,
+      userDir,
+    }
+  }
+  if (userDirExists && overwriteAssets) {
+    await removeDir(userDir)
+  }
   await ensureDir(userDir)
 
   const avatar = profile.media.find((item) => item.kind === 'avatar') || null
@@ -566,6 +586,8 @@ async function materializeProfileAssets(profile, requestContext) {
   }
 
   return {
+    skipped: false,
+    userDir,
     avatarPath,
     photoPaths,
     photoLikes,
@@ -677,6 +699,18 @@ async function main() {
       }
 
       const assets = await materializeProfileAssets(profile, context.request)
+      if (assets.skipped) {
+        console.log(`Saltando assets existentes para ${profile.username}: ${assets.userDir}`)
+        state.processedProfiles[url] = {
+          username: profile.username,
+          userId: profile.userId || '',
+          skipped: true,
+          reason: 'existing_assets_dir',
+          at: new Date().toISOString(),
+        }
+        await writeJson(statePath, state)
+        continue
+      }
       const manifestProfile = toManifestProfile(profile, assets)
       upsertManifestProfile(manifest, manifestProfile)
 
