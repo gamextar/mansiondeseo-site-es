@@ -119,6 +119,20 @@ function buildArgs(config) {
   return args
 }
 
+function buildChildEnv(jobType, config) {
+  const env = { ...process.env }
+
+  if (jobType === 'extract') {
+    const loginUsername = stringValue(config.loginUsername, '')
+    const loginPassword = typeof config.loginPassword === 'string' ? config.loginPassword : ''
+    if (loginUsername) env.CONTACTOSSEX_LOGIN_USERNAME = loginUsername
+    if (loginPassword) env.CONTACTOSSEX_LOGIN_PASSWORD = loginPassword
+    if (boolValue(config.saveLoginCreds, false)) env.CONTACTOSSEX_SAVE_LOGIN_CREDS = '1'
+  }
+
+  return env
+}
+
 function buildImportArgs(config) {
   const args = [importerScript]
   const manifestPath = stringValue(config.manifestPath, '')
@@ -205,6 +219,7 @@ function startProcess(jobType, argsBuilder, config) {
 
   activeChild = spawn(process.execPath, activeCommand.slice(1), {
     cwd: repoRoot,
+    env: buildChildEnv(jobType, config),
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 

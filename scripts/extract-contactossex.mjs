@@ -32,6 +32,10 @@ Opciones:
   --batch-dir <path>             Carpeta donde guardar manifests por corrida
   --batch-name <name>            Nombre del batch actual; si falta, se genera uno automáticamente
   --no-batch-output              Desactiva la escritura del manifest separado por batch
+  --login-username <value>       Username para re-login automático
+  --login-password <value>       Password para re-login automático
+  --login-creds-file <path>      Archivo local donde guardar/leer credenciales
+  --save-login-creds             Guarda las credenciales localmente para futuros re-logins
   --assets-dir <path>            Carpeta donde guardar fotos/videos descargados
   --list-url-template <url>      URL de listados con {page}. Default: https://contactossex.com/members/search?page={page}
   --page-start <n>               Página inicial
@@ -90,6 +94,7 @@ const listUrlTemplate = takeFlag('--list-url-template', 'https://contactossex.co
 const profileUrl = takeFlag('--profile-url', '')
 const overwriteAssets = hasFlag('--overwrite-assets')
 const noBatchOutput = hasFlag('--no-batch-output')
+const saveLoginCreds = hasFlag('--save-login-creds') || String(process.env.CONTACTOSSEX_SAVE_LOGIN_CREDS || '') === '1'
 const excludedUsernames = new Set(
   String(takeFlag('--exclude-usernames', '') || '')
     .split(',')
@@ -105,6 +110,12 @@ const statePath = path.resolve(repoRoot, takeFlag('--state', './data/contactosse
 const outputPath = path.resolve(repoRoot, takeFlag('--output', './data/contactossex-placeholders.json'))
 const batchDir = path.resolve(repoRoot, takeFlag('--batch-dir', './data/contactossex-batches'))
 const requestedBatchName = takeFlag('--batch-name', '')
+const loginCredsPath = path.resolve(
+  repoRoot,
+  takeFlag('--login-creds-file', process.env.CONTACTOSSEX_LOGIN_CREDS_FILE || './data/contactossex-login.json')
+)
+const providedLoginUsername = takeFlag('--login-username', process.env.CONTACTOSSEX_LOGIN_USERNAME || '')
+const providedLoginPassword = takeFlag('--login-password', process.env.CONTACTOSSEX_LOGIN_PASSWORD || '')
 const assetsDir = path.resolve(repoRoot, takeFlag('--assets-dir', './data/contactossex-assets'))
 const headless = explicitHeadless ? true : !headed && !manualLogin
 const batchOutputEnabled = !noBatchOutput
@@ -136,6 +147,30 @@ async function readJson(filePath, fallback) {
 async function writeJson(filePath, value) {
   await ensureDir(path.dirname(filePath))
   await fs.writeFile(filePath, JSON.stringify(value, null, 2))
+}
+
+async function loadLoginCredentials() {
+  const username = String(providedLoginUsername || '').trim()
+  const password = String(providedLoginPassword || '')
+
+  if (username && password) {
+    const creds = { username, password }
+    if (saveLoginCreds) {
+      await writeJson(loginCredsPath, creds)
+      console.log(`Credenciales guardadas en ${loginCredsPath}`)
+    }
+    return creds
+  }
+
+  const stored = await readJson(loginCredsPath, null)
+  if (stored?.username && stored?.password) {
+    return {
+      username: String(stored.username).trim(),
+      password: String(stored.password),
+    }
+  }
+
+  return null
 }
 
 function slugifySegment(value, fallback = 'profile') {
@@ -405,13 +440,52 @@ async function waitForManualLogin(page, context) {
   console.log(`Sesión guardada en ${sessionPath}`)
 }
 
+async function attemptAutoLogin(page, context, credentials) {
+  if (!credentials?.username || !credentials?.password) return false
+
+  console.log('Intentando login automático con credenciales guardadas...')
+  await page.goto('https://contactossex.com', { waitUntil: 'domcontentloaded' })
+
+  try {
+    await page.waitForSelector('#username', { timeout: 8000 })
+    await page.fill('#username', credentials.username)
+    await page.fill('#password', credentials.password)
+    await Promise.allSettled([
+      page.waitForLoadState('domcontentloaded', { timeout: 15000 }),
+      page.click('#btn-login'),
+    ])
+
+    const timeoutMs = 30000
+    const startedAt = Date.now()
+    while (Date.now() - startedAt < timeoutMs) {
+      if (await pageLooksAuthenticated(page)) {
+        await ensureDir(path.dirname(sessionPath))
+        await context.storageState({ path: sessionPath })
+        console.log(`Sesión guardada en ${sessionPath}`)
+        return true
+      }
+      await delay(1000)
+    }
+  } catch {
+    // fall through to manual login
+  }
+
+  console.log('No se pudo completar el login automático; vuelvo a login manual.')
+  return false
+}
+
 async function ensureAuthenticated(page, context) {
+  const credentials = await loadLoginCredentials()
   await page.goto('https://contactossex.com', { waitUntil: 'domcontentloaded' })
   await delay(1200)
   if (!freshSession && existsSync(sessionPath)) {
     await page.goto(listUrlTemplate.replace('{page}', '1'), { waitUntil: 'domcontentloaded' })
     await delay(1200)
     if (await pageLooksAuthenticated(page)) return
+  }
+
+  if (await attemptAutoLogin(page, context, credentials)) {
+    return
   }
 
   console.log('\nLogin manual requerido.')

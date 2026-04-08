@@ -346,7 +346,26 @@
               </label>
             </div>
 
+            <div class="row-2">
+              <label>
+                Usuario de la cuenta
+                <input id="loginUsername" autocomplete="username" placeholder="Solo para re-login automático" />
+              </label>
+              <label>
+                Password de la cuenta
+                <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Se guarda solo si marcas la opción" />
+              </label>
+            </div>
+
             <div class="checks">
+              <label class="check">
+                <input id="saveLoginCreds" type="checkbox" />
+                <span>
+                  <strong>Guardar credenciales localmente</strong>
+                  Las guarda en <code>data/</code> para que el extractor intente reloguearse solo si la sesión vence.
+                </span>
+              </label>
+
               <label class="check">
                 <input id="batchOutput" type="checkbox" checked />
                 <span>
@@ -500,6 +519,8 @@
           profileUrl: document.getElementById('profileUrl').value,
           batchName: document.getElementById('batchName').value,
           batchDir: document.getElementById('batchDir').value,
+          loginUsername: document.getElementById('loginUsername').value,
+          loginPassword: document.getElementById('loginPassword').value,
           pageStart: document.getElementById('pageStart').value,
           pageEnd: document.getElementById('pageEnd').value,
           maxProfiles: document.getElementById('maxProfiles').value,
@@ -508,6 +529,7 @@
           delayMs: document.getElementById('delayMs').value,
           mediaDelayMs: document.getElementById('mediaDelayMs').value,
           excludeUsernames: document.getElementById('excludeUsernames').value,
+          saveLoginCreds: document.getElementById('saveLoginCreds').checked,
           batchOutput: document.getElementById('batchOutput').checked,
           manualLogin: document.getElementById('manualLogin').checked,
           useChrome: document.getElementById('useChrome').checked,
