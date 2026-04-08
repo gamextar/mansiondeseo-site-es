@@ -592,6 +592,10 @@ function manifestRelativePath(filePath) {
   return path.relative(path.dirname(outputPath), filePath)
 }
 
+function isVideoExtension(ext) {
+  return ['mp4', 'webm', 'mov', 'm4v'].includes(String(ext || '').toLowerCase())
+}
+
 async function profileAssetDirHasFiles(username, fallbackId = '') {
   const usernameSlug = slugifySegment(username, fallbackId || 'user')
   const userDir = path.join(assetsDir, usernameSlug)
@@ -619,12 +623,7 @@ async function materializeProfileAssets(profile, requestContext) {
   await ensureDir(userDir)
 
   const avatar = profile.media.find((item) => item.kind === 'avatar') || null
-  const gallery = profile.media
-    .filter((item) => item.kind === 'gallery' && item.type === 'image')
-    .slice(0, Math.max(0, maxPhotos))
-  const stories = profile.media
-    .filter((item) => item.type === 'video')
-    .slice(0, Math.max(0, maxVideos))
+  const mediaItems = profile.media.filter((item) => item.kind !== 'avatar')
 
   let avatarPath = ''
   if (avatar?.url) {
@@ -636,23 +635,24 @@ async function materializeProfileAssets(profile, requestContext) {
 
   const photoPaths = []
   const photoLikes = []
-  for (let index = 0; index < gallery.length; index += 1) {
-    const item = gallery[index]
+  const storyVideoPaths = []
+
+  for (const item of mediaItems) {
     const ext = await inferRemoteExtension(requestContext, item.url)
-    const absolute = path.join(userDir, `photo-${String(index + 1).padStart(2, '0')}.${ext}`)
+    if (isVideoExtension(ext)) {
+      if (storyVideoPaths.length >= Math.max(0, maxVideos)) continue
+      const suffix = storyVideoPaths.length === 0 ? '' : `-${String(storyVideoPaths.length + 1).padStart(2, '0')}`
+      const absolute = path.join(userDir, `story${suffix}.${ext}`)
+      await downloadFile(requestContext, item.url, absolute)
+      storyVideoPaths.push(manifestRelativePath(absolute))
+      continue
+    }
+
+    if (photoPaths.length >= Math.max(0, maxPhotos)) continue
+    const absolute = path.join(userDir, `photo-${String(photoPaths.length + 1).padStart(2, '0')}.${ext}`)
     await downloadFile(requestContext, item.url, absolute)
     photoPaths.push(manifestRelativePath(absolute))
     photoLikes.push(Number.isFinite(Number(item.likes)) ? Number(item.likes) : 0)
-  }
-
-  const storyVideoPaths = []
-  for (let index = 0; index < stories.length; index += 1) {
-    const item = stories[index]
-    const ext = await inferRemoteExtension(requestContext, item.url)
-    const suffix = index === 0 ? '' : `-${String(index + 1).padStart(2, '0')}`
-    const absolute = path.join(userDir, `story${suffix}.${ext}`)
-    await downloadFile(requestContext, item.url, absolute)
-    storyVideoPaths.push(manifestRelativePath(absolute))
   }
 
   return {
