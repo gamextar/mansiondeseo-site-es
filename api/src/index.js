@@ -2738,6 +2738,10 @@ async function handleUpdateProfile(request, env) {
     .bind(...values).run();
 
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first();
+  if (user) {
+    setCachedViewer(auth.sub, user);
+    setCachedFullUser(auth.sub, user);
+  }
   return json({ user: sanitizeUser(user, env) });
 }
 

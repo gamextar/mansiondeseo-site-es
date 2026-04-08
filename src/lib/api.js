@@ -704,6 +704,14 @@ export function invalidateProfilesCache() {
   }
 }
 
+function markFeedDirty() {
+  invalidateProfilesCache();
+  try {
+    sessionStorage.setItem('mansion_feed_dirty', '1');
+    sessionStorage.removeItem('mansion_feed');
+  } catch {}
+}
+
 export async function getProfile(id) {
   return sharedGet(`profile:${id}`, () => apiFetch__getProfile(id), { ttlMs: 2 * 60_000 });
 }
@@ -736,6 +744,21 @@ export async function updateProfile(fields) {
         user: { ...(currentDashboard.user || {}), ...data.user },
       });
     }
+  }
+  const touchesBrowseState = [
+    'role',
+    'seeking',
+    'interests',
+    'country',
+    'city',
+    'province',
+    'locality',
+    'premium',
+    'ghost_mode',
+  ].some((key) => Object.prototype.hasOwnProperty.call(fields || {}, key));
+
+  if (touchesBrowseState) {
+    markFeedDirty();
   }
   return data;
 }
