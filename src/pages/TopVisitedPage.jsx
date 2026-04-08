@@ -5,6 +5,13 @@ import { getTopVisitedProfiles } from '../lib/api';
 import { formatLocation } from '../lib/location';
 import AvatarImg from '../components/AvatarImg';
 
+const RANKING_FILTERS = [
+  { id: 'all', label: 'Todo' },
+  { id: 'mujeres', label: 'Mujeres' },
+  { id: 'hombres', label: 'Hombres' },
+  { id: 'parejas', label: 'Parejas' },
+];
+
 function rankAccent(rank) {
   if (rank === 1) return 'from-[#f3ddaa] via-mansion-gold to-[#8c6b1f]';
   if (rank === 2) return 'from-slate-200 via-slate-400 to-slate-600';
@@ -102,6 +109,7 @@ function RankCard({ profile, compact = false }) {
 
 export default function TopVisitedPage() {
   const [profiles, setProfiles] = useState([]);
+  const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -110,7 +118,7 @@ export default function TopVisitedPage() {
     setLoading(true);
     setError('');
 
-    getTopVisitedProfiles(100)
+    getTopVisitedProfiles(100, filter)
       .then((data) => {
         if (cancelled) return;
         setProfiles(data?.profiles || []);
@@ -126,7 +134,7 @@ export default function TopVisitedPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [filter]);
 
   const podium = profiles.slice(0, 3);
   const rest = profiles.slice(3);
@@ -159,6 +167,25 @@ export default function TopVisitedPage() {
                 tráfico real del sitio
               </span>
             </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {RANKING_FILTERS.map((option) => {
+                const active = filter === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setFilter(option.id)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                      active
+                        ? 'border-mansion-gold/30 bg-mansion-gold/12 text-mansion-gold'
+                        : 'border-mansion-border/20 bg-black/20 text-text-dim hover:border-mansion-gold/18 hover:text-text-primary'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -176,8 +203,8 @@ export default function TopVisitedPage() {
               <section className="mt-8">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-mansion-gold" />
-                  <h2 className="text-lg font-semibold text-text-primary">Podio</h2>
+                    <Trophy className="h-5 w-5 text-mansion-gold" />
+                    <h2 className="text-lg font-semibold text-text-primary">Podio</h2>
                   </div>
                   <p className="text-[11px] uppercase tracking-[0.2em] text-text-dim">Los más vistos ahora</p>
                 </div>

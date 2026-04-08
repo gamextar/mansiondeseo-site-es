@@ -2845,9 +2845,16 @@ async function handleGetTopVisitedProfiles(request, env) {
 
   const url = new URL(request.url);
   const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '100', 10)));
+  const filter = String(url.searchParams.get('filter') || 'all').trim().toLowerCase();
+  const roleValues = (
+    filter === 'mujeres' ? ['mujer']
+      : filter === 'hombres' ? ['hombre']
+        : filter === 'parejas' ? PAIR_ROLE_IDS
+          : []
+  );
 
-  const { results } = await env.DB.prepare(
-    `SELECT
+  let query = `
+    SELECT
         u.id,
         u.username,
         u.age,
@@ -2867,11 +2874,25 @@ async function handleGetTopVisitedProfiles(request, env) {
      FROM profile_stats ps
      JOIN users u ON u.id = ps.user_id
      WHERE u.status = 'verified'
+  `;
+  const bindings = [];
+
+  if (roleValues.length > 0) {
+    query += ` AND u.role IN (${roleValues.map(() => '?').join(', ')})`;
+    bindings.push(...roleValues);
+  }
+
+  query += `
      ORDER BY ps.visits_total DESC, ps.updated_at DESC
-     LIMIT ?`
-  ).bind(limit).all();
+     LIMIT ?`;
+  bindings.push(limit);
+
+  const { results } = await env.DB.prepare(
+    query
+  ).bind(...bindings).all();
 
   return json({
+    filter,
     profiles: (results || []).map((u, index) => ({
       rank: index + 1,
       id: u.id,

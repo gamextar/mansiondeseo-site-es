@@ -927,9 +927,16 @@ export async function getVisits() {
   return sharedGet('visits', () => apiFetch('/visits'), { ttlMs: 10 * 60_000 });
 }
 
-export async function getTopVisitedProfiles(limit = 100) {
+export async function getTopVisitedProfiles(limit = 100, filter = 'all') {
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 100));
-  return sharedGet(`topVisited:${safeLimit}`, () => apiFetch(`/rankings/top-visited?limit=${safeLimit}`), { ttlMs: 10 * 60_000 });
+  const safeFilter = ['all', 'mujeres', 'hombres', 'parejas'].includes(String(filter || '').toLowerCase())
+    ? String(filter || 'all').toLowerCase()
+    : 'all';
+  return sharedGet(
+    `topVisited:${safeFilter}:${safeLimit}`,
+    () => apiFetch(`/rankings/top-visited?limit=${safeLimit}&filter=${encodeURIComponent(safeFilter)}`),
+    { ttlMs: 10 * 60_000 }
+  );
 }
 
 // ── Gifts & Coins ───────────────────────────────────────
