@@ -21,11 +21,20 @@ let lastExitCode = null
 let lastStatus = 'idle'
 let startedAt = null
 let finishedAt = null
+let lastSummary = null
 
 function appendLog(line) {
   const text = String(line || '').replace(/\r/g, '')
   for (const part of text.split('\n')) {
     if (!part) continue
+    if (part.startsWith('__SUMMARY__ ')) {
+      try {
+        lastSummary = JSON.parse(part.slice('__SUMMARY__ '.length))
+      } catch {
+        // ignore malformed summary lines and keep normal logs flowing
+      }
+      continue
+    }
     logBuffer.push(`[${new Date().toISOString()}] ${part}`)
   }
   if (logBuffer.length > 1000) {
@@ -42,6 +51,7 @@ function currentStatus() {
     finishedAt,
     lastExitCode,
     command: activeCommand,
+    summary: lastSummary,
     logs: logBuffer.slice(-300),
   }
 }
@@ -134,6 +144,7 @@ function startExtraction(config) {
   logBuffer = []
   lastExitCode = null
   lastStatus = 'running'
+  lastSummary = null
   startedAt = new Date().toISOString()
   finishedAt = null
 

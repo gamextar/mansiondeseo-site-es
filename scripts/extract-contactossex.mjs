@@ -799,12 +799,19 @@ async function main() {
     }
 
     let processedThisRun = 0
+    let skippedThisRun = 0
+    let skippedMissingUsername = 0
+    let skippedExcludedUsername = 0
+    let skippedExistingAssets = 0
+    let skippedExistingKnownProfile = 0
     for (const url of urls) {
       if (maxProfiles > 0 && processedThisRun >= maxProfiles) break
       if (!force && !overwriteAssets) {
         const knownProfile = state.processedProfiles[url]
         if (knownProfile?.username && await profileAssetDirHasFiles(knownProfile.username, knownProfile.userId || '')) {
           console.log(`Saltando perfil con carpeta existente: ${knownProfile.username} (${url})`)
+          skippedThisRun += 1
+          skippedExistingKnownProfile += 1
           continue
         }
       }
@@ -815,6 +822,8 @@ async function main() {
         console.log(`Saltado: no se pudo leer username en ${url}`)
         state.processedProfiles[url] = { skipped: true, reason: 'missing_username', at: new Date().toISOString() }
         await writeJson(statePath, state)
+        skippedThisRun += 1
+        skippedMissingUsername += 1
         continue
       }
       if (excludedUsernames.has(String(profile.username || '').trim().toLowerCase())) {
@@ -826,6 +835,8 @@ async function main() {
           at: new Date().toISOString(),
         }
         await writeJson(statePath, state)
+        skippedThisRun += 1
+        skippedExcludedUsername += 1
         continue
       }
 
@@ -840,6 +851,8 @@ async function main() {
           at: new Date().toISOString(),
         }
         await writeJson(statePath, state)
+        skippedThisRun += 1
+        skippedExistingAssets += 1
         continue
       }
       const manifestProfile = toManifestProfile(profile, assets)
@@ -859,6 +872,19 @@ async function main() {
     }
 
     await context.storageState({ path: sessionPath })
+    console.log(
+      `__SUMMARY__ ${JSON.stringify({
+        discoveredProfiles: urls.length,
+        downloadedProfiles: processedThisRun,
+        skippedProfiles: skippedThisRun,
+        skippedBreakdown: {
+          existingKnownProfile: skippedExistingKnownProfile,
+          existingAssetsDir: skippedExistingAssets,
+          excludedUsername: skippedExcludedUsername,
+          missingUsername: skippedMissingUsername,
+        },
+      })}`
+    )
     console.log(`\nListo. Manifest: ${outputPath}`)
     console.log(`Assets: ${assetsDir}`)
     console.log(`Estado: ${statePath}`)
