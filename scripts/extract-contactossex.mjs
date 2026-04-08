@@ -303,10 +303,16 @@ async function extractProfileData(page, requestContext, url) {
     const mainPictureLink = document.querySelector('a[data-fancybox="gallery"][href*="/members/picture-zoom"]')
     const mainPictureStyle = document.querySelector('.main-picture')?.getAttribute('style') || ''
     const backgroundMatch = mainPictureStyle.match(/url\((["']?)(.*?)\1\)/i)
-    const galleryItems = Array.from(document.querySelectorAll('.card-multimedia a[href*="/members/picture-zoom"]')).map((anchor) => ({
-      href: anchor.href,
-      thumb: anchor.querySelector('img')?.src || '',
-    }))
+    const galleryItems = Array.from(document.querySelectorAll('.card-multimedia-parent')).map((card) => {
+      const anchor = card.querySelector('a[href*="/members/picture-zoom"]')
+      const likesText = clean(card.querySelector('.ranking-heart span')?.textContent || '')
+      const likes = Number.parseInt(likesText.replace(/[^\d]/g, ''), 10)
+      return {
+        href: anchor?.href || '',
+        thumb: anchor?.querySelector('img')?.src || '',
+        likes: Number.isFinite(likes) ? likes : 0,
+      }
+    }).filter((item) => item.href || item.thumb)
 
     return {
       url: window.location.href,
@@ -346,6 +352,7 @@ async function extractProfileData(page, requestContext, url) {
       zoomUrl: item.href,
       fallbackUrl: item.thumb,
       kind: 'gallery',
+      likes: item.likes || 0,
     })
   }
 
@@ -399,6 +406,7 @@ async function extractProfileData(page, requestContext, url) {
         url: chosenUrl,
         type: chosenType,
         kind: ref.kind,
+        likes: ref.likes || 0,
       })
       seenMediaUrls.add(chosenUrl)
     } else if (fallback && !seenMediaUrls.has(fallback)) {
@@ -406,6 +414,7 @@ async function extractProfileData(page, requestContext, url) {
         url: fallback,
         type: fallback.match(/\.(mp4|webm|mov)(\?|$)/i) ? 'video' : 'image',
         kind: ref.kind,
+        likes: ref.likes || 0,
       })
       seenMediaUrls.add(fallback)
     }
@@ -465,12 +474,14 @@ async function materializeProfileAssets(profile, requestContext) {
   }
 
   const photoPaths = []
+  const photoLikes = []
   for (let index = 0; index < gallery.length; index += 1) {
     const item = gallery[index]
     const ext = await inferRemoteExtension(requestContext, item.url)
     const absolute = path.join(userDir, `photo-${String(index + 1).padStart(2, '0')}.${ext}`)
     await downloadFile(requestContext, item.url, absolute)
     photoPaths.push(manifestRelativePath(absolute))
+    photoLikes.push(Number.isFinite(Number(item.likes)) ? Number(item.likes) : 0)
   }
 
   let storyVideoPath = ''
@@ -485,6 +496,7 @@ async function materializeProfileAssets(profile, requestContext) {
   return {
     avatarPath,
     photoPaths,
+    photoLikes,
     storyVideoPath,
   }
 }
@@ -503,6 +515,7 @@ function toManifestProfile(profile, assets) {
     sexual_orientation: profile.sexual_orientation,
     avatarPath: assets.avatarPath || undefined,
     photoPaths: assets.photoPaths,
+    photoLikes: assets.photoLikes,
     storyVideoPath: assets.storyVideoPath || undefined,
   }
 }
