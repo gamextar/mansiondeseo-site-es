@@ -10,6 +10,7 @@ import { chromium } from 'playwright'
 
 const DEFAULT_MAX_PHOTOS_PER_PROFILE = 12
 const DEFAULT_MAX_VIDEOS_PER_PROFILE = 3
+const MEDIA_REQUEST_TIMEOUT_MS = 15000
 
 function printUsage() {
   console.log(`Uso:
@@ -732,17 +733,34 @@ async function extractProfileData(page, requestContext, url) {
 
 async function downloadFile(requestContext, fileUrl, destinationPath) {
   if (existsSync(destinationPath)) return
-  const response = await requestContext.get(fileUrl, { failOnStatusCode: true })
+  const response = await requestContext.get(fileUrl, {
+    failOnStatusCode: true,
+    timeout: MEDIA_REQUEST_TIMEOUT_MS,
+  })
   const buffer = Buffer.from(await response.body())
   await ensureDir(path.dirname(destinationPath))
   await fs.writeFile(destinationPath, buffer)
   if (mediaDelayMs > 0) await delay(mediaDelayMs)
 }
 
-async function inferRemoteExtension(requestContext, fileUrl) {
-  const response = await requestContext.get(fileUrl, { failOnStatusCode: false })
-  const contentType = String(response.headers()['content-type'] || '').toLowerCase()
-  return pickExtension(fileUrl, contentType)
+function fallbackExtensionForType(mediaType) {
+  return mediaType === 'video' ? 'mp4' : 'webp'
+}
+
+async function inferRemoteExtension(requestContext, fileUrl, mediaType = 'image') {
+  try {
+    const response = await requestContext.get(fileUrl, {
+      failOnStatusCode: false,
+      timeout: MEDIA_REQUEST_TIMEOUT_MS,
+    })
+    const contentType = String(response.headers()['content-type'] || '').toLowerCase()
+    const inferred = pickExtension(fileUrl, contentType)
+    return inferred === 'bin' ? fallbackExtensionForType(mediaType) : inferred
+  } catch (error) {
+    const fallback = fallbackExtensionForType(mediaType)
+    console.log(`Aviso: timeout/extensión no resuelta para ${fileUrl}; usando .${fallback}`)
+    return fallback
+  }
 }
 
 function manifestRelativePath(filePath) {
@@ -784,10 +802,14 @@ async function materializeProfileAssets(profile, requestContext) {
 
   let avatarPath = ''
   if (avatar?.url) {
-    const ext = await inferRemoteExtension(requestContext, avatar.url)
-    const absolute = path.join(userDir, `avatar.${ext}`)
-    await downloadFile(requestContext, avatar.url, absolute)
-    avatarPath = manifestRelativePath(absolute)
+    try {
+      const ext = await inferRemoteExtension(requestContext, avatar.url, avatar.type || 'image')
+      const absolute = path.join(userDir, `avatar.${ext}`)
+      await downloadFile(requestContext, avatar.url, absolute)
+      avatarPath = manifestRelativePath(absolute)
+    } catch (error) {
+      console.log(`Aviso: no pude bajar avatar de ${profile.username}: ${error?.message || error}`)
+    }
   }
 
   const photoPaths = []
@@ -796,22 +818,26 @@ async function materializeProfileAssets(profile, requestContext) {
   const storyVideoLikes = []
 
   for (const item of mediaItems) {
-    const ext = await inferRemoteExtension(requestContext, item.url)
-    if (isVideoExtension(ext)) {
-      if (storyVideoPaths.length >= Math.max(0, maxVideos)) continue
-      const suffix = storyVideoPaths.length === 0 ? '' : `-${String(storyVideoPaths.length + 1).padStart(2, '0')}`
-      const absolute = path.join(userDir, `story${suffix}.${ext}`)
-      await downloadFile(requestContext, item.url, absolute)
-      storyVideoPaths.push(manifestRelativePath(absolute))
-      storyVideoLikes.push(Number.isFinite(Number(item.likes)) ? Number(item.likes) : 0)
-      continue
-    }
+    try {
+      const ext = await inferRemoteExtension(requestContext, item.url, item.type || 'image')
+      if (isVideoExtension(ext)) {
+        if (storyVideoPaths.length >= Math.max(0, maxVideos)) continue
+        const suffix = storyVideoPaths.length === 0 ? '' : `-${String(storyVideoPaths.length + 1).padStart(2, '0')}`
+        const absolute = path.join(userDir, `story${suffix}.${ext}`)
+        await downloadFile(requestContext, item.url, absolute)
+        storyVideoPaths.push(manifestRelativePath(absolute))
+        storyVideoLikes.push(Number.isFinite(Number(item.likes)) ? Number(item.likes) : 0)
+        continue
+      }
 
-    if (photoPaths.length >= Math.max(0, maxPhotos)) continue
-    const absolute = path.join(userDir, `photo-${String(photoPaths.length + 1).padStart(2, '0')}.${ext}`)
-    await downloadFile(requestContext, item.url, absolute)
-    photoPaths.push(manifestRelativePath(absolute))
-    photoLikes.push(Number.isFinite(Number(item.likes)) ? Number(item.likes) : 0)
+      if (photoPaths.length >= Math.max(0, maxPhotos)) continue
+      const absolute = path.join(userDir, `photo-${String(photoPaths.length + 1).padStart(2, '0')}.${ext}`)
+      await downloadFile(requestContext, item.url, absolute)
+      photoPaths.push(manifestRelativePath(absolute))
+      photoLikes.push(Number.isFinite(Number(item.likes)) ? Number(item.likes) : 0)
+    } catch (error) {
+      console.log(`Aviso: saltando media de ${profile.username}: ${item.url} (${error?.message || error})`)
+    }
   }
 
   return {
