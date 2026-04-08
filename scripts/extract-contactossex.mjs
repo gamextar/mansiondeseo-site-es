@@ -583,6 +583,16 @@ function manifestRelativePath(filePath) {
   return path.relative(path.dirname(outputPath), filePath)
 }
 
+async function profileAssetDirHasFiles(username, fallbackId = '') {
+  const usernameSlug = slugifySegment(username, fallbackId || 'user')
+  const userDir = path.join(assetsDir, usernameSlug)
+  if (!existsSync(userDir)) {
+    return false
+  }
+  const entries = await fs.readdir(userDir)
+  return entries.length > 0
+}
+
 async function materializeProfileAssets(profile, requestContext) {
   const usernameSlug = slugifySegment(profile.username, profile.userId || 'user')
   const userDir = path.join(assetsDir, usernameSlug)
@@ -709,15 +719,11 @@ async function main() {
       urls.push(profileUrl)
     } else {
       for (let pageNo = pageStart; pageNo <= pageEnd; pageNo += 1) {
-        if (!force && state.processedPages.includes(pageNo)) {
-          console.log(`Saltando page ${pageNo} (ya procesada)`)
-          continue
-        }
         const listUrl = listUrlTemplate.replace('{page}', String(pageNo))
         console.log(`Leyendo listado ${listUrl}`)
         const links = await getProfileLinksFromList(page, listUrl)
         for (const link of links) {
-          if (force || !state.processedProfiles[link]) urls.push(link)
+          urls.push(link)
         }
         if (!state.processedPages.includes(pageNo)) state.processedPages.push(pageNo)
         await writeJson(statePath, state)
@@ -728,9 +734,12 @@ async function main() {
     let processedThisRun = 0
     for (const url of urls) {
       if (maxProfiles > 0 && processedThisRun >= maxProfiles) break
-      if (!force && state.processedProfiles[url]) {
-        console.log(`Saltando perfil ya procesado: ${url}`)
-        continue
+      if (!force && !overwriteAssets) {
+        const knownProfile = state.processedProfiles[url]
+        if (knownProfile?.username && await profileAssetDirHasFiles(knownProfile.username, knownProfile.userId || '')) {
+          console.log(`Saltando perfil con carpeta existente: ${knownProfile.username} (${url})`)
+          continue
+        }
       }
 
       console.log(`Extrayendo ${url}`)
