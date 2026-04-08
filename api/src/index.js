@@ -1744,9 +1744,10 @@ async function handleProfiles(request, env) {
   const url = new URL(request.url);
   const filter = url.searchParams.get('filter') || 'all';
   const search = url.searchParams.get('q') || '';
+  const fresh = url.searchParams.get('fresh') === '1';
 
   // Use cached viewer data when available to avoid a serial D1 round-trip
-  let viewer = getCachedViewer(auth.sub);
+  let viewer = fresh ? null : getCachedViewer(auth.sub);
   if (!viewer) {
     viewer = await env.DB.prepare('SELECT premium, premium_until, country, seeking, interests FROM users WHERE id = ?').bind(auth.sub).first();
     if (viewer) setCachedViewer(auth.sub, viewer);
@@ -1815,7 +1816,9 @@ async function handleProfiles(request, env) {
   // Parallel: cached settings + cached profiles + combined favorites + active stories
   const [settings, results, { results: allFavRows }, storyRows] = await Promise.all([
     cached('settings', 300_000, () => loadSettings(env)),  // 5 min
-    cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results)),  // 30s
+    fresh
+      ? env.DB.prepare(query).bind(...params).all().then(r => r.results)
+      : cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results)),  // 30s
     env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?').bind(auth.sub, auth.sub).all(),
     cached('active_story_users', 30_000, () => env.DB.prepare('SELECT DISTINCT user_id FROM stories WHERE active = 1').all().then(r => r.results).catch(() => [])),  // 30s
   ]);

@@ -60,7 +60,7 @@ export default function FeedPage() {
   const { user, siteSettings } = useAuth();
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
 
-  const loadProfiles = useCallback(({ silent = false } = {}) => {
+  const loadProfiles = useCallback(({ silent = false, forceFresh = false } = {}) => {
     const c = getCachedFeed();
     if (!silent && !c) setLoading(true);
     if (!silent && c) {
@@ -68,7 +68,7 @@ export default function FeedPage() {
       setViewerPremium(c.viewerPremium || false);
       if (c.settings) setSettings(c.settings);
     }
-    return getProfiles()
+    return getProfiles({ fresh: forceFresh })
       .then(data => {
         setProfiles(data.profiles || []);
         setViewerPremium(data.viewerPremium || false);
@@ -110,8 +110,10 @@ export default function FeedPage() {
     const onFocus = () => {
       if (sessionStorage.getItem('mansion_feed_dirty')) {
         sessionStorage.removeItem('mansion_feed_dirty');
+        const shouldForceFresh = sessionStorage.getItem('mansion_feed_force_refresh') === '1';
+        sessionStorage.removeItem('mansion_feed_force_refresh');
         sessionStorage.removeItem(FEED_CACHE_KEY);
-        loadProfiles();
+        loadProfiles({ forceFresh: shouldForceFresh });
         return;
       }
 

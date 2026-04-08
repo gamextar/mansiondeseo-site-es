@@ -686,13 +686,14 @@ export async function logout() {
 
 // ── Profiles ────────────────────────────────────────────
 
-export async function getProfiles({ filter, q } = {}) {
+export async function getProfiles({ filter, q, fresh = false } = {}) {
   const params = new URLSearchParams();
   if (filter && filter !== 'all') params.set('filter', filter);
   if (q) params.set('q', q);
+  if (fresh) params.set('fresh', '1');
   const qs = params.toString();
   // Search queries bypass cache (user expects fresh results), browse is cached longer.
-  if (q) return apiFetch(`/profiles${qs ? `?${qs}` : ''}`);
+  if (q || fresh) return apiFetch(`/profiles${qs ? `?${qs}` : ''}`);
   return sharedGet(`profiles:${filter || 'all'}`, () => apiFetch(`/profiles${qs ? `?${qs}` : ''}`), { ttlMs: 5 * 60_000 });
 }
 
@@ -708,6 +709,7 @@ function markFeedDirty() {
   invalidateProfilesCache();
   try {
     sessionStorage.setItem('mansion_feed_dirty', '1');
+    sessionStorage.setItem('mansion_feed_force_refresh', '1');
     sessionStorage.removeItem('mansion_feed');
   } catch {}
 }
