@@ -687,6 +687,7 @@ async function materializeProfileAssets(profile, requestContext) {
   const photoPaths = []
   const photoLikes = []
   const storyVideoPaths = []
+  const storyVideoLikes = []
 
   for (const item of mediaItems) {
     const ext = await inferRemoteExtension(requestContext, item.url)
@@ -696,6 +697,7 @@ async function materializeProfileAssets(profile, requestContext) {
       const absolute = path.join(userDir, `story${suffix}.${ext}`)
       await downloadFile(requestContext, item.url, absolute)
       storyVideoPaths.push(manifestRelativePath(absolute))
+      storyVideoLikes.push(Number.isFinite(Number(item.likes)) ? Number(item.likes) : 0)
       continue
     }
 
@@ -714,6 +716,7 @@ async function materializeProfileAssets(profile, requestContext) {
     photoLikes,
     storyVideoPath: storyVideoPaths[0] || '',
     storyVideoPaths,
+    storyVideoLikes,
   }
 }
 
@@ -739,6 +742,7 @@ function toManifestProfile(profile, assets) {
     photoLikes: assets.photoLikes,
     storyVideoPath: assets.storyVideoPath || undefined,
     storyVideoPaths: assets.storyVideoPaths,
+    storyVideoLikes: assets.storyVideoLikes,
   }
 }
 
