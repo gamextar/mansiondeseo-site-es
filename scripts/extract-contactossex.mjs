@@ -225,6 +225,24 @@ function parsePersonalInfo(raw) {
   }
 }
 
+function parseStats(raw) {
+  const normalized = String(raw || '').replace(/\s+/g, ' ').trim()
+  const [followersMatch, followingMatch, visitsMatch] = [
+    normalized.match(/([\d.,]+)\s+Seguidores/i),
+    normalized.match(/([\d.,]+)\s+Seguidos/i),
+    normalized.match(/([\d.,]+)\s+Visitas/i),
+  ]
+  const parseCount = (match) => {
+    const value = String(match?.[1] || '').replace(/[^\d]/g, '')
+    return value ? Number(value) : 0
+  }
+  return {
+    followers: parseCount(followersMatch),
+    following: parseCount(followingMatch),
+    visits: parseCount(visitsMatch),
+  }
+}
+
 function pickExtension(url, contentType = '') {
   const clean = String(url || '').split('?')[0].split('#')[0]
   const ext = path.extname(clean).replace('.', '').toLowerCase()
@@ -322,6 +340,7 @@ async function extractProfileData(page, requestContext, url) {
       premium: !!document.querySelector('.stripesGold'),
       personalInfo: textByHeading('Información Personal'),
       location: textByHeading('Ubicación'),
+      stats: textByHeading('Estadísticas'),
       seeking: textByHeading('Buscando'),
       bio: description,
       mainPictureHref: mainPictureLink?.href || '',
@@ -331,6 +350,7 @@ async function extractProfileData(page, requestContext, url) {
   })
 
   const personalInfo = parsePersonalInfo(extracted.personalInfo)
+  const stats = parseStats(extracted.stats)
 
   const locationParts = extracted.location
     .split(',')
@@ -429,6 +449,9 @@ async function extractProfileData(page, requestContext, url) {
     premium: !!extracted.premium,
     role: personalInfo.role,
     age: personalInfo.age,
+    followers: stats.followers,
+    following: stats.following,
+    visits: stats.visits,
     sexual_orientation: personalInfo.sexual_orientation,
     marital_status: personalInfo.marital_status,
     locality,
@@ -514,6 +537,9 @@ function toManifestProfile(profile, assets) {
     country: profile.country === 'Argentina' ? 'AR' : profile.country,
     bio: profile.bio,
     premium: !!profile.premium,
+    followers: Number.isFinite(Number(profile.followers)) ? Number(profile.followers) : 0,
+    following: Number.isFinite(Number(profile.following)) ? Number(profile.following) : 0,
+    visits: Number.isFinite(Number(profile.visits)) ? Number(profile.visits) : 0,
     marital_status: profile.marital_status,
     sexual_orientation: profile.sexual_orientation,
     avatarPath: assets.avatarPath || undefined,

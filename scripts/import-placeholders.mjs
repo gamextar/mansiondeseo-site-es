@@ -422,6 +422,11 @@ function validateProfile(profile) {
   if (seeking.length === 0 || seeking.some((value) => !validSeekingRoles.has(value))) {
     throw new Error(`seeking inválido en ${profile.username}`)
   }
+
+  const messageBlockRoles = ensureArray(profile.message_block_roles || profile.messageBlockRoles)
+  if (messageBlockRoles.some((value) => !validSeekingRoles.has(value))) {
+    throw new Error(`message_block_roles inválido en ${profile.username}`)
+  }
 }
 
 async function upsertProfile(profile, manifestDir) {
@@ -453,6 +458,7 @@ async function upsertProfile(profile, manifestDir) {
 
   const interests = ensureArray(profile.interests)
   const seeking = ensureArray(profile.seeking)
+  const messageBlockRoles = ensureArray(profile.message_block_roles || profile.messageBlockRoles)
   const premium = !!profile.premium
   const premiumUntil = premium ? (profile.premiumUntil || futureSql(365)) : null
   const lastActive = profile.lastActive || nowSql()
@@ -471,6 +477,7 @@ async function upsertProfile(profile, manifestDir) {
     username,
     role: profile.role,
     seeking: JSON.stringify(seeking),
+    message_block_roles: JSON.stringify(messageBlockRoles),
     interests: JSON.stringify(interests),
     age,
     birthdate: birthdate || null,
