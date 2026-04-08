@@ -448,7 +448,7 @@ async function upsertProfile(profile, manifestDir) {
     const actionLabel = dryRun ? '[dry-run] saltando existente' : 'Saltando existente'
     console.log(`\n${actionLabel} user ${username} (${existing.id})`)
     console.log(`  email: ${existing.email || email}`)
-    return { userId: existing.id, username, created: false, skipped: true }
+    return { userId: existing.id, username, created: false, updated: false, skipped: true, skippedExisting: true, storyImported: false }
   }
 
   const userId = existing?.id || profile.id || randomUUID()
@@ -514,6 +514,7 @@ async function upsertProfile(profile, manifestDir) {
   }
 
   const columns = Object.keys(baseFields)
+  const storySource = profile.storyVideoPath || null
 
   if (dryRun) {
     console.log(`\n[dry-run] ${existing ? 'update' : 'insert'} user ${username} (${userId})`)
@@ -521,6 +522,11 @@ async function upsertProfile(profile, manifestDir) {
     if (!explicitBirthdate && birthdate) console.log(`  birthdate estimada: ${birthdate}`)
     console.log(`  avatar: ${avatarUrl || '-'}`)
     console.log(`  photos: ${photoUrls.length}`)
+    const baseResult = { userId, username, created: !existing, updated: !!existing, skipped: false, skippedExisting: false, storyImported: false }
+    if (!storySource) return baseResult
+    const storyUrl = await resolveMediaReference(manifestDir, username, storySource, 'story')
+    console.log(`  story: ${storyUrl}`)
+    return { ...baseResult, storyImported: !!storyUrl }
   } else if (existing) {
     const updates = columns.map((column) => `${column} = ${sql(baseFields[column])}`).join(',\n      ')
     executeSql(`
@@ -542,16 +548,10 @@ async function upsertProfile(profile, manifestDir) {
     console.log(`Creado user ${username} (${userId})`)
   }
 
-  const storySource = profile.storyVideoPath || null
-  if (!storySource) return { userId, username, created: !existing }
+  if (!storySource) return { userId, username, created: !existing, updated: !!existing, skipped: false, skippedExisting: false, storyImported: false }
 
   const storyUrl = await resolveMediaReference(manifestDir, username, storySource, 'story')
   const storyCaption = profile.storyCaption || ''
-
-  if (dryRun) {
-    console.log(`  story: ${storyUrl}`)
-    return { userId, username, created: !existing }
-  }
 
   if (replaceStory) {
     executeSql(`DELETE FROM stories WHERE user_id = ${sql(userId)}`)
@@ -570,7 +570,7 @@ async function upsertProfile(profile, manifestDir) {
   `)
   console.log(`  story importada para ${username}`)
 
-  return { userId, username, created: !existing }
+  return { userId, username, created: !existing, updated: !!existing, skipped: false, skippedExisting: false, storyImported: true }
 }
 
 async function main() {
@@ -602,6 +602,19 @@ async function main() {
     results.push(await upsertProfile(profile, manifestDir))
   }
 
+  const summary = {
+    type: 'import',
+    manifestPath,
+    processedProfiles: results.length,
+    createdProfiles: results.filter((item) => item.created).length,
+    updatedProfiles: results.filter((item) => item.updated).length,
+    skippedProfiles: results.filter((item) => item.skipped).length,
+    skippedExistingProfiles: results.filter((item) => item.skippedExisting).length,
+    importedStories: results.filter((item) => item.storyImported).length,
+    dryRun,
+    remote: useRemote,
+  }
+  console.log(`__SUMMARY__ ${JSON.stringify(summary)}`)
   console.log(`\nListo. Procesados: ${results.length}`)
 }
 

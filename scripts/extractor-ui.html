@@ -51,7 +51,7 @@
 
       .grid {
         display: grid;
-        grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+        grid-template-columns: minmax(320px, 420px) minmax(320px, 420px) minmax(0, 1fr);
         gap: 18px;
       }
 
@@ -408,6 +408,62 @@
           </div>
         </section>
 
+        <section class="panel">
+          <h2>Importación a Mansion Deseo</h2>
+          <form id="import-form" class="fields">
+            <label>
+              Batch a importar
+              <select id="manifestPath"></select>
+            </label>
+
+            <div class="row-2">
+              <label>
+                Username puntual
+                <input id="onlyUsername" placeholder="Vacío = importar todo el batch" />
+              </label>
+              <label>
+                Ruta manual del manifest
+                <input id="customManifestPath" placeholder="./data/contactossex-batches/lote-01.json" />
+              </label>
+            </div>
+
+            <div class="checks">
+              <label class="check">
+                <input id="importDryRun" type="checkbox" checked />
+                <span>
+                  <strong>Dry-run</strong>
+                  Revisa qué haría el import sin subir media ni escribir en la base.
+                </span>
+              </label>
+
+              <label class="check">
+                <input id="skipExistingUsers" type="checkbox" checked />
+                <span>
+                  <strong>Saltar usuarios existentes</strong>
+                  Evita reimportar perfiles que ya estén en Mansion Deseo.
+                </span>
+              </label>
+
+              <label class="check">
+                <input id="keepStory" type="checkbox" />
+                <span>
+                  <strong>Conservar stories existentes</strong>
+                  Si no está marcado, el import reemplaza la story actual del usuario.
+                </span>
+              </label>
+            </div>
+
+            <div class="actions">
+              <button type="submit">Iniciar Importación</button>
+              <button type="button" class="secondary" id="refresh-batches-button">Actualizar Batches</button>
+            </div>
+          </form>
+
+          <div class="hint">
+            Consejo: usa primero <code>Dry-run</code> para validar el batch, y luego desmárcalo para el import real.
+          </div>
+        </section>
+
         <section class="panel status-card">
           <h2>Estado y Log</h2>
           <div id="status-pill" class="pill"><span class="dot"></span><span id="status-text">idle</span></div>
@@ -424,6 +480,7 @@
 
     <script>
       const form = document.getElementById('extract-form')
+      const importForm = document.getElementById('import-form')
       const logs = document.getElementById('logs')
       const statusText = document.getElementById('status-text')
       const statusPill = document.getElementById('status-pill')
@@ -433,6 +490,9 @@
       const summaryList = document.getElementById('summary-list')
       const stopButton = document.getElementById('stop-button')
       const refreshButton = document.getElementById('refresh-button')
+      const refreshBatchesButton = document.getElementById('refresh-batches-button')
+      const manifestPathSelect = document.getElementById('manifestPath')
+      const customManifestPath = document.getElementById('customManifestPath')
 
       function formPayload() {
         return {
@@ -457,6 +517,46 @@
         }
       }
 
+      function importPayload() {
+        return {
+          manifestPath: customManifestPath.value || manifestPathSelect.value,
+          onlyUsername: document.getElementById('onlyUsername').value,
+          dryRun: document.getElementById('importDryRun').checked,
+          skipExistingUsers: document.getElementById('skipExistingUsers').checked,
+          keepStory: document.getElementById('keepStory').checked,
+        }
+      }
+
+      async function fetchBatches() {
+        const response = await fetch('/api/batches')
+        const data = await response.json()
+        renderBatches(data.batches || [])
+      }
+
+      function renderBatches(batches) {
+        const previous = manifestPathSelect.value
+        manifestPathSelect.innerHTML = ''
+
+        if (!batches.length) {
+          const option = document.createElement('option')
+          option.value = './data/contactossex-placeholders.json'
+          option.textContent = 'Manifest principal actual'
+          manifestPathSelect.appendChild(option)
+          return
+        }
+
+        for (const batch of batches) {
+          const option = document.createElement('option')
+          option.value = batch.path
+          option.textContent = `${batch.name} (${new Date(batch.modifiedAt).toLocaleString()})`
+          manifestPathSelect.appendChild(option)
+        }
+
+        if (previous && [...manifestPathSelect.options].some((option) => option.value === previous)) {
+          manifestPathSelect.value = previous
+        }
+      }
+
       async function fetchStatus() {
         const response = await fetch('/api/status')
         const data = await response.json()
@@ -475,36 +575,54 @@
         if (Array.isArray(data.command) && data.command.length) {
           bits.push(`Comando: ${data.command.join(' ')}`)
         }
+        if (data.jobType) {
+          bits.unshift(`Tipo: ${data.jobType === 'import' ? 'importación' : data.jobType === 'extract' ? 'extracción' : data.jobType}`)
+        }
         meta.innerHTML = bits.map((bit) => `<div>${bit}</div>`).join('')
 
         if (data.summary) {
           const s = data.summary
-          const skippedBreakdown = s.skippedBreakdown || {}
           summary.hidden = false
-          summaryGrid.innerHTML = [
-            { value: s.downloadedProfiles ?? 0, label: 'Perfiles bajados' },
-            { value: s.skippedProfiles ?? 0, label: 'Perfiles salteados' },
-            { value: s.discoveredProfiles ?? 0, label: 'Perfiles leídos del listado' },
-          ]
-            .map(
-              (item) => `
-                <div class="summary-item">
-                  <strong>${item.value}</strong>
-                  <span>${item.label}</span>
-                </div>
-              `
-            )
-            .join('')
+          if (s.type === 'import') {
+            summaryGrid.innerHTML = [
+              { value: s.processedProfiles ?? 0, label: 'Perfiles procesados' },
+              { value: s.createdProfiles ?? 0, label: 'Perfiles creados' },
+              { value: s.skippedProfiles ?? 0, label: 'Perfiles salteados' },
+            ].map((item) => `
+              <div class="summary-item">
+                <strong>${item.value}</strong>
+                <span>${item.label}</span>
+              </div>
+            `).join('')
 
-          summaryList.innerHTML = [
-            `Saltados por carpeta ya existente: ${skippedBreakdown.existingKnownProfile ?? 0}`,
-            `Saltados por assets ya existentes: ${skippedBreakdown.existingAssetsDir ?? 0}`,
-            `Saltados por username excluido: ${skippedBreakdown.excludedUsername ?? 0}`,
-            `Saltados por username faltante: ${skippedBreakdown.missingUsername ?? 0}`,
-            s.batchManifestPath ? `Batch guardado en: ${s.batchManifestPath}` : 'Batch separado: desactivado',
-          ]
-            .map((line) => `<div>${line}</div>`)
-            .join('')
+            summaryList.innerHTML = [
+              `Actualizados: ${s.updatedProfiles ?? 0}`,
+              `Saltados por existir: ${s.skippedExistingProfiles ?? 0}`,
+              `Stories importadas: ${s.importedStories ?? 0}`,
+              `Manifest usado: ${s.manifestPath || '-'}`,
+              `Modo: ${s.dryRun ? 'dry-run' : 'real'} / ${s.remote ? 'remote' : 'local'}`,
+            ].map((line) => `<div>${line}</div>`).join('')
+          } else {
+            const skippedBreakdown = s.skippedBreakdown || {}
+            summaryGrid.innerHTML = [
+              { value: s.downloadedProfiles ?? 0, label: 'Perfiles bajados' },
+              { value: s.skippedProfiles ?? 0, label: 'Perfiles salteados' },
+              { value: s.discoveredProfiles ?? 0, label: 'Perfiles leídos del listado' },
+            ].map((item) => `
+              <div class="summary-item">
+                <strong>${item.value}</strong>
+                <span>${item.label}</span>
+              </div>
+            `).join('')
+
+            summaryList.innerHTML = [
+              `Saltados por carpeta ya existente: ${skippedBreakdown.existingKnownProfile ?? 0}`,
+              `Saltados por assets ya existentes: ${skippedBreakdown.existingAssetsDir ?? 0}`,
+              `Saltados por username excluido: ${skippedBreakdown.excludedUsername ?? 0}`,
+              `Saltados por username faltante: ${skippedBreakdown.missingUsername ?? 0}`,
+              s.batchManifestPath ? `Batch guardado en: ${s.batchManifestPath}` : 'Batch separado: desactivado',
+            ].map((line) => `<div>${line}</div>`).join('')
+          }
         } else {
           summary.hidden = true
           summaryGrid.innerHTML = ''
@@ -526,6 +644,17 @@
         renderStatus(data)
       })
 
+      importForm.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        const response = await fetch('/api/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(importPayload()),
+        })
+        const data = await response.json()
+        renderStatus(data)
+      })
+
       stopButton.addEventListener('click', async () => {
         const response = await fetch('/api/stop', { method: 'POST' })
         const data = await response.json()
@@ -533,8 +662,10 @@
       })
 
       refreshButton.addEventListener('click', fetchStatus)
+      refreshBatchesButton.addEventListener('click', fetchBatches)
 
       fetchStatus()
+      fetchBatches()
       setInterval(fetchStatus, 1500)
     </script>
   </body>

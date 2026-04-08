@@ -11,11 +11,14 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, '..')
 const extractorScript = path.join(__dirname, 'extract-contactossex.mjs')
+const importerScript = path.join(__dirname, 'import-placeholders.mjs')
 const htmlPath = path.join(__dirname, 'extractor-ui.html')
 const port = Number.parseInt(process.env.EXTRACTOR_UI_PORT || '4318', 10)
+const defaultBatchDir = path.join(repoRoot, 'data', 'contactossex-batches')
 
 let activeChild = null
 let activeCommand = []
+let activeJobType = 'idle'
 let logBuffer = []
 let lastExitCode = null
 let lastStatus = 'idle'
@@ -47,6 +50,7 @@ function currentStatus() {
     running: Boolean(activeChild),
     pid: activeChild?.pid || null,
     status: lastStatus,
+    jobType: activeJobType,
     startedAt,
     finishedAt,
     lastExitCode,
@@ -115,6 +119,26 @@ function buildArgs(config) {
   return args
 }
 
+function buildImportArgs(config) {
+  const args = [importerScript]
+  const manifestPath = stringValue(config.manifestPath, '')
+  const onlyUsername = stringValue(config.onlyUsername, '')
+
+  if (!manifestPath) {
+    throw new Error('Falta manifestPath para la importación.')
+  }
+
+  args.push('--manifest', manifestPath)
+  if (boolValue(config.useLocal, false)) args.push('--local')
+  else args.push('--remote')
+  if (boolValue(config.dryRun, true)) args.push('--dry-run')
+  if (boolValue(config.skipExistingUsers, true)) args.push('--skip-existing-users')
+  if (boolValue(config.keepStory, false)) args.push('--keep-story')
+  if (onlyUsername) args.push('--only', onlyUsername)
+
+  return args
+}
+
 async function readBody(req) {
   const chunks = []
   for await (const chunk of req) chunks.push(chunk)
@@ -140,12 +164,36 @@ async function serveHtml(res) {
   res.end(html)
 }
 
-function startExtraction(config) {
+async function listBatchFiles() {
+  try {
+    const entries = await fs.readdir(defaultBatchDir, { withFileTypes: true })
+    const items = await Promise.all(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+        .map(async (entry) => {
+          const absolutePath = path.join(defaultBatchDir, entry.name)
+          const stat = await fs.stat(absolutePath)
+          return {
+            name: entry.name,
+            path: path.relative(repoRoot, absolutePath),
+            modifiedAt: stat.mtime.toISOString(),
+            size: stat.size,
+          }
+        })
+    )
+    return items.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt))
+  } catch {
+    return []
+  }
+}
+
+function startProcess(jobType, argsBuilder, config) {
   if (activeChild) {
-    throw new Error('Ya hay una extracción corriendo.')
+    throw new Error('Ya hay un proceso corriendo.')
   }
 
-  activeCommand = [process.execPath, ...buildArgs(config)]
+  activeCommand = [process.execPath, ...argsBuilder(config)]
+  activeJobType = jobType
   logBuffer = []
   lastExitCode = null
   lastStatus = 'running'
@@ -153,7 +201,7 @@ function startExtraction(config) {
   startedAt = new Date().toISOString()
   finishedAt = null
 
-  appendLog(`Iniciando extractor con ${activeCommand.slice(1).join(' ')}`)
+  appendLog(`Iniciando ${jobType === 'import' ? 'importador' : 'extractor'} con ${activeCommand.slice(1).join(' ')}`)
 
   activeChild = spawn(process.execPath, activeCommand.slice(1), {
     cwd: repoRoot,
@@ -166,14 +214,22 @@ function startExtraction(config) {
     lastExitCode = code
     lastStatus = code === 0 ? 'completed' : 'failed'
     finishedAt = new Date().toISOString()
-    appendLog(`Extractor finalizado con código ${code}`)
+    appendLog(`${jobType === 'import' ? 'Importador' : 'Extractor'} finalizado con código ${code}`)
     activeChild = null
   })
 }
 
+function startExtraction(config) {
+  startProcess('extract', buildArgs, config)
+}
+
+function startImport(config) {
+  startProcess('import', buildImportArgs, config)
+}
+
 function stopExtraction() {
   if (!activeChild) return false
-  appendLog('Deteniendo extracción por pedido del usuario...')
+  appendLog(`Deteniendo ${activeJobType === 'import' ? 'importación' : 'extracción'} por pedido del usuario...`)
   activeChild.kill('SIGTERM')
   return true
 }
@@ -192,9 +248,21 @@ const server = http.createServer(async (req, res) => {
       return
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/batches') {
+      respondJson(res, 200, { batches: await listBatchFiles() })
+      return
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/start') {
       const body = await readBody(req)
       startExtraction(body)
+      respondJson(res, 200, currentStatus())
+      return
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/import') {
+      const body = await readBody(req)
+      startImport(body)
       respondJson(res, 200, currentStatus())
       return
     }
