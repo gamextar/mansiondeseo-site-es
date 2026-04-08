@@ -71,7 +71,7 @@ function buildArgs(config) {
   )
   const pageStart = intValue(config.pageStart, 1)
   const pageEnd = intValue(config.pageEnd, pageStart)
-  const maxProfiles = intValue(config.maxProfiles, 6)
+  const maxProfiles = intValue(config.maxProfiles, 24)
   const maxPhotos = intValue(config.maxPhotos, 12)
   const maxVideos = intValue(config.maxVideos, 3)
   const delayMs = intValue(config.delayMs, 10000)

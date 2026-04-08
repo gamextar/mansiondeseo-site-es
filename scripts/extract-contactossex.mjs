@@ -25,6 +25,7 @@ Opciones:
   --headed                       Fuerza navegador visible
   --headless                     Fuerza navegador oculto
   --session <path>               Archivo de storage state de Playwright
+  --browser-profile-dir <path>   Perfil persistente de Chromium para conservar mejor la sesión
   --state <path>                 Archivo de estado incremental
   --output <path>                Manifest JSON de salida
   --assets-dir <path>            Carpeta donde guardar fotos/videos descargados
@@ -90,6 +91,10 @@ const excludedUsernames = new Set(
     .filter(Boolean)
 )
 const sessionPath = path.resolve(repoRoot, takeFlag('--session', './data/contactossex-session.json'))
+const browserProfileDir = path.resolve(
+  repoRoot,
+  takeFlag('--browser-profile-dir', './data/contactossex-browser-profile')
+)
 const statePath = path.resolve(repoRoot, takeFlag('--state', './data/contactossex-extract-state.json'))
 const outputPath = path.resolve(repoRoot, takeFlag('--output', './data/contactossex-placeholders.json'))
 const assetsDir = path.resolve(repoRoot, takeFlag('--assets-dir', './data/contactossex-assets'))
@@ -678,6 +683,7 @@ async function main() {
   await ensureDir(path.dirname(outputPath))
   await ensureDir(path.dirname(statePath))
   await ensureDir(assetsDir)
+  await ensureDir(path.dirname(browserProfileDir))
 
   const state = await readJson(statePath, {
     processedPages: [],
@@ -685,12 +691,15 @@ async function main() {
   })
   const manifest = await readJson(outputPath, { profiles: [] })
 
-  const browser = await chromium.launch({ headless })
-  const context = await browser.newContext({
-    storageState: !freshSession && existsSync(sessionPath) ? sessionPath : undefined,
+  if (freshSession && existsSync(browserProfileDir)) {
+    await removeDir(browserProfileDir)
+  }
+
+  const context = await chromium.launchPersistentContext(browserProfileDir, {
+    headless,
     viewport: { width: 1440, height: 960 },
   })
-  const page = await context.newPage()
+  const page = context.pages()[0] || await context.newPage()
 
   try {
     await ensureAuthenticated(page, context)
@@ -778,7 +787,7 @@ async function main() {
     console.log(`Assets: ${assetsDir}`)
     console.log(`Estado: ${statePath}`)
   } finally {
-    await browser.close()
+    await context.close()
   }
 }
 
