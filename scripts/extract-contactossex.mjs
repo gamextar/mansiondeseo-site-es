@@ -488,7 +488,25 @@ async function extractProfileData(page, requestContext, url) {
 
   const resolvedMedia = []
   const seenMediaUrls = new Set()
+  let resolvedPhotoCount = 0
+  let resolvedVideoCount = 0
   for (const ref of mediaRefs) {
+    if (resolvedPhotoCount >= Math.max(0, maxPhotos) && resolvedVideoCount >= Math.max(0, maxVideos)) {
+      break
+    }
+
+    if (
+      ref.kind === 'gallery' &&
+      ref.declaredType !== 'video' &&
+      resolvedPhotoCount >= Math.max(0, maxPhotos)
+    ) {
+      continue
+    }
+
+    if (ref.declaredType === 'video' && resolvedVideoCount >= Math.max(0, maxVideos)) {
+      continue
+    }
+
     const absoluteZoom = absolutize(extracted.url, ref.zoomUrl)
     const fallback = absolutize(extracted.url, ref.fallbackUrl)
     let finalUrl = fallback
@@ -532,6 +550,12 @@ async function extractProfileData(page, requestContext, url) {
     }
 
     if (chosenUrl && !seenMediaUrls.has(chosenUrl)) {
+      if (chosenType === 'video' && resolvedVideoCount >= Math.max(0, maxVideos)) {
+        continue
+      }
+      if (ref.kind === 'gallery' && chosenType === 'image' && resolvedPhotoCount >= Math.max(0, maxPhotos)) {
+        continue
+      }
       resolvedMedia.push({
         url: chosenUrl,
         type: chosenType,
@@ -539,14 +563,25 @@ async function extractProfileData(page, requestContext, url) {
         likes: ref.likes || 0,
       })
       seenMediaUrls.add(chosenUrl)
+      if (chosenType === 'video') resolvedVideoCount += 1
+      else if (ref.kind === 'gallery') resolvedPhotoCount += 1
     } else if (fallback && !seenMediaUrls.has(fallback)) {
+      const fallbackType = fallback.match(/\.(mp4|webm|mov)(\?|$)/i) ? 'video' : 'image'
+      if (fallbackType === 'video' && resolvedVideoCount >= Math.max(0, maxVideos)) {
+        continue
+      }
+      if (ref.kind === 'gallery' && fallbackType === 'image' && resolvedPhotoCount >= Math.max(0, maxPhotos)) {
+        continue
+      }
       resolvedMedia.push({
         url: fallback,
-        type: fallback.match(/\.(mp4|webm|mov)(\?|$)/i) ? 'video' : 'image',
+        type: fallbackType,
         kind: ref.kind,
         likes: ref.likes || 0,
       })
       seenMediaUrls.add(fallback)
+      if (fallbackType === 'video') resolvedVideoCount += 1
+      else if (ref.kind === 'gallery') resolvedPhotoCount += 1
     }
   }
 
