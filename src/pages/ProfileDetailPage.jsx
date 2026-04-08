@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Heart, MessageCircle, Shield, Crown,
-  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift,
+  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift, Eye,
 } from 'lucide-react';
 import { getProfile, getToken, toggleFavorite, updateProfile, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
@@ -410,6 +410,7 @@ export default function ProfileDetailPage() {
   }
 
   const { name, age, role, interests, bio, totalPhotos, verified, online, premium, blurred, isOwnProfile, receivedGifts } = profile;
+  const visitsTotal = Number(profile?.visits_total || 0);
   const seeking = Array.isArray(profile?.seeking) ? profile.seeking : (profile?.seeking ? [profile.seeking] : []);
   const messageBlockRoles = Array.isArray(profile?.message_block_roles) ? profile.message_block_roles : [];
   const locationText = formatLocation(profile);
@@ -593,12 +594,25 @@ export default function ProfileDetailPage() {
             {role}
           </motion.span>
 
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.32 }}
+            className="mt-4 mb-6"
+          >
+            <div className="inline-flex items-center gap-2 rounded-full border border-mansion-border/30 bg-mansion-card/50 px-3 py-2 text-sm text-text-primary">
+              <Eye className="w-4 h-4 text-mansion-gold" />
+              <span className="font-semibold tabular-nums">{visitsTotal.toLocaleString('es-AR')}</span>
+              <span className="text-text-dim">visitas al perfil</span>
+            </div>
+          </motion.div>
+
           {/* Bio */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
-            className="mt-6 mb-6"
+            className="mb-6"
           >
             <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Sobre {name.split(' ')[0]}</h3>
             <div className="border-l-2 border-mansion-gold/40 pl-4">

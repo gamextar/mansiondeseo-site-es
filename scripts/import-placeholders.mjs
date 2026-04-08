@@ -45,7 +45,7 @@ Campos soportados por perfil:
   role                requerido: hombre | mujer | pareja | pareja_hombres | pareja_mujeres | trans
   seeking             requerido: array de roles (hombre | mujer | pareja | pareja_hombres | pareja_mujeres | trans)
   interests           opcional: array
-  age, birthdate, province, locality, marital_status, sexual_orientation, country, bio
+  age, birthdate, province, locality, marital_status, sexual_orientation, country, bio, visits
   premium             opcional boolean
   premiumUntil        opcional string YYYY-MM-DD HH:MM:SS
   avatarPath          opcional path local o URL
@@ -339,6 +339,18 @@ function ensureSexualOrientationColumn() {
   }
 }
 
+function ensureProfileStatsTable() {
+  if (dryRun) return
+  executeSql(`
+    CREATE TABLE IF NOT EXISTS profile_stats (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      visits_total INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+  executeSql('CREATE INDEX IF NOT EXISTS idx_profile_stats_visits_total ON profile_stats(visits_total DESC, updated_at DESC)')
+}
+
 function normalizeBirthdate(value) {
   const raw = String(value || '').trim()
   if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return ''
@@ -473,6 +485,7 @@ async function upsertProfile(profile, manifestDir) {
   const premiumUntil = premium ? (profile.premiumUntil || futureSql(365)) : null
   const lastActive = profile.lastActive || nowSql()
   const createdAt = profile.createdAt || nowSql()
+  const visitsTotal = Math.max(0, Number(profile.visits) || 0)
   const avatarCrop = profile.avatarCrop ? JSON.stringify(profile.avatarCrop) : null
   const explicitBirthdate = normalizeBirthdate(profile.birthdate || '')
   const derivedBirthdate = !explicitBirthdate ? estimateBirthdateFromAge(profile.age) : ''
@@ -522,6 +535,7 @@ async function upsertProfile(profile, manifestDir) {
     if (!explicitBirthdate && birthdate) console.log(`  birthdate estimada: ${birthdate}`)
     console.log(`  avatar: ${avatarUrl || '-'}`)
     console.log(`  photos: ${photoUrls.length}`)
+    console.log(`  visitas: ${visitsTotal}`)
     const baseResult = { userId, username, created: !existing, updated: !!existing, skipped: false, skippedExisting: false, storyImported: false }
     if (!storySource) return baseResult
     const storyUrl = await resolveMediaReference(manifestDir, username, storySource, 'story')
@@ -546,6 +560,17 @@ async function upsertProfile(profile, manifestDir) {
       )
     `)
     console.log(`Creado user ${username} (${userId})`)
+  }
+
+  executeSql(`
+    INSERT INTO profile_stats (user_id, visits_total, updated_at)
+    VALUES (${sql(userId)}, ${sql(visitsTotal)}, datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET
+      visits_total = ${sql(visitsTotal)},
+      updated_at = datetime('now')
+  `)
+  if (visitsTotal > 0) {
+    console.log(`  visitas importadas: ${visitsTotal}`)
   }
 
   if (!storySource) return { userId, username, created: !existing, updated: !!existing, skipped: false, skippedExisting: false, storyImported: false }
@@ -594,6 +619,7 @@ async function main() {
   ensureBirthdateColumn()
   ensureMaritalStatusColumn()
   ensureSexualOrientationColumn()
+  ensureProfileStatsTable()
 
   const results = []
   for (let index = 0; index < filtered.length; index += 1) {

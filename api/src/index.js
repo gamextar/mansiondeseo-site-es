@@ -28,6 +28,8 @@ let _userBirthdateColumnReady = null;
 let _userMaritalStatusColumnReady = null;
 let _userSexualOrientationColumnReady = null;
 let _userMessageBlockRolesColumnReady = null;
+let _profileVisitStructuresReady = null;
+let _profileStatsBackfillReady = null;
 
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
@@ -145,6 +147,7 @@ async function deleteUserMediaFromR2(env, user, storyRows = []) {
 
 async function deleteUserCompletely(env, user) {
   const userId = user.id;
+  await ensureProfileVisitStructures(env);
   const storyRowsResult = await env.DB.prepare(
     'SELECT id, video_url FROM stories WHERE user_id = ?'
   ).bind(userId).all();
@@ -165,6 +168,7 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM verification_tokens WHERE user_id = ? OR email = ?').bind(userId, user.email),
     env.DB.prepare('DELETE FROM processed_payments WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM message_limits WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM profile_stats WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
@@ -576,6 +580,64 @@ function getProfileVisitDedupeWindowMinutes(env) {
   const raw = Number(env?.PROFILE_VISIT_DEDUPE_MINUTES || 30);
   if (!Number.isFinite(raw) || raw < 1) return 30;
   return Math.floor(raw);
+}
+
+async function ensureProfileVisitStructures(env) {
+  if (!_profileVisitStructuresReady) {
+    _profileVisitStructuresReady = Promise.all([
+      env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS profile_stats (
+          user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          visits_total INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_profile_visits_visited_created ON profile_visits(visited_id, created_at DESC)'
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_profile_visits_visitor_visited_created ON profile_visits(visitor_id, visited_id, created_at DESC)'
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_profile_stats_visits_total ON profile_stats(visits_total DESC, updated_at DESC)'
+      ).run(),
+    ]).catch((err) => {
+      _profileVisitStructuresReady = null;
+      throw err;
+    });
+  }
+
+  await _profileVisitStructuresReady;
+
+  if (!_profileStatsBackfillReady) {
+    _profileStatsBackfillReady = env.DB.prepare(`
+      INSERT INTO profile_stats (user_id, visits_total, updated_at)
+      SELECT visited_id, COUNT(*), datetime('now')
+      FROM profile_visits
+      GROUP BY visited_id
+      ON CONFLICT(user_id) DO UPDATE SET
+        visits_total = MAX(profile_stats.visits_total, excluded.visits_total),
+        updated_at = datetime('now')
+    `).run().catch((err) => {
+      _profileStatsBackfillReady = null;
+      throw err;
+    });
+  }
+
+  await _profileStatsBackfillReady;
+}
+
+async function incrementProfileVisitStat(env, userId, increment = 1) {
+  const amount = Math.max(0, Number(increment) || 0);
+  if (!amount) return;
+  await ensureProfileVisitStructures(env);
+  await env.DB.prepare(`
+    INSERT INTO profile_stats (user_id, visits_total, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET
+      visits_total = profile_stats.visits_total + excluded.visits_total,
+      updated_at = datetime('now')
+  `).bind(userId, amount).run();
 }
 
 function normalizeGalleryPhotos(rawPhotos, avatarUrl = '') {
@@ -1565,8 +1627,9 @@ async function handleOwnProfileDashboard(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
+  await ensureProfileVisitStructures(env);
   const cachedUser = getCachedFullUser(auth.sub);
-  const [dbUser, activeStory, visitRows, giftRows] = await Promise.all([
+  const [dbUser, activeStory, visitRows, giftRows, visitStatRow] = await Promise.all([
     cachedUser ? Promise.resolve(cachedUser) : env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
     env.DB.prepare('SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first(),
     env.DB.prepare(
@@ -1590,11 +1653,13 @@ async function handleOwnProfileDashboard(request, env) {
        ORDER BY ug.created_at DESC
        LIMIT 50`
     ).bind(auth.sub).all(),
+    env.DB.prepare('SELECT visits_total FROM profile_stats WHERE user_id = ?').bind(auth.sub).first(),
   ]);
 
   if (!dbUser) return error('Usuario no encontrado', 404);
 
   const user = sanitizeUser(dbUser, env);
+  user.visits_total = Number(visitStatRow?.visits_total || 0);
   user.has_active_story = !!activeStory;
   if (activeStory) {
     user.active_story_id = activeStory.id;
@@ -1772,19 +1837,22 @@ async function handleProfiles(request, env) {
 async function handleProfileDetail(request, env, userId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  await ensureProfileVisitStructures(env);
 
   // Parallel fetch: profile + viewer info + cached settings + favorites (all independent)
-  const [user, viewer, settings, favRow, favByRow] = await Promise.all([
+  const [user, viewer, settings, favRow, favByRow, visitStatRow] = await Promise.all([
     env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first(),
     env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
     cached('settings', 300_000, () => loadSettings(env)),
     env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(auth.sub, userId).first(),
     env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(userId, auth.sub).first(),
+    env.DB.prepare('SELECT visits_total FROM profile_stats WHERE user_id = ?').bind(userId).first(),
   ]);
   if (!user) return error('Perfil no encontrado', 404);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
   const isFavorited = !!favRow;
   const profileFavoritedViewer = !!favByRow;
+  let visitsTotal = Number(visitStatRow?.visits_total || 0);
 
   const hasGhostMode = isPremiumActive(user) && !!user.ghost_mode;
   const isOwnProfile = auth.sub === userId;
@@ -1795,7 +1863,7 @@ async function handleProfileDetail(request, env, userId) {
   if (!isOwnProfile) {
     try {
       const dedupeWindow = `-${getProfileVisitDedupeWindowMinutes(env)} minutes`;
-      await env.DB.prepare(
+      const visitInsert = await env.DB.prepare(
         `INSERT INTO profile_visits (id, visitor_id, visited_id)
          SELECT ?, ?, ?
          WHERE NOT EXISTS (
@@ -1806,6 +1874,10 @@ async function handleProfileDetail(request, env, userId) {
              AND created_at >= datetime('now', ?)
          )`
       ).bind(crypto.randomUUID(), auth.sub, userId, auth.sub, userId, dedupeWindow).run();
+      if (Number(visitInsert?.meta?.changes || 0) > 0) {
+        await incrementProfileVisitStat(env, userId, 1);
+        visitsTotal += 1;
+      }
     } catch {
       // Silently fail — duplicate or DB issue
     }
@@ -1878,6 +1950,7 @@ async function handleProfileDetail(request, env, userId) {
       lastActive: user.last_active,
       avatar_url: user.avatar_url,
       avatar_crop: safeParseJSON(user.avatar_crop, null),
+      visits_total: visitsTotal,
       receivedGifts: giftResults,
     },
     viewerPremium: viewerIsPremium,
@@ -2736,6 +2809,7 @@ function safeParseJSON(str, fallback) {
 async function handleGetVisits(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  await ensureProfileVisitStructures(env);
 
   const { results } = await env.DB.prepare(
     `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, u.role, u.premium, u.last_active,
@@ -2762,6 +2836,58 @@ async function handleGetVisits(request, env) {
   }));
 
   return json({ visitors });
+}
+
+async function handleGetTopVisitedProfiles(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  await ensureProfileVisitStructures(env);
+
+  const url = new URL(request.url);
+  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '100', 10)));
+
+  const { results } = await env.DB.prepare(
+    `SELECT
+        u.id,
+        u.username,
+        u.age,
+        u.birthdate,
+        u.city,
+        u.locality,
+        u.role,
+        u.avatar_url,
+        u.avatar_crop,
+        u.verified,
+        u.premium,
+        u.premium_until,
+        u.ghost_mode,
+        u.fake,
+        u.last_active,
+        ps.visits_total
+     FROM profile_stats ps
+     JOIN users u ON u.id = ps.user_id
+     WHERE u.status = 'verified'
+     ORDER BY ps.visits_total DESC, ps.updated_at DESC
+     LIMIT ?`
+  ).bind(limit).all();
+
+  return json({
+    profiles: (results || []).map((u, index) => ({
+      rank: index + 1,
+      id: u.id,
+      name: u.username,
+      age: getPublicAge(u),
+      ...getLocationFields(u),
+      role: mapRoleToDisplay(u.role),
+      verified: !!u.verified,
+      online: isOnline(u.last_active),
+      premium: isPremiumActive(u),
+      fake: !!u.fake,
+      avatar_url: u.avatar_url,
+      avatar_crop: safeParseJSON(u.avatar_crop, null),
+      visits_total: Number(u.visits_total || 0),
+    })),
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4412,6 +4538,7 @@ async function handleRequest(request, env) {
 
   // ── Profile Visits
   if (path === '/api/visits' && method === 'GET') return handleGetVisits(request, env);
+  if (path === '/api/rankings/top-visited' && method === 'GET') return handleGetTopVisitedProfiles(request, env);
 
   // ── Gifts & Coins
   if (path === '/api/gifts/catalog' && method === 'GET') return handleGetGiftCatalog(request, env);

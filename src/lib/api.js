@@ -927,6 +927,11 @@ export async function getVisits() {
   return sharedGet('visits', () => apiFetch('/visits'), { ttlMs: 10 * 60_000 });
 }
 
+export async function getTopVisitedProfiles(limit = 100) {
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 100));
+  return sharedGet(`topVisited:${safeLimit}`, () => apiFetch(`/rankings/top-visited?limit=${safeLimit}`), { ttlMs: 10 * 60_000 });
+}
+
 // ── Gifts & Coins ───────────────────────────────────────
 
 export async function getGiftCatalog() {
