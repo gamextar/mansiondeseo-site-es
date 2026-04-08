@@ -75,6 +75,14 @@ function invalidateOwnProfileDashboardCache() {
   sessionCache.delete(OWN_PROFILE_DASHBOARD_CACHE_KEY);
 }
 
+function invalidateFavoritesCache() {
+  for (const key of sharedGetCache.keys()) {
+    if (String(key).startsWith('favorites:')) {
+      sharedGetCache.delete(key);
+    }
+  }
+}
+
 function invalidateMeCache() {
   sharedGetCache.delete('me');
   sessionCache.delete(AUTH_ME_CACHE_KEY);
@@ -905,7 +913,7 @@ export async function updateSettings(fields) {
 
 export async function toggleFavorite(targetId) {
   const data = await apiFetch(`/favorites/${targetId}`, { method: 'POST' });
-  sharedGetCache.delete('favorites');
+  invalidateFavoritesCache();
   return data;
 }
 
@@ -913,8 +921,14 @@ export async function toggleStoryLike(storyId) {
   return apiFetch(`/stories/${storyId}/like`, { method: 'POST' });
 }
 
-export async function getFavorites() {
-  return sharedGet('favorites', () => apiFetch('/favorites'), { ttlMs: 20_000 });
+export async function getFavorites(tab = 'following', limit = 100) {
+  const safeTab = String(tab || '').toLowerCase() === 'followers' ? 'followers' : 'following';
+  const safeLimit = Math.min(200, Math.max(1, Number(limit) || 100));
+  return sharedGet(
+    `favorites:${safeTab}:${safeLimit}`,
+    () => apiFetch(`/favorites?tab=${encodeURIComponent(safeTab)}&limit=${safeLimit}`),
+    { ttlMs: 20_000 }
+  );
 }
 
 export async function checkFavorite(targetId) {

@@ -3217,51 +3217,113 @@ async function handleToggleFavorite(request, env, targetId) {
   }
 }
 
+function mapFavoriteNetworkProfile(record) {
+  return {
+    id: record.id,
+    name: record.username,
+    age: getPublicAge(record),
+    ...getLocationFields(record),
+    role: mapRoleToDisplay(record.role),
+    verified: !!record.verified,
+    online: isOnline(record.last_active),
+    premium: isPremiumActive(record),
+    fake: !!record.fake,
+    avatar_url: record.avatar_url,
+    avatar_crop: safeParseJSON(record.avatar_crop, null),
+    visits_total: Number(record.visits_total || 0),
+    followers_total: Number(record.followers_total || 0),
+    connected_at: record.connected_at || null,
+    mutual_follow: !!record.mutual_follow,
+  };
+}
+
 // ── GET /api/favorites ──────────────────────────────────
 async function handleGetFavorites(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  await ensureProfileVisitStructures(env);
 
-  const viewer = await env.DB.prepare('SELECT premium FROM users WHERE id = ?').bind(auth.sub).first();
-  const viewerIsPremium = viewer && !!viewer.premium;
-  const settings = await loadSettings(env);
+  const url = new URL(request.url);
+  const tab = String(url.searchParams.get('tab') || 'following').toLowerCase() === 'followers'
+    ? 'followers'
+    : 'following';
+  const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 100));
 
-  const { results: favByRows } = await env.DB.prepare('SELECT user_id FROM favorites WHERE target_id = ?').bind(auth.sub).all();
-  const favoritedBySet = new Set(favByRows.map(r => r.user_id));
+  const [followingCountRow, followersCountRow] = await Promise.all([
+    env.DB.prepare('SELECT COUNT(*) as count FROM favorites WHERE user_id = ?').bind(auth.sub).first(),
+    env.DB.prepare('SELECT COUNT(*) as count FROM favorites WHERE target_id = ?').bind(auth.sub).first(),
+  ]);
 
-  const { results } = await env.DB.prepare(
-    `SELECT u.* FROM favorites f JOIN users u ON u.id = f.target_id
-     WHERE f.user_id = ? ORDER BY f.created_at DESC`
-  ).bind(auth.sub).all();
+  const followingCount = Number(followingCountRow?.count || 0);
+  const followersCount = Number(followersCountRow?.count || 0);
 
-  const profiles = results.map(u => {
-    const hasGhostMode = isPremiumActive(u) && !!u.ghost_mode;
-    const blurred = hasGhostMode && !viewerIsPremium && !favoritedBySet.has(u.id);
-    const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(u.photos, []), u.avatar_url);
-    const displayPhotos = buildDisplayPhotos(u.avatar_url, galleryPhotos);
-    const visiblePhotos = viewerIsPremium
-      ? displayPhotos.length
-      : blurred ? 0 : Math.min(displayPhotos.length, settings.freeVisiblePhotos);
-    return {
-      id: u.id,
-      name: u.username,
-      age: getPublicAge(u),
-      ...getLocationFields(u),
-      role: mapRoleToDisplay(u.role),
-      interests: safeParseJSON(u.interests, []),
-      photos: galleryPhotos,
-      totalPhotos: displayPhotos.length,
-      visiblePhotos,
-      verified: !!u.verified,
-      online: !!u.online,
-      premium: !!u.premium,
-      blurred,
-      avatar_url: u.avatar_url,
-      avatar_crop: safeParseJSON(u.avatar_crop, null),
-    };
+  const query = tab === 'followers'
+    ? `
+      SELECT
+        u.id,
+        u.username,
+        u.age,
+        u.birthdate,
+        u.city,
+        u.locality,
+        u.role,
+        u.avatar_url,
+        u.avatar_crop,
+        u.verified,
+        u.premium,
+        u.premium_until,
+        u.fake,
+        u.last_active,
+        COALESCE(ps.visits_total, 0) as visits_total,
+        COALESCE(ps.followers_total, 0) as followers_total,
+        f.created_at as connected_at,
+        CASE WHEN back.user_id IS NOT NULL THEN 1 ELSE 0 END as mutual_follow
+      FROM favorites f
+      JOIN users u ON u.id = f.user_id
+      LEFT JOIN profile_stats ps ON ps.user_id = u.id
+      LEFT JOIN favorites back ON back.user_id = ? AND back.target_id = u.id
+      WHERE f.target_id = ?
+      ORDER BY f.created_at DESC
+      LIMIT ?
+    `
+    : `
+      SELECT
+        u.id,
+        u.username,
+        u.age,
+        u.birthdate,
+        u.city,
+        u.locality,
+        u.role,
+        u.avatar_url,
+        u.avatar_crop,
+        u.verified,
+        u.premium,
+        u.premium_until,
+        u.fake,
+        u.last_active,
+        COALESCE(ps.visits_total, 0) as visits_total,
+        COALESCE(ps.followers_total, 0) as followers_total,
+        f.created_at as connected_at,
+        CASE WHEN back.user_id IS NOT NULL THEN 1 ELSE 0 END as mutual_follow
+      FROM favorites f
+      JOIN users u ON u.id = f.target_id
+      LEFT JOIN profile_stats ps ON ps.user_id = u.id
+      LEFT JOIN favorites back ON back.user_id = u.id AND back.target_id = ?
+      WHERE f.user_id = ?
+      ORDER BY f.created_at DESC
+      LIMIT ?
+    `;
+
+  const { results } = await env.DB.prepare(query).bind(auth.sub, auth.sub, limit).all();
+
+  return json({
+    tab,
+    followingCount,
+    followersCount,
+    totalCount: tab === 'followers' ? followersCount : followingCount,
+    profiles: (results || []).map(mapFavoriteNetworkProfile),
   });
-
-  return json({ profiles, viewerPremium: viewerIsPremium, settings });
 }
 
 // ── GET /api/favorites/check/:id ────────────────────────

@@ -165,6 +165,14 @@ function AppLayout() {
             }
           />
           <Route
+            path="/seguidores"
+            element={
+              <RequireRegistration>
+                <FavoritesPage />
+              </RequireRegistration>
+            }
+          />
+          <Route
             path="/configuracion"
             element={
               <RequireRegistration>

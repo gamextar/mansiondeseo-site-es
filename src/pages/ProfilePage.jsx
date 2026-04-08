@@ -869,7 +869,7 @@ export default function ProfilePage() {
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-2 px-1">Mi Cuenta</h3>
           {[
             { icon: Settings, label: 'Configuración', sublabel: 'Privacidad, notificaciones', path: user?.is_admin ? '/admin/configuracion' : null },
-            { icon: Heart, label: 'Mis favoritos', sublabel: 'Perfiles guardados', path: '/favoritos' },
+            { icon: Heart, label: 'Seguidores', sublabel: 'Seguidores y siguiendo', path: '/seguidores' },
             { icon: Shield, label: 'Verificación', sublabel: 'Verificar mi identidad', path: null },
           ].map(({ icon: Icon, label, sublabel, path }) => (
             <button

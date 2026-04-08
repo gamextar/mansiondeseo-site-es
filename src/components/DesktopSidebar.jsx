@@ -1,5 +1,5 @@
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Film, MessageCircle, User, Crown, Settings, Camera, Trophy } from 'lucide-react';
+import { Home, Film, MessageCircle, User, Crown, Settings, Camera, Trophy, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useState } from 'react';
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio' },
   { to: '/videos', icon: Film, label: 'Videos' },
   { to: '/ranking', icon: Trophy, label: 'Ranking' },
+  { to: '/seguidores', icon: Heart, label: 'Seguidores' },
   { to: '/mensajes', icon: MessageCircle, label: 'Mensajes' },
   { to: '/perfil', icon: User, label: 'Mi Perfil' },
 ];
@@ -123,6 +124,8 @@ export default function DesktopSidebar() {
           const isActive =
             to === '/' || to === '/perfil'
               ? location.pathname === to
+              : to === '/seguidores'
+                ? location.pathname.startsWith('/seguidores') || location.pathname.startsWith('/favoritos')
               : location.pathname.startsWith(to);
 
           return (
