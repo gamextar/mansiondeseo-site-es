@@ -348,48 +348,16 @@
               </label>
             </div>
 
+            <div class="hint">
+              Las carpetas, sesión, state y batches se resuelven automáticamente según el grupo elegido.
+            </div>
+
             <div class="row-2">
               <label>
                 Excluir usernames
                 <input id="excludeUsernames" value="Conejita1988" />
               </label>
-              <label>
-                Carpeta de batches base
-                <input id="batchDir" value="./data/contactossex-batches" />
-              </label>
-            </div>
-
-            <div class="row-2">
-              <label>
-                Nombre del batch
-                <input id="batchName" placeholder="Vacío = batch-01, batch-02, ..." />
-              </label>
-              <label>
-                Carpeta final esperada
-                <input id="resolvedBatchDir" value="./data/contactossex-batches/mujer" readonly />
-              </label>
-            </div>
-
-            <div class="row-2">
-              <label>
-                Assets del grupo
-                <input id="resolvedAssetsDir" value="./data/contactossex-assets/mujer" readonly />
-              </label>
-              <label>
-                Manifest acumulado del grupo
-                <input id="resolvedManifestPath" value="./data/contactossex-placeholders/mujer.json" readonly />
-              </label>
-            </div>
-
-            <div class="row-2">
-              <label>
-                State incremental del grupo
-                <input id="resolvedStatePath" value="./data/contactossex-state/mujer.json" readonly />
-              </label>
-              <label>
-                Sesión / browser profile del grupo
-                <input id="resolvedSessionPath" value="./data/contactossex-session-mujer.json + ./data/contactossex-browser-profile-mujer" readonly />
-              </label>
+              <div></div>
             </div>
 
             <div class="row-2">
@@ -579,8 +547,8 @@
           listUrlTemplate: document.getElementById('listUrlTemplate').value,
           profileUrl: document.getElementById('profileUrl').value,
           roleGroup: document.getElementById('roleGroup').value,
-          batchName: document.getElementById('batchName').value,
-          batchDir: document.getElementById('batchDir').value,
+          batchName: '',
+          batchDir: './data/contactossex-batches',
           loginUsername: document.getElementById('loginUsername').value,
           loginPassword: document.getElementById('loginPassword').value,
           pageStart: document.getElementById('pageStart').value,
@@ -616,16 +584,6 @@
         const response = await fetch('/api/batches')
         const data = await response.json()
         renderBatches(data.batches || [])
-      }
-
-      function updateResolvedBatchDir() {
-        const base = document.getElementById('batchDir').value || './data/contactossex-batches'
-        const roleGroup = document.getElementById('roleGroup').value || 'mixto'
-        document.getElementById('resolvedBatchDir').value = `${base.replace(/\/+$/, '')}/${roleGroup}`
-        document.getElementById('resolvedAssetsDir').value = `./data/contactossex-assets/${roleGroup}`
-        document.getElementById('resolvedManifestPath').value = `./data/contactossex-placeholders/${roleGroup}.json`
-        document.getElementById('resolvedStatePath').value = `./data/contactossex-state/${roleGroup}.json`
-        document.getElementById('resolvedSessionPath').value = `./data/contactossex-session-${roleGroup}.json + ./data/contactossex-browser-profile-${roleGroup}`
       }
 
       function renderBatches(batches) {
@@ -758,12 +716,9 @@
 
       refreshButton.addEventListener('click', fetchStatus)
       refreshBatchesButton.addEventListener('click', fetchBatches)
-      document.getElementById('batchDir').addEventListener('input', updateResolvedBatchDir)
-      document.getElementById('roleGroup').addEventListener('change', updateResolvedBatchDir)
 
       fetchStatus()
       fetchBatches()
-      updateResolvedBatchDir()
       setInterval(fetchStatus, 1500)
     </script>
   </body>
