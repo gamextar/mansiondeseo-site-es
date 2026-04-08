@@ -442,6 +442,26 @@ async function pageLooksAuthenticated(page) {
   }
 }
 
+async function gotoWithRetry(page, url, options = {}, retries = 3) {
+  let lastError = null
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      await page.goto(url, options)
+      return
+    } catch (error) {
+      lastError = error
+      const message = String(error?.message || error || '')
+      const isAborted = message.includes('net::ERR_ABORTED')
+      if (!isAborted || attempt >= retries) {
+        throw error
+      }
+      console.log(`Aviso: navegación abortada a ${url}. Reintento ${attempt}/${retries}...`)
+      await delay(1000 * attempt)
+    }
+  }
+  if (lastError) throw lastError
+}
+
 async function waitForManualLogin(page, context) {
   const timeoutMs = 10 * 60 * 1000
   const startedAt = Date.now()
@@ -484,6 +504,7 @@ async function attemptAutoLogin(page, context, credentials) {
     const startedAt = Date.now()
     while (Date.now() - startedAt < timeoutMs) {
       if (await pageLooksAuthenticated(page)) {
+        await delay(1200)
         await ensureDir(path.dirname(sessionPath))
         await context.storageState({ path: sessionPath })
         console.log(`Sesión guardada en ${sessionPath}`)
@@ -501,10 +522,10 @@ async function attemptAutoLogin(page, context, credentials) {
 
 async function ensureAuthenticated(page, context) {
   const credentials = await loadLoginCredentials()
-  await page.goto('https://contactossex.com', { waitUntil: 'domcontentloaded' })
+  await gotoWithRetry(page, 'https://contactossex.com', { waitUntil: 'domcontentloaded' })
   await delay(1200)
   if (!freshSession && existsSync(sessionPath)) {
-    await page.goto(listUrlTemplate.replace('{page}', '1'), { waitUntil: 'domcontentloaded' })
+    await gotoWithRetry(page, listUrlTemplate.replace('{page}', '1'), { waitUntil: 'domcontentloaded' })
     await delay(1200)
     if (await pageLooksAuthenticated(page)) return
   }
@@ -525,7 +546,7 @@ async function ensureAuthenticated(page, context) {
 }
 
 async function getProfileLinksFromList(page, url) {
-  await page.goto(url, { waitUntil: 'domcontentloaded' })
+  await gotoWithRetry(page, url, { waitUntil: 'domcontentloaded' })
   await delay(Math.max(400, delayMs))
   return page.evaluate(() => {
     const anchors = Array.from(document.querySelectorAll('a[href*="/members/profile/"]'))
