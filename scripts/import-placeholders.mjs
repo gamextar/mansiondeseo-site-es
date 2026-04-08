@@ -484,7 +484,7 @@ async function upsertProfile(profile, manifestDir) {
     avatar_url: avatarUrl || null,
     avatar_crop: avatarCrop,
     photos: JSON.stringify(photoUrls),
-    verified: 1,
+    verified: 0,
     online: 0,
     premium: premium ? 1 : 0,
     premium_until: premiumUntil,
