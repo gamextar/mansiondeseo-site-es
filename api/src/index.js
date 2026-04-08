@@ -94,6 +94,82 @@ function normalizeStoryVideoUrl(url, env) {
   return r2Base ? `${r2Base}/${key}` : url;
 }
 
+function sanitizeStorageSegment(input, fallback = 'user') {
+  return String(input || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64) || fallback;
+}
+
+async function deleteR2KeysBestEffort(env, keys) {
+  for (const key of [...new Set(keys.filter(Boolean))]) {
+    try {
+      await env.IMAGES.delete(key);
+    } catch {
+      // best effort
+    }
+  }
+}
+
+async function deleteUserMediaFromR2(env, user, storyRows = []) {
+  const keys = new Set();
+  const photos = safeParseJSON(user?.photos, []);
+
+  for (const url of [user?.avatar_url, ...photos, ...storyRows.map((row) => row.video_url)]) {
+    const key = extractMediaKey(url, env);
+    if (key) keys.add(key);
+  }
+
+  const usernameSlug = sanitizeStorageSegment(user?.username, user?.id || 'user');
+  const profilePrefix = `profiles/${usernameSlug}/`;
+
+  try {
+    let cursor;
+    do {
+      const listed = await env.IMAGES.list({ prefix: profilePrefix, cursor });
+      for (const object of listed.objects || []) {
+        if (object?.key) keys.add(object.key);
+      }
+      cursor = listed.truncated ? listed.cursor : undefined;
+    } while (cursor);
+  } catch {
+    // best effort
+  }
+
+  await deleteR2KeysBestEffort(env, [...keys]);
+}
+
+async function deleteUserCompletely(env, user) {
+  const userId = user.id;
+  const storyRowsResult = await env.DB.prepare(
+    'SELECT id, video_url FROM stories WHERE user_id = ?'
+  ).bind(userId).all();
+  const storyRows = storyRowsResult.results || [];
+
+  await deleteUserMediaFromR2(env, user, storyRows);
+
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM story_likes WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM story_likes WHERE story_id IN (SELECT id FROM stories WHERE user_id = ?)').bind(userId),
+    env.DB.prepare('DELETE FROM stories WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM hidden_conversations WHERE user_id = ? OR partner_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM conversation_state WHERE user_id = ? OR partner_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM favorites WHERE user_id = ? OR target_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM profile_visits WHERE visitor_id = ? OR visited_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM user_gifts WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM verification_tokens WHERE user_id = ? OR email = ?').bind(userId, user.email),
+    env.DB.prepare('DELETE FROM processed_payments WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM message_limits WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
+  ]);
+}
+
 async function ensureHiddenConversationsTable(env) {
   if (!_hiddenConversationsReady) {
     _hiddenConversationsReady = Promise.all([
@@ -3351,24 +3427,53 @@ async function handleAdminDeleteUser(request, env, userId) {
 
   if (userId === auth.sub) return error('No puedes eliminarte a ti mismo', 400);
 
-  const user = await env.DB.prepare('SELECT id, email FROM users WHERE id = ?').bind(userId).first();
+  const user = await env.DB.prepare('SELECT id, email, username, avatar_url, photos FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
 
-  // Delete related data (all FK-referencing tables must be cleaned before users row)
-  await env.DB.batch([
-    env.DB.prepare('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
-    env.DB.prepare('DELETE FROM favorites WHERE user_id = ? OR target_id = ?').bind(userId, userId),
-    env.DB.prepare('DELETE FROM profile_visits WHERE visitor_id = ? OR visited_id = ?').bind(userId, userId),
-    env.DB.prepare('DELETE FROM user_gifts WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
-    env.DB.prepare('DELETE FROM verification_tokens WHERE user_id = ? OR email = ?').bind(userId, user.email),
-    env.DB.prepare('DELETE FROM processed_payments WHERE user_id = ?').bind(userId),
-    env.DB.prepare('DELETE FROM message_limits WHERE user_id = ?').bind(userId),
-    env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
-    env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
-  ]);
+  await deleteUserCompletely(env, user);
 
   console.log(`🗑️ Admin eliminó usuario ${userId} (${user.email})`);
   return json({ success: true });
+}
+
+async function handleAdminBulkDeleteUsers(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const body = await request.json().catch(() => ({}));
+  const userIds = [...new Set((Array.isArray(body?.user_ids) ? body.user_ids : []).map((value) => String(value || '').trim()).filter(Boolean))];
+  if (userIds.length === 0) return error('Debes enviar al menos un user_id', 400);
+  if (userIds.length > 100) return error('Máximo 100 usuarios por borrado masivo', 400);
+
+  const results = [];
+  for (const userId of userIds) {
+    if (userId === auth.sub) {
+      results.push({ user_id: userId, deleted: false, reason: 'cannot_delete_self' });
+      continue;
+    }
+
+    const user = await env.DB.prepare('SELECT id, email, username, avatar_url, photos FROM users WHERE id = ?').bind(userId).first();
+    if (!user) {
+      results.push({ user_id: userId, deleted: false, reason: 'not_found' });
+      continue;
+    }
+
+    try {
+      await deleteUserCompletely(env, user);
+      results.push({ user_id: userId, email: user.email, username: user.username, deleted: true });
+    } catch (err) {
+      results.push({ user_id: userId, email: user.email, username: user.username, deleted: false, reason: 'delete_failed', error: String(err?.message || err) });
+    }
+  }
+
+  return json({
+    success: true,
+    deleted: results.filter((item) => item.deleted).length,
+    skipped: results.filter((item) => !item.deleted).length,
+    results,
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4277,6 +4382,7 @@ async function handleRequest(request, env) {
 
   // ── Admin: Users
   if (path === '/api/admin/users' && method === 'GET') return handleAdminGetUsers(request, env);
+  if (path === '/api/admin/users/bulk-delete' && method === 'POST') return handleAdminBulkDeleteUsers(request, env);
   const adminUserMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)$/);
   if (adminUserMatch && method === 'GET') return handleAdminGetUser(request, env, adminUserMatch[1]);
   if (adminUserMatch && method === 'PUT') return handleAdminUpdateUser(request, env, adminUserMatch[1]);

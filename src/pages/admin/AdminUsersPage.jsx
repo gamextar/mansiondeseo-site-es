@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, Ghost, Ban, AlertTriangle, Pause, Play, Film } from 'lucide-react';
-import { adminGetUsers, adminUpdateUser, adminDeleteUser, adminUploadStoryForUser, adminDeleteStory } from '../../lib/api';
+import { adminGetUsers, adminUpdateUser, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 
 function timeAgo(dateStr) {
@@ -49,6 +49,7 @@ export default function AdminUsersPage() {
   const [searchInput, setSearchInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [storyUploading, setStoryUploading] = useState(false);
   const [storyCaption, setStoryCaption] = useState('');
@@ -62,6 +63,7 @@ export default function AdminUsersPage() {
       setTotal(data.total);
       setPage(data.page);
       setPages(data.pages);
+      setSelectedIds([]);
     } catch {
       // ignore
     } finally {
@@ -104,6 +106,44 @@ export default function AdminUsersPage() {
     }
   };
 
+  const toggleSelectedId = (userId) => {
+    setSelectedIds(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
+  };
+
+  const toggleSelectAllCurrentPage = () => {
+    const currentPageIds = users.map((u) => u.id);
+    setSelectedIds((prev) => {
+      const allSelected = currentPageIds.length > 0 && currentPageIds.every((id) => prev.includes(id));
+      return allSelected
+        ? prev.filter((id) => !currentPageIds.includes(id))
+        : [...new Set([...prev, ...currentPageIds])];
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`¿Eliminar PERMANENTEMENTE ${selectedIds.length} usuarios?\n\nEsto borrará también su media en R2, mensajes, favoritos, visitas, gifts y stories.`)) return;
+    setActionLoading(true);
+    try {
+      const result = await adminBulkDeleteUsers(selectedIds);
+      const deletedIds = (result.results || []).filter((item) => item.deleted).map((item) => item.user_id);
+      const failed = (result.results || []).filter((item) => !item.deleted);
+      setUsers(prev => prev.filter((u) => !deletedIds.includes(u.id)));
+      setSelectedIds(prev => prev.filter((id) => !deletedIds.includes(id)));
+      setTotal(t => Math.max(0, t - deletedIds.length));
+      if (selected && deletedIds.includes(selected.id)) setSelected(null);
+      if (failed.length > 0) {
+        alert(`Se eliminaron ${deletedIds.length} usuarios. ${failed.length} no se pudieron borrar o se saltaron.`);
+      }
+    } catch (err) {
+      alert(err.message || 'Error al borrar usuarios');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const allCurrentPageSelected = users.length > 0 && users.every((u) => selectedIds.includes(u.id));
+
   const handleStoryUpload = async (e) => {
     const file = e.target.files?.[0];
     if (storyInputRef.current) storyInputRef.current.value = '';
@@ -145,6 +185,31 @@ export default function AdminUsersPage() {
           <p className="text-sm text-text-dim mt-1">{total} usuarios registrados</p>
         </div>
 
+        {selectedIds.length > 0 && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-red-500/20 bg-red-900/10 px-4 py-3">
+            <p className="text-sm text-red-300">
+              {selectedIds.length} usuario{selectedIds.length === 1 ? '' : 's'} seleccionado{selectedIds.length === 1 ? '' : 's'}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                className="px-3 py-2 rounded-xl bg-mansion-elevated text-text-dim hover:text-text-primary text-xs transition-colors"
+              >
+                Limpiar selección
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={handleBulkDelete}
+                className="px-3 py-2 rounded-xl bg-red-900/30 border border-red-500/20 text-red-300 hover:bg-red-900/40 text-xs font-semibold transition-colors disabled:opacity-60"
+              >
+                {actionLoading ? 'Borrando...' : 'Borrar seleccionados'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Search */}
         <form onSubmit={handleSearch} className="mb-4">
           <div className="flex gap-2">
@@ -180,6 +245,15 @@ export default function AdminUsersPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-mansion-border/20 text-left text-[10px] text-text-dim uppercase tracking-wider">
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={allCurrentPageSelected}
+                        onChange={toggleSelectAllCurrentPage}
+                        className="accent-mansion-gold"
+                        aria-label="Seleccionar todos los usuarios de la página"
+                      />
+                    </th>
                     <th className="px-4 py-3">Usuario</th>
                     <th className="px-4 py-3 hidden md:table-cell">Email</th>
                     <th className="px-4 py-3 hidden lg:table-cell">País</th>
@@ -194,6 +268,15 @@ export default function AdminUsersPage() {
                 <tbody className="divide-y divide-mansion-border/10">
                   {users.map(u => (
                     <tr key={u.id} className="hover:bg-mansion-elevated/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(u.id)}
+                          onChange={() => toggleSelectedId(u.id)}
+                          className="accent-mansion-gold"
+                          aria-label={`Seleccionar ${u.username}`}
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0 flex items-center justify-center">

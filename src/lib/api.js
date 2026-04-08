@@ -1024,6 +1024,13 @@ export async function adminDeleteUser(userId) {
   return apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
 }
 
+export async function adminBulkDeleteUsers(userIds) {
+  return apiFetch('/admin/users/bulk-delete', {
+    method: 'POST',
+    body: JSON.stringify({ user_ids: userIds }),
+  });
+}
+
 // ── Stories ─────────────────────────────────────────────
 
 export async function getStories({ page = 1, limit = 100 } = {}) {
