@@ -245,6 +245,15 @@ function isRemoteUrl(value) {
 function resolveLocalPath(baseDir, inputPath) {
   if (path.isAbsolute(inputPath)) return inputPath
 
+  const inferLegacyRoleGroup = () => {
+    const normalizedBase = String(baseDir || '').replace(/\\/g, '/')
+    const batchMatch = normalizedBase.match(/\/data\/contactossex-batches\/([^/]+)(?:\/|$)/)
+    if (batchMatch?.[1]) return batchMatch[1]
+    const manifestMatch = normalizedBase.match(/\/data\/contactossex-placeholders(?:\/([^/.]+)\.json)?$/)
+    if (manifestMatch?.[1]) return manifestMatch[1]
+    return null
+  }
+
   const candidates = [
     path.resolve(baseDir, inputPath),
   ]
@@ -257,6 +266,12 @@ function resolveLocalPath(baseDir, inputPath) {
   const stripped = normalized.replace(/^(\.\.\/)+/, '')
   if (stripped && stripped !== normalized) {
     candidates.push(path.resolve(repoRoot, 'data', stripped))
+  }
+
+  const legacyRoleGroup = inferLegacyRoleGroup()
+  if (legacyRoleGroup && normalized.startsWith('contactossex-assets/')) {
+    const subPath = normalized.replace(/^contactossex-assets\//, '')
+    candidates.push(path.resolve(repoRoot, 'data', 'contactossex-assets', legacyRoleGroup, subPath))
   }
 
   for (const candidate of candidates) {
