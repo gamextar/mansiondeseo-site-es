@@ -682,8 +682,11 @@
           summaryList.innerHTML = ''
         }
 
+        const wasNearBottom = (logs.scrollHeight - logs.scrollTop - logs.clientHeight) < 24
         logs.textContent = (data.logs || []).join('\n') || 'Sin logs todavía.'
-        logs.scrollTop = logs.scrollHeight
+        if (wasNearBottom) {
+          logs.scrollTop = logs.scrollHeight
+        }
       }
 
       form.addEventListener('submit', async (event) => {
