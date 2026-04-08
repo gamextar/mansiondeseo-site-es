@@ -84,8 +84,8 @@ const pageEnd = Number.parseInt(takeFlag('--page-end', String(pageStart)), 10)
 const maxProfiles = Number.parseInt(takeFlag('--max-profiles', '0'), 10)
 const maxPhotos = Number.parseInt(takeFlag('--max-photos', String(DEFAULT_MAX_PHOTOS_PER_PROFILE)), 10)
 const maxVideos = Number.parseInt(takeFlag('--max-videos', String(DEFAULT_MAX_VIDEOS_PER_PROFILE)), 10)
-const delayMs = Number.parseInt(takeFlag('--delay-ms', '1200'), 10)
-const mediaDelayMs = Number.parseInt(takeFlag('--media-delay-ms', '350'), 10)
+const delayMs = Number.parseInt(takeFlag('--delay-ms', '3000'), 10)
+const mediaDelayMs = Number.parseInt(takeFlag('--media-delay-ms', '250'), 10)
 const listUrlTemplate = takeFlag('--list-url-template', 'https://contactossex.com/members/search?page={page}')
 const profileUrl = takeFlag('--profile-url', '')
 const overwriteAssets = hasFlag('--overwrite-assets')
@@ -147,25 +147,27 @@ function slugifySegment(value, fallback = 'profile') {
   return slug || fallback
 }
 
-function timestampBatchName() {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  const hour = String(now.getHours()).padStart(2, '0')
-  const minute = String(now.getMinutes()).padStart(2, '0')
-  const second = String(now.getSeconds()).padStart(2, '0')
-  return `batch-${year}${month}${day}-${hour}${minute}${second}`
+async function nextSequentialBatchName() {
+  const fallback = 'batch-01'
+  try {
+    const entries = await fs.readdir(batchDir, { withFileTypes: true })
+    const numbers = entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name.match(/^batch-(\d+)\.json$/i))
+      .filter(Boolean)
+      .map((match) => Number.parseInt(match[1], 10))
+      .filter(Number.isFinite)
+
+    const next = (numbers.length ? Math.max(...numbers) : 0) + 1
+    return `batch-${String(next).padStart(2, '0')}`
+  } catch {
+    return fallback
+  }
 }
 
-function buildBatchName() {
-  if (requestedBatchName) return slugifySegment(requestedBatchName, timestampBatchName())
-  if (profileUrl) {
-    const fromUrl = profileUrl.split('/').filter(Boolean).pop()
-    return slugifySegment(`batch-${fromUrl}`, timestampBatchName())
-  }
-  if (pageStart === pageEnd) return `batch-page-${pageStart}-${timestampBatchName()}`
-  return `batch-pages-${pageStart}-${pageEnd}-${timestampBatchName()}`
+async function buildBatchName() {
+  if (requestedBatchName) return slugifySegment(requestedBatchName, 'batch-01')
+  return nextSequentialBatchName()
 }
 
 function delay(ms) {
@@ -795,7 +797,7 @@ async function main() {
     processedProfiles: {},
   })
   const manifest = await readJson(outputPath, { profiles: [] })
-  const batchName = buildBatchName()
+  const batchName = await buildBatchName()
   const batchPath = path.join(batchDir, `${batchName}.json`)
   const batchManifest = { profiles: [] }
 
