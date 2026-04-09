@@ -19,6 +19,7 @@ import { isSafariDesktopBrowser } from '../lib/browser';
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const FEED_CACHE_TTL_MS = 5 * 60_000;
+const FEED_BACKGROUND_REFRESH_MS = 45_000;
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const SAFARI_DESKTOP_INITIAL_VISIBLE = 24;
 const SAFARI_DESKTOP_VISIBLE_STEP = 12;
@@ -63,6 +64,12 @@ function clearCachedFeed() {
 function isFeedCacheFresh(cached) {
   const timestamp = Number(cached?.timestamp) || 0;
   return timestamp > 0 && Date.now() - timestamp < FEED_CACHE_TTL_MS;
+}
+
+function shouldBackgroundRefreshFeed(cached) {
+  const timestamp = Number(cached?.timestamp) || 0;
+  if (timestamp <= 0) return true;
+  return Date.now() - timestamp >= FEED_BACKGROUND_REFRESH_MS;
 }
 
 function hasFeedPaginationState(cached) {
@@ -259,7 +266,7 @@ export default function FeedPage() {
     setHasMore(typeof cachedFeed.hasMore === 'boolean' ? cachedFeed.hasMore : true);
     setLoading(false);
 
-    if (!isFeedCacheFresh(cachedFeed) || !hasFeedPaginationState(cachedFeed)) {
+    if (!isFeedCacheFresh(cachedFeed) || !hasFeedPaginationState(cachedFeed) || shouldBackgroundRefreshFeed(cachedFeed)) {
       loadProfiles({ silent: true });
     }
   }, [getInitialVisibleCount, navigate, loadProfiles]);
@@ -291,7 +298,7 @@ export default function FeedPage() {
       }
 
       const cachedFeed = getCachedFeed();
-      if (!isFeedCacheFresh(cachedFeed) || !hasFeedPaginationState(cachedFeed)) {
+      if (!isFeedCacheFresh(cachedFeed) || !hasFeedPaginationState(cachedFeed) || shouldBackgroundRefreshFeed(cachedFeed)) {
         loadProfiles({ silent: true });
       }
     };

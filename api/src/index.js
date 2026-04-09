@@ -14,6 +14,14 @@ function cached(key, ttlMs, fetcher) {
   return fetcher().then(val => { _cache.set(key, { val, exp: Date.now() + ttlMs }); return val; });
 }
 
+function invalidateFeedBrowseCache() {
+  for (const key of _cache.keys()) {
+    if (String(key).startsWith('profiles:') || String(key) === 'active_story_users') {
+      _cache.delete(key);
+    }
+  }
+}
+
 const _routeMetrics = new Map();
 let _metricsWindowStartedAt = Date.now();
 let _metricsRequestCount = 0;
@@ -3873,6 +3881,9 @@ async function handleAdminUpdateUser(request, env, userId) {
 
   vals.push(userId);
   await env.DB.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...vals).run();
+  _fullUserCache.delete(userId);
+  _viewerCache.delete(userId);
+  invalidateFeedBrowseCache();
 
   const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
   const { password_hash, ...safe } = updated;
