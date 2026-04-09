@@ -81,6 +81,13 @@ export default function FeedPage() {
   const { user, siteSettings } = useAuth();
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const loadMoreRef = useRef(null);
+  const storiesScrollRef = useRef(null);
+  const storiesDragRef = useRef({
+    active: false,
+    startX: 0,
+    startScrollLeft: 0,
+    moved: false,
+  });
 
   const loadProfiles = useCallback(({ silent = false, forceFresh = false } = {}) => {
     const c = getCachedFeed();
@@ -216,6 +223,58 @@ export default function FeedPage() {
     try { return new Set(JSON.parse(viewedRaw)); } catch { return new Set(); }
   }, [viewedRaw]);
 
+  const handleStoriesWheel = useCallback((event) => {
+    const el = storiesScrollRef.current;
+    if (!el) return;
+    const absX = Math.abs(event.deltaX);
+    const absY = Math.abs(event.deltaY);
+    if (absY <= absX) return;
+    if (el.scrollWidth <= el.clientWidth) return;
+    event.preventDefault();
+    el.scrollLeft += event.deltaY;
+  }, []);
+
+  const handleStoriesPointerDown = useCallback((event) => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    const el = storiesScrollRef.current;
+    if (!el || el.scrollWidth <= el.clientWidth) return;
+    storiesDragRef.current = {
+      active: true,
+      startX: event.clientX,
+      startScrollLeft: el.scrollLeft,
+      moved: false,
+    };
+    el.setPointerCapture?.(event.pointerId);
+  }, []);
+
+  const handleStoriesPointerMove = useCallback((event) => {
+    const el = storiesScrollRef.current;
+    const drag = storiesDragRef.current;
+    if (!el || !drag.active) return;
+    const deltaX = event.clientX - drag.startX;
+    if (Math.abs(deltaX) > 4) {
+      drag.moved = true;
+    }
+    el.scrollLeft = drag.startScrollLeft - deltaX;
+  }, []);
+
+  const finishStoriesDrag = useCallback((event) => {
+    const el = storiesScrollRef.current;
+    const drag = storiesDragRef.current;
+    if (!drag.active) return;
+    drag.active = false;
+    if (el && event?.pointerId !== undefined) {
+      try { el.releasePointerCapture?.(event.pointerId); } catch {}
+    }
+  }, []);
+
+  const handleStoriesClickCapture = useCallback((event) => {
+    if (!storiesDragRef.current.moved) return;
+    event.preventDefault();
+    event.stopPropagation();
+    storiesDragRef.current.moved = false;
+  }, []);
+
   useEffect(() => {
     if (!loadMoreRef.current || loading || loadingMore || !hasMore) return;
     const observer = new IntersectionObserver(
@@ -252,11 +311,19 @@ export default function FeedPage() {
           <p className="text-text-muted text-sm lg:text-base font-medium">Transmitiendo</p>
         </div>
         <motion.div
-          className="flex overflow-x-auto scrollbar-hide pb-2"
+          ref={storiesScrollRef}
+          className="flex overflow-x-auto scrollbar-hide pb-2 lg:cursor-grab active:lg:cursor-grabbing select-none"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', gap: `${storyCircleGap}px` }}
           variants={stagger}
           initial="hidden"
           animate="visible"
+          onWheel={handleStoriesWheel}
+          onPointerDown={handleStoriesPointerDown}
+          onPointerMove={handleStoriesPointerMove}
+          onPointerUp={finishStoriesDrag}
+          onPointerCancel={finishStoriesDrag}
+          onPointerLeave={finishStoriesDrag}
+          onClickCapture={handleStoriesClickCapture}
         >
           {/* User's own story circle */}
           {user && (
