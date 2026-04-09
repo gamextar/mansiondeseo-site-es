@@ -37,7 +37,7 @@ function buildPreview(profile) {
   };
 }
 
-function RankCard({ profile, compact = false, safariDesktop = false }) {
+function RankCard({ profile, compact = false, safariDesktop = false, imageLoading = 'lazy' }) {
   const location = formatLocation(profile);
   const isPodium = profile.rank <= 3;
 
@@ -54,7 +54,15 @@ function RankCard({ profile, compact = false, safariDesktop = false }) {
         <div className="relative shrink-0">
           <div className={`${compact ? 'h-16 w-16' : 'h-20 w-20'} overflow-hidden rounded-[1.35rem] border border-white/10 bg-mansion-elevated shadow-[0_12px_24px_rgba(0,0,0,0.18)]`}>
             {profile.avatar_url ? (
-              <AvatarImg src={profile.avatar_url} crop={profile.avatar_crop} alt={profile.name} className="h-full w-full" />
+              <AvatarImg
+                src={profile.avatar_url}
+                crop={profile.avatar_crop}
+                alt={profile.name}
+                className="h-full w-full"
+                loading={imageLoading}
+                decoding="async"
+                fetchPriority={imageLoading === 'eager' ? 'high' : 'auto'}
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-text-dim">
                 <Trophy className="h-6 w-6" />
@@ -238,7 +246,7 @@ export default function TopVisitedPage() {
                 </div>
                 <div className="grid gap-4 lg:grid-cols-3">
                   {podium.map((profile) => (
-                    <RankCard key={profile.id} profile={profile} safariDesktop={safariDesktop} />
+                    <RankCard key={profile.id} profile={profile} safariDesktop={safariDesktop} imageLoading="eager" />
                   ))}
                 </div>
               </section>
@@ -256,7 +264,7 @@ export default function TopVisitedPage() {
               </div>
               <div className="grid gap-3">
                 {renderedRest.map((profile) => (
-                  <RankCard key={profile.id} profile={profile} compact safariDesktop={safariDesktop} />
+                  <RankCard key={profile.id} profile={profile} compact safariDesktop={safariDesktop} imageLoading="lazy" />
                 ))}
               </div>
             </section>
