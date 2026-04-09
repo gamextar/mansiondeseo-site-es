@@ -20,8 +20,8 @@ import { isSafariDesktopBrowser } from '../lib/browser';
 const FEED_CACHE_KEY = 'mansion_feed';
 const FEED_CACHE_TTL_MS = 5 * 60_000;
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
-const SAFARI_DESKTOP_INITIAL_VISIBLE = 24;
-const SAFARI_DESKTOP_VISIBLE_STEP = 12;
+const SAFARI_DESKTOP_INITIAL_VISIBLE = 16;
+const SAFARI_DESKTOP_VISIBLE_STEP = 8;
 
 const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, motionProps = {}, children, ...rest }, ref) {
   if (disabled) return <div ref={ref} {...rest}>{children}</div>;
@@ -80,6 +80,7 @@ export default function FeedPage() {
   );
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [visibleCount, setVisibleCount] = useState(() => getInitialVisibleCount(cached?.profiles || []));
+  const [showStoriesSection, setShowStoriesSection] = useState(() => !safariDesktop);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
   const [nextCursor, setNextCursor] = useState(cached?.nextCursor || null);
@@ -119,6 +120,30 @@ export default function FeedPage() {
     const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
     isSafariDesktopRef.current = isSafari && isDesktop;
   }, []);
+
+  useEffect(() => {
+    if (!safariDesktop) {
+      setShowStoriesSection(true);
+      return undefined;
+    }
+
+    setShowStoriesSection(false);
+    let frameA = 0;
+    let frameB = 0;
+    const timeoutId = window.setTimeout(() => {
+      frameA = requestAnimationFrame(() => {
+        frameB = requestAnimationFrame(() => {
+          setShowStoriesSection(true);
+        });
+      });
+    }, 140);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (frameA) cancelAnimationFrame(frameA);
+      if (frameB) cancelAnimationFrame(frameB);
+    };
+  }, [safariDesktop]);
 
   const loadProfiles = useCallback(({ silent = false, forceFresh = false } = {}) => {
     const c = getCachedFeed();
@@ -254,7 +279,7 @@ export default function FeedPage() {
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
   const renderedProfiles = safariDesktop ? safeProfiles.slice(0, visibleCount) : safeProfiles;
-  const storyProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, safariDesktop ? 10 : 15);
+  const storyProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, safariDesktop ? 6 : 15);
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
@@ -424,6 +449,7 @@ export default function FeedPage() {
         <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
       {/* Stories section */}
+      {showStoriesSection && (
       <AnimatedBlock
         disabled={safariDesktop}
         className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0"
@@ -617,6 +643,7 @@ export default function FeedPage() {
           })}
         </AnimatedBlock>
       </AnimatedBlock>
+      )}
 
       {/* Results count */}
       <AnimatedBlock
