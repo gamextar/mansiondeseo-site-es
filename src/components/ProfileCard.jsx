@@ -95,7 +95,11 @@ export default function ProfileCard({
 
   return (
     <div>
-      <Link to={`/perfiles/${id}`} state={{ preview: { id, name, age, city: profile.city, province: profile.province, locality: profile.locality, role, photos, avatar_url: profile.avatar_url, avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode } }} className="block group">
+      <Link
+        to={`/perfiles/${id}`}
+        state={{ preview: { id, name, age, city: profile.city, province: profile.province, locality: profile.locality, role, photos, avatar_url: profile.avatar_url, avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode } }}
+        className="block group rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-mansion-gold/40 focus-visible:ring-offset-0"
+      >
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card">
           {/* Photo — use actual photo with blur for blocked cards */}
           {mainPhoto ? (
