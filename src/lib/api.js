@@ -1093,7 +1093,7 @@ export async function adminBulkDeleteUsers(userIds) {
 
 // ── Stories ─────────────────────────────────────────────
 
-export async function getStories({ page = 1, limit = 100 } = {}) {
+export async function getStories({ page = 1, limit = 50 } = {}) {
   const params = new URLSearchParams({ page, limit });
   return sharedGet(`stories:${page}:${limit}`, () => apiFetch(`/stories?${params}`), { ttlMs: 2 * 60_000 });
 }
