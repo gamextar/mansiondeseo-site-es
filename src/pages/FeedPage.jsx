@@ -20,7 +20,7 @@ import { isSafariDesktopBrowser } from '../lib/browser';
 const FEED_CACHE_KEY = 'mansion_feed';
 const FEED_CACHE_TTL_MS = 5 * 60_000;
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
-const SAFARI_DESKTOP_INITIAL_VISIBLE = 16;
+const SAFARI_DESKTOP_INITIAL_VISIBLE = 24;
 const SAFARI_DESKTOP_VISIBLE_STEP = 8;
 
 const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, motionProps = {}, children, ...rest }, ref) {
