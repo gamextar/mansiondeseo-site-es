@@ -51,13 +51,23 @@ function isFeedCacheFresh(cached) {
   return timestamp > 0 && Date.now() - timestamp < FEED_CACHE_TTL_MS;
 }
 
+function hasFeedPaginationState(cached) {
+  if (!cached || typeof cached !== 'object') return false;
+  return Object.prototype.hasOwnProperty.call(cached, 'hasMore')
+    || Object.prototype.hasOwnProperty.call(cached, 'nextCursor');
+}
+
 export default function FeedPage() {
   const cached = getCachedFeed();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
   const [nextCursor, setNextCursor] = useState(cached?.nextCursor || null);
-  const [hasMore, setHasMore] = useState(!!cached?.hasMore);
+  const [hasMore, setHasMore] = useState(
+    cached
+      ? (typeof cached?.hasMore === 'boolean' ? cached.hasMore : true)
+      : false
+  );
   const [loading, setLoading] = useState(!cached);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showOwnStoryPreview, setShowOwnStoryPreview] = useState(false);
@@ -142,10 +152,10 @@ export default function FeedPage() {
     setViewerPremium(cachedFeed.viewerPremium || false);
     if (cachedFeed.settings) setSettings(cachedFeed.settings);
     setNextCursor(cachedFeed.nextCursor || null);
-    setHasMore(!!cachedFeed.hasMore);
+    setHasMore(typeof cachedFeed.hasMore === 'boolean' ? cachedFeed.hasMore : true);
     setLoading(false);
 
-    if (!isFeedCacheFresh(cachedFeed)) {
+    if (!isFeedCacheFresh(cachedFeed) || !hasFeedPaginationState(cachedFeed)) {
       loadProfiles({ silent: true });
     }
   }, [navigate, loadProfiles]);
@@ -171,7 +181,7 @@ export default function FeedPage() {
       }
 
       const cachedFeed = getCachedFeed();
-      if (!isFeedCacheFresh(cachedFeed)) {
+      if (!isFeedCacheFresh(cachedFeed) || !hasFeedPaginationState(cachedFeed)) {
         loadProfiles({ silent: true });
       }
     };
