@@ -101,7 +101,7 @@ export default function ProfileCard({
         className="block group rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-mansion-gold/40 focus-visible:ring-offset-0"
       >
         <div
-          className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card shadow-card"
+          className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card ring-1 ring-white/5 shadow-[0_14px_28px_rgba(0,0,0,0.24)]"
           style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
         >
           {/* Photo — use actual photo with blur for blocked cards */}
