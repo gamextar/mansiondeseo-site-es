@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ChevronDown, ChevronUp, Clock, Download, Film, LoaderCircle, Play, RefreshCw, Scissors, SlidersHorizontal, Wand2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, Clock, Download, Film, LoaderCircle, Play, RefreshCw, Scissors, SlidersHorizontal, Upload, Wand2 } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 
