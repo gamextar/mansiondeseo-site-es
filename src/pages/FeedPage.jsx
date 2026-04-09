@@ -720,17 +720,7 @@ export default function FeedPage() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
-                {Array.from({ length: 8 }).map((_, idx) => (
-                  <div
-                    key={`feed-skeleton-${idx}`}
-                    className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-mansion-card shadow-card"
-                  >
-                    <div className="absolute inset-0 animate-pulse bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01)_38%,rgba(0,0,0,0.14))]" />
-                    <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/45 to-transparent" />
-                  </div>
-                ))}
-              </div>
+              <div className="h-24" aria-hidden="true" />
             )}
             <div ref={loadMoreRef} className="h-8" />
             {loadingMore && (
