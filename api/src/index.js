@@ -1845,7 +1845,8 @@ async function handleProfiles(request, env) {
     params.push(term, term, term, term);
   }
   const windowLimit = cursor + FEED_PROFILE_LIMIT;
-  const dbLimit = roleBuckets.length > 1 ? Math.max(windowLimit * 10, FEED_PROFILE_LIMIT * 10) : windowLimit + 1;
+  const pageWindowLimit = windowLimit + 1;
+  const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, FEED_PROFILE_LIMIT * 10) : pageWindowLimit;
   query += ` ORDER BY last_active DESC LIMIT ${dbLimit}`;
 
   // Cache key for profiles query (shared across all users)
@@ -1931,9 +1932,9 @@ async function handleProfiles(request, env) {
         list.sort((a, b) => b._matchingInterests - a._matchingInterests);
       }
     }
-    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, windowLimit);
+    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, pageWindowLimit);
   } else {
-    profiles = profiles.slice(0, windowLimit);
+    profiles = profiles.slice(0, pageWindowLimit);
   }
 
   // Strip internal sort fields
@@ -1941,14 +1942,14 @@ async function handleProfiles(request, env) {
 
   const totalProfiles = profiles.length;
   const pagedProfiles = profiles.slice(cursor, cursor + FEED_PROFILE_LIMIT);
-  const nextCursor = cursor + pagedProfiles.length;
-  const hasMore = nextCursor < totalProfiles;
+  const hasMore = totalProfiles > cursor + FEED_PROFILE_LIMIT;
+  const nextCursor = hasMore ? cursor + FEED_PROFILE_LIMIT : null;
 
   return json({
     profiles: pagedProfiles,
     viewerPremium: viewerIsPremium,
     settings,
-    nextCursor: hasMore ? String(nextCursor) : null,
+    nextCursor: nextCursor !== null ? String(nextCursor) : null,
     hasMore,
   });
 }
