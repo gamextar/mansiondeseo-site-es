@@ -5,7 +5,7 @@ import {
   ArrowLeft, Heart, MessageCircle, Shield, Crown,
   MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift, Eye,
 } from 'lucide-react';
-import { getProfile, getToken, toggleFavorite, updateProfile, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { getProfile, getToken, toggleFavorite, updateProfile, adminUpdateUser, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { formatLocation } from '../lib/location';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
@@ -112,6 +112,8 @@ export default function ProfileDetailPage() {
   const [isReordering, setIsReordering] = useState(false);
   const [orderedPhotos, setOrderedPhotos] = useState(initialProfile?.photos || []);
   const [savingOrder, setSavingOrder] = useState(false);
+  const dragItem = useRef(null);
+  const dragOverItem = useRef(null);
   // Gift state
   const [giftModalOpen, setGiftModalOpen] = useState(false);
   const [giftCatalog, setGiftCatalog] = useState([]);
@@ -162,7 +164,11 @@ export default function ProfileDetailPage() {
   const savePhotoOrder = async () => {
     setSavingOrder(true);
     try {
-      await updateProfile({ photos: orderedPhotos });
+      if (user?.is_admin && !profile?.isOwnProfile) {
+        await adminUpdateUser(id, { photos: orderedPhotos });
+      } else {
+        await updateProfile({ photos: orderedPhotos });
+      }
       setProfile(prev => {
         if (!prev) return prev;
         const nextProfile = { ...prev, photos: orderedPhotos, totalPhotos: getDisplayPhotos({ ...prev, photos: orderedPhotos }).length };
@@ -180,6 +186,87 @@ export default function ProfileDetailPage() {
       setSavingOrder(false);
     }
   };
+
+  const handleDragStart = useCallback((index, event) => {
+    dragItem.current = index;
+    event.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleDragOver = useCallback((index, event) => {
+    event.preventDefault();
+    dragOverItem.current = index;
+  }, []);
+
+  const handleDrop = useCallback((event) => {
+    event.preventDefault();
+    const from = dragItem.current;
+    const to = dragOverItem.current;
+    dragItem.current = null;
+    dragOverItem.current = null;
+    if (from === null || to === null || from === to) return;
+    setOrderedPhotos((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }, []);
+
+  const persistAdminGalleryUpdate = useCallback(async (nextFields) => {
+    if (!profile || !user?.is_admin || profile.isOwnProfile) return;
+    setSavingOrder(true);
+    try {
+      const data = await adminUpdateUser(id, nextFields);
+      setProfile((prev) => {
+        if (!prev) return prev;
+        const nextProfile = {
+          ...prev,
+          avatar_url: data.user.avatar_url,
+          avatar_crop: data.user.avatar_crop,
+          photos: data.user.photos || [],
+          totalPhotos: getDisplayPhotos({
+            ...prev,
+            avatar_url: data.user.avatar_url,
+            avatar_crop: data.user.avatar_crop,
+            photos: data.user.photos || [],
+          }).length,
+        };
+        writeProfileDetailCache(id, {
+          profile: nextProfile,
+          viewerPremium,
+          settings,
+        });
+        return nextProfile;
+      });
+      if (Array.isArray(data.user.photos)) {
+        setOrderedPhotos(data.user.photos);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setSavingOrder(false);
+    }
+  }, [id, profile, settings, user?.is_admin, viewerPremium]);
+
+  const handleAdminDeletePhoto = useCallback((photoUrl) => {
+    if (!profile || !Array.isArray(profile.photos)) return;
+    const nextPhotos = profile.photos.filter((photo) => photo !== photoUrl);
+    persistAdminGalleryUpdate({ photos: nextPhotos });
+  }, [persistAdminGalleryUpdate, profile]);
+
+  const handleAdminUsePhotoAsAvatar = useCallback((photoUrl) => {
+    if (!profile || !Array.isArray(profile.photos) || profile.avatar_url === photoUrl) return;
+    const previousAvatar = profile.avatar_url || '';
+    const basePhotos = profile.photos.filter((photo) => photo !== photoUrl);
+    const nextPhotos = previousAvatar && previousAvatar !== photoUrl && !basePhotos.includes(previousAvatar)
+      ? [previousAvatar, ...basePhotos]
+      : basePhotos;
+    persistAdminGalleryUpdate({
+      avatar_url: photoUrl,
+      avatar_crop: null,
+      photos: nextPhotos,
+    });
+  }, [persistAdminGalleryUpdate, profile]);
 
   const handleToggleFavorite = async () => {
     if (togglingFav) return;
@@ -422,6 +509,7 @@ export default function ProfileDetailPage() {
   const galleryPhotos = getGalleryPhotos(profile);
   const displayPhotos = getDisplayPhotos(profile);
   const avatarDisplayOffset = profile.avatar_url ? 1 : 0;
+  const canAdminEditViewedProfile = !!user?.is_admin && !isOwnProfile;
 
   // Incognito mode blur (whole profile)
   const isGhostBlurred = blurred;
@@ -760,15 +848,15 @@ export default function ProfileDetailPage() {
             >
               <div className="flex items-center justify-between mb-2.5">
                 <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider">Galería</h3>
-                {isOwnProfile && !isReordering && (
+                {(isOwnProfile || canAdminEditViewedProfile) && !isReordering && (
                   <button
                     onClick={() => { setOrderedPhotos(galleryPhotos); setIsReordering(true); }}
                     className="text-xs text-mansion-gold hover:text-mansion-gold/80 transition-colors"
                   >
-                    Editar orden
+                    {canAdminEditViewedProfile ? 'Editar galería' : 'Editar orden'}
                   </button>
                 )}
-                {isOwnProfile && isReordering && (
+                {(isOwnProfile || canAdminEditViewedProfile) && isReordering && (
                   <div className="flex gap-2">
                     <button
                       onClick={() => setIsReordering(false)}
@@ -793,10 +881,16 @@ export default function ProfileDetailPage() {
                   return (
                     <motion.div
                       key={isReordering ? photo : i}
+                      draggable={canAdminEditViewedProfile && isReordering && orderedPhotos.length > 1}
+                      onDragStart={canAdminEditViewedProfile && isReordering ? (event) => handleDragStart(i, event) : undefined}
+                      onDragOver={canAdminEditViewedProfile && isReordering ? (event) => handleDragOver(i, event) : undefined}
+                      onDrop={canAdminEditViewedProfile && isReordering ? handleDrop : undefined}
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.6 + i * 0.04 }}
-                      className="aspect-square rounded-2xl overflow-hidden bg-mansion-card relative group"
+                      className={`aspect-square rounded-2xl overflow-hidden bg-mansion-card relative group ${
+                        canAdminEditViewedProfile && isReordering ? 'cursor-grab active:cursor-grabbing' : ''
+                      }`}
                     >
                       <img
                         src={resolveMediaUrl(photo)}
@@ -813,21 +907,52 @@ export default function ProfileDetailPage() {
                       )}
                       {isReordering ? (
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => movePhoto(i, -1)}
-                            disabled={i === 0}
-                            className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/40 disabled:opacity-20 flex items-center justify-center transition-colors"
-                          >
-                            <ChevronLeft className="w-4 h-4 text-white" />
-                          </button>
-                          <span className="text-white/70 text-xs font-bold">{i + 1}</span>
-                          <button
-                            onClick={() => movePhoto(i, 1)}
-                            disabled={i === orderedPhotos.length - 1}
-                            className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/40 disabled:opacity-20 flex items-center justify-center transition-colors"
-                          >
-                            <ChevronRightIcon className="w-4 h-4 text-white" />
-                          </button>
+                          {canAdminEditViewedProfile ? (
+                            <>
+                              <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-1 text-white/80 text-[11px] font-semibold">
+                                <GripVertical className="w-3.5 h-3.5" />
+                                #{i + 1}
+                              </span>
+                              <div className="absolute inset-x-2 bottom-2 flex items-center justify-between gap-2">
+                                <button
+                                  onClick={() => handleAdminUsePhotoAsAvatar(photo)}
+                                  disabled={savingOrder || profile.avatar_url === photo}
+                                  className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors disabled:opacity-50 ${
+                                    profile.avatar_url === photo
+                                      ? 'bg-mansion-gold text-black'
+                                      : 'bg-white/15 text-white hover:bg-mansion-gold hover:text-black'
+                                  }`}
+                                >
+                                  {profile.avatar_url === photo ? 'Avatar' : 'Usar avatar'}
+                                </button>
+                                <button
+                                  onClick={() => handleAdminDeletePhoto(photo)}
+                                  disabled={savingOrder}
+                                  className="w-7 h-7 rounded-full bg-red-500/70 hover:bg-red-500 disabled:opacity-50 flex items-center justify-center transition-colors"
+                                >
+                                  <X className="w-4 h-4 text-white" />
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => movePhoto(i, -1)}
+                                disabled={i === 0}
+                                className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/40 disabled:opacity-20 flex items-center justify-center transition-colors"
+                              >
+                                <ChevronLeft className="w-4 h-4 text-white" />
+                              </button>
+                              <span className="text-white/70 text-xs font-bold">{i + 1}</span>
+                              <button
+                                onClick={() => movePhoto(i, 1)}
+                                disabled={i === orderedPhotos.length - 1}
+                                className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/40 disabled:opacity-20 flex items-center justify-center transition-colors"
+                              >
+                                <ChevronRightIcon className="w-4 h-4 text-white" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       ) : !blocked && (
                         <div
