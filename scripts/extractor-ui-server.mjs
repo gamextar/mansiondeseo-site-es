@@ -146,6 +146,13 @@ function buildArgs(config) {
 function buildChildEnv(jobType, config) {
   const env = { ...process.env }
 
+  // Prefer the current Wrangler OAuth session over potentially stale shell vars
+  // when the long-running UI server was started from an old terminal session.
+  delete env.CLOUDFLARE_API_TOKEN
+  delete env.CLOUDFLARE_ACCOUNT_ID
+  delete env.CF_API_TOKEN
+  delete env.CF_ACCOUNT_ID
+
   if (jobType === 'extract') {
     const loginUsername = stringValue(config.loginUsername, '')
     const loginPassword = typeof config.loginPassword === 'string' ? config.loginPassword : ''
