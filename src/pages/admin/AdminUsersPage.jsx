@@ -48,6 +48,7 @@ export default function AdminUsersPage() {
   const [pages, setPages] = useState(1);
   const [query, setQuery] = useState('');
   const [fakeFilter, setFakeFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('all');
   const [searchInput, setSearchInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -63,10 +64,16 @@ export default function AdminUsersPage() {
   const galleryDragItem = useRef(null);
   const galleryDragOverItem = useRef(null);
 
-  const fetchUsers = useCallback(async (p = page, q = query, fake = fakeFilter) => {
+  const fetchUsers = useCallback(async (p = page, q = query, fake = fakeFilter, role = roleFilter) => {
     setLoading(true);
     try {
-      const data = await adminGetUsers({ page: p, limit: 20, q, fake: fake === 'all' ? '' : fake });
+      const data = await adminGetUsers({
+        page: p,
+        limit: 20,
+        q,
+        fake: fake === 'all' ? '' : fake,
+        role: role === 'all' ? '' : role,
+      });
       setUsers(data.users);
       setTotal(data.total);
       setPage(data.page);
@@ -77,9 +84,9 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, query, fakeFilter]);
+  }, [page, query, fakeFilter, roleFilter]);
 
-  useEffect(() => { fetchUsers(1, query, fakeFilter); }, [query, fakeFilter]); // eslint-disable-line
+  useEffect(() => { fetchUsers(1, query, fakeFilter, roleFilter); }, [query, fakeFilter, roleFilter]); // eslint-disable-line
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -94,7 +101,11 @@ export default function AdminUsersPage() {
   const handleSelectMatchingFakes = async () => {
     setSelectionLoading(true);
     try {
-      const data = await adminGetUserIds({ q: query, fake: '1' });
+      const data = await adminGetUserIds({
+        q: query,
+        fake: '1',
+        role: roleFilter === 'all' ? '' : roleFilter,
+      });
       setSelectedIds(data.ids || []);
     } catch (err) {
       alert(err.message || 'Error al seleccionar usuarios fake');
@@ -378,6 +389,26 @@ export default function AdminUsersPage() {
             </button>
           ))}
 
+          {[
+            { id: 'all', label: 'Todos los roles' },
+            { id: 'mujer', label: 'Mujeres' },
+            { id: 'hombre', label: 'Hombres' },
+            { id: 'pareja', label: 'Parejas' },
+          ].map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setRoleFilter(option.id)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
+                roleFilter === option.id
+                  ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
+                  : 'bg-mansion-card border-mansion-border/20 text-text-dim hover:text-text-primary'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+
           <button
             type="button"
             onClick={handleSelectVisibleFakes}
@@ -386,11 +417,11 @@ export default function AdminUsersPage() {
             Seleccionar fake visibles
           </button>
 
-          <button
-            type="button"
-            disabled={selectionLoading}
-            onClick={handleSelectMatchingFakes}
-            className="px-3 py-2 rounded-xl bg-mansion-card border border-mansion-border/20 text-text-dim hover:text-mansion-gold text-xs font-semibold transition-colors disabled:opacity-60"
+              <button
+                type="button"
+                disabled={selectionLoading}
+                onClick={handleSelectMatchingFakes}
+                className="px-3 py-2 rounded-xl bg-mansion-card border border-mansion-border/20 text-text-dim hover:text-mansion-gold text-xs font-semibold transition-colors disabled:opacity-60"
           >
             {selectionLoading ? 'Seleccionando...' : 'Seleccionar fake del resultado'}
           </button>
@@ -495,7 +526,7 @@ export default function AdminUsersPage() {
         {pages > 1 && (
           <div className="flex items-center justify-center gap-2 mt-4">
             <button
-              onClick={() => fetchUsers(page - 1, query, fakeFilter)}
+              onClick={() => fetchUsers(page - 1, query, fakeFilter, roleFilter)}
               disabled={page <= 1}
               className="p-2 rounded-lg bg-mansion-card border border-mansion-border/20 text-text-muted disabled:opacity-30 hover:text-mansion-gold transition-colors"
             >
@@ -503,7 +534,7 @@ export default function AdminUsersPage() {
             </button>
             <span className="text-sm text-text-dim px-3">{page} / {pages}</span>
             <button
-              onClick={() => fetchUsers(page + 1, query, fakeFilter)}
+              onClick={() => fetchUsers(page + 1, query, fakeFilter, roleFilter)}
               disabled={page >= pages}
               className="p-2 rounded-lg bg-mansion-card border border-mansion-border/20 text-text-muted disabled:opacity-30 hover:text-mansion-gold transition-colors"
             >

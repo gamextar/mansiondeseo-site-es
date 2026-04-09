@@ -1055,17 +1055,19 @@ export async function adminResetAllCoins() {
 
 // ── Admin: Users ────────────────────────────────────────
 
-export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '' } = {}) {
+export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', role = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (q) params.set('q', q);
   if (fake === '1' || fake === '0') params.set('fake', fake);
+  if (['mujer', 'hombre', 'pareja'].includes(role)) params.set('role', role);
   return apiFetch(`/admin/users?${params}`);
 }
 
-export async function adminGetUserIds({ q = '', fake = '' } = {}) {
+export async function adminGetUserIds({ q = '', fake = '', role = '' } = {}) {
   const params = new URLSearchParams();
   if (q) params.set('q', q);
   if (fake === '1' || fake === '0') params.set('fake', fake);
+  if (['mujer', 'hombre', 'pareja'].includes(role)) params.set('role', role);
   return apiFetch(`/admin/users/ids?${params}`);
 }
 

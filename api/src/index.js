@@ -3703,6 +3703,7 @@ async function handleAdminGetUsers(request, env) {
   const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
   const q = (url.searchParams.get('q') || '').trim();
   const fakeFilter = url.searchParams.get('fake');
+  const roleFilter = (url.searchParams.get('role') || '').trim();
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
@@ -3722,6 +3723,14 @@ async function handleAdminGetUsers(request, env) {
   if (fakeFilter === '1' || fakeFilter === '0') {
     filters.push('fake = ?');
     bindings.push(Number(fakeFilter));
+  }
+
+  if (roleFilter === 'mujer' || roleFilter === 'hombre') {
+    filters.push('role = ?');
+    bindings.push(roleFilter);
+  } else if (roleFilter === 'pareja') {
+    filters.push(`role IN (${PAIR_ROLE_IDS.map(() => '?').join(', ')})`);
+    bindings.push(...PAIR_ROLE_IDS);
   }
 
   if (filters.length > 0) {
@@ -3774,6 +3783,7 @@ async function handleAdminGetUserIds(request, env) {
   const url = new URL(request.url);
   const q = (url.searchParams.get('q') || '').trim();
   const fakeFilter = url.searchParams.get('fake');
+  const roleFilter = (url.searchParams.get('role') || '').trim();
 
   let query = 'SELECT id, fake FROM users';
   const filters = [];
@@ -3787,6 +3797,14 @@ async function handleAdminGetUserIds(request, env) {
   if (fakeFilter === '1' || fakeFilter === '0') {
     filters.push('fake = ?');
     bindings.push(Number(fakeFilter));
+  }
+
+  if (roleFilter === 'mujer' || roleFilter === 'hombre') {
+    filters.push('role = ?');
+    bindings.push(roleFilter);
+  } else if (roleFilter === 'pareja') {
+    filters.push(`role IN (${PAIR_ROLE_IDS.map(() => '?').join(', ')})`);
+    bindings.push(...PAIR_ROLE_IDS);
   }
 
   if (filters.length > 0) {
