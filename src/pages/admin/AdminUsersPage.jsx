@@ -710,6 +710,29 @@ export default function AdminUsersPage() {
                 </button>
 
                 <div className="space-y-3 pt-2 border-t border-mansion-border/20">
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-[10px] text-text-dim uppercase tracking-wider">Avatar</p>
+                      <p className="text-[11px] text-text-dim mt-1">Se muestra aparte y no forma parte del orden de la galería.</p>
+                    </div>
+                    <div className="w-24">
+                      <div className="aspect-square rounded-2xl overflow-hidden border border-mansion-border/20 bg-mansion-elevated">
+                        {selected.avatar_url ? (
+                          <AvatarImg
+                            src={selected.avatar_url}
+                            crop={selected.avatar_crop}
+                            alt={`Avatar de ${selected.username}`}
+                            className="w-full h-full"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-2xl text-text-dim">
+                            {roleBadge(selected.role)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-[10px] text-text-dim uppercase tracking-wider">Galería</p>
