@@ -35,6 +35,40 @@ const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'parej
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 
+function getRoleBucketsForFilters(filterParts = []) {
+  return [...new Set(filterParts)]
+    .filter((role) => SEEKING_ROLE_IDS.includes(role))
+    .map((role) => ({
+      key: role,
+      roles: role === 'pareja' ? PAIR_ROLE_IDS : [role],
+    }));
+}
+
+function getRoleBucketKey(role) {
+  return PAIR_ROLE_IDS.includes(role) ? 'pareja' : role;
+}
+
+function interleaveRoleBuckets(bucketDefs, bucketMap, limit = 50) {
+  const output = [];
+  const cursors = new Map(bucketDefs.map((bucket) => [bucket.key, 0]));
+
+  while (output.length < limit) {
+    let addedInRound = false;
+    for (const bucket of bucketDefs) {
+      if (output.length >= limit) break;
+      const list = bucketMap.get(bucket.key) || [];
+      const cursor = cursors.get(bucket.key) || 0;
+      if (cursor >= list.length) continue;
+      output.push(list[cursor]);
+      cursors.set(bucket.key, cursor + 1);
+      addedInRound = true;
+    }
+    if (!addedInRound) break;
+  }
+
+  return output;
+}
+
 // ── Helpers ─────────────────────────────────────────────
 
 function generateId() {
@@ -1795,6 +1829,7 @@ async function handleProfiles(request, env) {
   } else {
     filterParts = filter.split(',').map(f => f.trim()).filter(f => roleFilters.includes(f));
   }
+  const roleBuckets = getRoleBucketsForFilters(filterParts);
   if (filterParts.length === 1) {
     const roleValues = filterParts[0] === 'pareja' ? PAIR_ROLE_IDS : [filterParts[0]];
     query += ` AND role IN (${roleValues.map(f => `'${f}'`).join(',')})`;
@@ -1807,7 +1842,8 @@ async function handleProfiles(request, env) {
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
-  query += ` ORDER BY last_active DESC LIMIT 51`;
+  const dbLimit = roleBuckets.length > 1 ? 500 : 51;
+  query += ` ORDER BY last_active DESC LIMIT ${dbLimit}`;
 
   // Cache key for profiles query (shared across all users)
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
@@ -1828,7 +1864,7 @@ async function handleProfiles(request, env) {
   const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
 
   // Filter out current user (cached query includes everyone) + map to frontend shape
-  let profiles = results.filter(u => u.id !== auth.sub).slice(0, 50).map(u => {
+  let profiles = results.filter(u => u.id !== auth.sub).map(u => {
     const profileIsPremium = isPremiumActive(u);
     const hasGhostMode = profileIsPremium && !!u.ghost_mode;
     // Ghost mode blur: blurred unless viewer is premium OR the ghost-mode user has favorited the viewer
@@ -1867,6 +1903,7 @@ async function handleProfiles(request, env) {
       avatar_url: u.avatar_url,
       avatar_crop: safeParseJSON(u.avatar_crop, null),
       has_active_story: activeStoryUserIds.has(String(u.id)),
+      _roleId: u.role,
       _matchingInterests: viewerInterests.length > 0
         ? profileInterests.filter(i => viewerInterests.includes(i)).length
         : 0,
@@ -1874,11 +1911,30 @@ async function handleProfiles(request, env) {
   });
 
   // Sort: profiles with more matching interests first, then by last_active (already sorted by DB)
-  if (viewerInterests.length > 0) {
+  if (viewerInterests.length > 0 && roleBuckets.length <= 1) {
     profiles.sort((a, b) => b._matchingInterests - a._matchingInterests);
   }
-  // Strip internal sort field
-  profiles = profiles.map(({ _matchingInterests, ...p }) => p);
+
+  if (roleBuckets.length > 1) {
+    const bucketMap = new Map(roleBuckets.map((bucket) => [bucket.key, []]));
+    for (const profile of profiles) {
+      const bucketKey = getRoleBucketKey(profile._roleId);
+      if (!bucketMap.has(bucketKey)) continue;
+      bucketMap.get(bucketKey).push(profile);
+    }
+    if (viewerInterests.length > 0) {
+      for (const bucket of roleBuckets) {
+        const list = bucketMap.get(bucket.key) || [];
+        list.sort((a, b) => b._matchingInterests - a._matchingInterests);
+      }
+    }
+    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, 50);
+  } else {
+    profiles = profiles.slice(0, 50);
+  }
+
+  // Strip internal sort fields
+  profiles = profiles.map(({ _matchingInterests, _roleId, ...p }) => p);
 
   return json({ profiles, viewerPremium: viewerIsPremium, settings });
 }
