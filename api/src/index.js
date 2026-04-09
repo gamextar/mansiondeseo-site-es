@@ -1780,6 +1780,7 @@ async function handleProfiles(request, env) {
   const filter = url.searchParams.get('filter') || 'all';
   const search = url.searchParams.get('q') || '';
   const fresh = url.searchParams.get('fresh') === '1';
+  const cursor = Math.max(0, Number.parseInt(url.searchParams.get('cursor') || '0', 10) || 0);
 
   // Use cached viewer data when available to avoid a serial D1 round-trip
   let viewer = fresh ? null : getCachedViewer(auth.sub);
@@ -1843,7 +1844,8 @@ async function handleProfiles(request, env) {
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
-  const dbLimit = roleBuckets.length > 1 ? FEED_PROFILE_LIMIT * 10 : FEED_PROFILE_LIMIT + 1;
+  const windowLimit = cursor + FEED_PROFILE_LIMIT;
+  const dbLimit = roleBuckets.length > 1 ? Math.max(windowLimit * 10, FEED_PROFILE_LIMIT * 10) : windowLimit + 1;
   query += ` ORDER BY last_active DESC LIMIT ${dbLimit}`;
 
   // Cache key for profiles query (shared across all users)
@@ -1929,15 +1931,26 @@ async function handleProfiles(request, env) {
         list.sort((a, b) => b._matchingInterests - a._matchingInterests);
       }
     }
-    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, FEED_PROFILE_LIMIT);
+    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, windowLimit);
   } else {
-    profiles = profiles.slice(0, FEED_PROFILE_LIMIT);
+    profiles = profiles.slice(0, windowLimit);
   }
 
   // Strip internal sort fields
   profiles = profiles.map(({ _matchingInterests, _roleId, ...p }) => p);
 
-  return json({ profiles, viewerPremium: viewerIsPremium, settings });
+  const totalProfiles = profiles.length;
+  const pagedProfiles = profiles.slice(cursor, cursor + FEED_PROFILE_LIMIT);
+  const nextCursor = cursor + pagedProfiles.length;
+  const hasMore = nextCursor < totalProfiles;
+
+  return json({
+    profiles: pagedProfiles,
+    viewerPremium: viewerIsPremium,
+    settings,
+    nextCursor: hasMore ? String(nextCursor) : null,
+    hasMore,
+  });
 }
 
 // ── GET /api/profiles/:id ───────────────────────────────

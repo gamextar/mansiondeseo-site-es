@@ -39,6 +39,8 @@ function setCachedFeed(data) {
       profiles: data.profiles || [],
       viewerPremium: data.viewerPremium || false,
       settings: data.settings || {},
+      nextCursor: data.nextCursor || null,
+      hasMore: !!data.hasMore,
       timestamp: Date.now(),
     }));
   } catch {}
@@ -54,11 +56,15 @@ export default function FeedPage() {
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
+  const [nextCursor, setNextCursor] = useState(cached?.nextCursor || null);
+  const [hasMore, setHasMore] = useState(!!cached?.hasMore);
   const [loading, setLoading] = useState(!cached);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [showOwnStoryPreview, setShowOwnStoryPreview] = useState(false);
   const navigate = useNavigate();
   const { user, siteSettings } = useAuth();
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
+  const loadMoreRef = useRef(null);
 
   const loadProfiles = useCallback(({ silent = false, forceFresh = false } = {}) => {
     const c = getCachedFeed();
@@ -67,17 +73,62 @@ export default function FeedPage() {
       setProfiles(c.profiles || []);
       setViewerPremium(c.viewerPremium || false);
       if (c.settings) setSettings(c.settings);
+      setNextCursor(c.nextCursor || null);
+      setHasMore(!!c.hasMore);
     }
     return getProfiles({ fresh: forceFresh })
       .then(data => {
         setProfiles(data.profiles || []);
         setViewerPremium(data.viewerPremium || false);
         if (data.settings) setSettings(data.settings);
-        setCachedFeed({ profiles: data.profiles || [], viewerPremium: data.viewerPremium || false, settings: data.settings || {} });
+        setNextCursor(data.nextCursor || null);
+        setHasMore(!!data.hasMore);
+        setCachedFeed({
+          profiles: data.profiles || [],
+          viewerPremium: data.viewerPremium || false,
+          settings: data.settings || {},
+          nextCursor: data.nextCursor || null,
+          hasMore: !!data.hasMore,
+        });
       })
-      .catch(() => setProfiles([]))
+      .catch(() => {
+        setProfiles([]);
+        setNextCursor(null);
+        setHasMore(false);
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  const loadMoreProfiles = useCallback(() => {
+    if (loading || loadingMore || !hasMore || !nextCursor) return Promise.resolve();
+    setLoadingMore(true);
+    return getProfiles({ cursor: nextCursor })
+      .then((data) => {
+        const newProfiles = Array.isArray(data?.profiles) ? data.profiles : [];
+        setProfiles((prev) => {
+          const seen = new Set(prev.map((item) => item.id));
+          const merged = [...prev];
+          for (const profile of newProfiles) {
+            if (!profile?.id || seen.has(profile.id)) continue;
+            seen.add(profile.id);
+            merged.push(profile);
+          }
+          setCachedFeed({
+            profiles: merged,
+            viewerPremium: data.viewerPremium ?? viewerPremium,
+            settings: data.settings || settings || {},
+            nextCursor: data.nextCursor || null,
+            hasMore: !!data.hasMore,
+          });
+          return merged;
+        });
+        if (data.settings) setSettings(data.settings);
+        if (typeof data.viewerPremium === 'boolean') setViewerPremium(data.viewerPremium);
+        setNextCursor(data.nextCursor || null);
+        setHasMore(!!data.hasMore);
+      })
+      .finally(() => setLoadingMore(false));
+  }, [hasMore, loading, loadingMore, nextCursor, viewerPremium, settings]);
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
@@ -90,6 +141,8 @@ export default function FeedPage() {
     setProfiles(cachedFeed.profiles || []);
     setViewerPremium(cachedFeed.viewerPremium || false);
     if (cachedFeed.settings) setSettings(cachedFeed.settings);
+    setNextCursor(cachedFeed.nextCursor || null);
+    setHasMore(!!cachedFeed.hasMore);
     setLoading(false);
 
     if (!isFeedCacheFresh(cachedFeed)) {
@@ -152,6 +205,20 @@ export default function FeedPage() {
   const viewedStoryUsers = useMemo(() => {
     try { return new Set(JSON.parse(viewedRaw)); } catch { return new Set(); }
   }, [viewedRaw]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current || loading || loadingMore || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMoreProfiles();
+        }
+      },
+      { rootMargin: '600px 0px' }
+    );
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, loadMoreProfiles]);
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
@@ -287,11 +354,19 @@ export default function FeedPage() {
             <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
           </div>
         ) : safeProfiles.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
-            {safeProfiles.map((profile, index) => (
-              <ProfileCard key={profile.id} profile={profile} index={index} viewerPremium={viewerPremium} settings={safeSettings} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
+              {safeProfiles.map((profile, index) => (
+                <ProfileCard key={profile.id} profile={profile} index={index} viewerPremium={viewerPremium} settings={safeSettings} />
+              ))}
+            </div>
+            <div ref={loadMoreRef} className="h-8" />
+            {loadingMore && (
+              <div className="flex items-center justify-center py-6">
+                <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+              </div>
+            )}
+          </>
         ) : (
           <motion.div
             initial={{ opacity: 0 }}
