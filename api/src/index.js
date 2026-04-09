@@ -3838,7 +3838,7 @@ async function handleAdminUpdateUser(request, env, userId) {
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
 
-  const user = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+  const user = await env.DB.prepare('SELECT id, avatar_url FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
 
   const body = await request.json();
@@ -3860,6 +3860,10 @@ async function handleAdminUpdateUser(request, env, userId) {
   if (body.status !== undefined && ['pending', 'verified'].includes(body.status)) { updates.push('status = ?'); vals.push(body.status); }
   if (body.account_status !== undefined && ['active', 'under_review', 'suspended'].includes(body.account_status)) {
     updates.push('account_status = ?'); vals.push(body.account_status);
+  }
+  if (body.photos !== undefined) {
+    updates.push('photos = ?');
+    vals.push(JSON.stringify(normalizeGalleryPhotos(body.photos, user.avatar_url || '')));
   }
 
   if (updates.length === 0) return error('Nada que actualizar');

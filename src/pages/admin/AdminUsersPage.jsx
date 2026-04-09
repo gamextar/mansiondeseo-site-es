@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, Ghost, Ban, AlertTriangle, Pause, Play, Film } from 'lucide-react';
-import { adminGetUsers, adminGetUserIds, adminUpdateUser, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory } from '../../lib/api';
+import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Pause, Play, Film, Pencil } from 'lucide-react';
+import { adminGetUsers, adminGetUserIds, adminGetUser, adminUpdateUser, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
+import { resolveMediaUrl } from '../../lib/media';
 
 function timeAgo(dateStr) {
   if (!dateStr) return 'Nunca';
@@ -50,12 +51,17 @@ export default function AdminUsersPage() {
   const [searchInput, setSearchInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [selectedLoading, setSelectedLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [selectionLoading, setSelectionLoading] = useState(false);
   const [storyUploading, setStoryUploading] = useState(false);
   const [storyCaption, setStoryCaption] = useState('');
+  const [galleryEditing, setGalleryEditing] = useState(false);
+  const [gallerySaving, setGallerySaving] = useState(false);
   const storyInputRef = useRef(null);
+  const galleryDragItem = useRef(null);
+  const galleryDragOverItem = useRef(null);
 
   const fetchUsers = useCallback(async (p = page, q = query, fake = fakeFilter) => {
     setLoading(true);
@@ -109,6 +115,77 @@ export default function AdminUsersPage() {
       setActionLoading(false);
     }
   };
+
+  const openUserModal = useCallback(async (user) => {
+    setSelected({ ...user, photos: Array.isArray(user.photos) ? user.photos : [] });
+    setSelectedLoading(true);
+    setGalleryEditing(false);
+    setStoryCaption('');
+    try {
+      const data = await adminGetUser(user.id);
+      setSelected(data.user);
+    } catch (err) {
+      alert(err.message || 'Error al cargar el detalle del usuario');
+    } finally {
+      setSelectedLoading(false);
+    }
+  }, []);
+
+  const closeUserModal = useCallback(() => {
+    setSelected(null);
+    setSelectedLoading(false);
+    setGalleryEditing(false);
+    setGallerySaving(false);
+    setStoryCaption('');
+    galleryDragItem.current = null;
+    galleryDragOverItem.current = null;
+  }, []);
+
+  const persistGalleryPhotos = useCallback(async (nextPhotos) => {
+    if (!selected?.id) return;
+    const userId = selected.id;
+    const previousPhotos = Array.isArray(selected.photos) ? selected.photos : [];
+    setGallerySaving(true);
+    setSelected((prev) => (prev && prev.id === userId ? { ...prev, photos: nextPhotos } : prev));
+    try {
+      const data = await adminUpdateUser(userId, { photos: nextPhotos });
+      setSelected((prev) => (prev && prev.id === userId ? { ...prev, ...data.user } : prev));
+    } catch (err) {
+      setSelected((prev) => (prev && prev.id === userId ? { ...prev, photos: previousPhotos } : prev));
+      alert(err.message || 'Error al guardar la galería');
+    } finally {
+      setGallerySaving(false);
+    }
+  }, [selected]);
+
+  const handleGalleryDragStart = useCallback((index, event) => {
+    galleryDragItem.current = index;
+    event.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleGalleryDragOver = useCallback((index, event) => {
+    event.preventDefault();
+    galleryDragOverItem.current = index;
+  }, []);
+
+  const handleGalleryDrop = useCallback((event) => {
+    event.preventDefault();
+    const from = galleryDragItem.current;
+    const to = galleryDragOverItem.current;
+    galleryDragItem.current = null;
+    galleryDragOverItem.current = null;
+    if (from === null || to === null || from === to || !Array.isArray(selected?.photos)) return;
+    const next = [...selected.photos];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    persistGalleryPhotos(next);
+  }, [persistGalleryPhotos, selected]);
+
+  const handleGalleryDeletePhoto = useCallback((url) => {
+    if (!Array.isArray(selected?.photos)) return;
+    const next = selected.photos.filter((photo) => photo !== url);
+    persistGalleryPhotos(next);
+  }, [persistGalleryPhotos, selected]);
 
   const handleDelete = async (userId, email) => {
     if (!confirm(`¿Eliminar PERMANENTEMENTE a ${email}?\n\nEsto borrará todos sus mensajes, favoritos, visitas y regalos.`)) return;
@@ -372,7 +449,7 @@ export default function AdminUsersPage() {
                       <td className="px-4 py-3 text-xs text-text-dim hidden md:table-cell">{timeAgo(u.last_active)}</td>
                       <td className="px-4 py-3 text-right">
                         <button
-                          onClick={() => setSelected(u)}
+                          onClick={() => openUserModal(u)}
                           className="px-2.5 py-1.5 rounded-lg bg-mansion-elevated text-text-muted hover:text-mansion-gold text-xs transition-colors"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -410,8 +487,8 @@ export default function AdminUsersPage() {
 
       {/* User detail modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSelected(null)}>
-          <div className="bg-mansion-card rounded-2xl border border-white/10 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={closeUserModal}>
+          <div className="bg-mansion-card rounded-2xl border border-white/10 w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-mansion-border/20">
               <div className="flex items-center gap-3">
@@ -427,13 +504,19 @@ export default function AdminUsersPage() {
                   <p className="text-[11px] text-text-dim">{selected.email}</p>
                 </div>
               </div>
-              <button onClick={() => setSelected(null)} className="p-2 rounded-lg hover:bg-mansion-elevated text-text-dim transition-colors">
+              <button onClick={closeUserModal} className="p-2 rounded-lg hover:bg-mansion-elevated text-text-dim transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Info */}
             <div className="p-4 space-y-3">
+              {selectedLoading ? (
+                <div className="rounded-2xl border border-mansion-border/20 bg-mansion-elevated/40 p-8 text-center text-sm text-text-dim">
+                  Cargando detalle del usuario...
+                </div>
+              ) : (
+                <>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="bg-mansion-elevated rounded-xl p-3">
                   <p className="text-text-dim text-[10px] uppercase tracking-wider mb-1">ID</p>
@@ -626,6 +709,78 @@ export default function AdminUsersPage() {
                   <span className="text-xs text-red-400 font-semibold">Eliminar usuario</span>
                 </button>
 
+                <div className="space-y-3 pt-2 border-t border-mansion-border/20">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] text-text-dim uppercase tracking-wider">Galería</p>
+                      <p className="text-[11px] text-text-dim mt-1">
+                        {Array.isArray(selected.photos) ? selected.photos.length : 0} foto{selected.photos?.length === 1 ? '' : 's'}
+                        {galleryEditing ? ' · Arrastra para reordenar' : ''}
+                      </p>
+                    </div>
+                    {Array.isArray(selected.photos) && selected.photos.length > 0 && (
+                      <button
+                        type="button"
+                        disabled={gallerySaving}
+                        onClick={() => setGalleryEditing((prev) => !prev)}
+                        className={`flex items-center gap-1 text-xs transition-colors ${
+                          galleryEditing
+                            ? 'text-mansion-gold hover:text-mansion-gold-light'
+                            : 'text-text-dim hover:text-text-primary'
+                        } disabled:opacity-60`}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        {galleryEditing ? (gallerySaving ? 'Guardando...' : 'Listo') : 'Editar'}
+                      </button>
+                    )}
+                  </div>
+
+                  {Array.isArray(selected.photos) && selected.photos.length > 0 ? (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+                      {selected.photos.map((url, index) => (
+                        <div
+                          key={`${url}-${index}`}
+                          draggable={galleryEditing && selected.photos.length > 1 && !gallerySaving}
+                          onDragStart={galleryEditing ? (event) => handleGalleryDragStart(index, event) : undefined}
+                          onDragOver={galleryEditing ? (event) => handleGalleryDragOver(index, event) : undefined}
+                          onDrop={galleryEditing ? handleGalleryDrop : undefined}
+                          className={`group relative aspect-square rounded-2xl overflow-hidden border border-mansion-border/20 bg-mansion-elevated ${
+                            galleryEditing ? 'cursor-grab active:cursor-grabbing' : ''
+                          }`}
+                        >
+                          <img
+                            src={resolveMediaUrl(url)}
+                            alt={`Foto ${index + 1}`}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5">
+                            <span className="text-[10px] font-semibold text-white/90">#{index + 1}</span>
+                            {galleryEditing && (
+                              <button
+                                type="button"
+                                disabled={gallerySaving}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  handleGalleryDeletePhoto(url);
+                                }}
+                                className="inline-flex items-center justify-center rounded-full bg-black/60 p-1 text-white transition-colors hover:bg-red-500/80 disabled:opacity-60"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-mansion-border/20 bg-mansion-elevated/30 px-4 py-6 text-center text-sm text-text-dim">
+                      Este usuario no tiene fotos en su galería.
+                    </div>
+                  )}
+                </div>
+
                 {/* Upload / Delete story */}
                 <div className="space-y-2 pt-2 border-t border-mansion-border/20">
                   <p className="text-[10px] text-text-dim uppercase tracking-wider">Historias</p>
@@ -666,6 +821,8 @@ export default function AdminUsersPage() {
                   />
                 </div>
               </div>
+                </>
+              )}
             </div>
           </div>
         </div>
