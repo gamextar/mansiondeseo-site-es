@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { useAgeVerified } from './hooks/useAgeVerified';
 import AgeVerificationModal from './components/AgeVerificationModal';
 import Navbar from './components/Navbar';
@@ -65,12 +64,6 @@ function AppLayout() {
       {showChrome && <Navbar />}
 
       <div className={showChrome ? 'lg:pl-64 xl:pl-72' : ''}>
-        <motion.div
-          key={location.pathname}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-        >
         <Suspense
           fallback={(
             <div className="min-h-screen bg-mansion-base flex items-center justify-center">
@@ -193,7 +186,6 @@ function AppLayout() {
           </Route>
         </Routes>
         </Suspense>
-        </motion.div>
       </div>
 
       {showChrome && <BottomNav />}
