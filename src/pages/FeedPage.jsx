@@ -95,6 +95,16 @@ export default function FeedPage() {
     lastTs: 0,
     velocity: 0,
   });
+  const isSafariDesktopRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const ua = window.navigator.userAgent || '';
+    const vendor = window.navigator.vendor || '';
+    const isSafari = /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Firefox|Edg|OPR/i.test(ua) && /Apple/i.test(vendor);
+    const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+    isSafariDesktopRef.current = isSafari && isDesktop;
+  }, []);
 
   const loadProfiles = useCallback(({ silent = false, forceFresh = false } = {}) => {
     const c = getCachedFeed();
@@ -237,6 +247,7 @@ export default function FeedPage() {
   }, [viewedRaw]);
 
   const handleStoriesWheel = useCallback((event) => {
+    if (isSafariDesktopRef.current) return;
     const el = storiesScrollRef.current;
     if (!el) return;
     const absX = Math.abs(event.deltaX);
@@ -298,6 +309,7 @@ export default function FeedPage() {
   }, []);
 
   const handleStoriesPointerDown = useCallback((event) => {
+    if (isSafariDesktopRef.current) return;
     if (event.pointerType !== 'mouse' || event.button !== 0) return;
     const el = storiesScrollRef.current;
     if (!el || el.scrollWidth <= el.clientWidth) return;
@@ -315,6 +327,7 @@ export default function FeedPage() {
   }, [stopStoriesMomentum]);
 
   const handleStoriesPointerMove = useCallback((event) => {
+    if (isSafariDesktopRef.current) return;
     const el = storiesScrollRef.current;
     const drag = storiesDragRef.current;
     if (!el || !drag.active) return;
@@ -332,6 +345,7 @@ export default function FeedPage() {
   }, []);
 
   const finishStoriesDrag = useCallback((event) => {
+    if (isSafariDesktopRef.current) return;
     const el = storiesScrollRef.current;
     const drag = storiesDragRef.current;
     if (!drag.active) return;
@@ -348,6 +362,7 @@ export default function FeedPage() {
   }, [startStoriesMomentum]);
 
   const handleStoriesClickCapture = useCallback((event) => {
+    if (isSafariDesktopRef.current) return;
     if (!storiesDragRef.current.moved) return;
     event.preventDefault();
     event.stopPropagation();
