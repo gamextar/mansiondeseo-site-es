@@ -82,11 +82,18 @@ export default function FeedPage() {
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const loadMoreRef = useRef(null);
   const storiesScrollRef = useRef(null);
+  const storiesMomentumRef = useRef({
+    frameId: null,
+    velocity: 0,
+  });
   const storiesDragRef = useRef({
     active: false,
     startX: 0,
     startScrollLeft: 0,
     moved: false,
+    lastX: 0,
+    lastTs: 0,
+    velocity: 0,
   });
 
   const loadProfiles = useCallback(({ silent = false, forceFresh = false } = {}) => {
@@ -244,28 +251,84 @@ export default function FeedPage() {
     event.preventDefault();
   }, []);
 
+  const stopStoriesMomentum = useCallback(() => {
+    const momentum = storiesMomentumRef.current;
+    if (momentum.frameId) {
+      cancelAnimationFrame(momentum.frameId);
+      momentum.frameId = null;
+    }
+    momentum.velocity = 0;
+  }, []);
+
+  const startStoriesMomentum = useCallback(() => {
+    const el = storiesScrollRef.current;
+    const momentum = storiesMomentumRef.current;
+    if (!el || Math.abs(momentum.velocity) < 0.01) return;
+
+    const step = () => {
+      const currentEl = storiesScrollRef.current;
+      if (!currentEl) {
+        momentum.frameId = null;
+        momentum.velocity = 0;
+        return;
+      }
+
+      currentEl.scrollLeft += momentum.velocity * 16;
+
+      const maxScrollLeft = Math.max(0, currentEl.scrollWidth - currentEl.clientWidth);
+      if (currentEl.scrollLeft <= 0 || currentEl.scrollLeft >= maxScrollLeft) {
+        currentEl.scrollLeft = Math.min(maxScrollLeft, Math.max(0, currentEl.scrollLeft));
+        momentum.frameId = null;
+        momentum.velocity = 0;
+        return;
+      }
+
+      momentum.velocity *= 0.92;
+      if (Math.abs(momentum.velocity) < 0.01) {
+        momentum.frameId = null;
+        momentum.velocity = 0;
+        return;
+      }
+
+      momentum.frameId = requestAnimationFrame(step);
+    };
+
+    if (momentum.frameId) cancelAnimationFrame(momentum.frameId);
+    momentum.frameId = requestAnimationFrame(step);
+  }, []);
+
   const handleStoriesPointerDown = useCallback((event) => {
     if (event.pointerType !== 'mouse' || event.button !== 0) return;
     const el = storiesScrollRef.current;
     if (!el || el.scrollWidth <= el.clientWidth) return;
+    stopStoriesMomentum();
     storiesDragRef.current = {
       active: true,
       startX: event.clientX,
       startScrollLeft: el.scrollLeft,
       moved: false,
+      lastX: event.clientX,
+      lastTs: event.timeStamp || performance.now(),
+      velocity: 0,
     };
     el.setPointerCapture?.(event.pointerId);
-  }, []);
+  }, [stopStoriesMomentum]);
 
   const handleStoriesPointerMove = useCallback((event) => {
     const el = storiesScrollRef.current;
     const drag = storiesDragRef.current;
     if (!el || !drag.active) return;
     const deltaX = event.clientX - drag.startX;
+    const now = event.timeStamp || performance.now();
+    const deltaTs = Math.max(1, now - drag.lastTs);
+    const deltaSinceLast = event.clientX - drag.lastX;
     if (Math.abs(deltaX) > 4) {
       drag.moved = true;
     }
     el.scrollLeft = drag.startScrollLeft - deltaX;
+    drag.velocity = (-deltaSinceLast) / deltaTs;
+    drag.lastX = event.clientX;
+    drag.lastTs = now;
   }, []);
 
   const finishStoriesDrag = useCallback((event) => {
@@ -276,7 +339,13 @@ export default function FeedPage() {
     if (el && event?.pointerId !== undefined) {
       try { el.releasePointerCapture?.(event.pointerId); } catch {}
     }
-  }, []);
+    storiesMomentumRef.current.velocity = drag.moved ? drag.velocity : 0;
+    if (drag.moved) {
+      startStoriesMomentum();
+    } else {
+      storiesMomentumRef.current.velocity = 0;
+    }
+  }, [startStoriesMomentum]);
 
   const handleStoriesClickCapture = useCallback((event) => {
     if (!storiesDragRef.current.moved) return;
@@ -298,6 +367,8 @@ export default function FeedPage() {
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
   }, [hasMore, loading, loadingMore, loadMoreProfiles]);
+
+  useEffect(() => () => stopStoriesMomentum(), [stopStoriesMomentum]);
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
