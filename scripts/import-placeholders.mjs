@@ -717,6 +717,9 @@ async function main() {
   const manifestDir = path.dirname(manifestPath)
   const normalizedRoleGroup = String(onlyRoleGroup || '').trim().toLowerCase()
   const filtered = profiles.filter((profile) => {
+    if (profile?.excluded) {
+      return false
+    }
     if (onlyUsername && String(profile.username || '').toLowerCase() !== onlyUsername.toLowerCase()) {
       return false
     }

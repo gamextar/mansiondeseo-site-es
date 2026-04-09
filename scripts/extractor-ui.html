@@ -269,6 +269,99 @@
         color: var(--muted);
       }
 
+      .review-toolbar {
+        display: grid;
+        gap: 10px;
+      }
+
+      .review-stats {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .review-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.06);
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .review-list {
+        display: grid;
+        gap: 10px;
+        max-height: 640px;
+        overflow-y: auto;
+        padding-right: 2px;
+      }
+
+      .review-card {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,0.06);
+        background: rgba(255,255,255,0.03);
+      }
+
+      .review-card.excluded {
+        opacity: 0.72;
+        border-color: rgba(180,74,93,0.38);
+        background: rgba(125,47,68,0.12);
+      }
+
+      .review-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .review-title {
+        display: grid;
+        gap: 4px;
+      }
+
+      .review-name {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .review-meta {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .review-badges {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .review-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 9px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.06);
+        background: rgba(0,0,0,0.18);
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .review-badge.gold {
+        color: var(--accent);
+        border-color: rgba(211,173,122,0.24);
+        background: rgba(211,173,122,0.08);
+      }
+
       pre {
         margin: 0;
         width: 100%;
@@ -535,6 +628,43 @@
           </div>
         </section>
 
+        <section class="panel">
+          <h2>Revisión de Batches</h2>
+          <div class="review-toolbar">
+            <div class="row-2">
+              <label>
+                Grupo / carpeta
+                <select id="reviewGroup">
+                  <option value="all" selected>Todos</option>
+                  <option value="mujer">Mujeres</option>
+                  <option value="hombre">Hombres</option>
+                  <option value="pareja">Parejas</option>
+                  <option value="pareja_hombres">Pareja de Hombres</option>
+                  <option value="pareja_mujeres">Pareja de Mujeres</option>
+                  <option value="trans">Trans</option>
+                </select>
+              </label>
+              <label>
+                Batch a revisar
+                <select id="reviewManifestPath"></select>
+              </label>
+            </div>
+
+            <div class="actions">
+              <button type="button" class="secondary" id="refresh-review-button">Cargar revisión</button>
+            </div>
+
+            <div class="review-stats">
+              <span class="review-pill" id="review-count-pill">0 perfiles</span>
+              <span class="review-pill" id="review-excluded-pill">0 excluidos</span>
+            </div>
+
+            <div class="review-list" id="review-list">
+              <div class="hint">Selecciona un batch para revisar sus perfiles antes de importar.</div>
+            </div>
+          </div>
+        </section>
+
         <section class="panel status-card">
           <h2>Estado y Logs</h2>
           <div class="status-grid">
@@ -594,6 +724,13 @@
       const refreshBatchesButton = document.getElementById('refresh-batches-button')
       const manifestPathSelect = document.getElementById('manifestPath')
       const customManifestPath = document.getElementById('customManifestPath')
+      const reviewGroupSelect = document.getElementById('reviewGroup')
+      const reviewManifestPathSelect = document.getElementById('reviewManifestPath')
+      const refreshReviewButton = document.getElementById('refresh-review-button')
+      const reviewList = document.getElementById('review-list')
+      const reviewCountPill = document.getElementById('review-count-pill')
+      const reviewExcludedPill = document.getElementById('review-excluded-pill')
+      let allBatches = []
 
       function formPayload() {
         return {
@@ -636,7 +773,12 @@
       async function fetchBatches() {
         const response = await fetch('/api/batches')
         const data = await response.json()
-        renderBatches(data.batches || [])
+        allBatches = data.batches || []
+        renderBatches(allBatches)
+        renderReviewBatches(allBatches)
+        if (reviewManifestPathSelect.value) {
+          await fetchReview()
+        }
       }
 
       function renderBatches(batches) {
@@ -661,6 +803,97 @@
         if (previous && [...manifestPathSelect.options].some((option) => option.value === previous)) {
           manifestPathSelect.value = previous
         }
+      }
+
+      function renderReviewBatches(batches) {
+        const previous = reviewManifestPathSelect.value
+        const selectedGroup = reviewGroupSelect.value || 'all'
+        const filtered = selectedGroup === 'all'
+          ? batches
+          : batches.filter((batch) => String(batch.name || '').startsWith(`${selectedGroup}/`))
+
+        reviewManifestPathSelect.innerHTML = ''
+
+        if (!filtered.length) {
+          const option = document.createElement('option')
+          option.value = ''
+          option.textContent = 'No hay batches para este grupo'
+          reviewManifestPathSelect.appendChild(option)
+          reviewList.innerHTML = '<div class="hint">No hay batches guardados para ese grupo todavía.</div>'
+          reviewCountPill.textContent = '0 perfiles'
+          reviewExcludedPill.textContent = '0 excluidos'
+          return
+        }
+
+        for (const batch of filtered) {
+          const option = document.createElement('option')
+          option.value = batch.path
+          option.textContent = `${batch.name} (${new Date(batch.modifiedAt).toLocaleString()})`
+          reviewManifestPathSelect.appendChild(option)
+        }
+
+        if (previous && [...reviewManifestPathSelect.options].some((option) => option.value === previous)) {
+          reviewManifestPathSelect.value = previous
+        }
+      }
+
+      async function fetchReview() {
+        const manifestPath = reviewManifestPathSelect.value
+        if (!manifestPath) return
+
+        reviewList.innerHTML = '<div class="hint">Cargando perfiles del batch...</div>'
+        const response = await fetch(`/api/review?manifestPath=${encodeURIComponent(manifestPath)}`)
+        const data = await response.json()
+        renderReview(data)
+      }
+
+      function renderReview(data) {
+        const profiles = Array.isArray(data?.profiles) ? data.profiles : []
+        const excludedCount = profiles.filter((profile) => profile.excluded).length
+        reviewCountPill.textContent = `${profiles.length} perfiles`
+        reviewExcludedPill.textContent = `${excludedCount} excluidos`
+
+        if (!profiles.length) {
+          reviewList.innerHTML = '<div class="hint">Este batch no tiene perfiles.</div>'
+          return
+        }
+
+        reviewList.innerHTML = profiles.map((profile) => `
+          <article class="review-card ${profile.excluded ? 'excluded' : ''}" data-username="${profile.username}">
+            <div class="review-head">
+              <div class="review-title">
+                <div class="review-name">${profile.username}</div>
+                <div class="review-meta">${profile.roleLabel} · ${[profile.locality, profile.province].filter(Boolean).join(', ') || 'Ubicación sin datos'}</div>
+              </div>
+              <button type="button" class="${profile.excluded ? 'secondary' : 'danger'}" data-toggle-excluded="${profile.username}" data-excluded="${profile.excluded ? '1' : '0'}">
+                ${profile.excluded ? 'Incluir' : 'Excluir'}
+              </button>
+            </div>
+            <div class="review-badges">
+              <span class="review-badge">Seguidores: ${profile.followers || 0}</span>
+              <span class="review-badge">Visitas: ${profile.visits || 0}</span>
+              <span class="review-badge">Fotos: ${profile.photos || 0}</span>
+              <span class="review-badge">Videos: ${profile.videos || 0}</span>
+              ${profile.premium ? '<span class="review-badge gold">VIP</span>' : ''}
+              ${profile.excluded ? '<span class="review-badge">Excluido</span>' : ''}
+            </div>
+          </article>
+        `).join('')
+      }
+
+      async function toggleExcluded(username, excluded) {
+        const manifestPath = reviewManifestPathSelect.value
+        if (!manifestPath || !username) return
+        const response = await fetch('/api/review/excluded', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ manifestPath, username, excluded }),
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data?.error || 'No pude actualizar el manifest')
+        }
+        await fetchReview()
       }
 
       async function fetchStatus() {
@@ -814,9 +1047,30 @@
 
       refreshButton.addEventListener('click', fetchStatus)
       refreshBatchesButton.addEventListener('click', fetchBatches)
+      refreshReviewButton.addEventListener('click', fetchReview)
+      reviewGroupSelect.addEventListener('change', async () => {
+        renderReviewBatches(allBatches)
+        if (reviewManifestPathSelect.value) {
+          await fetchReview()
+        }
+      })
+      reviewManifestPathSelect.addEventListener('change', fetchReview)
+      reviewList.addEventListener('click', async (event) => {
+        const button = event.target.closest('[data-toggle-excluded]')
+        if (!button) return
+        button.disabled = true
+        try {
+          await toggleExcluded(button.dataset.toggleExcluded, button.dataset.excluded !== '1')
+        } catch (error) {
+          alert(error.message || 'No pude actualizar la exclusión')
+        } finally {
+          button.disabled = false
+        }
+      })
 
       fetchStatus()
       fetchBatches()
+      fetchReview().catch(() => {})
       setInterval(fetchStatus, 1500)
     </script>
   </body>

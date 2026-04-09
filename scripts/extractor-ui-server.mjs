@@ -204,6 +204,71 @@ async function serveHtml(res) {
   res.end(html)
 }
 
+function resolveManifestPath(inputPath) {
+  const raw = stringValue(inputPath, '')
+  if (!raw) {
+    throw new Error('Falta manifestPath')
+  }
+  const absolutePath = path.resolve(repoRoot, raw)
+  if (!absolutePath.startsWith(repoRoot)) {
+    throw new Error('Ruta de manifest inválida')
+  }
+  return absolutePath
+}
+
+async function loadManifestFile(inputPath) {
+  const absolutePath = resolveManifestPath(inputPath)
+  const raw = JSON.parse(await fs.readFile(absolutePath, 'utf8'))
+  const profiles = Array.isArray(raw) ? raw : raw?.profiles
+  if (!Array.isArray(profiles)) {
+    throw new Error('El manifest debe ser un array o { "profiles": [...] }')
+  }
+  return {
+    absolutePath,
+    relativePath: path.relative(repoRoot, absolutePath),
+    wrapped: !Array.isArray(raw),
+    raw,
+    profiles,
+  }
+}
+
+async function saveManifestFile(manifest) {
+  const nextPayload = manifest.wrapped
+    ? { ...manifest.raw, profiles: manifest.profiles }
+    : manifest.profiles
+  await fs.writeFile(manifest.absolutePath, JSON.stringify(nextPayload, null, 2))
+}
+
+function formatRoleLabel(role) {
+  const normalized = String(role || '').trim().toLowerCase()
+  if (normalized === 'mujer') return 'Mujer'
+  if (normalized === 'hombre') return 'Hombre'
+  if (normalized === 'pareja') return 'Pareja'
+  if (normalized === 'pareja_hombres') return 'Pareja de Hombres'
+  if (normalized === 'pareja_mujeres') return 'Pareja de Mujeres'
+  if (normalized === 'trans') return 'Trans'
+  return role || '-'
+}
+
+function mapReviewProfile(profile) {
+  return {
+    username: profile.username || '',
+    role: profile.role || '',
+    roleLabel: formatRoleLabel(profile.role),
+    province: profile.province || profile.city || '',
+    locality: profile.locality || '',
+    followers: Number(profile.followers) || 0,
+    visits: Number(profile.visits) || 0,
+    premium: !!profile.premium,
+    excluded: !!profile.excluded,
+    photos: Array.isArray(profile.photoPaths) ? profile.photoPaths.length : 0,
+    videos: Array.isArray(profile.storyVideoPaths)
+      ? profile.storyVideoPaths.length
+      : (profile.storyVideoPath ? 1 : 0),
+    seeking: Array.isArray(profile.seeking) ? profile.seeking : [],
+  }
+}
+
 async function listBatchFiles() {
   async function walk(dirPath) {
     const entries = await fs.readdir(dirPath, { withFileTypes: true })
@@ -302,6 +367,48 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/api/batches') {
       respondJson(res, 200, { batches: await listBatchFiles() })
+      return
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/review') {
+      const manifestPath = url.searchParams.get('manifestPath') || ''
+      const manifest = await loadManifestFile(manifestPath)
+      const profiles = manifest.profiles.map(mapReviewProfile)
+      respondJson(res, 200, {
+        manifestPath: manifest.relativePath,
+        total: profiles.length,
+        excluded: profiles.filter((profile) => profile.excluded).length,
+        profiles,
+      })
+      return
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/review/excluded') {
+      const body = await readBody(req)
+      const manifestPath = stringValue(body.manifestPath, '')
+      const username = stringValue(body.username, '')
+      const excluded = boolValue(body.excluded, false)
+      if (!manifestPath || !username) {
+        throw new Error('Faltan manifestPath o username')
+      }
+
+      const manifest = await loadManifestFile(manifestPath)
+      const index = manifest.profiles.findIndex((profile) => String(profile?.username || '').toLowerCase() === username.toLowerCase())
+      if (index === -1) {
+        throw new Error(`No encontré ${username} en ${manifest.relativePath}`)
+      }
+
+      manifest.profiles[index] = {
+        ...manifest.profiles[index],
+        excluded,
+      }
+      await saveManifestFile(manifest)
+
+      respondJson(res, 200, {
+        ok: true,
+        manifestPath: manifest.relativePath,
+        profile: mapReviewProfile(manifest.profiles[index]),
+      })
       return
     }
 
