@@ -240,6 +240,10 @@ export default function FeedPage() {
     el.scrollLeft += event.deltaY;
   }, []);
 
+  const handleStoriesNativeDragStart = useCallback((event) => {
+    event.preventDefault();
+  }, []);
+
   const handleStoriesPointerDown = useCallback((event) => {
     if (event.pointerType !== 'mouse' || event.button !== 0) return;
     const el = storiesScrollRef.current;
@@ -319,12 +323,13 @@ export default function FeedPage() {
         <motion.div
           ref={storiesScrollRef}
           className="flex overflow-x-auto scrollbar-hide pb-2 lg:cursor-grab active:lg:cursor-grabbing select-none"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', gap: `${storyCircleGap}px` }}
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', gap: `${storyCircleGap}px`, touchAction: 'pan-y' }}
           variants={stagger}
           initial="hidden"
           animate="visible"
           onWheel={handleStoriesWheel}
-          onPointerDown={handleStoriesPointerDown}
+          onDragStart={handleStoriesNativeDragStart}
+          onPointerDownCapture={handleStoriesPointerDown}
           onPointerMove={handleStoriesPointerMove}
           onPointerUp={finishStoriesDrag}
           onPointerCancel={finishStoriesDrag}
@@ -337,10 +342,12 @@ export default function FeedPage() {
               <div className="relative">
                 <button
                   type="button"
+                  draggable={false}
                   onClick={user.has_active_story && user.active_story_url
                     ? () => setShowOwnStoryPreview(true)
                     : () => navigate('/historia/nueva', { state: { from: '/' } })}
                   className="flex flex-col items-center gap-1 w-full"
+                  onDragStart={handleStoriesNativeDragStart}
                 >
                   <div className={`rounded-full ${
                     user.has_active_story
@@ -366,8 +373,10 @@ export default function FeedPage() {
                 {/* Plus badge */}
                 <button
                   type="button"
+                  draggable={false}
                   onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/' } }); }}
                   className="absolute bottom-4 right-0 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
+                  onDragStart={handleStoriesNativeDragStart}
                 >
                   <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
                 </button>
@@ -385,8 +394,10 @@ export default function FeedPage() {
               <motion.div key={`story-${p.id}`} variants={storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
                 <button
                   type="button"
+                  draggable={false}
                   onClick={() => navigate('/videos', { state: { storyUserId: p.id } })}
                   className="flex flex-col items-center gap-1"
+                  onDragStart={handleStoriesNativeDragStart}
                 >
                   <div className={`rounded-full ${
                     isViewed

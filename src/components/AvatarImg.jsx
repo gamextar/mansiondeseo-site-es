@@ -19,7 +19,7 @@ export default function AvatarImg({
   const resolvedSrc = resolveMediaUrl(src);
 
   if (!crop || !crop.r) {
-    return <img src={resolvedSrc} alt={alt} referrerPolicy="no-referrer" className={`${className} ${imgClassName} object-cover`.trim()} style={imgStyle || style} {...imgProps} />;
+    return <img src={resolvedSrc} alt={alt} referrerPolicy="no-referrer" draggable={false} className={`${className} ${imgClassName} object-cover`.trim()} style={imgStyle || style} {...imgProps} />;
   }
 
   const { x, y, s, r } = crop;
@@ -35,6 +35,7 @@ export default function AvatarImg({
         src={resolvedSrc}
         alt={alt}
         referrerPolicy="no-referrer"
+        draggable={false}
         className={imgClassName}
         style={{
           position: 'absolute',
