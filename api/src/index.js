@@ -1852,13 +1852,14 @@ async function handleProfiles(request, env) {
   // Cache key for profiles query (shared across all users)
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
   const profilesCacheKey = `profiles:${seekingKey}:${country}:${search}`;
+  const shouldUseProfilesCache = !fresh && cursor === 0;
 
   // Parallel: cached settings + cached profiles + combined favorites + active stories
   const [settings, results, { results: allFavRows }, storyRows] = await Promise.all([
     cached('settings', 300_000, () => loadSettings(env)),  // 5 min
-    fresh
-      ? env.DB.prepare(query).bind(...params).all().then(r => r.results)
-      : cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results)),  // 30s
+    shouldUseProfilesCache
+      ? cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results))  // 30s
+      : env.DB.prepare(query).bind(...params).all().then(r => r.results),
     env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?').bind(auth.sub, auth.sub).all(),
     cached('active_story_users', 30_000, () => env.DB.prepare('SELECT DISTINCT user_id FROM stories WHERE active = 1').all().then(r => r.results).catch(() => [])),  // 30s
   ]);

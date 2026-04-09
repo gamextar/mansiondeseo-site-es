@@ -46,6 +46,12 @@ function setCachedFeed(data) {
   } catch {}
 }
 
+function clearCachedFeed() {
+  try {
+    sessionStorage.removeItem(FEED_CACHE_KEY);
+  } catch {}
+}
+
 function isFeedCacheFresh(cached) {
   const timestamp = Number(cached?.timestamp) || 0;
   return timestamp > 0 && Date.now() - timestamp < FEED_CACHE_TTL_MS;
@@ -115,6 +121,7 @@ export default function FeedPage() {
     return getProfiles({ cursor: nextCursor })
       .then((data) => {
         const newProfiles = Array.isArray(data?.profiles) ? data.profiles : [];
+        clearCachedFeed();
         setProfiles((prev) => {
           const seen = new Set(prev.map((item) => item.id));
           const merged = [...prev];
@@ -123,13 +130,6 @@ export default function FeedPage() {
             seen.add(profile.id);
             merged.push(profile);
           }
-          setCachedFeed({
-            profiles: merged,
-            viewerPremium: data.viewerPremium ?? viewerPremium,
-            settings: data.settings || settings || {},
-            nextCursor: data.nextCursor || null,
-            hasMore: !!data.hasMore,
-          });
           return merged;
         });
         if (data.settings) setSettings(data.settings);
