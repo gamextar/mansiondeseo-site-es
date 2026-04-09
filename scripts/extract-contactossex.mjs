@@ -452,11 +452,13 @@ async function gotoWithRetry(page, url, options = {}, retries = 3) {
       lastError = error
       const message = String(error?.message || error || '')
       const isAborted = message.includes('net::ERR_ABORTED')
-      if (!isAborted || attempt >= retries) {
+      const isNetworkSuspended = message.includes('net::ERR_NETWORK_IO_SUSPENDED')
+      const isRetryable = isAborted || isNetworkSuspended
+      if (!isRetryable || attempt >= retries) {
         throw error
       }
-      console.log(`Aviso: navegación abortada a ${url}. Reintento ${attempt}/${retries}...`)
-      await delay(1000 * attempt)
+      console.log(`Aviso: navegación interrumpida a ${url}. Reintento ${attempt}/${retries}...`)
+      await delay(1500 * attempt)
     }
   }
   if (lastError) throw lastError
@@ -586,7 +588,7 @@ async function scrollProfileMedia(page) {
 }
 
 async function extractProfileData(page, requestContext, url) {
-  await page.goto(url, { waitUntil: 'domcontentloaded' })
+  await gotoWithRetry(page, url, { waitUntil: 'domcontentloaded' }, 4)
   await delay(Math.max(500, delayMs))
   await scrollProfileMedia(page)
 
@@ -1014,7 +1016,22 @@ async function main() {
       }
 
       console.log(`Extrayendo ${url}`)
-      const profile = await extractProfileData(page, context.request, url)
+      let profile
+      try {
+        profile = await extractProfileData(page, context.request, url)
+      } catch (error) {
+        const message = String(error?.message || error || '')
+        console.log(`Saltado por error de navegación/extracción en ${url}: ${message}`)
+        state.processedProfiles[url] = {
+          skipped: true,
+          reason: 'extract_error',
+          error: message.slice(0, 300),
+          at: new Date().toISOString(),
+        }
+        await writeJson(statePath, state)
+        skippedThisRun += 1
+        continue
+      }
       if (!profile.username) {
         console.log(`Saltado: no se pudo leer username en ${url}`)
         state.processedProfiles[url] = { skipped: true, reason: 'missing_username', at: new Date().toISOString() }
