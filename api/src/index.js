@@ -34,6 +34,7 @@ let _profileStatsBackfillReady = null;
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
+const FEED_PROFILE_LIMIT = 48;
 
 function getRoleBucketsForFilters(filterParts = []) {
   return [...new Set(filterParts)]
@@ -48,7 +49,7 @@ function getRoleBucketKey(role) {
   return PAIR_ROLE_IDS.includes(role) ? 'pareja' : role;
 }
 
-function interleaveRoleBuckets(bucketDefs, bucketMap, limit = 50) {
+function interleaveRoleBuckets(bucketDefs, bucketMap, limit = FEED_PROFILE_LIMIT) {
   const output = [];
   const cursors = new Map(bucketDefs.map((bucket) => [bucket.key, 0]));
 
@@ -1842,7 +1843,7 @@ async function handleProfiles(request, env) {
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
-  const dbLimit = roleBuckets.length > 1 ? 500 : 51;
+  const dbLimit = roleBuckets.length > 1 ? FEED_PROFILE_LIMIT * 10 : FEED_PROFILE_LIMIT + 1;
   query += ` ORDER BY last_active DESC LIMIT ${dbLimit}`;
 
   // Cache key for profiles query (shared across all users)
@@ -1928,9 +1929,9 @@ async function handleProfiles(request, env) {
         list.sort((a, b) => b._matchingInterests - a._matchingInterests);
       }
     }
-    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, 50);
+    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, FEED_PROFILE_LIMIT);
   } else {
-    profiles = profiles.slice(0, 50);
+    profiles = profiles.slice(0, FEED_PROFILE_LIMIT);
   }
 
   // Strip internal sort fields
