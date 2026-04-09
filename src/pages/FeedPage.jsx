@@ -81,6 +81,7 @@ export default function FeedPage() {
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [visibleCount, setVisibleCount] = useState(() => getInitialVisibleCount(cached?.profiles || []));
   const [showStoriesSection, setShowStoriesSection] = useState(() => !safariDesktop);
+  const [canAutoLoadMore, setCanAutoLoadMore] = useState(() => !safariDesktop);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
   const [nextCursor, setNextCursor] = useState(cached?.nextCursor || null);
@@ -124,10 +125,12 @@ export default function FeedPage() {
   useEffect(() => {
     if (!safariDesktop) {
       setShowStoriesSection(true);
+      setCanAutoLoadMore(true);
       return undefined;
     }
 
     setShowStoriesSection(false);
+    setCanAutoLoadMore(false);
     let frameA = 0;
     let frameB = 0;
     const timeoutId = window.setTimeout(() => {
@@ -143,6 +146,20 @@ export default function FeedPage() {
       if (frameA) cancelAnimationFrame(frameA);
       if (frameB) cancelAnimationFrame(frameB);
     };
+  }, [safariDesktop]);
+
+  useEffect(() => {
+    if (!safariDesktop) return undefined;
+
+    const unlockAutoLoad = () => {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      if (scrollTop > 80) {
+        setCanAutoLoadMore(true);
+      }
+    };
+
+    window.addEventListener('scroll', unlockAutoLoad, { passive: true });
+    return () => window.removeEventListener('scroll', unlockAutoLoad);
   }, [safariDesktop]);
 
   const loadProfiles = useCallback(({ silent = false, forceFresh = false } = {}) => {
@@ -423,7 +440,7 @@ export default function FeedPage() {
   }, []);
 
   useEffect(() => {
-    if (!loadMoreRef.current || loading || loadingMore || !hasMore) return;
+    if (!loadMoreRef.current || loading || loadingMore || !hasMore || !canAutoLoadMore) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
@@ -434,7 +451,7 @@ export default function FeedPage() {
     );
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [hasMore, loading, loadingMore, loadMoreProfiles, safariDesktop]);
+  }, [canAutoLoadMore, hasMore, loading, loadingMore, loadMoreProfiles, safariDesktop]);
 
   useEffect(() => () => stopStoriesMomentum(), [stopStoriesMomentum]);
 
