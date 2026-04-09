@@ -94,8 +94,8 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
               src={resolvedMainPhoto}
               alt={cardBlocked ? '' : name}
               referrerPolicy="no-referrer"
-              loading={index < 6 ? 'eager' : 'lazy'}
-              fetchPriority={index < 4 ? 'high' : 'auto'}
+              loading={index < (safariDesktop ? 2 : 6) ? 'eager' : 'lazy'}
+              fetchPriority={index < (safariDesktop ? 1 : 4) ? 'high' : 'auto'}
               decoding="async"
               className={`absolute inset-0 w-full h-full object-cover ${safariDesktop ? '' : 'transition-all duration-500 scale-105 group-hover:scale-100'}`}
               style={cardBlocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}

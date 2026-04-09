@@ -15,6 +15,7 @@ import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
 import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
+import { isSafariDesktopBrowser } from '../lib/browser';
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const FEED_CACHE_TTL_MS = 5 * 60_000;
@@ -64,6 +65,7 @@ function hasFeedPaginationState(cached) {
 }
 
 export default function FeedPage() {
+  const safariDesktop = isSafariDesktopBrowser();
   const cached = getCachedFeed();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
@@ -227,6 +229,7 @@ export default function FeedPage() {
 
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
+  const storyProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, safariDesktop ? 10 : 15);
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
@@ -398,9 +401,9 @@ export default function FeedPage() {
       {/* Stories section */}
       <motion.div
         className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+        initial={safariDesktop ? false : { opacity: 0, y: 10 }}
+        animate={safariDesktop ? undefined : { opacity: 1, y: 0 }}
+        transition={safariDesktop ? undefined : { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
       >
         <div className="flex items-center gap-1.5 mb-3">
           <Radio className="w-4 h-4 text-mansion-crimson" />
@@ -410,9 +413,9 @@ export default function FeedPage() {
           ref={storiesScrollRef}
           className="flex overflow-x-auto scrollbar-hide pb-2 lg:cursor-grab active:lg:cursor-grabbing select-none"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', gap: `${storyCircleGap}px`, touchAction: 'pan-y' }}
-          variants={stagger}
-          initial="hidden"
-          animate="visible"
+          variants={safariDesktop ? undefined : stagger}
+          initial={safariDesktop ? false : 'hidden'}
+          animate={safariDesktop ? undefined : 'visible'}
           onWheel={handleStoriesWheel}
           onDragStart={handleStoriesNativeDragStart}
           onPointerDownCapture={handleStoriesPointerDown}
@@ -424,7 +427,7 @@ export default function FeedPage() {
         >
           {/* User's own story circle */}
           {user && (
-            <motion.div variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
+            <motion.div variants={safariDesktop ? undefined : storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
               <div className="relative">
                 <button
                   type="button"
@@ -469,7 +472,7 @@ export default function FeedPage() {
               </div>
             </motion.div>
           )}
-          {safeProfiles.filter(p => p.has_active_story).slice(0, 15).map((p) => {
+          {storyProfiles.map((p) => {
             const photo = getPrimaryProfilePhoto(p);
             const photoCrop = getPrimaryProfileCrop(p);
             const isViewed = viewedStoryUsers.has(p.id);
@@ -477,7 +480,7 @@ export default function FeedPage() {
             const border = storyCircleBorder;
             const innerGap = storyCircleInnerGap;
             return (
-              <motion.div key={`story-${p.id}`} variants={storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
+              <motion.div key={`story-${p.id}`} variants={safariDesktop ? undefined : storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
                 <button
                   type="button"
                   draggable={false}
@@ -513,9 +516,9 @@ export default function FeedPage() {
       {/* Results count */}
       <motion.div
         className="px-4 lg:px-8 pb-2"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3, delay: 0.25 }}
+        initial={safariDesktop ? false : { opacity: 0 }}
+        animate={safariDesktop ? undefined : { opacity: 1 }}
+        transition={safariDesktop ? undefined : { duration: 0.3, delay: 0.25 }}
       >
         <p className="text-text-dim text-xs">
           {safeProfiles.length} {safeProfiles.length === 1 ? 'usuario' : 'usuarios'} conectados
@@ -525,9 +528,9 @@ export default function FeedPage() {
       {/* Grid */}
       <motion.div
         className="px-4 lg:px-8"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
+        initial={safariDesktop ? false : { opacity: 0, y: 12 }}
+        animate={safariDesktop ? undefined : { opacity: 1, y: 0 }}
+        transition={safariDesktop ? undefined : { duration: 0.4, delay: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
       >
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -549,8 +552,8 @@ export default function FeedPage() {
           </>
         ) : (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={safariDesktop ? false : { opacity: 0 }}
+            animate={safariDesktop ? undefined : { opacity: 1 }}
             className="text-center py-20"
           >
             <p className="text-text-muted text-lg mb-2">No hay perfiles</p>
