@@ -190,7 +190,7 @@ export default function DesktopSidebar() {
               >
                 <div className="w-8 h-8 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0">
                   {v.avatar_url ? (
-                    <AvatarImg src={v.avatar_url} crop={v.avatar_crop} alt={v.name} className="w-full h-full" />
+                    <AvatarImg src={v.avatar_url} crop={v.avatar_crop} cover alt={v.name} className="w-full h-full" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-text-dim">
                       <Camera className="w-3.5 h-3.5" />

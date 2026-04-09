@@ -535,7 +535,7 @@ export default function FeedPage() {
                       <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: storyCircleInnerGap }}>
                         <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
                           {user.avatar_url ? (
-                            <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
+                            <AvatarImg src={user.avatar_url} crop={user.avatar_crop} cover alt={user.username} className="w-full h-full" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
                               {user.username?.charAt(0)}
@@ -579,7 +579,7 @@ export default function FeedPage() {
                       <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: storyCircleInnerGap }}>
                         <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
                           {user.avatar_url ? (
-                            <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
+                            <AvatarImg src={user.avatar_url} crop={user.avatar_crop} cover alt={user.username} className="w-full h-full" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
                               {user.username?.charAt(0)}
@@ -627,7 +627,7 @@ export default function FeedPage() {
                     <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: innerGap }}>
                       <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
                         {photo ? (
-                          <AvatarImg src={photo} crop={photoCrop} alt={p.name} className="w-full h-full" />
+                          <AvatarImg src={photo} crop={photoCrop} cover alt={p.name} className="w-full h-full" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
                             {p.name?.charAt(0)}
@@ -656,7 +656,7 @@ export default function FeedPage() {
                     <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: innerGap }}>
                       <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
                         {photo ? (
-                          <AvatarImg src={photo} crop={photoCrop} alt={p.name} className="w-full h-full" />
+                          <AvatarImg src={photo} crop={photoCrop} cover alt={p.name} className="w-full h-full" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
                             {p.name?.charAt(0)}

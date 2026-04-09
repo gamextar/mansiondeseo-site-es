@@ -247,7 +247,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="flex flex-col items-start gap-2.5">
             <div className="rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize + 12, height: avatarSize + 12 }}>
               {story.avatar_url ? (
-                <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
+                <AvatarImg src={story.avatar_url} crop={story.avatar_crop} cover alt={story.username} className="w-full h-full" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-white/60 text-xl font-bold">{(story.username || '?')[0]}</div>
               )}
@@ -438,7 +438,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
         <MobileOverlayButton onPress={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1">
           <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
             {story.avatar_url ? (
-              <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
+              <AvatarImg src={story.avatar_url} crop={story.avatar_crop} cover alt={story.username} className="w-full h-full" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
             )}
@@ -1059,7 +1059,7 @@ export default function VideoFeedPage() {
             >
               <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
                 {activeStory.avatar_url ? (
-                  <AvatarImg src={activeStory.avatar_url} crop={activeStory.avatar_crop} alt={activeStory.username} className="w-full h-full" />
+                  <AvatarImg src={activeStory.avatar_url} crop={activeStory.avatar_crop} cover alt={activeStory.username} className="w-full h-full" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(activeStory.username || '?')[0]}</div>
                 )}

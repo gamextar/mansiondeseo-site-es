@@ -7,6 +7,7 @@ import { resolveMediaUrl } from '../lib/media';
 export default function AvatarImg({
   src,
   crop,
+  cover = false,
   className = '',
   imgClassName = '',
   alt = '',
@@ -18,7 +19,7 @@ export default function AvatarImg({
 
   const resolvedSrc = resolveMediaUrl(src);
 
-  if (!crop || !crop.r) {
+  if (cover || !crop || !crop.r) {
     return <img src={resolvedSrc} alt={alt} referrerPolicy="no-referrer" draggable={false} className={`${className} ${imgClassName} object-cover`.trim()} style={imgStyle || style} {...imgProps} />;
   }
 
