@@ -105,6 +105,9 @@ export default function ProfileDetailPage() {
   const initialProfile = cachedDetail?.profile || previewProfile;
   const [profile, setProfile] = useState(initialProfile);
   const [viewerPremium, setViewerPremium] = useState(cachedDetail?.viewerPremium || false);
+  const [viewerIsAdmin, setViewerIsAdmin] = useState(
+    typeof cachedDetail?.viewerIsAdmin === 'boolean' ? cachedDetail.viewerIsAdmin : !!user?.is_admin
+  );
   const [settings, setSettings] = useState(cachedDetail?.settings || DEFAULT_PROFILE_SETTINGS);
   const [isFavorited, setIsFavorited] = useState(initialProfile?.isFavorited ?? false);
   const [togglingFav, setTogglingFav] = useState(false);
@@ -129,6 +132,7 @@ export default function ProfileDetailPage() {
     setProfile(nextInitialProfile);
     setOrderedPhotos(nextInitialProfile?.photos || []);
     setViewerPremium(nextCachedDetail?.viewerPremium || false);
+    setViewerIsAdmin(typeof nextCachedDetail?.viewerIsAdmin === 'boolean' ? nextCachedDetail.viewerIsAdmin : !!user?.is_admin);
     setSettings(nextCachedDetail?.settings || DEFAULT_PROFILE_SETTINGS);
     setIsFavorited(nextInitialProfile?.isFavorited ?? false);
     setLoading(!nextInitialProfile);
@@ -139,17 +143,19 @@ export default function ProfileDetailPage() {
         setProfile(data.profile);
         setOrderedPhotos(data.profile.photos || []);
         setViewerPremium(data.viewerPremium || false);
+        setViewerIsAdmin(!!data.viewerIsAdmin);
         setSettings(nextSettings);
         if (data.profile.isFavorited !== undefined) setIsFavorited(data.profile.isFavorited);
         writeProfileDetailCache(id, {
           profile: data.profile,
           viewerPremium: data.viewerPremium || false,
+          viewerIsAdmin: !!data.viewerIsAdmin,
           settings: nextSettings,
         });
       })
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
-  }, [id, navigate, location.state]);
+  }, [id, navigate, location.state, user?.is_admin]);
 
   const movePhoto = useCallback((from, dir) => {
     const to = from + dir;
@@ -509,7 +515,7 @@ export default function ProfileDetailPage() {
   const galleryPhotos = getGalleryPhotos(profile);
   const displayPhotos = getDisplayPhotos(profile);
   const avatarDisplayOffset = profile.avatar_url ? 1 : 0;
-  const canAdminEditViewedProfile = !!user?.is_admin && !isOwnProfile;
+  const canAdminEditViewedProfile = viewerIsAdmin && !isOwnProfile;
 
   // Incognito mode blur (whole profile)
   const isGhostBlurred = blurred;

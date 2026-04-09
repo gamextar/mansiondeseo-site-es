@@ -2031,7 +2031,7 @@ async function handleProfileDetail(request, env, userId) {
   // Parallel fetch: profile + viewer info + cached settings + favorites (all independent)
   const [user, viewer, settings, favRow, favByRow, visitStatRow] = await Promise.all([
     env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first(),
-    env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
+    env.DB.prepare('SELECT premium, premium_until, is_admin FROM users WHERE id = ?').bind(auth.sub).first(),
     cached('settings', 300_000, () => loadSettings(env)),
     env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(auth.sub, userId).first(),
     env.DB.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND target_id = ?').bind(userId, auth.sub).first(),
@@ -2145,6 +2145,7 @@ async function handleProfileDetail(request, env, userId) {
       receivedGifts: giftResults,
     },
     viewerPremium: viewerIsPremium,
+    viewerIsAdmin: !!viewer?.is_admin,
     settings,
     ...(messageLimit ? { messageLimit } : {}),
   });
