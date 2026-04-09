@@ -144,13 +144,13 @@ export default function ProfileDetailPage() {
         setProfile(data.profile);
         setOrderedPhotos(data.profile.photos || []);
         setViewerPremium(data.viewerPremium || false);
-        setViewerIsAdmin(!!data.viewerIsAdmin);
+        setViewerIsAdmin(typeof data.viewerIsAdmin === 'boolean' ? data.viewerIsAdmin : !!user?.is_admin);
         setSettings(nextSettings);
         if (data.profile.isFavorited !== undefined) setIsFavorited(data.profile.isFavorited);
         writeProfileDetailCache(id, {
           profile: data.profile,
           viewerPremium: data.viewerPremium || false,
-          viewerIsAdmin: !!data.viewerIsAdmin,
+          viewerIsAdmin: typeof data.viewerIsAdmin === 'boolean' ? data.viewerIsAdmin : !!user?.is_admin,
           settings: nextSettings,
         });
       })
@@ -276,7 +276,8 @@ export default function ProfileDetailPage() {
   }, [persistAdminGalleryUpdate, profile]);
 
   const handleToggleReview = useCallback(async () => {
-    if (!viewerIsAdmin || profile?.isOwnProfile || !profile?.id || reviewUpdating) return;
+    const canAdminReview = viewerIsAdmin || !!user?.is_admin;
+    if (!canAdminReview || profile?.isOwnProfile || !profile?.id || reviewUpdating) return;
     const nextStatus = profile.account_status === 'under_review' ? 'active' : 'under_review';
     const confirmed = nextStatus === 'under_review'
       ? confirm(`¿Poner a ${profile.name} en revisión?\n\nEl usuario dejará de ser visible públicamente en feed, ranking, stories y perfil.`)
@@ -295,7 +296,7 @@ export default function ProfileDetailPage() {
         writeProfileDetailCache(id, {
           profile: nextProfile,
           viewerPremium,
-          viewerIsAdmin,
+          viewerIsAdmin: canAdminReview,
           settings,
         });
         return nextProfile;
@@ -310,7 +311,7 @@ export default function ProfileDetailPage() {
     } finally {
       setReviewUpdating(false);
     }
-  }, [id, profile, reviewUpdating, settings, viewerIsAdmin, viewerPremium]);
+  }, [id, profile, reviewUpdating, settings, user?.is_admin, viewerIsAdmin, viewerPremium]);
 
   const handleToggleFavorite = async () => {
     if (togglingFav) return;
@@ -545,6 +546,7 @@ export default function ProfileDetailPage() {
   }
 
   const { name, age, role, interests, bio, totalPhotos, verified, online, premium, blurred, isOwnProfile, receivedGifts } = profile;
+  const effectiveViewerIsAdmin = viewerIsAdmin || !!user?.is_admin;
   const visitsTotal = Number(profile?.visits_total || 0);
   const followersTotal = Number(profile?.followers_total || 0);
   const seeking = Array.isArray(profile?.seeking) ? profile.seeking : (profile?.seeking ? [profile.seeking] : []);
@@ -553,7 +555,7 @@ export default function ProfileDetailPage() {
   const galleryPhotos = getGalleryPhotos(profile);
   const displayPhotos = getDisplayPhotos(profile);
   const avatarDisplayOffset = profile.avatar_url ? 1 : 0;
-  const canAdminEditViewedProfile = viewerIsAdmin && !isOwnProfile;
+  const canAdminEditViewedProfile = effectiveViewerIsAdmin && !isOwnProfile;
 
   // Incognito mode blur (whole profile)
   const isGhostBlurred = blurred;
