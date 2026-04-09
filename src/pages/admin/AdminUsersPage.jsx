@@ -187,6 +187,34 @@ export default function AdminUsersPage() {
     persistGalleryPhotos(next);
   }, [persistGalleryPhotos, selected]);
 
+  const handleUsePhotoAsAvatar = useCallback(async (url) => {
+    if (!selected?.id || !Array.isArray(selected.photos) || selected.avatar_url === url) return;
+    const previousAvatar = selected.avatar_url || '';
+    const basePhotos = selected.photos.filter((photo) => photo !== url);
+    const nextPhotos = previousAvatar && previousAvatar !== url && !basePhotos.includes(previousAvatar)
+      ? [previousAvatar, ...basePhotos]
+      : basePhotos;
+
+    setGallerySaving(true);
+    try {
+      const data = await adminUpdateUser(selected.id, {
+        avatar_url: url,
+        avatar_crop: null,
+        photos: nextPhotos,
+      });
+      setSelected((prev) => (prev && prev.id === selected.id ? { ...prev, ...data.user } : prev));
+      setUsers((prev) => prev.map((user) => (
+        user.id === selected.id
+          ? { ...user, avatar_url: data.user.avatar_url, avatar_crop: data.user.avatar_crop, photos: data.user.photos }
+          : user
+      )));
+    } catch (err) {
+      alert(err.message || 'Error al actualizar el avatar');
+    } finally {
+      setGallerySaving(false);
+    }
+  }, [selected]);
+
   const handleDelete = async (userId, email) => {
     if (!confirm(`¿Eliminar PERMANENTEMENTE a ${email}?\n\nEsto borrará todos sus mensajes, favoritos, visitas y regalos.`)) return;
     setActionLoading(true);
@@ -780,18 +808,36 @@ export default function AdminUsersPage() {
                           <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5">
                             <span className="text-[10px] font-semibold text-white/90">#{index + 1}</span>
                             {galleryEditing && (
-                              <button
-                                type="button"
-                                disabled={gallerySaving}
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  handleGalleryDeletePhoto(url);
-                                }}
-                                className="inline-flex items-center justify-center rounded-full bg-black/60 p-1 text-white transition-colors hover:bg-red-500/80 disabled:opacity-60"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  disabled={gallerySaving || selected.avatar_url === url}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    handleUsePhotoAsAvatar(url);
+                                  }}
+                                  className={`rounded-full px-2 py-1 text-[10px] font-semibold transition-colors disabled:opacity-60 ${
+                                    selected.avatar_url === url
+                                      ? 'bg-mansion-gold/70 text-black'
+                                      : 'bg-black/60 text-white hover:bg-mansion-gold hover:text-black'
+                                  }`}
+                                >
+                                  {selected.avatar_url === url ? 'Avatar' : 'Usar'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={gallerySaving}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    handleGalleryDeletePhoto(url);
+                                  }}
+                                  className="inline-flex items-center justify-center rounded-full bg-black/60 p-1 text-white transition-colors hover:bg-red-500/80 disabled:opacity-60"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>

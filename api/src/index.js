@@ -3838,12 +3838,13 @@ async function handleAdminUpdateUser(request, env, userId) {
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
 
-  const user = await env.DB.prepare('SELECT id, avatar_url FROM users WHERE id = ?').bind(userId).first();
+  const user = await env.DB.prepare('SELECT id, avatar_url, avatar_crop FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
 
   const body = await request.json();
   const updates = [];
   const vals = [];
+  const effectiveAvatarUrl = body.avatar_url !== undefined ? (body.avatar_url || '') : (user.avatar_url || '');
 
   if (body.premium !== undefined) { updates.push('premium = ?'); vals.push(body.premium ? 1 : 0); }
   if (body.premium_until !== undefined) { updates.push('premium_until = ?'); vals.push(body.premium_until || null); }
@@ -3861,9 +3862,11 @@ async function handleAdminUpdateUser(request, env, userId) {
   if (body.account_status !== undefined && ['active', 'under_review', 'suspended'].includes(body.account_status)) {
     updates.push('account_status = ?'); vals.push(body.account_status);
   }
+  if (body.avatar_url !== undefined) { updates.push('avatar_url = ?'); vals.push(effectiveAvatarUrl || null); }
+  if (body.avatar_crop !== undefined) { updates.push('avatar_crop = ?'); vals.push(JSON.stringify(body.avatar_crop || null)); }
   if (body.photos !== undefined) {
     updates.push('photos = ?');
-    vals.push(JSON.stringify(normalizeGalleryPhotos(body.photos, user.avatar_url || '')));
+    vals.push(JSON.stringify(normalizeGalleryPhotos(body.photos, effectiveAvatarUrl)));
   }
 
   if (updates.length === 0) return error('Nada que actualizar');
