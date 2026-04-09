@@ -67,12 +67,21 @@ const RoleFallbackIcon = ({ role }) => {
   );
 };
 
-export default function ProfileCard({ profile, index = 0, viewerPremium = false, settings = {} }) {
+export default function ProfileCard({
+  profile,
+  index = 0,
+  viewerPremium = false,
+  settings = {},
+  safariDesktopOverride,
+  isMobileOverride,
+}) {
   const { id, name, age, role, interests, photos = [], verified, online, premium, blurred } = profile;
-  const safariDesktop = isSafariDesktopBrowser();
+  const safariDesktop = typeof safariDesktopOverride === 'boolean' ? safariDesktopOverride : isSafariDesktopBrowser();
   const roleImg = settings[ROLE_IMG_KEYS[role]] || null;
   const locationText = formatLocation(profile);
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+  const isMobile = typeof isMobileOverride === 'boolean'
+    ? isMobileOverride
+    : (typeof window !== 'undefined' && window.innerWidth < 1024);
   const baseBlur = isMobile ? (settings.blurMobile ?? settings.blurLevel ?? 14) : (settings.blurDesktop ?? settings.blurLevel ?? 8);
   // Profile cards are medium-sized — use base value as-is
   const blurLevel = baseBlur;

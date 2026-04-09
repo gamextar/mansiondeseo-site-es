@@ -81,6 +81,7 @@ export default function FeedPage() {
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [visibleCount, setVisibleCount] = useState(() => getInitialVisibleCount(cached?.profiles || []));
   const [showStoriesSection, setShowStoriesSection] = useState(() => !safariDesktop);
+  const [showGridSection, setShowGridSection] = useState(() => !safariDesktop);
   const [canAutoLoadMore, setCanAutoLoadMore] = useState(() => !safariDesktop);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
@@ -125,18 +126,27 @@ export default function FeedPage() {
   useEffect(() => {
     if (!safariDesktop) {
       setShowStoriesSection(true);
+      setShowGridSection(true);
       setCanAutoLoadMore(true);
       return undefined;
     }
 
     setShowStoriesSection(false);
+    setShowGridSection(false);
     setCanAutoLoadMore(false);
     let frameA = 0;
     let frameB = 0;
+    let frameC = 0;
+    let frameD = 0;
     const timeoutId = window.setTimeout(() => {
       frameA = requestAnimationFrame(() => {
         frameB = requestAnimationFrame(() => {
           setShowStoriesSection(true);
+        });
+      });
+      frameC = requestAnimationFrame(() => {
+        frameD = requestAnimationFrame(() => {
+          setShowGridSection(true);
         });
       });
     }, 140);
@@ -145,6 +155,8 @@ export default function FeedPage() {
       window.clearTimeout(timeoutId);
       if (frameA) cancelAnimationFrame(frameA);
       if (frameB) cancelAnimationFrame(frameB);
+      if (frameC) cancelAnimationFrame(frameC);
+      if (frameD) cancelAnimationFrame(frameD);
     };
   }, [safariDesktop]);
 
@@ -693,11 +705,30 @@ export default function FeedPage() {
           </div>
         ) : safeProfiles.length > 0 ? (
           <>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
-              {renderedProfiles.map((profile, index) => (
-                <ProfileCard key={profile.id} profile={profile} index={index} viewerPremium={viewerPremium} settings={safeSettings} />
-              ))}
-            </div>
+            {showGridSection ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
+                {renderedProfiles.map((profile, index) => (
+                  <ProfileCard
+                    key={profile.id}
+                    profile={profile}
+                    index={index}
+                    viewerPremium={viewerPremium}
+                    settings={safeSettings}
+                    safariDesktopOverride={safariDesktop}
+                    isMobileOverride={false}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
+                {Array.from({ length: 8 }).map((_, idx) => (
+                  <div
+                    key={`feed-skeleton-${idx}`}
+                    className="aspect-[3/4] rounded-2xl bg-mansion-card/55 border border-mansion-border/20 animate-pulse"
+                  />
+                ))}
+              </div>
+            )}
             <div ref={loadMoreRef} className="h-8" />
             {loadingMore && (
               <div className="flex items-center justify-center py-6">
