@@ -908,7 +908,7 @@ export default function VideoFeedPage() {
 
   if (stories.length === 0) {
     return (
-      <div className={`fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-40 px-6 ${safariDesktop ? 'route-no-svgs' : ''}`}>
+      <div className="fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-40 px-6">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-32 right-[-10%] w-[520px] h-[520px] rounded-full bg-mansion-crimson/10 blur-3xl" />
           <div className="absolute bottom-[-12%] left-[-6%] w-[460px] h-[460px] rounded-full bg-mansion-gold/10 blur-3xl" />
@@ -943,7 +943,7 @@ export default function VideoFeedPage() {
   }
 
   return (
-    <div className={`fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base ${safariDesktop ? 'route-no-svgs' : ''}`}>
+    <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
       {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">

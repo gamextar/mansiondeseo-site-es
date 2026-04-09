@@ -155,11 +155,6 @@ input, textarea, select {
   transform: translateY(0);
 }
 
-/* Safari desktop perf isolation: temporarily hide SVGs on heavy routes */
-.route-no-svgs svg {
-  display: none !important;
-}
-
 /* ═══════════════════════════════════════════
    Chat micro-interactions
    ═══════════════════════════════════════════ */

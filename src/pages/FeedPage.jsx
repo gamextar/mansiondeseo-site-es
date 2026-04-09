@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
+import { forwardRef, useState, useMemo, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Radio, Plus } from 'lucide-react';
@@ -20,6 +20,13 @@ import { isSafariDesktopBrowser } from '../lib/browser';
 const FEED_CACHE_KEY = 'mansion_feed';
 const FEED_CACHE_TTL_MS = 5 * 60_000;
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
+const SAFARI_DESKTOP_INITIAL_VISIBLE = 24;
+const SAFARI_DESKTOP_VISIBLE_STEP = 12;
+
+const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, motionProps = {}, children, ...rest }, ref) {
+  if (disabled) return <div ref={ref} {...rest}>{children}</div>;
+  return <motion.div ref={ref} {...rest} {...motionProps}>{children}</motion.div>;
+});
 
 function getCachedFeed() {
   try {
@@ -67,7 +74,12 @@ function hasFeedPaginationState(cached) {
 export default function FeedPage() {
   const safariDesktop = isSafariDesktopBrowser();
   const cached = getCachedFeed();
+  const getInitialVisibleCount = useCallback(
+    (list) => (safariDesktop ? Math.min(Array.isArray(list) ? list.length : 0, SAFARI_DESKTOP_INITIAL_VISIBLE) : Array.isArray(list) ? list.length : 0),
+    [safariDesktop]
+  );
   const [profiles, setProfiles] = useState(cached?.profiles || []);
+  const [visibleCount, setVisibleCount] = useState(() => getInitialVisibleCount(cached?.profiles || []));
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
   const [nextCursor, setNextCursor] = useState(cached?.nextCursor || null);
@@ -113,6 +125,7 @@ export default function FeedPage() {
     if (!silent && !c) setLoading(true);
     if (!silent && c) {
       setProfiles(c.profiles || []);
+      setVisibleCount(getInitialVisibleCount(c.profiles || []));
       setViewerPremium(c.viewerPremium || false);
       if (c.settings) setSettings(c.settings);
       setNextCursor(c.nextCursor || null);
@@ -121,6 +134,7 @@ export default function FeedPage() {
     return getProfiles({ fresh: forceFresh })
       .then(data => {
         setProfiles(data.profiles || []);
+        setVisibleCount(getInitialVisibleCount(data.profiles || []));
         setViewerPremium(data.viewerPremium || false);
         if (data.settings) setSettings(data.settings);
         setNextCursor(data.nextCursor || null);
@@ -139,9 +153,13 @@ export default function FeedPage() {
         setHasMore(false);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [getInitialVisibleCount]);
 
   const loadMoreProfiles = useCallback(() => {
+    if (safariDesktop && visibleCount < profiles.length) {
+      setVisibleCount((current) => Math.min(profiles.length, current + SAFARI_DESKTOP_VISIBLE_STEP));
+      return Promise.resolve();
+    }
     if (loading || loadingMore || !hasMore || !nextCursor) return Promise.resolve();
     setLoadingMore(true);
     return getProfiles({ cursor: nextCursor })
@@ -156,6 +174,11 @@ export default function FeedPage() {
             seen.add(profile.id);
             merged.push(profile);
           }
+          setVisibleCount((current) => (
+            safariDesktop
+              ? Math.min(merged.length, Math.max(current, current + SAFARI_DESKTOP_VISIBLE_STEP))
+              : merged.length
+          ));
           return merged;
         });
         if (data.settings) setSettings(data.settings);
@@ -164,7 +187,7 @@ export default function FeedPage() {
         setHasMore(!!data.hasMore);
       })
       .finally(() => setLoadingMore(false));
-  }, [hasMore, loading, loadingMore, nextCursor, viewerPremium, settings]);
+  }, [hasMore, loading, loadingMore, nextCursor, profiles.length, safariDesktop, visibleCount]);
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
@@ -175,6 +198,7 @@ export default function FeedPage() {
     }
 
     setProfiles(cachedFeed.profiles || []);
+    setVisibleCount(getInitialVisibleCount(cachedFeed.profiles || []));
     setViewerPremium(cachedFeed.viewerPremium || false);
     if (cachedFeed.settings) setSettings(cachedFeed.settings);
     setNextCursor(cachedFeed.nextCursor || null);
@@ -184,7 +208,7 @@ export default function FeedPage() {
     if (!isFeedCacheFresh(cachedFeed) || !hasFeedPaginationState(cachedFeed)) {
       loadProfiles({ silent: true });
     }
-  }, [navigate, loadProfiles]);
+  }, [getInitialVisibleCount, navigate, loadProfiles]);
 
   useEffect(() => {
     const handleHomeFocus = () => {
@@ -229,6 +253,7 @@ export default function FeedPage() {
 
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
+  const renderedProfiles = safariDesktop ? safeProfiles.slice(0, visibleCount) : safeProfiles;
   const storyProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, safariDesktop ? 10 : 15);
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
@@ -380,16 +405,16 @@ export default function FeedPage() {
           loadMoreProfiles();
         }
       },
-      { rootMargin: '600px 0px' }
+      { rootMargin: safariDesktop ? '150px 0px' : '600px 0px' }
     );
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [hasMore, loading, loadingMore, loadMoreProfiles]);
+  }, [hasMore, loading, loadingMore, loadMoreProfiles, safariDesktop]);
 
   useEffect(() => () => stopStoriesMomentum(), [stopStoriesMomentum]);
 
   return (
-    <div className={`min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar ${safariDesktop ? 'route-no-svgs' : ''}`}>
+    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
       {/* Pull-to-refresh indicator */}
       <div
         ref={indicatorRef}
@@ -399,23 +424,29 @@ export default function FeedPage() {
         <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
       {/* Stories section */}
-      <motion.div
+      <AnimatedBlock
+        disabled={safariDesktop}
         className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0"
-        initial={safariDesktop ? false : { opacity: 0, y: 10 }}
-        animate={safariDesktop ? undefined : { opacity: 1, y: 0 }}
-        transition={safariDesktop ? undefined : { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+        motionProps={{
+          initial: { opacity: 0, y: 10 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] },
+        }}
       >
         <div className="flex items-center gap-1.5 mb-3">
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="text-text-muted text-sm lg:text-base font-medium">Transmitiendo</p>
         </div>
-        <motion.div
+        <AnimatedBlock
+          disabled={safariDesktop}
           ref={storiesScrollRef}
           className="flex overflow-x-auto scrollbar-hide pb-2 lg:cursor-grab active:lg:cursor-grabbing select-none"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', gap: `${storyCircleGap}px`, touchAction: 'pan-y' }}
-          variants={safariDesktop ? undefined : stagger}
-          initial={safariDesktop ? false : 'hidden'}
-          animate={safariDesktop ? undefined : 'visible'}
+          motionProps={{
+            variants: stagger,
+            initial: 'hidden',
+            animate: 'visible',
+          }}
           onWheel={handleStoriesWheel}
           onDragStart={handleStoriesNativeDragStart}
           onPointerDownCapture={handleStoriesPointerDown}
@@ -427,50 +458,95 @@ export default function FeedPage() {
         >
           {/* User's own story circle */}
           {user && (
-            <motion.div variants={safariDesktop ? undefined : storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
-              <div className="relative">
-                <button
-                  type="button"
-                  draggable={false}
-                  onClick={user.has_active_story && user.active_story_url
-                    ? () => setShowOwnStoryPreview(true)
-                    : () => navigate('/historia/nueva', { state: { from: '/' } })}
-                  className="flex flex-col items-center gap-1 w-full"
-                  onDragStart={handleStoriesNativeDragStart}
-                >
-                  <div className={`rounded-full ${
-                    user.has_active_story
-                      ? viewedStoryUsers.has(String(user.id))
-                        ? 'bg-white/20'
-                        : 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400'
-                      : 'bg-mansion-border/40'
-                  }`} style={{ width: storyCircleSize, height: storyCircleSize, padding: storyCircleBorder }}>
-                    <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: storyCircleInnerGap }}>
-                      <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
-                        {user.avatar_url ? (
-                          <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
-                            {user.username?.charAt(0)}
-                          </div>
-                        )}
+            safariDesktop ? (
+              <div className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
+                <div className="relative">
+                  <button
+                    type="button"
+                    draggable={false}
+                    onClick={user.has_active_story && user.active_story_url
+                      ? () => setShowOwnStoryPreview(true)
+                      : () => navigate('/historia/nueva', { state: { from: '/' } })}
+                    className="flex flex-col items-center gap-1 w-full"
+                    onDragStart={handleStoriesNativeDragStart}
+                  >
+                    <div className={`rounded-full ${
+                      user.has_active_story
+                        ? viewedStoryUsers.has(String(user.id))
+                          ? 'bg-white/20'
+                          : 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400'
+                        : 'bg-mansion-border/40'
+                    }`} style={{ width: storyCircleSize, height: storyCircleSize, padding: storyCircleBorder }}>
+                      <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: storyCircleInnerGap }}>
+                        <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
+                          {user.avatar_url ? (
+                            <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
+                              {user.username?.charAt(0)}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <span className="text-[10px] text-mansion-gold truncate w-full text-center leading-tight">Tú</span>
-                </button>
-                {/* Plus badge */}
-                <button
-                  type="button"
-                  draggable={false}
-                  onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/' } }); }}
-                  className="absolute bottom-4 right-0 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
-                  onDragStart={handleStoriesNativeDragStart}
-                >
-                  <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
-                </button>
+                    <span className="text-[10px] text-mansion-gold truncate w-full text-center leading-tight">Tú</span>
+                  </button>
+                  <button
+                    type="button"
+                    draggable={false}
+                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/' } }); }}
+                    className="absolute bottom-4 right-0 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
+                    onDragStart={handleStoriesNativeDragStart}
+                  >
+                    <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
+                  </button>
+                </div>
               </div>
-            </motion.div>
+            ) : (
+              <motion.div variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
+                <div className="relative">
+                  <button
+                    type="button"
+                    draggable={false}
+                    onClick={user.has_active_story && user.active_story_url
+                      ? () => setShowOwnStoryPreview(true)
+                      : () => navigate('/historia/nueva', { state: { from: '/' } })}
+                    className="flex flex-col items-center gap-1 w-full"
+                    onDragStart={handleStoriesNativeDragStart}
+                  >
+                    <div className={`rounded-full ${
+                      user.has_active_story
+                        ? viewedStoryUsers.has(String(user.id))
+                          ? 'bg-white/20'
+                          : 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400'
+                        : 'bg-mansion-border/40'
+                    }`} style={{ width: storyCircleSize, height: storyCircleSize, padding: storyCircleBorder }}>
+                      <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: storyCircleInnerGap }}>
+                        <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
+                          {user.avatar_url ? (
+                            <AvatarImg src={user.avatar_url} crop={user.avatar_crop} alt={user.username} className="w-full h-full" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
+                              {user.username?.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-mansion-gold truncate w-full text-center leading-tight">Tú</span>
+                  </button>
+                  <button
+                    type="button"
+                    draggable={false}
+                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/' } }); }}
+                    className="absolute bottom-4 right-0 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
+                    onDragStart={handleStoriesNativeDragStart}
+                  >
+                    <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
+                  </button>
+                </div>
+              </motion.div>
+            )
           )}
           {storyProfiles.map((p) => {
             const photo = getPrimaryProfilePhoto(p);
@@ -479,8 +555,37 @@ export default function FeedPage() {
             const size = storyCircleSize;
             const border = storyCircleBorder;
             const innerGap = storyCircleInnerGap;
-            return (
-              <motion.div key={`story-${p.id}`} variants={safariDesktop ? undefined : storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
+            return safariDesktop ? (
+              <div key={`story-${p.id}`} className="flex-shrink-0" style={{ width: size + 6 }}>
+                <button
+                  type="button"
+                  draggable={false}
+                  onClick={() => navigate('/videos', { state: { storyUserId: p.id } })}
+                  className="flex flex-col items-center gap-1"
+                  onDragStart={handleStoriesNativeDragStart}
+                >
+                  <div className={`rounded-full ${
+                    isViewed
+                      ? 'bg-white/20'
+                      : 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson'
+                  }`} style={{ width: size, height: size, padding: border }}>
+                    <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: innerGap }}>
+                      <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
+                        {photo ? (
+                          <AvatarImg src={photo} crop={photoCrop} alt={p.name} className="w-full h-full" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
+                            {p.name?.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-text-muted truncate w-full text-center leading-tight">{p.name?.split(' ')[0]}</span>
+                </button>
+              </div>
+            ) : (
+              <motion.div key={`story-${p.id}`} variants={storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
                 <button
                   type="button"
                   draggable={false}
@@ -510,27 +615,33 @@ export default function FeedPage() {
               </motion.div>
             );
           })}
-        </motion.div>
-      </motion.div>
+        </AnimatedBlock>
+      </AnimatedBlock>
 
       {/* Results count */}
-      <motion.div
+      <AnimatedBlock
+        disabled={safariDesktop}
         className="px-4 lg:px-8 pb-2"
-        initial={safariDesktop ? false : { opacity: 0 }}
-        animate={safariDesktop ? undefined : { opacity: 1 }}
-        transition={safariDesktop ? undefined : { duration: 0.3, delay: 0.25 }}
+        motionProps={{
+          initial: { opacity: 0 },
+          animate: { opacity: 1 },
+          transition: { duration: 0.3, delay: 0.25 },
+        }}
       >
         <p className="text-text-dim text-xs">
           {safeProfiles.length} {safeProfiles.length === 1 ? 'usuario' : 'usuarios'} conectados
         </p>
-      </motion.div>
+      </AnimatedBlock>
 
       {/* Grid */}
-      <motion.div
+      <AnimatedBlock
+        disabled={safariDesktop}
         className="px-4 lg:px-8"
-        initial={safariDesktop ? false : { opacity: 0, y: 12 }}
-        animate={safariDesktop ? undefined : { opacity: 1, y: 0 }}
-        transition={safariDesktop ? undefined : { duration: 0.4, delay: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
+        motionProps={{
+          initial: { opacity: 0, y: 12 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.4, delay: 0.15, ease: [0.25, 0.46, 0.45, 0.94] },
+        }}
       >
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -539,7 +650,7 @@ export default function FeedPage() {
         ) : safeProfiles.length > 0 ? (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
-              {safeProfiles.map((profile, index) => (
+              {renderedProfiles.map((profile, index) => (
                 <ProfileCard key={profile.id} profile={profile} index={index} viewerPremium={viewerPremium} settings={safeSettings} />
               ))}
             </div>
@@ -551,16 +662,19 @@ export default function FeedPage() {
             )}
           </>
         ) : (
-          <motion.div
-            initial={safariDesktop ? false : { opacity: 0 }}
-            animate={safariDesktop ? undefined : { opacity: 1 }}
+          <AnimatedBlock
+            disabled={safariDesktop}
+            motionProps={{
+              initial: { opacity: 0 },
+              animate: { opacity: 1 },
+            }}
             className="text-center py-20"
           >
             <p className="text-text-muted text-lg mb-2">No hay perfiles</p>
             <p className="text-text-dim text-sm">Prueba con otro filtro</p>
-          </motion.div>
+          </AnimatedBlock>
         )}
-      </motion.div>
+      </AnimatedBlock>
 
       {showOwnStoryPreview && user?.active_story_url && (
         <div className="fixed inset-0 z-50 bg-black lg:left-64 xl:left-72 lg:bg-mansion-base">
