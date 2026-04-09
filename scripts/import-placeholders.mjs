@@ -31,6 +31,7 @@ Opciones:
   --local             Usa bindings locales de wrangler
   --dry-run           No sube ni escribe; solo muestra el plan
   --only <username>   Importa solo un username
+  --start-from <username>  Retoma el batch desde ese username (incluido)
   --only-role-group <group>  Importa solo un grupo: mujer | hombre | pareja | pareja_hombres | pareja_mujeres | trans
   --skip-existing-users  Salta usuarios que ya existan en Mansion Deseo
   --replace-story     Borra stories existentes del usuario antes de insertar la nueva (default)
@@ -85,6 +86,7 @@ if (rawArgs.includes('--help') || rawArgs.includes('-h')) {
 
 const manifestArg = takeFlag('--manifest', null) || rawArgs.shift() || null
 const onlyUsername = takeFlag('--only', '')
+const startFromUsername = takeFlag('--start-from', '')
 const onlyRoleGroup = takeFlag('--only-role-group', '')
 const dryRun = hasFlag('--dry-run')
 const useLocal = hasFlag('--local')
@@ -716,7 +718,7 @@ async function main() {
   const profiles = loadManifest(manifestPath)
   const manifestDir = path.dirname(manifestPath)
   const normalizedRoleGroup = String(onlyRoleGroup || '').trim().toLowerCase()
-  const filtered = profiles.filter((profile) => {
+  let filtered = profiles.filter((profile) => {
     if (profile?.excluded) {
       return false
     }
@@ -729,6 +731,15 @@ async function main() {
     return true
   })
 
+  if (startFromUsername) {
+    const normalizedStart = String(startFromUsername).toLowerCase()
+    const startIndex = filtered.findIndex((profile) => String(profile?.username || '').toLowerCase() === normalizedStart)
+    if (startIndex === -1) {
+      throw new Error(`No encontré start-from=${startFromUsername} dentro del manifest filtrado`)
+    }
+    filtered = filtered.slice(startIndex)
+  }
+
   if (filtered.length === 0) {
     throw new Error('No hay perfiles para importar con los filtros actuales')
   }
@@ -737,6 +748,9 @@ async function main() {
   console.log(`Destino: ${useRemote ? 'remote' : 'local'}${dryRun ? ' (dry-run)' : ''}`)
   console.log(`DB: ${wranglerConfig.dbName}`)
   console.log(`R2: ${wranglerConfig.bucketName}`)
+  if (startFromUsername) {
+    console.log(`Retomando desde: ${startFromUsername}`)
+  }
 
   ensureFakeColumn()
   ensureLocalityColumn()
@@ -761,6 +775,7 @@ async function main() {
     skippedProfiles: results.filter((item) => item.skipped).length,
     skippedExistingProfiles: results.filter((item) => item.skippedExisting).length,
     importedStories: results.filter((item) => item.storyImported).length,
+    startedFrom: startFromUsername || null,
     dryRun,
     remote: useRemote,
   }

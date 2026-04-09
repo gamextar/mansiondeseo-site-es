@@ -585,6 +585,13 @@
             </div>
             <div class="row-2">
               <label>
+                Retomar desde username
+                <input id="startFromUsername" placeholder="Ej: usuario177" />
+              </label>
+              <div></div>
+            </div>
+            <div class="row-2">
+              <label>
                 Ruta manual del manifest
                 <input id="customManifestPath" placeholder="./data/contactossex-batches/batch-01.json" />
               </label>
@@ -764,6 +771,7 @@
           manifestPath: customManifestPath.value || manifestPathSelect.value,
           onlyRoleGroup: document.getElementById('onlyRoleGroup').value,
           onlyUsername: document.getElementById('onlyUsername').value,
+          startFromUsername: document.getElementById('startFromUsername').value,
           dryRun: document.getElementById('importDryRun').checked,
           skipExistingUsers: document.getElementById('skipExistingUsers').checked,
           keepStory: document.getElementById('keepStory').checked,

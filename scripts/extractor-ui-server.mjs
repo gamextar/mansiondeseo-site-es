@@ -168,6 +168,7 @@ function buildImportArgs(config) {
   const args = [importerScript]
   const manifestPath = stringValue(config.manifestPath, '')
   const onlyUsername = stringValue(config.onlyUsername, '')
+  const startFromUsername = stringValue(config.startFromUsername, '')
   const onlyRoleGroup = stringValue(config.onlyRoleGroup, '')
 
   if (!manifestPath) {
@@ -181,6 +182,7 @@ function buildImportArgs(config) {
   if (boolValue(config.skipExistingUsers, true)) args.push('--skip-existing-users')
   if (boolValue(config.keepStory, false)) args.push('--keep-story')
   if (onlyUsername) args.push('--only', onlyUsername)
+  if (startFromUsername) args.push('--start-from', startFromUsername)
   if (onlyRoleGroup && onlyRoleGroup !== 'all') args.push('--only-role-group', onlyRoleGroup)
 
   return args
