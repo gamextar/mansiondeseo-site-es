@@ -36,6 +36,20 @@ const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const FEED_PROFILE_LIMIT = 48;
 
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number(value) || 0));
+}
+
+function parseNumberSetting(value, fallback) {
+  const parsed = Number.parseFloat(String(value ?? ''));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseBooleanSetting(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+}
+
 function getRoleBucketsForFilters(filterParts = []) {
   return [...new Set(filterParts)]
     .filter((role) => SEEKING_ROLE_IDS.includes(role))
@@ -68,6 +82,36 @@ function interleaveRoleBuckets(bucketDefs, bucketMap, limit = FEED_PROFILE_LIMIT
   }
 
   return output;
+}
+
+function computeFeedScore(profile, viewerInterests, settings) {
+  const now = Date.now();
+  const lastActiveRaw = String(profile?.last_active || '').trim();
+  const lastActiveTs = lastActiveRaw
+    ? new Date(lastActiveRaw.endsWith('Z') ? lastActiveRaw : `${lastActiveRaw}Z`).getTime()
+    : 0;
+  const hoursSinceActive = lastActiveTs > 0 ? Math.max(0, (now - lastActiveTs) / 3600_000) : 9999;
+  const recencyScore = clamp01(1 - (hoursSinceActive / 168)); // decay over 7 days
+  const photoCount = Math.max(0, Number(profile?.totalPhotos) || 0);
+  const photosScore = clamp01(photoCount / 12);
+  const followersScore = clamp01(Math.log10((Math.max(0, Number(profile?.followers_total) || 0)) + 1) / 3);
+  const sharedInterestsCount = Array.isArray(viewerInterests) && viewerInterests.length > 0
+    ? profile._matchingInterests || 0
+    : 0;
+  const sharedInterestsScore = Array.isArray(viewerInterests) && viewerInterests.length > 0
+    ? clamp01(sharedInterestsCount / Math.max(1, Math.min(viewerInterests.length, 5)))
+    : 0;
+  const storyScore = profile?.has_active_story ? 1 : 0;
+  const premiumScore = isPremiumActive(profile) ? 1 : 0;
+
+  return (
+    recencyScore * settings.feedWeightLastActive +
+    storyScore * settings.feedWeightStory +
+    photosScore * settings.feedWeightPhotos +
+    followersScore * settings.feedWeightFollowers +
+    sharedInterestsScore * settings.feedWeightSharedInterests +
+    premiumScore * settings.feedWeightPremium
+  );
 }
 
 // ── Helpers ─────────────────────────────────────────────
@@ -1775,12 +1819,14 @@ async function handleProfiles(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   await ensureUserBrowseIndexes(env);
+  await ensureProfileVisitStructures(env);
 
   const url = new URL(request.url);
   const filter = url.searchParams.get('filter') || 'all';
   const search = url.searchParams.get('q') || '';
   const fresh = url.searchParams.get('fresh') === '1';
   const cursor = Math.max(0, Number.parseInt(url.searchParams.get('cursor') || '0', 10) || 0);
+  const settings = await cached('settings', 300_000, () => loadSettings(env));
 
   // Use cached viewer data when available to avoid a serial D1 round-trip
   let viewer = fresh ? null : getCachedViewer(auth.sub);
@@ -1797,31 +1843,33 @@ async function handleProfiles(request, env) {
   // Build profiles query (don't exclude current user — cache is shared, filter later)
   let query = `
     SELECT
-      id,
-      username,
-      age,
-      birthdate,
-      city,
-      locality,
-      role,
-      interests,
-      bio,
-      avatar_url,
-      avatar_crop,
-      photos,
-      verified,
-      premium,
-      premium_until,
-      ghost_mode,
-      fake,
-      marital_status,
-      sexual_orientation,
-      last_active
-    FROM users
-    WHERE status = 'verified'
+      u.id,
+      u.username,
+      u.age,
+      u.birthdate,
+      u.city,
+      u.locality,
+      u.role,
+      u.interests,
+      u.bio,
+      u.avatar_url,
+      u.avatar_crop,
+      u.photos,
+      u.verified,
+      u.premium,
+      u.premium_until,
+      u.ghost_mode,
+      u.fake,
+      u.marital_status,
+      u.sexual_orientation,
+      u.last_active,
+      COALESCE(ps.followers_total, 0) AS followers_total
+    FROM users u
+    LEFT JOIN profile_stats ps ON ps.user_id = u.id
+    WHERE u.status = 'verified'
   `;
   const params = [];
-  if (country) { query += ` AND country = ?`; params.push(country); }
+  if (settings.feedFilterByCountry && country) { query += ` AND u.country = ?`; params.push(country); }
 
   // Role filter: use server-side seeking, fall back to frontend filter param
   const roleFilters = SEEKING_ROLE_IDS;
@@ -1840,7 +1888,7 @@ async function handleProfiles(request, env) {
     query += ` AND role IN (${roleValues.map(f => `'${f}'`).join(',')})`;
   }
   if (search) {
-    query += ` AND (username LIKE ? OR city LIKE ? OR locality LIKE ? OR bio LIKE ?)`;
+    query += ` AND (u.username LIKE ? OR u.city LIKE ? OR u.locality LIKE ? OR u.bio LIKE ?)`;
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
@@ -1851,12 +1899,12 @@ async function handleProfiles(request, env) {
 
   // Cache key for profiles query (shared across all users)
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
-  const profilesCacheKey = `profiles:${seekingKey}:${country}:${search}`;
+  const countryKey = settings.feedFilterByCountry ? country : 'all-countries';
+  const profilesCacheKey = `profiles:${seekingKey}:${countryKey}:${search}`;
   const shouldUseProfilesCache = !fresh && cursor === 0;
 
   // Parallel: cached settings + cached profiles + combined favorites + active stories
-  const [settings, results, { results: allFavRows }, storyRows] = await Promise.all([
-    cached('settings', 300_000, () => loadSettings(env)),  // 5 min
+  const [results, { results: allFavRows }, storyRows] = await Promise.all([
     shouldUseProfilesCache
       ? cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results))  // 30s
       : env.DB.prepare(query).bind(...params).all().then(r => r.results),
@@ -1908,6 +1956,7 @@ async function handleProfiles(request, env) {
       avatar_url: u.avatar_url,
       avatar_crop: safeParseJSON(u.avatar_crop, null),
       has_active_story: activeStoryUserIds.has(String(u.id)),
+      followers_total: Number(u.followers_total || 0),
       _roleId: u.role,
       _matchingInterests: viewerInterests.length > 0
         ? profileInterests.filter(i => viewerInterests.includes(i)).length
@@ -1915,9 +1964,17 @@ async function handleProfiles(request, env) {
     };
   });
 
-  // Sort: profiles with more matching interests first, then by last_active (already sorted by DB)
-  if (viewerInterests.length > 0 && roleBuckets.length <= 1) {
-    profiles.sort((a, b) => b._matchingInterests - a._matchingInterests);
+  profiles = profiles.map((profile) => ({
+    ...profile,
+    _feedScore: computeFeedScore(profile, viewerInterests, settings),
+  }));
+
+  // Sort: weighted feed score first, then last_active as tie-break.
+  if (roleBuckets.length <= 1) {
+    profiles.sort((a, b) => {
+      if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
+      return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
+    });
   }
 
   if (roleBuckets.length > 1) {
@@ -1927,11 +1984,12 @@ async function handleProfiles(request, env) {
       if (!bucketMap.has(bucketKey)) continue;
       bucketMap.get(bucketKey).push(profile);
     }
-    if (viewerInterests.length > 0) {
-      for (const bucket of roleBuckets) {
-        const list = bucketMap.get(bucket.key) || [];
-        list.sort((a, b) => b._matchingInterests - a._matchingInterests);
-      }
+    for (const bucket of roleBuckets) {
+      const list = bucketMap.get(bucket.key) || [];
+      list.sort((a, b) => {
+        if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
+        return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
+      });
     }
     profiles = interleaveRoleBuckets(roleBuckets, bucketMap, pageWindowLimit);
   } else {
@@ -1939,7 +1997,7 @@ async function handleProfiles(request, env) {
   }
 
   // Strip internal sort fields
-  profiles = profiles.map(({ _matchingInterests, _roleId, ...p }) => p);
+  profiles = profiles.map(({ _matchingInterests, _roleId, _feedScore, ...p }) => p);
 
   const totalProfiles = profiles.length;
   const pagedProfiles = profiles.slice(cursor, cursor + FEED_PROFILE_LIMIT);
@@ -3115,6 +3173,13 @@ async function loadSettings(env) {
     resendApiKey: settings.resend_api_key || env.RESEND_API_KEY || '',
     mailFrom: settings.mail_from || env.MAIL_FROM || 'noreply@unicoapps.com',
     onlineThresholdMinutes: parseInt(settings.online_threshold_minutes || '60', 10),
+    feedFilterByCountry: parseBooleanSetting(settings.feed_filter_by_country, false),
+    feedWeightLastActive: parseNumberSetting(settings.feed_weight_last_active, 45),
+    feedWeightStory: parseNumberSetting(settings.feed_weight_story, 18),
+    feedWeightPhotos: parseNumberSetting(settings.feed_weight_photos, 12),
+    feedWeightFollowers: parseNumberSetting(settings.feed_weight_followers, 10),
+    feedWeightSharedInterests: parseNumberSetting(settings.feed_weight_shared_interests, 20),
+    feedWeightPremium: parseNumberSetting(settings.feed_weight_premium, 8),
   };
   // Keep module-level threshold in sync so isOnline() uses the latest value
   _onlineThresholdMs = result.onlineThresholdMinutes * 60_000;
@@ -3164,6 +3229,13 @@ function getPublicSettingsPayload(settings) {
     galleryParejaImg: settings.galleryParejaImg,
     coinIconUrl: settings.coinIconUrl,
     coinIconSize: settings.coinIconSize,
+    feedFilterByCountry: settings.feedFilterByCountry,
+    feedWeightLastActive: settings.feedWeightLastActive,
+    feedWeightStory: settings.feedWeightStory,
+    feedWeightPhotos: settings.feedWeightPhotos,
+    feedWeightFollowers: settings.feedWeightFollowers,
+    feedWeightSharedInterests: settings.feedWeightSharedInterests,
+    feedWeightPremium: settings.feedWeightPremium,
     navBottomPadding: settings.navBottomPadding,
     navSidePadding: settings.navSidePadding,
     navHeight: settings.navHeight,
@@ -3257,6 +3329,13 @@ async function handleUpdateSettings(request, env) {
     'resend_api_key',
     'mail_from',
     'online_threshold_minutes',
+    'feed_filter_by_country',
+    'feed_weight_last_active',
+    'feed_weight_story',
+    'feed_weight_photos',
+    'feed_weight_followers',
+    'feed_weight_shared_interests',
+    'feed_weight_premium',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {

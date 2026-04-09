@@ -37,6 +37,13 @@ export default function SettingsPage() {
   const [siteCountry, setSiteCountry] = useState('AR');
   const [allowedCountries, setAllowedCountries] = useState('AR');
   const [hidePasswordRegister, setHidePasswordRegister] = useState(true);
+  const [feedFilterByCountry, setFeedFilterByCountry] = useState(false);
+  const [feedWeightLastActive, setFeedWeightLastActive] = useState(45);
+  const [feedWeightStory, setFeedWeightStory] = useState(18);
+  const [feedWeightPhotos, setFeedWeightPhotos] = useState(12);
+  const [feedWeightFollowers, setFeedWeightFollowers] = useState(10);
+  const [feedWeightSharedInterests, setFeedWeightSharedInterests] = useState(20);
+  const [feedWeightPremium, setFeedWeightPremium] = useState(8);
 
   // Coin packs
   const [coinPack1Coins, setCoinPack1Coins] = useState('1000');
@@ -181,6 +188,13 @@ export default function SettingsPage() {
         setSiteCountry(s.siteCountry);
         setAllowedCountries(s.allowedCountries || 'AR');
         setHidePasswordRegister(s.hidePasswordRegister);
+        setFeedFilterByCountry(s.feedFilterByCountry === true);
+        setFeedWeightLastActive(s.feedWeightLastActive ?? 45);
+        setFeedWeightStory(s.feedWeightStory ?? 18);
+        setFeedWeightPhotos(s.feedWeightPhotos ?? 12);
+        setFeedWeightFollowers(s.feedWeightFollowers ?? 10);
+        setFeedWeightSharedInterests(s.feedWeightSharedInterests ?? 20);
+        setFeedWeightPremium(s.feedWeightPremium ?? 8);
         setVipPriceMonthly(s.vipPriceMonthly);
         setVipPrice3Months(s.vipPrice3Months);
         setVipPrice6Months(s.vipPrice6Months);
@@ -287,6 +301,13 @@ export default function SettingsPage() {
         site_country: siteCountry,
         allowed_countries: allowedCountries,
         hide_password_register: hidePasswordRegister ? '1' : '0',
+        feed_filter_by_country: feedFilterByCountry ? '1' : '0',
+        feed_weight_last_active: feedWeightLastActive,
+        feed_weight_story: feedWeightStory,
+        feed_weight_photos: feedWeightPhotos,
+        feed_weight_followers: feedWeightFollowers,
+        feed_weight_shared_interests: feedWeightSharedInterests,
+        feed_weight_premium: feedWeightPremium,
         vip_price_monthly: vipPriceMonthly,
         vip_price_3months: vipPrice3Months,
         vip_price_6months: vipPrice6Months,
@@ -348,6 +369,13 @@ export default function SettingsPage() {
       setSiteCountry(s.siteCountry);
       setAllowedCountries(s.allowedCountries || 'AR');
       setHidePasswordRegister(s.hidePasswordRegister);
+      setFeedFilterByCountry(s.feedFilterByCountry === true);
+      setFeedWeightLastActive(s.feedWeightLastActive ?? 45);
+      setFeedWeightStory(s.feedWeightStory ?? 18);
+      setFeedWeightPhotos(s.feedWeightPhotos ?? 12);
+      setFeedWeightFollowers(s.feedWeightFollowers ?? 10);
+      setFeedWeightSharedInterests(s.feedWeightSharedInterests ?? 20);
+      setFeedWeightPremium(s.feedWeightPremium ?? 8);
       setVipPriceMonthly(s.vipPriceMonthly);
       setVipPrice3Months(s.vipPrice3Months);
       setVipPrice6Months(s.vipPrice6Months);
@@ -1001,6 +1029,47 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <ToggleSwitch value={hidePasswordRegister} onChange={setHidePasswordRegister} />
+              </div>
+            </div>
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5 space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                    <Activity className="w-4 h-4 text-mansion-gold" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">Scoring del feed</h3>
+                    <p className="text-[11px] text-text-dim">Ajusta cuánto pesa cada señal en el orden del feed principal.</p>
+                  </div>
+                </div>
+                <ToggleSwitch value={feedFilterByCountry} onChange={setFeedFilterByCountry} />
+              </div>
+
+              <div className="rounded-xl border border-white/5 bg-mansion-elevated/30 px-3 py-2 text-[11px] text-text-dim">
+                Filtro por país en el feed:
+                <span className="ml-2 font-semibold text-mansion-gold">{feedFilterByCountry ? 'Activo' : 'Desactivado'}</span>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                {[
+                  { label: 'Actividad reciente', value: feedWeightLastActive, setter: setFeedWeightLastActive, hint: 'Empuja usuarios activos recientemente.' },
+                  { label: 'Story activa', value: feedWeightStory, setter: setFeedWeightStory, hint: 'Premia perfiles que están transmitiendo.' },
+                  { label: 'Cantidad de fotos', value: feedWeightPhotos, setter: setFeedWeightPhotos, hint: 'Sube perfiles con más contenido cargado.' },
+                  { label: 'Seguidores', value: feedWeightFollowers, setter: setFeedWeightFollowers, hint: 'Da peso social a perfiles fuertes.' },
+                  { label: 'Intereses compartidos', value: feedWeightSharedInterests, setter: setFeedWeightSharedInterests, hint: 'Aumenta afinidad por gustos similares.' },
+                  { label: 'Premium', value: feedWeightPremium, setter: setFeedWeightPremium, hint: 'Da un plus a perfiles VIP.' },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">{item.label}</p>
+                        <p className="text-[11px] text-text-dim">{item.hint}</p>
+                      </div>
+                      <Counter value={item.value} onChange={item.setter} min={0} max={100} />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
