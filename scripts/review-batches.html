@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Revisión Local de Batches</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #120f12;
+        --panel: rgba(26, 20, 27, 0.86);
+        --panel-2: rgba(38, 30, 40, 0.92);
+        --line: rgba(255,255,255,0.08);
+        --text: #f7eef1;
+        --muted: #b9abb2;
+        --gold: #d6b27c;
+        --gold-soft: rgba(214,178,124,0.14);
+        --crimson: #a73552;
+        --danger: #c45164;
+        --ok: #78bf98;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(214,178,124,0.15), transparent 28%),
+          radial-gradient(circle at top right, rgba(167,53,82,0.18), transparent 30%),
+          linear-gradient(180deg, #0f0c10 0%, #171218 100%);
+      }
+
+      .wrap {
+        max-width: 1380px;
+        margin: 0 auto;
+        padding: 28px 18px 42px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(32px, 5vw, 52px);
+        line-height: 1;
+      }
+
+      .sub {
+        margin: 0 0 24px;
+        color: var(--muted);
+        font-size: 15px;
+        max-width: 780px;
+      }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 22px;
+        padding: 28px;
+        border-radius: 28px;
+        border: 1px solid var(--line);
+        background:
+          radial-gradient(circle at top left, rgba(214,178,124,0.12), transparent 40%),
+          linear-gradient(155deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+        box-shadow: 0 26px 80px rgba(0,0,0,0.26);
+        backdrop-filter: blur(14px);
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(120deg, rgba(255,255,255,0.05), transparent 34%, transparent 72%, rgba(255,255,255,0.02));
+        pointer-events: none;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: end;
+        margin-bottom: 18px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      select, button {
+        font: inherit;
+      }
+
+      select {
+        width: 100%;
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.09);
+        background: var(--panel-2);
+        color: var(--text);
+        padding: 12px 14px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 16px;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      .primary {
+        color: #140f12;
+        background: linear-gradient(135deg, var(--gold), #f3d7b2);
+      }
+
+      .danger {
+        color: #fff;
+        background: linear-gradient(135deg, #7d2f44, var(--danger));
+      }
+
+      .secondary {
+        color: var(--text);
+        background: rgba(255,255,255,0.08);
+      }
+
+      .stats {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.06);
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 24px;
+        border: 1px solid var(--line);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)),
+          #19131a;
+        box-shadow: 0 18px 54px rgba(0,0,0,0.2);
+      }
+
+      .card.excluded {
+        opacity: 0.72;
+        border-color: rgba(196,81,100,0.32);
+      }
+
+      .hero-media {
+        position: relative;
+        aspect-ratio: 4 / 4.6;
+        background:
+          radial-gradient(circle at top left, rgba(214,178,124,0.09), transparent 40%),
+          linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.18));
+      }
+
+      .hero-media img,
+      .hero-media video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .hero-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(0,0,0,0.08), transparent 34%, rgba(0,0,0,0.62));
+      }
+
+      .top-badges,
+      .bottom-meta {
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        z-index: 2;
+      }
+
+      .top-badges { top: 14px; }
+      .bottom-meta { bottom: 14px; align-items: end; }
+
+      .stack {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(10,10,14,0.36);
+        backdrop-filter: blur(10px);
+      }
+
+      .badge.gold {
+        color: var(--gold);
+        border-color: rgba(214,178,124,0.3);
+        background: rgba(214,178,124,0.12);
+      }
+
+      .title {
+        display: grid;
+        gap: 4px;
+      }
+
+      .name {
+        font-size: 24px;
+        font-weight: 700;
+        color: #fff;
+        line-height: 1;
+      }
+
+      .meta {
+        font-size: 12px;
+        color: rgba(255,255,255,0.8);
+      }
+
+      .body {
+        padding: 14px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .thumbs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+      }
+
+      .thumb {
+        aspect-ratio: 1 / 1;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(255,255,255,0.03);
+      }
+
+      .thumb img,
+      .thumb video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .line {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        color: var(--muted);
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.06);
+      }
+
+      .bio {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+        min-height: 56px;
+      }
+
+      .empty {
+        padding: 32px;
+        border-radius: 24px;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,0.03);
+        color: var(--muted);
+        text-align: center;
+      }
+
+      @media (max-width: 860px) {
+        .toolbar {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="hero">
+        <h1>Revisión Local de Perfiles</h1>
+        <p class="sub">Explora batches por sexo/carpeta, revisa cómo se verían los perfiles y excluye los que no quieras subir. Esta herramienta es independiente del extractor e importer.</p>
+      </section>
+
+      <div class="toolbar">
+        <label>
+          Grupo
+          <select id="group">
+            <option value="all" selected>Todos</option>
+            <option value="mujer">Mujeres</option>
+            <option value="hombre">Hombres</option>
+            <option value="pareja">Parejas</option>
+            <option value="pareja_hombres">Pareja de Hombres</option>
+            <option value="pareja_mujeres">Pareja de Mujeres</option>
+            <option value="trans">Trans</option>
+          </select>
+        </label>
+
+        <label>
+          Batch
+          <select id="batch"></select>
+        </label>
+
+        <button class="primary" id="reload">Actualizar</button>
+      </div>
+
+      <div class="stats">
+        <span class="pill" id="count">0 perfiles</span>
+        <span class="pill" id="excluded">0 excluidos</span>
+        <span class="pill" id="manifest">Sin batch seleccionado</span>
+      </div>
+
+      <div class="grid" id="grid">
+        <div class="empty">Cargando batches...</div>
+      </div>
+    </div>
+
+    <script>
+      const groupSelect = document.getElementById('group')
+      const batchSelect = document.getElementById('batch')
+      const reloadButton = document.getElementById('reload')
+      const grid = document.getElementById('grid')
+      const countPill = document.getElementById('count')
+      const excludedPill = document.getElementById('excluded')
+      const manifestPill = document.getElementById('manifest')
+
+      let allBatches = []
+
+      async function fetchBatches() {
+        const response = await fetch('/api/batches')
+        const data = await response.json()
+        allBatches = data.batches || []
+        renderBatchOptions()
+        if (batchSelect.value) {
+          await fetchReview()
+        } else {
+          grid.innerHTML = '<div class="empty">No hay batches guardados para este grupo todavía.</div>'
+          countPill.textContent = '0 perfiles'
+          excludedPill.textContent = '0 excluidos'
+          manifestPill.textContent = 'Sin batch seleccionado'
+        }
+      }
+
+      function renderBatchOptions() {
+        const previous = batchSelect.value
+        const group = groupSelect.value || 'all'
+        const filtered = group === 'all'
+          ? allBatches
+          : allBatches.filter((batch) => String(batch.name || '').startsWith(`${group}/`))
+
+        batchSelect.innerHTML = ''
+
+        if (!filtered.length) {
+          const option = document.createElement('option')
+          option.value = ''
+          option.textContent = 'No hay batches para este grupo'
+          batchSelect.appendChild(option)
+          return
+        }
+
+        for (const batch of filtered) {
+          const option = document.createElement('option')
+          option.value = batch.path
+          option.textContent = `${batch.name} (${new Date(batch.modifiedAt).toLocaleString()})`
+          batchSelect.appendChild(option)
+        }
+
+        if (previous && [...batchSelect.options].some((option) => option.value === previous)) {
+          batchSelect.value = previous
+        }
+      }
+
+      async function fetchReview() {
+        const manifestPath = batchSelect.value
+        if (!manifestPath) return
+        grid.innerHTML = '<div class="empty">Cargando perfiles...</div>'
+        const response = await fetch(`/api/review?manifestPath=${encodeURIComponent(manifestPath)}`)
+        const data = await response.json()
+        renderReview(data)
+      }
+
+      function statBadge(label, value, extraClass = '') {
+        return `<span class="badge ${extraClass}">${label}: ${value}</span>`
+      }
+
+      function thumbMedia(url, isVideo = false) {
+        if (!url) return '<div class="thumb"></div>'
+        return `
+          <div class="thumb">
+            ${isVideo ? `<video src="${url}" muted playsinline preload="metadata"></video>` : `<img src="${url}" alt="" loading="lazy" />`}
+          </div>
+        `
+      }
+
+      function renderReview(data) {
+        const profiles = Array.isArray(data?.profiles) ? data.profiles : []
+        const excludedCount = profiles.filter((profile) => profile.excluded).length
+        countPill.textContent = `${profiles.length} perfiles`
+        excludedPill.textContent = `${excludedCount} excluidos`
+        manifestPill.textContent = data?.manifestPath || 'Sin batch seleccionado'
+
+        if (!profiles.length) {
+          grid.innerHTML = '<div class="empty">Este batch no tiene perfiles.</div>'
+          return
+        }
+
+        grid.innerHTML = profiles.map((profile) => {
+          const seeking = Array.isArray(profile.seeking) ? profile.seeking : []
+          const blocked = Array.isArray(profile.messageBlockRoles) ? profile.messageBlockRoles : []
+          const thumbs = [
+            ...profile.previewPhotos.map((url) => thumbMedia(url, false)),
+            ...profile.previewVideos.map((url) => thumbMedia(url, true)),
+          ].join('')
+
+          return `
+            <article class="card ${profile.excluded ? 'excluded' : ''}" data-username="${profile.username}">
+              <div class="hero-media">
+                ${profile.avatarUrl ? `<img src="${profile.avatarUrl}" alt="${profile.username}" loading="lazy" />` : ''}
+                <div class="hero-overlay"></div>
+                <div class="top-badges">
+                  <div class="stack">
+                    <span class="badge">${profile.roleLabel}</span>
+                    ${profile.premium ? '<span class="badge gold">VIP</span>' : ''}
+                  </div>
+                  <button type="button" class="${profile.excluded ? 'secondary' : 'danger'}" data-toggle="${profile.username}" data-excluded="${profile.excluded ? '1' : '0'}">
+                    ${profile.excluded ? 'Incluir' : 'Excluir'}
+                  </button>
+                </div>
+                <div class="bottom-meta">
+                  <div class="title">
+                    <div class="name">${profile.username}</div>
+                    <div class="meta">${[profile.locality, profile.province].filter(Boolean).join(', ') || 'Ubicación sin datos'}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="body">
+                <div class="line">
+                  ${statBadge('Seguidores', profile.followers || 0)}
+                  ${statBadge('Visitas', profile.visits || 0)}
+                  ${statBadge('Fotos', profile.photos || 0)}
+                  ${statBadge('Videos', profile.videos || 0)}
+                </div>
+                <div class="thumbs">${thumbs || '<div class="thumb"></div>'}</div>
+                <div class="line">
+                  ${(seeking.length ? seeking : ['Sin buscando']).map((label) => `<span class="tag">Busco: ${label}</span>`).join('')}
+                </div>
+                ${blocked.length ? `<div class="line">${blocked.map((label) => `<span class="tag">Bloquea: ${label}</span>`).join('')}</div>` : ''}
+                <div class="bio">${profile.bio ? profile.bio.slice(0, 180) : 'Sin bio cargada.'}${profile.bio && profile.bio.length > 180 ? '…' : ''}</div>
+              </div>
+            </article>
+          `
+        }).join('')
+      }
+
+      async function toggleExcluded(username, excluded) {
+        const manifestPath = batchSelect.value
+        if (!manifestPath || !username) return
+        const response = await fetch('/api/review/excluded', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ manifestPath, username, excluded }),
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data?.error || 'No pude actualizar el manifest')
+        }
+        await fetchReview()
+      }
+
+      groupSelect.addEventListener('change', async () => {
+        renderBatchOptions()
+        if (batchSelect.value) {
+          await fetchReview()
+        }
+      })
+
+      batchSelect.addEventListener('change', fetchReview)
+      reloadButton.addEventListener('click', fetchBatches)
+
+      grid.addEventListener('click', async (event) => {
+        const button = event.target.closest('[data-toggle]')
+        if (!button) return
+        button.disabled = true
+        try {
+          await toggleExcluded(button.dataset.toggle, button.dataset.excluded !== '1')
+        } catch (error) {
+          alert(error.message || 'No pude actualizar la exclusión')
+        } finally {
+          button.disabled = false
+        }
+      })
+
+      fetchBatches().catch((error) => {
+        grid.innerHTML = `<div class="empty">${error.message || 'No pude cargar los batches.'}</div>`
+      })
+    </script>
+  </body>
+</html>
