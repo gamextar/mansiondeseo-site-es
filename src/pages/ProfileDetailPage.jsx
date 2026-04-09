@@ -3,9 +3,9 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Heart, MessageCircle, Shield, Crown,
-  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift, Eye, AlertTriangle,
+  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift, Eye,
 } from 'lucide-react';
-import { getProfile, getToken, toggleFavorite, updateProfile, adminUpdateUser, invalidateProfilesCache, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { getProfile, getToken, toggleFavorite, updateProfile, adminUpdateUser, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { formatLocation } from '../lib/location';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
@@ -115,7 +115,6 @@ export default function ProfileDetailPage() {
   const [isReordering, setIsReordering] = useState(false);
   const [orderedPhotos, setOrderedPhotos] = useState(initialProfile?.photos || []);
   const [savingOrder, setSavingOrder] = useState(false);
-  const [reviewUpdating, setReviewUpdating] = useState(false);
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
   // Gift state
@@ -144,13 +143,13 @@ export default function ProfileDetailPage() {
         setProfile(data.profile);
         setOrderedPhotos(data.profile.photos || []);
         setViewerPremium(data.viewerPremium || false);
-        setViewerIsAdmin(typeof data.viewerIsAdmin === 'boolean' ? data.viewerIsAdmin : !!user?.is_admin);
+        setViewerIsAdmin(!!data.viewerIsAdmin);
         setSettings(nextSettings);
         if (data.profile.isFavorited !== undefined) setIsFavorited(data.profile.isFavorited);
         writeProfileDetailCache(id, {
           profile: data.profile,
           viewerPremium: data.viewerPremium || false,
-          viewerIsAdmin: typeof data.viewerIsAdmin === 'boolean' ? data.viewerIsAdmin : !!user?.is_admin,
+          viewerIsAdmin: !!data.viewerIsAdmin,
           settings: nextSettings,
         });
       })
@@ -274,44 +273,6 @@ export default function ProfileDetailPage() {
       photos: nextPhotos,
     });
   }, [persistAdminGalleryUpdate, profile]);
-
-  const handleToggleReview = useCallback(async () => {
-    const canAdminReview = viewerIsAdmin || !!user?.is_admin;
-    if (!canAdminReview || profile?.isOwnProfile || !profile?.id || reviewUpdating) return;
-    const nextStatus = profile.account_status === 'under_review' ? 'active' : 'under_review';
-    const confirmed = nextStatus === 'under_review'
-      ? confirm(`¿Poner a ${profile.name} en revisión?\n\nEl usuario dejará de ser visible públicamente en feed, ranking, stories y perfil.`)
-      : true;
-    if (!confirmed) return;
-
-    setReviewUpdating(true);
-    try {
-      const data = await adminUpdateUser(profile.id, { account_status: nextStatus });
-      setProfile((prev) => {
-        if (!prev) return prev;
-        const nextProfile = {
-          ...prev,
-          account_status: data.user.account_status,
-        };
-        writeProfileDetailCache(id, {
-          profile: nextProfile,
-          viewerPremium,
-          viewerIsAdmin: canAdminReview,
-          settings,
-        });
-        return nextProfile;
-      });
-      invalidateProfilesCache();
-      try {
-        sessionStorage.setItem('mansion_feed_dirty', '1');
-        sessionStorage.setItem('mansion_feed_force_refresh', '1');
-      } catch {}
-    } catch (err) {
-      alert(err.message || 'Error al actualizar revisión');
-    } finally {
-      setReviewUpdating(false);
-    }
-  }, [id, profile, reviewUpdating, settings, user?.is_admin, viewerIsAdmin, viewerPremium]);
 
   const handleToggleFavorite = async () => {
     if (togglingFav) return;
@@ -546,7 +507,6 @@ export default function ProfileDetailPage() {
   }
 
   const { name, age, role, interests, bio, totalPhotos, verified, online, premium, blurred, isOwnProfile, receivedGifts } = profile;
-  const effectiveViewerIsAdmin = viewerIsAdmin || !!user?.is_admin;
   const visitsTotal = Number(profile?.visits_total || 0);
   const followersTotal = Number(profile?.followers_total || 0);
   const seeking = Array.isArray(profile?.seeking) ? profile.seeking : (profile?.seeking ? [profile.seeking] : []);
@@ -555,7 +515,7 @@ export default function ProfileDetailPage() {
   const galleryPhotos = getGalleryPhotos(profile);
   const displayPhotos = getDisplayPhotos(profile);
   const avatarDisplayOffset = profile.avatar_url ? 1 : 0;
-  const canAdminEditViewedProfile = effectiveViewerIsAdmin && !isOwnProfile;
+  const canAdminEditViewedProfile = viewerIsAdmin && !isOwnProfile;
 
   // Incognito mode blur (whole profile)
   const isGhostBlurred = blurred;
@@ -643,26 +603,6 @@ export default function ProfileDetailPage() {
           )}
 
           <div className="flex gap-2">
-            {canAdminEditViewedProfile && (
-              <button
-                onClick={handleToggleReview}
-                disabled={reviewUpdating}
-                className={`rounded-2xl border px-3 py-2 text-xs font-semibold transition-colors ${
-                  profile.account_status === 'under_review'
-                    ? 'border-yellow-500/30 bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/25'
-                    : 'border-red-500/30 bg-red-500/20 text-red-200 hover:bg-red-500/25'
-                } disabled:opacity-60`}
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  {reviewUpdating
-                    ? 'Guardando...'
-                    : profile.account_status === 'under_review'
-                      ? 'Quitar revisión'
-                      : 'Poner en revisión'}
-                </span>
-              </button>
-            )}
           </div>
         </div>
 
