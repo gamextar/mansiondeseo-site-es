@@ -170,6 +170,12 @@ export default function FeedPage() {
   useEffect(() => {
     const handleHomeFocus = () => {
       setShowOwnStoryPreview(false);
+      const scrollTarget = document.scrollingElement || document.documentElement || document.body;
+      if (scrollTarget) {
+        scrollTarget.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     };
     window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
     return () => window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
