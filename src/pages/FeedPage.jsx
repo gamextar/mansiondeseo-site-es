@@ -77,6 +77,7 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(!cached);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showOwnStoryPreview, setShowOwnStoryPreview] = useState(false);
+  const [visibleProfileCount, setVisibleProfileCount] = useState(cached?.profiles?.length ? Math.min(cached.profiles.length, 24) : 24);
   const navigate = useNavigate();
   const { user, siteSettings } = useAuth();
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
@@ -217,6 +218,7 @@ export default function FeedPage() {
 
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
+  const renderedProfiles = safeProfiles.slice(0, visibleProfileCount);
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
@@ -370,6 +372,30 @@ export default function FeedPage() {
 
   useEffect(() => () => stopStoriesMomentum(), [stopStoriesMomentum]);
 
+  useEffect(() => {
+    if (safeProfiles.length <= 24) {
+      setVisibleProfileCount(safeProfiles.length);
+      return undefined;
+    }
+
+    let rafId = null;
+    let nextCount = 24;
+    setVisibleProfileCount(24);
+
+    const step = () => {
+      nextCount = Math.min(safeProfiles.length, nextCount + 24);
+      setVisibleProfileCount(nextCount);
+      if (nextCount < safeProfiles.length) {
+        rafId = requestAnimationFrame(step);
+      }
+    };
+
+    rafId = requestAnimationFrame(step);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [safeProfiles.length]);
+
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
       {/* Pull-to-refresh indicator */}
@@ -521,7 +547,7 @@ export default function FeedPage() {
         ) : safeProfiles.length > 0 ? (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
-              {safeProfiles.map((profile, index) => (
+              {renderedProfiles.map((profile, index) => (
                 <ProfileCard key={profile.id} profile={profile} index={index} viewerPremium={viewerPremium} settings={safeSettings} />
               ))}
             </div>

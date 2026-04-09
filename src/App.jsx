@@ -27,8 +27,6 @@ import PagoPendientePage from './pages/PagoPendientePage';
 import CoinsPage from './pages/CoinsPage';
 import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
 import StoryUploadPage from './pages/StoryUploadPage';
-import VideoFeedPage from './pages/VideoFeedPage';
-import TopVisitedPage from './pages/TopVisitedPage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
@@ -36,6 +34,8 @@ import ApiDebugOverlay from './components/ApiDebugOverlay';
 import { AuthContext, useAuth } from './lib/authContext';
 
 const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
+const VideoFeedPage = lazy(() => import('./pages/VideoFeedPage'));
+const TopVisitedPage = lazy(() => import('./pages/TopVisitedPage'));
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/'];

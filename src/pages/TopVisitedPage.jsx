@@ -112,6 +112,7 @@ export default function TopVisitedPage() {
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [visibleRestCount, setVisibleRestCount] = useState(18);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,6 +139,31 @@ export default function TopVisitedPage() {
 
   const podium = profiles.slice(0, 3);
   const rest = profiles.slice(3);
+  const renderedRest = rest.slice(0, visibleRestCount);
+
+  useEffect(() => {
+    if (rest.length <= 18) {
+      setVisibleRestCount(rest.length);
+      return undefined;
+    }
+
+    let rafId = null;
+    let nextCount = 18;
+    setVisibleRestCount(18);
+
+    const step = () => {
+      nextCount = Math.min(rest.length, nextCount + 18);
+      setVisibleRestCount(nextCount);
+      if (nextCount < rest.length) {
+        rafId = requestAnimationFrame(step);
+      }
+    };
+
+    rafId = requestAnimationFrame(step);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [rest.length]);
 
   return (
     <div className="min-h-screen bg-mansion-base px-4 pb-28 pt-20 lg:px-8 lg:pb-10">
@@ -227,7 +253,7 @@ export default function TopVisitedPage() {
                 </p>
               </div>
               <div className="grid gap-3">
-                {rest.map((profile) => (
+                {renderedRest.map((profile) => (
                   <RankCard key={profile.id} profile={profile} compact />
                 ))}
               </div>
