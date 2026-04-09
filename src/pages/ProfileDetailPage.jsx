@@ -276,7 +276,7 @@ export default function ProfileDetailPage() {
   }, [persistAdminGalleryUpdate, profile]);
 
   const handleToggleReview = useCallback(async () => {
-    if (!viewerIsAdmin || isOwnProfile || !profile?.id || reviewUpdating) return;
+    if (!viewerIsAdmin || profile?.isOwnProfile || !profile?.id || reviewUpdating) return;
     const nextStatus = profile.account_status === 'under_review' ? 'active' : 'under_review';
     const confirmed = nextStatus === 'under_review'
       ? confirm(`¿Poner a ${profile.name} en revisión?\n\nEl usuario dejará de ser visible públicamente en feed, ranking, stories y perfil.`)
@@ -310,7 +310,7 @@ export default function ProfileDetailPage() {
     } finally {
       setReviewUpdating(false);
     }
-  }, [id, isOwnProfile, profile, reviewUpdating, settings, viewerIsAdmin, viewerPremium]);
+  }, [id, profile, reviewUpdating, settings, viewerIsAdmin, viewerPremium]);
 
   const handleToggleFavorite = async () => {
     if (togglingFav) return;
