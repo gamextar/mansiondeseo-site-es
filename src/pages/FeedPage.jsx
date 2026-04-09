@@ -389,7 +389,7 @@ export default function FeedPage() {
   useEffect(() => () => stopStoriesMomentum(), [stopStoriesMomentum]);
 
   return (
-    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
+    <div className={`min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar ${safariDesktop ? 'route-no-svgs' : ''}`}>
       {/* Pull-to-refresh indicator */}
       <div
         ref={indicatorRef}
