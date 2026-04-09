@@ -3,6 +3,7 @@ import { MapPin, Shield, Crown, Lock } from 'lucide-react';
 import { getDisplayPhotos, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { formatLocation } from '../lib/location';
 import { resolveMediaUrl } from '../lib/media';
+import { isSafariDesktopBrowser } from '../lib/browser';
 
 // Masquerade mask SVG icon for incognito mode
 const MaskIcon = ({ className = 'w-6 h-6', customSvg = '' }) => {
@@ -68,6 +69,7 @@ const RoleFallbackIcon = ({ role }) => {
 
 export default function ProfileCard({ profile, index = 0, viewerPremium = false, settings = {} }) {
   const { id, name, age, role, interests, photos = [], verified, online, premium, blurred } = profile;
+  const safariDesktop = isSafariDesktopBrowser();
   const roleImg = settings[ROLE_IMG_KEYS[role]] || null;
   const locationText = formatLocation(profile);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
@@ -95,7 +97,7 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
               loading={index < 6 ? 'eager' : 'lazy'}
               fetchPriority={index < 4 ? 'high' : 'auto'}
               decoding="async"
-              className="absolute inset-0 w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100"
+              className={`absolute inset-0 w-full h-full object-cover ${safariDesktop ? '' : 'transition-all duration-500 scale-105 group-hover:scale-100'}`}
               style={cardBlocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
             />
           ) : null}
@@ -119,20 +121,20 @@ export default function ProfileCard({ profile, index = 0, viewerPremium = false,
           <div className="absolute top-3 left-3 right-3 flex items-start justify-between z-20">
             <div className="flex gap-1.5">
               {premium && (
-                <span className="flex items-center gap-1 bg-mansion-gold/20 backdrop-blur-sm border border-mansion-gold/30 rounded-full px-2 py-0.5 text-[10px] font-semibold text-mansion-gold">
+                <span className={`flex items-center gap-1 border border-mansion-gold/30 rounded-full px-2 py-0.5 text-[10px] font-semibold text-mansion-gold ${safariDesktop ? 'bg-black/55' : 'bg-mansion-gold/20 backdrop-blur-sm'}`}>
                   <Crown className="w-3 h-3" />
                   VIP
                 </span>
               )}
               {verified && (
-                <span className="flex items-center gap-1 bg-mansion-elevated/80 backdrop-blur-sm border border-mansion-border/40 rounded-full px-2 py-0.5 text-[10px] font-medium text-text-muted">
+                <span className={`flex items-center gap-1 border border-mansion-border/40 rounded-full px-2 py-0.5 text-[10px] font-medium text-text-muted ${safariDesktop ? 'bg-black/55' : 'bg-mansion-elevated/80 backdrop-blur-sm'}`}>
                   <Shield className="w-3 h-3 text-green-400" />
                 </span>
               )}
             </div>
 
             {online && (
-              <span className="w-3 h-3 rounded-full bg-green-400 border-2 border-black/40 shadow-lg animate-pulse-slow" />
+              <span className={`w-3 h-3 rounded-full bg-green-400 border-2 border-black/40 shadow-lg ${safariDesktop ? '' : 'animate-pulse-slow'}`} />
             )}
           </div>
 

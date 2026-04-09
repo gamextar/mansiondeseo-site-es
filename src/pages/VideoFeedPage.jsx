@@ -7,6 +7,7 @@ import { useAuth } from '../lib/authContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
 import { resolveMediaUrl } from '../lib/media';
+import { isSafariDesktopBrowser } from '../lib/browser';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -450,7 +451,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
         <p className="pointer-events-none text-white/40 text-[11px] mt-1.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{timeAgo(story.created_at)}</p>
       </div>
 
-      <button onClick={onToggleMute} className="hidden lg:flex fixed top-4 right-4 z-50 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-200" style={{ width: 52, height: 52 }}>
+      <button onClick={onToggleMute} className={`hidden lg:flex fixed top-4 right-4 z-50 rounded-full items-center justify-center transition-all duration-200 ${safariDesktop ? 'bg-black/60' : 'bg-black/40 backdrop-blur-sm hover:bg-black/60 hover:scale-110'}`} style={{ width: 52, height: 52 }}>
         {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
       </button>
     </>
@@ -495,6 +496,7 @@ function DesktopActionButtons({ story, onLike, navigate, onGift, isOwnStory = fa
 }
 
 export default function VideoFeedPage() {
+  const safariDesktop = isSafariDesktopBrowser();
   const location = useLocation();
   const navigate = useNavigate();
   const { siteSettings, user, setUser } = useAuth();
@@ -1081,14 +1083,14 @@ export default function VideoFeedPage() {
         <>
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(-1) : jumpByOne(-1))}
-            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
+            className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-200 ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
             style={{ left: 'calc(50% - 350px)' }}
           >
             <ChevronLeft className="w-9 h-9 text-white/70" />
           </button>
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(1) : jumpByOne(1))}
-            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
+            className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-200 ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
             style={{ right: 'calc(50% - 350px)' }}
           >
             <ChevronRight className="w-9 h-9 text-white/70" />
