@@ -1,12 +1,12 @@
 // ── R2 Media Gatekeeper Worker ───────────────────────────
-// Sits in front of media.unicoapps.com (R2 public bucket).
+// Sits in front of media.mansiondeseo.com / media.unicoapps.com (R2 public bucket).
 // Validates path before letting the request through.
 // Invalid paths → 403 immediately, zero R2 Class B operations.
 
 // Valid key pattern: profiles/<id>/<id>.ext  |  stories/<id>.ext  |  assets/<id>.ext
 const VALID_PATH = /^\/(profiles\/[^/]+\/[^/]+|stories\/[^/]+|assets\/[^/]+)\.[a-zA-Z0-9]{2,5}$/;
 
-const R2_PUBLIC_BASE = 'https://media.unicoapps.com';
+const R2_PUBLIC_BASE = 'https://media.mansiondeseo.com';
 
 export default {
   async fetch(request) {

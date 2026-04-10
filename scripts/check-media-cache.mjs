@@ -7,9 +7,9 @@ if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
   node scripts/check-media-cache.mjs <url> [url...] [--repeat N] [--wait-ms MS] [--referer URL]
 
 Ejemplos:
-  node scripts/check-media-cache.mjs "https://media.unicoapps.com/stories/demo.mp4"
-  node scripts/check-media-cache.mjs "https://media.unicoapps.com/stories/demo.mp4" --repeat 2 --wait-ms 3000
-  node scripts/check-media-cache.mjs "https://media.unicoapps.com/stories/demo.mp4" --referer "https://mansiondeseo.unicoapps.com/"
+  node scripts/check-media-cache.mjs "https://media.mansiondeseo.com/stories/demo.mp4"
+  node scripts/check-media-cache.mjs "https://media.mansiondeseo.com/stories/demo.mp4" --repeat 2 --wait-ms 3000
+  node scripts/check-media-cache.mjs "https://media.mansiondeseo.com/stories/demo.mp4" --referer "https://mansiondeseo.com/"
 `);
   process.exit(0);
 }
