@@ -484,13 +484,32 @@ export default function SettingsPage() {
     </button>
   );
 
-  const Counter = ({ value, onChange, min = 0, max = 99, step = 1 }) => (
-    <div className="flex items-center gap-3">
-      <button onClick={() => onChange(Math.max(min, value - step))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">−</button>
-      <span className="text-xl font-bold text-mansion-gold w-10 text-center">{value}</span>
-      <button onClick={() => onChange(Math.min(max, value + step))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">+</button>
-    </div>
-  );
+  const Counter = ({ value, onChange, min = 0, max = 99, step = 1 }) => {
+    const [draft, setDraft] = useState(null);
+    const inputValue = draft !== null ? draft : String(value);
+    const commit = (raw) => {
+      setDraft(null);
+      const n = parseInt(raw, 10);
+      if (!Number.isFinite(n)) return;
+      onChange(Math.min(max, Math.max(min, n)));
+    };
+    return (
+      <div className="flex items-center gap-3">
+        <button onClick={() => onChange(Math.max(min, value - step))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">−</button>
+        <input
+          type="number"
+          value={inputValue}
+          min={min}
+          max={max}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.target.blur(); } }}
+          className="text-xl font-bold text-mansion-gold bg-transparent text-center w-16 focus:outline-none focus:ring-1 focus:ring-mansion-gold/40 rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        />
+        <button onClick={() => onChange(Math.min(max, value + step))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">+</button>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
