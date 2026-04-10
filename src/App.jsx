@@ -223,21 +223,21 @@ function AppLayout() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
               className="fixed inset-0 z-[120]"
             >
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
-                className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+                transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-0 bg-black/65 backdrop-blur-[3px]"
               />
               <motion.div
-                initial={{ y: 28, opacity: 0.92, scale: 0.985 }}
+                initial={{ y: 72, opacity: 0.78, scale: 0.96 }}
                 animate={{ y: 0, opacity: 1, scale: 1 }}
-                exit={{ y: 24, opacity: 0.9, scale: 0.99 }}
-                transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                exit={{ y: 56, opacity: 0.72, scale: 0.97 }}
+                transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
                 className="absolute inset-0 overflow-y-auto bg-mansion-base"
               >
                 <Routes>

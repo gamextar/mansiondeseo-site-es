@@ -490,6 +490,15 @@ export default function FeedPage() {
     storiesDragRef.current.moved = false;
   }, []);
 
+  const maybeLoadMore = useCallback(() => {
+    if (!loadMoreRef.current || loading || loadingMore || !hasMore || !canAutoLoadMore) return;
+    const rect = loadMoreRef.current.getBoundingClientRect();
+    const thresholdPx = safariDesktop ? 900 : 700;
+    if (rect.top - window.innerHeight <= thresholdPx) {
+      loadMoreProfiles();
+    }
+  }, [canAutoLoadMore, hasMore, loadMoreProfiles, loading, loadingMore, safariDesktop]);
+
   useEffect(() => {
     if (!loadMoreRef.current || loading || loadingMore || !hasMore || !canAutoLoadMore) return;
     const observer = new IntersectionObserver(
@@ -503,6 +512,31 @@ export default function FeedPage() {
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
   }, [canAutoLoadMore, hasMore, loading, loadingMore, loadMoreProfiles, safariDesktop]);
+
+  useEffect(() => {
+    maybeLoadMore();
+  }, [maybeLoadMore, profiles.length, showGridSection, visibleCount]);
+
+  useEffect(() => {
+    let ticking = false;
+    const scheduleCheck = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        maybeLoadMore();
+      });
+    };
+
+    window.addEventListener('scroll', scheduleCheck, { passive: true });
+    window.addEventListener('resize', scheduleCheck);
+    window.addEventListener('focus', scheduleCheck);
+    return () => {
+      window.removeEventListener('scroll', scheduleCheck);
+      window.removeEventListener('resize', scheduleCheck);
+      window.removeEventListener('focus', scheduleCheck);
+    };
+  }, [maybeLoadMore]);
 
   useEffect(() => () => stopStoriesMomentum(), [stopStoriesMomentum]);
 
