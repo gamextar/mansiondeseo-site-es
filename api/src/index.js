@@ -146,7 +146,6 @@ function error(message, status = 400) {
 function getLegacyMediaBases() {
   return [
     'https://pub-c0bc1ab6fb294cc1bb2e231bb55b4afb.r2.dev',
-    'https://videos.unicoapps.com',
     'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api/images',
   ];
 }
