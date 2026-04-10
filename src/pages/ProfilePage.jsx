@@ -546,7 +546,7 @@ export default function ProfilePage() {
                 onClick={async () => {
                   if (!confirm('¿Eliminar tu historia actual?')) return;
                   try {
-                    const storiesData = await getStories({ limit: 100 });
+                    const storiesData = await getStories({ limit: 50 });
                     const currentStory = (storiesData.stories || []).find((story) => story.user_id === user?.id);
                     if (currentStory?.id) await deleteOwnStory(currentStory.id);
                     const me = await getMe().catch(() => null);

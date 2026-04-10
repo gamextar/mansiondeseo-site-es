@@ -19,6 +19,27 @@ function cached(key, ttlMs, fetcher) {
 const _feedCache = new Map();
 const FEED_CACHE_TTL = 120_000; // 2 min
 const FEED_CACHE_MAX_ENTRIES = 100;
+
+// Stories cache — keyed by viewer+seeking+limit, avoids D1 JOIN on every video feed load
+const _storiesCache = new Map();
+const STORIES_CACHE_TTL = 60_000; // 1 min — stories change more frequently than profiles
+const STORIES_CACHE_MAX_ENTRIES = 200;
+function getCachedStories(key) {
+  const entry = _storiesCache.get(key);
+  if (!entry) return null;
+  if (Date.now() >= entry.exp) { _storiesCache.delete(key); return null; }
+  return entry.val;
+}
+function setCachedStories(key, val) {
+  if (_storiesCache.size >= STORIES_CACHE_MAX_ENTRIES) {
+    const oldest = _storiesCache.keys().next().value;
+    _storiesCache.delete(oldest);
+  }
+  _storiesCache.set(key, { val, exp: Date.now() + STORIES_CACHE_TTL });
+}
+function invalidateStoriesCache() {
+  _storiesCache.clear();
+}
 function getCachedFeed(key) {
   const entry = _feedCache.get(key);
   if (!entry) return null;
@@ -4548,6 +4569,14 @@ async function handleGetStories(request, env) {
     : [];
   const roleValues = [...new Set(roleFilters.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])))];
 
+  // Worker-level cache — avoids the 3-table JOIN on every video feed load.
+  // Key: viewer + seeking filter + page/limit. Liked status comes from the cache
+  // and the client merges its optimistic pending-likes on top anyway.
+  const seekingKey = roleValues.sort().join(',');
+  const storiesCacheKey = `stories:${viewerId || 'anon'}:${seekingKey}:${page}:${limit}`;
+  const cached = getCachedStories(storiesCacheKey);
+  if (cached) return json({ stories: cached });
+
   const bindings = [viewerId || ''];
   let query = `
     SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
@@ -4587,6 +4616,7 @@ async function handleGetStories(request, env) {
     avatar_crop: safeParseJSON(r.avatar_crop, null),
   }));
 
+  setCachedStories(storiesCacheKey, stories);
   return json({ stories });
 }
 
@@ -4788,6 +4818,7 @@ async function handleAdminUploadStory(request, env) {
     INSERT INTO stories (id, user_id, video_url, caption) VALUES (?, ?, ?, ?)
   `).bind(storyId, userId, videoUrl, caption).run();
 
+  invalidateStoriesCache();
   return json({ id: storyId, video_url: videoUrl, user_id: userId, caption }, 201);
 }
 
@@ -4816,6 +4847,7 @@ async function handleDeleteOwnStory(request, env, storyId) {
     // R2 delete is best-effort
   }
 
+  invalidateStoriesCache();
   return json({ deleted: true, story_id: story.id });
 }
 
@@ -4839,6 +4871,7 @@ async function handleAdminDeleteStory(request, env, storyId) {
     // R2 delete is best-effort
   }
 
+  invalidateStoriesCache();
   return json({ deleted: true, story_id: storyId });
 }
 
@@ -4891,6 +4924,7 @@ async function handleUploadStory(request, env) {
     INSERT INTO stories (id, user_id, video_url, caption) VALUES (?, ?, ?, ?)
   `).bind(storyId, auth.sub, videoUrl, caption).run();
 
+  invalidateStoriesCache();
   return json({ id: storyId, video_url: videoUrl, caption }, 201);
 }
 
