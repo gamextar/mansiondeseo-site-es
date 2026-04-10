@@ -1926,9 +1926,9 @@ async function handleProfiles(request, env) {
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
-  // Fetch the full eligible candidate set so pagination is based on the real
-  // scored/interleaved feed order instead of an early SQL window.
-  query += ` ORDER BY last_active DESC`;
+  // Cap SQL results — frontend shows max 500 cards, so 600 gives enough
+  // headroom for filtering out the current user and scoring/interleaving.
+  query += ` ORDER BY last_active DESC LIMIT 600`;
 
   // Cache key for profiles query (shared across all users)
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
