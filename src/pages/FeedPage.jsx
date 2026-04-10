@@ -211,6 +211,9 @@ export default function FeedPage() {
       setVisibleCount((current) => Math.min(profiles.length, current + SAFARI_DESKTOP_VISIBLE_STEP));
       return Promise.resolve();
     }
+    // Stop paginating if we've hit the DOM card cap — new cards wouldn't render
+    // and the sentinel would stay visible, causing an infinite request loop.
+    if (!safariDesktop && profiles.length >= MOBILE_MAX_DOM_CARDS) return Promise.resolve();
     if (loading || loadingMore || !hasMore || !nextCursor || loadMoreFailedRef.current || loadingMoreRef.current) return Promise.resolve();
     loadingMoreRef.current = true;
     setLoadingMore(true);
