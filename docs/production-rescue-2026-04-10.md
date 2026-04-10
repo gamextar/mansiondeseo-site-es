@@ -8,7 +8,7 @@ This branch is a stable recovery point created after restoring the known-good Cl
 - Admin "Poner en revision" profile functionality restored in source.
 - Public filtering for users under review restored in source.
 - Canonical media domain set to `https://media.mansiondeseo.com`.
-- Legacy `https://media.unicoapps.com` URLs still normalized by the frontend.
+- Media URLs are now canonicalized to `https://media.mansiondeseo.com`.
 - Main feed backend page size set to 42 profiles.
 - `dist/` includes fresh build assets plus aliases for recent stale chunk names to reduce MIME/cache breakage.
 

@@ -1,5 +1,5 @@
 // ── R2 Media Gatekeeper Worker ───────────────────────────
-// Sits in front of media.mansiondeseo.com / media.unicoapps.com (R2 public bucket).
+// Sits in front of media.mansiondeseo.com (R2 public bucket).
 // Validates path before letting the request through.
 // Invalid paths → 403 immediately, zero R2 Class B operations.
 

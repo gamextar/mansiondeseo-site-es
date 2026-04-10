@@ -13,6 +13,12 @@ const repoRoot = path.resolve(__dirname, '..')
 const wranglerTomlPath = path.join(repoRoot, 'wrangler.toml')
 const DEFAULT_IMPORTED_EMAIL_DOMAIN = 'gamextar.com'
 const DEFAULT_IMPORTED_PASSWORD = 'mansiondeseo26'
+const CANONICAL_MEDIA_BASE = 'https://media.mansiondeseo.com'
+const LEGACY_MEDIA_BASES = [
+  'https://media.unicoapps.com',
+  'https://pub-c0bc1ab6fb294cc1bb2e231bb55b4afb.r2.dev',
+  'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api/images',
+]
 
 const rawArgs = process.argv.slice(2)
 
@@ -242,6 +248,18 @@ function guessContentType(filePath) {
 
 function isRemoteUrl(value) {
   return /^https?:\/\//i.test(String(value || ''))
+}
+
+function canonicalizeRemoteMediaUrl(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return raw
+  for (const base of LEGACY_MEDIA_BASES) {
+    if (raw === base) return CANONICAL_MEDIA_BASE
+    if (raw.startsWith(`${base}/`)) {
+      return `${CANONICAL_MEDIA_BASE}/${raw.slice(base.length + 1)}`
+    }
+  }
+  return raw
 }
 
 function resolveLocalPath(baseDir, inputPath) {
@@ -494,7 +512,7 @@ function uploadToR2(key, filePath) {
 
 async function resolveMediaReference(baseDir, username, input, kind, index = 0) {
   if (!input) return null
-  if (isRemoteUrl(input)) return input
+  if (isRemoteUrl(input)) return canonicalizeRemoteMediaUrl(input)
 
   const absolutePath = resolveLocalPath(baseDir, input)
   if (!existsSync(absolutePath)) {

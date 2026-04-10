@@ -27,7 +27,7 @@ const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
 const CLIENT_CACHE_VERSION_KEY = 'mansion_client_cache_version';
-const CLIENT_CACHE_VERSION = 'media-paths-v2';
+const CLIENT_CACHE_VERSION = 'media-paths-v3';
 const sharedGetCache = new Map();
 const sessionCache = {
   get(key, ttlMs = 0) {
@@ -54,20 +54,12 @@ const sessionCache = {
   },
 };
 
-function hasLegacyRootMediaUrl(value) {
-  const raw = typeof value === 'string' ? value : JSON.stringify(value || '');
-  return /https:\/\/media\.unicoapps\.com\/(?!profiles\/|stories\/|assets\/)[^"'\s)]+/i.test(raw);
-}
-
 function clearLegacyMediaCaches() {
   if (typeof window === 'undefined') return;
   try {
     if (localStorage.getItem(CLIENT_CACHE_VERSION_KEY) === CLIENT_CACHE_VERSION) return;
 
-    const userRaw = localStorage.getItem(USER_KEY) || '';
-    if (hasLegacyRootMediaUrl(userRaw)) {
-      localStorage.removeItem(USER_KEY);
-    }
+    localStorage.removeItem(USER_KEY);
 
     for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
       const key = sessionStorage.key(i);

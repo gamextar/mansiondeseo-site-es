@@ -1,6 +1,5 @@
 const CANONICAL_R2_BASE = 'https://media.mansiondeseo.com';
 const LEGACY_MEDIA_BASES = [
-  'https://media.unicoapps.com',
   'https://videos.unicoapps.com',
   'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api/images',
   'https://pub-c0bc1ab6fb294cc1bb2e231bb55b4afb.r2.dev',
