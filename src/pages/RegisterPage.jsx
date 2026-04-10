@@ -601,6 +601,28 @@ function FichaPreview({ data, currentStep, optimizeMotion = false }) {
 // ────────────────────────────────────────────
 
 const EMAIL_REGEX = /^[^\s@]{1,64}@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,24}$/;
+const COMMON_TLDS = new Set([
+  'com','net','org','edu','gov','mil','int',
+  'ar','br','cl','co','mx','pe','uy','ve','ec','py','bo','cr','pa','do','gt','sv','hn','ni','cu','pr',
+  'es','uk','fr','de','it','pt','nl','be','at','ch','pl','ru','ua','cz','se','no','dk','fi','ie','gr','ro','hu','bg','hr','sk','si','rs','ba','me','mk','al','lt','lv','ee','is','lu','mt','cy','li','mc','ad','sm','va',
+  'us','ca','au','nz','jp','cn','kr','in','id','ph','th','vn','my','sg','tw','hk','il','tr','sa','ae','za',
+  'io','ai','app','dev','me','tv','cc','info','biz','name','pro','mobi','tel','jobs','travel','museum','coop','aero','cat',
+  'online','site','store','shop','cloud','tech','xyz','club','live','world','blog','design','digital','studio','media','agency','solutions','network','systems','consulting','services','group','global','company','team','zone','space','plus','top','life','work','rocks','fun','icu','website','link','click','center','email','support','today','news','one','page',
+  'com.ar','gob.ar','edu.ar','com.br','com.mx','com.co','com.uy','com.pe','com.cl','com.ve','com.ec','com.py',
+  'co.uk','org.uk','ac.uk','co.jp','co.kr','co.nz','com.au','co.za','co.in',
+]);
+function isValidEmailTld(email) {
+  const domain = email.split('@')[1];
+  if (!domain) return false;
+  const parts = domain.toLowerCase().split('.');
+  if (parts.length < 2) return false;
+  // Check two-part TLD first (com.ar, co.uk), then single TLD
+  if (parts.length >= 3) {
+    const twoPartTld = parts.slice(-2).join('.');
+    if (COMMON_TLDS.has(twoPartTld)) return true;
+  }
+  return COMMON_TLDS.has(parts[parts.length - 1]);
+}
 const USERNAME_REGEX = /^[a-zA-Z0-9._]+$/;
 
 function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePasswordDefault, emailStatus, onEmailBlur, onNavigateRecover }) {
@@ -1631,7 +1653,7 @@ export default function RegisterPage() {
   );
 
   const canNext = () => {
-    if (step === 0) return EMAIL_REGEX.test(email) && password.length >= 12 && emailStatus !== 'exists' && emailStatus !== 'invalid' && !!turnstileToken;
+    if (step === 0) return EMAIL_REGEX.test(email) && isValidEmailTld(email) && password.length >= 12 && emailStatus !== 'exists' && emailStatus !== 'invalid' && !!turnstileToken;
     if (step === 1) return !!iAm;
     if (step === 2) return seeking.length > 0;
     if (step === 3) return interests.length > 0;
@@ -1640,7 +1662,7 @@ export default function RegisterPage() {
   };
 
   const handleEmailBlur = useCallback(async () => {
-    if (!email || !EMAIL_REGEX.test(email)) {
+    if (!email || !EMAIL_REGEX.test(email) || !isValidEmailTld(email)) {
       if (email) setEmailStatus('invalid');
       return;
     }
