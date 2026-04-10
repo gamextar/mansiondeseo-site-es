@@ -489,16 +489,18 @@ export default function FeedPage() {
   }, []);
 
   const maybeLoadMore = useCallback(() => {
-    if (!loadMoreRef.current || loading || loadingMore || !hasMore || !canAutoLoadMore) return;
+    const hasLocalMore = visibleCount < profiles.length;
+    if (!loadMoreRef.current || loading || loadingMore || (!hasMore && !hasLocalMore) || !canAutoLoadMore) return;
     const rect = loadMoreRef.current.getBoundingClientRect();
     const thresholdPx = 1500;
     if (rect.top - window.innerHeight <= thresholdPx) {
       loadMoreProfiles();
     }
-  }, [canAutoLoadMore, hasMore, loadMoreProfiles, loading, loadingMore, safariDesktop]);
+  }, [canAutoLoadMore, hasMore, loadMoreProfiles, loading, loadingMore, profiles.length, visibleCount]);
 
   useEffect(() => {
-    if (!loadMoreRef.current || loading || loadingMore || !hasMore || !canAutoLoadMore) return;
+    const hasLocalMore = visibleCount < profiles.length;
+    if (!loadMoreRef.current || loading || loadingMore || (!hasMore && !hasLocalMore) || !canAutoLoadMore) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
@@ -509,7 +511,7 @@ export default function FeedPage() {
     );
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [canAutoLoadMore, hasMore, loading, loadingMore, loadMoreProfiles, safariDesktop]);
+  }, [canAutoLoadMore, hasMore, loading, loadingMore, loadMoreProfiles, profiles.length, visibleCount]);
 
   useEffect(() => {
     maybeLoadMore();
