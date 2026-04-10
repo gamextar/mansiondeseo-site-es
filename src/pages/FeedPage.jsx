@@ -199,6 +199,8 @@ export default function FeedPage() {
     paginatedRef.current = false;
     return getProfiles({ fresh: forceFresh })
       .then(data => {
+        // If user paginated while this request was in-flight, don't replace their data
+        if (silent && paginatedRef.current) return;
         setProfiles(data.profiles || []);
         setVisibleCount(getInitialVisibleCount(data.profiles || []));
         setViewerPremium(data.viewerPremium || false);
