@@ -11,6 +11,7 @@
     "check:media-cache": "node scripts/check-media-cache.mjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
     "import:placeholders": "node scripts/import-placeholders.mjs",
+    "generate:import-blacklist": "node scripts/generate-import-blacklist.mjs",
     "extract:contactossex": "node scripts/extract-contactossex.mjs",
     "extract:contactossex:ui": "node scripts/extractor-ui-server.mjs",
     "review:batches:ui": "node scripts/review-batches-server.mjs",

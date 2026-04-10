@@ -13,6 +13,7 @@ const repoRoot = path.resolve(__dirname, '..')
 const wranglerTomlPath = path.join(repoRoot, 'wrangler.toml')
 const DEFAULT_IMPORTED_EMAIL_DOMAIN = 'gamextar.com'
 const DEFAULT_IMPORTED_PASSWORD = 'mansiondeseo26'
+const DEFAULT_BLACKLIST_PATH = path.join(repoRoot, 'data', 'import-blacklists', 'under-review-usernames.json')
 const CANONICAL_MEDIA_BASE = 'https://media.mansiondeseo.com'
 const LEGACY_MEDIA_BASES = [
   'https://media.unicoapps.com',
@@ -40,6 +41,7 @@ Opciones:
   --start-from <username>  Retoma el batch desde ese username (incluido)
   --only-role-group <group>  Importa solo un grupo: mujer | hombre | pareja | pareja_hombres | pareja_mujeres | trans
   --skip-existing-users  Salta usuarios que ya existan en Mansion Deseo
+  --blacklist-file <path>  JSON/TXT con usernames a bloquear antes de importar
   --replace-story     Borra stories existentes del usuario antes de insertar la nueva (default)
   --keep-story        Conserva stories existentes
   --help              Muestra esta ayuda
@@ -94,6 +96,7 @@ const manifestArg = takeFlag('--manifest', null) || rawArgs.shift() || null
 const onlyUsername = takeFlag('--only', '')
 const startFromUsername = takeFlag('--start-from', '')
 const onlyRoleGroup = takeFlag('--only-role-group', '')
+const blacklistFileArg = takeFlag('--blacklist-file', '')
 const dryRun = hasFlag('--dry-run')
 const useLocal = hasFlag('--local')
 const useRemote = !useLocal || hasFlag('--remote')
@@ -144,6 +147,38 @@ function loadManifest(filePath) {
     throw new Error('El manifest debe ser un array o { "profiles": [...] }')
   }
   return profiles
+}
+
+function loadUsernameBlacklist(filePath) {
+  if (!filePath || !existsSync(filePath)) {
+    return new Set()
+  }
+
+  const raw = readFileSync(filePath, 'utf8')
+  const trimmed = raw.trim()
+  if (!trimmed) return new Set()
+
+  let usernames = []
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+    const parsed = JSON.parse(trimmed)
+    if (Array.isArray(parsed)) {
+      usernames = parsed
+    } else if (Array.isArray(parsed?.usernames)) {
+      usernames = parsed.usernames
+    } else if (Array.isArray(parsed?.blacklist)) {
+      usernames = parsed.blacklist
+    } else {
+      throw new Error(`Formato de blacklist inválido en ${filePath}`)
+    }
+  } else {
+    usernames = trimmed.split(/\r?\n/g)
+  }
+
+  return new Set(
+    usernames
+      .map((value) => String(value || '').trim().toLowerCase())
+      .filter(Boolean)
+  )
 }
 
 function slugifyUsername(input) {
@@ -736,6 +771,10 @@ async function main() {
   const profiles = loadManifest(manifestPath)
   const manifestDir = path.dirname(manifestPath)
   const normalizedRoleGroup = String(onlyRoleGroup || '').trim().toLowerCase()
+  const blacklistPath = blacklistFileArg
+    ? path.resolve(process.cwd(), blacklistFileArg)
+    : (existsSync(DEFAULT_BLACKLIST_PATH) ? DEFAULT_BLACKLIST_PATH : '')
+  const usernameBlacklist = loadUsernameBlacklist(blacklistPath)
   let filtered = profiles.filter((profile) => {
     if (profile?.excluded) {
       return false
@@ -744,6 +783,9 @@ async function main() {
       return false
     }
     if (normalizedRoleGroup && roleToGroup(profile.role) !== normalizedRoleGroup) {
+      return false
+    }
+    if (usernameBlacklist.has(String(profile?.username || '').trim().toLowerCase())) {
       return false
     }
     return true
@@ -766,6 +808,9 @@ async function main() {
   console.log(`Destino: ${useRemote ? 'remote' : 'local'}${dryRun ? ' (dry-run)' : ''}`)
   console.log(`DB: ${wranglerConfig.dbName}`)
   console.log(`R2: ${wranglerConfig.bucketName}`)
+  if (blacklistPath) {
+    console.log(`Blacklist: ${blacklistPath} (${usernameBlacklist.size} usernames)`)
+  }
   if (startFromUsername) {
     console.log(`Retomando desde: ${startFromUsername}`)
   }
@@ -787,6 +832,8 @@ async function main() {
   const summary = {
     type: 'import',
     manifestPath,
+    blacklistPath: blacklistPath || null,
+    blacklistedUsernames: usernameBlacklist.size,
     processedProfiles: results.length,
     createdProfiles: results.filter((item) => item.created).length,
     updatedProfiles: results.filter((item) => item.updated).length,
