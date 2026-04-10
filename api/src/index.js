@@ -63,7 +63,7 @@ let _profileStatsBackfillReady = null;
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
-const FEED_PROFILE_LIMIT = 500;
+const FEED_PROFILE_LIMIT = 360;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -1928,7 +1928,7 @@ async function handleProfiles(request, env) {
   }
   // Cap SQL results — frontend shows max 500 cards, so 600 gives enough
   // headroom for filtering out the current user and scoring/interleaving.
-  query += ` ORDER BY last_active DESC LIMIT 600`;
+  query += ` ORDER BY last_active DESC LIMIT 400`;
 
   // Cache key for profiles query (shared across all users)
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
