@@ -92,6 +92,21 @@ const MaskIcon = ({ className = 'w-8 h-8', customSvg = '' }) => {
   );
 };
 
+function MotionDiv({ disabled = false, motionProps = {}, ...props }) {
+  if (disabled) return <div {...props} />;
+  return <motion.div {...motionProps} {...props} />;
+}
+
+function MotionSpan({ disabled = false, motionProps = {}, ...props }) {
+  if (disabled) return <span {...props} />;
+  return <motion.span {...motionProps} {...props} />;
+}
+
+function MotionButton({ disabled = false, motionProps = {}, ...props }) {
+  if (disabled) return <button {...props} />;
+  return <motion.button {...motionProps} {...props} />;
+}
+
 export default function ProfileDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -564,6 +579,7 @@ export default function ProfileDetailPage() {
   const displayPhotos = getDisplayPhotos(profile);
   const avatarDisplayOffset = profile.avatar_url ? 1 : 0;
   const canAdminEditViewedProfile = effectiveViewerIsAdmin && !isOwnProfile;
+  const disableMountMotion = isOverlayEntry;
 
   // Incognito mode blur (whole profile)
   const isGhostBlurred = blurred;
@@ -585,9 +601,12 @@ export default function ProfileDetailPage() {
 
       {/* Hero image carousel */}
       <div className="relative lg:w-[46%] lg:flex-shrink-0 lg:sticky lg:top-20 lg:self-start">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+        <MotionDiv
+          disabled={disableMountMotion}
+          motionProps={{
+            initial: { opacity: 0 },
+            animate: { opacity: 1 },
+          }}
           className="w-full aspect-[3/4] max-h-[70vh] lg:max-h-[85vh] overflow-hidden lg:rounded-3xl relative"
         >
           {/* Scroll-snap container */}
@@ -630,7 +649,7 @@ export default function ProfileDetailPage() {
           </div>
           {/* Bottom gradient — extended for smooth overlap */}
           <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-mansion-base via-mansion-base/60 to-transparent pointer-events-none" />
-        </motion.div>
+        </MotionDiv>
 
         {/* Top nav overlay — photo counter only (back button is fixed) */}
         <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 pt-14 lg:pt-4 z-[60] pointer-events-none">
@@ -647,15 +666,18 @@ export default function ProfileDetailPage() {
         </div>
 
         {/* Fixed back button — always visible over content */}
-        <motion.button
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
+        <MotionButton
+          disabled={disableMountMotion}
+          motionProps={{
+            initial: { opacity: 0, x: -10 },
+            animate: { opacity: 1, x: 0 },
+          }}
           onClick={handleBack}
           className="fixed w-16 h-16 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center z-[70]"
           style={{ top: 'max(env(safe-area-inset-top, 16px), 16px)', left: 16 }}
         >
           <ChevronLeft className="w-6 h-6 text-white" />
-        </motion.button>
+        </MotionButton>
 
         {/* Desktop arrow buttons */}
         {displayPhotos.length > 1 && (
@@ -698,10 +720,13 @@ export default function ProfileDetailPage() {
       </div>
 
       {/* Profile info */}
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15, duration: 0.5, ease: [.25,.46,.45,.94] }}
+      <MotionDiv
+        disabled={disableMountMotion}
+        motionProps={{
+          initial: { opacity: 0, y: 24 },
+          animate: { opacity: 1, y: 0 },
+          transition: { delay: 0.15, duration: 0.5, ease: [.25,.46,.45,.94] },
+        }}
         className="relative -mt-20 px-4 z-10 lg:mt-0 lg:px-0 lg:flex-1"
       >
         <div className="glass-elevated rounded-[2rem] p-6 shadow-elevated">
@@ -751,19 +776,25 @@ export default function ProfileDetailPage() {
           </div>
 
           {/* Role badge */}
-          <motion.span
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 }}
+          <MotionSpan
+            disabled={disableMountMotion}
+            motionProps={{
+              initial: { opacity: 0, scale: 0.8 },
+              animate: { opacity: 1, scale: 1 },
+              transition: { delay: 0.3 },
+            }}
             className={`inline-flex items-center text-xs font-semibold px-3 py-1 rounded-full border ${ROLE_COLOR[role]}`}
           >
             {role}
-          </motion.span>
+          </MotionSpan>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.32 }}
+          <MotionDiv
+            disabled={disableMountMotion}
+            motionProps={{
+              initial: { opacity: 0, y: 10 },
+              animate: { opacity: 1, y: 0 },
+              transition: { delay: 0.32 },
+            }}
             className="mt-4 mb-6"
           >
             <div className="flex flex-wrap items-center gap-2.5 text-sm text-text-primary">
@@ -778,29 +809,35 @@ export default function ProfileDetailPage() {
                 <span className="text-text-dim">visitas al perfil</span>
               </div>
             </div>
-          </motion.div>
+          </MotionDiv>
 
           {/* Bio */}
           {bio ? (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
+          <MotionDiv
+            disabled={disableMountMotion}
+            motionProps={{
+              initial: { opacity: 0, y: 10 },
+              animate: { opacity: 1, y: 0 },
+              transition: { delay: 0.35 },
+            }}
             className="mb-6"
           >
             <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Sobre {name.split(' ')[0]}</h3>
             <p className="text-base leading-relaxed text-text-primary">
               {bio}
             </p>
-          </motion.div>
+          </MotionDiv>
           ) : null}
 
           {/* Seeking */}
           {seeking.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
+            <MotionDiv
+              disabled={disableMountMotion}
+              motionProps={{
+                initial: { opacity: 0, y: 10 },
+                animate: { opacity: 1, y: 0 },
+                transition: { delay: 0.4 },
+              }}
               className="mb-6"
             >
               <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Busco</h3>
@@ -808,27 +845,33 @@ export default function ProfileDetailPage() {
                 {seeking.map((value, idx) => {
                   const meta = SEEKING_META[value] || { label: value, emoji: '✨', className: 'bg-mansion-card/60 text-text-primary border-mansion-border/30' };
                   return (
-                    <motion.span
+                    <MotionSpan
                       key={value}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.45 + idx * 0.04 }}
+                      disabled={disableMountMotion}
+                      motionProps={{
+                        initial: { opacity: 0, scale: 0.8 },
+                        animate: { opacity: 1, scale: 1 },
+                        transition: { delay: 0.45 + idx * 0.04 },
+                      }}
                       className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border ${meta.className}`}
                     >
                       <span>{meta.emoji}</span>
                       <span>{meta.label}</span>
-                    </motion.span>
+                    </MotionSpan>
                   );
                 })}
               </div>
-            </motion.div>
+            </MotionDiv>
           )}
 
           {messageBlockRoles.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.425 }}
+          <MotionDiv
+            disabled={disableMountMotion}
+            motionProps={{
+              initial: { opacity: 0, y: 10 },
+              animate: { opacity: 1, y: 0 },
+              transition: { delay: 0.425 },
+            }}
             className="mb-6"
           >
             <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">No acepta mensajes de</h3>
@@ -836,53 +879,65 @@ export default function ProfileDetailPage() {
               {messageBlockRoles.map((value, idx) => {
                 const meta = MESSAGE_BLOCK_META[value] || { label: value, emoji: '⛔', className: 'bg-mansion-card/60 text-text-primary border-mansion-border/30' };
                 return (
-                  <motion.span
+                  <MotionSpan
                     key={value}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.47 + idx * 0.04 }}
+                    disabled={disableMountMotion}
+                    motionProps={{
+                      initial: { opacity: 0, scale: 0.8 },
+                      animate: { opacity: 1, scale: 1 },
+                      transition: { delay: 0.47 + idx * 0.04 },
+                    }}
                     className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border ${meta.className}`}
                   >
                     <span>{meta.emoji}</span>
                     <span>{meta.label}</span>
-                  </motion.span>
+                  </MotionSpan>
                 );
               })}
             </div>
-          </motion.div>
+          </MotionDiv>
           )}
 
           {/* Interests */}
           {interests.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.45 }}
+            <MotionDiv
+              disabled={disableMountMotion}
+              motionProps={{
+                initial: { opacity: 0, y: 10 },
+                animate: { opacity: 1, y: 0 },
+                transition: { delay: 0.45 },
+              }}
               className="mb-6"
             >
               <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Intereses</h3>
               <div className="flex flex-wrap gap-2">
                 {interests.map((tag, idx) => (
-                  <motion.span
+                  <MotionSpan
                     key={tag}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.5 + idx * 0.04 }}
+                    disabled={disableMountMotion}
+                    motionProps={{
+                      initial: { opacity: 0, scale: 0.8 },
+                      animate: { opacity: 1, scale: 1 },
+                      transition: { delay: 0.5 + idx * 0.04 },
+                    }}
                     className="text-xs font-medium px-3 py-1.5 rounded-full bg-mansion-gold/10 text-mansion-gold border border-mansion-gold/20 hover:bg-mansion-gold/15 transition-colors"
                   >
                     {tag}
-                  </motion.span>
+                  </MotionSpan>
                 ))}
               </div>
-            </motion.div>
+            </MotionDiv>
           )}
 
           {/* Received Gifts */}
           {receivedGifts && receivedGifts.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
+            <MotionDiv
+              disabled={disableMountMotion}
+              motionProps={{
+                initial: { opacity: 0, y: 10 },
+                animate: { opacity: 1, y: 0 },
+                transition: { delay: 0.5 },
+              }}
               className="mb-6"
             >
               <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">
@@ -890,28 +945,34 @@ export default function ProfileDetailPage() {
               </h3>
               <div className="flex flex-wrap gap-1.5">
                 {receivedGifts.map((g, idx) => (
-                  <motion.div
+                  <MotionDiv
                     key={g.id}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.55 + idx * 0.03 }}
+                    disabled={disableMountMotion}
+                    motionProps={{
+                      initial: { opacity: 0, scale: 0.8 },
+                      animate: { opacity: 1, scale: 1 },
+                      transition: { delay: 0.55 + idx * 0.03 },
+                    }}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-mansion-card/40 border border-mansion-border/15"
                     title={`${g.gift_name} de ${g.sender_name}`}
                   >
                     <span className="text-lg">{g.gift_emoji}</span>
                     <span className="text-[10px] text-text-dim">{g.sender_name}</span>
-                  </motion.div>
+                  </MotionDiv>
                 ))}
               </div>
-            </motion.div>
+            </MotionDiv>
           )}
 
           {/* Photo gallery */}
           {galleryPhotos.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.55 }}
+            <MotionDiv
+              disabled={disableMountMotion}
+              motionProps={{
+                initial: { opacity: 0, y: 10 },
+                animate: { opacity: 1, y: 0 },
+                transition: { delay: 0.55 },
+              }}
               className="mb-4"
             >
               <div className="flex items-center justify-between mb-2.5">
@@ -947,15 +1008,18 @@ export default function ProfileDetailPage() {
                   const displayIndex = i + avatarDisplayOffset;
                   const blocked = !isReordering && isPhotoBlocked(displayIndex);
                   return (
-                    <motion.div
+                    <MotionDiv
                       key={isReordering ? photo : i}
+                      disabled={disableMountMotion}
+                      motionProps={{
+                        initial: { opacity: 0, scale: 0.9 },
+                        animate: { opacity: 1, scale: 1 },
+                        transition: { delay: 0.6 + i * 0.04 },
+                      }}
                       draggable={canAdminEditViewedProfile && isReordering && orderedPhotos.length > 1}
                       onDragStart={canAdminEditViewedProfile && isReordering ? (event) => handleDragStart(i, event) : undefined}
                       onDragOver={canAdminEditViewedProfile && isReordering ? (event) => handleDragOver(i, event) : undefined}
                       onDrop={canAdminEditViewedProfile && isReordering ? handleDrop : undefined}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.6 + i * 0.04 }}
                       className={`aspect-square rounded-2xl overflow-hidden bg-mansion-card relative group ${
                         canAdminEditViewedProfile && isReordering ? 'cursor-grab active:cursor-grabbing' : ''
                       }`}
@@ -1030,23 +1094,26 @@ export default function ProfileDetailPage() {
                           <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-70 transition-opacity" />
                         </div>
                       )}
-                    </motion.div>
+                    </MotionDiv>
                   );
                 })}
               </div>
-            </motion.div>
+            </MotionDiv>
           )}
         </div>
-      </motion.div>
+      </MotionDiv>
 
       </div>{/* end two-column wrapper */}
 
       {/* Floating action column — vertical right */}
       {!isOwnProfile && (
-      <motion.div
-        initial={{ x: 40, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ delay: 0.5, type: 'spring', damping: 20, stiffness: 200 }}
+      <MotionDiv
+        disabled={disableMountMotion}
+        motionProps={{
+          initial: { x: 40, opacity: 0 },
+          animate: { x: 0, opacity: 1 },
+          transition: { delay: 0.5, type: 'spring', damping: 20, stiffness: 200 },
+        }}
         className="fixed right-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] lg:bottom-16 lg:right-8 z-[60] flex flex-col items-center gap-4"
       >
         <motion.button
@@ -1087,7 +1154,7 @@ export default function ProfileDetailPage() {
         >
           <MessageCircle className="w-6 h-6" />
         </Link>
-      </motion.div>
+      </MotionDiv>
       )}
 
       {/* ── Gift Picker Modal ── */}
