@@ -108,6 +108,7 @@ export default function FeedPage() {
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const loadMoreRef = useRef(null);
   const scrollRestoredRef = useRef(false);
+  const paginatedRef = useRef(false);
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
     frameId: null,
@@ -195,6 +196,7 @@ export default function FeedPage() {
       setNextCursor(c.nextCursor || null);
       setHasMore(!!c.hasMore);
     }
+    paginatedRef.current = false;
     return getProfiles({ fresh: forceFresh })
       .then(data => {
         setProfiles(data.profiles || []);
@@ -212,9 +214,11 @@ export default function FeedPage() {
         });
       })
       .catch(() => {
-        setProfiles([]);
-        setNextCursor(null);
-        setHasMore(false);
+        if (!silent) {
+          setProfiles([]);
+          setNextCursor(null);
+          setHasMore(false);
+        }
       })
       .finally(() => setLoading(false));
   }, [getInitialVisibleCount]);
@@ -229,6 +233,7 @@ export default function FeedPage() {
     return getProfiles({ cursor: nextCursor })
       .then((data) => {
         const newProfiles = Array.isArray(data?.profiles) ? data.profiles : [];
+        paginatedRef.current = true;
         setProfiles((prev) => {
           const seen = new Set(prev.map((item) => item.id));
           const merged = [...prev];
@@ -329,18 +334,17 @@ export default function FeedPage() {
         return;
       }
 
+      // Don't background-refresh if user has paginated past page 1
+      if (paginatedRef.current) return;
+
       const cachedFeed = getCachedFeed();
-      // Don't reload if we've already paginated (cache was cleared after page 2+)
-      if (!cachedFeed && profiles.length > 0) return;
       if (!isFeedCacheFresh(cachedFeed) || !hasFeedPaginationState(cachedFeed) || shouldBackgroundRefreshFeed(cachedFeed)) {
         loadProfiles({ silent: true });
       }
     };
     window.addEventListener('focus', onFocus);
-    // Also check immediately (for in-app navigation without losing focus)
-    onFocus();
     return () => window.removeEventListener('focus', onFocus);
-  }, [loadProfiles, profiles.length]);
+  }, [loadProfiles]);
 
   const { indicatorRef } = usePullToRefresh(
     useCallback(() => loadProfiles({ silent: true }), [loadProfiles])
