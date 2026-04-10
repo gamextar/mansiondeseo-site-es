@@ -84,6 +84,7 @@ export default function FeedPage() {
   const loadMoreRef = useRef(null);
   const scrollRestoredRef = useRef(false);
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
+  const loadMoreFailedRef = useRef(false); // stop retrying on persistent errors
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
     frameId: null,
@@ -188,6 +189,7 @@ export default function FeedPage() {
           nextCursor: data.nextCursor || null,
           hasMore: !!data.hasMore,
         });
+        loadMoreFailedRef.current = false;
       })
       .catch(() => {
         if (myId !== loadIdRef.current) return;
@@ -208,7 +210,7 @@ export default function FeedPage() {
       setVisibleCount((current) => Math.min(profiles.length, current + SAFARI_DESKTOP_VISIBLE_STEP));
       return Promise.resolve();
     }
-    if (loading || loadingMore || !hasMore || !nextCursor) return Promise.resolve();
+    if (loading || loadingMore || !hasMore || !nextCursor || loadMoreFailedRef.current) return Promise.resolve();
     setLoadingMore(true);
     // Bump loadId so any in-flight loadProfiles response is discarded
     ++loadIdRef.current;
@@ -235,6 +237,11 @@ export default function FeedPage() {
         if (typeof data.viewerPremium === 'boolean') setViewerPremium(data.viewerPremium);
         setNextCursor(data.nextCursor || null);
         setHasMore(!!data.hasMore);
+        loadMoreFailedRef.current = false;
+      })
+      .catch(() => {
+        // Stop retrying — prevents infinite request loop on persistent server errors
+        loadMoreFailedRef.current = true;
       })
       .finally(() => setLoadingMore(false));
   }, [hasMore, loading, loadingMore, nextCursor, profiles.length, safariDesktop, visibleCount]);

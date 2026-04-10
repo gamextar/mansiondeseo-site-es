@@ -14,12 +14,33 @@ function cached(key, ttlMs, fetcher) {
   return fetcher().then(val => { _cache.set(key, { val, exp: Date.now() + ttlMs }); return val; });
 }
 
+// Processed feed cache — keyed per viewer, stores the fully mapped+scored+sorted profiles list.
+// Cursor pages read from this cache instead of re-computing everything.
+const _feedCache = new Map();
+const FEED_CACHE_TTL = 30_000; // 30s
+const FEED_CACHE_MAX_ENTRIES = 200;
+function getCachedFeed(key) {
+  const entry = _feedCache.get(key);
+  if (!entry) return null;
+  if (Date.now() >= entry.exp) { _feedCache.delete(key); return null; }
+  return entry.val;
+}
+function setCachedFeed(key, val) {
+  // Evict oldest entries if cache is too large
+  if (_feedCache.size >= FEED_CACHE_MAX_ENTRIES) {
+    const oldest = _feedCache.keys().next().value;
+    _feedCache.delete(oldest);
+  }
+  _feedCache.set(key, { val, exp: Date.now() + FEED_CACHE_TTL });
+}
+
 function invalidateFeedBrowseCache() {
   for (const key of _cache.keys()) {
     if (String(key).startsWith('profiles:') || String(key) === 'active_story_users') {
       _cache.delete(key);
     }
   }
+  _feedCache.clear();
 }
 
 const _routeMetrics = new Map();
@@ -1916,7 +1937,30 @@ async function handleProfiles(request, env) {
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
   const countryKey = settings.feedFilterByCountry ? country : 'all-countries';
   const profilesCacheKey = `profiles:${seekingKey}:${countryKey}:${search}`;
-  const shouldUseProfilesCache = !fresh && cursor === 0;
+
+  // Feed cache key — viewer-specific (includes favorites, blurred, premium status)
+  const feedCacheKey = `feed:${auth.sub}:${seekingKey}:${countryKey}:${search}`;
+
+  // For cursor pages, try to serve from the fully-processed feed cache.
+  // This avoids re-fetching, re-mapping, re-scoring, and re-sorting ALL profiles.
+  if (cursor > 0 && !fresh) {
+    const cachedFeedData = getCachedFeed(feedCacheKey);
+    if (cachedFeedData) {
+      const totalProfiles = cachedFeedData.profiles.length;
+      const pagedProfiles = cachedFeedData.profiles.slice(cursor, cursor + FEED_PROFILE_LIMIT);
+      const hasMore = totalProfiles > cursor + FEED_PROFILE_LIMIT;
+      const nextCursor = hasMore ? cursor + FEED_PROFILE_LIMIT : null;
+      return json({
+        profiles: pagedProfiles,
+        viewerPremium: cachedFeedData.viewerPremium,
+        settings,
+        nextCursor: nextCursor !== null ? String(nextCursor) : null,
+        hasMore,
+      });
+    }
+  }
+
+  const shouldUseProfilesCache = !fresh;
 
   // Parallel: cached settings + cached profiles + combined favorites + active stories
   const [results, { results: allFavRows }, storyRows] = await Promise.all([
@@ -2013,6 +2057,9 @@ async function handleProfiles(request, env) {
 
   // Strip internal sort fields
   profiles = profiles.map(({ _matchingInterests, _roleId, _feedScore, ...p }) => p);
+
+  // Cache the fully processed feed for cursor pages
+  setCachedFeed(feedCacheKey, { profiles, viewerPremium: viewerIsPremium });
 
   const totalProfiles = profiles.length;
   const pagedProfiles = profiles.slice(cursor, cursor + FEED_PROFILE_LIMIT);
