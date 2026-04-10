@@ -1906,13 +1906,11 @@ async function handleProfiles(request, env) {
     params.push(term, term, term, term);
   }
   const windowLimit = cursor + FEED_PROFILE_LIMIT;
-  // Overfetch by 2: one extra row to detect hasMore, plus one extra because we later
-  // filter out the current viewer from the shared candidate set.
-  const pageProbeLimit = windowLimit + 2;
-  const dbLimit = roleBuckets.length > 1
-    ? Math.max(pageProbeLimit * 10, FEED_PROFILE_LIMIT * 10)
-    : pageProbeLimit + 1;
-  query += ` ORDER BY last_active DESC LIMIT ${dbLimit}`;
+  // Keep one extra row to detect whether there are more pages after slicing.
+  const pageProbeLimit = windowLimit + 1;
+  // Fetch the full eligible candidate set so pagination is based on the real
+  // scored/interleaved feed order instead of an early SQL window.
+  query += ` ORDER BY last_active DESC`;
 
   // Cache key for profiles query (shared across all users)
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';

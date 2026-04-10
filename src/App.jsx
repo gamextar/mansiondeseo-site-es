@@ -67,6 +67,36 @@ function AppLayout() {
     markApiDebugRoute(location.pathname + location.search);
   }, [location.pathname, location.search]);
 
+  useEffect(() => {
+    if (!profileOverlayOpen || typeof window === 'undefined') return undefined;
+
+    const scrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    const { style: bodyStyle } = document.body;
+    const { style: htmlStyle } = document.documentElement;
+    const previousBody = {
+      position: bodyStyle.position,
+      top: bodyStyle.top,
+      width: bodyStyle.width,
+      overflow: bodyStyle.overflow,
+    };
+    const previousHtmlOverflow = htmlStyle.overflow;
+
+    bodyStyle.position = 'fixed';
+    bodyStyle.top = `-${scrollY}px`;
+    bodyStyle.width = '100%';
+    bodyStyle.overflow = 'hidden';
+    htmlStyle.overflow = 'hidden';
+
+    return () => {
+      bodyStyle.position = previousBody.position;
+      bodyStyle.top = previousBody.top;
+      bodyStyle.width = previousBody.width;
+      bodyStyle.overflow = previousBody.overflow;
+      htmlStyle.overflow = previousHtmlOverflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [profileOverlayOpen]);
+
   return (
     <>
       {showChrome && <DesktopSidebar />}
