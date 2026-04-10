@@ -14,6 +14,45 @@ function cached(key, ttlMs, fetcher) {
   return fetcher().then(val => { _cache.set(key, { val, exp: Date.now() + ttlMs }); return val; });
 }
 
+// ── Two-level cache for expensive shared (non-user-specific) queries ────────
+// L1: _cache Map — zero latency, per-isolate only
+// L2: CF Cache API — ~1ms, shared across ALL isolates in the same PoP
+// At scale with many parallel isolates, L2 eliminates redundant D1 reads.
+const _CACHE_L2_PREFIX = 'https://mansion-l2-cache/';
+async function cachedCrossIsolate(key, ttlMs, fetcher) {
+  // L1 — synchronous hit, zero overhead
+  const l1 = _cache.get(key);
+  if (l1 && Date.now() < l1.exp) return l1.val;
+
+  // L2 — CF Cache API, shared across isolates within a PoP
+  try {
+    const hit = await caches.default.match(new Request(`${_CACHE_L2_PREFIX}${encodeURIComponent(key)}`));
+    if (hit) {
+      const val = await hit.json();
+      _cache.set(key, { val, exp: Date.now() + ttlMs }); // warm L1
+      return val;
+    }
+  } catch {}
+
+  // Full miss — fetch from source
+  const val = await fetcher();
+  const ttlSec = Math.floor(ttlMs / 1000);
+  _cache.set(key, { val, exp: Date.now() + ttlMs }); // populate L1
+  // Populate L2 fire-and-forget — don't add latency to this response
+  try {
+    caches.default.put(
+      new Request(`${_CACHE_L2_PREFIX}${encodeURIComponent(key)}`),
+      new Response(JSON.stringify(val), {
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${ttlSec}` },
+      })
+    );
+  } catch {}
+  return val;
+}
+async function invalidateCrossIsolateCache(key) {
+  try { await caches.default.delete(new Request(`${_CACHE_L2_PREFIX}${encodeURIComponent(key)}`)); } catch {}
+}
+
 // Processed feed cache — keyed per viewer, stores the fully mapped+scored+sorted profiles list.
 // Cursor pages read from this cache instead of re-computing everything.
 const _feedCache = new Map();
@@ -56,11 +95,15 @@ function setCachedFeed(key, val) {
 }
 
 function invalidateFeedBrowseCache() {
+  const l2Keys = [];
   for (const key of _cache.keys()) {
     if (String(key).startsWith('profiles:') || String(key) === 'active_story_users') {
       _cache.delete(key);
+      l2Keys.push(key);
     }
   }
+  // Invalidate L2 (CF Cache API) so other isolates also see the fresh data
+  for (const key of l2Keys) invalidateCrossIsolateCache(key);
   _feedCache.clear();
 }
 
@@ -1994,11 +2037,11 @@ async function handleProfiles(request, env) {
 
   const shouldUseProfilesCache = !fresh;
 
-  // Parallel: cached profiles + cached favorites + active stories
+  // Parallel: cached profiles (L1+L2) + cached favorites + active stories
   const cachedFavRows = !fresh ? getCachedFavorites(auth.sub) : null;
   const [results, allFavRows, storyRows] = await Promise.all([
     shouldUseProfilesCache
-      ? cached(profilesCacheKey, 120_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results))  // 2 min — matches feed cache TTL
+      ? cachedCrossIsolate(profilesCacheKey, 120_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results))  // L1+L2, 2 min
       : env.DB.prepare(query).bind(...params).all().then(r => r.results),
     cachedFavRows
       ? Promise.resolve(cachedFavRows)
