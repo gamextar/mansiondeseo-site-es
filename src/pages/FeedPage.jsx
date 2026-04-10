@@ -21,6 +21,7 @@ const FEED_CACHE_KEY = 'mansion_feed';
 const FEED_CACHE_TTL_MS = 5 * 60_000;
 const FEED_BACKGROUND_REFRESH_MS = 45_000;
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
+const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
 const SAFARI_DESKTOP_INITIAL_VISIBLE = 24;
 const SAFARI_DESKTOP_VISIBLE_STEP = 12;
 
@@ -105,6 +106,7 @@ export default function FeedPage() {
   const { user, siteSettings } = useAuth();
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const loadMoreRef = useRef(null);
+  const scrollRestoredRef = useRef(false);
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
     frameId: null,
@@ -274,6 +276,7 @@ export default function FeedPage() {
   useEffect(() => {
     const handleHomeFocus = () => {
       setShowOwnStoryPreview(false);
+      try { sessionStorage.removeItem(FEED_SCROLL_KEY); } catch {}
       const scrollTarget = document.scrollingElement || document.documentElement || document.body;
       if (scrollTarget) {
         scrollTarget.scrollTo({ top: 0, behavior: 'smooth' });
@@ -285,6 +288,34 @@ export default function FeedPage() {
     return () => window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
   }, []);
 
+  // Save scroll position (throttled via rAF)
+  useEffect(() => {
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(() => {
+          try { sessionStorage.setItem(FEED_SCROLL_KEY, String(window.scrollY)); } catch {}
+          ticking = false;
+        });
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Restore scroll position once after profiles render from cache
+  useEffect(() => {
+    if (scrollRestoredRef.current || profiles.length === 0) return;
+    scrollRestoredRef.current = true;
+    try {
+      const savedY = parseInt(sessionStorage.getItem(FEED_SCROLL_KEY), 10);
+      if (savedY > 0) {
+        requestAnimationFrame(() => { window.scrollTo(0, savedY); });
+      }
+    } catch {}
+  }, [profiles.length]);
+
   // Reload feed when navigating back after preference changes
   useEffect(() => {
     const onFocus = () => {
@@ -293,6 +324,7 @@ export default function FeedPage() {
         const shouldForceFresh = sessionStorage.getItem('mansion_feed_force_refresh') === '1';
         sessionStorage.removeItem('mansion_feed_force_refresh');
         sessionStorage.removeItem(FEED_CACHE_KEY);
+        try { sessionStorage.removeItem(FEED_SCROLL_KEY); } catch {}
         loadProfiles({ forceFresh: shouldForceFresh });
         return;
       }
