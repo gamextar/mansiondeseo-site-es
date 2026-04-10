@@ -1926,9 +1926,6 @@ async function handleProfiles(request, env) {
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
-  const windowLimit = cursor + FEED_PROFILE_LIMIT;
-  // Keep one extra row to detect whether there are more pages after slicing.
-  const pageProbeLimit = windowLimit + 1;
   // Fetch the full eligible candidate set so pagination is based on the real
   // scored/interleaved feed order instead of an early SQL window.
   query += ` ORDER BY last_active DESC`;
@@ -2050,9 +2047,7 @@ async function handleProfiles(request, env) {
         return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
       });
     }
-    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, pageProbeLimit);
-  } else {
-    profiles = profiles.slice(0, pageProbeLimit);
+    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, Infinity);
   }
 
   // Strip internal sort fields
