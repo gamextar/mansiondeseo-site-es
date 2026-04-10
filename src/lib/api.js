@@ -581,7 +581,7 @@ async function apiUpload(path, options = {}) {
 
 // ── Auth ────────────────────────────────────────────────
 
-export async function register({ email, password, username, role, seeking, interests, age, birthdate, province, locality, city, bio, country }) {
+export async function register({ email, password, username, role, seeking, interests, age, birthdate, province, locality, city, bio, country, turnstileToken }) {
   const normalizedProvince = province ?? city ?? '';
   const normalizedAge = age === '' || age == null ? undefined : Number(age);
   const data = await apiFetch('/auth/register', {
@@ -600,6 +600,7 @@ export async function register({ email, password, username, role, seeking, inter
       city: normalizedProvince,
       bio,
       country,
+      turnstileToken: turnstileToken || undefined,
     }),
   });
   // Registration now returns needsVerification instead of token
