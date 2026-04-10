@@ -18,8 +18,6 @@ import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMed
 import { isSafariDesktopBrowser } from '../lib/browser';
 
 const FEED_CACHE_KEY = 'mansion_feed';
-const FEED_CACHE_TTL_MS = 5 * 60_000;
-const FEED_BACKGROUND_REFRESH_MS = 45_000;
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
 const SAFARI_DESKTOP_INITIAL_VISIBLE = 24;
@@ -55,29 +53,6 @@ function setCachedFeed(data) {
       timestamp: Date.now(),
     }));
   } catch {}
-}
-
-function clearCachedFeed() {
-  try {
-    sessionStorage.removeItem(FEED_CACHE_KEY);
-  } catch {}
-}
-
-function isFeedCacheFresh(cached) {
-  const timestamp = Number(cached?.timestamp) || 0;
-  return timestamp > 0 && Date.now() - timestamp < FEED_CACHE_TTL_MS;
-}
-
-function shouldBackgroundRefreshFeed(cached) {
-  const timestamp = Number(cached?.timestamp) || 0;
-  if (timestamp <= 0) return true;
-  return Date.now() - timestamp >= FEED_BACKGROUND_REFRESH_MS;
-}
-
-function hasFeedPaginationState(cached) {
-  if (!cached || typeof cached !== 'object') return false;
-  return Object.prototype.hasOwnProperty.call(cached, 'hasMore')
-    || Object.prototype.hasOwnProperty.call(cached, 'nextCursor');
 }
 
 export default function FeedPage() {
@@ -185,10 +160,10 @@ export default function FeedPage() {
     return () => window.removeEventListener('scroll', unlockAutoLoad);
   }, [safariDesktop]);
 
-  const loadProfiles = useCallback(({ silent = false, forceFresh = false } = {}) => {
+  const loadProfiles = useCallback(({ forceFresh = false } = {}) => {
     const c = getCachedFeed();
-    if (!silent && !c) setLoading(true);
-    if (!silent && c) {
+    if (!c) setLoading(true);
+    if (c) {
       setProfiles(c.profiles || []);
       setVisibleCount(getInitialVisibleCount(c.profiles || []));
       setViewerPremium(c.viewerPremium || false);
@@ -199,7 +174,6 @@ export default function FeedPage() {
     const myId = ++loadIdRef.current;
     return getProfiles({ fresh: forceFresh })
       .then(data => {
-        // Discard if a newer load or pagination happened after this call started
         if (myId !== loadIdRef.current) return;
         setProfiles(data.profiles || []);
         setVisibleCount(getInitialVisibleCount(data.profiles || []));
@@ -217,7 +191,8 @@ export default function FeedPage() {
       })
       .catch(() => {
         if (myId !== loadIdRef.current) return;
-        if (!silent) {
+        // If we had cached data, keep showing it
+        if (!c) {
           setProfiles([]);
           setNextCursor(null);
           setHasMore(false);
@@ -280,10 +255,6 @@ export default function FeedPage() {
     setNextCursor(cachedFeed.nextCursor || null);
     setHasMore(typeof cachedFeed.hasMore === 'boolean' ? cachedFeed.hasMore : true);
     setLoading(false);
-
-    if (!isFeedCacheFresh(cachedFeed) || !hasFeedPaginationState(cachedFeed) || shouldBackgroundRefreshFeed(cachedFeed)) {
-      loadProfiles({ silent: true });
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -346,7 +317,7 @@ export default function FeedPage() {
   }, [loadProfiles]);
 
   const { indicatorRef } = usePullToRefresh(
-    useCallback(() => loadProfiles({ silent: true }), [loadProfiles])
+    useCallback(() => loadProfiles({ forceFresh: true }), [loadProfiles])
   );
 
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
