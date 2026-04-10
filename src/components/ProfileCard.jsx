@@ -111,7 +111,13 @@ export default function ProfileCard({
   };
 
   return (
-    <div className="rounded-2xl overflow-hidden">
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{
+        contentVisibility: 'auto',
+        containIntrinsicSize: '360px 480px',
+      }}
+    >
       <Link
         to={`/perfiles/${id}`}
         state={{
