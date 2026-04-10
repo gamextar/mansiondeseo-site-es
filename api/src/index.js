@@ -17,7 +17,7 @@ function cached(key, ttlMs, fetcher) {
 // Processed feed cache — keyed per viewer, stores the fully mapped+scored+sorted profiles list.
 // Cursor pages read from this cache instead of re-computing everything.
 const _feedCache = new Map();
-const FEED_CACHE_TTL = 30_000; // 30s
+const FEED_CACHE_TTL = 120_000; // 2 min
 const FEED_CACHE_MAX_ENTRIES = 100;
 function getCachedFeed(key) {
   const entry = _feedCache.get(key);
@@ -63,7 +63,7 @@ let _profileStatsBackfillReady = null;
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
-const FEED_PROFILE_LIMIT = 126;
+const FEED_PROFILE_LIMIT = 500;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
