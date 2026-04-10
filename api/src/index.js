@@ -2004,9 +2004,9 @@ async function handleProfiles(request, env) {
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
-  // Cap SQL results — frontend shows max 500 cards, so 600 gives enough
-  // headroom for filtering out the current user and scoring/interleaving.
-  query += ` ORDER BY last_active DESC LIMIT 400`;
+  // Cap SQL results — configurable from admin, clamped to [100, 2000] for safety.
+  const sqlLimit = Math.min(Math.max(100, settings.feedSqlLimit ?? 400), 2000);
+  query += ` ORDER BY last_active DESC LIMIT ${sqlLimit}`;
 
   // Cache key for profiles query (shared across all users)
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
@@ -3329,6 +3329,7 @@ async function loadSettings(env) {
     feedWeightPremium: parseNumberSetting(settings.feed_weight_premium, 8),
     feedMaxCardsMobile: parseInt(settings.feed_max_cards_mobile || '360', 10),
     feedMaxCardsDesktop: parseInt(settings.feed_max_cards_desktop || '360', 10),
+    feedSqlLimit: parseInt(settings.feed_sql_limit || '400', 10),
   };
   // Keep module-level threshold in sync so isOnline() uses the latest value
   _onlineThresholdMs = result.onlineThresholdMinutes * 60_000;
@@ -3387,6 +3388,7 @@ function getPublicSettingsPayload(settings) {
     feedWeightPremium: settings.feedWeightPremium,
     feedMaxCardsMobile: settings.feedMaxCardsMobile,
     feedMaxCardsDesktop: settings.feedMaxCardsDesktop,
+    feedSqlLimit: settings.feedSqlLimit,
     navBottomPadding: settings.navBottomPadding,
     navSidePadding: settings.navSidePadding,
     navHeight: settings.navHeight,
@@ -3489,6 +3491,7 @@ async function handleUpdateSettings(request, env) {
     'feed_weight_premium',
     'feed_max_cards_mobile',
     'feed_max_cards_desktop',
+    'feed_sql_limit',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {

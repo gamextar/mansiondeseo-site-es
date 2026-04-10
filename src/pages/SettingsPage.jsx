@@ -46,6 +46,7 @@ export default function SettingsPage() {
   const [feedWeightPremium, setFeedWeightPremium] = useState(8);
   const [feedMaxCardsMobile, setFeedMaxCardsMobile] = useState(360);
   const [feedMaxCardsDesktop, setFeedMaxCardsDesktop] = useState(360);
+  const [feedSqlLimit, setFeedSqlLimit] = useState(400);
 
   // Coin packs
   const [coinPack1Coins, setCoinPack1Coins] = useState('1000');
@@ -199,6 +200,7 @@ export default function SettingsPage() {
         setFeedWeightPremium(s.feedWeightPremium ?? 8);
         setFeedMaxCardsMobile(s.feedMaxCardsMobile ?? 360);
         setFeedMaxCardsDesktop(s.feedMaxCardsDesktop ?? 360);
+        setFeedSqlLimit(s.feedSqlLimit ?? 400);
         setVipPrice3Months(s.vipPrice3Months);
         setVipPrice6Months(s.vipPrice6Months);
         setIncognitoIconSvg(s.incognitoIconSvg || '');
@@ -313,6 +315,7 @@ export default function SettingsPage() {
         feed_weight_premium: feedWeightPremium,
         feed_max_cards_mobile: feedMaxCardsMobile,
         feed_max_cards_desktop: feedMaxCardsDesktop,
+        feed_sql_limit: feedSqlLimit,
         vip_price_monthly: vipPriceMonthly,
         vip_price_3months: vipPrice3Months,
         vip_price_6months: vipPrice6Months,
@@ -383,6 +386,7 @@ export default function SettingsPage() {
       setFeedWeightPremium(s.feedWeightPremium ?? 8);
       setFeedMaxCardsMobile(s.feedMaxCardsMobile ?? 360);
       setFeedMaxCardsDesktop(s.feedMaxCardsDesktop ?? 360);
+      setFeedSqlLimit(s.feedSqlLimit ?? 400);
       setVipPrice3Months(s.vipPrice3Months);
       setVipPrice6Months(s.vipPrice6Months);
       setIncognitoIconSvg(s.incognitoIconSvg || '');
@@ -1099,6 +1103,20 @@ export default function SettingsPage() {
                       </div>
                       <Counter value={feedMaxCardsDesktop} onChange={setFeedMaxCardsDesktop} min={12} max={600} step={12} />
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <h3 className="text-sm font-semibold text-text-primary mb-1">Pool de perfiles (SQL LIMIT)</h3>
+                <p className="text-[11px] text-text-dim mb-3">Cuántos perfiles trae el servidor de D1. Más = más cobertura pero más costo por query. Clampeado entre 100 y 2000.</p>
+                <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-text-primary">SQL LIMIT</p>
+                      <p className="text-[11px] text-text-dim">Aplica igual para mobile y desktop.</p>
+                    </div>
+                    <Counter value={feedSqlLimit} onChange={setFeedSqlLimit} min={100} max={2000} step={50} />
                   </div>
                 </div>
               </div>
