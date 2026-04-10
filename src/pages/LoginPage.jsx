@@ -51,7 +51,7 @@ export default function LoginPage() {
           <h1 className="font-display text-3xl font-bold text-gradient-gold mb-1">
             Mansión Deseo
           </h1>
-          <p className="text-text-muted text-sm">Accede a tu club privado</p>
+          <p className="text-text-muted text-sm">Accedé a tu espacio privado</p>
         </div>
 
         {/* Form */}
@@ -119,9 +119,9 @@ export default function LoginPage() {
 
         {/* Register link */}
         <p className="text-center text-text-muted text-sm">
-          ¿Aún no tienes cuenta?{' '}
+          ¿Aún no tenés cuenta?{' '}
           <Link to="/bienvenida" className="text-mansion-gold font-medium hover:underline">
-            Únete a la Mansión
+            Crear acceso
           </Link>
         </p>
       </motion.div>

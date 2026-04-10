@@ -1,9 +1,15 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronRight, Sparkles } from 'lucide-react';
+import { useSeoMeta } from '../lib/seo';
 
 export default function WelcomePage() {
   const navigate = useNavigate();
+  useSeoMeta({
+    title: 'Mansión Deseo | Acceso privado para adultos',
+    description: 'Comunidad privada y selecta para adultos registrados, pensada para parejas y usuarios solos que valoran perfiles verificados y acceso discreto.',
+    canonical: 'https://mansiondeseo.com/bienvenida',
+  });
 
   return (
     <div className="min-h-screen bg-mansion-base flex flex-col items-center justify-center relative overflow-hidden px-6">
@@ -63,16 +69,28 @@ export default function WelcomePage() {
         </h1>
 
         <p className="fade-in-up fade-delay-600 text-text-muted text-sm leading-relaxed mb-10 max-w-xs mx-auto">
-          Un espacio exclusivo para quienes buscan experiencias únicas con discreción total,
-          perfiles verificados y conexiones reales.
+          Un espacio selecto para quienes buscan experiencias únicas con discreción total,
+          perfiles verificados y conexiones reales entre parejas y usuarios solos.
         </p>
+
+        <div className="fade-in-up fade-delay-650 grid grid-cols-2 gap-2 mb-8 text-left">
+          <Link to="/parejas" className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-xs text-text-primary hover:border-mansion-gold/30 hover:text-mansion-gold transition-colors">
+            Parejas
+          </Link>
+          <Link to="/swingers" className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-xs text-text-primary hover:border-mansion-gold/30 hover:text-mansion-gold transition-colors">
+            Swingers
+          </Link>
+          <Link to="/mujeres" className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-xs text-text-primary hover:border-mansion-gold/30 hover:text-mansion-gold transition-colors">
+            Mujeres
+          </Link>
+        </div>
 
         {/* CTA */}
         <button
           onClick={() => navigate('/registro')}
           className="fade-in-up fade-delay-700 btn-gold w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 active:scale-[0.97]"
         >
-          Comenzar
+          Crear acceso
           <ChevronRight className="w-5 h-5" />
         </button>
 
@@ -83,7 +101,7 @@ export default function WelcomePage() {
             onClick={() => navigate('/login')}
             className="text-mansion-gold text-sm font-medium hover:underline"
           >
-            Iniciar sesión
+            Acceder
           </button>
         </p>
 
@@ -93,9 +111,9 @@ export default function WelcomePage() {
             <Sparkles className="w-3 h-3 text-mansion-gold" /> Verificados
           </span>
           <span>•</span>
-          <span>Discreto</span>
+          <span>Privado</span>
           <span>•</span>
-          <span>Exclusivo</span>
+          <span>Selecto</span>
         </div>
       </div>
     </div>

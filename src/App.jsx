@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate } from 'react-router-dom';
 import { useAgeVerified } from './hooks/useAgeVerified';
 import AgeVerificationModal from './components/AgeVerificationModal';
 import Navbar from './components/Navbar';
@@ -14,6 +14,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import WelcomePage from './pages/WelcomePage';
+import SEOLandingPage from './pages/SEOLandingPage';
 import ProfilePage from './pages/ProfilePage';
 import FavoritesPage from './pages/FavoritesPage';
 import SettingsPage from './pages/SettingsPage';
@@ -43,6 +44,11 @@ function RequireRegistration({ children }) {
   const { registered } = useAuth();
   if (!registered) return <Navigate to="/bienvenida" replace />;
   return children;
+}
+
+function SEOCityLanding({ variant }) {
+  const { citySlug = '' } = useParams();
+  return <SEOLandingPage variant={variant} citySlug={citySlug || ''} />;
 }
 
 function AppLayout() {
@@ -77,6 +83,28 @@ function AppLayout() {
           <Route path="/registro" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/recuperar-contrasena" element={<ForgotPasswordPage />} />
+
+          {/* Public SEO landing pages */}
+          <Route path="/parejas" element={<SEOLandingPage variant="parejas" />} />
+          <Route path="/trios" element={<SEOLandingPage variant="trios" />} />
+          <Route path="/swingers" element={<SEOLandingPage variant="swingers" />} />
+          <Route path="/mujeres" element={<SEOLandingPage variant="mujeres" />} />
+          <Route path="/hombres" element={<SEOLandingPage variant="hombres" />} />
+          <Route path="/trans" element={<SEOLandingPage variant="trans" />} />
+          <Route path="/cuckold-argentina" element={<SEOLandingPage variant="cuckold-argentina" />} />
+          <Route path="/contactossex" element={<SEOLandingPage variant="contactossex" />} />
+          <Route path="/contactossex-argentina" element={<SEOLandingPage variant="contactossex-argentina" />} />
+          <Route path="/cornudos-argentina" element={<SEOLandingPage variant="cornudos-argentina" />} />
+          <Route path="/parejas/:citySlug" element={<SEOCityLanding variant="parejas" />} />
+          <Route path="/trios/:citySlug" element={<SEOCityLanding variant="trios" />} />
+          <Route path="/swingers/:citySlug" element={<SEOCityLanding variant="swingers" />} />
+          <Route path="/mujeres/:citySlug" element={<SEOCityLanding variant="mujeres" />} />
+          <Route path="/hombres/:citySlug" element={<SEOCityLanding variant="hombres" />} />
+          <Route path="/trans/:citySlug" element={<SEOCityLanding variant="trans" />} />
+          <Route path="/cuckold-argentina/:citySlug" element={<SEOCityLanding variant="cuckold-argentina" />} />
+          <Route path="/contactossex/:citySlug" element={<SEOCityLanding variant="contactossex" />} />
+          <Route path="/contactossex-argentina/:citySlug" element={<SEOCityLanding variant="contactossex-argentina" />} />
+          <Route path="/cornudos-argentina/:citySlug" element={<SEOCityLanding variant="cornudos-argentina" />} />
 
           {/* Pagos */}
           <Route path="/vip" element={<VipPage />} />

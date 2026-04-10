@@ -625,9 +625,9 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
       </motion.div>
 
       <h2 className="font-display text-2xl font-bold text-text-primary mb-2">
-        Únete a la Mansión
+        Crear acceso
       </h2>
-      <p className="text-text-muted text-sm mb-8">Crea tu cuenta para comenzar</p>
+      <p className="text-text-muted text-sm mb-8">Creá tu cuenta para empezar a explorar el sitio</p>
 
       <div className="space-y-4 max-w-xs mx-auto text-left">
         <div>
@@ -1449,7 +1449,7 @@ function SuccessScreen({ onEnter }) {
         transition={{ delay: 0.4 }}
         className="font-display text-3xl font-bold text-text-primary mt-8 mb-3"
       >
-        ¡Bienvenido/a!
+        Acceso creado
       </motion.h2>
 
       <motion.p
@@ -1458,14 +1458,14 @@ function SuccessScreen({ onEnter }) {
         transition={{ delay: 0.5 }}
         className="text-text-muted text-sm mb-10 max-w-xs"
       >
-        Tu perfil está listo. Ahora puedes explorar la Mansión y conectar con personas afines.
+        Tu perfil está listo. Ahora podés explorar el sitio y conectar con personas afines.
       </motion.p>
 
       <button
         onClick={onEnter}
         className="fade-in-up fade-delay-600 btn-gold text-lg font-display flex items-center gap-2 active:scale-[0.97]"
       >
-        Entrar a la Mansión
+        Entrar al sitio
         <ChevronRight className="w-5 h-5" />
       </button>
     </motion.div>

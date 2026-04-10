@@ -108,14 +108,14 @@ export default function ForgotPasswordPage() {
             <KeyRound className="w-7 h-7 text-mansion-gold" />
           </div>
           <h1 className="font-display text-2xl font-bold text-text-primary mb-2">
-            {step === 'done' ? '¡Listo!' : 'Recuperar contraseña'}
+            {step === 'done' ? '¡Listo!' : 'Recuperar acceso'}
           </h1>
           <p className="text-text-muted text-sm">
-            {step === 'email' && 'Ingresa tu email y te enviaremos un código'}
+            {step === 'email' && 'Ingresá tu email y te enviaremos un código'}
             {step === 'code' && (
               <>Enviamos un código de 6 dígitos a <span className="text-mansion-gold font-medium">{email}</span></>
             )}
-            {step === 'done' && 'Tu contraseña fue actualizada correctamente'}
+            {step === 'done' && 'Tu acceso fue actualizado correctamente'}
           </p>
         </div>
 
@@ -241,7 +241,7 @@ export default function ForgotPasswordPage() {
             onClick={() => navigate('/login')}
             className="btn-gold w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2"
           >
-            Iniciar sesión
+            Volver a ingresar
             <ChevronRight className="w-5 h-5" />
           </motion.button>
         )}
