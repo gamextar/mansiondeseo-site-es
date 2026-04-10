@@ -1041,6 +1041,38 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
   const latestAdultBirthdate = getLatestAdultBirthdate();
   const enteredAge = calculateAgeFromBirthdate(data.birthdate);
 
+  // Parse current birthdate into parts
+  const bdParts = data.birthdate ? data.birthdate.split('-') : [];
+  const bdYear = bdParts[0] || '';
+  const bdMonth = bdParts[1] || '';
+  const bdDay = bdParts[2] || '';
+
+  const currentYear = new Date().getUTCFullYear();
+  const defaultYear = currentYear - 18;
+  const minYear = currentYear - 90;
+
+  const MONTHS = [
+    { value: '01', label: 'Enero' }, { value: '02', label: 'Febrero' }, { value: '03', label: 'Marzo' },
+    { value: '04', label: 'Abril' }, { value: '05', label: 'Mayo' }, { value: '06', label: 'Junio' },
+    { value: '07', label: 'Julio' }, { value: '08', label: 'Agosto' }, { value: '09', label: 'Septiembre' },
+    { value: '10', label: 'Octubre' }, { value: '11', label: 'Noviembre' }, { value: '12', label: 'Diciembre' },
+  ];
+
+  // Days in selected month/year
+  const daysInMonth = bdYear && bdMonth
+    ? new Date(Number(bdYear), Number(bdMonth), 0).getDate()
+    : 31;
+
+  const updateBirthdate = (y, m, d) => {
+    if (y && m && d) {
+      onChange({ ...data, birthdate: `${y}-${m}-${d}` });
+    } else {
+      onChange({ ...data, birthdate: '' });
+    }
+  };
+
+  const selectClass = "appearance-none bg-mansion-elevated border border-mansion-border/30 text-text-primary rounded-xl px-3 py-3 text-base font-medium focus:outline-none focus:border-mansion-gold/50 focus:ring-1 focus:ring-mansion-gold/20 transition-colors cursor-pointer";
+
   const ARGENTINA_PROVINCES = [
     'Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba',
     'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja',
@@ -1104,15 +1136,54 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
         </div>
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">Fecha de nacimiento</label>
-          <input
-            type="date"
-            value={data.birthdate}
-            onChange={(e) => onChange({ ...data, birthdate: e.target.value })}
-            max={latestAdultBirthdate}
-            className="w-full"
-          />
+          <div className="grid grid-cols-3 gap-2">
+            <select
+              value={bdDay}
+              onChange={(e) => updateBirthdate(bdYear, bdMonth, e.target.value)}
+              className={selectClass}
+            >
+              <option value="" disabled>Día</option>
+              {Array.from({ length: daysInMonth }, (_, i) => {
+                const d = String(i + 1).padStart(2, '0');
+                return <option key={d} value={d}>{i + 1}</option>;
+              })}
+            </select>
+            <select
+              value={bdMonth}
+              onChange={(e) => {
+                const newMonth = e.target.value;
+                // Clamp day if needed
+                const maxDay = bdYear ? new Date(Number(bdYear), Number(newMonth), 0).getDate() : 31;
+                const clampedDay = bdDay && Number(bdDay) > maxDay ? String(maxDay).padStart(2, '0') : bdDay;
+                updateBirthdate(bdYear, newMonth, clampedDay);
+              }}
+              className={selectClass}
+            >
+              <option value="" disabled>Mes</option>
+              {MONTHS.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            <select
+              value={bdYear}
+              onChange={(e) => {
+                const newYear = e.target.value;
+                // Clamp day if needed (Feb leap year)
+                const maxDay = bdMonth ? new Date(Number(newYear), Number(bdMonth), 0).getDate() : 31;
+                const clampedDay = bdDay && Number(bdDay) > maxDay ? String(maxDay).padStart(2, '0') : bdDay;
+                updateBirthdate(newYear, bdMonth, clampedDay);
+              }}
+              className={selectClass}
+            >
+              <option value="" disabled>Año</option>
+              {Array.from({ length: defaultYear - minYear + 1 }, (_, i) => {
+                const y = defaultYear - i;
+                return <option key={y} value={String(y)}>{y}</option>;
+              })}
+            </select>
+          </div>
           {enteredAge && (
-            <p className="text-[10px] text-text-dim mt-0.5">Edad actual: {enteredAge} años</p>
+            <p className="text-[10px] text-text-dim mt-1">Edad actual: {enteredAge} años</p>
           )}
           {data.birthdate && !isAdultBirthdate(data.birthdate) && (
             <p className="text-[10px] text-mansion-crimson mt-0.5">Debes ser mayor de 18 años</p>
