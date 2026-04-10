@@ -256,6 +256,16 @@ export default function App() {
     }
   }, []);
 
+  // Listen for auth expiration events dispatched by apiFetch on 401
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setRegisteredState(false);
+      setUserState(null);
+    };
+    window.addEventListener('mansion-auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('mansion-auth-expired', handleAuthExpired);
+  }, []);
+
   useEffect(() => {
     if (bootstrapStartedRef.current) return;
 

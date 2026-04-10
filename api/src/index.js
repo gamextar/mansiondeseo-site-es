@@ -4486,11 +4486,26 @@ async function handleGetStories(request, env) {
   const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
   const offset = (page - 1) * limit;
 
-  // Try to get current user for per-user liked status
+  // Try to get current user for per-user liked status and server-side seeking filter
   const auth = await authenticate(request, env).catch(() => null);
   const viewerId = auth?.sub || null;
 
-  const { results } = await env.DB.prepare(`
+  let viewer = viewerId ? getCachedViewer(viewerId) : null;
+  if (viewerId && !viewer) {
+    viewer = await env.DB.prepare(
+      'SELECT premium, premium_until, country, seeking, interests FROM users WHERE id = ?'
+    ).bind(viewerId).first();
+    if (viewer) setCachedViewer(viewerId, viewer);
+  }
+
+  const viewerSeeking = normalizeRoleArray(safeParseJSON(viewer?.seeking, []), SEEKING_ROLE_IDS, []);
+  const roleFilters = viewerSeeking.length > 0 && viewerSeeking.length < SEEKING_ROLE_IDS.length
+    ? viewerSeeking
+    : [];
+  const roleValues = [...new Set(roleFilters.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])))];
+
+  const bindings = [viewerId || ''];
+  let query = `
     SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
            u.username, u.avatar_url, u.avatar_crop,
            CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
@@ -4500,10 +4515,19 @@ async function handleGetStories(request, env) {
     WHERE s.active = 1
       AND u.status = 'verified'
       AND COALESCE(u.account_status, 'active') = 'active'
+  `;
+  if (roleValues.length > 0) {
+    query += ` AND u.role IN (${roleValues.map(() => '?').join(', ')})`;
+    bindings.push(...roleValues);
+  }
+  query += `
       AND (s.user_id != ? OR ? = '')
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
-  `).bind(viewerId || '', viewerId || '', viewerId || '', limit, offset).all();
+  `;
+  bindings.push(viewerId || '', viewerId || '', limit, offset);
+
+  const { results } = await env.DB.prepare(query).bind(...bindings).all();
 
   const stories = (results || []).map(r => ({
     id: r.id,

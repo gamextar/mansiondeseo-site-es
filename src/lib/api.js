@@ -476,7 +476,7 @@ async function apiFetch(path, options = {}) {
   // Handle 401 — token expired
   if (res.status === 401 && token) {
     clearAuth();
-    window.location.href = '/bienvenida';
+    window.dispatchEvent(new CustomEvent('mansion-auth-expired'));
     throw new Error('Sesión expirada');
   }
 
@@ -558,7 +558,7 @@ async function apiUpload(path, options = {}) {
 
       if (xhr.status === 401 && token) {
         clearAuth();
-        window.location.href = '/bienvenida';
+        window.dispatchEvent(new CustomEvent('mansion-auth-expired'));
         reject(new Error('Sesión expirada'));
         return;
       }
@@ -744,6 +744,7 @@ export function invalidateProfilesCache() {
 
 function markFeedDirty() {
   invalidateProfilesCache();
+  invalidateStoryFeedCache();
   try {
     sessionStorage.setItem('mansion_feed_dirty', '1');
     sessionStorage.setItem('mansion_feed_force_refresh', '1');
