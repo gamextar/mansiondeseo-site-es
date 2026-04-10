@@ -47,6 +47,8 @@ export default function SettingsPage() {
   const [feedMaxCardsMobile, setFeedMaxCardsMobile] = useState(360);
   const [feedMaxCardsDesktop, setFeedMaxCardsDesktop] = useState(360);
   const [feedSqlLimit, setFeedSqlLimit] = useState(400);
+  const [feedInitialCards, setFeedInitialCards] = useState(24);
+  const [feedStepCards, setFeedStepCards] = useState(12);
 
   // Coin packs
   const [coinPack1Coins, setCoinPack1Coins] = useState('1000');
@@ -201,6 +203,8 @@ export default function SettingsPage() {
         setFeedMaxCardsMobile(s.feedMaxCardsMobile ?? 360);
         setFeedMaxCardsDesktop(s.feedMaxCardsDesktop ?? 360);
         setFeedSqlLimit(s.feedSqlLimit ?? 400);
+        setFeedInitialCards(s.feedInitialCards ?? 24);
+        setFeedStepCards(s.feedStepCards ?? 12);
         setVipPrice3Months(s.vipPrice3Months);
         setVipPrice6Months(s.vipPrice6Months);
         setIncognitoIconSvg(s.incognitoIconSvg || '');
@@ -316,6 +320,8 @@ export default function SettingsPage() {
         feed_max_cards_mobile: feedMaxCardsMobile,
         feed_max_cards_desktop: feedMaxCardsDesktop,
         feed_sql_limit: feedSqlLimit,
+        feed_initial_cards: feedInitialCards,
+        feed_step_cards: feedStepCards,
         vip_price_monthly: vipPriceMonthly,
         vip_price_3months: vipPrice3Months,
         vip_price_6months: vipPrice6Months,
@@ -387,6 +393,8 @@ export default function SettingsPage() {
       setFeedMaxCardsMobile(s.feedMaxCardsMobile ?? 360);
       setFeedMaxCardsDesktop(s.feedMaxCardsDesktop ?? 360);
       setFeedSqlLimit(s.feedSqlLimit ?? 400);
+      setFeedInitialCards(s.feedInitialCards ?? 24);
+      setFeedStepCards(s.feedStepCards ?? 12);
       setVipPrice3Months(s.vipPrice3Months);
       setVipPrice6Months(s.vipPrice6Months);
       setIncognitoIconSvg(s.incognitoIconSvg || '');
@@ -1136,6 +1144,31 @@ export default function SettingsPage() {
                       <p className="text-[11px] text-text-dim">Aplica igual para mobile y desktop.</p>
                     </div>
                     <Counter value={feedSqlLimit} onChange={setFeedSqlLimit} min={100} max={2000} step={50} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <h3 className="text-sm font-semibold text-text-primary mb-1">Progressive reveal</h3>
+                <p className="text-[11px] text-text-dim mb-3">Cuántas cards se muestran al cargar y cuántas se suman al hacer scroll. Aplica en mobile y desktop.</p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">Cards iniciales</p>
+                        <p className="text-[11px] text-text-dim">Al cargar la página.</p>
+                      </div>
+                      <Counter value={feedInitialCards} onChange={setFeedInitialCards} min={4} max={200} step={4} />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">Incremento por scroll</p>
+                        <p className="text-[11px] text-text-dim">Cards que se suman al hacer scroll.</p>
+                      </div>
+                      <Counter value={feedStepCards} onChange={setFeedStepCards} min={1} max={100} step={4} />
+                    </div>
                   </div>
                 </div>
               </div>

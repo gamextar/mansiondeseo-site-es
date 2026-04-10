@@ -20,8 +20,8 @@ import { isSafariDesktopBrowser } from '../lib/browser';
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
-const SAFARI_DESKTOP_INITIAL_VISIBLE = 24;
-const SAFARI_DESKTOP_VISIBLE_STEP = 12;
+const FEED_INITIAL_VISIBLE = 24;
+const FEED_STEP = 12;
 const MOBILE_MAX_DOM_CARDS = 360;
 
 const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, motionProps = {}, children, ...rest }, ref) {
@@ -59,14 +59,17 @@ export default function FeedPage() {
   const safariDesktop = isSafariDesktopBrowser();
   const cached = getCachedFeed();
   const getInitialVisibleCount = useCallback(
-    (list) => (safariDesktop ? Math.min(Array.isArray(list) ? list.length : 0, SAFARI_DESKTOP_INITIAL_VISIBLE) : Array.isArray(list) ? list.length : 0),
-    [safariDesktop]
+    (list, s = {}) => Math.min(
+      Array.isArray(list) ? list.length : 0,
+      Math.max(1, s.feedInitialCards ?? FEED_INITIAL_VISIBLE)
+    ),
+    []
   );
   const [profiles, setProfiles] = useState(cached?.profiles || []);
-  const [visibleCount, setVisibleCount] = useState(() => getInitialVisibleCount(cached?.profiles || []));
+  const [visibleCount, setVisibleCount] = useState(() => getInitialVisibleCount(cached?.profiles || [], cached?.settings || {}));
   const [showStoriesSection, setShowStoriesSection] = useState(() => !safariDesktop);
   const [showGridSection, setShowGridSection] = useState(() => !safariDesktop);
-  const [canAutoLoadMore, setCanAutoLoadMore] = useState(() => !safariDesktop);
+  const [canAutoLoadMore, setCanAutoLoadMore] = useState(false);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
   const [nextCursor, setNextCursor] = useState(cached?.nextCursor || null);
@@ -115,7 +118,6 @@ export default function FeedPage() {
     if (!safariDesktop) {
       setShowStoriesSection(true);
       setShowGridSection(true);
-      setCanAutoLoadMore(true);
       return undefined;
     }
 
@@ -149,25 +151,20 @@ export default function FeedPage() {
   }, [safariDesktop]);
 
   useEffect(() => {
-    if (!safariDesktop) return undefined;
-
     const unlockAutoLoad = () => {
       const scrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      if (scrollTop > 80) {
-        setCanAutoLoadMore(true);
-      }
+      if (scrollTop > 80) setCanAutoLoadMore(true);
     };
-
     window.addEventListener('scroll', unlockAutoLoad, { passive: true });
     return () => window.removeEventListener('scroll', unlockAutoLoad);
-  }, [safariDesktop]);
+  }, []);
 
   const loadProfiles = useCallback(({ forceFresh = false } = {}) => {
     const c = getCachedFeed();
     if (!c) setLoading(true);
     if (c) {
       setProfiles(c.profiles || []);
-      setVisibleCount(getInitialVisibleCount(c.profiles || []));
+      setVisibleCount(getInitialVisibleCount(c.profiles || [], c.settings || {}));
       setViewerPremium(c.viewerPremium || false);
       if (c.settings) setSettings(c.settings);
       setNextCursor(c.nextCursor || null);
@@ -178,7 +175,7 @@ export default function FeedPage() {
       .then(data => {
         if (myId !== loadIdRef.current) return;
         setProfiles(data.profiles || []);
-        setVisibleCount(getInitialVisibleCount(data.profiles || []));
+        setVisibleCount(getInitialVisibleCount(data.profiles || [], data.settings || {}));
         setViewerPremium(data.viewerPremium || false);
         if (data.settings) setSettings(data.settings);
         setNextCursor(data.nextCursor || null);
@@ -207,13 +204,21 @@ export default function FeedPage() {
   }, [getInitialVisibleCount]);
 
   const loadMoreProfiles = useCallback(() => {
-    if (safariDesktop && visibleCount < profiles.length) {
-      setVisibleCount((current) => Math.min(profiles.length, current + SAFARI_DESKTOP_VISIBLE_STEP));
+    const step = Math.max(1, settings?.feedStepCards ?? FEED_STEP);
+    const maxCards = Math.max(12, safariDesktop
+      ? (settings?.feedMaxCardsDesktop ?? MOBILE_MAX_DOM_CARDS)
+      : (settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS));
+
+    // Reveal more from already-fetched profiles (no API call needed)
+    if (visibleCount < profiles.length && visibleCount < maxCards) {
+      setVisibleCount((c) => Math.min(profiles.length, Math.min(maxCards, c + step)));
       return Promise.resolve();
     }
-    // Stop paginating if we've hit the DOM card cap — new cards wouldn't render
-    // and the sentinel would stay visible, causing an infinite request loop.
-    if (!safariDesktop && profiles.length >= Math.max(12, (settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS))) return Promise.resolve();
+
+    // Hit the DOM cap — stop
+    if (visibleCount >= maxCards) return Promise.resolve();
+
+    // Need more from API
     if (loading || loadingMore || !hasMore || !nextCursor || loadMoreFailedRef.current || loadingMoreRef.current) return Promise.resolve();
     loadingMoreRef.current = true;
     setLoadingMore(true);
@@ -231,11 +236,7 @@ export default function FeedPage() {
             seen.add(profile.id);
             merged.push(profile);
           }
-          setVisibleCount((current) => (
-            safariDesktop
-              ? Math.min(merged.length, Math.max(current, current + SAFARI_DESKTOP_VISIBLE_STEP))
-              : merged.length
-          ));
+          setVisibleCount((c) => Math.min(merged.length, Math.min(maxCards, c + step)));
           return merged;
         });
         if (data.settings) setSettings(data.settings);
@@ -261,7 +262,7 @@ export default function FeedPage() {
     }
 
     setProfiles(cachedFeed.profiles || []);
-    setVisibleCount(getInitialVisibleCount(cachedFeed.profiles || []));
+    setVisibleCount(getInitialVisibleCount(cachedFeed.profiles || [], cachedFeed.settings || {}));
     setViewerPremium(cachedFeed.viewerPremium || false);
     if (cachedFeed.settings) setSettings(cachedFeed.settings);
     setNextCursor(cachedFeed.nextCursor || null);
@@ -342,9 +343,8 @@ export default function FeedPage() {
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
   const mobileMaxCards = Math.max(12, safeSettings.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS);
   const desktopMaxCards = Math.max(12, safeSettings.feedMaxCardsDesktop ?? MOBILE_MAX_DOM_CARDS);
-  const renderedProfiles = safariDesktop
-    ? safeProfiles.slice(0, Math.min(visibleCount, desktopMaxCards))
-    : safeProfiles.slice(0, mobileMaxCards);
+  const maxCards = safariDesktop ? desktopMaxCards : mobileMaxCards;
+  const renderedProfiles = safeProfiles.slice(0, Math.min(visibleCount, maxCards));
   const storyProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, safariDesktop ? 6 : 15);
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));

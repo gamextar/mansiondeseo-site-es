@@ -3330,6 +3330,8 @@ async function loadSettings(env) {
     feedMaxCardsMobile: parseInt(settings.feed_max_cards_mobile || '360', 10),
     feedMaxCardsDesktop: parseInt(settings.feed_max_cards_desktop || '360', 10),
     feedSqlLimit: parseInt(settings.feed_sql_limit || '400', 10),
+    feedInitialCards: parseInt(settings.feed_initial_cards || '24', 10),
+    feedStepCards: parseInt(settings.feed_step_cards || '12', 10),
   };
   // Keep module-level threshold in sync so isOnline() uses the latest value
   _onlineThresholdMs = result.onlineThresholdMinutes * 60_000;
@@ -3389,6 +3391,8 @@ function getPublicSettingsPayload(settings) {
     feedMaxCardsMobile: settings.feedMaxCardsMobile,
     feedMaxCardsDesktop: settings.feedMaxCardsDesktop,
     feedSqlLimit: settings.feedSqlLimit,
+    feedInitialCards: settings.feedInitialCards,
+    feedStepCards: settings.feedStepCards,
     navBottomPadding: settings.navBottomPadding,
     navSidePadding: settings.navSidePadding,
     navHeight: settings.navHeight,
@@ -3492,6 +3496,8 @@ async function handleUpdateSettings(request, env) {
     'feed_max_cards_mobile',
     'feed_max_cards_desktop',
     'feed_sql_limit',
+    'feed_initial_cards',
+    'feed_step_cards',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {
