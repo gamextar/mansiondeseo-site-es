@@ -61,6 +61,7 @@ function AppLayout() {
     FULLSCREEN_PATHS.includes(location.pathname);
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
   const showChrome = !isFullscreen && !isChatDetail;
+  const scrollLockRef = useRef(null);
 
   useEffect(() => {
     ensureApiDebug();
@@ -87,15 +88,40 @@ function AppLayout() {
     bodyStyle.overflow = 'hidden';
     htmlStyle.overflow = 'hidden';
 
+    // Store restore info for onExitComplete instead of cleaning up immediately.
+    // Immediate cleanup causes a white flash on iOS Safari because the browser
+    // paints a frame at scroll 0 before honoring window.scrollTo().
+    scrollLockRef.current = { previousBody, previousHtmlOverflow, scrollY };
+
     return () => {
-      bodyStyle.position = previousBody.position;
-      bodyStyle.top = previousBody.top;
-      bodyStyle.width = previousBody.width;
-      bodyStyle.overflow = previousBody.overflow;
-      htmlStyle.overflow = previousHtmlOverflow;
-      window.scrollTo(0, scrollY);
+      // Only restore immediately if the overlay was never animated out
+      // (e.g. route change that bypasses AnimatePresence).
+      if (scrollLockRef.current) {
+        const { previousBody: pb, previousHtmlOverflow: pho, scrollY: sy } = scrollLockRef.current;
+        scrollLockRef.current = null;
+        bodyStyle.position = pb.position;
+        bodyStyle.top = pb.top;
+        bodyStyle.width = pb.width;
+        bodyStyle.overflow = pb.overflow;
+        htmlStyle.overflow = pho;
+        window.scrollTo(0, sy);
+      }
     };
   }, [location.state?.backgroundScrollY, profileOverlayOpen]);
+
+  const handleOverlayExitComplete = useCallback(() => {
+    if (!scrollLockRef.current) return;
+    const { previousBody, previousHtmlOverflow, scrollY } = scrollLockRef.current;
+    scrollLockRef.current = null;
+    const { style: bodyStyle } = document.body;
+    const { style: htmlStyle } = document.documentElement;
+    bodyStyle.position = previousBody.position;
+    bodyStyle.top = previousBody.top;
+    bodyStyle.width = previousBody.width;
+    bodyStyle.overflow = previousBody.overflow;
+    htmlStyle.overflow = previousHtmlOverflow;
+    window.scrollTo(0, scrollY);
+  }, []);
 
   return (
     <>
@@ -246,7 +272,7 @@ function AppLayout() {
             <Route path="video-lab" element={<VideoLabPage />} />
           </Route>
         </Routes>
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" onExitComplete={handleOverlayExitComplete}>
           {profileOverlayOpen && (
             <motion.div
               key={location.key || location.pathname}
