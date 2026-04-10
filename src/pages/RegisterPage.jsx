@@ -1041,11 +1041,11 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
   const latestAdultBirthdate = getLatestAdultBirthdate();
   const enteredAge = calculateAgeFromBirthdate(data.birthdate);
 
-  // Parse current birthdate into parts
-  const bdParts = data.birthdate ? data.birthdate.split('-') : [];
-  const bdYear = bdParts[0] || '';
-  const bdMonth = bdParts[1] || '';
-  const bdDay = bdParts[2] || '';
+  // Local state for partial date selections (survives incomplete picks)
+  const initParts = data.birthdate ? data.birthdate.split('-') : [];
+  const [bdYear, setBdYear] = useState(initParts[0] || '');
+  const [bdMonth, setBdMonth] = useState(initParts[1] || '');
+  const [bdDay, setBdDay] = useState(initParts[2] || '');
 
   const currentYear = new Date().getUTCFullYear();
   const defaultYear = currentYear - 18;
@@ -1063,10 +1063,11 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
     ? new Date(Number(bdYear), Number(bdMonth), 0).getDate()
     : 31;
 
-  const updateBirthdate = (y, m, d) => {
+  // Sync to parent only when all 3 parts are set
+  const syncBirthdate = (y, m, d) => {
     if (y && m && d) {
       onChange({ ...data, birthdate: `${y}-${m}-${d}` });
-    } else {
+    } else if (data.birthdate) {
       onChange({ ...data, birthdate: '' });
     }
   };
@@ -1139,7 +1140,11 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
           <div className="grid grid-cols-3 gap-2">
             <select
               value={bdDay}
-              onChange={(e) => updateBirthdate(bdYear, bdMonth, e.target.value)}
+              onChange={(e) => {
+                const d = e.target.value;
+                setBdDay(d);
+                syncBirthdate(bdYear, bdMonth, d);
+              }}
               className={selectClass}
             >
               <option value="" disabled>Día</option>
@@ -1152,10 +1157,11 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
               value={bdMonth}
               onChange={(e) => {
                 const newMonth = e.target.value;
-                // Clamp day if needed
                 const maxDay = bdYear ? new Date(Number(bdYear), Number(newMonth), 0).getDate() : 31;
                 const clampedDay = bdDay && Number(bdDay) > maxDay ? String(maxDay).padStart(2, '0') : bdDay;
-                updateBirthdate(bdYear, newMonth, clampedDay);
+                setBdMonth(newMonth);
+                if (clampedDay !== bdDay) setBdDay(clampedDay);
+                syncBirthdate(bdYear, newMonth, clampedDay);
               }}
               className={selectClass}
             >
@@ -1168,10 +1174,11 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
               value={bdYear}
               onChange={(e) => {
                 const newYear = e.target.value;
-                // Clamp day if needed (Feb leap year)
                 const maxDay = bdMonth ? new Date(Number(newYear), Number(bdMonth), 0).getDate() : 31;
                 const clampedDay = bdDay && Number(bdDay) > maxDay ? String(maxDay).padStart(2, '0') : bdDay;
-                updateBirthdate(newYear, bdMonth, clampedDay);
+                setBdYear(newYear);
+                if (clampedDay !== bdDay) setBdDay(clampedDay);
+                syncBirthdate(newYear, bdMonth, clampedDay);
               }}
               className={selectClass}
             >
