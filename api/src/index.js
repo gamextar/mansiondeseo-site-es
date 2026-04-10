@@ -3327,6 +3327,8 @@ async function loadSettings(env) {
     feedWeightFollowers: parseNumberSetting(settings.feed_weight_followers, 10),
     feedWeightSharedInterests: parseNumberSetting(settings.feed_weight_shared_interests, 20),
     feedWeightPremium: parseNumberSetting(settings.feed_weight_premium, 8),
+    feedMaxCardsMobile: parseInt(settings.feed_max_cards_mobile || '360', 10),
+    feedMaxCardsDesktop: parseInt(settings.feed_max_cards_desktop || '360', 10),
   };
   // Keep module-level threshold in sync so isOnline() uses the latest value
   _onlineThresholdMs = result.onlineThresholdMinutes * 60_000;
@@ -3383,6 +3385,8 @@ function getPublicSettingsPayload(settings) {
     feedWeightFollowers: settings.feedWeightFollowers,
     feedWeightSharedInterests: settings.feedWeightSharedInterests,
     feedWeightPremium: settings.feedWeightPremium,
+    feedMaxCardsMobile: settings.feedMaxCardsMobile,
+    feedMaxCardsDesktop: settings.feedMaxCardsDesktop,
     navBottomPadding: settings.navBottomPadding,
     navSidePadding: settings.navSidePadding,
     navHeight: settings.navHeight,
@@ -3483,6 +3487,8 @@ async function handleUpdateSettings(request, env) {
     'feed_weight_followers',
     'feed_weight_shared_interests',
     'feed_weight_premium',
+    'feed_max_cards_mobile',
+    'feed_max_cards_desktop',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {

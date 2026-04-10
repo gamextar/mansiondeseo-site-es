@@ -44,6 +44,8 @@ export default function SettingsPage() {
   const [feedWeightFollowers, setFeedWeightFollowers] = useState(10);
   const [feedWeightSharedInterests, setFeedWeightSharedInterests] = useState(20);
   const [feedWeightPremium, setFeedWeightPremium] = useState(8);
+  const [feedMaxCardsMobile, setFeedMaxCardsMobile] = useState(360);
+  const [feedMaxCardsDesktop, setFeedMaxCardsDesktop] = useState(360);
 
   // Coin packs
   const [coinPack1Coins, setCoinPack1Coins] = useState('1000');
@@ -195,7 +197,8 @@ export default function SettingsPage() {
         setFeedWeightFollowers(s.feedWeightFollowers ?? 10);
         setFeedWeightSharedInterests(s.feedWeightSharedInterests ?? 20);
         setFeedWeightPremium(s.feedWeightPremium ?? 8);
-        setVipPriceMonthly(s.vipPriceMonthly);
+        setFeedMaxCardsMobile(s.feedMaxCardsMobile ?? 360);
+        setFeedMaxCardsDesktop(s.feedMaxCardsDesktop ?? 360);
         setVipPrice3Months(s.vipPrice3Months);
         setVipPrice6Months(s.vipPrice6Months);
         setIncognitoIconSvg(s.incognitoIconSvg || '');
@@ -308,6 +311,8 @@ export default function SettingsPage() {
         feed_weight_followers: feedWeightFollowers,
         feed_weight_shared_interests: feedWeightSharedInterests,
         feed_weight_premium: feedWeightPremium,
+        feed_max_cards_mobile: feedMaxCardsMobile,
+        feed_max_cards_desktop: feedMaxCardsDesktop,
         vip_price_monthly: vipPriceMonthly,
         vip_price_3months: vipPrice3Months,
         vip_price_6months: vipPrice6Months,
@@ -376,7 +381,8 @@ export default function SettingsPage() {
       setFeedWeightFollowers(s.feedWeightFollowers ?? 10);
       setFeedWeightSharedInterests(s.feedWeightSharedInterests ?? 20);
       setFeedWeightPremium(s.feedWeightPremium ?? 8);
-      setVipPriceMonthly(s.vipPriceMonthly);
+      setFeedMaxCardsMobile(s.feedMaxCardsMobile ?? 360);
+      setFeedMaxCardsDesktop(s.feedMaxCardsDesktop ?? 360);
       setVipPrice3Months(s.vipPrice3Months);
       setVipPrice6Months(s.vipPrice6Months);
       setIncognitoIconSvg(s.incognitoIconSvg || '');
@@ -474,11 +480,11 @@ export default function SettingsPage() {
     </button>
   );
 
-  const Counter = ({ value, onChange, min = 0, max = 99 }) => (
+  const Counter = ({ value, onChange, min = 0, max = 99, step = 1 }) => (
     <div className="flex items-center gap-3">
-      <button onClick={() => onChange(Math.max(min, value - 1))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">−</button>
+      <button onClick={() => onChange(Math.max(min, value - step))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">−</button>
       <span className="text-xl font-bold text-mansion-gold w-10 text-center">{value}</span>
-      <button onClick={() => onChange(Math.min(max, value + 1))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">+</button>
+      <button onClick={() => onChange(Math.min(max, value + step))} className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center text-text-secondary hover:text-mansion-gold transition-colors text-lg font-bold">+</button>
     </div>
   );
 
@@ -1070,6 +1076,31 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-4">
+                <h3 className="text-sm font-semibold text-text-primary mb-1">Límite de cards en el feed</h3>
+                <p className="text-[11px] text-text-dim mb-3">Máximo de perfiles que se renderizan en el DOM. Afecta el dispositivo del usuario, no el servidor.</p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">Mobile</p>
+                        <p className="text-[11px] text-text-dim">Cards en pantallas &lt; 1024px.</p>
+                      </div>
+                      <Counter value={feedMaxCardsMobile} onChange={setFeedMaxCardsMobile} min={12} max={600} step={12} />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">Desktop</p>
+                        <p className="text-[11px] text-text-dim">Cards en pantallas ≥ 1024px.</p>
+                      </div>
+                      <Counter value={feedMaxCardsDesktop} onChange={setFeedMaxCardsDesktop} min={12} max={600} step={12} />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

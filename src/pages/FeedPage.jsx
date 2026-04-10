@@ -213,7 +213,7 @@ export default function FeedPage() {
     }
     // Stop paginating if we've hit the DOM card cap — new cards wouldn't render
     // and the sentinel would stay visible, causing an infinite request loop.
-    if (!safariDesktop && profiles.length >= MOBILE_MAX_DOM_CARDS) return Promise.resolve();
+    if (!safariDesktop && profiles.length >= Math.max(12, (settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS))) return Promise.resolve();
     if (loading || loadingMore || !hasMore || !nextCursor || loadMoreFailedRef.current || loadingMoreRef.current) return Promise.resolve();
     loadingMoreRef.current = true;
     setLoadingMore(true);
@@ -249,7 +249,7 @@ export default function FeedPage() {
         loadMoreFailedRef.current = true;
       })
       .finally(() => { loadingMoreRef.current = false; setLoadingMore(false); });
-  }, [hasMore, loading, loadingMore, nextCursor, profiles.length, safariDesktop, visibleCount]);
+  }, [hasMore, loading, loadingMore, nextCursor, profiles.length, safariDesktop, settings, visibleCount]);
 
   // Initial load — runs once on mount
   useEffect(() => {
@@ -340,9 +340,11 @@ export default function FeedPage() {
 
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
+  const mobileMaxCards = Math.max(12, safeSettings.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS);
+  const desktopMaxCards = Math.max(12, safeSettings.feedMaxCardsDesktop ?? MOBILE_MAX_DOM_CARDS);
   const renderedProfiles = safariDesktop
-    ? safeProfiles.slice(0, visibleCount)
-    : safeProfiles.slice(0, MOBILE_MAX_DOM_CARDS);
+    ? safeProfiles.slice(0, Math.min(visibleCount, desktopMaxCards))
+    : safeProfiles.slice(0, mobileMaxCards);
   const storyProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, safariDesktop ? 6 : 15);
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
