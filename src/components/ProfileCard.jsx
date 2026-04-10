@@ -134,7 +134,6 @@ export default function ProfileCard({
       >
         <div
           className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card ring-1 ring-white/5 shadow-[0_14px_28px_rgba(0,0,0,0.24)]"
-          style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
         >
           {/* Photo — use actual photo with blur for blocked cards */}
           {mainPhoto ? (
@@ -145,7 +144,7 @@ export default function ProfileCard({
               loading={index < (safariDesktop ? 2 : 6) ? 'eager' : 'lazy'}
               fetchPriority={index < (safariDesktop ? 1 : 4) ? 'high' : 'auto'}
               decoding="async"
-              className={`absolute inset-0 w-full h-full object-cover ${safariDesktop ? '' : 'transition-all duration-500 scale-105 group-hover:scale-100'}`}
+              className={`absolute inset-0 w-full h-full object-cover ${safariDesktop ? '' : 'lg:transition-all lg:duration-500 lg:scale-105 lg:group-hover:scale-100'}`}
               style={cardBlocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
             />
           ) : null}
