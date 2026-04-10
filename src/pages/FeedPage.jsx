@@ -25,11 +25,6 @@ const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
 const SAFARI_DESKTOP_INITIAL_VISIBLE = 24;
 const SAFARI_DESKTOP_VISIBLE_STEP = 12;
 
-// DOM-windowing – prune off-screen cards to stay fast at 1000+ profiles
-const WINDOW_OVERSCAN_PX = 2500;
-const WINDOW_ACTIVATE_COUNT = 80;
-const SCROLL_QUANT_PX = 300;
-
 const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, motionProps = {}, children, ...rest }, ref) {
   if (disabled) return <div ref={ref} {...rest}>{children}</div>;
   return <motion.div ref={ref} {...rest} {...motionProps}>{children}</motion.div>;
@@ -127,10 +122,6 @@ export default function FeedPage() {
     velocity: 0,
   });
   const isSafariDesktopRef = useRef(false);
-  const gridWrapRef = useRef(null);
-  const gridRef = useRef(null);
-  const metricsRef = useRef({ cols: 2, rowH: 250 });
-  const gridWrapTopRef = useRef(0);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -140,26 +131,6 @@ export default function FeedPage() {
     const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
     isSafariDesktopRef.current = isSafari && isDesktop;
   }, []);
-
-  // Measure actual grid layout for windowing calculations
-  useEffect(() => {
-    const el = gridRef.current;
-    const wrap = gridWrapRef.current;
-    if (!el || !wrap) return;
-    const measure = () => {
-      const cs = getComputedStyle(el);
-      const colParts = (cs.gridTemplateColumns || '').split(' ').filter(s => s.trim());
-      const cols = colParts.length || 2;
-      const gap = parseFloat(cs.rowGap) || parseFloat(cs.gap) || 12;
-      const cardW = (el.clientWidth - (cols - 1) * gap) / cols;
-      metricsRef.current = { cols, rowH: cardW * (4 / 3) + gap };
-      gridWrapTopRef.current = wrap.getBoundingClientRect().top + window.scrollY;
-    };
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    measure();
-    return () => ro.disconnect();
-  }, [showGridSection]);
 
   useEffect(() => {
     if (!safariDesktop) {
@@ -376,39 +347,6 @@ export default function FeedPage() {
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
   const renderedProfiles = safariDesktop ? safeProfiles.slice(0, visibleCount) : safeProfiles;
-
-  // --- DOM windowing: compute which rows to render ---
-  const totalRendered = renderedProfiles.length;
-  let winStart = 0;
-  let winEnd = totalRendered;
-  let topPad = 0;
-  let botPad = 0;
-  if (totalRendered > WINDOW_ACTIVATE_COUNT) {
-    const { cols, rowH } = metricsRef.current;
-    const totalRows = Math.ceil(totalRendered / cols);
-    let sy, vh, wrapTop;
-    if (gridWrapRef.current) {
-      sy = window.scrollY;
-      vh = window.innerHeight;
-      wrapTop = gridWrapTopRef.current;
-    } else {
-      // First render before grid mounts: estimate from saved scroll
-      try { sy = parseInt(sessionStorage.getItem(FEED_SCROLL_KEY), 10) || 0; } catch { sy = 0; }
-      vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-      wrapTop = 200;
-    }
-    const firstRow = Math.max(0, Math.floor((sy - wrapTop - WINDOW_OVERSCAN_PX) / rowH));
-    const lastRow  = Math.min(totalRows, Math.ceil((sy - wrapTop + vh + WINDOW_OVERSCAN_PX) / rowH));
-    winStart = firstRow * cols;
-    winEnd   = Math.min(totalRendered, lastRow * cols);
-    topPad   = firstRow * rowH;
-    botPad   = Math.max(0, (totalRows - lastRow) * rowH);
-  }
-  const windowedProfiles = winStart === 0 && winEnd >= totalRendered
-    ? renderedProfiles
-    : renderedProfiles.slice(winStart, winEnd);
-  void scrollQuant; // referenced so React re-renders on coarse scroll
-
   const storyProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, safariDesktop ? 6 : 15);
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
@@ -428,21 +366,6 @@ export default function FeedPage() {
   const viewedStoryUsers = useMemo(() => {
     try { return new Set(JSON.parse(viewedRaw)); } catch { return new Set(); }
   }, [viewedRaw]);
-
-  // Coarse scroll tracking — triggers re-render for windowing recalculation
-  const scrollQuant = useSyncExternalStore(
-    useCallback((notify) => {
-      let last = Math.floor(window.scrollY / SCROLL_QUANT_PX);
-      const handler = () => {
-        const cur = Math.floor(window.scrollY / SCROLL_QUANT_PX);
-        if (cur !== last) { last = cur; notify(); }
-      };
-      window.addEventListener('scroll', handler, { passive: true });
-      return () => window.removeEventListener('scroll', handler);
-    }, []),
-    () => Math.floor(window.scrollY / SCROLL_QUANT_PX),
-    () => 0
-  );
 
   const handleStoriesWheel = useCallback((event) => {
     if (isSafariDesktopRef.current) return;
@@ -856,23 +779,19 @@ export default function FeedPage() {
         ) : safeProfiles.length > 0 ? (
           <>
             {showGridSection ? (
-              <div ref={gridWrapRef}>
-                {topPad > 0 && <div style={{ height: topPad }} aria-hidden="true" />}
-                <div ref={gridRef} className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
-                  {windowedProfiles.map((profile, i) => (
-                    <ProfileCard
-                      key={profile.id}
-                      profile={profile}
-                      index={winStart + i}
-                      rank={winStart + i + 1}
-                      viewerPremium={viewerPremium}
-                      settings={safeSettings}
-                      safariDesktopOverride={safariDesktop}
-                      isMobileOverride={false}
-                    />
-                  ))}
-                </div>
-                {botPad > 0 && <div style={{ height: botPad }} aria-hidden="true" />}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
+                {renderedProfiles.map((profile, index) => (
+                  <ProfileCard
+                    key={profile.id}
+                    profile={profile}
+                    index={index}
+                    rank={index + 1}
+                    viewerPremium={viewerPremium}
+                    settings={safeSettings}
+                    safariDesktopOverride={safariDesktop}
+                    isMobileOverride={false}
+                  />
+                ))}
               </div>
             ) : (
               <div className="h-24" aria-hidden="true" />
