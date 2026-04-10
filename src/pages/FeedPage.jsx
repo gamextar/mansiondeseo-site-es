@@ -20,9 +20,17 @@ import { isSafariDesktopBrowser } from '../lib/browser';
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
+const FEED_VISIBLE_KEY = 'mansion_feed_visible';
 const FEED_INITIAL_VISIBLE = 24;
 const FEED_STEP = 12;
 const MOBILE_MAX_DOM_CARDS = 360;
+
+function getSavedScrollY() {
+  try { const v = parseInt(sessionStorage.getItem(FEED_SCROLL_KEY), 10); return Number.isFinite(v) ? v : 0; } catch { return 0; }
+}
+function getSavedVisibleCount() {
+  try { const v = parseInt(sessionStorage.getItem(FEED_VISIBLE_KEY), 10); return Number.isFinite(v) && v > 0 ? v : null; } catch { return null; }
+}
 
 const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, motionProps = {}, children, ...rest }, ref) {
   if (disabled) return <div ref={ref} {...rest}>{children}</div>;
@@ -66,10 +74,16 @@ export default function FeedPage() {
     []
   );
   const [profiles, setProfiles] = useState(cached?.profiles || []);
-  const [visibleCount, setVisibleCount] = useState(() => getInitialVisibleCount(cached?.profiles || [], cached?.settings || {}));
+  const [visibleCount, setVisibleCount] = useState(() => {
+    if (cached) {
+      const saved = getSavedVisibleCount();
+      if (saved) return Math.min(cached.profiles?.length ?? 0, saved);
+    }
+    return getInitialVisibleCount(cached?.profiles || [], cached?.settings || {});
+  });
   const [showStoriesSection, setShowStoriesSection] = useState(() => !safariDesktop);
   const [showGridSection, setShowGridSection] = useState(() => !safariDesktop);
-  const [canAutoLoadMore, setCanAutoLoadMore] = useState(false);
+  const [canAutoLoadMore, setCanAutoLoadMore] = useState(() => getSavedScrollY() > 80);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
   const [nextCursor, setNextCursor] = useState(cached?.nextCursor || null);
@@ -265,12 +279,18 @@ export default function FeedPage() {
     }
 
     setProfiles(cachedFeed.profiles || []);
-    setVisibleCount(getInitialVisibleCount(cachedFeed.profiles || [], cachedFeed.settings || {}));
+    // Restore visibleCount from session so progressive reveal picks up where user left off
+    const savedVisible = getSavedVisibleCount();
+    setVisibleCount(savedVisible
+      ? Math.min(cachedFeed.profiles?.length ?? 0, savedVisible)
+      : getInitialVisibleCount(cachedFeed.profiles || [], cachedFeed.settings || {}));
     setViewerPremium(cachedFeed.viewerPremium || false);
     if (cachedFeed.settings) setSettings(cachedFeed.settings);
     setNextCursor(cachedFeed.nextCursor || null);
     setHasMore(typeof cachedFeed.hasMore === 'boolean' ? cachedFeed.hasMore : true);
     setLoading(false);
+    // Unlock auto-load if user was already scrolled past the threshold
+    if (getSavedScrollY() > 80) setCanAutoLoadMore(true);
     // Clear any residual dirty flags — the cache is already loaded,
     // stale flags from previous actions shouldn't trigger a reload.
     try {
@@ -283,7 +303,7 @@ export default function FeedPage() {
   useEffect(() => {
     const handleHomeFocus = () => {
       setShowOwnStoryPreview(false);
-      try { sessionStorage.removeItem(FEED_SCROLL_KEY); } catch {}
+      try { sessionStorage.removeItem(FEED_SCROLL_KEY); sessionStorage.removeItem(FEED_VISIBLE_KEY); } catch {}
       const scrollTarget = document.scrollingElement || document.documentElement || document.body;
       if (scrollTarget) {
         scrollTarget.scrollTo({ top: 0, behavior: 'smooth' });
@@ -295,14 +315,21 @@ export default function FeedPage() {
     return () => window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
   }, []);
 
-  // Save scroll position (throttled via rAF)
+  // Keep a ref of visibleCount so the scroll handler can read it without being a dep
+  const visibleCountRef = useRef(visibleCount);
+  useEffect(() => { visibleCountRef.current = visibleCount; }, [visibleCount]);
+
+  // Save scroll position + visibleCount (throttled via rAF)
   useEffect(() => {
     let ticking = false;
     const handleScroll = () => {
       if (!ticking) {
         ticking = true;
         requestAnimationFrame(() => {
-          try { sessionStorage.setItem(FEED_SCROLL_KEY, String(window.scrollY)); } catch {}
+          try {
+            sessionStorage.setItem(FEED_SCROLL_KEY, String(window.scrollY));
+            sessionStorage.setItem(FEED_VISIBLE_KEY, String(visibleCountRef.current));
+          } catch {}
           ticking = false;
         });
       }
@@ -331,7 +358,7 @@ export default function FeedPage() {
       const shouldForceFresh = sessionStorage.getItem('mansion_feed_force_refresh') === '1';
       sessionStorage.removeItem('mansion_feed_force_refresh');
       sessionStorage.removeItem(FEED_CACHE_KEY);
-      try { sessionStorage.removeItem(FEED_SCROLL_KEY); } catch {}
+      try { sessionStorage.removeItem(FEED_SCROLL_KEY); sessionStorage.removeItem(FEED_VISIBLE_KEY); } catch {}
       loadProfiles({ forceFresh: shouldForceFresh });
     };
     window.addEventListener('focus', onFocus);
