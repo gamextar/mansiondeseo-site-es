@@ -2,7 +2,13 @@
   "rules": [
     {
       "allowed": {
-        "origins": ["https://mansiondeseo-site.pages.dev", "http://localhost:5173"],
+        "origins": [
+          "https://mansiondeseo.com",
+          "https://www.mansiondeseo.com",
+          "https://mansiondeseo.unicoapps.com",
+          "https://mansiondeseo-site.pages.dev",
+          "http://localhost:5173"
+        ],
         "methods": ["GET"],
         "headers": ["*"]
       },
