@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useAgeVerified } from './hooks/useAgeVerified';
 import AgeVerificationModal from './components/AgeVerificationModal';
 import Navbar from './components/Navbar';
@@ -53,6 +54,8 @@ function SEOCityLanding({ variant }) {
 
 function AppLayout() {
   const location = useLocation();
+  const backgroundLocation = location.state?.backgroundLocation;
+  const profileOverlayOpen = location.state?.modal === 'profile' && !!backgroundLocation;
   const isFullscreen =
     FULLSCREEN_PATHS.some((p) => location.pathname.startsWith(p)) ||
     FULLSCREEN_PATHS.includes(location.pathname);
@@ -77,7 +80,7 @@ function AppLayout() {
             </div>
           )}
         >
-        <Routes location={location}>
+        <Routes location={backgroundLocation || location}>
           {/* Full-screen flows */}
           <Route path="/bienvenida" element={<WelcomePage />} />
           <Route path="/registro" element={<RegisterPage />} />
@@ -213,6 +216,37 @@ function AppLayout() {
             <Route path="video-lab" element={<VideoLabPage />} />
           </Route>
         </Routes>
+        <AnimatePresence mode="wait">
+          {profileOverlayOpen && (
+            <motion.div
+              key={location.key || location.pathname}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="fixed inset-0 z-[120]"
+            >
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+              />
+              <motion.div
+                initial={{ y: 28, opacity: 0.92, scale: 0.985 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: 24, opacity: 0.9, scale: 0.99 }}
+                transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-0 overflow-y-auto bg-mansion-base"
+              >
+                <Routes>
+                  <Route path="/perfiles/:id" element={<ProfileDetailPage />} />
+                </Routes>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         </Suspense>
       </div>
 

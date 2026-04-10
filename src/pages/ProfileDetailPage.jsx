@@ -100,6 +100,7 @@ export default function ProfileDetailPage() {
   const preview = location.state?.preview || null;
   const backTarget = location.state?.from || null;
   const backTargetState = location.state?.returnState;
+  const isOverlayEntry = !!location.state?.backgroundLocation;
   const cachedDetail = readProfileDetailCache(id);
   const previewProfile = buildPreviewProfile(preview);
   const initialProfile = cachedDetail?.profile || previewProfile;
@@ -125,7 +126,9 @@ export default function ProfileDetailPage() {
   const [giftSent, setGiftSent] = useState(null);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    if (!isOverlayEntry) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
     if (!getToken()) { navigate('/login'); return; }
     const nextCachedDetail = readProfileDetailCache(id);
     const nextPreviewProfile = buildPreviewProfile(location.state?.preview || null);
@@ -157,7 +160,7 @@ export default function ProfileDetailPage() {
       })
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
-  }, [id, navigate, location.state, user?.is_admin]);
+  }, [id, isOverlayEntry, navigate, location.state, user?.is_admin]);
 
   const movePhoto = useCallback((from, dir) => {
     const to = from + dir;
@@ -506,12 +509,16 @@ export default function ProfileDetailPage() {
   }, []);
 
   const handleBack = useCallback(() => {
+    if (isOverlayEntry) {
+      navigate(-1);
+      return;
+    }
     if (backTarget) {
       navigate(backTarget, backTargetState ? { state: backTargetState } : undefined);
       return;
     }
     navigate(-1);
-  }, [backTarget, backTargetState, navigate]);
+  }, [backTarget, backTargetState, isOverlayEntry, navigate]);
 
   // Keyboard navigation for lightbox
   useEffect(() => {
