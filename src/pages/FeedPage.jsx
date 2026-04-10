@@ -229,7 +229,6 @@ export default function FeedPage() {
     return getProfiles({ cursor: nextCursor })
       .then((data) => {
         const newProfiles = Array.isArray(data?.profiles) ? data.profiles : [];
-        clearCachedFeed();
         setProfiles((prev) => {
           const seen = new Set(prev.map((item) => item.id));
           const merged = [...prev];
@@ -331,6 +330,8 @@ export default function FeedPage() {
       }
 
       const cachedFeed = getCachedFeed();
+      // Don't reload if we've already paginated (cache was cleared after page 2+)
+      if (!cachedFeed && profiles.length > 0) return;
       if (!isFeedCacheFresh(cachedFeed) || !hasFeedPaginationState(cachedFeed) || shouldBackgroundRefreshFeed(cachedFeed)) {
         loadProfiles({ silent: true });
       }
@@ -339,7 +340,7 @@ export default function FeedPage() {
     // Also check immediately (for in-app navigation without losing focus)
     onFocus();
     return () => window.removeEventListener('focus', onFocus);
-  }, [loadProfiles]);
+  }, [loadProfiles, profiles.length]);
 
   const { indicatorRef } = usePullToRefresh(
     useCallback(() => loadProfiles({ silent: true }), [loadProfiles])
