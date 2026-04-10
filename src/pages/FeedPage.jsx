@@ -330,22 +330,16 @@ export default function FeedPage() {
     } catch {}
   }, [profiles.length]);
 
-  // Reload feed when navigating back after preference changes
+  // Reload feed ONLY when explicitly marked dirty (preference/settings changes)
   useEffect(() => {
     const onFocus = () => {
-      if (sessionStorage.getItem('mansion_feed_dirty')) {
-        sessionStorage.removeItem('mansion_feed_dirty');
-        const shouldForceFresh = sessionStorage.getItem('mansion_feed_force_refresh') === '1';
-        sessionStorage.removeItem('mansion_feed_force_refresh');
-        sessionStorage.removeItem(FEED_CACHE_KEY);
-        try { sessionStorage.removeItem(FEED_SCROLL_KEY); } catch {}
-        loadProfiles({ forceFresh: shouldForceFresh });
-        return;
-      }
-
-      const cachedFeed = getCachedFeed();
-      if (cachedFeed && isFeedCacheFresh(cachedFeed)) return; // cache is fine, skip
-      loadProfiles({ silent: true });
+      if (!sessionStorage.getItem('mansion_feed_dirty')) return;
+      sessionStorage.removeItem('mansion_feed_dirty');
+      const shouldForceFresh = sessionStorage.getItem('mansion_feed_force_refresh') === '1';
+      sessionStorage.removeItem('mansion_feed_force_refresh');
+      sessionStorage.removeItem(FEED_CACHE_KEY);
+      try { sessionStorage.removeItem(FEED_SCROLL_KEY); } catch {}
+      loadProfiles({ forceFresh: shouldForceFresh });
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
