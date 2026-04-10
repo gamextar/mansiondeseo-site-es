@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Shield, Crown, Lock } from 'lucide-react';
 import { getDisplayPhotos, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { formatLocation } from '../lib/location';
@@ -35,6 +35,8 @@ const ROLE_BG = {
   'Hombre Solo': 'bg-blue-500/20 text-blue-300',
   'Mujer Sola': 'bg-pink-500/20 text-pink-300',
 };
+
+const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
 
 const ROLE_IMG_KEYS = {
   'Hombre Solo': 'galleryHombreImg',
@@ -75,6 +77,7 @@ export default function ProfileCard({
   safariDesktopOverride,
   isMobileOverride,
 }) {
+  const location = useLocation();
   const { id, name, age, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const safariDesktop = typeof safariDesktopOverride === 'boolean' ? safariDesktopOverride : isSafariDesktopBrowser();
   const roleImg = settings[ROLE_IMG_KEYS[role]] || null;
@@ -92,12 +95,28 @@ export default function ProfileCard({
   const cardBlocked = blurred || visiblePhotos === 0;
   const mainPhoto = getPrimaryProfilePhoto(profile);
   const resolvedMainPhoto = resolveMediaUrl(mainPhoto);
+  const returnToPath = `${location.pathname}${location.search}${location.hash}`;
+
+  const handleOpenProfile = () => {
+    if (typeof window === 'undefined') return;
+    if (location.pathname !== '/' && location.pathname !== '/explorar') return;
+    try {
+      sessionStorage.setItem(
+        FEED_SCROLL_KEY,
+        String(window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0)
+      );
+    } catch {}
+  };
 
   return (
     <div className="rounded-2xl overflow-hidden">
       <Link
         to={`/perfiles/${id}`}
-        state={{ preview: { id, name, age, city: profile.city, province: profile.province, locality: profile.locality, role, photos, avatar_url: profile.avatar_url, avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode } }}
+        state={{
+          from: returnToPath,
+          preview: { id, name, age, city: profile.city, province: profile.province, locality: profile.locality, role, photos, avatar_url: profile.avatar_url, avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode },
+        }}
+        onClick={handleOpenProfile}
         className="block group rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-mansion-gold/40 focus-visible:ring-offset-0"
       >
         <div
