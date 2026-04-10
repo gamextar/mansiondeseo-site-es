@@ -70,7 +70,7 @@ function AppLayout() {
   useEffect(() => {
     if (!profileOverlayOpen || typeof window === 'undefined') return undefined;
 
-    const scrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    const scrollY = Number(location.state?.backgroundScrollY ?? window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
     const { style: bodyStyle } = document.body;
     const { style: htmlStyle } = document.documentElement;
     const previousBody = {
@@ -95,7 +95,7 @@ function AppLayout() {
       htmlStyle.overflow = previousHtmlOverflow;
       window.scrollTo(0, scrollY);
     };
-  }, [profileOverlayOpen]);
+  }, [location.state?.backgroundScrollY, profileOverlayOpen]);
 
   return (
     <>

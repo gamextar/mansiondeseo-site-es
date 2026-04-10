@@ -115,7 +115,11 @@ export default function ProfileCard({
       <Link
         to={`/perfiles/${id}`}
         state={{
-          ...(useOverlayNavigation ? { backgroundLocation: location, modal: 'profile' } : {}),
+          ...(useOverlayNavigation ? {
+            backgroundLocation: location,
+            backgroundScrollY: window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0,
+            modal: 'profile',
+          } : {}),
           from: returnToPath,
           preview: { id, name, age, city: profile.city, province: profile.province, locality: profile.locality, role, photos, avatar_url: profile.avatar_url, avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode },
         }}

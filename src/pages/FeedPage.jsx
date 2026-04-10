@@ -24,6 +24,7 @@ const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
 const SAFARI_DESKTOP_INITIAL_VISIBLE = 24;
 const SAFARI_DESKTOP_VISIBLE_STEP = 12;
+const FEED_WINDOW_OVERSCAN_ROWS = 4;
 
 const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, motionProps = {}, children, ...rest }, ref) {
   if (disabled) return <div ref={ref} {...rest}>{children}</div>;
@@ -108,6 +109,7 @@ export default function FeedPage() {
   const loadMoreRef = useRef(null);
   const scrollRestoredRef = useRef(false);
   const storiesScrollRef = useRef(null);
+  const gridWrapperRef = useRef(null);
   const storiesMomentumRef = useRef({
     frameId: null,
     velocity: 0,
@@ -122,6 +124,8 @@ export default function FeedPage() {
     velocity: 0,
   });
   const isSafariDesktopRef = useRef(false);
+  const [windowWidth, setWindowWidth] = useState(() => (typeof window === 'undefined' ? 1280 : window.innerWidth));
+  const [gridMetrics, setGridMetrics] = useState({ top: 0, width: 0 });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -130,6 +134,13 @@ export default function FeedPage() {
     const isSafari = /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Firefox|Edg|OPR/i.test(ua) && /Apple/i.test(vendor);
     const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
     isSafariDesktopRef.current = isSafari && isDesktop;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -288,6 +299,26 @@ export default function FeedPage() {
     return () => window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
   }, []);
 
+  useEffect(() => {
+    const updateGridMetrics = () => {
+      const el = gridWrapperRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      setGridMetrics({
+        top: rect.top + window.scrollY,
+        width: rect.width,
+      });
+    };
+
+    updateGridMetrics();
+    window.addEventListener('resize', updateGridMetrics);
+    window.addEventListener('scroll', updateGridMetrics, { passive: true });
+    return () => {
+      window.removeEventListener('resize', updateGridMetrics);
+      window.removeEventListener('scroll', updateGridMetrics);
+    };
+  }, [profiles.length, showGridSection, visibleCount]);
+
   // Save scroll position (throttled via rAF)
   useEffect(() => {
     let ticking = false;
@@ -347,6 +378,49 @@ export default function FeedPage() {
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
   const renderedProfiles = safariDesktop ? safeProfiles.slice(0, visibleCount) : safeProfiles;
+  const gridColumns = useMemo(() => {
+    if (windowWidth >= 1536) return 6;
+    if (windowWidth >= 1280) return 5;
+    if (windowWidth >= 1024) return 4;
+    if (windowWidth >= 768) return 3;
+    return 2;
+  }, [windowWidth]);
+  const gridGapPx = windowWidth >= 1024 ? 16 : 12;
+  const gridRowStride = useMemo(() => {
+    if (!gridMetrics.width || gridColumns <= 0) return 0;
+    const itemWidth = (gridMetrics.width - gridGapPx * (gridColumns - 1)) / gridColumns;
+    const itemHeight = itemWidth * (4 / 3);
+    return itemHeight + gridGapPx;
+  }, [gridColumns, gridGapPx, gridMetrics.width]);
+  const virtualWindow = useMemo(() => {
+    const total = renderedProfiles.length;
+    if (total <= 120 || !gridRowStride || !gridMetrics.top) {
+      return {
+        startIndex: 0,
+        endIndex: total,
+        topSpacerHeight: 0,
+        bottomSpacerHeight: 0,
+      };
+    }
+
+    const viewportTop = window.scrollY;
+    const viewportBottom = viewportTop + window.innerHeight;
+    const relativeTop = Math.max(0, viewportTop - gridMetrics.top);
+    const relativeBottom = Math.max(0, viewportBottom - gridMetrics.top);
+    const startRow = Math.max(0, Math.floor(relativeTop / gridRowStride) - FEED_WINDOW_OVERSCAN_ROWS);
+    const endRow = Math.ceil(relativeBottom / gridRowStride) + FEED_WINDOW_OVERSCAN_ROWS;
+    const totalRows = Math.ceil(total / gridColumns);
+    const boundedEndRow = Math.min(totalRows, endRow);
+    const startIndex = Math.min(total, startRow * gridColumns);
+    const endIndex = Math.min(total, boundedEndRow * gridColumns);
+    return {
+      startIndex,
+      endIndex,
+      topSpacerHeight: startRow * gridRowStride,
+      bottomSpacerHeight: Math.max(0, (totalRows - boundedEndRow) * gridRowStride),
+    };
+  }, [gridColumns, gridMetrics.top, gridRowStride, renderedProfiles.length]);
+  const windowedProfiles = renderedProfiles.slice(virtualWindow.startIndex, virtualWindow.endIndex);
   const storyProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, safariDesktop ? 6 : 15);
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
@@ -779,19 +853,23 @@ export default function FeedPage() {
         ) : safeProfiles.length > 0 ? (
           <>
             {showGridSection ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
-                {renderedProfiles.map((profile, index) => (
+              <div ref={gridWrapperRef}>
+                {virtualWindow.topSpacerHeight > 0 && <div style={{ height: `${virtualWindow.topSpacerHeight}px` }} aria-hidden="true" />}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
+                {windowedProfiles.map((profile, index) => (
                   <ProfileCard
                     key={profile.id}
                     profile={profile}
-                    index={index}
-                    rank={index + 1}
+                    index={virtualWindow.startIndex + index}
+                    rank={virtualWindow.startIndex + index + 1}
                     viewerPremium={viewerPremium}
                     settings={safeSettings}
                     safariDesktopOverride={safariDesktop}
                     isMobileOverride={false}
                   />
                 ))}
+                </div>
+                {virtualWindow.bottomSpacerHeight > 0 && <div style={{ height: `${virtualWindow.bottomSpacerHeight}px` }} aria-hidden="true" />}
               </div>
             ) : (
               <div className="h-24" aria-hidden="true" />
