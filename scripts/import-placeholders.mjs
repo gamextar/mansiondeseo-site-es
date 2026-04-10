@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { pbkdf2Sync, randomBytes, randomUUID } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { spawnSync } from 'node:child_process'
@@ -14,6 +14,7 @@ const wranglerTomlPath = path.join(repoRoot, 'wrangler.toml')
 const DEFAULT_IMPORTED_EMAIL_DOMAIN = 'gamextar.com'
 const DEFAULT_IMPORTED_PASSWORD = 'mansiondeseo26'
 const DEFAULT_BLACKLIST_PATH = path.join(repoRoot, 'data', 'import-blacklists', 'under-review-usernames.json')
+const DEFAULT_IMPORTED_REGISTRY_PATH = path.join(repoRoot, 'data', 'import-state', 'imported-usernames.json')
 const CANONICAL_MEDIA_BASE = 'https://media.mansiondeseo.com'
 const LEGACY_MEDIA_BASES = [
   'https://media.unicoapps.com',
@@ -42,6 +43,8 @@ Opciones:
   --only-role-group <group>  Importa solo un grupo: mujer | hombre | pareja | pareja_hombres | pareja_mujeres | trans
   --skip-existing-users  Salta usuarios que ya existan en Mansion Deseo
   --blacklist-file <path>  JSON/TXT con usernames a bloquear antes de importar
+  --imported-file <path>  JSON/TXT con usernames ya importados; por default usa un registro local acumulativo
+  --ignore-imported-registry  Ignora el registro local de ya importados para esta corrida
   --replace-story     Borra stories existentes del usuario antes de insertar la nueva (default)
   --keep-story        Conserva stories existentes
   --help              Muestra esta ayuda
@@ -97,10 +100,12 @@ const onlyUsername = takeFlag('--only', '')
 const startFromUsername = takeFlag('--start-from', '')
 const onlyRoleGroup = takeFlag('--only-role-group', '')
 const blacklistFileArg = takeFlag('--blacklist-file', '')
+const importedFileArg = takeFlag('--imported-file', '')
 const dryRun = hasFlag('--dry-run')
 const useLocal = hasFlag('--local')
 const useRemote = !useLocal || hasFlag('--remote')
 const skipExistingUsers = hasFlag('--skip-existing-users')
+const ignoreImportedRegistry = hasFlag('--ignore-imported-registry')
 const replaceStory = !hasFlag('--keep-story')
 
 if (!manifestArg) {
@@ -179,6 +184,23 @@ function loadUsernameBlacklist(filePath) {
       .map((value) => String(value || '').trim().toLowerCase())
       .filter(Boolean)
   )
+}
+
+function loadUsernameRegistry(filePath) {
+  return loadUsernameBlacklist(filePath)
+}
+
+function saveUsernameRegistry(filePath, usernames, metadata = {}) {
+  const payload = {
+    updatedAt: new Date().toISOString(),
+    mode: 'incremental',
+    total: usernames.length,
+    usernames,
+    ...metadata,
+  }
+
+  mkdirSync(path.dirname(filePath), { recursive: true })
+  writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
 }
 
 function slugifyUsername(input) {
@@ -775,7 +797,12 @@ async function main() {
     ? path.resolve(process.cwd(), blacklistFileArg)
     : (existsSync(DEFAULT_BLACKLIST_PATH) ? DEFAULT_BLACKLIST_PATH : '')
   const usernameBlacklist = loadUsernameBlacklist(blacklistPath)
+  const importedRegistryPath = ignoreImportedRegistry
+    ? ''
+    : path.resolve(process.cwd(), importedFileArg || DEFAULT_IMPORTED_REGISTRY_PATH)
+  const importedUsernames = loadUsernameRegistry(importedRegistryPath)
   let filtered = profiles.filter((profile) => {
+    const normalizedUsername = String(profile?.username || '').trim().toLowerCase()
     if (profile?.excluded) {
       return false
     }
@@ -785,7 +812,10 @@ async function main() {
     if (normalizedRoleGroup && roleToGroup(profile.role) !== normalizedRoleGroup) {
       return false
     }
-    if (usernameBlacklist.has(String(profile?.username || '').trim().toLowerCase())) {
+    if (usernameBlacklist.has(normalizedUsername)) {
+      return false
+    }
+    if (importedUsernames.has(normalizedUsername)) {
       return false
     }
     return true
@@ -811,6 +841,9 @@ async function main() {
   if (blacklistPath) {
     console.log(`Blacklist: ${blacklistPath} (${usernameBlacklist.size} usernames)`)
   }
+  if (importedRegistryPath) {
+    console.log(`Registro ya importados: ${importedRegistryPath} (${importedUsernames.size} usernames)`)
+  }
   if (startFromUsername) {
     console.log(`Retomando desde: ${startFromUsername}`)
   }
@@ -826,7 +859,18 @@ async function main() {
   for (let index = 0; index < filtered.length; index += 1) {
     const profile = filtered[index]
     console.log(`\n[${index + 1}/${filtered.length}] ${profile.username}`)
-    results.push(await upsertProfile(profile, manifestDir))
+    const result = await upsertProfile(profile, manifestDir)
+    results.push(result)
+
+    if (!dryRun && importedRegistryPath && !result.skipped) {
+      importedUsernames.add(String(result.username || '').trim().toLowerCase())
+      saveUsernameRegistry(importedRegistryPath, [...importedUsernames].sort((a, b) =>
+        a.localeCompare(b, 'es', { sensitivity: 'base' })
+      ), {
+        source: 'import-placeholders',
+        manifestPath,
+      })
+    }
   }
 
   const summary = {
@@ -834,6 +878,8 @@ async function main() {
     manifestPath,
     blacklistPath: blacklistPath || null,
     blacklistedUsernames: usernameBlacklist.size,
+    importedRegistryPath: importedRegistryPath || null,
+    importedRegistryUsernames: importedUsernames.size,
     processedProfiles: results.length,
     createdProfiles: results.filter((item) => item.created).length,
     updatedProfiles: results.filter((item) => item.updated).length,
