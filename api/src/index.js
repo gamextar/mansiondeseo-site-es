@@ -1908,7 +1908,7 @@ async function handleProfiles(request, env) {
   }
   const windowLimit = cursor + FEED_PROFILE_LIMIT;
   const pageWindowLimit = windowLimit + 1;
-  const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, FEED_PROFILE_LIMIT * 10) : pageWindowLimit;
+  const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, FEED_PROFILE_LIMIT * 10) : pageWindowLimit + 1;
   query += ` ORDER BY last_active DESC LIMIT ${dbLimit}`;
 
   // Cache key for profiles query (shared across all users)

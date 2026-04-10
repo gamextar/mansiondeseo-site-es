@@ -600,7 +600,7 @@ function FichaPreview({ data, currentStep, optimizeMotion = false }) {
 // Step Components
 // ────────────────────────────────────────────
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,8}$/;
+const EMAIL_REGEX = /^[^\s@]{1,64}@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,24}$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9._]+$/;
 
 function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePasswordDefault, emailStatus, onEmailBlur, onNavigateRecover }) {

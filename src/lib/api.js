@@ -134,6 +134,10 @@ function mergeMeCache(partialUser) {
   if (!currentUser) return;
   const nextUser = { ...currentUser, ...partialUser };
   cacheMeResponse({ user: nextUser });
+  const cachedBootstrap = sessionCache.get('appBootstrap', 60 * 60_000);
+  if (cachedBootstrap) {
+    sessionCache.set('appBootstrap', { ...cachedBootstrap, user: nextUser });
+  }
   const currentDashboard = sessionCache.get(OWN_PROFILE_DASHBOARD_CACHE_KEY, OWN_PROFILE_DASHBOARD_TTL_MS);
   if (currentDashboard?.user) {
     cacheOwnProfileDashboard({

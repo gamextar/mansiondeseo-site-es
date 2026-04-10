@@ -115,7 +115,7 @@ export default function ProfileDetailPage() {
   const [isReordering, setIsReordering] = useState(false);
   const [orderedPhotos, setOrderedPhotos] = useState(initialProfile?.photos || []);
   const [savingOrder, setSavingOrder] = useState(false);
-  const [reviewUpdating, setReviewUpdating] = useState(false);
+  const [togglingReview, setTogglingReview] = useState(false);
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
   // Gift state
@@ -125,6 +125,7 @@ export default function ProfileDetailPage() {
   const [giftSent, setGiftSent] = useState(null);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
     if (!getToken()) { navigate('/login'); return; }
     const nextCachedDetail = readProfileDetailCache(id);
     const nextPreviewProfile = buildPreviewProfile(location.state?.preview || null);
@@ -277,14 +278,14 @@ export default function ProfileDetailPage() {
 
   const handleToggleReview = useCallback(async () => {
     const canAdminReview = viewerIsAdmin || !!user?.is_admin;
-    if (!canAdminReview || profile?.isOwnProfile || !profile?.id || reviewUpdating) return;
+    if (!canAdminReview || profile?.isOwnProfile || !profile?.id || togglingReview) return;
     const nextStatus = profile.account_status === 'under_review' ? 'active' : 'under_review';
     const confirmed = nextStatus === 'under_review'
       ? confirm(`¿Poner a ${profile.name} en revisión?\n\nEl usuario dejará de ser visible públicamente en feed, ranking, stories y perfil.`)
       : true;
     if (!confirmed) return;
 
-    setReviewUpdating(true);
+    setTogglingReview(true);
     try {
       const data = await adminUpdateUser(profile.id, { account_status: nextStatus });
       setProfile((prev) => {
@@ -309,9 +310,9 @@ export default function ProfileDetailPage() {
     } catch (err) {
       alert(err.message || 'Error al actualizar revisión');
     } finally {
-      setReviewUpdating(false);
+      setTogglingReview(false);
     }
-  }, [id, profile, reviewUpdating, settings, user?.is_admin, viewerIsAdmin, viewerPremium]);
+  }, [id, profile, togglingReview, settings, user?.is_admin, viewerIsAdmin, viewerPremium]);
 
   const handleToggleFavorite = async () => {
     if (togglingFav) return;
@@ -571,7 +572,7 @@ export default function ProfileDetailPage() {
   const lightboxBlur = Math.round(baseBlur * 2.5);
 
   return (
-    <div className="min-h-screen bg-mansion-base pb-28 lg:pb-8">
+    <div className="min-h-screen bg-mansion-base pb-32 lg:pb-16">
       {/* Desktop: two-column layout / Mobile: stacked */}
       <div className="lg:flex lg:gap-8 lg:px-8 lg:pt-20 lg:max-w-6xl lg:mx-auto">
 
@@ -624,47 +625,30 @@ export default function ProfileDetailPage() {
           <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-mansion-base via-mansion-base/60 to-transparent pointer-events-none" />
         </motion.div>
 
-        {/* Top nav overlay */}
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 pt-14 lg:pt-4 z-[60]">
-          <motion.button
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            onClick={handleBack}
-            className="w-10 h-10 rounded-full glass flex items-center justify-center"
-          >
-            <ChevronLeft className="w-5 h-5 text-text-primary" />
-          </motion.button>
+        {/* Top nav overlay — photo counter only (back button is fixed) */}
+        <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 pt-14 lg:pt-4 z-[60] pointer-events-none">
+          <div className="w-16" />
 
           {/* Photo counter */}
           {displayPhotos.length > 1 && (
-            <span className="text-xs font-medium text-white/80 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1">
+            <span className="pointer-events-auto text-xs font-medium text-white/80 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1">
               {heroIndex + 1} / {totalPhotos || displayPhotos.length}
             </span>
           )}
 
-          <div className="flex gap-2">
-            {canAdminEditViewedProfile && (
-              <button
-                onClick={handleToggleReview}
-                disabled={reviewUpdating}
-                className={`rounded-2xl border px-3 py-2 text-xs font-semibold transition-colors ${
-                  profile.account_status === 'under_review'
-                    ? 'border-yellow-500/30 bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/25'
-                    : 'border-red-500/30 bg-red-500/20 text-red-200 hover:bg-red-500/25'
-                } disabled:opacity-60`}
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  {reviewUpdating
-                    ? 'Guardando...'
-                    : profile.account_status === 'under_review'
-                      ? 'Quitar revisión'
-                      : 'Poner en revisión'}
-                </span>
-              </button>
-            )}
-          </div>
+          <div className="w-16" />
         </div>
+
+        {/* Fixed back button — always visible over content */}
+        <motion.button
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          onClick={handleBack}
+          className="fixed w-16 h-16 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center z-[70]"
+          style={{ top: 'max(env(safe-area-inset-top, 16px), 16px)', left: 16 }}
+        >
+          <ChevronLeft className="w-6 h-6 text-white" />
+        </motion.button>
 
         {/* Desktop arrow buttons */}
         {displayPhotos.length > 1 && (
@@ -715,32 +699,54 @@ export default function ProfileDetailPage() {
       >
         <div className="glass-elevated rounded-[2rem] p-6 shadow-elevated">
           {/* Name row */}
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <div className="flex items-center gap-2.5 mb-1.5">
-                <h1 className="font-display text-3xl font-bold text-text-primary">
+          <div className="mb-5">
+            <div className="flex items-start justify-between gap-2 mb-1.5">
+              <div className="flex items-baseline gap-2.5 min-w-0">
+                <h1 className="font-display text-3xl font-bold text-text-primary truncate">
                   {name}
                 </h1>
-                <span className="text-text-muted text-xl font-light">{age}</span>
+                <span className="text-text-muted text-xl font-light shrink-0">{age}</span>
               </div>
-              <div className="flex items-center gap-3">
-                {locationText && (
-                  <span className="flex items-center gap-1 text-sm text-text-muted">
-                    <MapPin className="w-3.5 h-3.5" /> {locationText}
+              <div className="flex items-center gap-2 shrink-0">
+                {online && (
+                  <span className="flex items-center gap-1.5 text-xs text-green-400 bg-green-400/10 rounded-full px-2.5 py-1">
+                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse-slow" />
+                    Online
                   </span>
                 )}
-                <div className="flex items-center gap-1.5">
-                  {verified && <Shield className="w-4 h-4 text-green-400" />}
-                  {premium && <Crown className="w-4 h-4 text-mansion-gold" />}
-                </div>
+                {canAdminEditViewedProfile && (
+                  <button
+                    onClick={handleToggleReview}
+                    disabled={togglingReview}
+                    className={`rounded-2xl border px-3 py-2 text-xs font-semibold transition-colors ${
+                      profile.account_status === 'under_review'
+                        ? 'border-yellow-500/30 bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/25'
+                        : 'border-red-500/30 bg-red-500/20 text-red-200 hover:bg-red-500/25'
+                    } disabled:opacity-60`}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      {togglingReview
+                        ? 'Guardando...'
+                        : profile.account_status === 'under_review'
+                          ? 'Quitar revisión'
+                          : 'Poner en revisión'}
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
-            {online && (
-              <span className="flex items-center gap-1.5 text-xs text-green-400 bg-green-400/10 rounded-full px-2.5 py-1">
-                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse-slow" />
-                Online
-              </span>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {locationText && (
+                <span className="flex items-center gap-1 text-sm text-text-muted">
+                  <MapPin className="w-3.5 h-3.5" /> {locationText}
+                </span>
+              )}
+              <div className="flex items-center gap-1.5">
+                {verified && <Shield className="w-4 h-4 text-green-400" />}
+                {premium && <Crown className="w-4 h-4 text-mansion-gold" />}
+              </div>
+            </div>
           </div>
 
           {/* Role badge */}
@@ -774,6 +780,7 @@ export default function ProfileDetailPage() {
           </motion.div>
 
           {/* Bio */}
+          {bio ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -781,12 +788,11 @@ export default function ProfileDetailPage() {
             className="mb-6"
           >
             <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Sobre {name.split(' ')[0]}</h3>
-            <div className="border-l-2 border-mansion-gold/40 pl-4">
-              <p className="text-text-primary text-sm leading-relaxed font-display italic">
-                "{bio}"
-              </p>
-            </div>
+            <p className="text-base leading-relaxed text-text-primary">
+              {bio}
+            </p>
           </motion.div>
+          ) : null}
 
           {/* Seeking */}
           {seeking.length > 0 && (
@@ -817,38 +823,33 @@ export default function ProfileDetailPage() {
             </motion.div>
           )}
 
+          {messageBlockRoles.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.425 }}
             className="mb-6"
           >
-            <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Privacidad de Mensajes</h3>
-            {messageBlockRoles.length > 0 ? (
-              <>
-                <p className="text-text-dim text-xs mb-2.5">No recibe mensajes de:</p>
-                <div className="flex flex-wrap gap-2">
-                  {messageBlockRoles.map((value, idx) => {
-                    const meta = MESSAGE_BLOCK_META[value] || { label: value, emoji: '⛔', className: 'bg-mansion-card/60 text-text-primary border-mansion-border/30' };
-                    return (
-                      <motion.span
-                        key={value}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.47 + idx * 0.04 }}
-                        className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border ${meta.className}`}
-                      >
-                        <span>{meta.emoji}</span>
-                        <span>{meta.label}</span>
-                      </motion.span>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <p className="text-text-primary text-sm">Acepta todos los mensajes</p>
-            )}
+            <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">No acepta mensajes de</h3>
+            <div className="flex flex-wrap gap-2">
+              {messageBlockRoles.map((value, idx) => {
+                const meta = MESSAGE_BLOCK_META[value] || { label: value, emoji: '⛔', className: 'bg-mansion-card/60 text-text-primary border-mansion-border/30' };
+                return (
+                  <motion.span
+                    key={value}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.47 + idx * 0.04 }}
+                    className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border ${meta.className}`}
+                  >
+                    <span>{meta.emoji}</span>
+                    <span>{meta.label}</span>
+                  </motion.span>
+                );
+              })}
+            </div>
           </motion.div>
+          )}
 
           {/* Interests */}
           {interests.length > 0 && (
@@ -1039,35 +1040,35 @@ export default function ProfileDetailPage() {
 
       </div>{/* end two-column wrapper */}
 
-      {/* Floating action bar — horizontal bottom */}
+      {/* Floating action column — vertical right */}
       {!isOwnProfile && (
       <motion.div
-        initial={{ y: 40, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
+        initial={{ x: 40, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
         transition={{ delay: 0.5, type: 'spring', damping: 20, stiffness: 200 }}
-        className="fixed bottom-20 left-4 right-4 lg:bottom-8 lg:left-auto lg:right-8 lg:w-auto z-[60] flex items-center justify-center gap-3"
+        className="fixed right-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] lg:bottom-16 lg:right-8 z-[60] flex flex-col items-center gap-4"
       >
         <motion.button
           whileTap={{ scale: 0.85 }}
           onClick={handleToggleFavorite}
           disabled={togglingFav}
-          className={`w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-lg ${
+          className={`w-16 h-16 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-lg ${
             isFavorited
               ? 'bg-mansion-crimson/20 border-mansion-crimson/40 text-mansion-crimson'
-              : 'glass border-mansion-border/30 text-text-muted hover:text-mansion-crimson hover:border-mansion-crimson/30'
+              : 'bg-black/40 border-white/10 text-text-muted hover:text-mansion-crimson hover:border-mansion-crimson/30'
           }`}
         >
           <Heart
-            className={`w-5 h-5 transition-transform ${isFavorited ? 'scale-110' : ''}`}
+            className={`w-6 h-6 transition-transform ${isFavorited ? 'scale-110' : ''}`}
             fill={isFavorited ? 'currentColor' : 'none'}
           />
         </motion.button>
         <motion.button
           whileTap={{ scale: 0.85 }}
           onClick={openGiftModal}
-          className="w-12 h-12 rounded-full backdrop-blur-md glass border border-mansion-gold/30 text-mansion-gold flex items-center justify-center transition-all shadow-lg hover:bg-mansion-gold/10"
+          className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-md border border-mansion-gold/30 text-mansion-gold flex items-center justify-center transition-all shadow-lg hover:bg-mansion-gold/10"
         >
-          <Gift className="w-5 h-5" />
+          <Gift className="w-6 h-6" />
         </motion.button>
         <Link
           to={`/mensajes/${id}`}
@@ -1081,10 +1082,9 @@ export default function ProfileDetailPage() {
               online: profile.online,
             },
           }}
-          className="flex items-center gap-2 px-7 py-3.5 rounded-full bg-mansion-crimson text-white shadow-glow-crimson hover:bg-mansion-crimson-dark transition-all active:scale-95"
+          className="w-16 h-16 rounded-full bg-mansion-crimson text-white shadow-glow-crimson hover:bg-mansion-crimson-dark transition-all active:scale-95 flex items-center justify-center"
         >
-          <MessageCircle className="w-5 h-5" />
-          <span className="font-display font-semibold text-sm">Mensaje</span>
+          <MessageCircle className="w-6 h-6" />
         </Link>
       </motion.div>
       )}
@@ -1191,10 +1191,10 @@ export default function ProfileDetailPage() {
             {/* Close button – top-right, matching story upload style */}
             <button
               onClick={closeLightbox}
-              className="absolute z-30 flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
-              style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
+              className="absolute z-30 flex h-16 w-16 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md border border-white/10 shadow-lg transition-transform active:scale-95"
+              style={{ top: 'max(env(safe-area-inset-top, 16px), 16px)', right: 16 }}
             >
-              <X className="w-5 h-5 lg:w-6 lg:h-6" />
+              <X className="w-6 h-6" />
             </button>
 
             {/* Counter badge – top-left */}

@@ -497,13 +497,13 @@ export default function FeedPage() {
       >
         <div className="flex items-center gap-1.5 mb-3">
           <Radio className="w-4 h-4 text-mansion-crimson" />
-          <p className="text-text-muted text-sm lg:text-base font-medium">Transmitiendo</p>
+          <p className="text-text-muted text-sm lg:text-base font-medium">Video Flashes</p>
         </div>
         <AnimatedBlock
           disabled={safariDesktop}
           ref={storiesScrollRef}
           className="flex overflow-x-auto scrollbar-hide pb-2 lg:cursor-grab active:lg:cursor-grabbing select-none"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', gap: `${storyCircleGap}px`, touchAction: 'pan-y' }}
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', gap: `${storyCircleGap}px`, touchAction: 'pan-x' }}
           motionProps={{
             variants: stagger,
             initial: 'hidden',
