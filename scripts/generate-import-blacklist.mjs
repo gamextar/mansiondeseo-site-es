@@ -56,6 +56,27 @@ function runWranglerQuery(dbName, { remote, sql }) {
   return JSON.parse(result.stdout || '[]')
 }
 
+function loadExistingUsernames(filePath) {
+  try {
+    const raw = readFileSync(filePath, 'utf8').trim()
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      return parsed.map((value) => String(value || '').trim()).filter(Boolean)
+    }
+    if (Array.isArray(parsed?.usernames)) {
+      return parsed.usernames.map((value) => String(value || '').trim()).filter(Boolean)
+    }
+    if (Array.isArray(parsed?.blacklist)) {
+      return parsed.blacklist.map((value) => String(value || '').trim()).filter(Boolean)
+    }
+    return []
+  } catch (error) {
+    if (error?.code === 'ENOENT') return []
+    throw error
+  }
+}
+
 function main() {
   const argv = process.argv.slice(2)
   const outputArg = takeFlag(argv, '--out', '')
@@ -72,15 +93,24 @@ function main() {
   `.trim()
 
   const rows = runWranglerQuery(dbName, { remote, sql })
-  const usernames = (rows?.[0]?.results || [])
+  const fetchedUsernames = (rows?.[0]?.results || [])
     .map((row) => String(row?.username || '').trim())
     .filter(Boolean)
+  const existingUsernames = loadExistingUsernames(outputPath)
+  const usernames = [...new Set([...existingUsernames, ...fetchedUsernames])].sort((a, b) =>
+    a.localeCompare(b, 'es', { sensitivity: 'base' })
+  )
+  const addedUsernames = fetchedUsernames.filter((username) => !existingUsernames.includes(username))
 
   const payload = {
     generatedAt: new Date().toISOString(),
+    mode: 'incremental',
     source: remote ? 'remote' : 'local',
     dbName,
     filter: "COALESCE(account_status, 'active') = 'under_review'",
+    fetchedNow: fetchedUsernames.length,
+    existingBeforeMerge: existingUsernames.length,
+    addedNow: addedUsernames.length,
     total: usernames.length,
     usernames,
   }
@@ -89,7 +119,9 @@ function main() {
   writeFileSync(outputPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
 
   console.log(`Blacklist generada: ${outputPath}`)
-  console.log(`Usernames en revisión: ${usernames.length}`)
+  console.log(`Usernames leidos desde D1: ${fetchedUsernames.length}`)
+  console.log(`Usernames nuevos agregados: ${addedUsernames.length}`)
+  console.log(`Total acumulado blacklist: ${usernames.length}`)
 }
 
 main()
