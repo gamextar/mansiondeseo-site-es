@@ -718,20 +718,14 @@ export default function ProfileDetailPage() {
                   <button
                     onClick={handleToggleReview}
                     disabled={togglingReview}
-                    className={`rounded-2xl border px-3 py-2 text-xs font-semibold transition-colors ${
-                      profile.account_status === 'under_review'
-                        ? 'border-yellow-500/30 bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/25'
-                        : 'border-red-500/30 bg-red-500/20 text-red-200 hover:bg-red-500/25'
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold shadow transition-colors ${
+                      ((profile?.account_status) || 'active') === 'under_review'
+                        ? 'bg-yellow-500 text-black hover:bg-yellow-400'
+                        : 'bg-mansion-crimson text-white hover:bg-red-600'
                     } disabled:opacity-60`}
                   >
-                    <span className="inline-flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      {togglingReview
-                        ? 'Guardando...'
-                        : profile.account_status === 'under_review'
-                          ? 'Quitar revisión'
-                          : 'Poner en revisión'}
-                    </span>
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    {((profile?.account_status) || 'active') === 'under_review' ? 'EN REVISIÓN' : 'SUSPENDER'}
                   </button>
                 )}
               </div>

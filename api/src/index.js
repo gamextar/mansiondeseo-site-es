@@ -3737,6 +3737,7 @@ async function handleAdminGetUsers(request, env) {
   const q = (url.searchParams.get('q') || '').trim();
   const fakeFilter = url.searchParams.get('fake');
   const roleFilter = (url.searchParams.get('role') || '').trim();
+  const statusFilter = (url.searchParams.get('status') || '').trim();
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
@@ -3764,6 +3765,11 @@ async function handleAdminGetUsers(request, env) {
   } else if (roleFilter === 'pareja') {
     filters.push(`role IN (${PAIR_ROLE_IDS.map(() => '?').join(', ')})`);
     bindings.push(...PAIR_ROLE_IDS);
+  }
+
+  if (statusFilter === 'under_review' || statusFilter === 'suspended' || statusFilter === 'active') {
+    filters.push("COALESCE(account_status, 'active') = ?");
+    bindings.push(statusFilter);
   }
 
   if (filters.length > 0) {
