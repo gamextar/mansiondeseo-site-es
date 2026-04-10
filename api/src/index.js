@@ -1928,7 +1928,7 @@ async function handleProfiles(request, env) {
   }
   // Cap SQL results — frontend shows max 500 cards, so 600 gives enough
   // headroom for filtering out the current user and scoring/interleaving.
-  query += ` ORDER BY last_active DESC LIMIT 450`;
+  query += ` ORDER BY last_active DESC LIMIT 400`;
 
   // Cache key for profiles query (shared across all users)
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
