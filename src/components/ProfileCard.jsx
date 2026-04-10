@@ -72,6 +72,7 @@ const RoleFallbackIcon = ({ role }) => {
 export default function ProfileCard({
   profile,
   index = 0,
+  rank,
   viewerPremium = false,
   settings = {},
   safariDesktopOverride,
@@ -157,6 +158,11 @@ export default function ProfileCard({
           {/* Top badges */}
           <div className="absolute top-3 left-3 right-3 flex items-start justify-between z-20">
             <div className="flex gap-1.5">
+              {typeof rank === 'number' && Number.isFinite(rank) && (
+                <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${safariDesktop ? 'bg-black/55 border border-white/10' : 'bg-black/45 backdrop-blur-sm border border-white/10'}`}>
+                  #{rank}
+                </span>
+              )}
               {premium && (
                 <span className={`flex items-center gap-1 border border-mansion-gold/30 rounded-full px-2 py-0.5 text-[10px] font-semibold text-mansion-gold ${safariDesktop ? 'bg-black/55' : 'bg-mansion-gold/20 backdrop-blur-sm'}`}>
                   <Crown className="w-3 h-3" />

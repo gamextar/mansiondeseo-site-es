@@ -1906,8 +1906,12 @@ async function handleProfiles(request, env) {
     params.push(term, term, term, term);
   }
   const windowLimit = cursor + FEED_PROFILE_LIMIT;
-  const pageWindowLimit = windowLimit + 1;
-  const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, FEED_PROFILE_LIMIT * 10) : pageWindowLimit + 1;
+  // Overfetch by 2: one extra row to detect hasMore, plus one extra because we later
+  // filter out the current viewer from the shared candidate set.
+  const pageProbeLimit = windowLimit + 2;
+  const dbLimit = roleBuckets.length > 1
+    ? Math.max(pageProbeLimit * 10, FEED_PROFILE_LIMIT * 10)
+    : pageProbeLimit + 1;
   query += ` ORDER BY last_active DESC LIMIT ${dbLimit}`;
 
   // Cache key for profiles query (shared across all users)
@@ -2004,9 +2008,9 @@ async function handleProfiles(request, env) {
         return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
       });
     }
-    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, pageWindowLimit);
+    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, pageProbeLimit);
   } else {
-    profiles = profiles.slice(0, pageWindowLimit);
+    profiles = profiles.slice(0, pageProbeLimit);
   }
 
   // Strip internal sort fields

@@ -785,6 +785,7 @@ export default function FeedPage() {
                     key={profile.id}
                     profile={profile}
                     index={index}
+                    rank={index + 1}
                     viewerPremium={viewerPremium}
                     settings={safeSettings}
                     safariDesktopOverride={safariDesktop}
