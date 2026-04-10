@@ -42,7 +42,7 @@ let _profileStatsBackfillReady = null;
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
-const FEED_PROFILE_LIMIT = 40;
+const FEED_PROFILE_LIMIT = 42;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -791,6 +791,11 @@ function normalizeGalleryPhotos(rawPhotos, avatarUrl = '') {
 function buildDisplayPhotos(avatarUrl = '', rawPhotos = []) {
   const gallery = normalizeGalleryPhotos(rawPhotos, avatarUrl);
   return avatarUrl ? [avatarUrl, ...gallery] : gallery;
+}
+
+function isPubliclyVisibleAccount(record) {
+  const status = String(record?.account_status || 'active').trim().toLowerCase();
+  return status !== 'under_review' && status !== 'suspended';
 }
 
 function isDebugLoggingEnabled(env) {
@@ -1875,6 +1880,7 @@ async function handleProfiles(request, env) {
     FROM users u
     LEFT JOIN profile_stats ps ON ps.user_id = u.id
     WHERE u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
   `;
   const params = [];
   if (settings.feedFilterByCountry && country) { query += ` AND u.country = ?`; params.push(country); }
@@ -2046,6 +2052,10 @@ async function handleProfileDetail(request, env, userId) {
 
   const hasGhostMode = isPremiumActive(user) && !!user.ghost_mode;
   const isOwnProfile = auth.sub === userId;
+  const viewerIsAdmin = !!viewer?.is_admin;
+  if (!isOwnProfile && !viewerIsAdmin && !isPubliclyVisibleAccount(user)) {
+    return error('Perfil no encontrado', 404);
+  }
   // Ghost mode blur: blurred unless viewer is premium, OR profile owner favorited viewer
   const blurred = hasGhostMode && !viewerIsPremium && !profileFavoritedViewer;
 
@@ -2133,6 +2143,7 @@ async function handleProfileDetail(request, env, userId) {
       online: isOnline(user.last_active),
       premium: isPremiumActive(user),
       premium_until: user.premium_until || null,
+      account_status: user.account_status || 'active',
       ghost_mode: hasGhostMode,
       blurred,
       isFavorited,
@@ -2145,7 +2156,7 @@ async function handleProfileDetail(request, env, userId) {
       receivedGifts: giftResults,
     },
     viewerPremium: viewerIsPremium,
-    viewerIsAdmin: !!viewer?.is_admin,
+    viewerIsAdmin,
     settings,
     ...(messageLimit ? { messageLimit } : {}),
   });
@@ -3013,6 +3024,8 @@ async function handleGetVisits(request, env) {
      FROM profile_visits pv
      JOIN users u ON u.id = pv.visitor_id
      WHERE pv.visited_id = ?
+       AND u.status = 'verified'
+       AND COALESCE(u.account_status, 'active') = 'active'
      GROUP BY pv.visitor_id
      ORDER BY visited_at DESC
      LIMIT 10`
@@ -3070,6 +3083,7 @@ async function handleGetTopVisitedProfiles(request, env) {
      FROM profile_stats ps
      JOIN users u ON u.id = ps.user_id
      WHERE u.status = 'verified'
+       AND COALESCE(u.account_status, 'active') = 'active'
   `;
   const bindings = [];
 
@@ -3417,8 +3431,22 @@ async function handleGetFavorites(request, env) {
   const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 100));
 
   const [followingCountRow, followersCountRow] = await Promise.all([
-    env.DB.prepare('SELECT COUNT(*) as count FROM favorites WHERE user_id = ?').bind(auth.sub).first(),
-    env.DB.prepare('SELECT COUNT(*) as count FROM favorites WHERE target_id = ?').bind(auth.sub).first(),
+    env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM favorites f
+      JOIN users u ON u.id = f.target_id
+      WHERE f.user_id = ?
+        AND u.status = 'verified'
+        AND COALESCE(u.account_status, 'active') = 'active'
+    `).bind(auth.sub).first(),
+    env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM favorites f
+      JOIN users u ON u.id = f.user_id
+      WHERE f.target_id = ?
+        AND u.status = 'verified'
+        AND COALESCE(u.account_status, 'active') = 'active'
+    `).bind(auth.sub).first(),
   ]);
 
   const followingCount = Number(followingCountRow?.count || 0);
@@ -3450,6 +3478,8 @@ async function handleGetFavorites(request, env) {
       LEFT JOIN profile_stats ps ON ps.user_id = u.id
       LEFT JOIN favorites back ON back.user_id = ? AND back.target_id = u.id
       WHERE f.target_id = ?
+        AND u.status = 'verified'
+        AND COALESCE(u.account_status, 'active') = 'active'
       ORDER BY f.created_at DESC
       LIMIT ?
     `
@@ -3478,6 +3508,8 @@ async function handleGetFavorites(request, env) {
       LEFT JOIN profile_stats ps ON ps.user_id = u.id
       LEFT JOIN favorites back ON back.user_id = u.id AND back.target_id = ?
       WHERE f.user_id = ?
+        AND u.status = 'verified'
+        AND COALESCE(u.account_status, 'active') = 'active'
       ORDER BY f.created_at DESC
       LIMIT ?
     `;
@@ -4461,6 +4493,8 @@ async function handleGetStories(request, env) {
     JOIN users u ON u.id = s.user_id
     LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?
     WHERE s.active = 1
+      AND u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
       AND (s.user_id != ? OR ? = '')
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?

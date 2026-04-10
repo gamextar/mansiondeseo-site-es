@@ -11,7 +11,8 @@
     "import:placeholders": "node scripts/import-placeholders.mjs",
     "extract:contactossex": "node scripts/extract-contactossex.mjs",
     "extract:contactossex:ui": "node scripts/extractor-ui-server.mjs",
-    "review:batches:ui": "node scripts/review-batches-server.mjs"
+    "review:batches:ui": "node scripts/review-batches-server.mjs",
+    "preview:pages-deployment": "node scripts/pages-deployment-preview-server.mjs"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
