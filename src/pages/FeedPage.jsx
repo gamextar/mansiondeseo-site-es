@@ -85,6 +85,7 @@ export default function FeedPage() {
   const scrollRestoredRef = useRef(false);
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
   const loadMoreFailedRef = useRef(false); // stop retrying on persistent errors
+  const loadingMoreRef = useRef(false); // sync guard to prevent duplicate requests
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
     frameId: null,
@@ -210,7 +211,8 @@ export default function FeedPage() {
       setVisibleCount((current) => Math.min(profiles.length, current + SAFARI_DESKTOP_VISIBLE_STEP));
       return Promise.resolve();
     }
-    if (loading || loadingMore || !hasMore || !nextCursor || loadMoreFailedRef.current) return Promise.resolve();
+    if (loading || loadingMore || !hasMore || !nextCursor || loadMoreFailedRef.current || loadingMoreRef.current) return Promise.resolve();
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     // Bump loadId so any in-flight loadProfiles response is discarded
     ++loadIdRef.current;
@@ -243,7 +245,7 @@ export default function FeedPage() {
         // Stop retrying — prevents infinite request loop on persistent server errors
         loadMoreFailedRef.current = true;
       })
-      .finally(() => setLoadingMore(false));
+      .finally(() => { loadingMoreRef.current = false; setLoadingMore(false); });
   }, [hasMore, loading, loadingMore, nextCursor, profiles.length, safariDesktop, visibleCount]);
 
   // Initial load — runs once on mount
