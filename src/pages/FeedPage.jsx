@@ -2,6 +2,7 @@ import { forwardRef, useState, useMemo, useEffect, useCallback, useRef, useSyncE
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Radio, Plus } from 'lucide-react';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '../lib/authContext';
 
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.045 } } };
@@ -20,16 +21,30 @@ import { isSafariDesktopBrowser } from '../lib/browser';
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
-const FEED_VISIBLE_KEY = 'mansion_feed_visible';
-const FEED_INITIAL_VISIBLE = 24;
-const FEED_STEP = 12;
 const MOBILE_MAX_DOM_CARDS = 360;
 
 function getSavedScrollY() {
   try { const v = parseInt(sessionStorage.getItem(FEED_SCROLL_KEY), 10); return Number.isFinite(v) ? v : 0; } catch { return 0; }
 }
-function getSavedVisibleCount() {
-  try { const v = parseInt(sessionStorage.getItem(FEED_VISIBLE_KEY), 10); return Number.isFinite(v) && v > 0 ? v : null; } catch { return null; }
+
+function getGridColumns() {
+  if (typeof window === 'undefined') return 2;
+  const w = window.innerWidth;
+  if (w >= 1536) return 6;
+  if (w >= 1280) return 5;
+  if (w >= 1024) return 4;
+  if (w >= 768) return 3;
+  return 2;
+}
+
+function useGridColumns() {
+  const [cols, setCols] = useState(getGridColumns);
+  useEffect(() => {
+    const handler = () => setCols(getGridColumns());
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return cols;
 }
 
 const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, motionProps = {}, children, ...rest }, ref) {
@@ -65,22 +80,9 @@ function setCachedFeed(data) {
 
 export default function FeedPage() {
   const safariDesktop = isSafariDesktopBrowser();
+  const cols = useGridColumns();
   const cached = getCachedFeed();
-  const getInitialVisibleCount = useCallback(
-    (list, s = {}) => Math.min(
-      Array.isArray(list) ? list.length : 0,
-      Math.max(1, s.feedInitialCards ?? FEED_INITIAL_VISIBLE)
-    ),
-    []
-  );
   const [profiles, setProfiles] = useState(cached?.profiles || []);
-  const [visibleCount, setVisibleCount] = useState(() => {
-    if (cached) {
-      const saved = getSavedVisibleCount();
-      if (saved) return Math.min(cached.profiles?.length ?? 0, saved);
-    }
-    return getInitialVisibleCount(cached?.profiles || [], cached?.settings || {});
-  });
   const [showStoriesSection, setShowStoriesSection] = useState(() => !safariDesktop);
   const [showGridSection, setShowGridSection] = useState(() => !safariDesktop);
   const [canAutoLoadMore, setCanAutoLoadMore] = useState(() => getSavedScrollY() > 80);
@@ -88,9 +90,7 @@ export default function FeedPage() {
   const [settings, setSettings] = useState(cached?.settings || {});
   const [nextCursor, setNextCursor] = useState(cached?.nextCursor || null);
   const [hasMore, setHasMore] = useState(
-    cached
-      ? (typeof cached?.hasMore === 'boolean' ? cached.hasMore : true)
-      : false
+    cached ? (typeof cached?.hasMore === 'boolean' ? cached.hasMore : true) : false
   );
   const [loading, setLoading] = useState(!cached);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -99,6 +99,7 @@ export default function FeedPage() {
   const { user, siteSettings } = useAuth();
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const loadMoreRef = useRef(null);
+  const gridRef = useRef(null);
   const scrollRestoredRef = useRef(false);
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
   const loadMoreFailedRef = useRef(false); // stop retrying on persistent errors
@@ -178,7 +179,6 @@ export default function FeedPage() {
     if (!c) setLoading(true);
     if (c) {
       setProfiles(c.profiles || []);
-      setVisibleCount(getInitialVisibleCount(c.profiles || [], c.settings || {}));
       setViewerPremium(c.viewerPremium || false);
       if (c.settings) setSettings(c.settings);
       setNextCursor(c.nextCursor || null);
@@ -189,7 +189,6 @@ export default function FeedPage() {
       .then(data => {
         if (myId !== loadIdRef.current) return;
         setProfiles(data.profiles || []);
-        setVisibleCount(getInitialVisibleCount(data.profiles || [], data.settings || {}));
         setViewerPremium(data.viewerPremium || false);
         if (data.settings) setSettings(data.settings);
         setNextCursor(data.nextCursor || null);
@@ -205,41 +204,25 @@ export default function FeedPage() {
       })
       .catch(() => {
         if (myId !== loadIdRef.current) return;
-        // If we had cached data, keep showing it
-        if (!c) {
-          setProfiles([]);
-          setNextCursor(null);
-          setHasMore(false);
-        }
+        if (!c) { setProfiles([]); setNextCursor(null); setHasMore(false); }
       })
       .finally(() => {
         if (myId === loadIdRef.current) setLoading(false);
       });
-  }, [getInitialVisibleCount]);
+  }, []);
 
   const loadMoreProfiles = useCallback(() => {
-    const step = Math.max(1, settings?.feedStepCards ?? FEED_STEP);
     const maxCards = Math.max(12, safariDesktop
       ? (settings?.feedMaxCardsDesktop ?? MOBILE_MAX_DOM_CARDS)
       : (settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS));
 
-    // Reveal more from already-fetched profiles (no API call needed)
-    if (visibleCount < profiles.length && visibleCount < maxCards) {
-      if (loadingMoreRef.current) return Promise.resolve(); // throttle: one reveal per frame
-      loadingMoreRef.current = true;
-      setVisibleCount((c) => Math.min(profiles.length, Math.min(maxCards, c + step)));
-      requestAnimationFrame(() => { loadingMoreRef.current = false; });
-      return Promise.resolve();
-    }
-
-    // Hit the DOM cap — stop
-    if (visibleCount >= maxCards) return Promise.resolve();
+    // Hit the API cap — stop
+    if (profiles.length >= maxCards) return Promise.resolve();
 
     // Need more from API
     if (loading || loadingMore || !hasMore || !nextCursor || loadMoreFailedRef.current || loadingMoreRef.current) return Promise.resolve();
     loadingMoreRef.current = true;
     setLoadingMore(true);
-    // Bump loadId so any in-flight loadProfiles response is discarded
     ++loadIdRef.current;
     const cursor = nextCursor;
     return getProfiles({ cursor })
@@ -253,7 +236,6 @@ export default function FeedPage() {
             seen.add(profile.id);
             merged.push(profile);
           }
-          setVisibleCount((c) => Math.min(merged.length, Math.min(maxCards, c + step)));
           return merged;
         });
         if (data.settings) setSettings(data.settings);
@@ -262,12 +244,9 @@ export default function FeedPage() {
         setHasMore(!!data.hasMore);
         loadMoreFailedRef.current = false;
       })
-      .catch(() => {
-        // Stop retrying — prevents infinite request loop on persistent server errors
-        loadMoreFailedRef.current = true;
-      })
+      .catch(() => { loadMoreFailedRef.current = true; })
       .finally(() => { loadingMoreRef.current = false; setLoadingMore(false); });
-  }, [hasMore, loading, loadingMore, nextCursor, profiles.length, safariDesktop, settings, visibleCount]);
+  }, [hasMore, loading, loadingMore, nextCursor, profiles.length, safariDesktop, settings]);
 
   // Initial load — runs once on mount
   useEffect(() => {
@@ -279,20 +258,12 @@ export default function FeedPage() {
     }
 
     setProfiles(cachedFeed.profiles || []);
-    // Restore visibleCount from session so progressive reveal picks up where user left off
-    const savedVisible = getSavedVisibleCount();
-    setVisibleCount(savedVisible
-      ? Math.min(cachedFeed.profiles?.length ?? 0, savedVisible)
-      : getInitialVisibleCount(cachedFeed.profiles || [], cachedFeed.settings || {}));
     setViewerPremium(cachedFeed.viewerPremium || false);
     if (cachedFeed.settings) setSettings(cachedFeed.settings);
     setNextCursor(cachedFeed.nextCursor || null);
     setHasMore(typeof cachedFeed.hasMore === 'boolean' ? cachedFeed.hasMore : true);
     setLoading(false);
-    // Unlock auto-load if user was already scrolled past the threshold
     if (getSavedScrollY() > 80) setCanAutoLoadMore(true);
-    // Clear any residual dirty flags — the cache is already loaded,
-    // stale flags from previous actions shouldn't trigger a reload.
     try {
       sessionStorage.removeItem('mansion_feed_dirty');
       sessionStorage.removeItem('mansion_feed_force_refresh');
@@ -303,7 +274,7 @@ export default function FeedPage() {
   useEffect(() => {
     const handleHomeFocus = () => {
       setShowOwnStoryPreview(false);
-      try { sessionStorage.removeItem(FEED_SCROLL_KEY); sessionStorage.removeItem(FEED_VISIBLE_KEY); } catch {}
+      try { sessionStorage.removeItem(FEED_SCROLL_KEY); } catch {}
       const scrollTarget = document.scrollingElement || document.documentElement || document.body;
       if (scrollTarget) {
         scrollTarget.scrollTo({ top: 0, behavior: 'smooth' });
@@ -316,20 +287,16 @@ export default function FeedPage() {
   }, []);
 
   // Keep a ref of visibleCount so the scroll handler can read it without being a dep
-  const visibleCountRef = useRef(visibleCount);
-  useEffect(() => { visibleCountRef.current = visibleCount; }, [visibleCount]);
+  const visibleCountRef = useRef(0);
 
-  // Save scroll position + visibleCount (throttled via rAF)
+  // Save scroll position (throttled via rAF)
   useEffect(() => {
     let ticking = false;
     const handleScroll = () => {
       if (!ticking) {
         ticking = true;
         requestAnimationFrame(() => {
-          try {
-            sessionStorage.setItem(FEED_SCROLL_KEY, String(window.scrollY));
-            sessionStorage.setItem(FEED_VISIBLE_KEY, String(visibleCountRef.current));
-          } catch {}
+          try { sessionStorage.setItem(FEED_SCROLL_KEY, String(window.scrollY)); } catch {}
           ticking = false;
         });
       }
@@ -358,7 +325,7 @@ export default function FeedPage() {
       const shouldForceFresh = sessionStorage.getItem('mansion_feed_force_refresh') === '1';
       sessionStorage.removeItem('mansion_feed_force_refresh');
       sessionStorage.removeItem(FEED_CACHE_KEY);
-      try { sessionStorage.removeItem(FEED_SCROLL_KEY); sessionStorage.removeItem(FEED_VISIBLE_KEY); } catch {}
+      try { sessionStorage.removeItem(FEED_SCROLL_KEY); } catch {}
       loadProfiles({ forceFresh: shouldForceFresh });
     };
     window.addEventListener('focus', onFocus);
@@ -371,10 +338,6 @@ export default function FeedPage() {
 
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
-  const mobileMaxCards = Math.max(12, safeSettings.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS);
-  const desktopMaxCards = Math.max(12, safeSettings.feedMaxCardsDesktop ?? MOBILE_MAX_DOM_CARDS);
-  const maxCards = safariDesktop ? desktopMaxCards : mobileMaxCards;
-  const renderedProfiles = safeProfiles.slice(0, Math.min(visibleCount, maxCards));
   const storyProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, safariDesktop ? 6 : 15);
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
@@ -519,45 +482,32 @@ export default function FeedPage() {
   }, []);
 
   const maybeLoadMore = useCallback(() => {
-    const hasLocalMore = visibleCount < profiles.length;
-    if (!loadMoreRef.current || loading || loadingMore || (!hasMore && !hasLocalMore) || !canAutoLoadMore) return;
+    if (!loadMoreRef.current || loading || loadingMore || !hasMore || !canAutoLoadMore) return;
     const rect = loadMoreRef.current.getBoundingClientRect();
-    const thresholdPx = 1500;
-    if (rect.top - window.innerHeight <= thresholdPx) {
+    if (rect.top - window.innerHeight <= 1500) {
       loadMoreProfiles();
     }
-  }, [canAutoLoadMore, hasMore, loadMoreProfiles, loading, loadingMore, profiles.length, visibleCount]);
+  }, [canAutoLoadMore, hasMore, loadMoreProfiles, loading, loadingMore]);
 
   useEffect(() => {
-    const hasLocalMore = visibleCount < profiles.length;
-    if (!loadMoreRef.current || loading || loadingMore || (!hasMore && !hasLocalMore) || !canAutoLoadMore) return;
+    if (!loadMoreRef.current || loading || loadingMore || !hasMore || !canAutoLoadMore) return;
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          loadMoreProfiles();
-        }
-      },
+      (entries) => { if (entries.some((e) => e.isIntersecting)) loadMoreProfiles(); },
       { rootMargin: '1500px 0px' }
     );
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [canAutoLoadMore, hasMore, loading, loadingMore, loadMoreProfiles, profiles.length, visibleCount]);
+  }, [canAutoLoadMore, hasMore, loading, loadingMore, loadMoreProfiles]);
 
-  useEffect(() => {
-    maybeLoadMore();
-  }, [maybeLoadMore, profiles.length, showGridSection, visibleCount]);
+  useEffect(() => { maybeLoadMore(); }, [maybeLoadMore, profiles.length, showGridSection]);
 
   useEffect(() => {
     let ticking = false;
     const scheduleCheck = () => {
       if (ticking) return;
       ticking = true;
-      requestAnimationFrame(() => {
-        ticking = false;
-        maybeLoadMore();
-      });
+      requestAnimationFrame(() => { ticking = false; maybeLoadMore(); });
     };
-
     window.addEventListener('scroll', scheduleCheck, { passive: true });
     window.addEventListener('resize', scheduleCheck);
     window.addEventListener('focus', scheduleCheck);
@@ -569,6 +519,30 @@ export default function FeedPage() {
   }, [maybeLoadMore]);
 
   useEffect(() => () => stopStoriesMomentum(), [stopStoriesMomentum]);
+
+  // ── Virtual scroll setup ────────────────────────────────────────────────
+  const gap = safariDesktop ? 16 : 12; // matches lg:gap-4 / gap-3
+  const rows = useMemo(() => {
+    const result = [];
+    for (let i = 0; i < safeProfiles.length; i += cols) {
+      result.push(safeProfiles.slice(i, i + cols));
+    }
+    return result;
+  }, [safeProfiles, cols]);
+
+  const estimateRowHeight = useCallback(() => {
+    if (!gridRef.current) return 300;
+    const containerWidth = gridRef.current.offsetWidth;
+    const cardWidth = (containerWidth - gap * (cols - 1)) / cols;
+    return Math.round(cardWidth * (4 / 3)) + gap;
+  }, [cols, gap]);
+
+  const rowVirtualizer = useWindowVirtualizer({
+    count: rows.length,
+    estimateSize: estimateRowHeight,
+    overscan: 3,
+    scrollMargin: gridRef.current?.offsetTop ?? 0,
+  });
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
@@ -809,18 +783,43 @@ export default function FeedPage() {
         ) : safeProfiles.length > 0 ? (
           <>
             {showGridSection ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4">
-                {renderedProfiles.map((profile, index) => (
-                  <ProfileCard
-                    key={profile.id}
-                    profile={profile}
-                    index={index}
-                    rank={index + 1}
-                    viewerPremium={viewerPremium}
-                    settings={safeSettings}
-                    safariDesktopOverride={safariDesktop}
-                    isMobileOverride={false}
-                  />
+              <div
+                ref={gridRef}
+                style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}
+              >
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => (
+                  <div
+                    key={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
+                      display: 'grid',
+                      gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                      gap: `${gap}px`,
+                      paddingBottom: `${gap}px`,
+                    }}
+                  >
+                    {rows[virtualRow.index].map((profile, idx) => {
+                      const globalIndex = virtualRow.index * cols + idx;
+                      return (
+                        <ProfileCard
+                          key={profile.id}
+                          profile={profile}
+                          index={globalIndex}
+                          rank={globalIndex + 1}
+                          viewerPremium={viewerPremium}
+                          settings={safeSettings}
+                          safariDesktopOverride={safariDesktop}
+                          isMobileOverride={false}
+                        />
+                      );
+                    })}
+                  </div>
                 ))}
               </div>
             ) : (
@@ -836,10 +835,7 @@ export default function FeedPage() {
         ) : (
           <AnimatedBlock
             disabled={safariDesktop}
-            motionProps={{
-              initial: { opacity: 0 },
-              animate: { opacity: 1 },
-            }}
+            motionProps={{ initial: { opacity: 0 }, animate: { opacity: 1 } }}
             className="text-center py-20"
           >
             <p className="text-text-muted text-lg mb-2">No hay perfiles</p>
