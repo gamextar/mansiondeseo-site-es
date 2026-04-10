@@ -26,6 +26,8 @@ const OWN_PROFILE_DASHBOARD_TTL_MS = 60 * 60_000;
 const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
+const CLIENT_CACHE_VERSION_KEY = 'mansion_client_cache_version';
+const CLIENT_CACHE_VERSION = 'media-paths-v2';
 const sharedGetCache = new Map();
 const sessionCache = {
   get(key, ttlMs = 0) {
@@ -51,6 +53,44 @@ const sessionCache = {
     } catch {}
   },
 };
+
+function hasLegacyRootMediaUrl(value) {
+  const raw = typeof value === 'string' ? value : JSON.stringify(value || '');
+  return /https:\/\/media\.unicoapps\.com\/(?!profiles\/|stories\/|assets\/)[^"'\s)]+/i.test(raw);
+}
+
+function clearLegacyMediaCaches() {
+  if (typeof window === 'undefined') return;
+  try {
+    if (localStorage.getItem(CLIENT_CACHE_VERSION_KEY) === CLIENT_CACHE_VERSION) return;
+
+    const userRaw = localStorage.getItem(USER_KEY) || '';
+    if (hasLegacyRootMediaUrl(userRaw)) {
+      localStorage.removeItem(USER_KEY);
+    }
+
+    for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
+      const key = sessionStorage.key(i);
+      if (!key) continue;
+      if (
+        key === 'mansion_feed' ||
+        key === 'vf_stories' ||
+        key === 'appBootstrap' ||
+        key === AUTH_ME_CACHE_KEY ||
+        key === OWN_PROFILE_DASHBOARD_CACHE_KEY ||
+        key.startsWith('mansion_profile_detail_')
+      ) {
+        sessionStorage.removeItem(key);
+      }
+    }
+
+    localStorage.setItem(CLIENT_CACHE_VERSION_KEY, CLIENT_CACHE_VERSION);
+  } catch {
+    // Cache cleanup is best-effort; never block app startup.
+  }
+}
+
+clearLegacyMediaCaches();
 
 function invalidateBootstrapCache() {
   sharedGetCache.delete('bootstrap');
