@@ -108,7 +108,7 @@ export default function FeedPage() {
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const loadMoreRef = useRef(null);
   const scrollRestoredRef = useRef(false);
-  const paginatedRef = useRef(false);
+  const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
     frameId: null,
@@ -196,11 +196,11 @@ export default function FeedPage() {
       setNextCursor(c.nextCursor || null);
       setHasMore(!!c.hasMore);
     }
-    paginatedRef.current = false;
+    const myId = ++loadIdRef.current;
     return getProfiles({ fresh: forceFresh })
       .then(data => {
-        // If user paginated while this request was in-flight, don't replace their data
-        if (silent && paginatedRef.current) return;
+        // Discard if a newer load or pagination happened after this call started
+        if (myId !== loadIdRef.current) return;
         setProfiles(data.profiles || []);
         setVisibleCount(getInitialVisibleCount(data.profiles || []));
         setViewerPremium(data.viewerPremium || false);
@@ -216,13 +216,16 @@ export default function FeedPage() {
         });
       })
       .catch(() => {
+        if (myId !== loadIdRef.current) return;
         if (!silent) {
           setProfiles([]);
           setNextCursor(null);
           setHasMore(false);
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (myId === loadIdRef.current) setLoading(false);
+      });
   }, [getInitialVisibleCount]);
 
   const loadMoreProfiles = useCallback(() => {
@@ -232,10 +235,12 @@ export default function FeedPage() {
     }
     if (loading || loadingMore || !hasMore || !nextCursor) return Promise.resolve();
     setLoadingMore(true);
-    return getProfiles({ cursor: nextCursor })
+    // Bump loadId so any in-flight loadProfiles response is discarded
+    ++loadIdRef.current;
+    const cursor = nextCursor;
+    return getProfiles({ cursor })
       .then((data) => {
         const newProfiles = Array.isArray(data?.profiles) ? data.profiles : [];
-        paginatedRef.current = true;
         setProfiles((prev) => {
           const seen = new Set(prev.map((item) => item.id));
           const merged = [...prev];
@@ -259,6 +264,7 @@ export default function FeedPage() {
       .finally(() => setLoadingMore(false));
   }, [hasMore, loading, loadingMore, nextCursor, profiles.length, safariDesktop, visibleCount]);
 
+  // Initial load — runs once on mount
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
     const cachedFeed = getCachedFeed();
@@ -278,7 +284,8 @@ export default function FeedPage() {
     if (!isFeedCacheFresh(cachedFeed) || !hasFeedPaginationState(cachedFeed) || shouldBackgroundRefreshFeed(cachedFeed)) {
       loadProfiles({ silent: true });
     }
-  }, [getInitialVisibleCount, navigate, loadProfiles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const handleHomeFocus = () => {
@@ -336,13 +343,9 @@ export default function FeedPage() {
         return;
       }
 
-      // Don't background-refresh if user has paginated past page 1
-      if (paginatedRef.current) return;
-
       const cachedFeed = getCachedFeed();
-      if (!isFeedCacheFresh(cachedFeed) || !hasFeedPaginationState(cachedFeed) || shouldBackgroundRefreshFeed(cachedFeed)) {
-        loadProfiles({ silent: true });
-      }
+      if (cachedFeed && isFeedCacheFresh(cachedFeed)) return; // cache is fine, skip
+      loadProfiles({ silent: true });
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
