@@ -63,7 +63,7 @@ let _profileStatsBackfillReady = null;
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
-const FEED_PROFILE_LIMIT = 42;
+const FEED_PROFILE_LIMIT = 126;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
