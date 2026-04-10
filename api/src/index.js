@@ -1035,10 +1035,24 @@ const _lastActiveCache = new Map(); // userId → timestamp of last D1 UPDATE
 const _accountStatusCache = new Map(); // userId → { status, exp }
 const _viewerCache = new Map(); // userId → { data, exp } — viewer profile data (country, seeking, etc.)
 const _fullUserCache = new Map(); // userId → { data, exp } — full user row for reuse by handlers
+const _favoritesCache = new Map(); // userId → { rows, exp } — viewer's favorites rows (user_id + target_id)
 const LAST_ACTIVE_DEBOUNCE_MS = 5 * 60_000; // only UPDATE last_active every 5 min
 const ACCOUNT_STATUS_TTL_MS = 5 * 60_000; // cache account_status for 5 min
 const VIEWER_CACHE_TTL_MS = 2 * 60_000; // cache viewer data for 2 min
 const FULL_USER_CACHE_TTL_MS = 30_000; // cache full user row for 30s (short — used to deduplicate within same request wave)
+const FAVORITES_CACHE_TTL_MS = 120_000; // 2 min — same as feed cache
+
+function getCachedFavorites(userId) {
+  const entry = _favoritesCache.get(userId);
+  if (!entry || Date.now() >= entry.exp) { _favoritesCache.delete(userId); return null; }
+  return entry.rows;
+}
+function setCachedFavorites(userId, rows) {
+  _favoritesCache.set(userId, { rows, exp: Date.now() + FAVORITES_CACHE_TTL_MS });
+}
+function invalidateFavoritesCache(userId) {
+  _favoritesCache.delete(userId);
+}
 
 function getCachedViewer(userId) {
   const entry = _viewerCache.get(userId);
@@ -1980,12 +1994,15 @@ async function handleProfiles(request, env) {
 
   const shouldUseProfilesCache = !fresh;
 
-  // Parallel: cached settings + cached profiles + combined favorites + active stories
-  const [results, { results: allFavRows }, storyRows] = await Promise.all([
+  // Parallel: cached profiles + cached favorites + active stories
+  const cachedFavRows = !fresh ? getCachedFavorites(auth.sub) : null;
+  const [results, allFavRows, storyRows] = await Promise.all([
     shouldUseProfilesCache
-      ? cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results))  // 30s
+      ? cached(profilesCacheKey, 120_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results))  // 2 min — matches feed cache TTL
       : env.DB.prepare(query).bind(...params).all().then(r => r.results),
-    env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?').bind(auth.sub, auth.sub).all(),
+    cachedFavRows
+      ? Promise.resolve(cachedFavRows)
+      : env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?').bind(auth.sub, auth.sub).all().then(r => { setCachedFavorites(auth.sub, r.results); return r.results; }),
     cached('active_story_users', 30_000, () => env.DB.prepare('SELECT DISTINCT user_id FROM stories WHERE active = 1').all().then(r => r.results).catch(() => [])),  // 30s
   ]);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
@@ -3451,12 +3468,14 @@ async function handleToggleFavorite(request, env, targetId) {
     await env.DB.prepare('DELETE FROM favorites WHERE user_id = ? AND target_id = ?')
       .bind(auth.sub, targetId).run();
     await incrementProfileFollowerStat(env, targetId, -1);
+    invalidateFavoritesCache(auth.sub);
     const statRow = await env.DB.prepare('SELECT followers_total FROM profile_stats WHERE user_id = ?').bind(targetId).first();
     return json({ favorited: false, followers_total: Number(statRow?.followers_total || 0) });
   } else {
     await env.DB.prepare('INSERT INTO favorites (user_id, target_id) VALUES (?, ?)')
       .bind(auth.sub, targetId).run();
     await incrementProfileFollowerStat(env, targetId, 1);
+    invalidateFavoritesCache(auth.sub);
     const statRow = await env.DB.prepare('SELECT followers_total FROM profile_stats WHERE user_id = ?').bind(targetId).first();
     return json({ favorited: true, followers_total: Number(statRow?.followers_total || 0) });
   }
