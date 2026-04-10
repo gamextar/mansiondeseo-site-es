@@ -22,7 +22,7 @@ const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
 const SAFARI_DESKTOP_INITIAL_VISIBLE = 24;
 const SAFARI_DESKTOP_VISIBLE_STEP = 12;
-const MOBILE_MAX_DOM_CARDS = 200;
+const MOBILE_MAX_DOM_CARDS = 500;
 
 const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, motionProps = {}, children, ...rest }, ref) {
   if (disabled) return <div ref={ref} {...rest}>{children}</div>;

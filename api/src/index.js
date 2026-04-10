@@ -18,7 +18,7 @@ function cached(key, ttlMs, fetcher) {
 // Cursor pages read from this cache instead of re-computing everything.
 const _feedCache = new Map();
 const FEED_CACHE_TTL = 30_000; // 30s
-const FEED_CACHE_MAX_ENTRIES = 200;
+const FEED_CACHE_MAX_ENTRIES = 100;
 function getCachedFeed(key) {
   const entry = _feedCache.get(key);
   if (!entry) return null;
