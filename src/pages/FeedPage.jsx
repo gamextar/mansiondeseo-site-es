@@ -211,7 +211,10 @@ export default function FeedPage() {
 
     // Reveal more from already-fetched profiles (no API call needed)
     if (visibleCount < profiles.length && visibleCount < maxCards) {
+      if (loadingMoreRef.current) return Promise.resolve(); // throttle: one reveal per frame
+      loadingMoreRef.current = true;
       setVisibleCount((c) => Math.min(profiles.length, Math.min(maxCards, c + step)));
+      requestAnimationFrame(() => { loadingMoreRef.current = false; });
       return Promise.resolve();
     }
 
