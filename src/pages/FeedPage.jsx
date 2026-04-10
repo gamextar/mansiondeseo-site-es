@@ -267,6 +267,12 @@ export default function FeedPage() {
     setNextCursor(cachedFeed.nextCursor || null);
     setHasMore(typeof cachedFeed.hasMore === 'boolean' ? cachedFeed.hasMore : true);
     setLoading(false);
+    // Clear any residual dirty flags — the cache is already loaded,
+    // stale flags from previous actions shouldn't trigger a reload.
+    try {
+      sessionStorage.removeItem('mansion_feed_dirty');
+      sessionStorage.removeItem('mansion_feed_force_refresh');
+    } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
