@@ -943,7 +943,13 @@ export default function VideoFeedPage() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
+    <motion.div
+      className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base"
+      initial={{ opacity: 0, y: 18, scale: 0.992 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      style={{ transformOrigin: 'center bottom' }}
+    >
       {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">
@@ -1176,6 +1182,6 @@ export default function VideoFeedPage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }
