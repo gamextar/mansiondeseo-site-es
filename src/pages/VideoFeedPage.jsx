@@ -943,14 +943,22 @@ export default function VideoFeedPage() {
   }
 
   return (
-    <motion.div
-      className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base"
-      initial={{ opacity: 0, y: 18, scale: 0.992 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-      style={{ transformOrigin: 'center bottom' }}
-    >
-      {isDesktopViewport ? (
+    <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
+      <motion.div
+        className="absolute inset-0 pointer-events-none z-20 bg-black"
+        initial={{ opacity: 1 }}
+        animate={{ opacity: 0 }}
+        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+      />
+
+      <motion.div
+        className="relative h-full"
+        initial={{ opacity: 0, y: 40, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+        style={{ transformOrigin: 'center bottom' }}
+      >
+        {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">
             {stories.map((story, index) => {
@@ -994,7 +1002,7 @@ export default function VideoFeedPage() {
             })}
           </div>
         </div>
-      ) : (
+        ) : (
         <div
           ref={containerRef}
           onScroll={handleScroll}
@@ -1031,9 +1039,9 @@ export default function VideoFeedPage() {
             );
           })}
         </div>
-      )}
+        )}
 
-      {activeStory && (
+        {activeStory && (
         <div
           className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
           style={{ bottom: `${navBottomOffset + 16}px` }}
@@ -1049,9 +1057,9 @@ export default function VideoFeedPage() {
             isOwnStory={String(activeStory.user_id) === String(user?.id)}
           />
         </div>
-      )}
+        )}
 
-      {activeStory && (
+        {activeStory && (
         <div
           className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
           style={{ bottom: `${navBottomOffset + 8}px` }}
@@ -1083,9 +1091,9 @@ export default function VideoFeedPage() {
             )}
           </div>
         </div>
-      )}
+        )}
 
-      {stories.length > 1 && (
+        {stories.length > 1 && (
         <>
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(-1) : jumpByOne(-1))}
@@ -1102,11 +1110,11 @@ export default function VideoFeedPage() {
             <ChevronRight className="w-9 h-9 text-white/70" />
           </button>
         </>
-      )}
+        )}
 
-      {/* Gift Modal */}
-      <AnimatePresence>
-        {giftModalOpen && (
+        {/* Gift Modal */}
+        <AnimatePresence>
+          {giftModalOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1180,8 +1188,9 @@ export default function VideoFeedPage() {
               )}
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
   );
 }
