@@ -638,12 +638,12 @@ export default function VideoFeedPage() {
   }, []);
 
   const refreshStories = useCallback(async () => {
-    const data = await getStories();
+    const data = await getStories({ focusUserId: requestedStoryUserId || '' });
     const fresh = applyPendingStoryLikeState(data.stories || [], getPendingStoryLikes());
     setStories(fresh);
     persistStories(fresh);
     return fresh;
-  }, [persistStories]);
+  }, [persistStories, requestedStoryUserId]);
 
   useEffect(() => {
     let cancelled = false;

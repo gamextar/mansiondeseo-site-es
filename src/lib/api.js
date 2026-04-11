@@ -1134,9 +1134,10 @@ export async function adminBulkDeleteUsers(userIds) {
 
 // ── Stories ─────────────────────────────────────────────
 
-export async function getStories({ page = 1, limit = 50 } = {}) {
+export async function getStories({ page = 1, limit = 50, focusUserId = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
-  return sharedGet(`stories:${page}:${limit}`, () => apiFetch(`/stories?${params}`), { ttlMs: 2 * 60_000 });
+  if (focusUserId) params.set('focus_user_id', focusUserId);
+  return sharedGet(`stories:${page}:${limit}:${focusUserId || ''}`, () => apiFetch(`/stories?${params}`), { ttlMs: 2 * 60_000 });
 }
 
 export function invalidateStoriesCache() {

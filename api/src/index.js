@@ -4726,6 +4726,7 @@ async function handleGetStories(request, env) {
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
   const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
   const offset = (page - 1) * limit;
+  const focusUserId = String(url.searchParams.get('focus_user_id') || '').trim();
 
   // Try to get current user for per-user liked status and server-side seeking filter
   const auth = await authenticate(request, env).catch(() => null);
@@ -4749,7 +4750,7 @@ async function handleGetStories(request, env) {
   // Key: viewer + seeking filter + page/limit. Liked status comes from the cache
   // and the client merges its optimistic pending-likes on top anyway.
   const seekingKey = roleValues.sort().join(',');
-  const storiesCacheKey = `stories:${viewerId || 'anon'}:${seekingKey}:${page}:${limit}`;
+  const storiesCacheKey = `stories:${viewerId || 'anon'}:${seekingKey}:${page}:${limit}:${focusUserId || ''}`;
   const cached = getCachedStories(storiesCacheKey);
   if (cached) return json({ stories: cached });
 
@@ -4778,7 +4779,7 @@ async function handleGetStories(request, env) {
 
   const { results } = await env.DB.prepare(query).bind(...bindings).all();
 
-  const stories = (results || []).map(r => ({
+  let stories = (results || []).map(r => ({
     id: r.id,
     user_id: r.user_id,
     video_url: normalizeStoryVideoUrl(r.video_url, env),
@@ -4791,6 +4792,52 @@ async function handleGetStories(request, env) {
     avatar_url: r.avatar_url || '',
     avatar_crop: safeParseJSON(r.avatar_crop, null),
   }));
+
+  if (focusUserId && !stories.some((story) => String(story.user_id) === focusUserId)) {
+    const focusBindings = [viewerId || '', focusUserId];
+    let focusQuery = `
+      SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
+             u.username, u.avatar_url, u.avatar_crop,
+             CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
+      FROM stories s
+      JOIN users u ON u.id = s.user_id
+      LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?
+      WHERE s.active = 1
+        AND u.status = 'verified'
+        AND COALESCE(u.account_status, 'active') = 'active'
+        AND s.user_id = ?
+    `;
+    if (roleValues.length > 0) {
+      focusQuery += ` AND u.role IN (${roleValues.map(() => '?').join(', ')})`;
+      focusBindings.push(...roleValues);
+    }
+    focusQuery += `
+      AND (s.user_id != ? OR ? = '')
+      ORDER BY s.created_at DESC
+      LIMIT 1
+    `;
+    focusBindings.push(viewerId || '', viewerId || '');
+
+    const focusRow = await env.DB.prepare(focusQuery).bind(...focusBindings).first();
+    if (focusRow) {
+      stories = [
+        {
+          id: focusRow.id,
+          user_id: focusRow.user_id,
+          video_url: normalizeStoryVideoUrl(focusRow.video_url, env),
+          caption: focusRow.caption || '',
+          likes: focusRow.likes || 0,
+          liked: !!focusRow.liked,
+          comments: focusRow.comments || 0,
+          created_at: focusRow.created_at,
+          username: focusRow.username,
+          avatar_url: focusRow.avatar_url || '',
+          avatar_crop: safeParseJSON(focusRow.avatar_crop, null),
+        },
+        ...stories,
+      ];
+    }
+  }
 
   setCachedStories(storiesCacheKey, stories);
   return json({ stories });
