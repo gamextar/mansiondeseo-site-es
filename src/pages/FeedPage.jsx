@@ -413,21 +413,53 @@ export default function FeedPage() {
       const deltaY = previousRect.top - rect.top;
       if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue;
 
-      node.style.transition = 'none';
-      node.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1)`;
-      node.style.willChange = 'transform';
+      node.style.willChange = 'transform, filter, opacity';
+      const animation = typeof node.animate === 'function'
+        ? node.animate(
+            [
+              {
+                transform: `translate(${deltaX}px, ${deltaY}px) scale(0.96)`,
+                filter: 'brightness(0.88)',
+                opacity: 0.9,
+              },
+              {
+                transform: 'translate(0px, 0px) scale(1)',
+                filter: 'brightness(1)',
+                opacity: 1,
+              },
+            ],
+            {
+              duration: 720,
+              easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+            }
+          )
+        : null;
 
-      requestAnimationFrame(() => {
-        node.style.transition = 'transform 560ms cubic-bezier(0.22, 1, 0.36, 1)';
-        node.style.transform = 'translate(0px, 0px) scale(1)';
-        const cleanup = () => {
-          node.style.transition = '';
-          node.style.transform = '';
+      if (animation) {
+        animation.onfinish = () => {
           node.style.willChange = '';
-          node.removeEventListener('transitionend', cleanup);
         };
-        node.addEventListener('transitionend', cleanup);
-      });
+      } else {
+        node.style.transition = 'none';
+        node.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(0.96)`;
+        node.style.filter = 'brightness(0.88)';
+        node.style.opacity = '0.9';
+        requestAnimationFrame(() => {
+          node.style.transition = 'transform 720ms cubic-bezier(0.22, 1, 0.36, 1), filter 720ms cubic-bezier(0.22, 1, 0.36, 1), opacity 720ms cubic-bezier(0.22, 1, 0.36, 1)';
+          node.style.transform = 'translate(0px, 0px) scale(1)';
+          node.style.filter = 'brightness(1)';
+          node.style.opacity = '1';
+          const cleanup = () => {
+            node.style.transition = '';
+            node.style.transform = '';
+            node.style.filter = '';
+            node.style.opacity = '';
+            node.style.willChange = '';
+            node.removeEventListener('transitionend', cleanup);
+          };
+          node.addEventListener('transitionend', cleanup);
+        });
+      }
     }
 
     storyRectsRef.current = nextRects;
@@ -928,10 +960,9 @@ export default function FeedPage() {
                 </button>
               </div>
             ) : (
-              <motion.div
+              <div
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
-                variants={storyItem}
                 className="flex-shrink-0"
                 style={{ width: size + 6 }}
               >
@@ -961,7 +992,7 @@ export default function FeedPage() {
                   </div>
                   <span className="text-[10px] text-text-muted truncate w-full text-center leading-tight">{p.name?.split(' ')[0]}</span>
                 </button>
-              </motion.div>
+              </div>
             );
           })}
         </AnimatedBlock>
