@@ -264,32 +264,26 @@ export default function FeedPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    let rafId = null;
-    const smoothScrollToTop = () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      const start = window.scrollY;
-      if (start <= 0) return;
-      const duration = Math.min(600, Math.max(300, start * 0.35)); // scale with distance, max 600ms
-      const startTime = performance.now();
-      const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
-      const step = (now) => {
-        const elapsed = now - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        window.scrollTo(0, start * (1 - easeOutCubic(progress)));
-        if (progress < 1) { rafId = requestAnimationFrame(step); }
-      };
-      rafId = requestAnimationFrame(step);
-    };
+  const [gridOpacity, setGridOpacity] = useState(1);
 
+  useEffect(() => {
+    let fadeOutTimer = null;
+    let fadeInTimer = null;
     const handleHomeFocus = () => {
       setShowOwnStoryPreview(false);
-      smoothScrollToTop();
+      if (window.scrollY <= 0) return;
+      // Fade out → instant jump → fade in
+      setGridOpacity(0);
+      fadeOutTimer = setTimeout(() => {
+        window.scrollTo(0, 0);
+        fadeInTimer = setTimeout(() => setGridOpacity(1), 16);
+      }, 180);
     };
     window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
     return () => {
       window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
-      if (rafId) cancelAnimationFrame(rafId);
+      clearTimeout(fadeOutTimer);
+      clearTimeout(fadeInTimer);
     };
   }, []);
 
@@ -770,7 +764,7 @@ export default function FeedPage() {
             {showGridSection ? (
               <div
                 ref={gridRef}
-                style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}
+                style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', opacity: gridOpacity, transition: 'opacity 0.18s ease' }}
               >
                 {rowVirtualizer.getVirtualItems().map((virtualRow) => (
                   <div
