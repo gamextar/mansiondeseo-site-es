@@ -78,6 +78,8 @@ export default function SettingsPage() {
   const [storyCircleGap, setStoryCircleGap] = useState(8);
   const [storyCircleBorder, setStoryCircleBorder] = useState(4);
   const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
+  const [homeStoryCountMobile, setHomeStoryCountMobile] = useState(15);
+  const [homeStoryCountDesktop, setHomeStoryCountDesktop] = useState(30);
   const [sidebarStoryRingWidth, setSidebarStoryRingWidth] = useState(4);
   const [storyPresetEditor, setStoryPresetEditor] = useState('medium');
   const [avatarSizeDraft, setAvatarSizeDraft] = useState('88');
@@ -233,6 +235,8 @@ export default function SettingsPage() {
         setStoryCircleGap(s.storyCircleGap ?? 8);
         setStoryCircleBorder(s.storyCircleBorder ?? 4);
         setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
+        setHomeStoryCountMobile(s.homeStoryCountMobile ?? 15);
+        setHomeStoryCountDesktop(s.homeStoryCountDesktop ?? 30);
         setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? 4);
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
@@ -351,6 +355,8 @@ export default function SettingsPage() {
         story_circle_gap: storyCircleGap,
         story_circle_border: storyCircleBorder,
         story_circle_inner_gap: storyCircleInnerGap,
+        home_story_count_mobile: homeStoryCountMobile,
+        home_story_count_desktop: homeStoryCountDesktop,
         sidebar_story_ring_width: sidebarStoryRingWidth,
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
@@ -416,6 +422,8 @@ export default function SettingsPage() {
       setStoryCircleGap(s.storyCircleGap ?? 8);
       setStoryCircleBorder(s.storyCircleBorder ?? 4);
       setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
+      setHomeStoryCountMobile(s.homeStoryCountMobile ?? 15);
+      setHomeStoryCountDesktop(s.homeStoryCountDesktop ?? 30);
       setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? 4);
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
@@ -1850,6 +1858,34 @@ export default function SettingsPage() {
               <div className="mb-3">
                 <h3 className="text-sm font-semibold text-text-primary">Ajustes generales</h3>
                 <p className="text-[11px] text-text-dim">La home toma el preset Stories y la sidebar desktop toma el preset Sidebar desktop.</p>
+              </div>
+
+              <div className="grid gap-3 mb-3 md:grid-cols-2">
+                <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                      <Smartphone className="w-4 h-4 text-mansion-gold" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-text-primary">Stories visibles en mobile</h3>
+                      <p className="text-[11px] text-text-dim">Máximo de círculos mostrados en la home móvil</p>
+                    </div>
+                  </div>
+                  <Counter value={homeStoryCountMobile} onChange={setHomeStoryCountMobile} min={1} max={60} />
+                </div>
+
+                <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                      <Monitor className="w-4 h-4 text-mansion-gold" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-text-primary">Stories visibles en desktop</h3>
+                      <p className="text-[11px] text-text-dim">Máximo de círculos mostrados en la home desktop</p>
+                    </div>
+                  </div>
+                  <Counter value={homeStoryCountDesktop} onChange={setHomeStoryCountDesktop} min={1} max={60} />
+                </div>
               </div>
 
               <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">

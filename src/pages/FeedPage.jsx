@@ -77,6 +77,7 @@ function setCachedFeed(data) {
 export default function FeedPage() {
   const safariDesktop = isSafariDesktopBrowser();
   const cols = useGridColumns();
+  const isDesktopViewport = cols >= 4;
   const cached = getCachedFeed();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [showStoriesSection, setShowStoriesSection] = useState(() => !safariDesktop);
@@ -322,7 +323,15 @@ export default function FeedPage() {
 
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
-  const fallbackStoryProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, safariDesktop ? 6 : 15);
+  const storyLimit = Math.max(
+    1,
+    Math.round(
+      isDesktopViewport
+        ? (safeSettings.homeStoryCountDesktop ?? 30)
+        : (safeSettings.homeStoryCountMobile ?? 15)
+    )
+  );
+  const fallbackStoryProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, storyLimit);
   const storyProfiles = Array.isArray(liveStoryProfiles) ? liveStoryProfiles : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
@@ -352,7 +361,7 @@ export default function FeedPage() {
       const next = selectLivefeedStories(
         payload,
         user?.seeking || [],
-        safariDesktop ? 6 : 15,
+        storyLimit,
         { excludeUserId: user.id }
       );
       if (!cancelled) {
@@ -403,7 +412,7 @@ export default function FeedPage() {
       window.removeEventListener('focus', handleForegroundRefresh);
       document.removeEventListener('visibilitychange', handleForegroundRefresh);
     };
-  }, [safariDesktop, user?.id, user?.seeking]);
+  }, [storyLimit, user?.id, user?.seeking]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (isSafariDesktopRef.current) return;
