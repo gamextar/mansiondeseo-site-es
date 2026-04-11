@@ -265,17 +265,32 @@ export default function FeedPage() {
   }, []);
 
   useEffect(() => {
+    let rafId = null;
+    const smoothScrollToTop = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      const start = window.scrollY;
+      if (start <= 0) return;
+      const duration = Math.min(600, Math.max(300, start * 0.35)); // scale with distance, max 600ms
+      const startTime = performance.now();
+      const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+      const step = (now) => {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        window.scrollTo(0, start * (1 - easeOutCubic(progress)));
+        if (progress < 1) { rafId = requestAnimationFrame(step); }
+      };
+      rafId = requestAnimationFrame(step);
+    };
+
     const handleHomeFocus = () => {
       setShowOwnStoryPreview(false);
-      const scrollTarget = document.scrollingElement || document.documentElement || document.body;
-      if (scrollTarget) {
-        scrollTarget.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+      smoothScrollToTop();
     };
     window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
-    return () => window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
+    return () => {
+      window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   // Keep a ref of visibleCount so the scroll handler can read it without being a dep
