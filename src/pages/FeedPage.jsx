@@ -17,6 +17,7 @@ import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
+import { fetchLivefeedCurrent, fetchLivefeedPayload, selectLivefeedStories } from '../lib/livefeed';
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
@@ -90,6 +91,7 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(!cached);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showOwnStoryPreview, setShowOwnStoryPreview] = useState(false);
+  const [liveStoryProfiles, setLiveStoryProfiles] = useState(null);
   const navigate = useNavigate();
   const { user, siteSettings } = useAuth();
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
@@ -113,6 +115,13 @@ export default function FeedPage() {
     velocity: 0,
   });
   const isSafariDesktopRef = useRef(false);
+  const livefeedVersionRef = useRef('');
+  const livefeedPayloadRef = useRef(null);
+  const liveStoryProfilesRef = useRef(null);
+
+  useEffect(() => {
+    liveStoryProfilesRef.current = liveStoryProfiles;
+  }, [liveStoryProfiles]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -313,7 +322,8 @@ export default function FeedPage() {
 
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
-  const storyProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, safariDesktop ? 6 : 15);
+  const fallbackStoryProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, safariDesktop ? 6 : 15);
+  const storyProfiles = Array.isArray(liveStoryProfiles) ? liveStoryProfiles : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
@@ -332,6 +342,62 @@ export default function FeedPage() {
   const viewedStoryUsers = useMemo(() => {
     try { return new Set(JSON.parse(viewedRaw)); } catch { return new Set(); }
   }, [viewedRaw]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let cancelled = false;
+
+    const applyPayload = (payload) => {
+      livefeedPayloadRef.current = payload;
+      const next = selectLivefeedStories(
+        payload,
+        user?.seeking || [],
+        safariDesktop ? 6 : 15,
+        { excludeUserId: user.id }
+      );
+      if (!cancelled) {
+        setLiveStoryProfiles(next);
+      }
+    };
+
+    if (livefeedPayloadRef.current) {
+      applyPayload(livefeedPayloadRef.current);
+    }
+
+    const refreshLivefeed = async () => {
+      try {
+        const current = await fetchLivefeedCurrent();
+        if (!current?.version) return;
+        if (livefeedVersionRef.current === current.version && livefeedPayloadRef.current) {
+          applyPayload(livefeedPayloadRef.current);
+          return;
+        }
+        const payload = await fetchLivefeedPayload(current);
+        livefeedVersionRef.current = current.version;
+        applyPayload(payload);
+      } catch {
+        // Keep fallback story circles from feed if livefeed is unavailable.
+      }
+    };
+
+    refreshLivefeed();
+    const intervalId = window.setInterval(refreshLivefeed, 30_000);
+
+    const handleForegroundRefresh = () => {
+      if (document.visibilityState === 'hidden') return;
+      refreshLivefeed();
+    };
+
+    window.addEventListener('focus', handleForegroundRefresh);
+    document.addEventListener('visibilitychange', handleForegroundRefresh);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleForegroundRefresh);
+      document.removeEventListener('visibilitychange', handleForegroundRefresh);
+    };
+  }, [safariDesktop, user?.id, user?.seeking]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (isSafariDesktopRef.current) return;
@@ -617,7 +683,7 @@ export default function FeedPage() {
                 </div>
               </div>
             ) : (
-              <motion.div variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
+              <motion.div layout variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
                 <div className="relative">
                   <button
                     type="button"
@@ -699,7 +765,7 @@ export default function FeedPage() {
                 </button>
               </div>
             ) : (
-              <motion.div key={`story-${p.id}`} variants={storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
+              <motion.div layout key={`story-${p.id}`} variants={storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
                 <button
                   type="button"
                   draggable={false}

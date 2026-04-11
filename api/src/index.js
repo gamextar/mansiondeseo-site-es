@@ -63,6 +63,8 @@ const FEED_CACHE_MAX_ENTRIES = 100;
 const _storiesCache = new Map();
 const STORIES_CACHE_TTL = 60_000; // 1 min — stories change more frequently than profiles
 const STORIES_CACHE_MAX_ENTRIES = 200;
+const LIVEFEED_CURRENT_KEY = 'livefeed/current.json';
+const LIVEFEED_BUCKET_LIMIT = 50;
 function getCachedStories(key) {
   const entry = _storiesCache.get(key);
   if (!entry) return null;
@@ -78,6 +80,99 @@ function setCachedStories(key, val) {
 }
 function invalidateStoriesCache() {
   _storiesCache.clear();
+}
+
+function livefeedBucketForRole(role) {
+  const normalized = String(role || '').trim().toLowerCase();
+  if (normalized === 'mujer') return 'mujer';
+  if (normalized === 'hombre') return 'hombre';
+  if (normalized === 'trans') return 'trans';
+  if (PAIR_ROLE_IDS.includes(normalized)) return 'pareja';
+  return '';
+}
+
+function buildLivefeedStoryRow(row, env) {
+  return {
+    id: String(row?.user_id || ''),
+    story_id: String(row?.id || ''),
+    user_id: String(row?.user_id || ''),
+    name: row?.username || '',
+    username: row?.username || '',
+    role: row?.role || '',
+    avatar_url: row?.avatar_url ? normalizeStoryVideoUrl(row.avatar_url, env) : '',
+    avatar_crop: safeParseJSON(row?.avatar_crop, null),
+    created_at: row?.created_at || '',
+  };
+}
+
+async function putJsonObjectToR2(env, key, payload, cacheControl) {
+  await env.IMAGES.put(key, JSON.stringify(payload), {
+    httpMetadata: {
+      contentType: 'application/json',
+      cacheControl,
+    },
+  });
+}
+
+async function publishLivefeedSnapshot(env) {
+  if (!env?.IMAGES) return null;
+
+  const { results } = await env.DB.prepare(`
+    SELECT
+      s.id,
+      s.user_id,
+      s.created_at,
+      u.username,
+      u.avatar_url,
+      u.avatar_crop,
+      u.role
+    FROM stories s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.active = 1
+      AND u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
+    ORDER BY s.created_at DESC
+    LIMIT 400
+  `).all();
+
+  const buckets = {
+    mujer: [],
+    hombre: [],
+    pareja: [],
+    trans: [],
+  };
+
+  for (const row of results || []) {
+    const bucket = livefeedBucketForRole(row?.role);
+    if (!bucket || buckets[bucket].length >= LIVEFEED_BUCKET_LIMIT) continue;
+    buckets[bucket].push(buildLivefeedStoryRow(row, env));
+  }
+
+  const now = new Date().toISOString();
+  const version = `livefeed-${Date.now()}.json`;
+  const versionKey = `livefeed/${version}`;
+  const r2Base = String(env?.R2_PUBLIC_URL || '').replace(/\/$/, '');
+  const versionUrl = r2Base ? `${r2Base}/${versionKey}` : versionKey;
+
+  const versionPayload = {
+    version,
+    versionKey,
+    updatedAt: now,
+    stories: buckets,
+  };
+
+  const currentPayload = {
+    version,
+    versionKey,
+    versionUrl,
+    updatedAt: now,
+    counts: Object.fromEntries(Object.entries(buckets).map(([key, list]) => [key, list.length])),
+  };
+
+  await putJsonObjectToR2(env, versionKey, versionPayload, 'public, max-age=31536000, immutable');
+  await putJsonObjectToR2(env, LIVEFEED_CURRENT_KEY, currentPayload, 'public, max-age=30, stale-while-revalidate=30');
+
+  return currentPayload;
 }
 function getCachedFeed(key) {
   const entry = _feedCache.get(key);
@@ -343,6 +438,10 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
+
+  if (storyRows.length > 0) {
+    await publishLivefeedSnapshot(env).catch(() => {});
+  }
 }
 
 async function ensureHiddenConversationsTable(env) {
@@ -4890,6 +4989,7 @@ async function handleAdminUploadStory(request, env) {
   `).bind(storyId, userId, videoUrl, caption).run();
 
   invalidateStoriesCache();
+  await publishLivefeedSnapshot(env).catch(() => {});
   return json({ id: storyId, video_url: videoUrl, user_id: userId, caption }, 201);
 }
 
@@ -4919,6 +5019,7 @@ async function handleDeleteOwnStory(request, env, storyId) {
   }
 
   invalidateStoriesCache();
+  await publishLivefeedSnapshot(env).catch(() => {});
   return json({ deleted: true, story_id: story.id });
 }
 
@@ -4943,6 +5044,7 @@ async function handleAdminDeleteStory(request, env, storyId) {
   }
 
   invalidateStoriesCache();
+  await publishLivefeedSnapshot(env).catch(() => {});
   return json({ deleted: true, story_id: storyId });
 }
 
@@ -4996,6 +5098,7 @@ async function handleUploadStory(request, env) {
   `).bind(storyId, auth.sub, videoUrl, caption).run();
 
   invalidateStoriesCache();
+  await publishLivefeedSnapshot(env).catch(() => {});
   return json({ id: storyId, video_url: videoUrl, caption }, 201);
 }
 
