@@ -21,10 +21,18 @@ import { isSafariDesktopBrowser } from '../lib/browser';
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
+const FEED_GRID_OFFSET_KEY = 'mansion_feed_grid_offset';
+const FEED_ROW_HEIGHT_KEY = 'mansion_feed_row_height';
 const MOBILE_MAX_DOM_CARDS = 360;
 
 function getSavedScrollY() {
   try { const v = parseInt(sessionStorage.getItem(FEED_SCROLL_KEY), 10); return Number.isFinite(v) ? v : 0; } catch { return 0; }
+}
+function getSavedGridOffset() {
+  try { const v = parseInt(sessionStorage.getItem(FEED_GRID_OFFSET_KEY), 10); return Number.isFinite(v) && v > 0 ? v : 0; } catch { return 0; }
+}
+function getSavedRowHeight() {
+  try { const v = parseInt(sessionStorage.getItem(FEED_ROW_HEIGHT_KEY), 10); return Number.isFinite(v) && v > 0 ? v : 300; } catch { return 300; }
 }
 
 function getGridColumns() {
@@ -531,16 +539,21 @@ export default function FeedPage() {
   }, [safeProfiles, cols]);
 
   const estimateRowHeight = useCallback(() => {
-    if (!gridRef.current) return 300;
-    const containerWidth = gridRef.current.offsetWidth;
-    const cardWidth = (containerWidth - gap * (cols - 1)) / cols;
-    return Math.round(cardWidth * (4 / 3)) + gap;
+    if (gridRef.current) {
+      const containerWidth = gridRef.current.offsetWidth;
+      const cardWidth = (containerWidth - gap * (cols - 1)) / cols;
+      const h = Math.round(cardWidth * (4 / 3)) + gap;
+      try { sessionStorage.setItem(FEED_ROW_HEIGHT_KEY, String(h)); } catch {}
+      return h;
+    }
+    return getSavedRowHeight();
   }, [cols, gap]);
 
-  const [gridScrollMargin, setGridScrollMargin] = useState(0);
+  const [gridScrollMargin, setGridScrollMargin] = useState(getSavedGridOffset);
   useLayoutEffect(() => {
     if (!gridRef.current) return;
     const next = gridRef.current.offsetTop;
+    if (next > 0) try { sessionStorage.setItem(FEED_GRID_OFFSET_KEY, String(next)); } catch {}
     setGridScrollMargin(prev => prev !== next ? next : prev);
   });
 
