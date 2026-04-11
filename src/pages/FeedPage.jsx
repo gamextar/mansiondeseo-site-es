@@ -305,19 +305,21 @@ export default function FeedPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Restore scroll position synchronously before first paint.
-  // Reading offsetHeight forces the browser to reflow so the virtual grid's
-  // full height is committed before scrollTo — otherwise scrollTo gets clamped to 0.
-  useLayoutEffect(() => {
+  // Restore scroll position after the virtual grid has committed its full height.
+  // Double rAF: frame 1 lets the virtualizer write `height: totalSize` to the DOM,
+  // frame 2 lets the browser reflow so scrollTo isn't clamped to 0.
+  useEffect(() => {
     if (scrollRestoredRef.current || profiles.length === 0) return;
     scrollRestoredRef.current = true;
-    try {
-      const savedY = parseInt(sessionStorage.getItem(FEED_SCROLL_KEY), 10);
-      if (savedY > 0) {
-        void document.documentElement.offsetHeight; // force reflow
+    const savedY = parseInt(sessionStorage.getItem(FEED_SCROLL_KEY), 10);
+    if (!(savedY > 0)) return;
+    let id1, id2;
+    id1 = requestAnimationFrame(() => {
+      id2 = requestAnimationFrame(() => {
         window.scrollTo(0, savedY);
-      }
-    } catch {}
+      });
+    });
+    return () => { cancelAnimationFrame(id1); cancelAnimationFrame(id2); };
   }, [profiles.length]);
 
   // Reload feed ONLY when explicitly marked dirty (preference/settings changes)
