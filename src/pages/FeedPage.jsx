@@ -280,7 +280,7 @@ export default function FeedPage() {
         window.scrollTo(0, 0);
         document.documentElement.style.scrollBehavior = '';
         fadeInTimer = setTimeout(() => setGridOpacity(1), 16);
-      }, 180);
+      }, 300);
     };
     window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
     return () => {
@@ -767,7 +767,7 @@ export default function FeedPage() {
             {showGridSection ? (
               <div
                 ref={gridRef}
-                style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', opacity: gridOpacity, transition: 'opacity 0.18s ease' }}
+                style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', opacity: gridOpacity, transition: gridOpacity === 0 ? 'opacity 0.3s ease' : 'opacity 0.25s ease' }}
               >
                 {rowVirtualizer.getVirtualItems().map((virtualRow) => (
                   <div
