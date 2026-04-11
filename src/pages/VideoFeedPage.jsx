@@ -385,8 +385,6 @@ function MobileOverlayButton({ onPress, scrollContainerRef, className = '', styl
 
 function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, scrollContainerRef, onGift, isOwnStory = false }) {
   const [burstTrigger, setBurstTrigger] = useState(0);
-  const primaryButtonSize = 52;
-  const secondaryButtonSize = 46;
 
   const handleHeart = () => {
     setBurstTrigger(t => t + 1);
@@ -401,33 +399,33 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, s
             onPress={handleHeart}
             scrollContainerRef={scrollContainerRef}
             className="pointer-events-auto relative"
-            style={{ width: primaryButtonSize, height: primaryButtonSize }}
+            style={{ width: 58, height: 58 }}
           >
             <HeartBurst trigger={burstTrigger} />
-            <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: primaryButtonSize, height: primaryButtonSize }}>
-              <Heart className={`w-6.5 h-6.5 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
+            <div className={`rounded-full flex items-center justify-center transition-all duration-150 ${story.liked ? 'bg-mansion-crimson/25 scale-110' : 'bg-black/30 backdrop-blur-sm'}`} style={{ width: 58, height: 58 }}>
+              <Heart className={`w-7.5 h-7.5 transition-all duration-150 ${story.liked ? 'text-mansion-crimson fill-mansion-crimson scale-110' : 'text-white'}`} />
             </div>
           </MobileOverlayButton>
-          <span className="pointer-events-none text-white text-[10px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
+          <span className="pointer-events-none text-white text-[11px] font-semibold mt-1 drop-shadow tabular-nums">{story.likes || 0}</span>
         </div>
       )}
       {!isOwnStory && (
         <MobileOverlayButton onPress={() => navigate(`/mensajes/${story.user_id}`, { state: { from: '/videos' } })} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
-          <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: secondaryButtonSize, height: secondaryButtonSize }}>
-            <Send className="w-5.5 h-5.5 text-white" />
+          <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+            <Send className="w-6 h-6 text-white" />
           </div>
         </MobileOverlayButton>
       )}
       {!isOwnStory && (
         <MobileOverlayButton onPress={() => onGift(story)} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
-          <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: secondaryButtonSize, height: secondaryButtonSize }}>
-            <Gift className="w-5.5 h-5.5 text-mansion-gold" />
+          <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+            <Gift className="w-6 h-6 text-mansion-gold" />
           </div>
         </MobileOverlayButton>
       )}
       <MobileOverlayButton onPress={onToggleMute} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-center">
-        <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: secondaryButtonSize, height: secondaryButtonSize }}>
-          {isMuted ? <VolumeX className="w-5.5 h-5.5 text-white" /> : <Volume2 className="w-5.5 h-5.5 text-white" />}
+        <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
+          {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
         </div>
       </MobileOverlayButton>
     </>
@@ -598,7 +596,6 @@ export default function VideoFeedPage() {
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
-  const mobileAvatarSize = Math.max(40, avatarSize - 8);
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
 
@@ -1063,8 +1060,8 @@ export default function VideoFeedPage() {
 
         {activeStory && (
         <div
-          className="pointer-events-none fixed right-2.5 flex flex-col items-center gap-4 z-50 lg:hidden"
-          style={{ bottom: `${navBottomOffset + 10}px` }}
+          className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
+          style={{ bottom: `${navBottomOffset + 16}px` }}
         >
           <MobileActionButtons
             story={activeStory}
@@ -1081,17 +1078,17 @@ export default function VideoFeedPage() {
 
         {activeStory && (
         <div
-          className="pointer-events-none fixed left-3 right-16 z-50 lg:hidden"
-          style={{ bottom: `${navBottomOffset + 2}px` }}
+          className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
+          style={{ bottom: `${navBottomOffset + 8}px` }}
         >
-          <div className="pointer-events-none flex flex-col items-start gap-1.5 mb-0.5">
+          <div className="pointer-events-none flex flex-col items-start gap-2.5 mb-1">
             <MobileOverlayButton
               onPress={() => navigate(`/perfiles/${activeStory.user_id}`, { state: { from: '/videos' } })}
               scrollContainerRef={containerRef}
               className="pointer-events-auto"
-              style={{ width: mobileAvatarSize, height: mobileAvatarSize }}
+              style={{ width: avatarSize, height: avatarSize }}
             >
-              <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: mobileAvatarSize, height: mobileAvatarSize }}>
+              <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
                 {activeStory.avatar_url ? (
                   <AvatarImg src={activeStory.avatar_url} crop={activeStory.avatar_crop} cover alt={activeStory.username} className="w-full h-full" />
                 ) : (
@@ -1104,10 +1101,10 @@ export default function VideoFeedPage() {
               scrollContainerRef={containerRef}
               className="pointer-events-auto inline-flex items-start"
             >
-              <p className="pointer-events-none text-white font-bold text-[15px] leading-tight drop-shadow-lg">@{activeStory.username}</p>
+              <p className="pointer-events-none text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{activeStory.username}</p>
             </MobileOverlayButton>
             {activeStory.caption && (
-              <p className="pointer-events-none text-white/90 text-[13px] leading-snug line-clamp-2 drop-shadow">{activeStory.caption}</p>
+              <p className="pointer-events-none text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{activeStory.caption}</p>
             )}
           </div>
         </div>
