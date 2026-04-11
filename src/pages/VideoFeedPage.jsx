@@ -969,10 +969,28 @@ export default function VideoFeedPage() {
         className="absolute inset-0 pointer-events-none z-20 bg-black"
         initial={{ opacity: 1 }}
         animate={{ opacity: entryRevealReady ? 0 : 1 }}
-        transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.92, ease: [0.22, 1, 0.36, 1] }}
       />
 
-      <div className="relative h-full">
+      <motion.div
+        className="relative h-full"
+        initial={false}
+        animate={entryRevealReady
+          ? {
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              filter: 'brightness(1) saturate(1)',
+            }
+          : {
+              opacity: 0.94,
+              y: 20,
+              scale: 1.018,
+              filter: 'brightness(0.68) saturate(0.88)',
+            }}
+        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+        style={{ transformOrigin: 'center center', willChange: 'transform, opacity, filter' }}
+      >
         {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">
@@ -1207,7 +1225,7 @@ export default function VideoFeedPage() {
           </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
     </div>
   );
 }
