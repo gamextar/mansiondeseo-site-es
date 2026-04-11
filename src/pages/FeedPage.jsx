@@ -17,7 +17,7 @@ import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
-import { fetchLivefeedCurrent, fetchLivefeedPayload, selectLivefeedStories } from '../lib/livefeed';
+import { fetchLivefeedCurrent, fetchLivefeedPayload, selectLivefeedStories, getCachedLivefeedPayload } from '../lib/livefeed';
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
@@ -362,6 +362,12 @@ export default function FeedPage() {
 
     if (livefeedPayloadRef.current) {
       applyPayload(livefeedPayloadRef.current);
+    } else {
+      const cachedPayload = getCachedLivefeedPayload();
+      if (cachedPayload) {
+        livefeedPayloadRef.current = cachedPayload;
+        applyPayload(cachedPayload);
+      }
     }
 
     const refreshLivefeed = async () => {

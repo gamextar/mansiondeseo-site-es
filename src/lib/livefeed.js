@@ -1,6 +1,7 @@
 import { resolveMediaUrl } from './media';
 
 const LIVEFEED_CURRENT_URL = resolveMediaUrl('https://media.mansiondeseo.com/livefeed/current.json');
+const LIVEFEED_SESSION_KEY = 'mansion_livefeed_payload';
 
 function normalizeBucketName(role) {
   const normalized = String(role || '').trim().toLowerCase();
@@ -64,7 +65,11 @@ export async function fetchLivefeedPayload(current) {
   if (!response.ok) {
     throw new Error(`No pude leer livefeed payload (${response.status})`);
   }
-  return response.json();
+  const payload = await response.json();
+  try {
+    sessionStorage.setItem(LIVEFEED_SESSION_KEY, JSON.stringify(payload));
+  } catch {}
+  return payload;
 }
 
 export function selectLivefeedStories(payload, seeking, limit = 15, { excludeUserId = '' } = {}) {
@@ -81,4 +86,15 @@ export function selectLivefeedStories(payload, seeking, limit = 15, { excludeUse
     story_id: story?.story_id || '',
     has_active_story: true,
   })).filter((story) => story.id && String(story.id) !== String(excludeUserId || ''));
+}
+
+export function getCachedLivefeedPayload() {
+  try {
+    const raw = sessionStorage.getItem(LIVEFEED_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
 }

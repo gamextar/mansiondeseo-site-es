@@ -669,6 +669,7 @@ export default function VideoFeedPage() {
 
     const targetIndex = stories.findIndex((story) => String(story.user_id) === String(targetStoryUserId));
     if (targetIndex < 0) {
+      if (loading) return;
       setActiveDispIdx(1);
       setBoundaryOverlayIdx(null);
       initialStoryUserIdRef.current = null;
