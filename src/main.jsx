@@ -8,13 +8,6 @@ if (typeof window !== 'undefined' && window.location.hostname === 'www.mansionde
   window.location.replace(canonicalUrl);
 }
 
-// Prevent iOS Safari PWA from restoring scroll on SPA navigation.
-// Our pages handle scroll position explicitly (FeedPage resets to 0 on mount,
-// overlay in App.jsx restores via explicit window.scrollTo — both unaffected by this flag).
-if (typeof window !== 'undefined' && 'scrollRestoration' in history) {
-  history.scrollRestoration = 'manual';
-}
-
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

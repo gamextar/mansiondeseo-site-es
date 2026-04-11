@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAgeVerified } from './hooks/useAgeVerified';
@@ -67,6 +67,18 @@ function AppLayout() {
     ensureApiDebug();
     markApiDebugRoute(location.pathname + location.search);
   }, [location.pathname, location.search]);
+
+  // Reset scroll to top on every route change, EXCEPT when opening/closing
+  // a profile overlay (which manages scroll lock/restore itself).
+  const prevPathnameRef = useRef(location.pathname);
+  useLayoutEffect(() => {
+    const prev = prevPathnameRef.current;
+    prevPathnameRef.current = location.pathname;
+    if (profileOverlayOpen) return; // overlay handles its own scroll
+    if (location.state?.backgroundLocation) return; // closing overlay — App handles it
+    if (prev === location.pathname) return; // same route, no reset
+    window.scrollTo(0, 0);
+  }, [location.pathname, location.state, profileOverlayOpen]);
 
   useEffect(() => {
     if (!profileOverlayOpen || typeof window === 'undefined') return undefined;
