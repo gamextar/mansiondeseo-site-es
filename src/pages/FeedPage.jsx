@@ -242,6 +242,9 @@ export default function FeedPage() {
       .finally(() => { loadingMoreRef.current = false; setLoadingMore(false); });
   }, [hasMore, loading, loadingMore, nextCursor, profiles.length, safariDesktop, settings]);
 
+  // Reset scroll to top on mount — prevents inheriting scrollY from previous page
+  useLayoutEffect(() => { window.scrollTo(0, 0); }, []);
+
   // Initial load — runs once on mount
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
