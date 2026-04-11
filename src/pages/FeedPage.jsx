@@ -305,13 +305,16 @@ export default function FeedPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Restore scroll position synchronously before first paint
+  // Restore scroll position synchronously before first paint.
+  // Reading offsetHeight forces the browser to reflow so the virtual grid's
+  // full height is committed before scrollTo — otherwise scrollTo gets clamped to 0.
   useLayoutEffect(() => {
     if (scrollRestoredRef.current || profiles.length === 0) return;
     scrollRestoredRef.current = true;
     try {
       const savedY = parseInt(sessionStorage.getItem(FEED_SCROLL_KEY), 10);
       if (savedY > 0) {
+        void document.documentElement.offsetHeight; // force reflow
         window.scrollTo(0, savedY);
       }
     } catch {}
