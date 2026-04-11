@@ -583,6 +583,7 @@ export default function VideoFeedPage() {
   };
   const initial = applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
   const requestedStoryUserId = location.state?.storyUserId || null;
+  const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
@@ -609,6 +610,9 @@ export default function VideoFeedPage() {
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
+  const closeOverlay = useCallback(() => {
+    navigate(-1);
+  }, [navigate]);
 
   const infiniteStories = stories.length > 0
     ? [stories[stories.length - 1], ...stories, stories[0]]
@@ -1005,6 +1009,17 @@ export default function VideoFeedPage() {
 
   return (
     <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
+      {isOverlayPreview && (
+        <button
+          type="button"
+          onClick={closeOverlay}
+          className="fixed z-[70] flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+          style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
+          aria-label="Cerrar"
+        >
+          <X className="h-7 w-7 text-white" />
+        </button>
+      )}
       <motion.div
         className="absolute inset-0 pointer-events-none z-20 bg-black"
         initial={{ opacity: entryRevealReady ? 0 : 0.7 }}
