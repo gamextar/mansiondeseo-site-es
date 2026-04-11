@@ -8,11 +8,6 @@ if (typeof window !== 'undefined' && window.location.hostname === 'www.mansionde
   window.location.replace(canonicalUrl);
 }
 
-// Prevent iOS Safari PWA from overriding our programmatic scroll restoration
-if (typeof window !== 'undefined' && 'scrollRestoration' in history) {
-  history.scrollRestoration = 'manual';
-}
-
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
