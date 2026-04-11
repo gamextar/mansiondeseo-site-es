@@ -20,20 +20,7 @@ import { isSafariDesktopBrowser } from '../lib/browser';
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
-const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
-const FEED_GRID_OFFSET_KEY = 'mansion_feed_grid_offset';
-const FEED_ROW_HEIGHT_KEY = 'mansion_feed_row_height';
 const MOBILE_MAX_DOM_CARDS = 360;
-
-function getSavedScrollY() {
-  try { const v = parseInt(sessionStorage.getItem(FEED_SCROLL_KEY), 10); return Number.isFinite(v) ? v : 0; } catch { return 0; }
-}
-function getSavedGridOffset() {
-  try { const v = parseInt(sessionStorage.getItem(FEED_GRID_OFFSET_KEY), 10); return Number.isFinite(v) && v > 0 ? v : 0; } catch { return 0; }
-}
-function getSavedRowHeight() {
-  try { const v = parseInt(sessionStorage.getItem(FEED_ROW_HEIGHT_KEY), 10); return Number.isFinite(v) && v > 0 ? v : 300; } catch { return 300; }
-}
 
 function getGridColumns() {
   if (typeof window === 'undefined') return 2;
@@ -93,7 +80,7 @@ export default function FeedPage() {
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [showStoriesSection, setShowStoriesSection] = useState(() => !safariDesktop);
   const [showGridSection, setShowGridSection] = useState(() => !safariDesktop);
-  const [canAutoLoadMore, setCanAutoLoadMore] = useState(() => getSavedScrollY() > 80);
+  const [canAutoLoadMore, setCanAutoLoadMore] = useState(false);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
   const [nextCursor, setNextCursor] = useState(cached?.nextCursor || null);
@@ -108,7 +95,6 @@ export default function FeedPage() {
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const loadMoreRef = useRef(null);
   const gridRef = useRef(null);
-  const scrollRestoredRef = useRef(false);
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
   const loadMoreFailedRef = useRef(false); // stop retrying on persistent errors
   const loadingMoreRef = useRef(false); // sync guard to prevent duplicate requests
@@ -271,7 +257,6 @@ export default function FeedPage() {
     setNextCursor(cachedFeed.nextCursor || null);
     setHasMore(typeof cachedFeed.hasMore === 'boolean' ? cachedFeed.hasMore : true);
     setLoading(false);
-    if (getSavedScrollY() > 80) setCanAutoLoadMore(true);
     try {
       sessionStorage.removeItem('mansion_feed_dirty');
       sessionStorage.removeItem('mansion_feed_force_refresh');
@@ -282,7 +267,6 @@ export default function FeedPage() {
   useEffect(() => {
     const handleHomeFocus = () => {
       setShowOwnStoryPreview(false);
-      try { sessionStorage.removeItem(FEED_SCROLL_KEY); } catch {}
       const scrollTarget = document.scrollingElement || document.documentElement || document.body;
       if (scrollTarget) {
         scrollTarget.scrollTo({ top: 0, behavior: 'smooth' });
@@ -297,34 +281,6 @@ export default function FeedPage() {
   // Keep a ref of visibleCount so the scroll handler can read it without being a dep
   const visibleCountRef = useRef(0);
 
-  // Save scroll position (throttled via rAF)
-  useEffect(() => {
-    let ticking = false;
-    const handleScroll = () => {
-      if (!ticking) {
-        ticking = true;
-        requestAnimationFrame(() => {
-          try { sessionStorage.setItem(FEED_SCROLL_KEY, String(window.scrollY)); } catch {}
-          ticking = false;
-        });
-      }
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Restore scroll position before first paint.
-  // initialOffset already told the virtualizer which rows to render,
-  // so the container has the correct totalSize height on first commit.
-  // useLayoutEffect fires after DOM commit but before paint — scrollTo works
-  // without clamping and without a visible scroll animation.
-  useLayoutEffect(() => {
-    if (scrollRestoredRef.current || profiles.length === 0) return;
-    scrollRestoredRef.current = true;
-    const savedY = getSavedScrollY();
-    if (savedY > 0) window.scrollTo(0, savedY);
-  }, [profiles.length]);
-
   // Reload feed ONLY when explicitly marked dirty (preference/settings changes)
   useEffect(() => {
     const onFocus = () => {
@@ -333,7 +289,6 @@ export default function FeedPage() {
       const shouldForceFresh = sessionStorage.getItem('mansion_feed_force_refresh') === '1';
       sessionStorage.removeItem('mansion_feed_force_refresh');
       sessionStorage.removeItem(FEED_CACHE_KEY);
-      try { sessionStorage.removeItem(FEED_SCROLL_KEY); } catch {}
       loadProfiles({ forceFresh: shouldForceFresh });
     };
     window.addEventListener('focus', onFocus);
@@ -539,21 +494,16 @@ export default function FeedPage() {
   }, [safeProfiles, cols]);
 
   const estimateRowHeight = useCallback(() => {
-    if (gridRef.current) {
-      const containerWidth = gridRef.current.offsetWidth;
-      const cardWidth = (containerWidth - gap * (cols - 1)) / cols;
-      const h = Math.round(cardWidth * (4 / 3)) + gap;
-      try { sessionStorage.setItem(FEED_ROW_HEIGHT_KEY, String(h)); } catch {}
-      return h;
-    }
-    return getSavedRowHeight();
+    if (!gridRef.current) return 300;
+    const containerWidth = gridRef.current.offsetWidth;
+    const cardWidth = (containerWidth - gap * (cols - 1)) / cols;
+    return Math.round(cardWidth * (4 / 3)) + gap;
   }, [cols, gap]);
 
-  const [gridScrollMargin, setGridScrollMargin] = useState(getSavedGridOffset);
+  const [gridScrollMargin, setGridScrollMargin] = useState(0);
   useLayoutEffect(() => {
     if (!gridRef.current) return;
     const next = gridRef.current.offsetTop;
-    if (next > 0) try { sessionStorage.setItem(FEED_GRID_OFFSET_KEY, String(next)); } catch {}
     setGridScrollMargin(prev => prev !== next ? next : prev);
   });
 
@@ -562,7 +512,6 @@ export default function FeedPage() {
     estimateSize: estimateRowHeight,
     overscan: 3,
     scrollMargin: gridScrollMargin,
-    initialOffset: getSavedScrollY(),
   });
 
   return (
