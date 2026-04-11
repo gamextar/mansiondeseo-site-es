@@ -581,20 +581,21 @@ export default function VideoFeedPage() {
     return [];
   };
   const initial = applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
+  const requestedStoryUserId = location.state?.storyUserId || null;
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
   const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
-  const [activeDispIdx, setActiveDispIdx] = useState(savedIdx);
+  const [activeDispIdx, setActiveDispIdx] = useState(() => (requestedStoryUserId ? 1 : savedIdx()));
   const [boundaryOverlayIdx, setBoundaryOverlayIdx] = useState(null);
   const [isMuted, setIsMuted] = useState(savedMuted);
   const [isDesktopViewport, setIsDesktopViewport] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(min-width: 1024px)').matches;
   });
-  const initialStoryUserIdRef = useRef(location.state?.storyUserId || null);
+  const initialStoryUserIdRef = useRef(requestedStoryUserId);
 
   const persistStories = useCallback((nextStories) => {
     try {
@@ -667,7 +668,12 @@ export default function VideoFeedPage() {
     if (!targetStoryUserId || stories.length === 0) return;
 
     const targetIndex = stories.findIndex((story) => String(story.user_id) === String(targetStoryUserId));
-    if (targetIndex < 0) return;
+    if (targetIndex < 0) {
+      setActiveDispIdx(1);
+      setBoundaryOverlayIdx(null);
+      initialStoryUserIdRef.current = null;
+      return;
+    }
 
     setActiveDispIdx(targetIndex + 1);
     setBoundaryOverlayIdx(null);
