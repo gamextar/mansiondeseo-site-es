@@ -618,6 +618,25 @@ export default function VideoFeedPage() {
     ? stories[desktopActiveIdx - 1] || stories[0] || null
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
 
+  const syncMobileViewportToIndex = useCallback((index) => {
+    if (isDesktopViewport) return false;
+    const container = containerRef.current;
+    if (!container || stories.length === 0) return false;
+
+    const height = container.clientHeight;
+    if (!height) return false;
+
+    const clampedIndex = Math.min(Math.max(index, 1), stories.length);
+    const nextScrollTop = height * clampedIndex;
+    if (Math.abs(container.scrollTop - nextScrollTop) <= Math.max(4, height * 0.25)) {
+      return true;
+    }
+
+    container.scrollTop = nextScrollTop;
+    setBoundaryOverlayIdx(null);
+    return true;
+  }, [isDesktopViewport, stories.length]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
@@ -679,7 +698,8 @@ export default function VideoFeedPage() {
     setActiveDispIdx(targetIndex + 1);
     setBoundaryOverlayIdx(null);
     initialStoryUserIdRef.current = null;
-  }, [stories]);
+    syncMobileViewportToIndex(targetIndex + 1);
+  }, [stories, loading, syncMobileViewportToIndex]);
 
   useEffect(() => {
     if (!activeStory?.user_id) return;
@@ -749,7 +769,10 @@ export default function VideoFeedPage() {
       if (!height) return false;
 
       const idx = Math.min(Math.max(activeDispIdx, 1), stories.length);
-      container.scrollTop = height * idx;
+      const nextScrollTop = height * idx;
+      if (Math.abs(container.scrollTop - nextScrollTop) > Math.max(4, height * 0.25)) {
+        container.scrollTop = nextScrollTop;
+      }
       setBoundaryOverlayIdx(null);
       return true;
     };
@@ -761,7 +784,7 @@ export default function VideoFeedPage() {
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [isDesktopViewport, stories.length]);
+  }, [activeDispIdx, isDesktopViewport, stories.length]);
 
   useEffect(() => {
     try { sessionStorage.setItem('vf_idx', String(activeDispIdx)); } catch {}
