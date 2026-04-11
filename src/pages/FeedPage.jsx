@@ -1,4 +1,4 @@
-import { forwardRef, useState, useMemo, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
+import { forwardRef, useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Radio, Plus } from 'lucide-react';
@@ -537,11 +537,18 @@ export default function FeedPage() {
     return Math.round(cardWidth * (4 / 3)) + gap;
   }, [cols, gap]);
 
+  const [gridScrollMargin, setGridScrollMargin] = useState(0);
+  useLayoutEffect(() => {
+    if (!gridRef.current) return;
+    const next = gridRef.current.offsetTop;
+    setGridScrollMargin(prev => prev !== next ? next : prev);
+  });
+
   const rowVirtualizer = useWindowVirtualizer({
     count: rows.length,
     estimateSize: estimateRowHeight,
     overscan: 3,
-    scrollMargin: gridRef.current?.offsetTop ?? 0,
+    scrollMargin: gridScrollMargin,
   });
 
   return (
