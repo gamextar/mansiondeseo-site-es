@@ -23,6 +23,7 @@ function timeAgo(dateStr) {
 
 // ── Avatar size fallback; real value comes from siteSettings.videoAvatarSize ─
 const AVATAR_SIZE_DEFAULT = 52;
+const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 
 function applyPendingStoryLikeState(inputStories, pendingLikes = {}) {
   if (!Array.isArray(inputStories) || inputStories.length === 0) return inputStories;
@@ -704,12 +705,12 @@ export default function VideoFeedPage() {
   useEffect(() => {
     if (!activeStory?.user_id) return;
     try {
-      const arr = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
+      const arr = JSON.parse(sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY) || '[]');
       const uid = String(activeStory.user_id);
       if (!arr.includes(uid)) {
         arr.push(uid);
         if (arr.length > 300) arr.splice(0, arr.length - 300);
-        localStorage.setItem('viewed_story_users', JSON.stringify(arr));
+        sessionStorage.setItem(PENDING_VIEWED_STORIES_KEY, JSON.stringify(arr));
       }
     } catch {}
   }, [activeStory?.user_id]);

@@ -23,6 +23,8 @@ const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const MOBILE_MAX_DOM_CARDS = 360;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
+const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
+const VIEWED_STORIES_APPLY_DELAY_MS = 520;
 
 function getGridColumns() {
   if (typeof window === 'undefined') return 2;
@@ -107,7 +109,7 @@ export default function FeedPage() {
     frameId: null,
     velocity: 0,
   });
-  const openStoryTimerRef = useRef(null);
+  const pendingViewedTimerRef = useRef(null);
   const storiesDragRef = useRef({
     active: false,
     startX: 0,
@@ -303,9 +305,9 @@ export default function FeedPage() {
   }, []);
 
   useEffect(() => () => {
-    if (openStoryTimerRef.current) {
-      window.clearTimeout(openStoryTimerRef.current);
-      openStoryTimerRef.current = null;
+    if (pendingViewedTimerRef.current) {
+      window.clearTimeout(pendingViewedTimerRef.current);
+      pendingViewedTimerRef.current = null;
     }
   }, []);
 
@@ -379,31 +381,68 @@ export default function FeedPage() {
     }
     return [...unseen, ...seen];
   }, [storyProfiles, viewedStoryUsers]);
-
-  const markStoryViewed = useCallback((userId) => {
-    if (!userId) return;
+  const applyPendingViewedStories = useCallback(() => {
     try {
-      const arr = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
-      const normalized = String(userId);
-      if (!arr.includes(normalized)) {
-        arr.push(normalized);
-        if (arr.length > 300) arr.splice(0, arr.length - 300);
-        localStorage.setItem('viewed_story_users', JSON.stringify(arr));
+      const rawPending = sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY);
+      if (!rawPending) return false;
+      const pending = JSON.parse(rawPending);
+      const nextPending = Array.isArray(pending) ? pending.map((value) => String(value || '')).filter(Boolean) : [];
+      if (nextPending.length === 0) {
+        sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
+        return false;
       }
-    } catch {}
-    window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
+
+      const current = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
+      const seen = new Set(Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : []);
+      let changed = false;
+      for (const userId of nextPending) {
+        if (seen.has(userId)) continue;
+        seen.add(userId);
+        changed = true;
+      }
+      sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
+      if (!changed) return false;
+
+      const merged = [...seen];
+      if (merged.length > 300) merged.splice(0, merged.length - 300);
+      localStorage.setItem('viewed_story_users', JSON.stringify(merged));
+      window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
+      return true;
+    } catch {
+      return false;
+    }
   }, []);
 
-  const openStoryFromHome = useCallback((storyUserId) => {
-    markStoryViewed(storyUserId);
-    if (openStoryTimerRef.current) {
-      window.clearTimeout(openStoryTimerRef.current);
+  const schedulePendingViewedStories = useCallback(() => {
+    try {
+      if (document.hidden) return;
+      if (!sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY)) return;
+    } catch {
+      return;
     }
-    openStoryTimerRef.current = window.setTimeout(() => {
-      navigate('/videos', { state: { storyUserId } });
-      openStoryTimerRef.current = null;
-    }, 220);
-  }, [markStoryViewed, navigate]);
+    if (pendingViewedTimerRef.current) {
+      window.clearTimeout(pendingViewedTimerRef.current);
+    }
+    pendingViewedTimerRef.current = window.setTimeout(() => {
+      applyPendingViewedStories();
+      pendingViewedTimerRef.current = null;
+    }, VIEWED_STORIES_APPLY_DELAY_MS);
+  }, [applyPendingViewedStories]);
+
+  useEffect(() => {
+    schedulePendingViewedStories();
+    const handleResume = () => schedulePendingViewedStories();
+    window.addEventListener('focus', handleResume);
+    document.addEventListener('visibilitychange', handleResume);
+    return () => {
+      window.removeEventListener('focus', handleResume);
+      document.removeEventListener('visibilitychange', handleResume);
+    };
+  }, [schedulePendingViewedStories]);
+
+  const openStoryFromHome = useCallback((storyUserId) => {
+    navigate('/videos', { state: { storyUserId } });
+  }, [navigate]);
 
   useEffect(() => {
     if (!user?.id) return undefined;
@@ -833,7 +872,14 @@ export default function FeedPage() {
                 </button>
               </div>
             ) : (
-              <motion.div layout key={`story-${p.id}`} variants={storyItem} className="flex-shrink-0" style={{ width: size + 6 }}>
+              <motion.div
+                layout
+                key={`story-${p.id}`}
+                variants={storyItem}
+                transition={{ layout: { duration: 0.55, ease: [0.22, 1, 0.36, 1] } }}
+                className="flex-shrink-0"
+                style={{ width: size + 6 }}
+              >
                 <button
                   type="button"
                   draggable={false}
