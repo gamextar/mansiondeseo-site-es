@@ -275,7 +275,10 @@ export default function FeedPage() {
       // Fade out → instant jump → fade in
       setGridOpacity(0);
       fadeOutTimer = setTimeout(() => {
+        // Force instant jump — overrides any CSS scroll-behavior:smooth
+        document.documentElement.style.scrollBehavior = 'auto';
         window.scrollTo(0, 0);
+        document.documentElement.style.scrollBehavior = '';
         fadeInTimer = setTimeout(() => setGridOpacity(1), 16);
       }, 180);
     };
