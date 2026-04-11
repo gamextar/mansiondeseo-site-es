@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { peekOwnProfileDashboard } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import AvatarImg from './AvatarImg';
+import { warmVideoFeed } from '../lib/videoFeedWarmup';
 
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 
@@ -93,9 +94,18 @@ export default function DesktopSidebar() {
             <NavLink
               key={to}
               to={to}
+              onMouseEnter={() => {
+                if (to === '/videos') warmVideoFeed();
+              }}
+              onFocus={() => {
+                if (to === '/videos') warmVideoFeed();
+              }}
               onClick={() => {
                 if (to === '/' && location.pathname === '/') {
                   window.dispatchEvent(new CustomEvent(HOME_FEED_FOCUS_EVENT));
+                }
+                if (to === '/videos') {
+                  warmVideoFeed();
                 }
               }}
               className="relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all group"

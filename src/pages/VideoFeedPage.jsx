@@ -521,13 +521,22 @@ export default function VideoFeedPage() {
   const [giftCatalog, setGiftCatalog] = useState([]);
   const [giftSent, setGiftSent] = useState(null);
   const [sendingGift, setSendingGift] = useState(null);
-  const [entryRevealReady, setEntryRevealReady] = useState(false);
+  const [entryRevealReady, setEntryRevealReady] = useState(() => {
+    try {
+      return sessionStorage.getItem('vf_prefetched') === '1';
+    } catch {
+      return false;
+    }
+  });
   const entryRevealDoneRef = useRef(false);
 
   const handleEntryRevealReady = useCallback(() => {
     if (entryRevealDoneRef.current) return;
     entryRevealDoneRef.current = true;
     setEntryRevealReady(true);
+    try {
+      sessionStorage.removeItem('vf_prefetched');
+    } catch {}
   }, []);
 
   const openGiftModal = useCallback((story) => {
@@ -967,9 +976,9 @@ export default function VideoFeedPage() {
     <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
       <motion.div
         className="absolute inset-0 pointer-events-none z-20 bg-black"
-        initial={{ opacity: 1 }}
+        initial={{ opacity: entryRevealReady ? 0 : 0.7 }}
         animate={{ opacity: entryRevealReady ? 0 : 1 }}
-        transition={{ duration: 1.3, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: entryRevealReady ? 0.01 : 0.45, ease: [0.22, 1, 0.36, 1] }}
       />
 
       <div className="relative h-full">

@@ -33,9 +33,10 @@ import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
 import { AuthContext, useAuth } from './lib/authContext';
+import { preloadVideoFeedChunk, preloadVideoFeedData } from './lib/videoFeedWarmup';
 
 const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
-const VideoFeedPage = lazy(() => import('./pages/VideoFeedPage'));
+const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const TopVisitedPage = lazy(() => import('./pages/TopVisitedPage'));
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
@@ -54,6 +55,7 @@ function SEOCityLanding({ variant }) {
 
 function AppLayout() {
   const location = useLocation();
+  const { user } = useAuth();
   const backgroundLocation = location.state?.backgroundLocation;
   const profileOverlayOpen = location.state?.modal === 'profile' && !!backgroundLocation;
   const isFullscreen =
@@ -67,6 +69,24 @@ function AppLayout() {
     ensureApiDebug();
     markApiDebugRoute(location.pathname + location.search);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    if (typeof window === 'undefined') return undefined;
+
+    const warm = () => {
+      preloadVideoFeedChunk();
+      preloadVideoFeedData();
+    };
+
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(() => warm(), { timeout: 1500 });
+      return () => window.cancelIdleCallback?.(id);
+    }
+
+    const timer = window.setTimeout(warm, 700);
+    return () => window.clearTimeout(timer);
+  }, [user]);
 
   // Reset scroll to top on every route change, EXCEPT when opening/closing
   // a profile overlay (which manages scroll lock/restore itself).

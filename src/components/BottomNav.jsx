@@ -3,6 +3,7 @@ import { Home, Film, MessageCircle, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../lib/authContext';
+import { warmVideoFeed } from '../lib/videoFeedWarmup';
 
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 
@@ -63,9 +64,18 @@ export default function BottomNav() {
               <NavLink
                 key={to}
                 to={to}
+                onMouseEnter={() => {
+                  if (to === '/videos') warmVideoFeed();
+                }}
+                onFocus={() => {
+                  if (to === '/videos') warmVideoFeed();
+                }}
                 onClick={(e) => {
                   if (to === '/' && location.pathname === '/') {
                     window.dispatchEvent(new CustomEvent(HOME_FEED_FOCUS_EVENT));
+                  }
+                  if (to === '/videos') {
+                    warmVideoFeed();
                   }
                   if (to === '/perfil' && location.pathname !== '/perfil') {
                     e.preventDefault();
