@@ -969,7 +969,7 @@ export default function VideoFeedPage() {
         className="absolute inset-0 pointer-events-none z-20 bg-black"
         initial={{ opacity: 1 }}
         animate={{ opacity: entryRevealReady ? 0 : 1 }}
-        transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 1.3, ease: [0.22, 1, 0.36, 1] }}
       />
 
       <motion.div
@@ -978,16 +978,14 @@ export default function VideoFeedPage() {
         animate={entryRevealReady
           ? {
               opacity: 1,
-              y: 0,
               filter: 'brightness(1) saturate(1)',
             }
           : {
               opacity: 0.94,
-              y: 20,
               filter: 'brightness(0.68) saturate(0.88)',
             }}
-        transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-        style={{ transformOrigin: 'center center', willChange: 'transform, opacity, filter' }}
+        transition={{ duration: 1.3, ease: [0.22, 1, 0.36, 1] }}
+        style={{ willChange: 'opacity, filter' }}
       >
         {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
