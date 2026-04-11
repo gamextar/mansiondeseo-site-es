@@ -111,6 +111,7 @@ export default function FeedPage() {
   const pendingViewedTimerRef = useRef(null);
   const storyNodeRefs = useRef(new Map());
   const storyRectsRef = useRef(new Map());
+  const previousOrderedStoryIdsRef = useRef('');
   const storiesDragRef = useRef({
     active: false,
     startX: 0,
@@ -392,6 +393,26 @@ export default function FeedPage() {
     }
     return [...unseen, ...seen];
   }, [storyProfiles, viewedStoryUsers]);
+
+  useLayoutEffect(() => {
+    const orderedIds = orderedStoryProfiles.map((profile) => String(profile?.id || '')).filter(Boolean).join(',');
+    const previousOrderedIds = previousOrderedStoryIdsRef.current;
+    previousOrderedStoryIdsRef.current = orderedIds;
+    if (!orderedIds || !storiesScrollRef.current || orderedIds === previousOrderedIds) return;
+
+    const container = storiesScrollRef.current;
+    const firstUnseen = orderedStoryProfiles.find((profile) => !viewedStoryUsers.has(String(profile?.id || ''))) || orderedStoryProfiles[0];
+    const targetNode = storyNodeRefs.current.get(String(firstUnseen?.id || ''));
+    if (!targetNode) return;
+
+    const targetLeft = Math.max(0, targetNode.offsetLeft - 8);
+    if (Math.abs(container.scrollLeft - targetLeft) < 12) return;
+
+    container.scrollTo({
+      left: targetLeft,
+      behavior: previousOrderedIds ? 'smooth' : 'auto',
+    });
+  }, [orderedStoryProfiles, viewedStoryUsers]);
 
   useLayoutEffect(() => {
     const nextRects = new Map();

@@ -24,6 +24,7 @@ function timeAgo(dateStr) {
 // ── Avatar size fallback; real value comes from siteSettings.videoAvatarSize ─
 const AVATAR_SIZE_DEFAULT = 52;
 const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
+const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 
 function applyPendingStoryLikeState(inputStories, pendingLikes = {}) {
   if (!Array.isArray(inputStories) || inputStories.length === 0) return inputStories;
@@ -613,6 +614,24 @@ export default function VideoFeedPage() {
   const closeOverlay = useCallback(() => {
     navigate(-1);
   }, [navigate]);
+  const markStoryViewed = useCallback((storyUserId) => {
+    const uid = String(storyUserId || '');
+    if (!uid) return;
+    try {
+      const current = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
+      const seen = new Set(Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : []);
+      if (seen.has(uid)) {
+        sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
+        return;
+      }
+      seen.add(uid);
+      const merged = [...seen];
+      if (merged.length > 300) merged.splice(0, merged.length - 300);
+      localStorage.setItem('viewed_story_users', JSON.stringify(merged));
+      sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
+      window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
+    } catch {}
+  }, []);
 
   const infiniteStories = stories.length > 0
     ? [stories[stories.length - 1], ...stories, stories[0]]
@@ -708,16 +727,8 @@ export default function VideoFeedPage() {
 
   useEffect(() => {
     if (!activeStory?.user_id) return;
-    try {
-      const arr = JSON.parse(sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY) || '[]');
-      const uid = String(activeStory.user_id);
-      if (!arr.includes(uid)) {
-        arr.push(uid);
-        if (arr.length > 300) arr.splice(0, arr.length - 300);
-        sessionStorage.setItem(PENDING_VIEWED_STORIES_KEY, JSON.stringify(arr));
-      }
-    } catch {}
-  }, [activeStory?.user_id]);
+    markStoryViewed(activeStory.user_id);
+  }, [activeStory?.user_id, markStoryViewed]);
 
   useEffect(() => {
     return subscribe((event) => {
@@ -1013,11 +1024,11 @@ export default function VideoFeedPage() {
         <button
           type="button"
           onClick={closeOverlay}
-          className="fixed z-[70] flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+          className="fixed z-[70] flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
           style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
           aria-label="Cerrar"
         >
-          <X className="h-7 w-7 text-white" />
+          <X className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
         </button>
       )}
       <motion.div
