@@ -1,5 +1,5 @@
 import { forwardRef, useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef, useSyncExternalStore } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Radio, Plus } from 'lucide-react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
@@ -12,7 +12,6 @@ const storyItem = {
 };
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
-import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
 import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
@@ -94,9 +93,9 @@ export default function FeedPage() {
   );
   const [loading, setLoading] = useState(!cached);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [showOwnStoryPreview, setShowOwnStoryPreview] = useState(false);
   const [liveStoryProfiles, setLiveStoryProfiles] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, siteSettings } = useAuth();
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const loadMoreRef = useRef(null);
@@ -286,7 +285,6 @@ export default function FeedPage() {
     let fadeOutTimer = null;
     let fadeInTimer = null;
     const handleHomeFocus = () => {
-      setShowOwnStoryPreview(false);
       if (window.scrollY <= 0) return;
       // Fade out → instant jump → fade in
       setGridOpacity(0);
@@ -524,8 +522,16 @@ export default function FeedPage() {
   }, [schedulePendingViewedStories]);
 
   const openStoryFromHome = useCallback((storyUserId) => {
-    navigate('/videos', { state: { storyUserId } });
-  }, [navigate]);
+    const backgroundScrollY = Number(window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
+    navigate('/videos', {
+      state: {
+        storyUserId,
+        modal: 'videos',
+        backgroundLocation: location,
+        backgroundScrollY,
+      },
+    });
+  }, [location, navigate]);
 
   useEffect(() => {
     if (!user?.id) return undefined;
@@ -835,7 +841,7 @@ export default function FeedPage() {
                     type="button"
                     draggable={false}
                     onClick={user.has_active_story && user.active_story_url
-                      ? () => setShowOwnStoryPreview(true)
+                      ? () => openStoryFromHome(user.id)
                       : () => navigate('/historia/nueva', { state: { from: '/' } })}
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
@@ -879,7 +885,7 @@ export default function FeedPage() {
                     type="button"
                     draggable={false}
                     onClick={user.has_active_story && user.active_story_url
-                      ? () => setShowOwnStoryPreview(true)
+                      ? () => openStoryFromHome(user.id)
                       : () => navigate('/historia/nueva', { state: { from: '/' } })}
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
@@ -1092,18 +1098,6 @@ export default function FeedPage() {
         )}
       </AnimatedBlock>
 
-      {showOwnStoryPreview && user?.active_story_url && (
-        <div className="fixed inset-0 z-50 bg-black lg:left-64 xl:left-72 lg:bg-mansion-base">
-          <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
-            <StoryPreviewOverlay
-              videoUrl={user.active_story_url}
-              user={user}
-              navBottomOffset={navBottomOffset}
-              onDismiss={() => setShowOwnStoryPreview(false)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

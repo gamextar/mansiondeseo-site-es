@@ -58,6 +58,8 @@ function AppLayout() {
   const { user } = useAuth();
   const backgroundLocation = location.state?.backgroundLocation;
   const profileOverlayOpen = location.state?.modal === 'profile' && !!backgroundLocation;
+  const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
+  const routeOverlayOpen = profileOverlayOpen || videoOverlayOpen;
   const isFullscreen =
     FULLSCREEN_PATHS.some((p) => location.pathname.startsWith(p)) ||
     FULLSCREEN_PATHS.includes(location.pathname);
@@ -94,14 +96,14 @@ function AppLayout() {
   useLayoutEffect(() => {
     const prev = prevPathnameRef.current;
     prevPathnameRef.current = location.pathname;
-    if (profileOverlayOpen) return; // overlay handles its own scroll
+    if (routeOverlayOpen) return; // overlay handles its own scroll
     if (location.state?.backgroundLocation) return; // closing overlay — App handles it
     if (prev === location.pathname) return; // same route, no reset
     window.scrollTo(0, 0);
-  }, [location.pathname, location.state, profileOverlayOpen]);
+  }, [location.pathname, location.state, routeOverlayOpen]);
 
   useEffect(() => {
-    if (!profileOverlayOpen || typeof window === 'undefined') return undefined;
+    if (!routeOverlayOpen || typeof window === 'undefined') return undefined;
 
     const scrollY = Number(location.state?.backgroundScrollY ?? window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
     const { style: bodyStyle } = document.body;
@@ -139,7 +141,7 @@ function AppLayout() {
         window.scrollTo(0, sy);
       }
     };
-  }, [location.state?.backgroundScrollY, profileOverlayOpen]);
+  }, [location.state?.backgroundScrollY, routeOverlayOpen]);
 
   const handleOverlayExitComplete = useCallback(() => {
     if (!scrollLockRef.current) return;
@@ -330,6 +332,35 @@ function AppLayout() {
               >
                 <Routes>
                   <Route path="/perfiles/:id" element={<ProfileDetailPage />} />
+                </Routes>
+              </motion.div>
+            </motion.div>
+          )}
+          {videoOverlayOpen && (
+            <motion.div
+              key={location.key || location.pathname}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed inset-0 z-[130]"
+            >
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-0 bg-black/72 backdrop-blur-[4px]"
+              />
+              <motion.div
+                initial={{ opacity: 0.85, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0.84, scale: 0.985 }}
+                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute inset-0 overflow-hidden"
+              >
+                <Routes>
+                  <Route path="/videos" element={<VideoFeedPage />} />
                 </Routes>
               </motion.div>
             </motion.div>
