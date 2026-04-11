@@ -2,12 +2,11 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X } from 'lucide-react';
-import { getStories, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { getStories, getPendingStoryLikes, enqueueStoryLike, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
 import { resolveMediaUrl } from '../lib/media';
-import { isSafariDesktopBrowser } from '../lib/browser';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -99,11 +98,10 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
-  const revealSentRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
 
@@ -114,16 +112,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     loadedSrcRef.current = videoSrc;
   }
   const activeSrc = loadedSrcRef.current ? resolveMediaUrl(loadedSrcRef.current) : loadedSrcRef.current;
-
-  useEffect(() => {
-    revealSentRef.current = false;
-  }, [activeSrc]);
-
-  const notifyRevealReady = useCallback(() => {
-    if (!isActive || !onRevealReady || revealSentRef.current) return;
-    revealSentRef.current = true;
-    onRevealReady();
-  }, [isActive, onRevealReady]);
 
   const attemptPlay = useCallback(() => {
     const video = videoRef.current;
@@ -168,7 +156,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     if (!video) return;
 
     const handleReady = () => {
-      notifyRevealReady();
       attemptPlay();
     };
 
@@ -176,7 +163,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     video.addEventListener('canplay', handleReady);
 
     if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      notifyRevealReady();
       attemptPlay();
     }
 
@@ -184,7 +170,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       video.removeEventListener('loadeddata', handleReady);
       video.removeEventListener('canplay', handleReady);
     };
-  }, [activeSrc, attemptPlay, isActive, notifyRevealReady]);
+  }, [activeSrc, attemptPlay, isActive]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -260,7 +246,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="flex flex-col items-start gap-2.5">
             <div className="rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize + 12, height: avatarSize + 12 }}>
               {story.avatar_url ? (
-                <AvatarImg src={story.avatar_url} crop={story.avatar_crop} cover alt={story.username} className="w-full h-full" />
+                <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-white/60 text-xl font-bold">{(story.username || '?')[0]}</div>
               )}
@@ -451,7 +437,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
         <MobileOverlayButton onPress={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1">
           <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
             {story.avatar_url ? (
-              <AvatarImg src={story.avatar_url} crop={story.avatar_crop} cover alt={story.username} className="w-full h-full" />
+              <AvatarImg src={story.avatar_url} crop={story.avatar_crop} alt={story.username} className="w-full h-full" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
             )}
@@ -464,7 +450,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
         <p className="pointer-events-none text-white/40 text-[11px] mt-1.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{timeAgo(story.created_at)}</p>
       </div>
 
-      <button onClick={onToggleMute} className={`hidden lg:flex fixed top-4 right-4 z-50 rounded-full items-center justify-center transition-all duration-200 ${safariDesktop ? 'bg-black/60' : 'bg-black/40 backdrop-blur-sm hover:bg-black/60 hover:scale-110'}`} style={{ width: 52, height: 52 }}>
+      <button onClick={onToggleMute} className="hidden lg:flex fixed top-4 right-4 z-50 rounded-full bg-black/40 backdrop-blur-sm items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-200" style={{ width: 52, height: 52 }}>
         {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
       </button>
     </>
@@ -509,7 +495,6 @@ function DesktopActionButtons({ story, onLike, navigate, onGift, isOwnStory = fa
 }
 
 export default function VideoFeedPage() {
-  const safariDesktop = isSafariDesktopBrowser();
   const location = useLocation();
   const navigate = useNavigate();
   const { siteSettings, user, setUser } = useAuth();
@@ -521,14 +506,6 @@ export default function VideoFeedPage() {
   const [giftCatalog, setGiftCatalog] = useState([]);
   const [giftSent, setGiftSent] = useState(null);
   const [sendingGift, setSendingGift] = useState(null);
-  const [entryRevealReady, setEntryRevealReady] = useState(false);
-  const entryRevealDoneRef = useRef(false);
-
-  const handleEntryRevealReady = useCallback(() => {
-    if (entryRevealDoneRef.current) return;
-    entryRevealDoneRef.current = true;
-    setEntryRevealReady(true);
-  }, []);
 
   const openGiftModal = useCallback((story) => {
     setGiftTargetStory(story);
@@ -648,7 +625,6 @@ export default function VideoFeedPage() {
 
     return () => {
       cancelled = true;
-      flushPendingStoryLikes({ keepalive: true }).catch(() => {});
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshStories]);
@@ -965,15 +941,7 @@ export default function VideoFeedPage() {
 
   return (
     <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
-      <motion.div
-        className="absolute inset-0 pointer-events-none z-20 bg-black"
-        initial={{ opacity: 1 }}
-        animate={{ opacity: entryRevealReady ? 0 : 1 }}
-        transition={{ duration: 1.3, ease: [0.22, 1, 0.36, 1] }}
-      />
-
-      <div className="relative h-full">
-        {isDesktopViewport ? (
+      {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">
             {stories.map((story, index) => {
@@ -1011,14 +979,13 @@ export default function VideoFeedPage() {
                     resetOnDeactivate={false}
                     onGift={openGiftModal}
                     isOwnStory={String(story.user_id) === String(user?.id)}
-                    onRevealReady={isActive ? handleEntryRevealReady : undefined}
                   />
                 </div>
               );
             })}
           </div>
         </div>
-        ) : (
+      ) : (
         <div
           ref={containerRef}
           onScroll={handleScroll}
@@ -1050,15 +1017,14 @@ export default function VideoFeedPage() {
                   resetOnDeactivate
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
-                  onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
                 />
               </div>
             );
           })}
         </div>
-        )}
+      )}
 
-        {activeStory && (
+      {activeStory && (
         <div
           className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
           style={{ bottom: `${navBottomOffset + 16}px` }}
@@ -1074,9 +1040,9 @@ export default function VideoFeedPage() {
             isOwnStory={String(activeStory.user_id) === String(user?.id)}
           />
         </div>
-        )}
+      )}
 
-        {activeStory && (
+      {activeStory && (
         <div
           className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
           style={{ bottom: `${navBottomOffset + 8}px` }}
@@ -1090,7 +1056,7 @@ export default function VideoFeedPage() {
             >
               <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
                 {activeStory.avatar_url ? (
-                  <AvatarImg src={activeStory.avatar_url} crop={activeStory.avatar_crop} cover alt={activeStory.username} className="w-full h-full" />
+                  <AvatarImg src={activeStory.avatar_url} crop={activeStory.avatar_crop} alt={activeStory.username} className="w-full h-full" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(activeStory.username || '?')[0]}</div>
                 )}
@@ -1108,30 +1074,30 @@ export default function VideoFeedPage() {
             )}
           </div>
         </div>
-        )}
+      )}
 
-        {stories.length > 1 && (
+      {stories.length > 1 && (
         <>
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(-1) : jumpByOne(-1))}
-            className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-200 ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
+            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
             style={{ left: 'calc(50% - 350px)' }}
           >
             <ChevronLeft className="w-9 h-9 text-white/70" />
           </button>
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(1) : jumpByOne(1))}
-            className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-200 ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
+            className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full bg-mansion-card/60 backdrop-blur-sm items-center justify-center border border-white/10 hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110 transition-all duration-200"
             style={{ right: 'calc(50% - 350px)' }}
           >
             <ChevronRight className="w-9 h-9 text-white/70" />
           </button>
         </>
-        )}
+      )}
 
-        {/* Gift Modal */}
-        <AnimatePresence>
-          {giftModalOpen && (
+      {/* Gift Modal */}
+      <AnimatePresence>
+        {giftModalOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1205,9 +1171,8 @@ export default function VideoFeedPage() {
               )}
             </motion.div>
           </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
