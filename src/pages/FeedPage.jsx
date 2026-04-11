@@ -305,17 +305,22 @@ export default function FeedPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Align the browser viewport to the saved scroll position.
-  // The virtualizer already rendered the correct rows via initialOffset,
-  // so this scrollTo causes no re-render — it only moves the viewport.
+  // Restore scroll position after the virtual grid has its full height in the DOM.
+  // history.scrollRestoration = 'manual' (set in main.jsx) prevents iOS Safari
+  // from overriding our scrollTo with its own history-based position.
+  // Double rAF: frame 1 = virtualizer commits totalSize height, frame 2 = browser reflow.
   useEffect(() => {
     if (scrollRestoredRef.current || profiles.length === 0) return;
     scrollRestoredRef.current = true;
     const savedY = getSavedScrollY();
     if (!(savedY > 0)) return;
-    // Single rAF is enough: virtualizer already has the correct items,
-    // we just need the DOM height committed before scrollTo.
-    requestAnimationFrame(() => { window.scrollTo(0, savedY); });
+    let id1, id2;
+    id1 = requestAnimationFrame(() => {
+      id2 = requestAnimationFrame(() => {
+        window.scrollTo(0, savedY);
+      });
+    });
+    return () => { cancelAnimationFrame(id1); cancelAnimationFrame(id2); };
   }, [profiles.length]);
 
   // Reload feed ONLY when explicitly marked dirty (preference/settings changes)
@@ -550,7 +555,6 @@ export default function FeedPage() {
     estimateSize: estimateRowHeight,
     overscan: 3,
     scrollMargin: gridScrollMargin,
-    initialOffset: getSavedScrollY(),
   });
 
   return (
