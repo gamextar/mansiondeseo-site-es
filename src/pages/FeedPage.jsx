@@ -110,6 +110,8 @@ export default function FeedPage() {
     velocity: 0,
   });
   const pendingViewedTimerRef = useRef(null);
+  const storyNodeRefs = useRef(new Map());
+  const storyRectsRef = useRef(new Map());
   const storiesDragRef = useRef({
     active: false,
     startX: 0,
@@ -311,6 +313,17 @@ export default function FeedPage() {
     }
   }, []);
 
+  const setStoryNodeRef = useCallback((storyId, node) => {
+    const key = String(storyId || '');
+    if (!key) return;
+    if (node) {
+      storyNodeRefs.current.set(key, node);
+    } else {
+      storyNodeRefs.current.delete(key);
+      storyRectsRef.current.delete(key);
+    }
+  }, []);
+
   // Keep a ref of visibleCount so the scroll handler can read it without being a dep
   const visibleCountRef = useRef(0);
 
@@ -381,6 +394,44 @@ export default function FeedPage() {
     }
     return [...unseen, ...seen];
   }, [storyProfiles, viewedStoryUsers]);
+
+  useLayoutEffect(() => {
+    const nextRects = new Map();
+
+    for (const profile of orderedStoryProfiles) {
+      const key = String(profile?.id || '');
+      const node = storyNodeRefs.current.get(key);
+      if (!key || !node) continue;
+
+      const rect = node.getBoundingClientRect();
+      nextRects.set(key, rect);
+
+      const previousRect = storyRectsRef.current.get(key);
+      if (!previousRect) continue;
+
+      const deltaX = previousRect.left - rect.left;
+      const deltaY = previousRect.top - rect.top;
+      if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue;
+
+      node.style.transition = 'none';
+      node.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1)`;
+      node.style.willChange = 'transform';
+
+      requestAnimationFrame(() => {
+        node.style.transition = 'transform 560ms cubic-bezier(0.22, 1, 0.36, 1)';
+        node.style.transform = 'translate(0px, 0px) scale(1)';
+        const cleanup = () => {
+          node.style.transition = '';
+          node.style.transform = '';
+          node.style.willChange = '';
+          node.removeEventListener('transitionend', cleanup);
+        };
+        node.addEventListener('transitionend', cleanup);
+      });
+    }
+
+    storyRectsRef.current = nextRects;
+  }, [orderedStoryProfiles]);
   const applyPendingViewedStories = useCallback(() => {
     try {
       const rawPending = sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY);
@@ -843,7 +894,12 @@ export default function FeedPage() {
             const border = storyCircleBorder;
             const innerGap = storyCircleInnerGap;
             return safariDesktop ? (
-              <div key={`story-${p.id}`} className="flex-shrink-0 transition-transform duration-300" style={{ width: size + 6 }}>
+              <div
+                key={`story-${p.id}`}
+                ref={(node) => setStoryNodeRef(p.id, node)}
+                className="flex-shrink-0"
+                style={{ width: size + 6 }}
+              >
                 <button
                   type="button"
                   draggable={false}
@@ -873,10 +929,9 @@ export default function FeedPage() {
               </div>
             ) : (
               <motion.div
-                layout
                 key={`story-${p.id}`}
+                ref={(node) => setStoryNodeRef(p.id, node)}
                 variants={storyItem}
-                transition={{ layout: { duration: 0.55, ease: [0.22, 1, 0.36, 1] } }}
                 className="flex-shrink-0"
                 style={{ width: size + 6 }}
               >
