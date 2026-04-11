@@ -101,7 +101,7 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, showClose = false, onClose }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
@@ -217,6 +217,18 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   return (
     <div className="relative w-full h-full bg-black flex items-center justify-center snap-start snap-always">
       <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
+        {showClose && onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute z-30 flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+            style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
+            aria-label="Cerrar"
+          >
+            <X className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+          </button>
+        )}
+
         {/* eslint-disable-next-line */}
         <video
           ref={videoRef}
@@ -611,9 +623,35 @@ export default function VideoFeedPage() {
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
+  const flushPendingViewedStories = useCallback(() => {
+    try {
+      const rawPending = sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY);
+      if (!rawPending) return;
+      const pending = JSON.parse(rawPending);
+      const nextPending = Array.isArray(pending) ? pending.map((value) => String(value || '')).filter(Boolean) : [];
+      sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
+      if (nextPending.length === 0) return;
+
+      const current = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
+      const seen = new Set(Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : []);
+      let changed = false;
+      for (const userId of nextPending) {
+        if (seen.has(userId)) continue;
+        seen.add(userId);
+        changed = true;
+      }
+      if (!changed) return;
+
+      const merged = [...seen];
+      if (merged.length > 300) merged.splice(0, merged.length - 300);
+      localStorage.setItem('viewed_story_users', JSON.stringify(merged));
+      window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
+    } catch {}
+  }, []);
   const closeOverlay = useCallback(() => {
+    flushPendingViewedStories();
     navigate(-1);
-  }, [navigate]);
+  }, [flushPendingViewedStories, navigate]);
   const markStoryViewed = useCallback((storyUserId) => {
     const uid = String(storyUserId || '');
     if (!uid) return;
@@ -630,6 +668,18 @@ export default function VideoFeedPage() {
       localStorage.setItem('viewed_story_users', JSON.stringify(merged));
       sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
       window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
+    } catch {}
+  }, []);
+  const queueStoryViewed = useCallback((storyUserId) => {
+    const uid = String(storyUserId || '');
+    if (!uid) return;
+    try {
+      const current = JSON.parse(sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY) || '[]');
+      const next = Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : [];
+      if (next.includes(uid)) return;
+      next.push(uid);
+      if (next.length > 300) next.splice(0, next.length - 300);
+      sessionStorage.setItem(PENDING_VIEWED_STORIES_KEY, JSON.stringify(next));
     } catch {}
   }, []);
 
@@ -727,8 +777,19 @@ export default function VideoFeedPage() {
 
   useEffect(() => {
     if (!activeStory?.user_id) return;
+    if (isOverlayPreview) {
+      queueStoryViewed(activeStory.user_id);
+      return;
+    }
     markStoryViewed(activeStory.user_id);
-  }, [activeStory?.user_id, markStoryViewed]);
+  }, [activeStory?.user_id, isOverlayPreview, markStoryViewed, queueStoryViewed]);
+
+  useEffect(() => {
+    if (!isOverlayPreview) return undefined;
+    return () => {
+      flushPendingViewedStories();
+    };
+  }, [flushPendingViewedStories, isOverlayPreview]);
 
   useEffect(() => {
     return subscribe((event) => {
@@ -1020,17 +1081,6 @@ export default function VideoFeedPage() {
 
   return (
     <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
-      {isOverlayPreview && (
-        <button
-          type="button"
-          onClick={closeOverlay}
-          className="fixed z-[70] flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
-          style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
-          aria-label="Cerrar"
-        >
-          <X className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
-        </button>
-      )}
       <motion.div
         className="absolute inset-0 pointer-events-none z-20 bg-black"
         initial={{ opacity: entryRevealReady ? 0 : 0.7 }}
@@ -1075,12 +1125,14 @@ export default function VideoFeedPage() {
                     gradientHeight={gradientHeight}
                     gradientOpacity={gradientOpacity}
                     resetOnDeactivate={false}
-                    onGift={openGiftModal}
-                    isOwnStory={String(story.user_id) === String(user?.id)}
-                    onRevealReady={isActive ? handleEntryRevealReady : undefined}
-                  />
-                </div>
-              );
+                  onGift={openGiftModal}
+                  isOwnStory={String(story.user_id) === String(user?.id)}
+                  onRevealReady={isActive ? handleEntryRevealReady : undefined}
+                  showClose={isOverlayPreview && isActive}
+                  onClose={isOverlayPreview ? closeOverlay : undefined}
+                />
+              </div>
+            );
             })}
           </div>
         </div>
@@ -1117,6 +1169,8 @@ export default function VideoFeedPage() {
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
+                  showClose={isOverlayPreview && displayIndex === activeDispIdx}
+                  onClose={isOverlayPreview ? closeOverlay : undefined}
                 />
               </div>
             );
