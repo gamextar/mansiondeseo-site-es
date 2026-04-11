@@ -118,22 +118,44 @@ async function publishLivefeedSnapshot(env) {
   if (!env?.IMAGES) return null;
 
   const { results } = await env.DB.prepare(`
-    SELECT
-      s.id,
-      s.user_id,
-      s.created_at,
-      u.username,
-      u.avatar_url,
-      u.avatar_crop,
-      u.role
-    FROM stories s
-    JOIN users u ON u.id = s.user_id
-    WHERE s.active = 1
-      AND u.status = 'verified'
-      AND COALESCE(u.account_status, 'active') = 'active'
-    ORDER BY s.created_at DESC
-    LIMIT 400
-  `).all();
+    WITH ranked AS (
+      SELECT
+        s.id,
+        s.user_id,
+        s.created_at,
+        u.username,
+        u.avatar_url,
+        u.avatar_crop,
+        u.role,
+        CASE
+          WHEN u.role = 'mujer' THEN 'mujer'
+          WHEN u.role = 'hombre' THEN 'hombre'
+          WHEN u.role IN ('pareja', 'pareja_hombres', 'pareja_mujeres') THEN 'pareja'
+          WHEN u.role = 'trans' THEN 'trans'
+          ELSE ''
+        END AS livefeed_bucket,
+        ROW_NUMBER() OVER (
+          PARTITION BY CASE
+            WHEN u.role = 'mujer' THEN 'mujer'
+            WHEN u.role = 'hombre' THEN 'hombre'
+            WHEN u.role IN ('pareja', 'pareja_hombres', 'pareja_mujeres') THEN 'pareja'
+            WHEN u.role = 'trans' THEN 'trans'
+            ELSE ''
+          END
+          ORDER BY s.created_at DESC
+        ) AS rn
+      FROM stories s
+      JOIN users u ON u.id = s.user_id
+      WHERE s.active = 1
+        AND u.status = 'verified'
+        AND COALESCE(u.account_status, 'active') = 'active'
+    )
+    SELECT id, user_id, created_at, username, avatar_url, avatar_crop, role
+    FROM ranked
+    WHERE livefeed_bucket != ''
+      AND rn <= ?
+    ORDER BY created_at DESC
+  `).bind(LIVEFEED_BUCKET_LIMIT).all();
 
   const buckets = {
     mujer: [],

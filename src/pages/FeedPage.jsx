@@ -365,7 +365,7 @@ export default function FeedPage() {
         { excludeUserId: user.id }
       );
       if (!cancelled) {
-        setLiveStoryProfiles(next);
+        setLiveStoryProfiles(next.length > 0 ? next : null);
       }
     };
 
