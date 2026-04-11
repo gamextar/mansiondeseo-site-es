@@ -305,14 +305,14 @@ export default function FeedPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Restore scroll position once after profiles render from cache
-  useEffect(() => {
+  // Restore scroll position synchronously before first paint
+  useLayoutEffect(() => {
     if (scrollRestoredRef.current || profiles.length === 0) return;
     scrollRestoredRef.current = true;
     try {
       const savedY = parseInt(sessionStorage.getItem(FEED_SCROLL_KEY), 10);
       if (savedY > 0) {
-        requestAnimationFrame(() => { window.scrollTo(0, savedY); });
+        window.scrollTo(0, savedY);
       }
     } catch {}
   }, [profiles.length]);
