@@ -22,6 +22,7 @@ import { fetchLivefeedCurrent, fetchLivefeedPayload, selectLivefeedStories, getC
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const MOBILE_MAX_DOM_CARDS = 360;
+const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 
 function getGridColumns() {
   if (typeof window === 'undefined') return 2;
@@ -106,6 +107,7 @@ export default function FeedPage() {
     frameId: null,
     velocity: 0,
   });
+  const openStoryTimerRef = useRef(null);
   const storiesDragRef = useRef({
     active: false,
     startX: 0,
@@ -300,6 +302,13 @@ export default function FeedPage() {
     };
   }, []);
 
+  useEffect(() => () => {
+    if (openStoryTimerRef.current) {
+      window.clearTimeout(openStoryTimerRef.current);
+      openStoryTimerRef.current = null;
+    }
+  }, []);
+
   // Keep a ref of visibleCount so the scroll handler can read it without being a dep
   const visibleCountRef = useRef(0);
 
@@ -344,7 +353,13 @@ export default function FeedPage() {
       window.addEventListener('storage', handler);
       window.addEventListener('focus', handler);
       window.addEventListener('visibilitychange', handler);
-      return () => { window.removeEventListener('storage', handler); window.removeEventListener('focus', handler); window.removeEventListener('visibilitychange', handler); };
+      window.addEventListener(VIEWED_STORIES_EVENT, handler);
+      return () => {
+        window.removeEventListener('storage', handler);
+        window.removeEventListener('focus', handler);
+        window.removeEventListener('visibilitychange', handler);
+        window.removeEventListener(VIEWED_STORIES_EVENT, handler);
+      };
     }, []),
     () => localStorage.getItem('viewed_story_users') || '[]',
   );
@@ -364,6 +379,31 @@ export default function FeedPage() {
     }
     return [...unseen, ...seen];
   }, [storyProfiles, viewedStoryUsers]);
+
+  const markStoryViewed = useCallback((userId) => {
+    if (!userId) return;
+    try {
+      const arr = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
+      const normalized = String(userId);
+      if (!arr.includes(normalized)) {
+        arr.push(normalized);
+        if (arr.length > 300) arr.splice(0, arr.length - 300);
+        localStorage.setItem('viewed_story_users', JSON.stringify(arr));
+      }
+    } catch {}
+    window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
+  }, []);
+
+  const openStoryFromHome = useCallback((storyUserId) => {
+    markStoryViewed(storyUserId);
+    if (openStoryTimerRef.current) {
+      window.clearTimeout(openStoryTimerRef.current);
+    }
+    openStoryTimerRef.current = window.setTimeout(() => {
+      navigate('/videos', { state: { storyUserId } });
+      openStoryTimerRef.current = null;
+    }, 220);
+  }, [markStoryViewed, navigate]);
 
   useEffect(() => {
     if (!user?.id) return undefined;
@@ -768,7 +808,7 @@ export default function FeedPage() {
                 <button
                   type="button"
                   draggable={false}
-                  onClick={() => navigate('/videos', { state: { storyUserId: p.id } })}
+                  onClick={() => openStoryFromHome(p.id)}
                   className="flex flex-col items-center gap-1"
                   onDragStart={handleStoriesNativeDragStart}
                 >
@@ -797,7 +837,7 @@ export default function FeedPage() {
                 <button
                   type="button"
                   draggable={false}
-                  onClick={() => navigate('/videos', { state: { storyUserId: p.id } })}
+                  onClick={() => openStoryFromHome(p.id)}
                   className="flex flex-col items-center gap-1"
                   onDragStart={handleStoriesNativeDragStart}
                 >
