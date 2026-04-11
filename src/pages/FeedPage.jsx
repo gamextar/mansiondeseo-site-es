@@ -305,22 +305,16 @@ export default function FeedPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Restore scroll position after the virtual grid has its full height in the DOM.
-  // history.scrollRestoration = 'manual' (set in main.jsx) prevents iOS Safari
-  // from overriding our scrollTo with its own history-based position.
-  // Double rAF: frame 1 = virtualizer commits totalSize height, frame 2 = browser reflow.
-  useEffect(() => {
+  // Restore scroll position before first paint.
+  // initialOffset already told the virtualizer which rows to render,
+  // so the container has the correct totalSize height on first commit.
+  // useLayoutEffect fires after DOM commit but before paint — scrollTo works
+  // without clamping and without a visible scroll animation.
+  useLayoutEffect(() => {
     if (scrollRestoredRef.current || profiles.length === 0) return;
     scrollRestoredRef.current = true;
     const savedY = getSavedScrollY();
-    if (!(savedY > 0)) return;
-    let id1, id2;
-    id1 = requestAnimationFrame(() => {
-      id2 = requestAnimationFrame(() => {
-        window.scrollTo(0, savedY);
-      });
-    });
-    return () => { cancelAnimationFrame(id1); cancelAnimationFrame(id2); };
+    if (savedY > 0) window.scrollTo(0, savedY);
   }, [profiles.length]);
 
   // Reload feed ONLY when explicitly marked dirty (preference/settings changes)
@@ -555,6 +549,7 @@ export default function FeedPage() {
     estimateSize: estimateRowHeight,
     overscan: 3,
     scrollMargin: gridScrollMargin,
+    initialOffset: getSavedScrollY(),
   });
 
   return (
