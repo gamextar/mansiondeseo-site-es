@@ -351,6 +351,19 @@ export default function FeedPage() {
   const viewedStoryUsers = useMemo(() => {
     try { return new Set(JSON.parse(viewedRaw)); } catch { return new Set(); }
   }, [viewedRaw]);
+  const orderedStoryProfiles = useMemo(() => {
+    const unseen = [];
+    const seen = [];
+    for (const profile of storyProfiles) {
+      if (!profile?.id) continue;
+      if (viewedStoryUsers.has(String(profile.id))) {
+        seen.push(profile);
+      } else {
+        unseen.push(profile);
+      }
+    }
+    return [...unseen, ...seen];
+  }, [storyProfiles, viewedStoryUsers]);
 
   useEffect(() => {
     if (!user?.id) return undefined;
@@ -743,7 +756,7 @@ export default function FeedPage() {
               </motion.div>
             )
           )}
-          {storyProfiles.map((p) => {
+          {orderedStoryProfiles.map((p) => {
             const photo = getPrimaryProfilePhoto(p);
             const photoCrop = getPrimaryProfileCrop(p);
             const isViewed = viewedStoryUsers.has(p.id);
@@ -751,7 +764,7 @@ export default function FeedPage() {
             const border = storyCircleBorder;
             const innerGap = storyCircleInnerGap;
             return safariDesktop ? (
-              <div key={`story-${p.id}`} className="flex-shrink-0" style={{ width: size + 6 }}>
+              <div key={`story-${p.id}`} className="flex-shrink-0 transition-transform duration-300" style={{ width: size + 6 }}>
                 <button
                   type="button"
                   draggable={false}
