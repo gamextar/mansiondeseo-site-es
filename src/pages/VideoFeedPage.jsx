@@ -99,10 +99,11 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
+  const revealSentRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
 
@@ -113,6 +114,16 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     loadedSrcRef.current = videoSrc;
   }
   const activeSrc = loadedSrcRef.current ? resolveMediaUrl(loadedSrcRef.current) : loadedSrcRef.current;
+
+  useEffect(() => {
+    revealSentRef.current = false;
+  }, [activeSrc]);
+
+  const notifyRevealReady = useCallback(() => {
+    if (!isActive || !onRevealReady || revealSentRef.current) return;
+    revealSentRef.current = true;
+    onRevealReady();
+  }, [isActive, onRevealReady]);
 
   const attemptPlay = useCallback(() => {
     const video = videoRef.current;
@@ -157,6 +168,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     if (!video) return;
 
     const handleReady = () => {
+      notifyRevealReady();
       attemptPlay();
     };
 
@@ -164,6 +176,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     video.addEventListener('canplay', handleReady);
 
     if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      notifyRevealReady();
       attemptPlay();
     }
 
@@ -171,7 +184,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       video.removeEventListener('loadeddata', handleReady);
       video.removeEventListener('canplay', handleReady);
     };
-  }, [activeSrc, attemptPlay, isActive]);
+  }, [activeSrc, attemptPlay, isActive, notifyRevealReady]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -508,6 +521,14 @@ export default function VideoFeedPage() {
   const [giftCatalog, setGiftCatalog] = useState([]);
   const [giftSent, setGiftSent] = useState(null);
   const [sendingGift, setSendingGift] = useState(null);
+  const [entryRevealReady, setEntryRevealReady] = useState(false);
+  const entryRevealDoneRef = useRef(false);
+
+  const handleEntryRevealReady = useCallback(() => {
+    if (entryRevealDoneRef.current) return;
+    entryRevealDoneRef.current = true;
+    setEntryRevealReady(true);
+  }, []);
 
   const openGiftModal = useCallback((story) => {
     setGiftTargetStory(story);
@@ -947,17 +968,11 @@ export default function VideoFeedPage() {
       <motion.div
         className="absolute inset-0 pointer-events-none z-20 bg-black"
         initial={{ opacity: 1 }}
-        animate={{ opacity: 0 }}
-        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+        animate={{ opacity: entryRevealReady ? 0 : 1 }}
+        transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
       />
 
-      <motion.div
-        className="relative h-full"
-        initial={{ opacity: 0, y: 40, scale: 0.985 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-        style={{ transformOrigin: 'center bottom' }}
-      >
+      <div className="relative h-full">
         {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">
@@ -996,6 +1011,7 @@ export default function VideoFeedPage() {
                     resetOnDeactivate={false}
                     onGift={openGiftModal}
                     isOwnStory={String(story.user_id) === String(user?.id)}
+                    onRevealReady={isActive ? handleEntryRevealReady : undefined}
                   />
                 </div>
               );
@@ -1034,6 +1050,7 @@ export default function VideoFeedPage() {
                   resetOnDeactivate
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
+                  onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
                 />
               </div>
             );
@@ -1190,7 +1207,7 @@ export default function VideoFeedPage() {
           </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </div>
     </div>
   );
 }
