@@ -727,7 +727,7 @@ export default function FeedPage() {
       if (currentEl.scrollLeft <= 0 || currentEl.scrollLeft >= maxScrollLeft) {
         currentEl.scrollLeft = Math.min(maxScrollLeft, Math.max(0, currentEl.scrollLeft));
         if (momentum.velocity !== 0) {
-          nudgeStoriesEdge(currentEl.scrollLeft <= 0 ? 1 : -1, Math.min(24, Math.max(10, Math.abs(momentum.velocity) * 18)));
+          nudgeStoriesEdge(currentEl.scrollLeft <= 0 ? -1 : 1, Math.min(24, Math.max(10, Math.abs(momentum.velocity) * 18)));
         }
         momentum.frameId = null;
         momentum.velocity = 0;
@@ -791,7 +791,7 @@ export default function FeedPage() {
     el.scrollLeft = clampedScrollLeft;
     if (desiredScrollLeft !== clampedScrollLeft) {
       const overflow = desiredScrollLeft - clampedScrollLeft;
-      setStoriesEdgeOffsetImmediate(Math.max(-24, Math.min(24, overflow * 0.18)));
+      setStoriesEdgeOffsetImmediate(Math.max(-24, Math.min(24, -overflow * 0.18)));
     } else if (storiesEdgeOffsetRef.current !== 0) {
       setStoriesEdgeOffsetImmediate(storiesEdgeOffsetRef.current * 0.72);
     }
