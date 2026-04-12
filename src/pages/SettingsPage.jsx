@@ -80,6 +80,7 @@ export default function SettingsPage() {
   const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
   const [homeStoryCountMobile, setHomeStoryCountMobile] = useState(15);
   const [homeStoryCountDesktop, setHomeStoryCountDesktop] = useState(30);
+  const [homeStoriesUseLivefeed, setHomeStoriesUseLivefeed] = useState(true);
   const [sidebarStoryRingWidth, setSidebarStoryRingWidth] = useState(4);
   const [storyPresetEditor, setStoryPresetEditor] = useState('medium');
   const [avatarSizeDraft, setAvatarSizeDraft] = useState('88');
@@ -237,6 +238,7 @@ export default function SettingsPage() {
         setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
         setHomeStoryCountMobile(s.homeStoryCountMobile ?? 15);
         setHomeStoryCountDesktop(s.homeStoryCountDesktop ?? 30);
+        setHomeStoriesUseLivefeed(s.homeStoriesUseLivefeed !== false);
         setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? 4);
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
@@ -357,6 +359,7 @@ export default function SettingsPage() {
         story_circle_inner_gap: storyCircleInnerGap,
         home_story_count_mobile: homeStoryCountMobile,
         home_story_count_desktop: homeStoryCountDesktop,
+        home_stories_use_livefeed: homeStoriesUseLivefeed,
         sidebar_story_ring_width: sidebarStoryRingWidth,
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
@@ -424,6 +427,7 @@ export default function SettingsPage() {
       setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
       setHomeStoryCountMobile(s.homeStoryCountMobile ?? 15);
       setHomeStoryCountDesktop(s.homeStoryCountDesktop ?? 30);
+      setHomeStoriesUseLivefeed(s.homeStoriesUseLivefeed !== false);
       setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? 4);
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
@@ -1876,6 +1880,16 @@ export default function SettingsPage() {
                     </div>
                   </div>
                   <Counter value={homeStoryCountDesktop} onChange={setHomeStoryCountDesktop} min={1} max={60} />
+                </div>
+              </div>
+
+              <div className="bg-mansion-card rounded-2xl p-4 border border-white/5 mb-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">Usar livefeed en home</h3>
+                    <p className="text-[11px] text-text-dim">Si lo apagas, la fila de stories usa solo las stories del feed principal y deja de consultar `livefeed/current.json`.</p>
+                  </div>
+                  <ToggleSwitch value={homeStoriesUseLivefeed} onChange={setHomeStoriesUseLivefeed} />
                 </div>
               </div>
 

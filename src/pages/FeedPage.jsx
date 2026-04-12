@@ -360,8 +360,9 @@ export default function FeedPage() {
         : (safeSettings.homeStoryCountMobile ?? 15)
     )
   );
+  const useHomeStoriesLivefeed = safeSettings.homeStoriesUseLivefeed !== false;
   const fallbackStoryProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, storyLimit);
-  const storyProfiles = Array.isArray(liveStoryProfiles) ? liveStoryProfiles : fallbackStoryProfiles;
+  const storyProfiles = useHomeStoriesLivefeed && Array.isArray(liveStoryProfiles) ? liveStoryProfiles : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
@@ -609,6 +610,12 @@ export default function FeedPage() {
 
   useEffect(() => {
     if (!user?.id) return undefined;
+    if (!useHomeStoriesLivefeed) {
+      livefeedVersionRef.current = '';
+      livefeedPayloadRef.current = null;
+      setLiveStoryProfiles(null);
+      return undefined;
+    }
     let cancelled = false;
     let lastForegroundRefreshAt = 0;
 
@@ -673,7 +680,7 @@ export default function FeedPage() {
       window.removeEventListener('focus', handleForegroundRefresh);
       document.removeEventListener('visibilitychange', handleForegroundRefresh);
     };
-  }, [storyLimit, user?.id, user?.seeking]);
+  }, [storyLimit, useHomeStoriesLivefeed, user?.id, user?.seeking]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
