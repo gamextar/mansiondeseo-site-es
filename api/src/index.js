@@ -1838,6 +1838,7 @@ async function handleProfiles(request, env) {
   const search = url.searchParams.get('q') || '';
   const fresh = url.searchParams.get('fresh') === '1';
   const cursor = Math.max(0, Number.parseInt(url.searchParams.get('cursor') || '0', 10) || 0);
+  const reqPageSize = Math.min(200, Math.max(12, Number.parseInt(url.searchParams.get('pageSize') || '0', 10) || FEED_PROFILE_LIMIT));
   const settings = await cached('settings', 300_000, () => loadSettings(env));
 
   // Use cached viewer data when available to avoid a serial D1 round-trip
@@ -1905,9 +1906,9 @@ async function handleProfiles(request, env) {
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
-  const windowLimit = cursor + FEED_PROFILE_LIMIT;
+  const windowLimit = cursor + reqPageSize;
   const pageWindowLimit = windowLimit + 1;
-  const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, FEED_PROFILE_LIMIT * 10) : pageWindowLimit;
+  const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, reqPageSize * 10) : pageWindowLimit;
   query += ` ORDER BY last_active DESC LIMIT ${dbLimit}`;
 
   // Cache key for profiles query (shared across all users)
@@ -2015,9 +2016,9 @@ async function handleProfiles(request, env) {
   profiles = profiles.map(({ _matchingInterests, _roleId, _feedScore, ...p }) => p);
 
   const totalProfiles = Number(countRow?.total ?? profiles.length);
-  const pagedProfiles = profiles.slice(cursor, cursor + FEED_PROFILE_LIMIT);
-  const hasMore = totalProfiles > cursor + FEED_PROFILE_LIMIT;
-  const nextCursor = hasMore ? cursor + FEED_PROFILE_LIMIT : null;
+  const pagedProfiles = profiles.slice(cursor, cursor + reqPageSize);
+  const hasMore = totalProfiles > cursor + reqPageSize;
+  const nextCursor = hasMore ? cursor + reqPageSize : null;
 
   return json({
     profiles: pagedProfiles,
