@@ -11,7 +11,6 @@ import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
-import { fetchLivefeedCurrent, fetchLivefeedPayload, selectLivefeedStories, getCachedLivefeedPayload } from '../lib/livefeed';
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
@@ -31,21 +30,6 @@ function getInitialStoryLimit(settings, isDesktopViewport) {
         : (settings?.homeStoryCountMobile ?? 15)
     )
   );
-}
-
-function getInitialLiveStoryProfiles(user, settings, isDesktopViewport) {
-  if (!user?.id) return null;
-  if (settings?.homeStoriesUseLivefeed === false) return null;
-  const cachedPayload = getCachedLivefeedPayload();
-  if (!cachedPayload) return null;
-  const storyLimit = getInitialStoryLimit(settings, isDesktopViewport);
-  const next = selectLivefeedStories(
-    cachedPayload,
-    user?.seeking || [],
-    storyLimit,
-    { excludeUserId: user.id }
-  );
-  return next.length > 0 ? next : null;
 }
 
 function getGridColumns() {
@@ -124,11 +108,6 @@ export default function FeedPage() {
     cached ? (typeof cached?.hasMore === 'boolean' ? cached.hasMore : true) : false
   );
   const [loading, setLoading] = useState(!cached);
-  const initialLiveStories = getInitialLiveStoryProfiles(user, cached?.settings || {}, isDesktopViewport);
-  const [liveStoryProfiles, setLiveStoryProfiles] = useState(() => initialLiveStories);
-  const [livefeedStoriesReady, setLivefeedStoriesReady] = useState(
-    () => !user?.id || cached?.settings?.homeStoriesUseLivefeed === false || Array.isArray(initialLiveStories)
-  );
   const [storiesIntroEnabled, setStoriesIntroEnabled] = useState(true);
   const storiesIntroConsumedRef = useRef(false);
   const navigate = useNavigate();
@@ -162,14 +141,7 @@ export default function FeedPage() {
     velocity: 0,
   });
   const isSafariDesktopRef = useRef(false);
-  const livefeedVersionRef = useRef('');
-  const livefeedPayloadRef = useRef(null);
-  const liveStoryProfilesRef = useRef(null);
   const pagedFeedConfigRef = useRef('');
-
-  useEffect(() => {
-    liveStoryProfilesRef.current = liveStoryProfiles;
-  }, [liveStoryProfiles]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -393,13 +365,8 @@ export default function FeedPage() {
     return Array.from({ length: end - adjustedStart + 1 }, (_, idx) => adjustedStart + idx);
   }, [currentPage, totalPages]);
   const storyLimit = getInitialStoryLimit(safeSettings, isDesktopViewport);
-  const useHomeStoriesLivefeed = safeSettings.homeStoriesUseLivefeed !== false;
   const fallbackStoryProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, storyLimit);
-  const storyProfiles = useHomeStoriesLivefeed
-    ? (Array.isArray(liveStoryProfiles)
-        ? liveStoryProfiles
-        : (livefeedStoriesReady ? fallbackStoryProfiles : []))
-    : fallbackStoryProfiles;
+  const storyProfiles = fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
@@ -693,84 +660,6 @@ export default function FeedPage() {
       },
     });
   }, [location, navigate]);
-
-  useEffect(() => {
-    if (!user?.id) return undefined;
-    if (!useHomeStoriesLivefeed) {
-      livefeedVersionRef.current = '';
-      livefeedPayloadRef.current = null;
-      setLiveStoryProfiles(null);
-      setLivefeedStoriesReady(true);
-      return undefined;
-    }
-    let cancelled = false;
-    let lastForegroundRefreshAt = 0;
-
-    const applyPayload = (payload) => {
-      livefeedPayloadRef.current = payload;
-      const next = selectLivefeedStories(
-        payload,
-        user?.seeking || [],
-        storyLimit,
-        { excludeUserId: user.id }
-      );
-      if (!cancelled) {
-        setLiveStoryProfiles(next.length > 0 ? next : null);
-        setLivefeedStoriesReady(true);
-      }
-    };
-
-    if (livefeedPayloadRef.current) {
-      applyPayload(livefeedPayloadRef.current);
-    } else {
-      const cachedPayload = getCachedLivefeedPayload();
-      if (cachedPayload) {
-        livefeedPayloadRef.current = cachedPayload;
-        applyPayload(cachedPayload);
-      }
-    }
-
-    const refreshLivefeed = async (options = {}) => {
-      try {
-        const current = await fetchLivefeedCurrent(options);
-        if (!current?.version) return;
-        if (livefeedVersionRef.current === current.version && livefeedPayloadRef.current) {
-          applyPayload(livefeedPayloadRef.current);
-          return;
-        }
-        const payload = await fetchLivefeedPayload(current);
-        livefeedVersionRef.current = current.version;
-        applyPayload(payload);
-      } catch {
-        // Keep fallback story circles from feed if livefeed is unavailable.
-        if (!cancelled) setLivefeedStoriesReady(true);
-      }
-    };
-
-    refreshLivefeed({ minIntervalMs: 0 });
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState === 'hidden') return;
-      refreshLivefeed({ minIntervalMs: 15_000 });
-    }, 30_000);
-
-    const handleForegroundRefresh = () => {
-      if (document.visibilityState === 'hidden') return;
-      const now = Date.now();
-      if (now - lastForegroundRefreshAt < 5_000) return;
-      lastForegroundRefreshAt = now;
-      refreshLivefeed({ minIntervalMs: 15_000 });
-    };
-
-    window.addEventListener('focus', handleForegroundRefresh);
-    document.addEventListener('visibilitychange', handleForegroundRefresh);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-      window.removeEventListener('focus', handleForegroundRefresh);
-      document.removeEventListener('visibilitychange', handleForegroundRefresh);
-    };
-  }, [storyLimit, useHomeStoriesLivefeed, user?.id, user?.seeking]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
