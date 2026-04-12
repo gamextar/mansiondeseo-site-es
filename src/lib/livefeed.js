@@ -84,6 +84,10 @@ export function selectLivefeedStories(payload, seeking, limit = 15, { excludeUse
     avatar_crop: story?.avatar_crop || null,
     created_at: story?.created_at || '',
     story_id: story?.story_id || '',
+    video_url: resolveMediaUrl(story?.video_url || ''),
+    caption: story?.caption || '',
+    likes: Number(story?.likes || 0),
+    comments: Number(story?.comments || 0),
     has_active_story: true,
   })).filter((story) => story.id && String(story.id) !== String(excludeUserId || ''));
 }

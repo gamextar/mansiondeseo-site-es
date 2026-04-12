@@ -575,11 +575,31 @@ export default function FeedPage() {
     };
   }, [schedulePendingViewedStories]);
 
-  const openStoryFromHome = useCallback((storyUserId) => {
+  const openStoryFromHome = useCallback((storyOrUserId) => {
+    const storyUserId = typeof storyOrUserId === 'object' && storyOrUserId !== null
+      ? String(storyOrUserId.user_id || storyOrUserId.id || '')
+      : String(storyOrUserId || '');
+    const storySeed = typeof storyOrUserId === 'object' && storyOrUserId !== null
+      ? {
+          id: String(storyOrUserId.story_id || storyOrUserId.id || storyUserId),
+          story_id: String(storyOrUserId.story_id || storyOrUserId.id || storyUserId),
+          user_id: storyUserId,
+          video_url: storyOrUserId.video_url || storyOrUserId.active_story_url || '',
+          caption: storyOrUserId.caption || '',
+          likes: Number(storyOrUserId.likes || 0),
+          comments: Number(storyOrUserId.comments || 0),
+          created_at: storyOrUserId.created_at || '',
+          username: storyOrUserId.username || storyOrUserId.name || '',
+          avatar_url: storyOrUserId.avatar_url || '',
+          avatar_crop: storyOrUserId.avatar_crop || null,
+          liked: false,
+        }
+      : null;
     const backgroundScrollY = Number(window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
     navigate('/videos', {
       state: {
         storyUserId,
+        storySeed,
         modal: 'videos',
         backgroundLocation: location,
         backgroundScrollY,
@@ -978,7 +998,14 @@ export default function FeedPage() {
                     type="button"
                     draggable={false}
                     onClick={user.has_active_story && user.active_story_url
-                      ? () => openStoryFromHome(user.id)
+                      ? () => openStoryFromHome({
+                          user_id: user.id,
+                          story_id: user.id,
+                          video_url: user.active_story_url || '',
+                          username: user.username || '',
+                          avatar_url: user.avatar_url || '',
+                          avatar_crop: user.avatar_crop || null,
+                        })
                       : () => navigate('/historia/nueva', { state: { from: '/' } })}
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
@@ -1022,7 +1049,14 @@ export default function FeedPage() {
                     type="button"
                     draggable={false}
                     onClick={user.has_active_story && user.active_story_url
-                      ? () => openStoryFromHome(user.id)
+                      ? () => openStoryFromHome({
+                          user_id: user.id,
+                          story_id: user.id,
+                          video_url: user.active_story_url || '',
+                          username: user.username || '',
+                          avatar_url: user.avatar_url || '',
+                          avatar_crop: user.avatar_crop || null,
+                        })
                       : () => navigate('/historia/nueva', { state: { from: '/' } })}
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
@@ -1122,7 +1156,7 @@ export default function FeedPage() {
                 <button
                   type="button"
                   draggable={false}
-                  onClick={() => openStoryFromHome(p.id)}
+                  onClick={() => openStoryFromHome(p)}
                   className="flex flex-col items-center gap-1"
                   onDragStart={handleStoriesNativeDragStart}
                 >
@@ -1156,7 +1190,7 @@ export default function FeedPage() {
                 <button
                   type="button"
                   draggable={false}
-                  onClick={() => openStoryFromHome(p.id)}
+                  onClick={() => openStoryFromHome(p)}
                   className="flex flex-col items-center gap-1"
                   onDragStart={handleStoriesNativeDragStart}
                 >

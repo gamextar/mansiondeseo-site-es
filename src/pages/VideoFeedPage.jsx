@@ -26,6 +26,34 @@ const AVATAR_SIZE_DEFAULT = 52;
 const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 
+function normalizeStorySeed(seed) {
+  if (!seed || typeof seed !== 'object') return null;
+  const userId = String(seed.user_id || seed.id || '').trim();
+  const videoUrl = String(seed.video_url || '').trim();
+  if (!userId || !videoUrl) return null;
+  return {
+    id: String(seed.story_id || seed.id || userId),
+    story_id: String(seed.story_id || seed.id || userId),
+    user_id: userId,
+    video_url: videoUrl,
+    caption: String(seed.caption || ''),
+    likes: Number(seed.likes || 0),
+    liked: !!seed.liked,
+    comments: Number(seed.comments || 0),
+    created_at: String(seed.created_at || ''),
+    username: String(seed.username || seed.name || ''),
+    avatar_url: String(seed.avatar_url || ''),
+    avatar_crop: seed.avatar_crop || null,
+  };
+}
+
+function mergeSeedStory(stories, seedStory) {
+  const list = Array.isArray(stories) ? stories : [];
+  if (!seedStory) return list;
+  const filtered = list.filter((story) => String(story?.user_id || '') !== String(seedStory.user_id));
+  return [seedStory, ...filtered];
+}
+
 function applyPendingStoryLikeState(inputStories, pendingLikes = {}) {
   if (!Array.isArray(inputStories) || inputStories.length === 0) return inputStories;
 
@@ -585,9 +613,10 @@ export default function VideoFeedPage() {
     } catch {}
     return [];
   };
-  const initial = applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
   const requestedStoryUserId = location.state?.storyUserId || null;
+  const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
+  const initial = applyPendingStoryLikeState(mergeSeedStory(cachedStories(), requestedStorySeed), getPendingStoryLikes());
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
@@ -644,10 +673,10 @@ export default function VideoFeedPage() {
     navigate(-1);
   }, [flushPendingViewedStories, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
-    if (!isOverlayPreview) return;
+    if (!isOverlayPreview || !isDesktopViewport) return;
     if (event.target.closest('[data-story-card-frame="true"]')) return;
     closeOverlay();
-  }, [closeOverlay, isOverlayPreview]);
+  }, [closeOverlay, isDesktopViewport, isOverlayPreview]);
   const markStoryViewed = useCallback((storyUserId) => {
     const uid = String(storyUserId || '');
     if (!uid) return;
@@ -728,11 +757,11 @@ export default function VideoFeedPage() {
 
   const refreshStories = useCallback(async () => {
     const data = await getStories({ focusUserId: requestedStoryUserId || '' });
-    const fresh = applyPendingStoryLikeState(data.stories || [], getPendingStoryLikes());
+    const fresh = applyPendingStoryLikeState(mergeSeedStory(data.stories || [], requestedStorySeed), getPendingStoryLikes());
     setStories(fresh);
     persistStories(fresh);
     return fresh;
-  }, [persistStories, requestedStoryUserId]);
+  }, [persistStories, requestedStorySeed, requestedStoryUserId]);
 
   useEffect(() => {
     let cancelled = false;

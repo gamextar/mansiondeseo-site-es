@@ -88,6 +88,10 @@ function buildStoryRow(row) {
     role: row?.role || '',
     avatar_url: normalizeMediaUrl(row?.avatar_url || ''),
     avatar_crop: safeParseJSON(row?.avatar_crop, null),
+    video_url: normalizeMediaUrl(row?.video_url || ''),
+    caption: row?.caption || '',
+    likes: Number(row?.likes || 0),
+    comments: Number(row?.comments || 0),
     created_at: row?.created_at || '',
   }
 }
@@ -108,6 +112,10 @@ async function main() {
       SELECT
         s.id,
         s.user_id,
+        s.video_url,
+        s.caption,
+        s.likes,
+        s.comments,
         s.created_at,
         u.username,
         u.avatar_url,
@@ -136,7 +144,7 @@ async function main() {
         AND u.status = 'verified'
         AND COALESCE(u.account_status, 'active') = 'active'
     )
-    SELECT id, user_id, created_at, username, avatar_url, avatar_crop, role
+    SELECT id, user_id, video_url, caption, likes, comments, created_at, username, avatar_url, avatar_crop, role
     FROM ranked
     WHERE livefeed_bucket != ''
       AND rn <= ${LIVEFEED_BUCKET_LIMIT}
