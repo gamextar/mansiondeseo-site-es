@@ -8,6 +8,8 @@ function hideStartupShield() {
   const shield = document.getElementById('startup-shield');
   if (!shield) return;
 
+  const startedAt = Date.now();
+
   const removeShield = () => {
     shield.remove();
   };
@@ -17,10 +19,31 @@ function hideStartupShield() {
     window.setTimeout(removeShield, 320);
   };
 
-  window.requestAnimationFrame(() => {
-    window.requestAnimationFrame(() => {
-      window.setTimeout(reveal, 120);
+  const minVisibleMs = 850;
+  const extraSettleMs = 220;
+
+  const waitForFonts = () => {
+    if (!document.fonts?.ready) return Promise.resolve();
+    return document.fonts.ready.catch(() => {});
+  };
+
+  const waitForWindowLoad = () => {
+    if (document.readyState === 'complete') return Promise.resolve();
+    return new Promise((resolve) => {
+      window.addEventListener('load', resolve, { once: true });
     });
+  };
+
+  Promise.all([waitForWindowLoad(), waitForFonts()]).finally(() => {
+    const elapsed = Date.now() - startedAt;
+    const remaining = Math.max(0, minVisibleMs - elapsed);
+    window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          window.setTimeout(reveal, extraSettleMs);
+        });
+      });
+    }, remaining);
   });
 }
 
