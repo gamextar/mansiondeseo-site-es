@@ -729,7 +729,7 @@ export default function FeedPage() {
       if (currentEl.scrollLeft <= 0 || currentEl.scrollLeft >= maxScrollLeft) {
         currentEl.scrollLeft = Math.min(maxScrollLeft, Math.max(0, currentEl.scrollLeft));
         if (momentum.velocity !== 0) {
-          nudgeStoriesEdge(currentEl.scrollLeft <= 0 ? -1 : 1, Math.min(38, Math.max(14, Math.abs(momentum.velocity) * 24)));
+          nudgeStoriesEdge(currentEl.scrollLeft <= 0 ? 1 : -1, Math.min(38, Math.max(14, Math.abs(momentum.velocity) * 24)));
         }
         momentum.frameId = null;
         momentum.velocity = 0;
