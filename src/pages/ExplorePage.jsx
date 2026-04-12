@@ -5,12 +5,12 @@ import { Search, SlidersHorizontal } from 'lucide-react';
 import ProfileCard from '../components/ProfileCard';
 import { getProfiles, getToken } from '../lib/api';
 
-export default function ExplorePage() {
+export default function ExplorePage({ initialData }) {
   const [search, setSearch] = useState('');
-  const [profiles, setProfiles] = useState([]);
-  const [viewerPremium, setViewerPremium] = useState(false);
-  const [settings, setSettings] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [profiles, setProfiles] = useState(initialData?.profiles || []);
+  const [viewerPremium, setViewerPremium] = useState(initialData?.viewerPremium || false);
+  const [settings, setSettings] = useState(initialData?.settings || {});
+  const [loading, setLoading] = useState(!initialData);
   const navigate = useNavigate();
 
   useEffect(() => {

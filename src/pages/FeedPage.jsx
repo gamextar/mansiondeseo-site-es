@@ -88,12 +88,12 @@ function setCachedFeed(data) {
   } catch {}
 }
 
-export default function FeedPage() {
+export default function FeedPage({ initialData }) {
   const safariDesktop = isSafariDesktopBrowser();
   const cols = useGridColumns();
   const isDesktopViewport = cols >= 4;
   const desktopStoryRailEnhanced = isDesktopViewport;
-  const cached = getCachedFeed();
+  const cached = initialData || getCachedFeed();
   const { user, siteSettings } = useAuth();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [showStoriesSection, setShowStoriesSection] = useState(true);

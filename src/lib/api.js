@@ -400,10 +400,12 @@ if (typeof window !== 'undefined') {
 // ── Token management ────────────────────────────────────
 
 export function getToken() {
+  if (typeof localStorage === 'undefined') return null;
   return localStorage.getItem(TOKEN_KEY);
 }
 
 export function setToken(token) {
+  if (typeof localStorage === 'undefined') return;
   if (token) {
     localStorage.setItem(TOKEN_KEY, token);
   } else {
@@ -414,6 +416,7 @@ export function setToken(token) {
 }
 
 export function getStoredUser() {
+  if (typeof localStorage === 'undefined') return null;
   try {
     const raw = localStorage.getItem(USER_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -423,6 +426,7 @@ export function getStoredUser() {
 }
 
 export function setStoredUser(user) {
+  if (typeof localStorage === 'undefined') return;
   if (user) {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   } else {
@@ -431,6 +435,7 @@ export function setStoredUser(user) {
 }
 
 export function clearAuth() {
+  if (typeof localStorage === 'undefined') return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem('mansion_registered');

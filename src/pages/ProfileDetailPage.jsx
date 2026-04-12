@@ -107,7 +107,7 @@ function MotionButton({ disabled = false, motionProps = {}, ...props }) {
   return <motion.button {...motionProps} {...props} />;
 }
 
-export default function ProfileDetailPage() {
+export default function ProfileDetailPage({ initialData }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -116,7 +116,7 @@ export default function ProfileDetailPage() {
   const backTarget = location.state?.from || null;
   const backTargetState = location.state?.returnState;
   const isOverlayEntry = !!location.state?.backgroundLocation;
-  const cachedDetail = readProfileDetailCache(id);
+  const cachedDetail = initialData || readProfileDetailCache(id);
   const previewProfile = buildPreviewProfile(preview);
   const initialProfile = cachedDetail?.profile || previewProfile;
   const [profile, setProfile] = useState(initialProfile);

@@ -1021,9 +1021,10 @@ function setCachedFullUser(userId, data) {
 async function authenticate(request, env) {
   const authHeader = request.headers.get('Authorization');
   const fallbackToken = request.headers.get('X-Session-Token') || '';
-  const token = authHeader?.startsWith('Bearer ')
+  let token = authHeader?.startsWith('Bearer ')
     ? authHeader.slice(7)
     : fallbackToken.trim();
+
   if (!token) return null;
   const payload = await verifyJWT(token, env.JWT_SECRET);
   if (!payload) return null;
@@ -1706,7 +1707,6 @@ async function handleVerifyToken(request, env) {
 
   const jwt = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
 
-  // Redirect to frontend with token
   return Response.redirect(`${getPrimaryAppOrigin(env)}/?token=${jwt}`, 302);
 }
 
