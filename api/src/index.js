@@ -1838,7 +1838,6 @@ async function handleProfiles(request, env) {
   const search = url.searchParams.get('q') || '';
   const fresh = url.searchParams.get('fresh') === '1';
   const cursor = Math.max(0, Number.parseInt(url.searchParams.get('cursor') || '0', 10) || 0);
-  const reqPageSize = Math.min(200, Math.max(12, Number.parseInt(url.searchParams.get('pageSize') || '0', 10) || FEED_PROFILE_LIMIT));
   const settings = await cached('settings', 300_000, () => loadSettings(env));
 
   // Use cached viewer data when available to avoid a serial D1 round-trip
@@ -1906,9 +1905,9 @@ async function handleProfiles(request, env) {
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
-  const windowLimit = cursor + reqPageSize;
+  const windowLimit = cursor + FEED_PROFILE_LIMIT;
   const pageWindowLimit = windowLimit + 1;
-  const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, reqPageSize * 10) : pageWindowLimit;
+  const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, FEED_PROFILE_LIMIT * 10) : pageWindowLimit;
   query += ` ORDER BY last_active DESC LIMIT ${dbLimit}`;
 
   // Cache key for profiles query (shared across all users)
@@ -1917,15 +1916,13 @@ async function handleProfiles(request, env) {
   const profilesCacheKey = `profiles:${seekingKey}:${countryKey}:${search}`;
   const shouldUseProfilesCache = !fresh && cursor === 0;
 
-  // Parallel: cached settings + cached profiles + combined favorites + active stories + total count
-  const countQuery = query.replace(/SELECT[\s\S]+?FROM users u/, 'SELECT COUNT(*) AS total FROM users u').replace(/ORDER BY[\s\S]+$/, '');
-  const [results, { results: allFavRows }, storyRows, countRow] = await Promise.all([
+  // Parallel: cached settings + cached profiles + combined favorites + active stories
+  const [results, { results: allFavRows }, storyRows] = await Promise.all([
     shouldUseProfilesCache
       ? cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results))  // 30s
       : env.DB.prepare(query).bind(...params).all().then(r => r.results),
     env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?').bind(auth.sub, auth.sub).all(),
     cached('active_story_users', 30_000, () => env.DB.prepare('SELECT DISTINCT user_id FROM stories WHERE active = 1').all().then(r => r.results).catch(() => [])),  // 30s
-    cached(`count:${profilesCacheKey}`, 60_000, () => env.DB.prepare(countQuery).bind(...params).first()),
   ]);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
   const viewerFavorites = new Set(allFavRows.filter(r => r.user_id === auth.sub).map(r => r.target_id));
@@ -2015,16 +2012,15 @@ async function handleProfiles(request, env) {
   // Strip internal sort fields
   profiles = profiles.map(({ _matchingInterests, _roleId, _feedScore, ...p }) => p);
 
-  const totalProfiles = Number(countRow?.total ?? profiles.length);
-  const pagedProfiles = profiles.slice(cursor, cursor + reqPageSize);
-  const hasMore = totalProfiles > cursor + reqPageSize;
-  const nextCursor = hasMore ? cursor + reqPageSize : null;
+  const totalProfiles = profiles.length;
+  const pagedProfiles = profiles.slice(cursor, cursor + FEED_PROFILE_LIMIT);
+  const hasMore = totalProfiles > cursor + FEED_PROFILE_LIMIT;
+  const nextCursor = hasMore ? cursor + FEED_PROFILE_LIMIT : null;
 
   return json({
     profiles: pagedProfiles,
     viewerPremium: viewerIsPremium,
     settings,
-    totalProfiles,
     nextCursor: nextCursor !== null ? String(nextCursor) : null,
     hasMore,
   });
@@ -3206,9 +3202,6 @@ async function loadSettings(env) {
     feedWeightFollowers: parseNumberSetting(settings.feed_weight_followers, 10),
     feedWeightSharedInterests: parseNumberSetting(settings.feed_weight_shared_interests, 20),
     feedWeightPremium: parseNumberSetting(settings.feed_weight_premium, 8),
-    feedCardsPerPage: parseNumberSetting(settings.feed_cards_per_page, 12),
-    feedMaxPages: parseNumberSetting(settings.feed_max_pages, 10),
-    feedPrefetchPages: parseNumberSetting(settings.feed_prefetch_pages, 6),
   };
   // Keep module-level threshold in sync so isOnline() uses the latest value
   _onlineThresholdMs = result.onlineThresholdMinutes * 60_000;
@@ -3265,9 +3258,6 @@ function getPublicSettingsPayload(settings) {
     feedWeightFollowers: settings.feedWeightFollowers,
     feedWeightSharedInterests: settings.feedWeightSharedInterests,
     feedWeightPremium: settings.feedWeightPremium,
-    feedCardsPerPage: settings.feedCardsPerPage,
-    feedMaxPages: settings.feedMaxPages,
-    feedPrefetchPages: settings.feedPrefetchPages,
     navBottomPadding: settings.navBottomPadding,
     navSidePadding: settings.navSidePadding,
     navHeight: settings.navHeight,
@@ -3369,9 +3359,6 @@ async function handleUpdateSettings(request, env) {
     'feed_weight_followers',
     'feed_weight_shared_interests',
     'feed_weight_premium',
-    'feed_cards_per_page',
-    'feed_max_pages',
-    'feed_prefetch_pages',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {
