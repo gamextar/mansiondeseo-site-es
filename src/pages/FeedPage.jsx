@@ -2,7 +2,6 @@ import { forwardRef, useState, useMemo, useEffect, useLayoutEffect, useCallback,
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Plus, Radio } from 'lucide-react';
-import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '../lib/authContext';
 
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.045 } } };
@@ -15,7 +14,7 @@ import AvatarImg from '../components/AvatarImg';
 import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
-import { isFirefoxDesktopBrowser, isSafariDesktopBrowser } from '../lib/browser';
+import { isSafariDesktopBrowser } from '../lib/browser';
 import { fetchLivefeedCurrent, fetchLivefeedPayload, selectLivefeedStories, getCachedLivefeedPayload } from '../lib/livefeed';
 
 const FEED_CACHE_KEY = 'mansion_feed';
@@ -23,12 +22,6 @@ const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const DEFAULT_CARDS_PER_PAGE = 12;
 const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PREFETCH_PAGES = 6;
-
-function getMobileMaxCards(s) {
-  const cpp = Math.max(6, Math.min(60, s?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE));
-  const mp = Math.max(1, Math.min(50, s?.feedMaxPages ?? DEFAULT_MAX_PAGES));
-  return Math.max(12, cpp * mp);
-}
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
@@ -91,16 +84,13 @@ function setCachedFeed(data) {
 
 export default function FeedPage() {
   const safariDesktop = isSafariDesktopBrowser();
-  const firefoxDesktop = isFirefoxDesktopBrowser();
   const cols = useGridColumns();
   const isDesktopViewport = cols >= 4;
-  const usePagedDesktopFeed = isDesktopViewport;
   const desktopStoryRailEnhanced = isDesktopViewport;
   const cached = getCachedFeed();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [showStoriesSection, setShowStoriesSection] = useState(true);
   const [showGridSection, setShowGridSection] = useState(true);
-  const [canAutoLoadMore, setCanAutoLoadMore] = useState(false);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
   const [nextCursor, setNextCursor] = useState(cached?.nextCursor || null);
@@ -111,17 +101,13 @@ export default function FeedPage() {
     cached ? (typeof cached?.hasMore === 'boolean' ? cached.hasMore : true) : false
   );
   const [loading, setLoading] = useState(!cached);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [liveStoryProfiles, setLiveStoryProfiles] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, siteSettings } = useAuth();
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
-  const loadMoreRef = useRef(null);
   const gridRef = useRef(null);
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
-  const loadMoreFailedRef = useRef(false); // stop retrying on persistent errors
-  const loadingMoreRef = useRef(false); // sync guard to prevent duplicate requests
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
     frameId: null,
@@ -166,41 +152,17 @@ export default function FeedPage() {
 
 
 
-  useEffect(() => {
-    const unlockAutoLoad = () => {
-      const scrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      if (scrollTop > 80) setCanAutoLoadMore(true);
-    };
-    window.addEventListener('scroll', unlockAutoLoad, { passive: true });
-    return () => window.removeEventListener('scroll', unlockAutoLoad);
-  }, []);
-
   const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize, targetPageCursor } = {}) => {
     const resolvedPageSize = Math.max(
       12,
-      Number(pageSize) || (
-        usePagedDesktopFeed
-          ? (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
-          : getMobileMaxCards(settings)
-      )
+      Number(pageSize) || (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
     );
     const c = getCachedFeed();
     if (!c) setLoading(true);
-    if (c && cursor === 0 && !forceFresh && !usePagedDesktopFeed) {
-      setProfiles(c.profiles || []);
-      setViewerPremium(c.viewerPremium || false);
-      if (c.settings) setSettings(c.settings);
-      setNextCursor(c.nextCursor || null);
-      setBlockCursor(Number(c.blockCursor ?? c.currentCursor) || 0);
-      setPageCursor(Number(c.pageCursor ?? c.currentCursor) || 0);
-      setTotalProfiles(Number(c.totalProfiles) || (Array.isArray(c.profiles) ? c.profiles.length : 0));
-      setHasMore(!!c.hasMore);
-    }
     const myId = ++loadIdRef.current;
     return getProfiles({ fresh: forceFresh, cursor, pageSize: resolvedPageSize })
       .then(data => {
         if (myId !== loadIdRef.current) return;
-        animatedRowsRef.current.clear();
         setProfiles(data.profiles || []);
         setViewerPremium(data.viewerPremium || false);
         if (data.settings) setSettings(data.settings);
@@ -238,43 +200,7 @@ export default function FeedPage() {
       .finally(() => {
         if (myId === loadIdRef.current) setLoading(false);
       });
-  }, [settings, usePagedDesktopFeed]);
-
-  const loadMoreProfiles = useCallback(() => {
-    if (usePagedDesktopFeed) return Promise.resolve();
-    const maxCards = getMobileMaxCards(settings);
-
-    // Hit the API cap — stop
-    if (profiles.length >= maxCards) return Promise.resolve();
-
-    // Need more from API
-    if (loading || loadingMore || !hasMore || !nextCursor || loadMoreFailedRef.current || loadingMoreRef.current) return Promise.resolve();
-    loadingMoreRef.current = true;
-    setLoadingMore(true);
-    ++loadIdRef.current;
-    const cursor = nextCursor;
-    return getProfiles({ cursor })
-      .then((data) => {
-        const newProfiles = Array.isArray(data?.profiles) ? data.profiles : [];
-        setProfiles((prev) => {
-          const seen = new Set(prev.map((item) => item.id));
-          const merged = [...prev];
-          for (const profile of newProfiles) {
-            if (!profile?.id || seen.has(profile.id)) continue;
-            seen.add(profile.id);
-            merged.push(profile);
-          }
-          return merged;
-        });
-        if (data.settings) setSettings(data.settings);
-        if (typeof data.viewerPremium === 'boolean') setViewerPremium(data.viewerPremium);
-        setNextCursor(data.nextCursor || null);
-        setHasMore(!!data.hasMore);
-        loadMoreFailedRef.current = false;
-      })
-      .catch(() => { loadMoreFailedRef.current = true; })
-      .finally(() => { loadingMoreRef.current = false; setLoadingMore(false); });
-  }, [hasMore, loading, loadingMore, nextCursor, profiles.length, settings, usePagedDesktopFeed]);
+  }, [settings]);
 
   // Initial load — runs once on mount
   useEffect(() => {
@@ -283,15 +209,11 @@ export default function FeedPage() {
     const cachedPageSize = Number(cachedFeed?.pageSize) || 0;
     const expectedPageSize = Math.max(
       12,
-      usePagedDesktopFeed
-        ? (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
-        : getMobileMaxCards(settings)
+      (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
     );
-    const canReuseCachedPagedFeed = !!cachedFeed
-      && usePagedDesktopFeed
-      && cachedPageSize === expectedPageSize;
+    const canReuseCached = !!cachedFeed && cachedPageSize === expectedPageSize;
 
-    if (!cachedFeed || (usePagedDesktopFeed && !canReuseCachedPagedFeed)) {
+    if (!cachedFeed || !canReuseCached) {
       loadProfiles({ cursor: 0, pageSize: expectedPageSize });
       return;
     }
@@ -310,7 +232,7 @@ export default function FeedPage() {
       sessionStorage.removeItem('mansion_feed_force_refresh');
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadProfiles, navigate, settings, usePagedDesktopFeed]);
+  }, [loadProfiles, navigate, settings]);
 
   const [gridOpacity, setGridOpacity] = useState(1);
 
@@ -366,23 +288,17 @@ export default function FeedPage() {
       const shouldForceFresh = sessionStorage.getItem('mansion_feed_force_refresh') === '1';
       sessionStorage.removeItem('mansion_feed_force_refresh');
       sessionStorage.removeItem(FEED_CACHE_KEY);
-      const nextPageSize = Math.max(
-        12,
-        usePagedDesktopFeed
-          ? (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
-          : getMobileMaxCards(settings)
-      );
       const nextBlockSize = (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES);
       loadProfiles({
         forceFresh: shouldForceFresh,
-        cursor: usePagedDesktopFeed ? Math.floor(pageCursor / nextBlockSize) * nextBlockSize : 0,
-        pageSize: usePagedDesktopFeed ? nextPageSize : undefined,
-        targetPageCursor: usePagedDesktopFeed ? pageCursor : undefined,
+        cursor: Math.floor(pageCursor / nextBlockSize) * nextBlockSize,
+        pageSize: nextBlockSize,
+        targetPageCursor: pageCursor,
       });
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [loadProfiles, pageCursor, settings, usePagedDesktopFeed]);
+  }, [loadProfiles, pageCursor, settings]);
 
   const { indicatorRef } = usePullToRefresh(
     useCallback(() => loadProfiles({ forceFresh: true }), [loadProfiles])
@@ -394,26 +310,19 @@ export default function FeedPage() {
   const maxPages = Math.max(1, Math.min(50, safeSettings.feedMaxPages ?? DEFAULT_MAX_PAGES));
   const prefetchPages = Math.max(1, Math.min(20, safeSettings.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES));
   const blockSize = cardsPerPage * prefetchPages;
-  const maxFeedCards = Math.max(
-    12,
-    isDesktopViewport
-      ? cardsPerPage
-      : getMobileMaxCards(safeSettings)
-  );
   const visibleProfiles = useMemo(() => {
-    if (!usePagedDesktopFeed) return safeProfiles.slice(0, maxFeedCards);
     const start = Math.max(0, pageCursor - blockCursor);
     return safeProfiles.slice(start, start + cardsPerPage);
-  }, [blockCursor, cardsPerPage, maxFeedCards, pageCursor, safeProfiles, usePagedDesktopFeed]);
-  const currentPage = usePagedDesktopFeed ? Math.floor(pageCursor / cardsPerPage) + 1 : 1;
-  const totalPages = usePagedDesktopFeed ? Math.min(maxPages, Math.max(1, Math.ceil((totalProfiles || 0) / cardsPerPage))) : 1;
+  }, [blockCursor, cardsPerPage, pageCursor, safeProfiles]);
+  const currentPage = Math.floor(pageCursor / cardsPerPage) + 1;
+  const totalPages = Math.min(maxPages, Math.max(1, Math.ceil((totalProfiles || 0) / cardsPerPage)));
   const pageWindow = useMemo(() => {
-    if (!usePagedDesktopFeed || totalPages <= 1) return [];
+    if (totalPages <= 1) return [];
     const start = Math.max(1, currentPage - 2);
     const end = Math.min(totalPages, start + 4);
     const adjustedStart = Math.max(1, end - 4);
     return Array.from({ length: end - adjustedStart + 1 }, (_, idx) => adjustedStart + idx);
-  }, [currentPage, totalPages, usePagedDesktopFeed]);
+  }, [currentPage, totalPages]);
   const storyLimit = Math.max(
     1,
     Math.round(
@@ -431,7 +340,6 @@ export default function FeedPage() {
   const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleInnerGap ?? 3)) / 100));
 
   const goToFeedPage = useCallback(async (page) => {
-    if (!usePagedDesktopFeed) return;
     const safePage = Math.max(1, Math.min(totalPages, Number(page) || 1));
     const nextPageCursor = (safePage - 1) * cardsPerPage;
     if (nextPageCursor === pageCursor && profiles.length > 0) return;
@@ -460,15 +368,15 @@ export default function FeedPage() {
     }
     const targetTop = Math.max(0, (gridRef.current?.offsetTop || 0) - 24);
     window.scrollTo({ top: targetTop, behavior: 'smooth' });
-  }, [blockCursor, blockSize, cardsPerPage, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, usePagedDesktopFeed, viewerPremium]);
+  }, [blockCursor, blockSize, cardsPerPage, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, viewerPremium]);
 
   useEffect(() => {
-    if (!usePagedDesktopFeed || loading) return;
-    const nextConfig = `${usePagedDesktopFeed ? 'paged' : 'scroll'}:${maxFeedCards}`;
+    if (loading) return;
+    const nextConfig = `paged:${cardsPerPage}`;
     if (pagedFeedConfigRef.current === nextConfig) return;
     pagedFeedConfigRef.current = nextConfig;
     loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
-  }, [blockSize, loadProfiles, loading, maxFeedCards, usePagedDesktopFeed]);
+  }, [blockSize, cardsPerPage, loadProfiles, loading]);
 
   const viewedRaw = useSyncExternalStore(
     useCallback((cb) => {
@@ -981,87 +889,13 @@ export default function FeedPage() {
     storiesDragRef.current.moved = false;
   }, [desktopStoryRailEnhanced, stopStoriesBounce, stopStoriesMomentum]);
 
-  const maybeLoadMore = useCallback(() => {
-    if (usePagedDesktopFeed) return;
-    if (!loadMoreRef.current || loading || loadingMore || !hasMore || !canAutoLoadMore) return;
-    const rect = loadMoreRef.current.getBoundingClientRect();
-    if (rect.top - window.innerHeight <= 1500) {
-      loadMoreProfiles();
-    }
-  }, [canAutoLoadMore, hasMore, loadMoreProfiles, loading, loadingMore, usePagedDesktopFeed]);
-
-  useEffect(() => {
-    if (usePagedDesktopFeed) return;
-    if (!loadMoreRef.current || loading || loadingMore || !hasMore || !canAutoLoadMore) return;
-    const observer = new IntersectionObserver(
-      (entries) => { if (entries.some((e) => e.isIntersecting)) loadMoreProfiles(); },
-      { rootMargin: '1500px 0px' }
-    );
-    observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
-  }, [canAutoLoadMore, hasMore, loading, loadingMore, loadMoreProfiles, usePagedDesktopFeed]);
-
-  useEffect(() => { maybeLoadMore(); }, [maybeLoadMore, profiles.length, showGridSection]);
-
-  useEffect(() => {
-    if (usePagedDesktopFeed) return;
-    let ticking = false;
-    const scheduleCheck = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => { ticking = false; maybeLoadMore(); });
-    };
-    window.addEventListener('scroll', scheduleCheck, { passive: true });
-    window.addEventListener('resize', scheduleCheck);
-    window.addEventListener('focus', scheduleCheck);
-    return () => {
-      window.removeEventListener('scroll', scheduleCheck);
-      window.removeEventListener('resize', scheduleCheck);
-      window.removeEventListener('focus', scheduleCheck);
-    };
-  }, [maybeLoadMore, usePagedDesktopFeed]);
-
   useEffect(() => () => {
     stopStoriesMomentum();
     stopStoriesBounce();
   }, [stopStoriesBounce, stopStoriesMomentum]);
 
-  // ── Virtual scroll setup ────────────────────────────────────────────────
+  // ── Grid setup ────────────────────────────────────────────────────
   const gap = 12;
-  const animatedRowsRef = useRef(new Set());
-  const rows = useMemo(() => {
-    const result = [];
-    for (let i = 0; i < visibleProfiles.length; i += cols) {
-      result.push(visibleProfiles.slice(i, i + cols));
-    }
-    return result;
-  }, [visibleProfiles, cols]);
-
-  const estimateRowHeight = useCallback(() => {
-    if (!gridRef.current) return 300;
-    const containerWidth = gridRef.current.offsetWidth;
-    const cardWidth = (containerWidth - gap * (cols - 1)) / cols;
-    return Math.round(cardWidth * (4 / 3)) + gap;
-  }, [cols, gap]);
-
-  const [gridScrollMargin, setGridScrollMargin] = useState(0);
-  useLayoutEffect(() => {
-    if (!gridRef.current) return;
-    const next = gridRef.current.offsetTop;
-    setGridScrollMargin(prev => prev !== next ? next : prev);
-  }, [cols, orderedStoryProfiles.length, safariDesktop, showGridSection, showStoriesSection, storyCircleSize]);
-
-  const rowVirtualizer = useWindowVirtualizer({
-    count: usePagedDesktopFeed ? 0 : rows.length,
-    estimateSize: estimateRowHeight,
-    overscan: firefoxDesktop ? 2 : 3,
-    scrollMargin: gridScrollMargin,
-  });
-
-  useEffect(() => {
-    if (usePagedDesktopFeed) return;
-    rowVirtualizer.measure();
-  }, [cols, gap, gridScrollMargin, rowVirtualizer, rows.length, usePagedDesktopFeed]);
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
@@ -1373,13 +1207,11 @@ export default function FeedPage() {
         ) : visibleProfiles.length > 0 ? (
           <>
             {showGridSection ? (
-              usePagedDesktopFeed ? (
                   <div
-                    key={`desktop-page-${pageCursor}`}
+                    key={`feed-page-${pageCursor}`}
                     ref={gridRef}
-                    className="grid"
+                    className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
                     style={{
-                      gridTemplateColumns: `repeat(${cols}, 1fr)`,
                       gap: `${gap}px`,
                       opacity: gridOpacity,
                       transition: gridOpacity === 0 ? 'opacity 0.3s ease' : 'opacity 0.25s ease',
@@ -1388,8 +1220,8 @@ export default function FeedPage() {
                     {visibleProfiles.map((profile, index) => (
                       <div
                         key={profile.id}
-                        className="feed-card-enter"
-                        style={{ animationDelay: `${index * 0.04}s` }}
+                        className={isDesktopViewport ? 'feed-card-enter' : undefined}
+                        style={isDesktopViewport ? { animationDelay: `${index * 0.04}s` } : undefined}
                       >
                         <ProfileCard
                           profile={profile}
@@ -1401,55 +1233,44 @@ export default function FeedPage() {
                       </div>
                     ))}
                   </div>
-              ) : (
-              <div
-                ref={gridRef}
-                style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', opacity: gridOpacity, transition: gridOpacity === 0 ? 'opacity 0.3s ease' : 'opacity 0.25s ease' }}
-              >
-                {rowVirtualizer.getVirtualItems().map((virtualRow) => (
-                  <div
-                    key={virtualRow.index}
-                    ref={firefoxDesktop ? undefined : rowVirtualizer.measureElement}
-                    data-index={virtualRow.index}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
-                      display: 'grid',
-                      gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                      gap: `${gap}px`,
-                      paddingBottom: `${gap}px`,
-                    }}
-                  >
-                    {rows[virtualRow.index].map((profile, idx) => {
-                      const globalIndex = virtualRow.index * cols + idx;
-                      return (
-                        <ProfileCard
-                          key={profile.id}
-                          profile={profile}
-                          index={globalIndex}
-                          rank={globalIndex + 1}
-                          viewerPremium={viewerPremium}
-                          settings={safeSettings}
-                        />
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-              )
             ) : (
               <div className="h-24" aria-hidden="true" />
             )}
-            {usePagedDesktopFeed ? (
-              totalPages > 1 ? (
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <>
+                {/* Mobile overlay arrows — fixed at bottom */}
+                <div className="lg:hidden fixed left-0 right-0 z-40 flex items-center justify-between px-4 pointer-events-none" style={{ bottom: `${navBottomOffset + 8}px` }}>
+                  {currentPage > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => goToFeedPage(currentPage - 1)}
+                      className="pointer-events-auto flex items-center justify-center w-11 h-11 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
+                    >
+                      <ChevronLeft className="w-5 h-5 text-white/80" />
+                    </button>
+                  ) : <div className="w-11" />}
+                  <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-black/60 backdrop-blur-md border border-white/15 px-3 py-1.5 shadow-lg">
+                    <span className="text-[11px] font-medium text-white/70">{currentPage} / {totalPages}</span>
+                  </div>
+                  {currentPage < totalPages ? (
+                    <button
+                      type="button"
+                      onClick={() => goToFeedPage(currentPage + 1)}
+                      className="pointer-events-auto flex items-center justify-center w-11 h-11 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
+                    >
+                      <ChevronRight className="w-5 h-5 text-white/80" />
+                    </button>
+                  ) : <div className="w-11" />}
+                </div>
+
+                {/* Desktop pagination bar */}
                 <motion.div
                   initial={{ opacity: 0, y: 14 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-                  className="py-6"
+                  className="hidden lg:block py-6"
                 >
                   <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/10 bg-mansion-card/80 px-3 py-3 shadow-[0_16px_36px_rgba(0,0,0,0.18)] backdrop-blur-sm">
                     <span className="mr-1 text-xs font-medium text-text-muted">
@@ -1462,7 +1283,7 @@ export default function FeedPage() {
                       className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-text-muted transition hover:border-white/20 hover:text-white disabled:opacity-40"
                     >
                       <ChevronLeft className="w-4 h-4" />
-                      <span className="hidden sm:inline">Anterior</span>
+                      Anterior
                     </button>
                     {pageWindow.map((page) => (
                       <motion.button
@@ -1485,20 +1306,11 @@ export default function FeedPage() {
                       disabled={currentPage >= totalPages || loading}
                       className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-text-muted transition hover:border-white/20 hover:text-white disabled:opacity-40"
                     >
-                      <span className="hidden sm:inline">Siguiente</span>
+                      Siguiente
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </motion.div>
-              ) : null
-            ) : (
-              <>
-                <div ref={loadMoreRef} className="h-8" />
-                {loadingMore && (
-                  <div className="flex items-center justify-center py-6">
-                    <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
-                  </div>
-                )}
               </>
             )}
           </>
