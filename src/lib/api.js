@@ -126,10 +126,6 @@ function mergeMeCache(partialUser) {
   if (!currentUser) return;
   const nextUser = { ...currentUser, ...partialUser };
   cacheMeResponse({ user: nextUser });
-  const cachedBootstrap = sessionCache.get('appBootstrap', 60 * 60_000);
-  if (cachedBootstrap) {
-    sessionCache.set('appBootstrap', { ...cachedBootstrap, user: nextUser });
-  }
   const currentDashboard = sessionCache.get(OWN_PROFILE_DASHBOARD_CACHE_KEY, OWN_PROFILE_DASHBOARD_TTL_MS);
   if (currentDashboard?.user) {
     cacheOwnProfileDashboard({
@@ -476,7 +472,7 @@ async function apiFetch(path, options = {}) {
   // Handle 401 — token expired
   if (res.status === 401 && token) {
     clearAuth();
-    window.dispatchEvent(new CustomEvent('mansion-auth-expired'));
+    window.location.href = '/bienvenida';
     throw new Error('Sesión expirada');
   }
 
@@ -558,7 +554,7 @@ async function apiUpload(path, options = {}) {
 
       if (xhr.status === 401 && token) {
         clearAuth();
-        window.dispatchEvent(new CustomEvent('mansion-auth-expired'));
+        window.location.href = '/bienvenida';
         reject(new Error('Sesión expirada'));
         return;
       }
@@ -581,7 +577,7 @@ async function apiUpload(path, options = {}) {
 
 // ── Auth ────────────────────────────────────────────────
 
-export async function register({ email, password, username, role, seeking, interests, age, birthdate, province, locality, city, bio, country, turnstileToken }) {
+export async function register({ email, password, username, role, seeking, interests, age, birthdate, province, locality, city, bio, country }) {
   const normalizedProvince = province ?? city ?? '';
   const normalizedAge = age === '' || age == null ? undefined : Number(age);
   const data = await apiFetch('/auth/register', {
@@ -600,7 +596,6 @@ export async function register({ email, password, username, role, seeking, inter
       city: normalizedProvince,
       bio,
       country,
-      turnstileToken: turnstileToken || undefined,
     }),
   });
   // Registration now returns needsVerification instead of token
@@ -1095,12 +1090,11 @@ export async function adminResetAllCoins() {
 
 // ── Admin: Users ────────────────────────────────────────
 
-export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', role = '', status = '' } = {}) {
+export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', role = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (q) params.set('q', q);
   if (fake === '1' || fake === '0') params.set('fake', fake);
   if (['mujer', 'hombre', 'pareja'].includes(role)) params.set('role', role);
-  if (['under_review', 'suspended', 'active'].includes(status)) params.set('status', status);
   return apiFetch(`/admin/users?${params}`);
 }
 

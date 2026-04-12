@@ -1244,12 +1244,11 @@ export default function FeedPage() {
               <>
                 {/* Mobile overlay arrows — appear on scroll to bottom */}
                 <motion.div
-                  initial={{ opacity: 0, y: 40 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 40 }}
-                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={showMobileNav ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                   className="lg:hidden fixed left-0 right-0 z-40 flex items-center justify-between px-4 pointer-events-none"
-                  style={{ top: '50%', transform: 'translateY(-50%)' }}
+                  style={{ bottom: `${navBottomOffset + 8}px` }}
                 >
                   {currentPage > 1 ? (
                     <button

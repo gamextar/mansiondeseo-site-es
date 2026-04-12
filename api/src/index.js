@@ -14,222 +14,12 @@ function cached(key, ttlMs, fetcher) {
   return fetcher().then(val => { _cache.set(key, { val, exp: Date.now() + ttlMs }); return val; });
 }
 
-// ── Two-level cache for expensive shared (non-user-specific) queries ────────
-// L1: _cache Map — zero latency, per-isolate only
-// L2: CF Cache API — ~1ms, shared across ALL isolates in the same PoP
-// At scale with many parallel isolates, L2 eliminates redundant D1 reads.
-const _CACHE_L2_PREFIX = 'https://mansion-l2-cache/';
-async function cachedCrossIsolate(key, ttlMs, fetcher) {
-  // L1 — synchronous hit, zero overhead
-  const l1 = _cache.get(key);
-  if (l1 && Date.now() < l1.exp) return l1.val;
-
-  // L2 — CF Cache API, shared across isolates within a PoP
-  try {
-    const hit = await caches.default.match(new Request(`${_CACHE_L2_PREFIX}${encodeURIComponent(key)}`));
-    if (hit) {
-      const val = await hit.json();
-      _cache.set(key, { val, exp: Date.now() + ttlMs }); // warm L1
-      return val;
-    }
-  } catch {}
-
-  // Full miss — fetch from source
-  const val = await fetcher();
-  const ttlSec = Math.floor(ttlMs / 1000);
-  _cache.set(key, { val, exp: Date.now() + ttlMs }); // populate L1
-  // Populate L2 fire-and-forget — don't add latency to this response
-  try {
-    caches.default.put(
-      new Request(`${_CACHE_L2_PREFIX}${encodeURIComponent(key)}`),
-      new Response(JSON.stringify(val), {
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${ttlSec}` },
-      })
-    );
-  } catch {}
-  return val;
-}
-async function invalidateCrossIsolateCache(key) {
-  try { await caches.default.delete(new Request(`${_CACHE_L2_PREFIX}${encodeURIComponent(key)}`)); } catch {}
-}
-
-// Processed feed cache — keyed per viewer, stores the fully mapped+scored+sorted profiles list.
-// Cursor pages read from this cache instead of re-computing everything.
-const _feedCache = new Map();
-const FEED_CACHE_TTL = 120_000; // 2 min
-const FEED_CACHE_MAX_ENTRIES = 100;
-
-// Stories cache — keyed by viewer+seeking+limit, avoids D1 JOIN on every video feed load
-const _storiesCache = new Map();
-const STORIES_CACHE_TTL = 60_000; // 1 min — stories change more frequently than profiles
-const STORIES_CACHE_MAX_ENTRIES = 200;
-const LIVEFEED_CURRENT_KEY = 'livefeed/current.json';
-const LIVEFEED_BUCKET_LIMIT = 50;
-function getCachedStories(key) {
-  const entry = _storiesCache.get(key);
-  if (!entry) return null;
-  if (Date.now() >= entry.exp) { _storiesCache.delete(key); return null; }
-  return entry.val;
-}
-function setCachedStories(key, val) {
-  if (_storiesCache.size >= STORIES_CACHE_MAX_ENTRIES) {
-    const oldest = _storiesCache.keys().next().value;
-    _storiesCache.delete(oldest);
-  }
-  _storiesCache.set(key, { val, exp: Date.now() + STORIES_CACHE_TTL });
-}
-function invalidateStoriesCache() {
-  _storiesCache.clear();
-}
-
-function livefeedBucketForRole(role) {
-  const normalized = String(role || '').trim().toLowerCase();
-  if (normalized === 'mujer') return 'mujer';
-  if (normalized === 'hombre') return 'hombre';
-  if (normalized === 'trans') return 'trans';
-  if (PAIR_ROLE_IDS.includes(normalized)) return 'pareja';
-  return '';
-}
-
-function buildLivefeedStoryRow(row, env) {
-  return {
-    id: String(row?.user_id || ''),
-    story_id: String(row?.id || ''),
-    user_id: String(row?.user_id || ''),
-    name: row?.username || '',
-    username: row?.username || '',
-    role: row?.role || '',
-    avatar_url: row?.avatar_url ? normalizeStoryVideoUrl(row.avatar_url, env) : '',
-    avatar_crop: safeParseJSON(row?.avatar_crop, null),
-    video_url: row?.video_url ? normalizeStoryVideoUrl(row.video_url, env) : '',
-    caption: row?.caption || '',
-    likes: Number(row?.likes || 0),
-    comments: Number(row?.comments || 0),
-    created_at: row?.created_at || '',
-  };
-}
-
-async function putJsonObjectToR2(env, key, payload, cacheControl) {
-  await env.IMAGES.put(key, JSON.stringify(payload), {
-    httpMetadata: {
-      contentType: 'application/json',
-      cacheControl,
-    },
-  });
-}
-
-async function publishLivefeedSnapshot(env) {
-  if (!env?.IMAGES) return null;
-
-  const { results } = await env.DB.prepare(`
-    WITH ranked AS (
-      SELECT
-        s.id,
-        s.user_id,
-        s.video_url,
-        s.caption,
-        s.likes,
-        s.comments,
-        s.created_at,
-        u.username,
-        u.avatar_url,
-        u.avatar_crop,
-        u.role,
-        CASE
-          WHEN u.role = 'mujer' THEN 'mujer'
-          WHEN u.role = 'hombre' THEN 'hombre'
-          WHEN u.role IN ('pareja', 'pareja_hombres', 'pareja_mujeres') THEN 'pareja'
-          WHEN u.role = 'trans' THEN 'trans'
-          ELSE ''
-        END AS livefeed_bucket,
-        ROW_NUMBER() OVER (
-          PARTITION BY CASE
-            WHEN u.role = 'mujer' THEN 'mujer'
-            WHEN u.role = 'hombre' THEN 'hombre'
-            WHEN u.role IN ('pareja', 'pareja_hombres', 'pareja_mujeres') THEN 'pareja'
-            WHEN u.role = 'trans' THEN 'trans'
-            ELSE ''
-          END
-          ORDER BY s.created_at DESC
-        ) AS rn
-      FROM stories s
-      JOIN users u ON u.id = s.user_id
-      WHERE s.active = 1
-        AND u.status = 'verified'
-        AND COALESCE(u.account_status, 'active') = 'active'
-    )
-    SELECT id, user_id, video_url, caption, likes, comments, created_at, username, avatar_url, avatar_crop, role
-    FROM ranked
-    WHERE livefeed_bucket != ''
-      AND rn <= ?
-    ORDER BY created_at DESC
-  `).bind(LIVEFEED_BUCKET_LIMIT).all();
-
-  const buckets = {
-    mujer: [],
-    hombre: [],
-    pareja: [],
-    trans: [],
-  };
-
-  for (const row of results || []) {
-    const bucket = livefeedBucketForRole(row?.role);
-    if (!bucket || buckets[bucket].length >= LIVEFEED_BUCKET_LIMIT) continue;
-    buckets[bucket].push(buildLivefeedStoryRow(row, env));
-  }
-
-  const now = new Date().toISOString();
-  const version = `livefeed-${Date.now()}.json`;
-  const versionKey = `livefeed/${version}`;
-  const r2Base = String(env?.R2_PUBLIC_URL || '').replace(/\/$/, '');
-  const versionUrl = r2Base ? `${r2Base}/${versionKey}` : versionKey;
-
-  const versionPayload = {
-    version,
-    versionKey,
-    updatedAt: now,
-    stories: buckets,
-  };
-
-  const currentPayload = {
-    version,
-    versionKey,
-    versionUrl,
-    updatedAt: now,
-    counts: Object.fromEntries(Object.entries(buckets).map(([key, list]) => [key, list.length])),
-  };
-
-  await putJsonObjectToR2(env, versionKey, versionPayload, 'public, max-age=31536000, immutable');
-  await putJsonObjectToR2(env, LIVEFEED_CURRENT_KEY, currentPayload, 'public, max-age=30, stale-while-revalidate=30');
-
-  return currentPayload;
-}
-function getCachedFeed(key) {
-  const entry = _feedCache.get(key);
-  if (!entry) return null;
-  if (Date.now() >= entry.exp) { _feedCache.delete(key); return null; }
-  return entry.val;
-}
-function setCachedFeed(key, val) {
-  // Evict oldest entries if cache is too large
-  if (_feedCache.size >= FEED_CACHE_MAX_ENTRIES) {
-    const oldest = _feedCache.keys().next().value;
-    _feedCache.delete(oldest);
-  }
-  _feedCache.set(key, { val, exp: Date.now() + FEED_CACHE_TTL });
-}
-
 function invalidateFeedBrowseCache() {
-  const l2Keys = [];
   for (const key of _cache.keys()) {
     if (String(key).startsWith('profiles:') || String(key) === 'active_story_users') {
       _cache.delete(key);
-      l2Keys.push(key);
     }
   }
-  // Invalidate L2 (CF Cache API) so other isolates also see the fresh data
-  for (const key of l2Keys) invalidateCrossIsolateCache(key);
-  _feedCache.clear();
 }
 
 const _routeMetrics = new Map();
@@ -252,7 +42,7 @@ let _profileStatsBackfillReady = null;
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
-const FEED_PROFILE_LIMIT = 360;
+const FEED_PROFILE_LIMIT = 42;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -468,10 +258,6 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
-
-  if (storyRows.length > 0) {
-    await publishLivefeedSnapshot(env).catch(() => {});
-  }
 }
 
 async function ensureHiddenConversationsTable(env) {
@@ -1207,24 +993,10 @@ const _lastActiveCache = new Map(); // userId → timestamp of last D1 UPDATE
 const _accountStatusCache = new Map(); // userId → { status, exp }
 const _viewerCache = new Map(); // userId → { data, exp } — viewer profile data (country, seeking, etc.)
 const _fullUserCache = new Map(); // userId → { data, exp } — full user row for reuse by handlers
-const _favoritesCache = new Map(); // userId → { rows, exp } — viewer's favorites rows (user_id + target_id)
 const LAST_ACTIVE_DEBOUNCE_MS = 5 * 60_000; // only UPDATE last_active every 5 min
 const ACCOUNT_STATUS_TTL_MS = 5 * 60_000; // cache account_status for 5 min
 const VIEWER_CACHE_TTL_MS = 2 * 60_000; // cache viewer data for 2 min
 const FULL_USER_CACHE_TTL_MS = 30_000; // cache full user row for 30s (short — used to deduplicate within same request wave)
-const FAVORITES_CACHE_TTL_MS = 120_000; // 2 min — same as feed cache
-
-function getCachedFavorites(userId) {
-  const entry = _favoritesCache.get(userId);
-  if (!entry || Date.now() >= entry.exp) { _favoritesCache.delete(userId); return null; }
-  return entry.rows;
-}
-function setCachedFavorites(userId, rows) {
-  _favoritesCache.set(userId, { rows, exp: Date.now() + FAVORITES_CACHE_TTL_MS });
-}
-function invalidateFavoritesCache(userId) {
-  _favoritesCache.delete(userId);
-}
 
 function getCachedViewer(userId) {
   const entry = _viewerCache.get(userId);
@@ -2066,7 +1838,6 @@ async function handleProfiles(request, env) {
   const search = url.searchParams.get('q') || '';
   const fresh = url.searchParams.get('fresh') === '1';
   const cursor = Math.max(0, Number.parseInt(url.searchParams.get('cursor') || '0', 10) || 0);
-  const pageSize = Math.min(Math.max(12, Number.parseInt(url.searchParams.get('pageSize') || String(FEED_PROFILE_LIMIT), 10) || FEED_PROFILE_LIMIT), 600);
   const settings = await cached('settings', 300_000, () => loadSettings(env));
 
   // Use cached viewer data when available to avoid a serial D1 round-trip
@@ -2134,51 +1905,23 @@ async function handleProfiles(request, env) {
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
-  // Cap SQL results — derived from feed pagination settings (cardsPerPage × maxPages), clamped to [100, 2000].
-  const feedPool = (settings.feedCardsPerPage ?? 12) * (settings.feedMaxPages ?? 10);
-  const sqlLimit = Math.min(Math.max(100, feedPool), 2000);
-  query += ` ORDER BY last_active DESC LIMIT ${sqlLimit}`;
+  const windowLimit = cursor + FEED_PROFILE_LIMIT;
+  const pageWindowLimit = windowLimit + 1;
+  const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, FEED_PROFILE_LIMIT * 10) : pageWindowLimit;
+  query += ` ORDER BY last_active DESC LIMIT ${dbLimit}`;
 
   // Cache key for profiles query (shared across all users)
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
   const countryKey = settings.feedFilterByCountry ? country : 'all-countries';
   const profilesCacheKey = `profiles:${seekingKey}:${countryKey}:${search}`;
+  const shouldUseProfilesCache = !fresh && cursor === 0;
 
-  // Feed cache key — viewer-specific (includes favorites, blurred, premium status)
-  const feedCacheKey = `feed:${auth.sub}:${seekingKey}:${countryKey}:${search}`;
-
-  // For cursor pages, try to serve from the fully-processed feed cache.
-  // This avoids re-fetching, re-mapping, re-scoring, and re-sorting ALL profiles.
-  if (!fresh) {
-    const cachedFeedData = getCachedFeed(feedCacheKey);
-    if (cachedFeedData) {
-      const totalProfiles = cachedFeedData.profiles.length;
-      const pagedProfiles = cachedFeedData.profiles.slice(cursor, cursor + pageSize);
-      const hasMore = totalProfiles > cursor + pageSize;
-      const nextCursor = hasMore ? cursor + pageSize : null;
-      return json({
-        profiles: pagedProfiles,
-        viewerPremium: cachedFeedData.viewerPremium,
-        settings,
-        totalProfiles,
-        cursor,
-        nextCursor: nextCursor !== null ? String(nextCursor) : null,
-        hasMore,
-      });
-    }
-  }
-
-  const shouldUseProfilesCache = !fresh;
-
-  // Parallel: cached profiles (L1+L2) + cached favorites + active stories
-  const cachedFavRows = !fresh ? getCachedFavorites(auth.sub) : null;
-  const [results, allFavRows, storyRows] = await Promise.all([
+  // Parallel: cached settings + cached profiles + combined favorites + active stories
+  const [results, { results: allFavRows }, storyRows] = await Promise.all([
     shouldUseProfilesCache
-      ? cachedCrossIsolate(profilesCacheKey, 120_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results))  // L1+L2, 2 min
+      ? cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results))  // 30s
       : env.DB.prepare(query).bind(...params).all().then(r => r.results),
-    cachedFavRows
-      ? Promise.resolve(cachedFavRows)
-      : env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?').bind(auth.sub, auth.sub).all().then(r => { setCachedFavorites(auth.sub, r.results); return r.results; }),
+    env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?').bind(auth.sub, auth.sub).all(),
     cached('active_story_users', 30_000, () => env.DB.prepare('SELECT DISTINCT user_id FROM stories WHERE active = 1').all().then(r => r.results).catch(() => [])),  // 30s
   ]);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
@@ -2261,26 +2004,23 @@ async function handleProfiles(request, env) {
         return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
       });
     }
-    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, Infinity);
+    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, pageWindowLimit);
+  } else {
+    profiles = profiles.slice(0, pageWindowLimit);
   }
 
   // Strip internal sort fields
   profiles = profiles.map(({ _matchingInterests, _roleId, _feedScore, ...p }) => p);
 
-  // Cache the fully processed feed for cursor pages
-  setCachedFeed(feedCacheKey, { profiles, viewerPremium: viewerIsPremium });
-
   const totalProfiles = profiles.length;
-  const pagedProfiles = profiles.slice(cursor, cursor + pageSize);
-  const hasMore = totalProfiles > cursor + pageSize;
-  const nextCursor = hasMore ? cursor + pageSize : null;
+  const pagedProfiles = profiles.slice(cursor, cursor + FEED_PROFILE_LIMIT);
+  const hasMore = totalProfiles > cursor + FEED_PROFILE_LIMIT;
+  const nextCursor = hasMore ? cursor + FEED_PROFILE_LIMIT : null;
 
   return json({
     profiles: pagedProfiles,
     viewerPremium: viewerIsPremium,
     settings,
-    totalProfiles,
-    cursor,
     nextCursor: nextCursor !== null ? String(nextCursor) : null,
     hasMore,
   });
@@ -3432,9 +3172,6 @@ async function loadSettings(env) {
     storyCircleGap: parseInt(settings.story_circle_gap || '8', 10),
     storyCircleBorder: parseInt(settings.story_circle_border || '4', 10),
     storyCircleInnerGap: parseInt(settings.story_circle_inner_gap || '3', 10),
-    homeStoryCountMobile: parseInt(settings.home_story_count_mobile || '15', 10),
-    homeStoryCountDesktop: parseInt(settings.home_story_count_desktop || '30', 10),
-    homeStoriesUseLivefeed: settings.home_stories_use_livefeed !== '0',
     coinIconUrl: settings.coin_icon_url || '',
     coinIconSize: parseInt(settings.coin_icon_size || '18', 10),
     navBottomPadding: parseInt(settings.nav_bottom_padding || '24', 10),
@@ -3465,9 +3202,6 @@ async function loadSettings(env) {
     feedWeightFollowers: parseNumberSetting(settings.feed_weight_followers, 10),
     feedWeightSharedInterests: parseNumberSetting(settings.feed_weight_shared_interests, 20),
     feedWeightPremium: parseNumberSetting(settings.feed_weight_premium, 8),
-    feedCardsPerPage: parseInt(settings.feed_cards_per_page || '12', 10),
-    feedMaxPages: parseInt(settings.feed_max_pages || '10', 10),
-    feedPrefetchPages: parseInt(settings.feed_prefetch_pages || '6', 10),
   };
   // Keep module-level threshold in sync so isOnline() uses the latest value
   _onlineThresholdMs = result.onlineThresholdMinutes * 60_000;
@@ -3524,9 +3258,6 @@ function getPublicSettingsPayload(settings) {
     feedWeightFollowers: settings.feedWeightFollowers,
     feedWeightSharedInterests: settings.feedWeightSharedInterests,
     feedWeightPremium: settings.feedWeightPremium,
-    feedCardsPerPage: settings.feedCardsPerPage,
-    feedMaxPages: settings.feedMaxPages,
-    feedPrefetchPages: settings.feedPrefetchPages,
     navBottomPadding: settings.navBottomPadding,
     navSidePadding: settings.navSidePadding,
     navHeight: settings.navHeight,
@@ -3537,9 +3268,6 @@ function getPublicSettingsPayload(settings) {
     storyCirclePresetLarge: settings.storyCirclePresetLarge,
     storyCirclePresetXl: settings.storyCirclePresetXl,
     sidebarAvatarSize: settings.sidebarAvatarSize,
-    homeStoryCountMobile: settings.homeStoryCountMobile,
-    homeStoryCountDesktop: settings.homeStoryCountDesktop,
-    homeStoriesUseLivefeed: settings.homeStoriesUseLivefeed,
     videoGradientHeight: settings.videoGradientHeight,
     videoGradientOpacity: settings.videoGradientOpacity,
     videoAvatarSize: settings.videoAvatarSize,
@@ -3600,8 +3328,6 @@ async function handleUpdateSettings(request, env) {
     'story_circle_gap',
     'story_circle_border',
     'story_circle_inner_gap',
-    'home_story_count_mobile',
-    'home_story_count_desktop',
     'home_stories_use_livefeed',
     'sidebar_story_ring_width',
     'coin_icon_url',
@@ -3633,9 +3359,6 @@ async function handleUpdateSettings(request, env) {
     'feed_weight_followers',
     'feed_weight_shared_interests',
     'feed_weight_premium',
-    'feed_cards_per_page',
-    'feed_max_pages',
-    'feed_prefetch_pages',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {
@@ -3664,14 +3387,12 @@ async function handleToggleFavorite(request, env, targetId) {
     await env.DB.prepare('DELETE FROM favorites WHERE user_id = ? AND target_id = ?')
       .bind(auth.sub, targetId).run();
     await incrementProfileFollowerStat(env, targetId, -1);
-    invalidateFavoritesCache(auth.sub);
     const statRow = await env.DB.prepare('SELECT followers_total FROM profile_stats WHERE user_id = ?').bind(targetId).first();
     return json({ favorited: false, followers_total: Number(statRow?.followers_total || 0) });
   } else {
     await env.DB.prepare('INSERT INTO favorites (user_id, target_id) VALUES (?, ?)')
       .bind(auth.sub, targetId).run();
     await incrementProfileFollowerStat(env, targetId, 1);
-    invalidateFavoritesCache(auth.sub);
     const statRow = await env.DB.prepare('SELECT followers_total FROM profile_stats WHERE user_id = ?').bind(targetId).first();
     return json({ favorited: true, followers_total: Number(statRow?.followers_total || 0) });
   }
@@ -4016,7 +3737,6 @@ async function handleAdminGetUsers(request, env) {
   const q = (url.searchParams.get('q') || '').trim();
   const fakeFilter = url.searchParams.get('fake');
   const roleFilter = (url.searchParams.get('role') || '').trim();
-  const statusFilter = (url.searchParams.get('status') || '').trim();
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
@@ -4044,11 +3764,6 @@ async function handleAdminGetUsers(request, env) {
   } else if (roleFilter === 'pareja') {
     filters.push(`role IN (${PAIR_ROLE_IDS.map(() => '?').join(', ')})`);
     bindings.push(...PAIR_ROLE_IDS);
-  }
-
-  if (statusFilter === 'under_review' || statusFilter === 'suspended' || statusFilter === 'active') {
-    filters.push("COALESCE(account_status, 'active') = ?");
-    bindings.push(statusFilter);
   }
 
   if (filters.length > 0) {
@@ -4765,12 +4480,10 @@ async function handleGetStories(request, env) {
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
   const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
   const offset = (page - 1) * limit;
-  const focusUserId = String(url.searchParams.get('focus_user_id') || '').trim();
 
   // Try to get current user for per-user liked status and server-side seeking filter
   const auth = await authenticate(request, env).catch(() => null);
   const viewerId = auth?.sub || null;
-  const isOwnFocusStory = !!focusUserId && !!viewerId && focusUserId === viewerId;
 
   let viewer = viewerId ? getCachedViewer(viewerId) : null;
   if (viewerId && !viewer) {
@@ -4785,14 +4498,6 @@ async function handleGetStories(request, env) {
     ? viewerSeeking
     : [];
   const roleValues = [...new Set(roleFilters.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])))];
-
-  // Worker-level cache — avoids the 3-table JOIN on every video feed load.
-  // Key: viewer + seeking filter + page/limit. Liked status comes from the cache
-  // and the client merges its optimistic pending-likes on top anyway.
-  const seekingKey = roleValues.sort().join(',');
-  const storiesCacheKey = `stories:${viewerId || 'anon'}:${seekingKey}:${page}:${limit}:${focusUserId || ''}`;
-  const cached = getCachedStories(storiesCacheKey);
-  if (cached) return json({ stories: cached });
 
   const bindings = [viewerId || ''];
   let query = `
@@ -4819,7 +4524,7 @@ async function handleGetStories(request, env) {
 
   const { results } = await env.DB.prepare(query).bind(...bindings).all();
 
-  let stories = (results || []).map(r => ({
+  const stories = (results || []).map(r => ({
     id: r.id,
     user_id: r.user_id,
     video_url: normalizeStoryVideoUrl(r.video_url, env),
@@ -4833,57 +4538,6 @@ async function handleGetStories(request, env) {
     avatar_crop: safeParseJSON(r.avatar_crop, null),
   }));
 
-  if (focusUserId && !stories.some((story) => String(story.user_id) === focusUserId)) {
-    const focusBindings = [viewerId || '', focusUserId];
-    let focusQuery = `
-      SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
-             u.username, u.avatar_url, u.avatar_crop,
-             CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
-      FROM stories s
-      JOIN users u ON u.id = s.user_id
-      LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?
-      WHERE s.active = 1
-        AND u.status = 'verified'
-        AND COALESCE(u.account_status, 'active') = 'active'
-        AND s.user_id = ?
-    `;
-    if (roleValues.length > 0 && !isOwnFocusStory) {
-      focusQuery += ` AND u.role IN (${roleValues.map(() => '?').join(', ')})`;
-      focusBindings.push(...roleValues);
-    }
-    if (!isOwnFocusStory) {
-      focusQuery += `
-        AND (s.user_id != ? OR ? = '')
-      `;
-      focusBindings.push(viewerId || '', viewerId || '');
-    }
-    focusQuery += `
-      ORDER BY s.created_at DESC
-      LIMIT 1
-    `;
-
-    const focusRow = await env.DB.prepare(focusQuery).bind(...focusBindings).first();
-    if (focusRow) {
-      stories = [
-        {
-          id: focusRow.id,
-          user_id: focusRow.user_id,
-          video_url: normalizeStoryVideoUrl(focusRow.video_url, env),
-          caption: focusRow.caption || '',
-          likes: focusRow.likes || 0,
-          liked: !!focusRow.liked,
-          comments: focusRow.comments || 0,
-          created_at: focusRow.created_at,
-          username: focusRow.username,
-          avatar_url: focusRow.avatar_url || '',
-          avatar_crop: safeParseJSON(focusRow.avatar_crop, null),
-        },
-        ...stories,
-      ];
-    }
-  }
-
-  setCachedStories(storiesCacheKey, stories);
   return json({ stories });
 }
 
@@ -5085,8 +4739,6 @@ async function handleAdminUploadStory(request, env) {
     INSERT INTO stories (id, user_id, video_url, caption) VALUES (?, ?, ?, ?)
   `).bind(storyId, userId, videoUrl, caption).run();
 
-  invalidateStoriesCache();
-  await publishLivefeedSnapshot(env).catch(() => {});
   return json({ id: storyId, video_url: videoUrl, user_id: userId, caption }, 201);
 }
 
@@ -5115,8 +4767,6 @@ async function handleDeleteOwnStory(request, env, storyId) {
     // R2 delete is best-effort
   }
 
-  invalidateStoriesCache();
-  await publishLivefeedSnapshot(env).catch(() => {});
   return json({ deleted: true, story_id: story.id });
 }
 
@@ -5140,8 +4790,6 @@ async function handleAdminDeleteStory(request, env, storyId) {
     // R2 delete is best-effort
   }
 
-  invalidateStoriesCache();
-  await publishLivefeedSnapshot(env).catch(() => {});
   return json({ deleted: true, story_id: storyId });
 }
 
@@ -5194,8 +4842,6 @@ async function handleUploadStory(request, env) {
     INSERT INTO stories (id, user_id, video_url, caption) VALUES (?, ?, ?, ?)
   `).bind(storyId, auth.sub, videoUrl, caption).run();
 
-  invalidateStoriesCache();
-  await publishLivefeedSnapshot(env).catch(() => {});
   return json({ id: storyId, video_url: videoUrl, caption }, 201);
 }
 
