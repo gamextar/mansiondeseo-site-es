@@ -660,6 +660,7 @@ export default function FeedPage() {
 
     refreshLivefeed({ minIntervalMs: 0 });
     const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       refreshLivefeed({ minIntervalMs: 15_000 });
     }, 30_000);
 
