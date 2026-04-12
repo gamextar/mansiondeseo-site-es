@@ -112,6 +112,7 @@ export default function FeedPage() {
   const storyNodeRefs = useRef(new Map());
   const storyRectsRef = useRef(new Map());
   const previousOrderedStoryIdsRef = useRef('');
+  const initialStoriesAlignedRef = useRef(false);
   const storiesDragRef = useRef({
     active: false,
     captured: false,
@@ -396,6 +397,29 @@ export default function FeedPage() {
   }, [storyProfiles, viewedStoryUsers]);
 
   useLayoutEffect(() => {
+    if (!showStoriesSection || orderedStoryProfiles.length === 0) {
+      initialStoriesAlignedRef.current = false;
+      return;
+    }
+    const container = storiesScrollRef.current;
+    if (!container || initialStoriesAlignedRef.current) return;
+    initialStoriesAlignedRef.current = true;
+    container.scrollLeft = 0;
+    let rafA = 0;
+    let rafB = 0;
+    rafA = requestAnimationFrame(() => {
+      container.scrollLeft = 0;
+      rafB = requestAnimationFrame(() => {
+        if (storiesScrollRef.current) storiesScrollRef.current.scrollLeft = 0;
+      });
+    });
+    return () => {
+      if (rafA) cancelAnimationFrame(rafA);
+      if (rafB) cancelAnimationFrame(rafB);
+    };
+  }, [orderedStoryProfiles.length, showStoriesSection]);
+
+  useLayoutEffect(() => {
     const orderedIds = orderedStoryProfiles.map((profile) => String(profile?.id || '')).filter(Boolean).join(',');
     const previousOrderedIds = previousOrderedStoryIdsRef.current;
     previousOrderedStoryIdsRef.current = orderedIds;
@@ -622,7 +646,6 @@ export default function FeedPage() {
   }, [storyLimit, user?.id, user?.seeking]);
 
   const handleStoriesWheel = useCallback((event) => {
-    if (isSafariDesktopRef.current) return;
     const el = storiesScrollRef.current;
     if (!el) return;
     const absX = Math.abs(event.deltaX);
@@ -684,7 +707,6 @@ export default function FeedPage() {
   }, []);
 
   const handleStoriesPointerDown = useCallback((event) => {
-    if (isSafariDesktopRef.current) return;
     if (event.pointerType !== 'mouse' || event.button !== 0) return;
     const el = storiesScrollRef.current;
     if (!el || el.scrollWidth <= el.clientWidth) return;
@@ -702,7 +724,6 @@ export default function FeedPage() {
   }, [stopStoriesMomentum]);
 
   const handleStoriesPointerMove = useCallback((event) => {
-    if (isSafariDesktopRef.current) return;
     const el = storiesScrollRef.current;
     const drag = storiesDragRef.current;
     if (!el || !drag.active) return;
@@ -725,7 +746,6 @@ export default function FeedPage() {
   }, []);
 
   const finishStoriesDrag = useCallback((event) => {
-    if (isSafariDesktopRef.current) return;
     const el = storiesScrollRef.current;
     const drag = storiesDragRef.current;
     if (!drag.active) return;
@@ -743,7 +763,6 @@ export default function FeedPage() {
   }, [startStoriesMomentum]);
 
   const handleStoriesClickCapture = useCallback((event) => {
-    if (isSafariDesktopRef.current) return;
     if (!storiesDragRef.current.moved) return;
     event.preventDefault();
     event.stopPropagation();
