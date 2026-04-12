@@ -15,7 +15,7 @@ import AvatarImg from '../components/AvatarImg';
 import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
-import { isSafariDesktopBrowser } from '../lib/browser';
+import { isFirefoxDesktopBrowser, isSafariDesktopBrowser } from '../lib/browser';
 import { fetchLivefeedCurrent, fetchLivefeedPayload, selectLivefeedStories, getCachedLivefeedPayload } from '../lib/livefeed';
 
 const FEED_CACHE_KEY = 'mansion_feed';
@@ -78,6 +78,7 @@ function setCachedFeed(data) {
 
 export default function FeedPage() {
   const safariDesktop = isSafariDesktopBrowser();
+  const firefoxDesktop = isFirefoxDesktopBrowser();
   const cols = useGridColumns();
   const isDesktopViewport = cols >= 4;
   const desktopStoryRailEnhanced = isDesktopViewport;
@@ -943,14 +944,18 @@ export default function FeedPage() {
     if (!gridRef.current) return;
     const next = gridRef.current.offsetTop;
     setGridScrollMargin(prev => prev !== next ? next : prev);
-  });
+  }, [cols, orderedStoryProfiles.length, safariDesktop, showGridSection, showStoriesSection, storyCircleSize]);
 
   const rowVirtualizer = useWindowVirtualizer({
     count: rows.length,
     estimateSize: estimateRowHeight,
-    overscan: 3,
+    overscan: firefoxDesktop ? 2 : 3,
     scrollMargin: gridScrollMargin,
   });
+
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [cols, firefoxDesktop, gap, gridScrollMargin, rowVirtualizer, rows.length]);
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
@@ -1273,7 +1278,7 @@ export default function FeedPage() {
                 {rowVirtualizer.getVirtualItems().map((virtualRow) => (
                   <div
                     key={virtualRow.index}
-                    ref={rowVirtualizer.measureElement}
+                    ref={firefoxDesktop ? undefined : rowVirtualizer.measureElement}
                     data-index={virtualRow.index}
                     style={{
                       position: 'absolute',
