@@ -1016,7 +1016,7 @@ export default function FeedPage() {
   }, [stopStoriesBounce, stopStoriesMomentum]);
 
   // ── Virtual scroll setup ────────────────────────────────────────────────
-  const gap = isDesktopViewport ? 16 : 12; // matches lg:gap-4 / gap-3
+  const gap = 12;
   const animatedRowsRef = useRef(new Set());
   const rows = useMemo(() => {
     const result = [];
