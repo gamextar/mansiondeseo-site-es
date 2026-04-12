@@ -39,10 +39,11 @@ function MediaFamilyTable({ title, data }) {
         {rows.map(([key, label]) => {
           const entry = data?.[key] || {};
           return (
-            <div key={key} className="grid grid-cols-[1.2fr,0.8fr,0.8fr,0.8fr] items-center gap-2 border-b border-white/10 px-3 py-2 text-[10px] last:border-b-0">
+            <div key={key} className="grid grid-cols-[1.2fr,0.8fr,0.8fr,0.8fr,0.8fr] items-center gap-2 border-b border-white/10 px-3 py-2 text-[10px] last:border-b-0">
               <p className="text-white/85">{label}</p>
               <span className="text-white/60">tot {entry.total ?? 0}</span>
               <span className="text-emerald-200/80">hit {entry.hit ?? 0}</span>
+              <span className="text-sky-200/80">reval {entry.revalidated ?? 0}</span>
               <span className="text-amber-200/80">miss {entry.miss ?? 0}</span>
             </div>
           );
@@ -118,32 +119,12 @@ export default function ApiDebugOverlay() {
   }, []);
 
   useEffect(() => {
-    if (!panelPrefs.media || collapsed) {
-      if (mediaAutoTimerRef.current) {
-        window.clearTimeout(mediaAutoTimerRef.current);
-        mediaAutoTimerRef.current = null;
-      }
-      lastMediaAutoKeyRef.current = '';
-      return undefined;
-    }
-
-    const routeKey = `${location.pathname}${location.search}`;
-    if (lastMediaAutoKeyRef.current === routeKey) return undefined;
-
-    mediaAutoTimerRef.current = window.setTimeout(async () => {
-      lastMediaAutoKeyRef.current = routeKey;
-      setMediaSummary((prev) => ({ ...(prev || {}), loading: true }));
-      const next = await inspectVisibleMedia({ limit: 24 });
-      setMediaSummary(next);
+    if (mediaAutoTimerRef.current) {
+      window.clearTimeout(mediaAutoTimerRef.current);
       mediaAutoTimerRef.current = null;
-    }, 900);
-
-    return () => {
-      if (mediaAutoTimerRef.current) {
-        window.clearTimeout(mediaAutoTimerRef.current);
-        mediaAutoTimerRef.current = null;
-      }
-    };
+    }
+    lastMediaAutoKeyRef.current = '';
+    return undefined;
   }, [collapsed, location.pathname, location.search, panelPrefs.media]);
 
   if (!summary?.enabled) return null;
@@ -453,7 +434,7 @@ export default function ApiDebugOverlay() {
               <div className="flex items-center justify-between border-b border-emerald-500/15 bg-emerald-500/5 px-3 py-2">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-300/90">Media Cache</p>
-                  <p className="text-[10px] text-white/55">Inspeccion puntual de media visible para estimar HIT/MISS y posibles Class B.</p>
+                  <p className="text-[10px] text-white/55">Inspeccion manual de media visible para estimar HIT / REVALIDATED / MISS y posibles Class B.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -483,7 +464,7 @@ export default function ApiDebugOverlay() {
               <div className="space-y-2 px-3 py-3">
                 <div>
                   <p className="mb-2 text-[10px] uppercase tracking-[0.16em] text-white/45">Ruta actual</p>
-                  <div className="grid grid-cols-4 gap-2 text-[10px]">
+                  <div className="grid grid-cols-5 gap-2 text-[10px]">
                     <div className="rounded-lg bg-white/5 px-2 py-2">
                       <p className="text-white/50">total</p>
                       <p className="mt-1 text-base font-semibold text-white">{mediaSummary?.summary?.total ?? 0}</p>
@@ -491,6 +472,10 @@ export default function ApiDebugOverlay() {
                     <div className="rounded-lg bg-emerald-500/10 px-2 py-2">
                       <p className="text-emerald-200/70">HIT</p>
                       <p className="mt-1 text-base font-semibold text-emerald-200">{mediaSummary?.summary?.hit ?? 0}</p>
+                    </div>
+                    <div className="rounded-lg bg-sky-500/10 px-2 py-2">
+                      <p className="text-sky-200/70">REVAL</p>
+                      <p className="mt-1 text-base font-semibold text-sky-200">{mediaSummary?.summary?.revalidated ?? 0}</p>
                     </div>
                     <div className="rounded-lg bg-amber-500/10 px-2 py-2">
                       <p className="text-amber-200/70">MISS</p>
@@ -504,7 +489,7 @@ export default function ApiDebugOverlay() {
                 </div>
                 <div>
                   <p className="mb-2 text-[10px] uppercase tracking-[0.16em] text-white/45">Sesion</p>
-                  <div className="grid grid-cols-4 gap-2 text-[10px]">
+                  <div className="grid grid-cols-5 gap-2 text-[10px]">
                     <div className="rounded-lg bg-white/5 px-2 py-2">
                       <p className="text-white/50">total</p>
                       <p className="mt-1 text-base font-semibold text-white">{mediaSummary?.sessionSummary?.total ?? 0}</p>
@@ -512,6 +497,10 @@ export default function ApiDebugOverlay() {
                     <div className="rounded-lg bg-emerald-500/10 px-2 py-2">
                       <p className="text-emerald-200/70">HIT</p>
                       <p className="mt-1 text-base font-semibold text-emerald-200">{mediaSummary?.sessionSummary?.hit ?? 0}</p>
+                    </div>
+                    <div className="rounded-lg bg-sky-500/10 px-2 py-2">
+                      <p className="text-sky-200/70">REVAL</p>
+                      <p className="mt-1 text-base font-semibold text-sky-200">{mediaSummary?.sessionSummary?.revalidated ?? 0}</p>
                     </div>
                     <div className="rounded-lg bg-amber-500/10 px-2 py-2">
                       <p className="text-amber-200/70">MISS</p>
@@ -539,6 +528,8 @@ export default function ApiDebugOverlay() {
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                             entry.cacheStatus === 'HIT'
                               ? 'bg-emerald-500/15 text-emerald-200'
+                              : entry.cacheStatus === 'REVALIDATED'
+                                ? 'bg-sky-500/15 text-sky-200'
                               : entry.cacheStatus === 'MISS'
                                 ? 'bg-amber-500/15 text-amber-200'
                                 : 'bg-white/10 text-white/70'

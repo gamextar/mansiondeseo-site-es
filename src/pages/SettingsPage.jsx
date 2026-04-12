@@ -455,32 +455,12 @@ export default function SettingsPage() {
   const sectionMeta = ADMIN_SECTIONS.find(s => s.key === activeSection) || ADMIN_SECTIONS[0];
 
   useEffect(() => {
-    if (activeSection !== 'debug' || !debugPanelPrefs?.media) {
-      if (mediaAutoTimerRef.current) {
-        window.clearTimeout(mediaAutoTimerRef.current);
-        mediaAutoTimerRef.current = null;
-      }
-      lastMediaAutoKeyRef.current = '';
-      return undefined;
-    }
-
-    const inspectKey = `${window.location.pathname}${window.location.search}::${activeSection}`;
-    if (lastMediaAutoKeyRef.current === inspectKey) return undefined;
-
-    mediaAutoTimerRef.current = window.setTimeout(async () => {
-      lastMediaAutoKeyRef.current = inspectKey;
-      setMediaDebugSummary(prev => ({ ...(prev || {}), loading: true }));
-      const next = await inspectVisibleMedia({ limit: 24 });
-      setMediaDebugSummary(next);
+    if (mediaAutoTimerRef.current) {
+      window.clearTimeout(mediaAutoTimerRef.current);
       mediaAutoTimerRef.current = null;
-    }, 900);
-
-    return () => {
-      if (mediaAutoTimerRef.current) {
-        window.clearTimeout(mediaAutoTimerRef.current);
-        mediaAutoTimerRef.current = null;
-      }
-    };
+    }
+    lastMediaAutoKeyRef.current = '';
+    return undefined;
   }, [activeSection, debugPanelPrefs?.media, searchParams]);
 
   const ToggleSwitch = ({ value, onChange }) => (
@@ -1356,7 +1336,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Media Cache Debug</h3>
-                  <p className="text-[11px] text-text-dim">Inspecciona automaticamente las imagenes y videos visibles al entrar en la seccion de debug y acumula un resumen por sesion. El boton manual queda solo para refrescar al instante.</p>
+                  <p className="text-[11px] text-text-dim">Inspeccion manual de las imagenes y videos visibles. Muestra HIT, REVALIDATED y MISS sin dispararse automaticamente al entrar en debug.</p>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -1384,7 +1364,7 @@ export default function SettingsPage() {
 
               <div>
                 <p className="mb-2 text-[10px] uppercase tracking-wider text-text-dim">Ruta actual</p>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
                   <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2">
                     <p className="text-[10px] uppercase tracking-wider text-text-dim">Total</p>
                     <p className="mt-1 text-lg font-semibold text-text-primary">{mediaDebugSummary?.summary?.total ?? 0}</p>
@@ -1392,6 +1372,10 @@ export default function SettingsPage() {
                   <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
                     <p className="text-[10px] uppercase tracking-wider text-emerald-300/70">HIT</p>
                     <p className="mt-1 text-lg font-semibold text-emerald-200">{mediaDebugSummary?.summary?.hit ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-sky-500/10 border border-sky-500/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-sky-300/70">REVAL</p>
+                    <p className="mt-1 text-lg font-semibold text-sky-200">{mediaDebugSummary?.summary?.revalidated ?? 0}</p>
                   </div>
                   <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2">
                     <p className="text-[10px] uppercase tracking-wider text-amber-300/70">MISS</p>
@@ -1410,7 +1394,7 @@ export default function SettingsPage() {
 
               <div>
                 <p className="mb-2 text-[10px] uppercase tracking-wider text-text-dim">Sesion</p>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
                   <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2">
                     <p className="text-[10px] uppercase tracking-wider text-text-dim">Total</p>
                     <p className="mt-1 text-lg font-semibold text-text-primary">{mediaDebugSummary?.sessionSummary?.total ?? 0}</p>
@@ -1418,6 +1402,10 @@ export default function SettingsPage() {
                   <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
                     <p className="text-[10px] uppercase tracking-wider text-emerald-300/70">HIT</p>
                     <p className="mt-1 text-lg font-semibold text-emerald-200">{mediaDebugSummary?.sessionSummary?.hit ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-sky-500/10 border border-sky-500/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-sky-300/70">REVAL</p>
+                    <p className="mt-1 text-lg font-semibold text-sky-200">{mediaDebugSummary?.sessionSummary?.revalidated ?? 0}</p>
                   </div>
                   <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2">
                     <p className="text-[10px] uppercase tracking-wider text-amber-300/70">MISS</p>
@@ -1454,6 +1442,8 @@ export default function SettingsPage() {
                           <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                             entry.cacheStatus === 'HIT'
                               ? 'bg-emerald-500/15 border border-emerald-500/20 text-emerald-200'
+                              : entry.cacheStatus === 'REVALIDATED'
+                                ? 'bg-sky-500/15 border border-sky-500/20 text-sky-200'
                               : entry.cacheStatus === 'MISS'
                                 ? 'bg-amber-500/15 border border-amber-500/20 text-amber-200'
                                 : 'bg-mansion-border/20 border border-mansion-border/30 text-text-muted'

@@ -3,7 +3,7 @@ import { debugInspectMediaCache } from './api';
 const MEDIA_DEBUG_EVENT = 'mansion-media-debug-update';
 
 function createCounters() {
-  return { total: 0, hit: 0, miss: 0, other: 0, errors: 0 };
+  return { total: 0, hit: 0, revalidated: 0, miss: 0, other: 0, errors: 0 };
 }
 
 function normalizeFamily(url) {
@@ -23,6 +23,7 @@ function accumulateEntry(counter, entry) {
   counter.total += 1;
   if (entry.error) counter.errors += 1;
   else if (entry.cacheStatus === 'HIT') counter.hit += 1;
+  else if (entry.cacheStatus === 'REVALIDATED') counter.revalidated += 1;
   else if (entry.cacheStatus === 'MISS') counter.miss += 1;
   else counter.other += 1;
 }
@@ -160,6 +161,7 @@ function createController() {
           const sessionFamily = state.sessionFamilySummary[familyKey] || createCounters();
           sessionFamily.total += counters.total;
           sessionFamily.hit += counters.hit;
+          sessionFamily.revalidated += counters.revalidated;
           sessionFamily.miss += counters.miss;
           sessionFamily.other += counters.other;
           sessionFamily.errors += counters.errors;
