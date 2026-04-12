@@ -105,7 +105,11 @@ function AppLayout() {
   }, [location.pathname, location.state, routeOverlayOpen]);
 
   useEffect(() => {
-    if (!routeOverlayOpen || typeof window === 'undefined') return undefined;
+    // Video overlay is fullscreen — no need to lock the background scroll.
+    // On iOS PWA with black-translucent, body{position:fixed} breaks viewport
+    // calculations for fixed children, causing them to not extend behind the
+    // status bar (looks non-fullscreen). Skip the lock for video overlays.
+    if (!profileOverlayOpen || typeof window === 'undefined') return undefined;
 
     const scrollY = Number(location.state?.backgroundScrollY ?? window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
     const { style: bodyStyle } = document.body;
@@ -143,7 +147,7 @@ function AppLayout() {
         window.scrollTo(0, sy);
       }
     };
-  }, [location.state?.backgroundScrollY, routeOverlayOpen]);
+  }, [location.state?.backgroundScrollY, profileOverlayOpen]);
 
   const handleOverlayExitComplete = useCallback(() => {
     if (!scrollLockRef.current) return;
@@ -356,11 +360,11 @@ function AppLayout() {
                 className="absolute inset-0 bg-black/72 backdrop-blur-[4px]"
               />
               <motion.div
-                initial={{ opacity: 0.85, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0.84, scale: 0.985 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute inset-0 overflow-hidden"
+                className="absolute inset-0"
               >
                 <Routes>
                   <Route path="/videos" element={<VideoFeedPage />} />
