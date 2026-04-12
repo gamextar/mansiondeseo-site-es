@@ -107,6 +107,7 @@ export default function FeedPage() {
   const { user, siteSettings } = useAuth();
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const gridRef = useRef(null);
+  const [showMobileNav, setShowMobileNav] = useState(false);
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
@@ -265,6 +266,22 @@ export default function FeedPage() {
       pendingViewedTimerRef.current = null;
     }
   }, []);
+
+  // Show mobile pagination arrows when user scrolls near the bottom of the grid
+  useEffect(() => {
+    if (isDesktopViewport) return;
+    const handleScroll = () => {
+      const el = gridRef.current;
+      if (!el) { setShowMobileNav(false); return; }
+      const rect = el.getBoundingClientRect();
+      // Show when the bottom of the grid is within 120px of the viewport bottom
+      const nearBottom = rect.bottom <= window.innerHeight + 120;
+      setShowMobileNav(nearBottom);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isDesktopViewport, pageCursor]);
 
   const setStoryNodeRef = useCallback((storyId, node) => {
     const key = String(storyId || '');
@@ -1205,8 +1222,8 @@ export default function FeedPage() {
                     {visibleProfiles.map((profile, index) => (
                       <div
                         key={profile.id}
-                        className={isDesktopViewport ? 'feed-card-enter' : undefined}
-                        style={isDesktopViewport ? { animationDelay: `${index * 0.04}s` } : undefined}
+                        className="feed-card-enter"
+                        style={{ animationDelay: `${index * 0.04}s` }}
                       >
                         <ProfileCard
                           profile={profile}
@@ -1225,30 +1242,36 @@ export default function FeedPage() {
             {/* Pagination */}
             {totalPages > 1 && (
               <>
-                {/* Mobile overlay arrows — fixed at bottom */}
-                <div className="lg:hidden fixed left-0 right-0 z-40 flex items-center justify-between px-4 pointer-events-none" style={{ bottom: `${navBottomOffset + 8}px` }}>
+                {/* Mobile overlay arrows — appear on scroll to bottom */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={showMobileNav ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  className="lg:hidden fixed left-0 right-0 z-40 flex items-center justify-between px-4 pointer-events-none"
+                  style={{ bottom: `${navBottomOffset + 8}px` }}
+                >
                   {currentPage > 1 ? (
                     <button
                       type="button"
                       onClick={() => goToFeedPage(currentPage - 1)}
-                      className="pointer-events-auto flex items-center justify-center w-11 h-11 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
+                      className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
                     >
-                      <ChevronLeft className="w-5 h-5 text-white/80" />
+                      <ChevronLeft className="w-7 h-7 text-white/80" />
                     </button>
-                  ) : <div className="w-11" />}
-                  <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-black/60 backdrop-blur-md border border-white/15 px-3 py-1.5 shadow-lg">
-                    <span className="text-[11px] font-medium text-white/70">{currentPage} / {totalPages}</span>
+                  ) : <div className="w-14" />}
+                  <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-black/60 backdrop-blur-md border border-white/15 px-4 py-2 shadow-lg">
+                    <span className="text-xs font-medium text-white/70">{currentPage} / {totalPages}</span>
                   </div>
                   {currentPage < totalPages ? (
                     <button
                       type="button"
                       onClick={() => goToFeedPage(currentPage + 1)}
-                      className="pointer-events-auto flex items-center justify-center w-11 h-11 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
+                      className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
                     >
-                      <ChevronRight className="w-5 h-5 text-white/80" />
+                      <ChevronRight className="w-7 h-7 text-white/80" />
                     </button>
-                  ) : <div className="w-11" />}
-                </div>
+                  ) : <div className="w-14" />}
+                </motion.div>
 
                 {/* Desktop pagination bar */}
                 <motion.div
