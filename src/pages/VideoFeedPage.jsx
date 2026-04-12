@@ -631,6 +631,7 @@ export default function VideoFeedPage() {
     return window.matchMedia('(min-width: 1024px)').matches;
   });
   const initialStoryUserIdRef = useRef(requestedStoryUserId);
+  const apiRespondedRef = useRef(false);
 
   const persistStories = useCallback((nextStories) => {
     try {
@@ -758,6 +759,7 @@ export default function VideoFeedPage() {
   const refreshStories = useCallback(async () => {
     const data = await getStories({ focusUserId: requestedStoryUserId || '' });
     const fresh = applyPendingStoryLikeState(mergeSeedStory(data.stories || [], requestedStorySeed), getPendingStoryLikes());
+    apiRespondedRef.current = true;
     setStories(fresh);
     persistStories(fresh);
     return fresh;
@@ -787,7 +789,7 @@ export default function VideoFeedPage() {
 
     const targetIndex = stories.findIndex((story) => String(story.user_id) === String(targetStoryUserId));
     if (targetIndex < 0) {
-      if (loading) return;
+      if (!apiRespondedRef.current) return;
       setActiveDispIdx(1);
       setBoundaryOverlayIdx(null);
       initialStoryUserIdRef.current = null;
@@ -796,10 +798,9 @@ export default function VideoFeedPage() {
 
     setActiveDispIdx(targetIndex + 1);
     setBoundaryOverlayIdx(null);
-    // Only clear the ref after the API has responded (loading=false)
-    // so we can re-match if the list gets reordered by refreshStories
-    if (!loading) initialStoryUserIdRef.current = null;
     syncMobileViewportToIndex(targetIndex + 1);
+    // Only clear after the API has responded so we re-match on reorder
+    if (apiRespondedRef.current) initialStoryUserIdRef.current = null;
   }, [stories, loading, syncMobileViewportToIndex]);
 
   useEffect(() => {

@@ -1924,13 +1924,18 @@ async function handleProfiles(request, env) {
       ? cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results))  // 30s
       : env.DB.prepare(query).bind(...params).all().then(r => r.results),
     env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?').bind(auth.sub, auth.sub).all(),
-    cached('active_story_users', 30_000, () => env.DB.prepare('SELECT DISTINCT user_id FROM stories WHERE active = 1').all().then(r => r.results).catch(() => [])),  // 30s
+    cached('active_story_users', 30_000, () => env.DB.prepare('SELECT user_id, video_url FROM stories WHERE active = 1 ORDER BY created_at DESC').all().then(r => r.results).catch(() => [])),  // 30s
     cached(`count:${profilesCacheKey}`, 60_000, () => env.DB.prepare(countQuery).bind(...params).first()),
   ]);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
   const viewerFavorites = new Set(allFavRows.filter(r => r.user_id === auth.sub).map(r => r.target_id));
   const favoritedBySet = new Set(allFavRows.filter(r => r.target_id === auth.sub).map(r => r.user_id));
   const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
+  const activeStoryUrlMap = new Map();
+  for (const r of (storyRows || [])) {
+    const uid = String(r.user_id);
+    if (!activeStoryUrlMap.has(uid) && r.video_url) activeStoryUrlMap.set(uid, normalizeStoryVideoUrl(r.video_url, env));
+  }
 
   // Filter out current user (cached query includes everyone) + map to frontend shape
   let profiles = results.filter(u => u.id !== auth.sub).map(u => {
@@ -1972,6 +1977,7 @@ async function handleProfiles(request, env) {
       avatar_url: u.avatar_url,
       avatar_crop: safeParseJSON(u.avatar_crop, null),
       has_active_story: activeStoryUserIds.has(String(u.id)),
+      active_story_url: activeStoryUrlMap.get(String(u.id)) || null,
       followers_total: Number(u.followers_total || 0),
       _roleId: u.role,
       _matchingInterests: viewerInterests.length > 0
