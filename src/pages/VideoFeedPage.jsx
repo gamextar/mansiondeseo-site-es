@@ -796,7 +796,9 @@ export default function VideoFeedPage() {
 
     setActiveDispIdx(targetIndex + 1);
     setBoundaryOverlayIdx(null);
-    initialStoryUserIdRef.current = null;
+    // Only clear the ref after the API has responded (loading=false)
+    // so we can re-match if the list gets reordered by refreshStories
+    if (!loading) initialStoryUserIdRef.current = null;
     syncMobileViewportToIndex(targetIndex + 1);
   }, [stories, loading, syncMobileViewportToIndex]);
 
