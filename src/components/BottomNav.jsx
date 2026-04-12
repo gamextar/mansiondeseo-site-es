@@ -35,16 +35,15 @@ function getInitialNavSettings() {
 export default function BottomNav() {
   const location = useLocation();
   const { unreadCount } = useUnreadMessages();
-  const { siteSettings, user } = useAuth();
+  const { user } = useAuth();
 
-  // Use useState so nav dimensions are frozen on first render — prevents
-  // the visual resize/jump when bootstrap resolves and siteSettings updates.
+  // All nav dimensions are frozen at mount time from sessionStorage so the nav
+  // never resizes/jumps when the bootstrap resolves and siteSettings updates.
+  // Updated values take effect on next full page load (sessionStorage is saved
+  // by bootstrap, so subsequent visits already have the correct values).
   const [dims] = useState(getInitialNavSettings);
-  const bottomPadding = siteSettings?.navBottomPadding ?? dims.navBottomPadding;
-  const sidePadding = siteSettings?.navSidePadding ?? dims.navSidePadding;
-  const navHeight = dims.navHeight; // intentionally frozen — avoids layout shift
-  const navOpacity = siteSettings?.navOpacity ?? dims.navOpacity;
-  const navBlur = siteSettings?.navBlur ?? dims.navBlur;
+  const { navHeight, navBottomPadding: bottomPadding, navSidePadding: sidePadding,
+          navOpacity, navBlur } = dims;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
@@ -62,7 +61,6 @@ export default function BottomNav() {
         paddingLeft: sidePadding,
         paddingRight: sidePadding,
         isolation: 'isolate',
-        willChange: 'transform',
       }}
     >
       <div
