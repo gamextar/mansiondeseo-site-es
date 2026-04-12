@@ -389,8 +389,6 @@ export default function App() {
   const [siteSettings, setSiteSettings] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('mansion_site_settings') || '{}'); } catch { return {}; }
   });
-  const [bootShieldVisible, setBootShieldVisible] = useState(() => debugFlags.bootShield);
-  const [snapshotShieldVisible, setSnapshotShieldVisible] = useState(false);
   const bootstrapStartedRef = useRef(false);
 
   const handleDisableBootDiagnostics = useCallback(() => {
@@ -451,71 +449,6 @@ export default function App() {
 
     orientationApi.lock('portrait').catch(() => {});
     return undefined;
-  }, []);
-
-  useEffect(() => {
-    if (debugFlags.bootShield) {
-      setBootShieldVisible(true);
-    }
-  }, [debugFlags.bootShield]);
-
-  useEffect(() => {
-    if (!debugFlags.bootShield) return undefined;
-    const timer = window.setTimeout(() => setBootShieldVisible(false), 900);
-    return () => window.clearTimeout(timer);
-  }, [debugFlags.bootShield]);
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return undefined;
-
-    let revealTimer = null;
-
-    const showSnapshotShield = () => {
-      setSnapshotShieldVisible(true);
-      if (revealTimer) {
-        window.clearTimeout(revealTimer);
-        revealTimer = null;
-      }
-    };
-
-    const hideSnapshotShield = () => {
-      if (document.visibilityState === 'hidden') return;
-      if (revealTimer) window.clearTimeout(revealTimer);
-      revealTimer = window.setTimeout(() => {
-        setSnapshotShieldVisible(false);
-      }, 220);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        showSnapshotShield();
-      } else {
-        hideSnapshotShield();
-      }
-    };
-
-    const handlePageHide = () => {
-      showSnapshotShield();
-    };
-
-    const handlePageShow = () => {
-      hideSnapshotShield();
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pagehide', handlePageHide);
-    window.addEventListener('pageshow', handlePageShow);
-
-    if (document.visibilityState === 'visible') {
-      hideSnapshotShield();
-    }
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pagehide', handlePageHide);
-      window.removeEventListener('pageshow', handlePageShow);
-      if (revealTimer) window.clearTimeout(revealTimer);
-    };
   }, []);
 
   useEffect(() => {
@@ -633,12 +566,6 @@ export default function App() {
             </div>
           </div>
         ) : null}
-        {bootShieldVisible && (
-          <div className="fixed inset-0 z-[9999] bg-mansion-base" aria-hidden="true" />
-        )}
-        {snapshotShieldVisible && (
-          <div className="fixed inset-0 z-[9998] bg-mansion-base" aria-hidden="true" />
-        )}
         {!debugFlags.shellOnly && !verified && <AgeVerificationModal onVerify={verify} />}
         {!debugFlags.shellOnly && <AppLayout />}
         {!debugFlags.shellOnly && <InstallAppBanner />}
