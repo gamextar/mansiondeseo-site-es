@@ -610,6 +610,7 @@ export default function FeedPage() {
   useEffect(() => {
     if (!user?.id) return undefined;
     let cancelled = false;
+    let lastForegroundRefreshAt = 0;
 
     const applyPayload = (payload) => {
       livefeedPayloadRef.current = payload;
@@ -634,9 +635,9 @@ export default function FeedPage() {
       }
     }
 
-    const refreshLivefeed = async () => {
+    const refreshLivefeed = async (options = {}) => {
       try {
-        const current = await fetchLivefeedCurrent();
+        const current = await fetchLivefeedCurrent(options);
         if (!current?.version) return;
         if (livefeedVersionRef.current === current.version && livefeedPayloadRef.current) {
           applyPayload(livefeedPayloadRef.current);
@@ -650,12 +651,17 @@ export default function FeedPage() {
       }
     };
 
-    refreshLivefeed();
-    const intervalId = window.setInterval(refreshLivefeed, 30_000);
+    refreshLivefeed({ minIntervalMs: 0 });
+    const intervalId = window.setInterval(() => {
+      refreshLivefeed({ minIntervalMs: 15_000 });
+    }, 30_000);
 
     const handleForegroundRefresh = () => {
       if (document.visibilityState === 'hidden') return;
-      refreshLivefeed();
+      const now = Date.now();
+      if (now - lastForegroundRefreshAt < 5_000) return;
+      lastForegroundRefreshAt = now;
+      refreshLivefeed({ minIntervalMs: 15_000 });
     };
 
     window.addEventListener('focus', handleForegroundRefresh);

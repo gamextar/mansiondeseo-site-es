@@ -2,6 +2,12 @@ import { resolveMediaUrl } from './media';
 
 const LIVEFEED_CURRENT_URL = resolveMediaUrl('https://media.mansiondeseo.com/livefeed/current.json');
 const LIVEFEED_SESSION_KEY = 'mansion_livefeed_payload';
+const LIVEFEED_CURRENT_SESSION_KEY = 'mansion_livefeed_current';
+const DEFAULT_CURRENT_MIN_INTERVAL_MS = 15_000;
+
+let currentRequestPromise = null;
+let currentSnapshotCache = null;
+let currentSnapshotFetchedAt = 0;
 
 function normalizeBucketName(role) {
   const normalized = String(role || '').trim().toLowerCase();
@@ -23,6 +29,38 @@ export function getLivefeedBucketsForSeeking(seeking = []) {
   return buckets.length > 0 ? buckets : ['mujer', 'hombre', 'pareja', 'trans'];
 }
 
+function readCachedCurrentSnapshot() {
+  if (currentSnapshotCache && currentSnapshotFetchedAt > 0) {
+    return currentSnapshotCache;
+  }
+  try {
+    const raw = sessionStorage.getItem(LIVEFEED_CURRENT_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    currentSnapshotCache = parsed;
+    currentSnapshotFetchedAt = Date.now();
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function storeCurrentSnapshot(snapshot, source = 'network') {
+  currentSnapshotCache = snapshot;
+  currentSnapshotFetchedAt = Date.now();
+  try {
+    sessionStorage.setItem(LIVEFEED_CURRENT_SESSION_KEY, JSON.stringify(snapshot));
+  } catch {}
+  try {
+    window.__mansionLivefeedDebug = {
+      source,
+      version: snapshot?.version || '',
+      fetchedAt: new Date(currentSnapshotFetchedAt).toISOString(),
+    };
+  } catch {}
+}
+
 function interleaveBuckets(storiesByBucket, buckets, limit = 15) {
   const queues = buckets.map((bucket) => Array.isArray(storiesByBucket?.[bucket]) ? [...storiesByBucket[bucket]] : []);
   const output = [];
@@ -42,12 +80,38 @@ function interleaveBuckets(storiesByBucket, buckets, limit = 15) {
   return output;
 }
 
-export async function fetchLivefeedCurrent() {
-  const response = await fetch(LIVEFEED_CURRENT_URL, { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(`No pude leer livefeed current (${response.status})`);
+export async function fetchLivefeedCurrent({ minIntervalMs = DEFAULT_CURRENT_MIN_INTERVAL_MS } = {}) {
+  const now = Date.now();
+  const cached = readCachedCurrentSnapshot();
+  if (cached && now - currentSnapshotFetchedAt < Math.max(0, Number(minIntervalMs) || 0)) {
+    try {
+      window.__mansionLivefeedDebug = {
+        source: 'memory',
+        version: cached?.version || '',
+        fetchedAt: new Date(currentSnapshotFetchedAt).toISOString(),
+      };
+    } catch {}
+    return cached;
   }
-  return response.json();
+
+  if (currentRequestPromise) {
+    return currentRequestPromise;
+  }
+
+  currentRequestPromise = fetch(LIVEFEED_CURRENT_URL)
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`No pude leer livefeed current (${response.status})`);
+      }
+      const snapshot = await response.json();
+      storeCurrentSnapshot(snapshot, 'network');
+      return snapshot;
+    })
+    .finally(() => {
+      currentRequestPromise = null;
+    });
+
+  return currentRequestPromise;
 }
 
 export async function fetchLivefeedPayload(current) {
