@@ -20,8 +20,8 @@ function hideStartupShield() {
     window.setTimeout(removeShield, 320);
   };
 
-  const minVisibleMs = 850;
-  const extraSettleMs = 220;
+  const minVisibleMs = 180;
+  const extraSettleMs = 50;
 
   const waitForFonts = () => {
     if (!document.fonts?.ready) return Promise.resolve();

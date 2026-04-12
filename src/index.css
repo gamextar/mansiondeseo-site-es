@@ -155,13 +155,20 @@ select option {
 }
 
 @keyframes storyCircleEnter {
-  from {
+  0% {
     opacity: 0;
-    transform: translateY(18px) scale(0.74);
+    transform: scale(0.6);
   }
-  to {
+  60% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: scale(1.08);
+  }
+  80% {
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -171,7 +178,7 @@ select option {
 }
 
 .story-circle-enter {
-  animation: storyCircleEnter 0.68s cubic-bezier(0.18, 0.9, 0.22, 1) both;
+  animation: storyCircleEnter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Feed card entrance animation — per-card stagger */
