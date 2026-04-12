@@ -393,9 +393,9 @@ export default function SettingsPage() {
       setFeedWeightFollowers(s.feedWeightFollowers ?? 10);
       setFeedWeightSharedInterests(s.feedWeightSharedInterests ?? 20);
       setFeedWeightPremium(s.feedWeightPremium ?? 8);
-      setFeedMaxCardsMobile(s.feedMaxCardsMobile ?? 360);
-      setFeedMaxCardsDesktop(s.feedMaxCardsDesktop ?? 360);
-      setFeedSqlLimit(s.feedSqlLimit ?? 400);
+      setFeedCardsPerPage(s.feedCardsPerPage ?? 12);
+      setFeedMaxPages(s.feedMaxPages ?? 10);
+      setFeedPrefetchPages(s.feedPrefetchPages ?? 6);
       setVipPrice3Months(s.vipPrice3Months);
       setVipPrice6Months(s.vipPrice6Months);
       setIncognitoIconSvg(s.incognitoIconSvg || '');
