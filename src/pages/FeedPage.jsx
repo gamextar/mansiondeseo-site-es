@@ -142,6 +142,8 @@ export default function FeedPage({ initialData }) {
   });
   const isSafariDesktopRef = useRef(false);
   const pagedFeedConfigRef = useRef('');
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -155,9 +157,10 @@ export default function FeedPage({ initialData }) {
 
 
   const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize, targetPageCursor } = {}) => {
+    const s = settingsRef.current;
     const resolvedPageSize = Math.max(
       12,
-      Number(pageSize) || (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
+      Number(pageSize) || (s?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
     );
     const c = getCachedFeed();
     if (!c) setLoading(true);
@@ -185,7 +188,6 @@ export default function FeedPage({ initialData }) {
           nextCursor: data.nextCursor || null,
           hasMore: !!data.hasMore,
         });
-        loadMoreFailedRef.current = false;
         return data;
       })
       .catch(() => {
@@ -202,16 +204,17 @@ export default function FeedPage({ initialData }) {
       .finally(() => {
         if (myId === loadIdRef.current) setLoading(false);
       });
-  }, [settings]);
+  }, []); // stable — reads settings from settingsRef
 
   // Initial load — runs once on mount
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
     const cachedFeed = getCachedFeed();
+    const currentSettings = settingsRef.current;
     const cachedPageSize = Number(cachedFeed?.pageSize) || 0;
     const expectedPageSize = Math.max(
       12,
-      (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
+      (currentSettings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (currentSettings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
     );
     const canReuseCached = !!cachedFeed && cachedPageSize === expectedPageSize;
 
@@ -220,21 +223,14 @@ export default function FeedPage({ initialData }) {
       return;
     }
 
-    setProfiles(cachedFeed.profiles || []);
-    setViewerPremium(cachedFeed.viewerPremium || false);
-    if (cachedFeed.settings) setSettings(cachedFeed.settings);
-    setNextCursor(cachedFeed.nextCursor || null);
-    setBlockCursor(Number(cachedFeed.blockCursor ?? cachedFeed.currentCursor) || 0);
-    setPageCursor(Number(cachedFeed.pageCursor ?? cachedFeed.currentCursor) || 0);
-    setTotalProfiles(Number(cachedFeed.totalProfiles) || (Array.isArray(cachedFeed.profiles) ? cachedFeed.profiles.length : 0));
-    setHasMore(typeof cachedFeed.hasMore === 'boolean' ? cachedFeed.hasMore : true);
+    // State was already initialized from cache in useState — just clean up flags
     setLoading(false);
     try {
       sessionStorage.removeItem('mansion_feed_dirty');
       sessionStorage.removeItem('mansion_feed_force_refresh');
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadProfiles, navigate, settings]);
+  }, [navigate]);
 
   const [gridOpacity, setGridOpacity] = useState(1);
 
@@ -329,7 +325,8 @@ export default function FeedPage({ initialData }) {
       const shouldForceFresh = sessionStorage.getItem('mansion_feed_force_refresh') === '1';
       sessionStorage.removeItem('mansion_feed_force_refresh');
       sessionStorage.removeItem(FEED_CACHE_KEY);
-      const nextBlockSize = (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES);
+      const s = settingsRef.current;
+      const nextBlockSize = (s?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES);
       loadProfiles({
         forceFresh: shouldForceFresh,
         cursor: Math.floor(pageCursor / nextBlockSize) * nextBlockSize,
@@ -339,7 +336,7 @@ export default function FeedPage({ initialData }) {
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [loadProfiles, pageCursor, settings]);
+  }, [loadProfiles, pageCursor]);
 
   const { indicatorRef } = usePullToRefresh(
     useCallback(() => loadProfiles({ forceFresh: true }), [loadProfiles])
