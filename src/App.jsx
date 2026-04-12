@@ -39,6 +39,17 @@ const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const TopVisitedPage = lazy(() => import('./pages/TopVisitedPage'));
 
+function getBootDebugFlags() {
+  if (typeof window === 'undefined') {
+    return { bootShield: false, skipBootstrap: false };
+  }
+  const params = new URLSearchParams(window.location.search);
+  return {
+    bootShield: params.get('boot_shield') === '1',
+    skipBootstrap: params.get('skip_bootstrap') === '1',
+  };
+}
+
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/'];
 
@@ -376,6 +387,7 @@ function AppLayout() {
 
 export default function App() {
   const { verified, verify } = useAgeVerified();
+  const debugFlags = getBootDebugFlags();
   const [registered, setRegisteredState] = useState(
     () => !!getToken() || localStorage.getItem('mansion_registered') === 'true'
   );
@@ -385,6 +397,7 @@ export default function App() {
   const [siteSettings, setSiteSettings] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('mansion_site_settings') || '{}'); } catch { return {}; }
   });
+  const [bootShieldVisible, setBootShieldVisible] = useState(() => debugFlags.bootShield);
   const bootstrapStartedRef = useRef(false);
 
   const setRegistered = useCallback((val) => {
@@ -420,6 +433,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!debugFlags.bootShield) return undefined;
+    const timer = window.setTimeout(() => setBootShieldVisible(false), 900);
+    return () => window.clearTimeout(timer);
+  }, [debugFlags.bootShield]);
+
+  useEffect(() => {
     if (bootstrapStartedRef.current) return;
 
     const params = new URLSearchParams(window.location.search);
@@ -436,6 +455,15 @@ export default function App() {
 
     const hasSessionSettings = !!siteSettings && Object.keys(siteSettings).length > 0;
     const hasAuthToken = !!getToken();
+
+    if (debugFlags.skipBootstrap) {
+      bootstrapStartedRef.current = true;
+      setBootstrapUnread(null);
+      setBootstrapResolved(true);
+      return () => {
+        cancelled = true;
+      };
+    }
 
     if (!hasAuthToken && hasSessionSettings) {
       setBootstrapUnread(null);
@@ -491,13 +519,16 @@ export default function App() {
       cancelled = true;
       detachVisibilityListener?.();
     };
-  }, [setUser, siteSettings]);
+  }, [debugFlags.skipBootstrap, setUser, siteSettings]);
 
   return (
     <BrowserRouter>
       <AuthContext.Provider value={{ registered, setRegistered, user, setUser, siteSettings, setSiteSettings }}>
       <UnreadProvider initialUnread={bootstrapUnread} bootstrapResolved={bootstrapResolved}>
       <div className="relative min-h-screen">
+        {bootShieldVisible && (
+          <div className="fixed inset-0 z-[9999] bg-mansion-base" aria-hidden="true" />
+        )}
         {!verified && <AgeVerificationModal onVerify={verify} />}
         <AppLayout />
         <InstallAppBanner />
