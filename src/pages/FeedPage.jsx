@@ -682,8 +682,8 @@ export default function FeedPage() {
     stopStoriesBounce();
     const step = () => {
       const current = storiesEdgeOffsetRef.current;
-      const next = current + (target - current) * 0.11;
-      if (Math.abs(next - target) < 0.25) {
+      const next = current + (target - current) * 0.095;
+      if (Math.abs(next - target) < 0.18) {
         storiesEdgeOffsetRef.current = target;
         setStoriesEdgeOffset(target);
         storiesBounceFrameRef.current = null;
@@ -696,7 +696,7 @@ export default function FeedPage() {
     storiesBounceFrameRef.current = requestAnimationFrame(step);
   }, [stopStoriesBounce]);
 
-  const nudgeStoriesEdge = useCallback((direction, magnitude = 30) => {
+  const nudgeStoriesEdge = useCallback((direction, magnitude = 34) => {
     setStoriesEdgeOffsetImmediate(direction * magnitude);
     animateStoriesEdgeOffsetTo(0);
   }, [animateStoriesEdgeOffsetTo, setStoriesEdgeOffsetImmediate]);
@@ -729,7 +729,7 @@ export default function FeedPage() {
       if (currentEl.scrollLeft <= 0 || currentEl.scrollLeft >= maxScrollLeft) {
         currentEl.scrollLeft = Math.min(maxScrollLeft, Math.max(0, currentEl.scrollLeft));
         if (momentum.velocity !== 0) {
-          nudgeStoriesEdge(currentEl.scrollLeft <= 0 ? 1 : -1, Math.min(54, Math.max(18, Math.abs(momentum.velocity) * 30)));
+          nudgeStoriesEdge(currentEl.scrollLeft <= 0 ? 1 : -1, Math.min(62, Math.max(20, Math.abs(momentum.velocity) * 34)));
         }
         momentum.frameId = null;
         momentum.velocity = 0;
@@ -972,6 +972,50 @@ export default function FeedPage() {
           {/* User's own story circle */}
           {user && (
             safariDesktop ? (
+              <div className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
+                <div className="relative">
+                  <button
+                    type="button"
+                    draggable={false}
+                    onClick={user.has_active_story && user.active_story_url
+                      ? () => openStoryFromHome(user.id)
+                      : () => navigate('/historia/nueva', { state: { from: '/' } })}
+                    className="flex flex-col items-center gap-1 w-full"
+                    onDragStart={handleStoriesNativeDragStart}
+                  >
+                    <div className={`rounded-full ${
+                      user.has_active_story
+                        ? viewedStoryUsers.has(String(user.id))
+                          ? 'bg-white/20'
+                          : 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400'
+                        : 'bg-mansion-border/40'
+                    }`} style={{ width: storyCircleSize, height: storyCircleSize, padding: storyCircleBorder }}>
+                      <div className="w-full h-full rounded-full bg-mansion-base" style={{ padding: storyCircleInnerGap }}>
+                        <div className="w-full h-full rounded-full overflow-hidden bg-mansion-elevated">
+                          {user.avatar_url ? (
+                            <AvatarImg src={user.avatar_url} crop={user.avatar_crop} cover alt={user.username} className="w-full h-full" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-text-dim text-xs font-bold">
+                              {user.username?.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-mansion-gold truncate w-full text-center leading-tight">Tú</span>
+                  </button>
+                  <button
+                    type="button"
+                    draggable={false}
+                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/' } }); }}
+                    className="absolute bottom-4 right-0 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
+                    onDragStart={handleStoriesNativeDragStart}
+                  >
+                    <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
+                  </button>
+                </div>
+              </div>
+            ) : desktopStoryRailEnhanced ? (
               <div className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
                 <div className="relative">
                   <button
