@@ -723,15 +723,16 @@ export async function logout() {
 
 // ── Profiles ────────────────────────────────────────────
 
-export async function getProfiles({ filter, q, fresh = false, cursor } = {}) {
+export async function getProfiles({ filter, q, fresh = false, cursor, pageSize } = {}) {
   const params = new URLSearchParams();
   if (filter && filter !== 'all') params.set('filter', filter);
   if (q) params.set('q', q);
   if (fresh) params.set('fresh', '1');
   if (cursor !== undefined && cursor !== null && cursor !== '') params.set('cursor', String(cursor));
+  if (pageSize !== undefined && pageSize !== null && pageSize !== '') params.set('pageSize', String(pageSize));
   const qs = params.toString();
   // Search queries bypass cache (user expects fresh results), browse is cached longer.
-  if (q || fresh || cursor) return apiFetch(`/profiles${qs ? `?${qs}` : ''}`);
+  if (q || fresh || cursor || pageSize) return apiFetch(`/profiles${qs ? `?${qs}` : ''}`);
   return sharedGet(`profiles:${filter || 'all'}`, () => apiFetch(`/profiles${qs ? `?${qs}` : ''}`), { ttlMs: 5 * 60_000 });
 }
 

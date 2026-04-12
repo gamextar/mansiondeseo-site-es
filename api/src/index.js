@@ -2066,6 +2066,7 @@ async function handleProfiles(request, env) {
   const search = url.searchParams.get('q') || '';
   const fresh = url.searchParams.get('fresh') === '1';
   const cursor = Math.max(0, Number.parseInt(url.searchParams.get('cursor') || '0', 10) || 0);
+  const pageSize = Math.min(Math.max(12, Number.parseInt(url.searchParams.get('pageSize') || String(FEED_PROFILE_LIMIT), 10) || FEED_PROFILE_LIMIT), 600);
   const settings = await cached('settings', 300_000, () => loadSettings(env));
 
   // Use cached viewer data when available to avoid a serial D1 round-trip
@@ -2147,17 +2148,19 @@ async function handleProfiles(request, env) {
 
   // For cursor pages, try to serve from the fully-processed feed cache.
   // This avoids re-fetching, re-mapping, re-scoring, and re-sorting ALL profiles.
-  if (cursor > 0 && !fresh) {
+  if (!fresh) {
     const cachedFeedData = getCachedFeed(feedCacheKey);
     if (cachedFeedData) {
       const totalProfiles = cachedFeedData.profiles.length;
-      const pagedProfiles = cachedFeedData.profiles.slice(cursor, cursor + FEED_PROFILE_LIMIT);
-      const hasMore = totalProfiles > cursor + FEED_PROFILE_LIMIT;
-      const nextCursor = hasMore ? cursor + FEED_PROFILE_LIMIT : null;
+      const pagedProfiles = cachedFeedData.profiles.slice(cursor, cursor + pageSize);
+      const hasMore = totalProfiles > cursor + pageSize;
+      const nextCursor = hasMore ? cursor + pageSize : null;
       return json({
         profiles: pagedProfiles,
         viewerPremium: cachedFeedData.viewerPremium,
         settings,
+        totalProfiles,
+        cursor,
         nextCursor: nextCursor !== null ? String(nextCursor) : null,
         hasMore,
       });
@@ -2267,14 +2270,16 @@ async function handleProfiles(request, env) {
   setCachedFeed(feedCacheKey, { profiles, viewerPremium: viewerIsPremium });
 
   const totalProfiles = profiles.length;
-  const pagedProfiles = profiles.slice(cursor, cursor + FEED_PROFILE_LIMIT);
-  const hasMore = totalProfiles > cursor + FEED_PROFILE_LIMIT;
-  const nextCursor = hasMore ? cursor + FEED_PROFILE_LIMIT : null;
+  const pagedProfiles = profiles.slice(cursor, cursor + pageSize);
+  const hasMore = totalProfiles > cursor + pageSize;
+  const nextCursor = hasMore ? cursor + pageSize : null;
 
   return json({
     profiles: pagedProfiles,
     viewerPremium: viewerIsPremium,
     settings,
+    totalProfiles,
+    cursor,
     nextCursor: nextCursor !== null ? String(nextCursor) : null,
     hasMore,
   });
