@@ -1,6 +1,6 @@
 import { forwardRef, useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Plus, Radio } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 
@@ -1243,35 +1243,46 @@ export default function FeedPage() {
             {totalPages > 1 && (
               <>
                 {/* Mobile overlay arrows — appear on scroll to bottom */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={showMobileNav ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                  className="lg:hidden fixed left-0 right-0 z-40 flex items-center justify-between px-4 pointer-events-none"
-                  style={{ bottom: `${navBottomOffset + 8}px` }}
-                >
-                  {currentPage > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() => goToFeedPage(currentPage - 1)}
-                      className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
+                <AnimatePresence>
+                  {showMobileNav ? (
+                    <div
+                      className="lg:hidden fixed left-0 right-0 top-1/2 z-40 -translate-y-1/2 px-4 pointer-events-none"
+                      aria-hidden="true"
                     >
-                      <ChevronLeft className="w-7 h-7 text-white/80" />
-                    </button>
-                  ) : <div className="w-14" />}
-                  <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-black/60 backdrop-blur-md border border-white/15 px-4 py-2 shadow-lg">
-                    <span className="text-xs font-medium text-white/70">{currentPage} / {totalPages}</span>
-                  </div>
-                  {currentPage < totalPages ? (
-                    <button
-                      type="button"
-                      onClick={() => goToFeedPage(currentPage + 1)}
-                      className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
-                    >
-                      <ChevronRight className="w-7 h-7 text-white/80" />
-                    </button>
-                  ) : <div className="w-14" />}
-                </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0, y: 26, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 26, scale: 0.96 }}
+                        transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
+                        className="flex items-center justify-between"
+                      >
+                        {currentPage > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => goToFeedPage(currentPage - 1)}
+                            aria-label="Pagina anterior"
+                            className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
+                          >
+                            <ChevronLeft className="w-7 h-7 text-white/80" />
+                          </button>
+                        ) : <div className="w-14" />}
+                        <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-black/60 backdrop-blur-md border border-white/15 px-4 py-2 shadow-lg">
+                          <span className="text-xs font-medium text-white/70">{currentPage} / {totalPages}</span>
+                        </div>
+                        {currentPage < totalPages ? (
+                          <button
+                            type="button"
+                            onClick={() => goToFeedPage(currentPage + 1)}
+                            aria-label="Pagina siguiente"
+                            className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
+                          >
+                            <ChevronRight className="w-7 h-7 text-white/80" />
+                          </button>
+                        ) : <div className="w-14" />}
+                      </motion.div>
+                    </div>
+                  ) : null}
+                </AnimatePresence>
 
                 {/* Desktop pagination bar */}
                 <motion.div
