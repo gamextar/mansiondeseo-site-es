@@ -26,6 +26,32 @@ const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
 
+function getInitialStoryLimit(settings, isDesktopViewport) {
+  return Math.max(
+    1,
+    Math.round(
+      isDesktopViewport
+        ? (settings?.homeStoryCountDesktop ?? 30)
+        : (settings?.homeStoryCountMobile ?? 15)
+    )
+  );
+}
+
+function getInitialLiveStoryProfiles(user, settings, isDesktopViewport) {
+  if (!user?.id) return null;
+  if (settings?.homeStoriesUseLivefeed === false) return null;
+  const cachedPayload = getCachedLivefeedPayload();
+  if (!cachedPayload) return null;
+  const storyLimit = getInitialStoryLimit(settings, isDesktopViewport);
+  const next = selectLivefeedStories(
+    cachedPayload,
+    user?.seeking || [],
+    storyLimit,
+    { excludeUserId: user.id }
+  );
+  return next.length > 0 ? next : null;
+}
+
 function getGridColumns() {
   if (typeof window === 'undefined') return 2;
   const w = window.innerWidth;
@@ -88,6 +114,7 @@ export default function FeedPage() {
   const isDesktopViewport = cols >= 4;
   const desktopStoryRailEnhanced = isDesktopViewport;
   const cached = getCachedFeed();
+  const { user, siteSettings } = useAuth();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [showStoriesSection, setShowStoriesSection] = useState(true);
   const [showGridSection, setShowGridSection] = useState(true);
@@ -101,10 +128,9 @@ export default function FeedPage() {
     cached ? (typeof cached?.hasMore === 'boolean' ? cached.hasMore : true) : false
   );
   const [loading, setLoading] = useState(!cached);
-  const [liveStoryProfiles, setLiveStoryProfiles] = useState(null);
+  const [liveStoryProfiles, setLiveStoryProfiles] = useState(() => getInitialLiveStoryProfiles(user, cached?.settings || {}, isDesktopViewport));
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, siteSettings } = useAuth();
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const gridRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);
@@ -342,14 +368,7 @@ export default function FeedPage() {
     const adjustedStart = Math.max(1, end - 4);
     return Array.from({ length: end - adjustedStart + 1 }, (_, idx) => adjustedStart + idx);
   }, [currentPage, totalPages]);
-  const storyLimit = Math.max(
-    1,
-    Math.round(
-      isDesktopViewport
-        ? (safeSettings.homeStoryCountDesktop ?? 30)
-        : (safeSettings.homeStoryCountMobile ?? 15)
-    )
-  );
+  const storyLimit = getInitialStoryLimit(safeSettings, isDesktopViewport);
   const useHomeStoriesLivefeed = safeSettings.homeStoriesUseLivefeed !== false;
   const fallbackStoryProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, storyLimit);
   const storyProfiles = useHomeStoriesLivefeed && Array.isArray(liveStoryProfiles) ? liveStoryProfiles : fallbackStoryProfiles;
@@ -929,7 +948,7 @@ export default function FeedPage() {
       {/* Stories section */}
       {showStoriesSection && (
       <div
-        className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0"
+        className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0 fade-in-up"
       >
         <div className="flex items-center gap-1.5 mb-3">
           <Radio className="w-4 h-4 text-mansion-crimson" />
@@ -948,7 +967,7 @@ export default function FeedPage() {
           }}
           motionProps={{
             variants: stagger,
-            initial: false,
+            initial: 'hidden',
             animate: 'visible',
           }}
           onWheel={handleStoriesWheel}
@@ -963,7 +982,7 @@ export default function FeedPage() {
           {/* User's own story circle */}
           {user && (
             safariDesktop ? (
-              <div className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
+              <motion.div variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
                 <div className="relative">
                   <button
                     type="button"
@@ -1012,9 +1031,9 @@ export default function FeedPage() {
                     <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
                   </button>
                 </div>
-              </div>
+              </motion.div>
             ) : desktopStoryRailEnhanced ? (
-              <div className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
+              <motion.div variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
                 <div className="relative">
                   <button
                     type="button"
@@ -1063,7 +1082,7 @@ export default function FeedPage() {
                     <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
                   </button>
                 </div>
-              </div>
+              </motion.div>
             ) : (
               <motion.div layout variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
                 <div className="relative">
@@ -1118,9 +1137,10 @@ export default function FeedPage() {
             const border = storyCircleBorder;
             const innerGap = storyCircleInnerGap;
             return safariDesktop ? (
-              <div
+              <motion.div
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
+                variants={storyItem}
                 className="flex-shrink-0"
                 style={{ width: size + 6 }}
               >
@@ -1150,11 +1170,12 @@ export default function FeedPage() {
                   </div>
                   <span className="text-[10px] text-text-muted truncate w-full text-center leading-tight">{p.name?.split(' ')[0]}</span>
                 </button>
-              </div>
+              </motion.div>
             ) : (
-              <div
+              <motion.div
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
+                variants={storyItem}
                 className="flex-shrink-0"
                 style={{ width: size + 6 }}
               >
@@ -1184,7 +1205,7 @@ export default function FeedPage() {
                   </div>
                   <span className="text-[10px] text-text-muted truncate w-full text-center leading-tight">{p.name?.split(' ')[0]}</span>
                 </button>
-              </div>
+              </motion.div>
             );
           })}
         </AnimatedBlock>
@@ -1193,7 +1214,7 @@ export default function FeedPage() {
 
       {/* Results count */}
       <div
-        className="px-4 lg:px-8 pb-2"
+        className="px-4 lg:px-8 pb-2 fade-in-up fade-delay-300"
       >
         <p className="text-text-dim text-xs">
           {visibleProfiles.length} {visibleProfiles.length === 1 ? 'usuario' : 'usuarios'} conectados
