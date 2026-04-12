@@ -1,6 +1,6 @@
 import { forwardRef, useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Plus, Radio } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 
@@ -274,9 +274,11 @@ export default function FeedPage() {
       const el = gridRef.current;
       if (!el) { setShowMobileNav(false); return; }
       const rect = el.getBoundingClientRect();
-      // Show when the bottom of the grid is within 120px of the viewport bottom
-      const nearBottom = rect.bottom <= window.innerHeight + 120;
-      setShowMobileNav(nearBottom);
+      // Add hysteresis so the overlay does not flicker right on the threshold.
+      setShowMobileNav((prev) => {
+        const threshold = prev ? 180 : 120;
+        return rect.bottom <= window.innerHeight + threshold;
+      });
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
@@ -1221,7 +1223,7 @@ export default function FeedPage() {
                   >
                     {visibleProfiles.map((profile, index) => (
                       <div
-                        key={profile.id}
+                        key={`${pageCursor}-${profile.id}`}
                         className="feed-card-enter"
                         style={{ animationDelay: `${index * 0.04}s` }}
                       >
@@ -1243,46 +1245,48 @@ export default function FeedPage() {
             {totalPages > 1 && (
               <>
                 {/* Mobile overlay arrows — appear on scroll to bottom */}
-                <AnimatePresence>
-                  {showMobileNav ? (
-                    <div
-                      className="lg:hidden fixed left-0 right-0 top-1/2 z-40 -translate-y-1/2 px-4 pointer-events-none"
-                      aria-hidden="true"
-                    >
-                      <motion.div
-                        initial={{ opacity: 0, y: 26, scale: 0.96 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 26, scale: 0.96 }}
-                        transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
-                        className="flex items-center justify-between"
-                      >
-                        {currentPage > 1 ? (
-                          <button
-                            type="button"
-                            onClick={() => goToFeedPage(currentPage - 1)}
-                            aria-label="Pagina anterior"
-                            className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
-                          >
-                            <ChevronLeft className="w-7 h-7 text-white/80" />
-                          </button>
-                        ) : <div className="w-14" />}
-                        <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-black/60 backdrop-blur-md border border-white/15 px-4 py-2 shadow-lg">
-                          <span className="text-xs font-medium text-white/70">{currentPage} / {totalPages}</span>
-                        </div>
-                        {currentPage < totalPages ? (
-                          <button
-                            type="button"
-                            onClick={() => goToFeedPage(currentPage + 1)}
-                            aria-label="Pagina siguiente"
-                            className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
-                          >
-                            <ChevronRight className="w-7 h-7 text-white/80" />
-                          </button>
-                        ) : <div className="w-14" />}
-                      </motion.div>
+                <div
+                  className="lg:hidden fixed left-0 right-0 top-1/2 z-40 -translate-y-1/2 px-4 pointer-events-none"
+                  aria-hidden={!showMobileNav}
+                >
+                  <motion.div
+                    initial={false}
+                    animate={{
+                      opacity: showMobileNav ? 1 : 0,
+                      y: showMobileNav ? 0 : 26,
+                      scale: showMobileNav ? 1 : 0.96,
+                    }}
+                    transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
+                    className="flex flex-col items-center gap-3"
+                    style={{ pointerEvents: showMobileNav ? 'auto' : 'none' }}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      {currentPage > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => goToFeedPage(currentPage - 1)}
+                          aria-label="Pagina anterior"
+                          className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
+                        >
+                          <ChevronLeft className="w-7 h-7 text-white/80" />
+                        </button>
+                      ) : <div className="w-14" />}
+                      {currentPage < totalPages ? (
+                        <button
+                          type="button"
+                          onClick={() => goToFeedPage(currentPage + 1)}
+                          aria-label="Pagina siguiente"
+                          className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
+                        >
+                          <ChevronRight className="w-7 h-7 text-white/80" />
+                        </button>
+                      ) : <div className="w-14" />}
                     </div>
-                  ) : null}
-                </AnimatePresence>
+                    <div className="rounded-full bg-black/60 backdrop-blur-md border border-white/15 px-4 py-2 shadow-lg">
+                      <span className="text-xs font-medium text-white/70">{currentPage} / {totalPages}</span>
+                    </div>
+                  </motion.div>
+                </div>
 
                 {/* Desktop pagination bar */}
                 <motion.div
