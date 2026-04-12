@@ -80,6 +80,7 @@ export default function FeedPage() {
   const safariDesktop = isSafariDesktopBrowser();
   const cols = useGridColumns();
   const isDesktopViewport = cols >= 4;
+  const desktopStoryRailEnhanced = isDesktopViewport;
   const cached = getCachedFeed();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [showStoriesSection, setShowStoriesSection] = useState(() => !safariDesktop);
@@ -649,6 +650,7 @@ export default function FeedPage() {
   }, [storyLimit, user?.id, user?.seeking]);
 
   const handleStoriesWheel = useCallback((event) => {
+    if (!desktopStoryRailEnhanced) return;
     const el = storiesScrollRef.current;
     if (!el) return;
     const absX = Math.abs(event.deltaX);
@@ -657,7 +659,7 @@ export default function FeedPage() {
     if (el.scrollWidth <= el.clientWidth) return;
     event.preventDefault();
     el.scrollLeft += event.deltaY;
-  }, []);
+  }, [desktopStoryRailEnhanced]);
 
   const handleStoriesNativeDragStart = useCallback((event) => {
     event.preventDefault();
@@ -749,6 +751,7 @@ export default function FeedPage() {
   }, [nudgeStoriesEdge]);
 
   const handleStoriesPointerDown = useCallback((event) => {
+    if (!desktopStoryRailEnhanced) return;
     if (event.pointerType !== 'mouse' || event.button !== 0) return;
     const el = storiesScrollRef.current;
     if (!el || el.scrollWidth <= el.clientWidth) return;
@@ -767,9 +770,10 @@ export default function FeedPage() {
       lastTs: event.timeStamp || performance.now(),
       velocity: 0,
     };
-  }, [setStoriesEdgeOffsetImmediate, stopStoriesBounce, stopStoriesMomentum]);
+  }, [desktopStoryRailEnhanced, setStoriesEdgeOffsetImmediate, stopStoriesBounce, stopStoriesMomentum]);
 
   const handleStoriesPointerMove = useCallback((event) => {
+    if (!desktopStoryRailEnhanced) return;
     const el = storiesScrollRef.current;
     const drag = storiesDragRef.current;
     if (!el || !drag.active) return;
@@ -799,9 +803,10 @@ export default function FeedPage() {
     drag.velocity = (-deltaSinceLast) / deltaTs;
     drag.lastX = event.clientX;
     drag.lastTs = now;
-  }, [setStoriesEdgeOffsetImmediate]);
+  }, [desktopStoryRailEnhanced, setStoriesEdgeOffsetImmediate]);
 
   const finishStoriesDrag = useCallback((event) => {
+    if (!desktopStoryRailEnhanced) return;
     const el = storiesScrollRef.current;
     const drag = storiesDragRef.current;
     if (!drag.active) return;
@@ -819,14 +824,26 @@ export default function FeedPage() {
       animateStoriesEdgeOffsetTo(0);
     }
     drag.captured = false;
-  }, [animateStoriesEdgeOffsetTo, startStoriesMomentum]);
+  }, [animateStoriesEdgeOffsetTo, desktopStoryRailEnhanced, startStoriesMomentum]);
 
   const handleStoriesClickCapture = useCallback((event) => {
+    if (!desktopStoryRailEnhanced) return;
     if (!storiesDragRef.current.moved) return;
     event.preventDefault();
     event.stopPropagation();
     storiesDragRef.current.moved = false;
-  }, []);
+  }, [desktopStoryRailEnhanced]);
+
+  useEffect(() => {
+    if (desktopStoryRailEnhanced) return;
+    stopStoriesMomentum();
+    stopStoriesBounce();
+    storiesEdgeOffsetRef.current = 0;
+    setStoriesEdgeOffset(0);
+    storiesDragRef.current.active = false;
+    storiesDragRef.current.captured = false;
+    storiesDragRef.current.moved = false;
+  }, [desktopStoryRailEnhanced, stopStoriesBounce, stopStoriesMomentum]);
 
   const maybeLoadMore = useCallback(() => {
     if (!loadMoreRef.current || loading || loadingMore || !hasMore || !canAutoLoadMore) return;
@@ -929,14 +946,14 @@ export default function FeedPage() {
         <AnimatedBlock
           disabled={safariDesktop}
           ref={storiesScrollRef}
-          className="flex overflow-x-auto scrollbar-hide pb-2 lg:cursor-grab active:lg:cursor-grabbing select-none"
+          className={`flex overflow-x-auto scrollbar-hide pb-2 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
           style={{
             scrollbarWidth: 'none',
             msOverflowStyle: 'none',
             gap: `${storyCircleGap}px`,
             touchAction: 'pan-x',
-            transform: `translate3d(${storiesEdgeOffset}px, 0, 0)`,
-            transition: storiesDragRef.current.active ? 'none' : 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+            transform: desktopStoryRailEnhanced ? `translate3d(${storiesEdgeOffset}px, 0, 0)` : 'translate3d(0px, 0, 0)',
+            transition: desktopStoryRailEnhanced && storiesDragRef.current.active ? 'none' : 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
           motionProps={{
             variants: stagger,
