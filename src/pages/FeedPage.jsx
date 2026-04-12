@@ -108,6 +108,7 @@ export default function FeedPage() {
   const cols = useGridColumns();
   const isDesktopViewport = cols >= 4;
   const usePagedDesktopFeed = isDesktopViewport;
+  const useFancyDesktopPageTransition = usePagedDesktopFeed && !safariDesktop && !firefoxDesktop;
   const desktopStoryRailEnhanced = isDesktopViewport;
   const cached = getCachedFeed();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
@@ -1420,6 +1421,7 @@ export default function FeedPage() {
           <>
             {showGridSection ? (
               usePagedDesktopFeed ? (
+                useFancyDesktopPageTransition ? (
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={`desktop-page-${pageCursor}`}
@@ -1452,6 +1454,32 @@ export default function FeedPage() {
                     ))}
                   </motion.div>
                 </AnimatePresence>
+                ) : (
+                  <div
+                    key={`desktop-page-static-${pageCursor}`}
+                    ref={gridRef}
+                    className="grid"
+                    style={{
+                      gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                      gap: `${gap}px`,
+                      opacity: gridOpacity,
+                      transition: gridOpacity === 0 ? 'opacity 0.3s ease' : 'opacity 0.25s ease',
+                    }}
+                  >
+                    {visibleProfiles.map((profile, index) => (
+                      <ProfileCard
+                        key={profile.id}
+                        profile={profile}
+                        index={index}
+                        rank={pageCursor + index + 1}
+                        viewerPremium={viewerPremium}
+                        settings={safeSettings}
+                        safariDesktopOverride={safariDesktop}
+                        isMobileOverride={false}
+                      />
+                    ))}
+                  </div>
+                )
               ) : (
               <div
                 ref={gridRef}
@@ -1499,12 +1527,12 @@ export default function FeedPage() {
             {usePagedDesktopFeed ? (
               totalPages > 1 ? (
                 <motion.div
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
+                  initial={useFancyDesktopPageTransition ? { opacity: 0, y: 14 } : false}
+                  animate={useFancyDesktopPageTransition ? { opacity: 1, y: 0 } : undefined}
+                  transition={useFancyDesktopPageTransition ? { duration: 0.32, ease: [0.22, 1, 0.36, 1], delay: 0.08 } : undefined}
                   className="py-6"
                 >
-                  <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/10 bg-mansion-card/80 px-3 py-3 shadow-[0_16px_36px_rgba(0,0,0,0.18)] backdrop-blur-sm">
+                  <div className={`mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/10 bg-mansion-card/80 px-3 py-3 shadow-[0_16px_36px_rgba(0,0,0,0.18)] ${useFancyDesktopPageTransition ? 'backdrop-blur-sm' : ''}`}>
                     <span className="mr-1 text-xs font-medium text-text-muted">
                       {Math.min(totalProfiles, pageCursor + 1)}-{Math.min(totalProfiles, pageCursor + visibleProfiles.length)} de {totalProfiles}
                     </span>
