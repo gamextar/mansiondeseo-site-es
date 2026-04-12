@@ -447,7 +447,7 @@ export default function FeedPage({ initialData }) {
     storiesIntroConsumedRef.current = true;
     const timerId = window.setTimeout(() => {
       setStoriesIntroEnabled(false);
-    }, 80);
+    }, 1400);
     return () => window.clearTimeout(timerId);
   }, [orderedStoryProfiles.length, user]);
 
