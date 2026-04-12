@@ -1,4 +1,4 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { Home, Film, MessageCircle, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
@@ -16,7 +16,6 @@ const NAV_ITEMS = [
 
 export default function BottomNav() {
   const location = useLocation();
-  const navigateTo = useNavigate();
   const { unreadCount } = useUnreadMessages();
   const { siteSettings, user } = useAuth();
 
@@ -77,12 +76,9 @@ export default function BottomNav() {
                   if (to === '/videos') {
                     warmVideoFeed();
                   }
-                  if (to === '/perfil' && location.pathname !== '/perfil') {
-                    e.preventDefault();
-                    navigateTo('/perfil');
-                  }
                 }}
-                className="relative flex flex-col items-center justify-center w-14 h-full group"
+                className="relative flex flex-col items-center justify-center w-16 h-full group"
+                style={{ touchAction: 'manipulation' }}
               >
                 {isActive && (
                   <motion.div
