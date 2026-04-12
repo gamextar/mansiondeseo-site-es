@@ -2134,8 +2134,9 @@ async function handleProfiles(request, env) {
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
-  // Cap SQL results — configurable from admin, clamped to [100, 2000] for safety.
-  const sqlLimit = Math.min(Math.max(100, settings.feedSqlLimit ?? 400), 2000);
+  // Cap SQL results — derived from feed pagination settings (cardsPerPage × maxPages), clamped to [100, 2000].
+  const feedPool = (settings.feedCardsPerPage ?? 12) * (settings.feedMaxPages ?? 10);
+  const sqlLimit = Math.min(Math.max(100, feedPool), 2000);
   query += ` ORDER BY last_active DESC LIMIT ${sqlLimit}`;
 
   // Cache key for profiles query (shared across all users)
@@ -3464,9 +3465,9 @@ async function loadSettings(env) {
     feedWeightFollowers: parseNumberSetting(settings.feed_weight_followers, 10),
     feedWeightSharedInterests: parseNumberSetting(settings.feed_weight_shared_interests, 20),
     feedWeightPremium: parseNumberSetting(settings.feed_weight_premium, 8),
-    feedMaxCardsMobile: parseInt(settings.feed_max_cards_mobile || '360', 10),
-    feedMaxCardsDesktop: parseInt(settings.feed_max_cards_desktop || '360', 10),
-    feedSqlLimit: parseInt(settings.feed_sql_limit || '400', 10),
+    feedCardsPerPage: parseInt(settings.feed_cards_per_page || '12', 10),
+    feedMaxPages: parseInt(settings.feed_max_pages || '10', 10),
+    feedPrefetchPages: parseInt(settings.feed_prefetch_pages || '6', 10),
   };
   // Keep module-level threshold in sync so isOnline() uses the latest value
   _onlineThresholdMs = result.onlineThresholdMinutes * 60_000;
@@ -3523,9 +3524,9 @@ function getPublicSettingsPayload(settings) {
     feedWeightFollowers: settings.feedWeightFollowers,
     feedWeightSharedInterests: settings.feedWeightSharedInterests,
     feedWeightPremium: settings.feedWeightPremium,
-    feedMaxCardsMobile: settings.feedMaxCardsMobile,
-    feedMaxCardsDesktop: settings.feedMaxCardsDesktop,
-    feedSqlLimit: settings.feedSqlLimit,
+    feedCardsPerPage: settings.feedCardsPerPage,
+    feedMaxPages: settings.feedMaxPages,
+    feedPrefetchPages: settings.feedPrefetchPages,
     navBottomPadding: settings.navBottomPadding,
     navSidePadding: settings.navSidePadding,
     navHeight: settings.navHeight,
@@ -3632,9 +3633,9 @@ async function handleUpdateSettings(request, env) {
     'feed_weight_followers',
     'feed_weight_shared_interests',
     'feed_weight_premium',
-    'feed_max_cards_mobile',
-    'feed_max_cards_desktop',
-    'feed_sql_limit',
+    'feed_cards_per_page',
+    'feed_max_pages',
+    'feed_prefetch_pages',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {

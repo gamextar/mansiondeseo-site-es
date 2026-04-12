@@ -21,8 +21,9 @@ import { fetchLivefeedCurrent, fetchLivefeedPayload, selectLivefeedStories, getC
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const MOBILE_MAX_DOM_CARDS = 360;
-const DESKTOP_FEED_PAGE_SIZE = 12;
-const DESKTOP_FEED_BLOCK_SIZE = 72;
+const DEFAULT_CARDS_PER_PAGE = 12;
+const DEFAULT_MAX_PAGES = 10;
+const DEFAULT_PREFETCH_PAGES = 6;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
@@ -174,8 +175,8 @@ export default function FeedPage() {
       12,
       Number(pageSize) || (
         usePagedDesktopFeed
-          ? DESKTOP_FEED_BLOCK_SIZE
-          : (settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS)
+          ? (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
+          : MOBILE_MAX_DOM_CARDS
       )
     );
     const c = getCachedFeed();
@@ -236,7 +237,7 @@ export default function FeedPage() {
 
   const loadMoreProfiles = useCallback(() => {
     if (usePagedDesktopFeed) return Promise.resolve();
-    const maxCards = Math.max(12, settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS);
+    const maxCards = Math.max(12, MOBILE_MAX_DOM_CARDS);
 
     // Hit the API cap — stop
     if (profiles.length >= maxCards) return Promise.resolve();
@@ -278,8 +279,8 @@ export default function FeedPage() {
     const expectedPageSize = Math.max(
       12,
       usePagedDesktopFeed
-        ? DESKTOP_FEED_BLOCK_SIZE
-        : (settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS)
+        ? (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
+        : MOBILE_MAX_DOM_CARDS
     );
     const canReuseCachedPagedFeed = !!cachedFeed
       && usePagedDesktopFeed
@@ -363,12 +364,13 @@ export default function FeedPage() {
       const nextPageSize = Math.max(
         12,
         usePagedDesktopFeed
-          ? DESKTOP_FEED_BLOCK_SIZE
-          : (settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS)
+          ? (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
+          : MOBILE_MAX_DOM_CARDS
       );
+      const nextBlockSize = (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES);
       loadProfiles({
         forceFresh: shouldForceFresh,
-        cursor: usePagedDesktopFeed ? Math.floor(pageCursor / DESKTOP_FEED_BLOCK_SIZE) * DESKTOP_FEED_BLOCK_SIZE : 0,
+        cursor: usePagedDesktopFeed ? Math.floor(pageCursor / nextBlockSize) * nextBlockSize : 0,
         pageSize: usePagedDesktopFeed ? nextPageSize : undefined,
         targetPageCursor: usePagedDesktopFeed ? pageCursor : undefined,
       });
@@ -383,20 +385,23 @@ export default function FeedPage() {
 
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
-  const desktopPageSize = Math.max(6, Math.min(60, safeSettings.feedMaxCardsDesktop ?? DESKTOP_FEED_PAGE_SIZE));
+  const cardsPerPage = Math.max(6, Math.min(60, safeSettings.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE));
+  const maxPages = Math.max(1, Math.min(50, safeSettings.feedMaxPages ?? DEFAULT_MAX_PAGES));
+  const prefetchPages = Math.max(1, Math.min(20, safeSettings.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES));
+  const blockSize = cardsPerPage * prefetchPages;
   const maxFeedCards = Math.max(
     12,
     isDesktopViewport
-      ? desktopPageSize
-      : (safeSettings.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS)
+      ? cardsPerPage
+      : MOBILE_MAX_DOM_CARDS
   );
   const visibleProfiles = useMemo(() => {
     if (!usePagedDesktopFeed) return safeProfiles.slice(0, maxFeedCards);
     const start = Math.max(0, pageCursor - blockCursor);
-    return safeProfiles.slice(start, start + desktopPageSize);
-  }, [blockCursor, desktopPageSize, maxFeedCards, pageCursor, safeProfiles, usePagedDesktopFeed]);
-  const currentPage = usePagedDesktopFeed ? Math.floor(pageCursor / desktopPageSize) + 1 : 1;
-  const totalPages = usePagedDesktopFeed ? Math.max(1, Math.ceil((totalProfiles || 0) / maxFeedCards)) : 1;
+    return safeProfiles.slice(start, start + cardsPerPage);
+  }, [blockCursor, cardsPerPage, maxFeedCards, pageCursor, safeProfiles, usePagedDesktopFeed]);
+  const currentPage = usePagedDesktopFeed ? Math.floor(pageCursor / cardsPerPage) + 1 : 1;
+  const totalPages = usePagedDesktopFeed ? Math.min(maxPages, Math.max(1, Math.ceil((totalProfiles || 0) / cardsPerPage))) : 1;
   const pageWindow = useMemo(() => {
     if (!usePagedDesktopFeed || totalPages <= 1) return [];
     const start = Math.max(1, currentPage - 2);
@@ -423,9 +428,9 @@ export default function FeedPage() {
   const goToFeedPage = useCallback(async (page) => {
     if (!usePagedDesktopFeed) return;
     const safePage = Math.max(1, Math.min(totalPages, Number(page) || 1));
-    const nextPageCursor = (safePage - 1) * desktopPageSize;
+    const nextPageCursor = (safePage - 1) * cardsPerPage;
     if (nextPageCursor === pageCursor && profiles.length > 0) return;
-    const nextBlockCursor = Math.floor(nextPageCursor / DESKTOP_FEED_BLOCK_SIZE) * DESKTOP_FEED_BLOCK_SIZE;
+    const nextBlockCursor = Math.floor(nextPageCursor / blockSize) * blockSize;
     const blockEndCursor = blockCursor + profiles.length;
     if (nextPageCursor >= blockCursor && nextPageCursor < blockEndCursor) {
       setPageCursor(nextPageCursor);
@@ -437,28 +442,28 @@ export default function FeedPage() {
         currentCursor: nextBlockCursor,
         blockCursor: nextBlockCursor,
         pageCursor: nextPageCursor,
-        pageSize: DESKTOP_FEED_BLOCK_SIZE,
+        pageSize: blockSize,
         nextCursor,
         hasMore,
       });
     } else {
       await loadProfiles({
         cursor: nextBlockCursor,
-        pageSize: DESKTOP_FEED_BLOCK_SIZE,
+        pageSize: blockSize,
         targetPageCursor: nextPageCursor,
       });
     }
     const targetTop = Math.max(0, (gridRef.current?.offsetTop || 0) - 24);
     window.scrollTo({ top: targetTop, behavior: 'smooth' });
-  }, [blockCursor, desktopPageSize, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, usePagedDesktopFeed, viewerPremium]);
+  }, [blockCursor, blockSize, cardsPerPage, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, usePagedDesktopFeed, viewerPremium]);
 
   useEffect(() => {
     if (!usePagedDesktopFeed || loading) return;
     const nextConfig = `${usePagedDesktopFeed ? 'paged' : 'scroll'}:${maxFeedCards}`;
     if (pagedFeedConfigRef.current === nextConfig) return;
     pagedFeedConfigRef.current = nextConfig;
-    loadProfiles({ cursor: 0, pageSize: DESKTOP_FEED_BLOCK_SIZE, targetPageCursor: 0 });
-  }, [loadProfiles, loading, maxFeedCards, usePagedDesktopFeed]);
+    loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
+  }, [blockSize, loadProfiles, loading, maxFeedCards, usePagedDesktopFeed]);
 
   const viewedRaw = useSyncExternalStore(
     useCallback((cb) => {

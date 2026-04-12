@@ -44,9 +44,9 @@ export default function SettingsPage() {
   const [feedWeightFollowers, setFeedWeightFollowers] = useState(10);
   const [feedWeightSharedInterests, setFeedWeightSharedInterests] = useState(20);
   const [feedWeightPremium, setFeedWeightPremium] = useState(8);
-  const [feedMaxCardsMobile, setFeedMaxCardsMobile] = useState(360);
-  const [feedMaxCardsDesktop, setFeedMaxCardsDesktop] = useState(360);
-  const [feedSqlLimit, setFeedSqlLimit] = useState(400);
+  const [feedCardsPerPage, setFeedCardsPerPage] = useState(12);
+  const [feedMaxPages, setFeedMaxPages] = useState(10);
+  const [feedPrefetchPages, setFeedPrefetchPages] = useState(6);
 
   // Coin packs
   const [coinPack1Coins, setCoinPack1Coins] = useState('1000');
@@ -201,9 +201,9 @@ export default function SettingsPage() {
         setFeedWeightFollowers(s.feedWeightFollowers ?? 10);
         setFeedWeightSharedInterests(s.feedWeightSharedInterests ?? 20);
         setFeedWeightPremium(s.feedWeightPremium ?? 8);
-        setFeedMaxCardsMobile(s.feedMaxCardsMobile ?? 360);
-        setFeedMaxCardsDesktop(s.feedMaxCardsDesktop ?? 360);
-        setFeedSqlLimit(s.feedSqlLimit ?? 400);
+        setFeedCardsPerPage(s.feedCardsPerPage ?? 12);
+        setFeedMaxPages(s.feedMaxPages ?? 10);
+        setFeedPrefetchPages(s.feedPrefetchPages ?? 6);
         setVipPrice3Months(s.vipPrice3Months);
         setVipPrice6Months(s.vipPrice6Months);
         setIncognitoIconSvg(s.incognitoIconSvg || '');
@@ -319,9 +319,9 @@ export default function SettingsPage() {
         feed_weight_followers: feedWeightFollowers,
         feed_weight_shared_interests: feedWeightSharedInterests,
         feed_weight_premium: feedWeightPremium,
-        feed_max_cards_mobile: feedMaxCardsMobile,
-        feed_max_cards_desktop: feedMaxCardsDesktop,
-        feed_sql_limit: feedSqlLimit,
+        feed_cards_per_page: feedCardsPerPage,
+        feed_max_pages: feedMaxPages,
+        feed_prefetch_pages: feedPrefetchPages,
         vip_price_monthly: vipPriceMonthly,
         vip_price_3months: vipPrice3Months,
         vip_price_6months: vipPrice6Months,
@@ -1094,40 +1094,35 @@ export default function SettingsPage() {
               </div>
 
               <div className="mt-4">
-                <h3 className="text-sm font-semibold text-text-primary mb-1">Límite de cards en el feed</h3>
-                <p className="text-[11px] text-text-dim mb-3">Máximo de perfiles que se renderizan en el DOM. Afecta el dispositivo del usuario, no el servidor.</p>
-                <div className="grid gap-3 md:grid-cols-2">
+                <h3 className="text-sm font-semibold text-text-primary mb-1">Paginación del feed (Desktop)</h3>
+                <p className="text-[11px] text-text-dim mb-3">Controla la paginación del feed en escritorio. Las cards totales accesibles = cards × páginas.</p>
+                <div className="grid gap-3 md:grid-cols-3">
                   <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-text-primary">Mobile</p>
-                        <p className="text-[11px] text-text-dim">Cards en pantallas &lt; 1024px.</p>
+                        <p className="text-sm font-semibold text-text-primary">Cards por página</p>
+                        <p className="text-[11px] text-text-dim">Perfiles visibles en cada página.</p>
                       </div>
-                      <Counter value={feedMaxCardsMobile} onChange={setFeedMaxCardsMobile} min={12} max={600} step={12} />
+                      <Counter value={feedCardsPerPage} onChange={setFeedCardsPerPage} min={6} max={60} step={6} />
                     </div>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-text-primary">Desktop</p>
-                        <p className="text-[11px] text-text-dim">Cards en pantallas ≥ 1024px.</p>
+                        <p className="text-sm font-semibold text-text-primary">Máx páginas</p>
+                        <p className="text-[11px] text-text-dim">Páginas navegables. {feedCardsPerPage * feedMaxPages} cards máx.</p>
                       </div>
-                      <Counter value={feedMaxCardsDesktop} onChange={setFeedMaxCardsDesktop} min={12} max={600} step={12} />
+                      <Counter value={feedMaxPages} onChange={setFeedMaxPages} min={1} max={50} step={1} />
                     </div>
                   </div>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <h3 className="text-sm font-semibold text-text-primary mb-1">Pool de perfiles (SQL LIMIT)</h3>
-                <p className="text-[11px] text-text-dim mb-3">Cuántos perfiles trae el servidor de D1. Más = más cobertura pero más costo por query. Clampeado entre 100 y 2000.</p>
-                <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-text-primary">SQL LIMIT</p>
-                      <p className="text-[11px] text-text-dim">Aplica igual para mobile y desktop.</p>
+                  <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">Precarga</p>
+                        <p className="text-[11px] text-text-dim">Páginas por request. {feedCardsPerPage * feedPrefetchPages} profiles/query.</p>
+                      </div>
+                      <Counter value={feedPrefetchPages} onChange={setFeedPrefetchPages} min={1} max={20} step={1} />
                     </div>
-                    <Counter value={feedSqlLimit} onChange={setFeedSqlLimit} min={100} max={2000} step={50} />
                   </div>
                 </div>
               </div>
