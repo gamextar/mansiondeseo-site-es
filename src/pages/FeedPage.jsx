@@ -914,7 +914,7 @@ export default function FeedPage() {
             safariDesktop ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '0ms' : undefined }}
+                style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
                   <button
@@ -968,7 +968,7 @@ export default function FeedPage() {
             ) : desktopStoryRailEnhanced ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '0ms' : undefined }}
+                style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
                   <button
@@ -1022,7 +1022,7 @@ export default function FeedPage() {
             ) : (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '0ms' : undefined }}
+                style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
                   <button
@@ -1080,7 +1080,7 @@ export default function FeedPage() {
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${Math.min(index + 1, 10) * 45}ms` : undefined }}
+                style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${90 + Math.min(index, 10) * 55}ms` : undefined }}
               >
                 <button
                   type="button"
@@ -1114,7 +1114,7 @@ export default function FeedPage() {
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${Math.min(index + 1, 10) * 45}ms` : undefined }}
+                style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${90 + Math.min(index, 10) * 55}ms` : undefined }}
               >
                 <button
                   type="button"
@@ -1183,7 +1183,7 @@ export default function FeedPage() {
                       <div
                         key={`${pageCursor}-${profile.id}`}
                         className="feed-card-enter"
-                        style={{ animationDelay: `${index * 0.04}s` }}
+                        style={{ animationDelay: `${0.06 + index * 0.055}s` }}
                       >
                         <ProfileCard
                           profile={profile}
