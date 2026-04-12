@@ -671,7 +671,7 @@ export default function FeedPage() {
   }, []);
 
   const setStoriesEdgeOffsetImmediate = useCallback((nextValue) => {
-    const clamped = Math.max(-26, Math.min(26, nextValue));
+    const clamped = Math.max(-42, Math.min(42, nextValue));
     storiesEdgeOffsetRef.current = clamped;
     setStoriesEdgeOffset(clamped);
   }, []);
@@ -680,8 +680,8 @@ export default function FeedPage() {
     stopStoriesBounce();
     const step = () => {
       const current = storiesEdgeOffsetRef.current;
-      const next = current + (target - current) * 0.18;
-      if (Math.abs(next - target) < 0.5) {
+      const next = current + (target - current) * 0.14;
+      if (Math.abs(next - target) < 0.35) {
         storiesEdgeOffsetRef.current = target;
         setStoriesEdgeOffset(target);
         storiesBounceFrameRef.current = null;
@@ -694,7 +694,7 @@ export default function FeedPage() {
     storiesBounceFrameRef.current = requestAnimationFrame(step);
   }, [stopStoriesBounce]);
 
-  const nudgeStoriesEdge = useCallback((direction, magnitude = 18) => {
+  const nudgeStoriesEdge = useCallback((direction, magnitude = 24) => {
     setStoriesEdgeOffsetImmediate(direction * magnitude);
     animateStoriesEdgeOffsetTo(0);
   }, [animateStoriesEdgeOffsetTo, setStoriesEdgeOffsetImmediate]);
@@ -721,20 +721,20 @@ export default function FeedPage() {
         return;
       }
 
-      currentEl.scrollLeft += momentum.velocity * 20;
+      currentEl.scrollLeft += momentum.velocity * 22;
 
       const maxScrollLeft = Math.max(0, currentEl.scrollWidth - currentEl.clientWidth);
       if (currentEl.scrollLeft <= 0 || currentEl.scrollLeft >= maxScrollLeft) {
         currentEl.scrollLeft = Math.min(maxScrollLeft, Math.max(0, currentEl.scrollLeft));
         if (momentum.velocity !== 0) {
-          nudgeStoriesEdge(currentEl.scrollLeft <= 0 ? -1 : 1, Math.min(24, Math.max(10, Math.abs(momentum.velocity) * 18)));
+          nudgeStoriesEdge(currentEl.scrollLeft <= 0 ? -1 : 1, Math.min(38, Math.max(14, Math.abs(momentum.velocity) * 24)));
         }
         momentum.frameId = null;
         momentum.velocity = 0;
         return;
       }
 
-      momentum.velocity *= 0.945;
+      momentum.velocity *= 0.955;
       if (Math.abs(momentum.velocity) < 0.01) {
         momentum.frameId = null;
         momentum.velocity = 0;
@@ -791,9 +791,10 @@ export default function FeedPage() {
     el.scrollLeft = clampedScrollLeft;
     if (desiredScrollLeft !== clampedScrollLeft) {
       const overflow = desiredScrollLeft - clampedScrollLeft;
-      setStoriesEdgeOffsetImmediate(Math.max(-24, Math.min(24, -overflow * 0.18)));
+      const elasticOffset = -Math.sign(overflow) * Math.min(42, Math.pow(Math.abs(overflow), 0.82) * 0.52);
+      setStoriesEdgeOffsetImmediate(elasticOffset);
     } else if (storiesEdgeOffsetRef.current !== 0) {
-      setStoriesEdgeOffsetImmediate(storiesEdgeOffsetRef.current * 0.72);
+      setStoriesEdgeOffsetImmediate(storiesEdgeOffsetRef.current * 0.82);
     }
     drag.velocity = (-deltaSinceLast) / deltaTs;
     drag.lastX = event.clientX;
@@ -935,7 +936,7 @@ export default function FeedPage() {
             gap: `${storyCircleGap}px`,
             touchAction: 'pan-x',
             transform: `translate3d(${storiesEdgeOffset}px, 0, 0)`,
-            transition: storiesDragRef.current.active ? 'none' : 'transform 180ms cubic-bezier(0.22, 1, 0.36, 1)',
+            transition: storiesDragRef.current.active ? 'none' : 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
           motionProps={{
             variants: stagger,
