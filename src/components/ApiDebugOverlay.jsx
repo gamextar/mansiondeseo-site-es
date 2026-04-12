@@ -170,10 +170,18 @@ export default function ApiDebugOverlay() {
     { key: 'chat_read', label: 'Read receipts', data: d1Summary?.actions?.chat_read },
     { key: 'chat_delete', label: 'Delete conv', data: d1Summary?.actions?.chat_delete },
   ];
+  const activePanels = [
+    panelPrefs.api,
+    panelPrefs.realtime,
+    panelPrefs.livefeed,
+    panelPrefs.d1 !== false,
+    panelPrefs.media,
+  ].filter(Boolean).length;
+  const useDesktopGrid = activePanels > 1;
 
   return (
     <div
-      className="fixed right-3 bottom-3 z-[9999] w-[min(360px,calc(100vw-24px))] rounded-2xl border border-mansion-gold/30 bg-black/85 text-white shadow-2xl backdrop-blur-md"
+      className="fixed right-3 bottom-3 z-[9999] w-[min(760px,calc(100vw-24px))] rounded-2xl border border-mansion-gold/30 bg-black/85 text-white shadow-2xl backdrop-blur-md"
       style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}
     >
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
@@ -215,9 +223,9 @@ export default function ApiDebugOverlay() {
       </div>
 
       {!collapsed && (
-        <div className="space-y-3 px-3 pt-3">
+        <div className={`px-3 pt-3 ${useDesktopGrid ? 'grid gap-3 md:grid-cols-2 md:items-start' : 'space-y-3'}`}>
           {panelPrefs.api && (
-            <>
+            <section className="space-y-3">
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-xl bg-white/5 px-3 py-2">
                   <p className="text-white/55">Requests</p>
@@ -278,11 +286,11 @@ export default function ApiDebugOverlay() {
                   ))
                 )}
               </div>
-            </>
+            </section>
           )}
 
           {panelPrefs.realtime && (
-            <div className="space-y-3">
+            <section className="space-y-3">
               <div className="rounded-xl border border-sky-500/20 overflow-hidden">
                 <div className="flex items-center justify-between border-b border-sky-500/15 bg-sky-500/5 px-3 py-2">
                   <div>
@@ -330,11 +338,11 @@ export default function ApiDebugOverlay() {
                   ))}
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
           {panelPrefs.livefeed && (
-            <div className="rounded-xl border border-fuchsia-500/20 overflow-hidden">
+            <section className="rounded-xl border border-fuchsia-500/20 overflow-hidden">
               <div className="flex items-center justify-between border-b border-fuchsia-500/15 bg-fuchsia-500/5 px-3 py-2">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.18em] text-fuchsia-300/90">Livefeed</p>
@@ -391,11 +399,11 @@ export default function ApiDebugOverlay() {
                   <p className="mt-2 break-all text-rose-200/85">{livefeedSummary?.lastError || 'Sin errores'}</p>
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
           {panelPrefs.d1 !== false && (
-            <div className="rounded-xl border border-emerald-500/20 overflow-hidden">
+            <section className="rounded-xl border border-emerald-500/20 overflow-hidden">
               <div className="flex items-center justify-between border-b border-emerald-500/15 bg-emerald-500/5 px-3 py-2">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-300/90">D1 estimado</p>
@@ -436,11 +444,11 @@ export default function ApiDebugOverlay() {
                   ))}
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
           {panelPrefs.media && (
-            <div className="rounded-xl border border-emerald-500/20 overflow-hidden">
+            <section className={`rounded-xl border border-emerald-500/20 overflow-hidden ${useDesktopGrid ? 'md:col-span-2' : ''}`}>
               <div className="flex items-center justify-between border-b border-emerald-500/15 bg-emerald-500/5 px-3 py-2">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-300/90">Media Cache</p>
@@ -521,8 +529,8 @@ export default function ApiDebugOverlay() {
                 ) : null}
                 <div className="max-h-56 overflow-y-auto rounded-xl border border-white/10">
                   {(mediaSummary?.entries || []).length === 0 ? (
-                    <div className="px-3 py-4 text-xs text-white/60">Todavia no se inspecciono media en esta ruta.</div>
-                  ) : (
+                  <div className="px-3 py-4 text-xs text-white/60">Todavia no se inspecciono media en esta ruta.</div>
+                ) : (
                     (mediaSummary?.entries || []).map((entry) => (
                       <div key={entry.url} className="border-b border-white/10 px-3 py-2 last:border-b-0">
                         <div className="flex items-start justify-between gap-3">
@@ -547,10 +555,10 @@ export default function ApiDebugOverlay() {
                   )}
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
-          <p className="pb-1 text-[10px] text-white/45">
+          <p className={`pb-1 text-[10px] text-white/45 ${useDesktopGrid ? 'md:col-span-2' : ''}`}>
             Activo por URL con <span className="text-white/75">?api_debug=1</span>
           </p>
         </div>
