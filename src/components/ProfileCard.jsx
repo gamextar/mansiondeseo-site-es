@@ -83,6 +83,7 @@ export default function ProfileCard({
   const safariDesktop = typeof safariDesktopOverride === 'boolean' ? safariDesktopOverride : isSafariDesktopBrowser();
   const firefoxDesktop = isFirefoxDesktopBrowser();
   const reducedGlassDesktop = safariDesktop || firefoxDesktop;
+  const reducedEffectsDesktop = firefoxDesktop;
   const roleImg = settings[ROLE_IMG_KEYS[role]] || null;
   const locationText = formatLocation(profile);
   const isMobile = typeof isMobileOverride === 'boolean'
@@ -129,7 +130,7 @@ export default function ProfileCard({
         className="block group rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-mansion-gold/40 focus-visible:ring-offset-0"
       >
         <div
-          className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card ring-1 ring-white/5 shadow-[0_14px_28px_rgba(0,0,0,0.24)]"
+          className={`relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card ring-1 ring-white/5 ${reducedEffectsDesktop ? 'shadow-[0_8px_16px_rgba(0,0,0,0.18)]' : 'shadow-[0_14px_28px_rgba(0,0,0,0.24)]'}`}
         >
           {/* Photo — use actual photo with blur for blocked cards */}
           {mainPhoto ? (
@@ -140,14 +141,20 @@ export default function ProfileCard({
               loading={index < (safariDesktop ? 2 : 6) ? 'eager' : 'lazy'}
               fetchPriority={index < (safariDesktop ? 1 : 4) ? 'high' : 'auto'}
               decoding="async"
-              className={`absolute inset-0 w-full h-full object-cover ${safariDesktop ? '' : 'lg:transition-all lg:duration-500 lg:scale-105 lg:group-hover:scale-100'}`}
-              style={cardBlocked ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' } : undefined}
+              className={`absolute inset-0 w-full h-full object-cover ${safariDesktop || reducedEffectsDesktop ? '' : 'lg:transition-all lg:duration-500 lg:scale-105 lg:group-hover:scale-100'}`}
+              style={
+                cardBlocked
+                  ? reducedEffectsDesktop
+                    ? { opacity: 0.55 }
+                    : { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' }
+                  : undefined
+              }
             />
           ) : null}
 
           {/* Incognito mode overlay */}
           {cardBlocked && (
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10">
+            <div className={`absolute inset-0 flex items-center justify-center z-10 ${reducedEffectsDesktop ? 'bg-black/52' : 'bg-black/30'}`}>
               <div className="flex flex-col items-center gap-1 text-white/70">
                 {blurred
                   ? <MaskIcon className="w-6 h-6" customSvg={settings.incognitoIconSvg || ''} />
