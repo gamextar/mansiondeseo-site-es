@@ -181,7 +181,7 @@ export default function ApiDebugOverlay() {
 
   return (
     <div
-      className="fixed right-3 bottom-3 z-[9999] w-[min(760px,calc(100vw-24px))] rounded-2xl border border-mansion-gold/30 bg-black/85 text-white shadow-2xl backdrop-blur-md"
+      className="fixed right-3 bottom-3 z-[9999] flex max-h-[min(82vh,900px)] w-[min(760px,calc(100vw-24px))] flex-col rounded-2xl border border-mansion-gold/30 bg-black/85 text-white shadow-2xl backdrop-blur-md"
       style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}
     >
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
@@ -223,7 +223,8 @@ export default function ApiDebugOverlay() {
       </div>
 
       {!collapsed && (
-        <div className={`px-3 pt-3 ${useDesktopGrid ? 'grid gap-3 md:grid-cols-2 md:items-start' : 'space-y-3'}`}>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className={`px-3 pt-3 ${useDesktopGrid ? 'grid gap-3 md:grid-cols-2 md:items-start' : 'space-y-3'}`}>
           {panelPrefs.api && (
             <section className="space-y-3">
               <div className="grid grid-cols-2 gap-2 text-xs">
@@ -561,6 +562,7 @@ export default function ApiDebugOverlay() {
           <p className={`pb-1 text-[10px] text-white/45 ${useDesktopGrid ? 'md:col-span-2' : ''}`}>
             Activo por URL con <span className="text-white/75">?api_debug=1</span>
           </p>
+          </div>
         </div>
       )}
     </div>
