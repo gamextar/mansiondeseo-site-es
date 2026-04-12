@@ -20,10 +20,15 @@ import { fetchLivefeedCurrent, fetchLivefeedPayload, selectLivefeedStories, getC
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
-const MOBILE_MAX_DOM_CARDS = 360;
 const DEFAULT_CARDS_PER_PAGE = 12;
 const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PREFETCH_PAGES = 6;
+
+function getMobileMaxCards(s) {
+  const cpp = Math.max(6, Math.min(60, s?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE));
+  const mp = Math.max(1, Math.min(50, s?.feedMaxPages ?? DEFAULT_MAX_PAGES));
+  return Math.max(12, cpp * mp);
+}
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
@@ -176,7 +181,7 @@ export default function FeedPage() {
       Number(pageSize) || (
         usePagedDesktopFeed
           ? (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
-          : MOBILE_MAX_DOM_CARDS
+          : getMobileMaxCards(settings)
       )
     );
     const c = getCachedFeed();
@@ -237,7 +242,7 @@ export default function FeedPage() {
 
   const loadMoreProfiles = useCallback(() => {
     if (usePagedDesktopFeed) return Promise.resolve();
-    const maxCards = Math.max(12, MOBILE_MAX_DOM_CARDS);
+    const maxCards = getMobileMaxCards(settings);
 
     // Hit the API cap — stop
     if (profiles.length >= maxCards) return Promise.resolve();
@@ -280,7 +285,7 @@ export default function FeedPage() {
       12,
       usePagedDesktopFeed
         ? (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
-        : MOBILE_MAX_DOM_CARDS
+        : getMobileMaxCards(settings)
     );
     const canReuseCachedPagedFeed = !!cachedFeed
       && usePagedDesktopFeed
@@ -365,7 +370,7 @@ export default function FeedPage() {
         12,
         usePagedDesktopFeed
           ? (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
-          : MOBILE_MAX_DOM_CARDS
+          : getMobileMaxCards(settings)
       );
       const nextBlockSize = (settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (settings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES);
       loadProfiles({
@@ -393,7 +398,7 @@ export default function FeedPage() {
     12,
     isDesktopViewport
       ? cardsPerPage
-      : MOBILE_MAX_DOM_CARDS
+      : getMobileMaxCards(safeSettings)
   );
   const visibleProfiles = useMemo(() => {
     if (!usePagedDesktopFeed) return safeProfiles.slice(0, maxFeedCards);
