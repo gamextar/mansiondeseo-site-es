@@ -4753,6 +4753,7 @@ async function handleGetStories(request, env) {
   // Try to get current user for per-user liked status and server-side seeking filter
   const auth = await authenticate(request, env).catch(() => null);
   const viewerId = auth?.sub || null;
+  const isOwnFocusStory = !!focusUserId && !!viewerId && focusUserId === viewerId;
 
   let viewer = viewerId ? getCachedViewer(viewerId) : null;
   if (viewerId && !viewer) {
@@ -4829,16 +4830,20 @@ async function handleGetStories(request, env) {
         AND COALESCE(u.account_status, 'active') = 'active'
         AND s.user_id = ?
     `;
-    if (roleValues.length > 0) {
+    if (roleValues.length > 0 && !isOwnFocusStory) {
       focusQuery += ` AND u.role IN (${roleValues.map(() => '?').join(', ')})`;
       focusBindings.push(...roleValues);
     }
+    if (!isOwnFocusStory) {
+      focusQuery += `
+        AND (s.user_id != ? OR ? = '')
+      `;
+      focusBindings.push(viewerId || '', viewerId || '');
+    }
     focusQuery += `
-      AND (s.user_id != ? OR ? = '')
       ORDER BY s.created_at DESC
       LIMIT 1
     `;
-    focusBindings.push(viewerId || '', viewerId || '');
 
     const focusRow = await env.DB.prepare(focusQuery).bind(...focusBindings).first();
     if (focusRow) {

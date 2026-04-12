@@ -101,7 +101,7 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, showClose = false, onClose }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
@@ -216,19 +216,10 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
 
   return (
     <div className="relative w-full h-full bg-black flex items-center justify-center snap-start snap-always">
-      <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
-        {showClose && onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute z-30 flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
-            style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
-            aria-label="Cerrar"
-          >
-            <X className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
-          </button>
-        )}
-
+      <div
+        data-story-card-frame="true"
+        className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden"
+      >
         {/* eslint-disable-next-line */}
         <video
           ref={videoRef}
@@ -652,6 +643,11 @@ export default function VideoFeedPage() {
     flushPendingViewedStories();
     navigate(-1);
   }, [flushPendingViewedStories, navigate]);
+  const handleOverlayBackdropPointerDown = useCallback((event) => {
+    if (!isOverlayPreview) return;
+    if (event.target.closest('[data-story-card-frame="true"]')) return;
+    closeOverlay();
+  }, [closeOverlay, isOverlayPreview]);
   const markStoryViewed = useCallback((storyUserId) => {
     const uid = String(storyUserId || '');
     if (!uid) return;
@@ -1080,7 +1076,10 @@ export default function VideoFeedPage() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base">
+    <div
+      className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base"
+      onPointerDown={handleOverlayBackdropPointerDown}
+    >
       <motion.div
         className="absolute inset-0 pointer-events-none z-20 bg-black"
         initial={{ opacity: entryRevealReady ? 0 : 0.7 }}
@@ -1089,6 +1088,17 @@ export default function VideoFeedPage() {
       />
 
       <div className="relative h-full">
+        {isOverlayPreview && (
+          <button
+            type="button"
+            onClick={closeOverlay}
+            className="absolute z-30 flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+            style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
+            aria-label="Cerrar"
+          >
+            <X className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+          </button>
+        )}
         {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">
@@ -1128,8 +1138,6 @@ export default function VideoFeedPage() {
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={isActive ? handleEntryRevealReady : undefined}
-                  showClose={isOverlayPreview && isActive}
-                  onClose={isOverlayPreview ? closeOverlay : undefined}
                 />
               </div>
             );
@@ -1169,8 +1177,6 @@ export default function VideoFeedPage() {
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
-                  showClose={isOverlayPreview && displayIndex === activeDispIdx}
-                  onClose={isOverlayPreview ? closeOverlay : undefined}
                 />
               </div>
             );
