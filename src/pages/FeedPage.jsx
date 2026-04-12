@@ -1406,15 +1406,11 @@ export default function FeedPage() {
                 ref={gridRef}
                 style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', opacity: gridOpacity, transition: gridOpacity === 0 ? 'opacity 0.3s ease' : 'opacity 0.25s ease' }}
               >
-                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const isNewRow = !animatedRowsRef.current.has(virtualRow.index);
-                  if (isNewRow) animatedRowsRef.current.add(virtualRow.index);
-                  return (
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => (
                   <div
                     key={virtualRow.index}
                     ref={firefoxDesktop ? undefined : rowVirtualizer.measureElement}
                     data-index={virtualRow.index}
-                    className={isNewRow ? 'feed-row-enter' : undefined}
                     style={{
                       position: 'absolute',
                       top: 0,
@@ -1441,8 +1437,7 @@ export default function FeedPage() {
                       );
                     })}
                   </div>
-                  );
-                })}
+                ))}
               </div>
               )
             ) : (
