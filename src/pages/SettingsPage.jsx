@@ -1097,30 +1097,30 @@ export default function SettingsPage() {
                 <h3 className="text-sm font-semibold text-text-primary mb-1">Paginación del feed (Desktop)</h3>
                 <p className="text-[11px] text-text-dim mb-3">Controla la paginación del feed en escritorio. Las cards totales accesibles = cards × páginas.</p>
                 <div className="grid gap-3 md:grid-cols-3">
-                  <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-text-primary">Cards por página</p>
-                        <p className="text-[11px] text-text-dim">Perfiles visibles en cada página.</p>
-                      </div>
+                  <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3 flex flex-col gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-text-primary">Cards por página</p>
+                      <p className="text-[11px] text-text-dim">Perfiles visibles en cada página.</p>
+                    </div>
+                    <div className="flex justify-end">
                       <Counter value={feedCardsPerPage} onChange={setFeedCardsPerPage} min={6} max={60} step={6} />
                     </div>
                   </div>
-                  <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-text-primary">Máx páginas</p>
-                        <p className="text-[11px] text-text-dim">Páginas navegables. {feedCardsPerPage * feedMaxPages} cards máx.</p>
-                      </div>
+                  <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3 flex flex-col gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-text-primary">Máx páginas</p>
+                      <p className="text-[11px] text-text-dim">Páginas navegables — {feedCardsPerPage * feedMaxPages} cards máx.</p>
+                    </div>
+                    <div className="flex justify-end">
                       <Counter value={feedMaxPages} onChange={setFeedMaxPages} min={1} max={50} step={1} />
                     </div>
                   </div>
-                  <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-text-primary">Precarga</p>
-                        <p className="text-[11px] text-text-dim">Páginas por request. {feedCardsPerPage * feedPrefetchPages} profiles/query.</p>
-                      </div>
+                  <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3 flex flex-col gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-text-primary">Precarga</p>
+                      <p className="text-[11px] text-text-dim">Páginas por request — {feedCardsPerPage * feedPrefetchPages} profiles/query.</p>
+                    </div>
+                    <div className="flex justify-end">
                       <Counter value={feedPrefetchPages} onChange={setFeedPrefetchPages} min={1} max={20} step={1} />
                     </div>
                   </div>
