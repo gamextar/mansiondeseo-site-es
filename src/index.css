@@ -154,9 +154,24 @@ select option {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes storyCircleEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .fade-in-up {
   opacity: 0;
   animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.story-circle-enter {
+  animation: storyCircleEnter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Feed card entrance animation — per-card stagger */

@@ -5,10 +5,6 @@ import { ChevronLeft, ChevronRight, Plus, Radio } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.045 } } };
-const storyItem = {
-  hidden: { opacity: 0, scale: 0.85, y: 8 },
-  visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 20 } },
-};
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
 import { getProfiles, getToken } from '../lib/api';
@@ -128,7 +124,13 @@ export default function FeedPage() {
     cached ? (typeof cached?.hasMore === 'boolean' ? cached.hasMore : true) : false
   );
   const [loading, setLoading] = useState(!cached);
-  const [liveStoryProfiles, setLiveStoryProfiles] = useState(() => getInitialLiveStoryProfiles(user, cached?.settings || {}, isDesktopViewport));
+  const initialLiveStories = getInitialLiveStoryProfiles(user, cached?.settings || {}, isDesktopViewport);
+  const [liveStoryProfiles, setLiveStoryProfiles] = useState(() => initialLiveStories);
+  const [livefeedStoriesReady, setLivefeedStoriesReady] = useState(
+    () => !user?.id || cached?.settings?.homeStoriesUseLivefeed === false || Array.isArray(initialLiveStories)
+  );
+  const [storiesIntroEnabled, setStoriesIntroEnabled] = useState(true);
+  const storiesIntroConsumedRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
@@ -393,7 +395,11 @@ export default function FeedPage() {
   const storyLimit = getInitialStoryLimit(safeSettings, isDesktopViewport);
   const useHomeStoriesLivefeed = safeSettings.homeStoriesUseLivefeed !== false;
   const fallbackStoryProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, storyLimit);
-  const storyProfiles = useHomeStoriesLivefeed && Array.isArray(liveStoryProfiles) ? liveStoryProfiles : fallbackStoryProfiles;
+  const storyProfiles = useHomeStoriesLivefeed
+    ? (Array.isArray(liveStoryProfiles)
+        ? liveStoryProfiles
+        : (livefeedStoriesReady ? fallbackStoryProfiles : []))
+    : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
@@ -470,6 +476,16 @@ export default function FeedPage() {
     }
     return [...unseen, ...seen];
   }, [storyProfiles, viewedStoryUsers]);
+
+  useEffect(() => {
+    if (storiesIntroConsumedRef.current) return;
+    if (orderedStoryProfiles.length === 0 && !user) return;
+    storiesIntroConsumedRef.current = true;
+    const timerId = window.setTimeout(() => {
+      setStoriesIntroEnabled(false);
+    }, 80);
+    return () => window.clearTimeout(timerId);
+  }, [orderedStoryProfiles.length, user]);
 
   useLayoutEffect(() => {
     if (!showStoriesSection || orderedStoryProfiles.length === 0) {
@@ -684,6 +700,7 @@ export default function FeedPage() {
       livefeedVersionRef.current = '';
       livefeedPayloadRef.current = null;
       setLiveStoryProfiles(null);
+      setLivefeedStoriesReady(true);
       return undefined;
     }
     let cancelled = false;
@@ -699,6 +716,7 @@ export default function FeedPage() {
       );
       if (!cancelled) {
         setLiveStoryProfiles(next.length > 0 ? next : null);
+        setLivefeedStoriesReady(true);
       }
     };
 
@@ -725,6 +743,7 @@ export default function FeedPage() {
         applyPayload(payload);
       } catch {
         // Keep fallback story circles from feed if livefeed is unavailable.
+        if (!cancelled) setLivefeedStoriesReady(true);
       }
     };
 
@@ -1004,7 +1023,10 @@ export default function FeedPage() {
           {/* User's own story circle */}
           {user && (
             safariDesktop ? (
-              <motion.div variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
+              <div
+                className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '0ms' : undefined }}
+              >
                 <div className="relative">
                   <button
                     type="button"
@@ -1053,9 +1075,12 @@ export default function FeedPage() {
                     <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
                   </button>
                 </div>
-              </motion.div>
+              </div>
             ) : desktopStoryRailEnhanced ? (
-              <motion.div variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
+              <div
+                className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '0ms' : undefined }}
+              >
                 <div className="relative">
                   <button
                     type="button"
@@ -1104,9 +1129,12 @@ export default function FeedPage() {
                     <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
                   </button>
                 </div>
-              </motion.div>
+              </div>
             ) : (
-              <motion.div layout variants={storyItem} className="flex-shrink-0" style={{ width: storyCircleSize + 6 }}>
+              <div
+                className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '0ms' : undefined }}
+              >
                 <div className="relative">
                   <button
                     type="button"
@@ -1148,10 +1176,10 @@ export default function FeedPage() {
                     <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
                   </button>
                 </div>
-              </motion.div>
+              </div>
             )
           )}
-          {orderedStoryProfiles.map((p) => {
+          {orderedStoryProfiles.map((p, index) => {
             const photo = getPrimaryProfilePhoto(p);
             const photoCrop = getPrimaryProfileCrop(p);
             const isViewed = viewedStoryUsers.has(p.id);
@@ -1159,12 +1187,11 @@ export default function FeedPage() {
             const border = storyCircleBorder;
             const innerGap = storyCircleInnerGap;
             return safariDesktop ? (
-              <motion.div
+              <div
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
-                variants={storyItem}
-                className="flex-shrink-0"
-                style={{ width: size + 6 }}
+                className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${Math.min(index + 1, 10) * 45}ms` : undefined }}
               >
                 <button
                   type="button"
@@ -1192,14 +1219,13 @@ export default function FeedPage() {
                   </div>
                   <span className="text-[10px] text-text-muted truncate w-full text-center leading-tight">{p.name?.split(' ')[0]}</span>
                 </button>
-              </motion.div>
+              </div>
             ) : (
-              <motion.div
+              <div
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
-                variants={storyItem}
-                className="flex-shrink-0"
-                style={{ width: size + 6 }}
+                className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${Math.min(index + 1, 10) * 45}ms` : undefined }}
               >
                 <button
                   type="button"
@@ -1227,7 +1253,7 @@ export default function FeedPage() {
                   </div>
                   <span className="text-[10px] text-text-muted truncate w-full text-center leading-tight">{p.name?.split(' ')[0]}</span>
                 </button>
-              </motion.div>
+              </div>
             );
           })}
         </AnimatedBlock>
