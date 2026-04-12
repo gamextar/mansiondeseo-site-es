@@ -19,6 +19,7 @@ import SEOLandingPage from './pages/SEOLandingPage';
 import ProfilePage from './pages/ProfilePage';
 import FavoritesPage from './pages/FavoritesPage';
 import SettingsPage from './pages/SettingsPage';
+import BlackScreenPage from './pages/BlackScreenPage';
 import AdminLayout from './components/AdminLayout';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import VipPage from './pages/VipPage';
@@ -41,7 +42,7 @@ const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const TopVisitedPage = lazy(() => import('./pages/TopVisitedPage'));
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
-const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/'];
+const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
 
 function RequireRegistration({ children }) {
   const { registered } = useAuth();
@@ -177,6 +178,7 @@ function AppLayout() {
           <Route path="/registro" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/recuperar-contrasena" element={<ForgotPasswordPage />} />
+          <Route path="/black-test" element={<BlackScreenPage />} />
 
           {/* Public SEO landing pages */}
           <Route path="/parejas" element={<SEOLandingPage variant="parejas" />} />
