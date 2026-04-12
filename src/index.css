@@ -150,6 +150,24 @@ select option {
   animation: fadeInUp 0.5s ease-out forwards;
 }
 
+/* Feed card entrance animation */
+@keyframes feedCardReveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+    filter: brightness(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+}
+
+.feed-card-enter {
+  animation: feedCardReveal 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* Delay utilities */
 .fade-delay-300 { animation-delay: 0.3s; }
 .fade-delay-500 { animation-delay: 0.5s; }

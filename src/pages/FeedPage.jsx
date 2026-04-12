@@ -249,6 +249,7 @@ export default function FeedPage() {
     return getProfiles({ fresh: forceFresh, cursor, pageSize: resolvedPageSize })
       .then(data => {
         if (myId !== loadIdRef.current) return;
+        animatedRowsRef.current.clear();
         setProfiles(data.profiles || []);
         setViewerPremium(data.viewerPremium || false);
         if (data.settings) setSettings(data.settings);
@@ -1072,6 +1073,7 @@ export default function FeedPage() {
 
   // ── Virtual scroll setup ────────────────────────────────────────────────
   const gap = safariDesktop ? 16 : 12; // matches lg:gap-4 / gap-3
+  const animatedRowsRef = useRef(new Set());
   const rows = useMemo(() => {
     const result = [];
     for (let i = 0; i < visibleProfiles.length; i += cols) {
@@ -1485,7 +1487,10 @@ export default function FeedPage() {
                 ref={gridRef}
                 style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', opacity: gridOpacity, transition: gridOpacity === 0 ? 'opacity 0.3s ease' : 'opacity 0.25s ease' }}
               >
-                {rowVirtualizer.getVirtualItems().map((virtualRow) => (
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const isNewRow = !animatedRowsRef.current.has(virtualRow.index);
+                  if (isNewRow) animatedRowsRef.current.add(virtualRow.index);
+                  return (
                   <div
                     key={virtualRow.index}
                     ref={firefoxDesktop ? undefined : rowVirtualizer.measureElement}
@@ -1505,8 +1510,12 @@ export default function FeedPage() {
                     {rows[virtualRow.index].map((profile, idx) => {
                       const globalIndex = virtualRow.index * cols + idx;
                       return (
-                        <ProfileCard
+                        <div
                           key={profile.id}
+                          className={isNewRow ? 'feed-card-enter' : undefined}
+                          style={isNewRow ? { animationDelay: `${idx * 0.06}s` } : undefined}
+                        >
+                        <ProfileCard
                           profile={profile}
                           index={globalIndex}
                           rank={globalIndex + 1}
@@ -1515,10 +1524,12 @@ export default function FeedPage() {
                           safariDesktopOverride={safariDesktop}
                           isMobileOverride={false}
                         />
+                        </div>
                       );
                     })}
                   </div>
-                ))}
+                  );
+                })}
               </div>
               )
             ) : (
