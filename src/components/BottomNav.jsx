@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../lib/authContext';
 import { warmVideoFeed } from '../lib/videoFeedWarmup';
-import { useRef } from 'react';
+import { useState } from 'react';
 
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 
@@ -15,19 +15,36 @@ const NAV_ITEMS = [
   { to: '/perfil', icon: User, label: 'Perfil' },
 ];
 
+// Read nav dimensions from sessionStorage once at module level so the
+// initial render already has the correct values before bootstrap resolves.
+function getInitialNavSettings() {
+  try {
+    const s = JSON.parse(sessionStorage.getItem('mansion_site_settings') || '{}');
+    return {
+      navHeight: Number(s.navHeight) || 71,
+      navBottomPadding: s.navBottomPadding != null ? Number(s.navBottomPadding) : 24,
+      navSidePadding: s.navSidePadding != null ? Number(s.navSidePadding) : 16,
+      navOpacity: s.navOpacity != null ? Number(s.navOpacity) : 40,
+      navBlur: s.navBlur != null ? Number(s.navBlur) : 24,
+    };
+  } catch {
+    return { navHeight: 71, navBottomPadding: 24, navSidePadding: 16, navOpacity: 40, navBlur: 24 };
+  }
+}
+
 export default function BottomNav() {
   const location = useLocation();
   const { unreadCount } = useUnreadMessages();
   const { siteSettings, user } = useAuth();
 
-  const bottomPadding = siteSettings?.navBottomPadding ?? 24;
-  const sidePadding = siteSettings?.navSidePadding ?? 16;
-  const navOpacity = siteSettings?.navOpacity ?? 40;
-  const navBlur = siteSettings?.navBlur ?? 24;
-  // Lock navHeight on first render to prevent resize jump when siteSettings loads
-  const navHeightRef = useRef(siteSettings?.navHeight ?? 71);
-  if (siteSettings?.navHeight) navHeightRef.current = siteSettings.navHeight;
-  const navHeight = navHeightRef.current;
+  // Use useState so nav dimensions are frozen on first render — prevents
+  // the visual resize/jump when bootstrap resolves and siteSettings updates.
+  const [dims] = useState(getInitialNavSettings);
+  const bottomPadding = siteSettings?.navBottomPadding ?? dims.navBottomPadding;
+  const sidePadding = siteSettings?.navSidePadding ?? dims.navSidePadding;
+  const navHeight = dims.navHeight; // intentionally frozen — avoids layout shift
+  const navOpacity = siteSettings?.navOpacity ?? dims.navOpacity;
+  const navBlur = siteSettings?.navBlur ?? dims.navBlur;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
