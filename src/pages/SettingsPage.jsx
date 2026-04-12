@@ -1293,6 +1293,10 @@ export default function SettingsPage() {
                   <p className="text-[10px] uppercase tracking-wider text-text-dim">Solo shell oscuro</p>
                   <p className="mt-1 text-sm font-semibold text-text-primary">{bootDebugFlags.shellOnly ? 'activo' : 'apagado'}</p>
                 </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2 col-span-2">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Forzar black test al abrir</p>
+                  <p className="mt-1 text-sm font-semibold text-text-primary">{bootDebugFlags.forceBlackTest ? 'activo' : 'apagado'}</p>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -1325,6 +1329,16 @@ export default function SettingsPage() {
                   }`}
                 >
                   Solo shell oscuro: {bootDebugFlags.shellOnly ? 'on' : 'off'}
+                </button>
+                <button
+                  onClick={() => applyBootDebugFlags({ ...bootDebugFlags, forceBlackTest: !bootDebugFlags.forceBlackTest })}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                    bootDebugFlags.forceBlackTest
+                      ? 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-300'
+                      : 'bg-mansion-card border border-mansion-border/40 text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  Abrir en black test: {bootDebugFlags.forceBlackTest ? 'on' : 'off'}
                 </button>
               </div>
 
@@ -1364,6 +1378,12 @@ export default function SettingsPage() {
                   className="px-4 py-2 rounded-xl bg-mansion-card border border-mansion-border/40 text-text-muted text-sm font-semibold hover:text-text-primary transition-colors"
                 >
                   Probar solo shell
+                </button>
+                <button
+                  onClick={() => applyBootDebugFlags({ bootShield: false, skipBootstrap: false, shellOnly: false, forceBlackTest: true }, true)}
+                  className="px-4 py-2 rounded-xl bg-mansion-card border border-mansion-border/40 text-text-muted text-sm font-semibold hover:text-text-primary transition-colors"
+                >
+                  Abrir PWA en black test
                 </button>
                 <button
                   onClick={clearBootDebugAndReload}

@@ -5,6 +5,7 @@ const DEFAULT_FLAGS = {
   bootShield: false,
   skipBootstrap: false,
   shellOnly: false,
+  forceBlackTest: false,
 };
 
 function normalize(raw = {}) {
@@ -12,6 +13,7 @@ function normalize(raw = {}) {
     bootShield: !!raw.bootShield,
     skipBootstrap: !!raw.skipBootstrap,
     shellOnly: !!raw.shellOnly,
+    forceBlackTest: !!raw.forceBlackTest,
   };
 }
 
@@ -45,6 +47,7 @@ export function getBootDebugFlags() {
     bootShield: readQueryOverride('boot_shield', stored.bootShield),
     skipBootstrap: readQueryOverride('skip_bootstrap', stored.skipBootstrap),
     shellOnly: readQueryOverride('shell_only', stored.shellOnly),
+    forceBlackTest: readQueryOverride('force_black_test', stored.forceBlackTest),
   };
 }
 
