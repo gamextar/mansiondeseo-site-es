@@ -13,6 +13,7 @@
 
     <!-- PWA -->
     <meta name="theme-color" content="#08080E" />
+    <meta name="color-scheme" content="dark" />
     <link rel="manifest" href="/manifest.json" />
 
     <!-- iOS / Apple PWA -->
@@ -21,6 +22,8 @@
     <meta name="apple-mobile-web-app-title" content="Mansión Deseo" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-startup-image" href="/startup-1320x2868.png" media="screen and (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/startup-1206x2622.png" media="screen and (device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
     <link rel="apple-touch-startup-image" href="/startup-1290x2796.png" media="screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
     <link rel="apple-touch-startup-image" href="/startup-1179x2556.png" media="screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
     <link rel="apple-touch-startup-image" href="/startup-1170x2532.png" media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
@@ -91,24 +94,8 @@
       "sameAs": []
     }
     </script>
-    <style>
-      #startup-shield {
-        position: fixed;
-        inset: 0;
-        z-index: 2147483647;
-        background: #08080E;
-        opacity: 1;
-        pointer-events: none;
-        transition: opacity 180ms ease;
-      }
-
-      #startup-shield[data-hidden="true"] {
-        opacity: 0;
-      }
-    </style>
   </head>
-  <body style="margin:0;background-color:#08080E">
-    <div id="startup-shield" aria-hidden="true"></div>
+  <body style="margin:0;background-color:#08080E;color-scheme:dark">
     <div id="root" style="background-color:#08080E"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
