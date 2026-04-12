@@ -157,7 +157,7 @@ select option {
 @keyframes storyCircleEnter {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.82);
+    transform: translateY(18px) scale(0.74);
   }
   to {
     opacity: 1;
@@ -171,7 +171,7 @@ select option {
 }
 
 .story-circle-enter {
-  animation: storyCircleEnter 0.56s cubic-bezier(0.18, 0.9, 0.22, 1) both;
+  animation: storyCircleEnter 0.68s cubic-bezier(0.18, 0.9, 0.22, 1) both;
 }
 
 /* Feed card entrance animation — per-card stagger */
@@ -190,7 +190,7 @@ select option {
 @keyframes feedCardRevealMobile {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.92);
+    transform: translateY(18px) scale(0.86);
   }
   to {
     opacity: 1;
@@ -199,7 +199,7 @@ select option {
 }
 
 .feed-card-enter {
-  animation: feedCardRevealMobile 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: feedCardRevealMobile 0.58s cubic-bezier(0.18, 0.9, 0.22, 1) both;
 }
 
 @media (min-width: 1024px) {

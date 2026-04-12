@@ -1183,7 +1183,7 @@ export default function FeedPage() {
                       <div
                         key={`${pageCursor}-${profile.id}`}
                         className="feed-card-enter"
-                        style={{ animationDelay: `${0.06 + index * 0.055}s` }}
+                        style={{ animationDelay: `${0.1 + index * 0.075}s` }}
                       >
                         <ProfileCard
                           profile={profile}
