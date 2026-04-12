@@ -134,6 +134,7 @@ export default function FeedPage() {
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const gridRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);
+  const mobileNavVisibilityTimerRef = useRef(null);
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
@@ -291,6 +292,10 @@ export default function FeedPage() {
       window.clearTimeout(pendingViewedTimerRef.current);
       pendingViewedTimerRef.current = null;
     }
+    if (mobileNavVisibilityTimerRef.current) {
+      window.clearTimeout(mobileNavVisibilityTimerRef.current);
+      mobileNavVisibilityTimerRef.current = null;
+    }
   }, []);
 
   // Show mobile pagination arrows when user scrolls near the bottom of the grid
@@ -300,15 +305,32 @@ export default function FeedPage() {
       const el = gridRef.current;
       if (!el) { setShowMobileNav(false); return; }
       const rect = el.getBoundingClientRect();
-      // Add hysteresis so the overlay does not flicker right on the threshold.
+      // Add hysteresis + delayed commit so the overlay does not chatter
+      // when the bottom edge hovers around the viewport threshold on iOS.
       setShowMobileNav((prev) => {
-        const threshold = prev ? 180 : 120;
-        return rect.bottom <= window.innerHeight + threshold;
+        const threshold = prev ? 220 : 110;
+        const next = rect.bottom <= window.innerHeight + threshold;
+        if (next === prev) return prev;
+        if (mobileNavVisibilityTimerRef.current) {
+          window.clearTimeout(mobileNavVisibilityTimerRef.current);
+          mobileNavVisibilityTimerRef.current = null;
+        }
+        mobileNavVisibilityTimerRef.current = window.setTimeout(() => {
+          setShowMobileNav(next);
+          mobileNavVisibilityTimerRef.current = null;
+        }, next ? 90 : 160);
+        return prev;
       });
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (mobileNavVisibilityTimerRef.current) {
+        window.clearTimeout(mobileNavVisibilityTimerRef.current);
+        mobileNavVisibilityTimerRef.current = null;
+      }
+    };
   }, [isDesktopViewport, pageCursor]);
 
   const setStoryNodeRef = useCallback((storyId, node) => {
@@ -1287,7 +1309,7 @@ export default function FeedPage() {
                           type="button"
                           onClick={() => goToFeedPage(currentPage - 1)}
                           aria-label="Pagina anterior"
-                          className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
+                          className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/72 border border-white/15 shadow-lg active:scale-95 transition-transform"
                         >
                           <ChevronLeft className="w-7 h-7 text-white/80" />
                         </button>
@@ -1297,13 +1319,13 @@ export default function FeedPage() {
                           type="button"
                           onClick={() => goToFeedPage(currentPage + 1)}
                           aria-label="Pagina siguiente"
-                          className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg active:scale-95 transition-transform"
+                          className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/72 border border-white/15 shadow-lg active:scale-95 transition-transform"
                         >
                           <ChevronRight className="w-7 h-7 text-white/80" />
                         </button>
                       ) : <div className="w-14" />}
                     </div>
-                    <div className="rounded-full bg-black/60 backdrop-blur-md border border-white/15 px-4 py-2 shadow-lg">
+                    <div className="rounded-full bg-black/72 border border-white/15 px-4 py-2 shadow-lg">
                       <span className="text-xs font-medium text-white/70">{currentPage} / {totalPages}</span>
                     </div>
                   </motion.div>
