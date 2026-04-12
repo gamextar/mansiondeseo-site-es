@@ -393,6 +393,19 @@ export default function App() {
   const [snapshotShieldVisible, setSnapshotShieldVisible] = useState(false);
   const bootstrapStartedRef = useRef(false);
 
+  // Remove the static HTML app-shell after React's first paint.
+  // The shell is a plain <div> in the HTML (no JS needed to create it), so it
+  // covers the white WebView-init flash even before any script runs.
+  useLayoutEffect(() => {
+    const shell = document.getElementById('app-shell');
+    if (!shell) return;
+    // Fade out quickly then remove
+    shell.style.transition = 'opacity 120ms ease';
+    shell.style.opacity = '0';
+    const t = setTimeout(() => shell.remove(), 130);
+    return () => clearTimeout(t);
+  }, []);
+
   const handleDisableBootDiagnostics = useCallback(() => {
     clearBootDebugFlags();
     if (typeof window !== 'undefined') {
