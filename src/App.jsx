@@ -34,7 +34,7 @@ import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
 import { AuthContext, useAuth } from './lib/authContext';
 import { preloadVideoFeedChunk, preloadVideoFeedData } from './lib/videoFeedWarmup';
-import { clearBootDebugFlags, getBootDebugFlags } from './lib/bootDebugPrefs';
+import { clearBootDebugFlags, getBootDebugFlags, subscribeBootDebugFlags } from './lib/bootDebugPrefs';
 
 const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
@@ -377,7 +377,7 @@ function AppLayout() {
 
 export default function App() {
   const { verified, verify } = useAgeVerified();
-  const debugFlags = getBootDebugFlags();
+  const [debugFlags, setDebugFlags] = useState(() => getBootDebugFlags());
   const [registered, setRegisteredState] = useState(
     () => !!getToken() || localStorage.getItem('mansion_registered') === 'true'
   );
@@ -428,6 +428,19 @@ export default function App() {
     window.addEventListener('mansion-auth-expired', handleAuthExpired);
     return () => window.removeEventListener('mansion-auth-expired', handleAuthExpired);
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeBootDebugFlags((nextFlags) => {
+      setDebugFlags(nextFlags);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (debugFlags.bootShield) {
+      setBootShieldVisible(true);
+    }
+  }, [debugFlags.bootShield]);
 
   useEffect(() => {
     if (!debugFlags.bootShield) return undefined;

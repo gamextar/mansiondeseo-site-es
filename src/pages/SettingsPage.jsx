@@ -127,6 +127,8 @@ export default function SettingsPage() {
   const [mediaDebugSummary, setMediaDebugSummary] = useState(() => getMediaDebugSummary());
   const [debugPanelPrefs, setDebugPanelPrefs] = useState(() => getDebugPanelPrefs());
   const [bootDebugFlags, setBootDebugFlagsState] = useState(() => getBootDebugFlags());
+  const [swResetting, setSwResetting] = useState(false);
+  const [swResetStatus, setSwResetStatus] = useState('');
   const realtimeEstimate = estimateRealtimeLoad(realtimeDebugSummary);
   const mediaAutoTimerRef = useRef(null);
   const lastMediaAutoKeyRef = useRef('');
@@ -302,6 +304,27 @@ export default function SettingsPage() {
     setBootDebugFlagsState(next);
     if (typeof window !== 'undefined') {
       window.location.reload();
+    }
+  };
+
+  const unregisterServiceWorkersAndReload = async () => {
+    if (typeof window === 'undefined') return;
+    setSwResetting(true);
+    setSwResetStatus('');
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+      setSwResetStatus('Service worker y caches borrados. Recargando...');
+      window.setTimeout(() => window.location.reload(), 120);
+    } catch {
+      setSwResetStatus('No pude limpiar el service worker en esta prueba.');
+      setSwResetting(false);
     }
   };
 
@@ -1307,6 +1330,12 @@ export default function SettingsPage() {
 
               <div className="flex flex-wrap gap-2">
                 <button
+                  onClick={() => applyBootDebugFlags({ bootShield: false, skipBootstrap: false, shellOnly: true }, false)}
+                  className="px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-sm font-semibold hover:text-cyan-200 transition-colors"
+                >
+                  Activar shell ahora
+                </button>
+                <button
                   onClick={() => applyBootDebugFlags(bootDebugFlags, true)}
                   className="px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-sm font-semibold hover:text-cyan-200 transition-colors"
                 >
@@ -1342,7 +1371,17 @@ export default function SettingsPage() {
                 >
                   Limpiar y recargar normal
                 </button>
+                <button
+                  onClick={unregisterServiceWorkersAndReload}
+                  disabled={swResetting}
+                  className="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm font-semibold hover:text-amber-200 transition-colors disabled:opacity-60"
+                >
+                  {swResetting ? 'Limpiando PWA...' : 'Borrar service worker y recargar'}
+                </button>
               </div>
+              {swResetStatus ? (
+                <p className="text-[11px] text-amber-200/80">{swResetStatus}</p>
+              ) : null}
             </div>
             <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-border/20 space-y-3">
               <div>
