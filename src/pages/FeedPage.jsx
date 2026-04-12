@@ -909,13 +909,8 @@ export default function FeedPage() {
       </div>
       {/* Stories section */}
       {showStoriesSection && (
-      <AnimatedBlock
+      <div
         className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0"
-        motionProps={{
-          initial: { opacity: 0, y: 10 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] },
-        }}
       >
         <div className="flex items-center gap-1.5 mb-3">
           <Radio className="w-4 h-4 text-mansion-crimson" />
@@ -934,7 +929,7 @@ export default function FeedPage() {
           }}
           motionProps={{
             variants: stagger,
-            initial: 'hidden',
+            initial: false,
             animate: 'visible',
           }}
           onWheel={handleStoriesWheel}
@@ -1174,31 +1169,21 @@ export default function FeedPage() {
             );
           })}
         </AnimatedBlock>
-      </AnimatedBlock>
+      </div>
       )}
 
       {/* Results count */}
-      <AnimatedBlock
+      <div
         className="px-4 lg:px-8 pb-2"
-        motionProps={{
-          initial: { opacity: 0 },
-          animate: { opacity: 1 },
-          transition: { duration: 0.3, delay: 0.25 },
-        }}
       >
         <p className="text-text-dim text-xs">
           {visibleProfiles.length} {visibleProfiles.length === 1 ? 'usuario' : 'usuarios'} conectados
         </p>
-      </AnimatedBlock>
+      </div>
 
       {/* Grid */}
-      <AnimatedBlock
+      <div
         className="px-4 lg:px-8"
-        motionProps={{
-          initial: { opacity: 0, y: 12 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.4, delay: 0.15, ease: [0.25, 0.46, 0.45, 0.94] },
-        }}
       >
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -1315,15 +1300,14 @@ export default function FeedPage() {
             )}
           </>
         ) : (
-          <AnimatedBlock
-            motionProps={{ initial: { opacity: 0 }, animate: { opacity: 1 } }}
+          <div
             className="text-center py-20"
           >
             <p className="text-text-muted text-lg mb-2">No hay perfiles</p>
             <p className="text-text-dim text-sm">Prueba con otro filtro</p>
-          </AnimatedBlock>
+          </div>
         )}
-      </AnimatedBlock>
+      </div>
 
     </div>
   );
