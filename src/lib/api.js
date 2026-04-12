@@ -969,6 +969,7 @@ export async function updateSettings(fields) {
   }).then((data) => {
     sharedGetCache.delete('publicSettings');
     sessionCache.delete('publicSettings');
+    markFeedDirty();
     return data;
   });
 }

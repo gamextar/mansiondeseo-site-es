@@ -229,7 +229,7 @@ export default function FeedPage() {
   }, []);
 
   const loadMoreProfiles = useCallback(() => {
-    const maxCards = Math.max(12, safariDesktop
+    const maxCards = Math.max(12, isDesktopViewport
       ? (settings?.feedMaxCardsDesktop ?? MOBILE_MAX_DOM_CARDS)
       : (settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS));
 
@@ -263,7 +263,7 @@ export default function FeedPage() {
       })
       .catch(() => { loadMoreFailedRef.current = true; })
       .finally(() => { loadingMoreRef.current = false; setLoadingMore(false); });
-  }, [hasMore, loading, loadingMore, nextCursor, profiles.length, safariDesktop, settings]);
+  }, [hasMore, isDesktopViewport, loading, loadingMore, nextCursor, profiles.length, settings]);
 
   // Initial load — runs once on mount
   useEffect(() => {
@@ -353,6 +353,16 @@ export default function FeedPage() {
 
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
+  const maxFeedCards = Math.max(
+    12,
+    isDesktopViewport
+      ? (safeSettings.feedMaxCardsDesktop ?? MOBILE_MAX_DOM_CARDS)
+      : (safeSettings.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS)
+  );
+  const visibleProfiles = useMemo(
+    () => safeProfiles.slice(0, maxFeedCards),
+    [maxFeedCards, safeProfiles]
+  );
   const storyLimit = Math.max(
     1,
     Math.round(
@@ -362,7 +372,7 @@ export default function FeedPage() {
     )
   );
   const useHomeStoriesLivefeed = safeSettings.homeStoriesUseLivefeed !== false;
-  const fallbackStoryProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, storyLimit);
+  const fallbackStoryProfiles = visibleProfiles.filter(p => p.has_active_story).slice(0, storyLimit);
   const storyProfiles = useHomeStoriesLivefeed && Array.isArray(liveStoryProfiles) ? liveStoryProfiles : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
@@ -926,11 +936,11 @@ export default function FeedPage() {
   const gap = safariDesktop ? 16 : 12; // matches lg:gap-4 / gap-3
   const rows = useMemo(() => {
     const result = [];
-    for (let i = 0; i < safeProfiles.length; i += cols) {
-      result.push(safeProfiles.slice(i, i + cols));
+    for (let i = 0; i < visibleProfiles.length; i += cols) {
+      result.push(visibleProfiles.slice(i, i + cols));
     }
     return result;
-  }, [safeProfiles, cols]);
+  }, [visibleProfiles, cols]);
 
   const estimateRowHeight = useCallback(() => {
     if (!gridRef.current) return 300;
@@ -1250,7 +1260,7 @@ export default function FeedPage() {
         }}
       >
         <p className="text-text-dim text-xs">
-          {safeProfiles.length} {safeProfiles.length === 1 ? 'usuario' : 'usuarios'} conectados
+          {visibleProfiles.length} {visibleProfiles.length === 1 ? 'usuario' : 'usuarios'} conectados
         </p>
       </AnimatedBlock>
 
@@ -1268,7 +1278,7 @@ export default function FeedPage() {
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
           </div>
-        ) : safeProfiles.length > 0 ? (
+        ) : visibleProfiles.length > 0 ? (
           <>
             {showGridSection ? (
               <div
