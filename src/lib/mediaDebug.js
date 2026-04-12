@@ -2,6 +2,54 @@ import { debugInspectMediaCache } from './api';
 
 const MEDIA_DEBUG_EVENT = 'mansion-media-debug-update';
 
+function createCounters() {
+  return { total: 0, hit: 0, miss: 0, other: 0, errors: 0 };
+}
+
+function normalizeFamily(url) {
+  try {
+    const { pathname } = new URL(url);
+    if (pathname.startsWith('/livefeed/')) return 'livefeed';
+    if (pathname.startsWith('/stories/')) return 'stories';
+    if (pathname.startsWith('/profiles/')) return 'profiles';
+    if (pathname.startsWith('/assets/')) return 'assets';
+    return 'other';
+  } catch {
+    return 'other';
+  }
+}
+
+function accumulateEntry(counter, entry) {
+  counter.total += 1;
+  if (entry.error) counter.errors += 1;
+  else if (entry.cacheStatus === 'HIT') counter.hit += 1;
+  else if (entry.cacheStatus === 'MISS') counter.miss += 1;
+  else counter.other += 1;
+}
+
+function summarizeFamilies(entries = []) {
+  const families = {
+    livefeed: createCounters(),
+    stories: createCounters(),
+    profiles: createCounters(),
+    assets: createCounters(),
+    other: createCounters(),
+  };
+
+  for (const entry of entries) {
+    const family = normalizeFamily(entry?.url || '');
+    accumulateEntry(families[family] || families.other, entry || {});
+  }
+
+  return families;
+}
+
+function cloneFamilies(families) {
+  return Object.fromEntries(
+    Object.entries(families || {}).map(([key, value]) => [key, { ...(value || createCounters()) }])
+  );
+}
+
 function createController() {
   if (typeof window === 'undefined') return null;
   if (window.__mansionMediaDebug) return window.__mansionMediaDebug;
@@ -11,8 +59,10 @@ function createController() {
     inspectedAt: null,
     route: window.location.pathname + window.location.search,
     entries: [],
-    summary: { total: 0, hit: 0, miss: 0, other: 0, errors: 0 },
-    sessionSummary: { total: 0, hit: 0, miss: 0, other: 0, errors: 0 },
+    summary: createCounters(),
+    sessionSummary: createCounters(),
+    familySummary: summarizeFamilies(),
+    sessionFamilySummary: summarizeFamilies(),
     error: '',
   };
 
@@ -25,6 +75,8 @@ function createController() {
         entries: [...state.entries],
         summary: { ...state.summary },
         sessionSummary: { ...state.sessionSummary },
+        familySummary: cloneFamilies(state.familySummary),
+        sessionFamilySummary: cloneFamilies(state.sessionFamilySummary),
         error: state.error,
       },
     }));
@@ -39,6 +91,8 @@ function createController() {
         entries: [...state.entries],
         summary: { ...state.summary },
         sessionSummary: { ...state.sessionSummary },
+        familySummary: cloneFamilies(state.familySummary),
+        sessionFamilySummary: cloneFamilies(state.sessionFamilySummary),
         error: state.error,
       };
     },
@@ -46,8 +100,10 @@ function createController() {
       state.loading = false;
       state.inspectedAt = null;
       state.entries = [];
-      state.summary = { total: 0, hit: 0, miss: 0, other: 0, errors: 0 };
-      state.sessionSummary = { total: 0, hit: 0, miss: 0, other: 0, errors: 0 };
+      state.summary = createCounters();
+      state.sessionSummary = createCounters();
+      state.familySummary = summarizeFamilies();
+      state.sessionFamilySummary = summarizeFamilies();
       state.error = '';
       emit();
       return this.summary();
@@ -85,16 +141,14 @@ function createController() {
         const entries = Array.isArray(data?.entries) ? data.entries : [];
 
         const summary = entries.reduce((acc, entry) => {
-          acc.total += 1;
-          if (entry.error) acc.errors += 1;
-          else if (entry.cacheStatus === 'HIT') acc.hit += 1;
-          else if (entry.cacheStatus === 'MISS') acc.miss += 1;
-          else acc.other += 1;
+          accumulateEntry(acc, entry);
           return acc;
-        }, { total: 0, hit: 0, miss: 0, other: 0, errors: 0 });
+        }, createCounters());
+        const familySummary = summarizeFamilies(entries);
 
         state.entries = entries;
         state.summary = summary;
+        state.familySummary = familySummary;
         state.sessionSummary = {
           total: state.sessionSummary.total + summary.total,
           hit: state.sessionSummary.hit + summary.hit,
@@ -102,6 +156,15 @@ function createController() {
           other: state.sessionSummary.other + summary.other,
           errors: state.sessionSummary.errors + summary.errors,
         };
+        for (const [familyKey, counters] of Object.entries(familySummary)) {
+          const sessionFamily = state.sessionFamilySummary[familyKey] || createCounters();
+          sessionFamily.total += counters.total;
+          sessionFamily.hit += counters.hit;
+          sessionFamily.miss += counters.miss;
+          sessionFamily.other += counters.other;
+          sessionFamily.errors += counters.errors;
+          state.sessionFamilySummary[familyKey] = sessionFamily;
+        }
         state.inspectedAt = new Date().toISOString();
         state.error = '';
       } catch (error) {

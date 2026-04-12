@@ -23,6 +23,35 @@ function TogglePill({ active, onClick, children }) {
   );
 }
 
+function MediaFamilyTable({ title, data }) {
+  const rows = [
+    ['profiles', 'Profiles'],
+    ['stories', 'Stories'],
+    ['livefeed', 'Livefeed'],
+    ['assets', 'Assets'],
+    ['other', 'Otros'],
+  ];
+
+  return (
+    <div>
+      <p className="mb-2 text-[10px] uppercase tracking-[0.16em] text-white/45">{title}</p>
+      <div className="rounded-xl border border-white/10 overflow-hidden">
+        {rows.map(([key, label]) => {
+          const entry = data?.[key] || {};
+          return (
+            <div key={key} className="grid grid-cols-[1.2fr,0.8fr,0.8fr,0.8fr] items-center gap-2 border-b border-white/10 px-3 py-2 text-[10px] last:border-b-0">
+              <p className="text-white/85">{label}</p>
+              <span className="text-white/60">tot {entry.total ?? 0}</span>
+              <span className="text-emerald-200/80">hit {entry.hit ?? 0}</span>
+              <span className="text-amber-200/80">miss {entry.miss ?? 0}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function ApiDebugOverlay() {
   const location = useLocation();
   const [summary, setSummary] = useState(() => getApiDebugSummary());
@@ -485,6 +514,8 @@ export default function ApiDebugOverlay() {
                     </div>
                   </div>
                 </div>
+                <MediaFamilyTable title="Ruta por familia" data={mediaSummary?.familySummary} />
+                <MediaFamilyTable title="Sesion por familia" data={mediaSummary?.sessionFamilySummary} />
                 {mediaSummary?.error ? (
                   <p className="text-[11px] text-rose-300">{mediaSummary.error}</p>
                 ) : null}
