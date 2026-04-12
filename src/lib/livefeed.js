@@ -1,4 +1,5 @@
 import { resolveMediaUrl } from './media';
+import { recordLivefeedCurrentDebug, recordLivefeedDebugError, recordLivefeedPayloadDebug } from './livefeedDebug';
 
 const LIVEFEED_CURRENT_URL = resolveMediaUrl('https://media.mansiondeseo.com/livefeed/current.json');
 const LIVEFEED_SESSION_KEY = 'mansion_livefeed_payload';
@@ -52,13 +53,7 @@ function storeCurrentSnapshot(snapshot, source = 'network') {
   try {
     sessionStorage.setItem(LIVEFEED_CURRENT_SESSION_KEY, JSON.stringify(snapshot));
   } catch {}
-  try {
-    window.__mansionLivefeedDebug = {
-      source,
-      version: snapshot?.version || '',
-      fetchedAt: new Date(currentSnapshotFetchedAt).toISOString(),
-    };
-  } catch {}
+  recordLivefeedCurrentDebug(source, snapshot);
 }
 
 function interleaveBuckets(storiesByBucket, buckets, limit = 15) {
@@ -84,17 +79,12 @@ export async function fetchLivefeedCurrent({ minIntervalMs = DEFAULT_CURRENT_MIN
   const now = Date.now();
   const cached = readCachedCurrentSnapshot();
   if (cached && now - currentSnapshotFetchedAt < Math.max(0, Number(minIntervalMs) || 0)) {
-    try {
-      window.__mansionLivefeedDebug = {
-        source: 'memory',
-        version: cached?.version || '',
-        fetchedAt: new Date(currentSnapshotFetchedAt).toISOString(),
-      };
-    } catch {}
+    recordLivefeedCurrentDebug('memory', cached);
     return cached;
   }
 
   if (currentRequestPromise) {
+    recordLivefeedCurrentDebug('deduped', currentSnapshotCache || cached || null);
     return currentRequestPromise;
   }
 
@@ -106,6 +96,10 @@ export async function fetchLivefeedCurrent({ minIntervalMs = DEFAULT_CURRENT_MIN
       const snapshot = await response.json();
       storeCurrentSnapshot(snapshot, 'network');
       return snapshot;
+    })
+    .catch((error) => {
+      recordLivefeedDebugError(error);
+      throw error;
     })
     .finally(() => {
       currentRequestPromise = null;
@@ -127,9 +121,11 @@ export async function fetchLivefeedPayload(current) {
 
   const response = await fetch(payloadUrl, { cache: 'force-cache' });
   if (!response.ok) {
+    recordLivefeedDebugError(new Error(`No pude leer livefeed payload (${response.status})`));
     throw new Error(`No pude leer livefeed payload (${response.status})`);
   }
   const payload = await response.json();
+  recordLivefeedPayloadDebug(payload, payloadUrl);
   try {
     sessionStorage.setItem(LIVEFEED_SESSION_KEY, JSON.stringify(payload));
   } catch {}

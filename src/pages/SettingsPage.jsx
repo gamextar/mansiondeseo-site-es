@@ -1259,6 +1259,7 @@ export default function SettingsPage() {
                 {[
                   ['api', 'API requests'],
                   ['realtime', 'WebSockets'],
+                  ['livefeed', 'Livefeed'],
                   ['media', 'HIT / MISS media'],
                 ].map(([key, label]) => (
                   <button
