@@ -1,6 +1,6 @@
 import { forwardRef, useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Plus, Radio } from 'lucide-react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '../lib/authContext';
@@ -9,25 +9,6 @@ const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.045 } 
 const storyItem = {
   hidden: { opacity: 0, scale: 0.85, y: 8 },
   visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 20 } },
-};
-const desktopPageGridVariants = {
-  initial: (direction = 1) => ({ opacity: 0, x: direction > 0 ? 28 : -28, y: 4 }),
-  animate: {
-    opacity: 1,
-    x: 0,
-    y: 0,
-    transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1], staggerChildren: 0.028, delayChildren: 0.02 },
-  },
-  exit: (direction = 1) => ({
-    opacity: 0,
-    x: direction > 0 ? -18 : 18,
-    y: -2,
-    transition: { duration: 0.18, ease: [0.4, 0, 1, 1] },
-  }),
-};
-const desktopPageCardVariants = {
-  initial: { opacity: 0, y: 20, scale: 0.96 },
-  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] } },
 };
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
@@ -108,12 +89,11 @@ export default function FeedPage() {
   const cols = useGridColumns();
   const isDesktopViewport = cols >= 4;
   const usePagedDesktopFeed = isDesktopViewport;
-  const useFancyDesktopPageTransition = usePagedDesktopFeed && !safariDesktop && !firefoxDesktop;
   const desktopStoryRailEnhanced = isDesktopViewport;
   const cached = getCachedFeed();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
-  const [showStoriesSection, setShowStoriesSection] = useState(() => !safariDesktop);
-  const [showGridSection, setShowGridSection] = useState(() => !safariDesktop);
+  const [showStoriesSection, setShowStoriesSection] = useState(true);
+  const [showGridSection, setShowGridSection] = useState(true);
   const [canAutoLoadMore, setCanAutoLoadMore] = useState(false);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
@@ -124,7 +104,6 @@ export default function FeedPage() {
   const [hasMore, setHasMore] = useState(
     cached ? (typeof cached?.hasMore === 'boolean' ? cached.hasMore : true) : false
   );
-  const [desktopPageDirection, setDesktopPageDirection] = useState(1);
   const [loading, setLoading] = useState(!cached);
   const [loadingMore, setLoadingMore] = useState(false);
   const [liveStoryProfiles, setLiveStoryProfiles] = useState(null);
@@ -179,41 +158,7 @@ export default function FeedPage() {
     isSafariDesktopRef.current = isSafari && isDesktop;
   }, []);
 
-  useEffect(() => {
-    if (!safariDesktop) {
-      setShowStoriesSection(true);
-      setShowGridSection(true);
-      return undefined;
-    }
 
-    setShowStoriesSection(false);
-    setShowGridSection(false);
-    setCanAutoLoadMore(false);
-    let frameA = 0;
-    let frameB = 0;
-    let frameC = 0;
-    let frameD = 0;
-    const timeoutId = window.setTimeout(() => {
-      frameA = requestAnimationFrame(() => {
-        frameB = requestAnimationFrame(() => {
-          setShowStoriesSection(true);
-        });
-      });
-      frameC = requestAnimationFrame(() => {
-        frameD = requestAnimationFrame(() => {
-          setShowGridSection(true);
-        });
-      });
-    }, 140);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-      if (frameA) cancelAnimationFrame(frameA);
-      if (frameB) cancelAnimationFrame(frameB);
-      if (frameC) cancelAnimationFrame(frameC);
-      if (frameD) cancelAnimationFrame(frameD);
-    };
-  }, [safariDesktop]);
 
   useEffect(() => {
     const unlockAutoLoad = () => {
@@ -479,7 +424,6 @@ export default function FeedPage() {
     const safePage = Math.max(1, Math.min(totalPages, Number(page) || 1));
     const nextPageCursor = (safePage - 1) * DESKTOP_FEED_PAGE_SIZE;
     if (nextPageCursor === pageCursor && profiles.length > 0) return;
-    setDesktopPageDirection(nextPageCursor > pageCursor ? 1 : -1);
     const nextBlockCursor = Math.floor(nextPageCursor / DESKTOP_FEED_BLOCK_SIZE) * DESKTOP_FEED_BLOCK_SIZE;
     const blockEndCursor = blockCursor + profiles.length;
     if (nextPageCursor >= blockCursor && nextPageCursor < blockEndCursor) {
@@ -1072,7 +1016,7 @@ export default function FeedPage() {
   }, [stopStoriesBounce, stopStoriesMomentum]);
 
   // ── Virtual scroll setup ────────────────────────────────────────────────
-  const gap = safariDesktop ? 16 : 12; // matches lg:gap-4 / gap-3
+  const gap = isDesktopViewport ? 16 : 12; // matches lg:gap-4 / gap-3
   const animatedRowsRef = useRef(new Set());
   const rows = useMemo(() => {
     const result = [];
@@ -1121,7 +1065,6 @@ export default function FeedPage() {
       {/* Stories section */}
       {showStoriesSection && (
       <AnimatedBlock
-        disabled={safariDesktop}
         className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0"
         motionProps={{
           initial: { opacity: 0, y: 10 },
@@ -1134,7 +1077,6 @@ export default function FeedPage() {
           <p className="text-text-muted text-sm lg:text-base font-medium">Video Flashes</p>
         </div>
         <AnimatedBlock
-          disabled={safariDesktop}
           ref={storiesScrollRef}
           className={`flex overflow-x-auto scrollbar-hide pb-2 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
           style={{
@@ -1392,7 +1334,6 @@ export default function FeedPage() {
 
       {/* Results count */}
       <AnimatedBlock
-        disabled={safariDesktop}
         className="px-4 lg:px-8 pb-2"
         motionProps={{
           initial: { opacity: 0 },
@@ -1407,7 +1348,6 @@ export default function FeedPage() {
 
       {/* Grid */}
       <AnimatedBlock
-        disabled={safariDesktop}
         className="px-4 lg:px-8"
         motionProps={{
           initial: { opacity: 0, y: 12 },
@@ -1423,9 +1363,7 @@ export default function FeedPage() {
           <>
             {showGridSection ? (
               usePagedDesktopFeed ? (
-                useFancyDesktopPageTransition ? (
-                <AnimatePresence mode="wait">
-                  <motion.div
+                  <div
                     key={`desktop-page-${pageCursor}`}
                     ref={gridRef}
                     className="grid"
@@ -1435,14 +1373,13 @@ export default function FeedPage() {
                       opacity: gridOpacity,
                       transition: gridOpacity === 0 ? 'opacity 0.3s ease' : 'opacity 0.25s ease',
                     }}
-                    custom={desktopPageDirection}
-                    variants={desktopPageGridVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
                   >
                     {visibleProfiles.map((profile, index) => (
-                      <motion.div key={profile.id} variants={desktopPageCardVariants}>
+                      <div
+                        key={profile.id}
+                        className="feed-card-enter"
+                        style={{ animationDelay: `${index * 0.04}s` }}
+                      >
                         <ProfileCard
                           profile={profile}
                           index={index}
@@ -1452,36 +1389,9 @@ export default function FeedPage() {
                           safariDesktopOverride={safariDesktop}
                           isMobileOverride={false}
                         />
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                </AnimatePresence>
-                ) : (
-                  <div
-                    key={`desktop-page-static-${pageCursor}`}
-                    ref={gridRef}
-                    className="grid"
-                    style={{
-                      gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                      gap: `${gap}px`,
-                      opacity: gridOpacity,
-                      transition: gridOpacity === 0 ? 'opacity 0.3s ease' : 'opacity 0.25s ease',
-                    }}
-                  >
-                    {visibleProfiles.map((profile, index) => (
-                      <ProfileCard
-                        key={profile.id}
-                        profile={profile}
-                        index={index}
-                        rank={pageCursor + index + 1}
-                        viewerPremium={viewerPremium}
-                        settings={safeSettings}
-                        safariDesktopOverride={safariDesktop}
-                        isMobileOverride={false}
-                      />
+                      </div>
                     ))}
                   </div>
-                )
               ) : (
               <div
                 ref={gridRef}
@@ -1538,12 +1448,12 @@ export default function FeedPage() {
             {usePagedDesktopFeed ? (
               totalPages > 1 ? (
                 <motion.div
-                  initial={useFancyDesktopPageTransition ? { opacity: 0, y: 14 } : false}
-                  animate={useFancyDesktopPageTransition ? { opacity: 1, y: 0 } : undefined}
-                  transition={useFancyDesktopPageTransition ? { duration: 0.32, ease: [0.22, 1, 0.36, 1], delay: 0.08 } : undefined}
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
                   className="py-6"
                 >
-                  <div className={`mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/10 bg-mansion-card/80 px-3 py-3 shadow-[0_16px_36px_rgba(0,0,0,0.18)] ${useFancyDesktopPageTransition ? 'backdrop-blur-sm' : ''}`}>
+                  <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/10 bg-mansion-card/80 px-3 py-3 shadow-[0_16px_36px_rgba(0,0,0,0.18)] backdrop-blur-sm">
                     <span className="mr-1 text-xs font-medium text-text-muted">
                       {Math.min(totalProfiles, pageCursor + 1)}-{Math.min(totalProfiles, pageCursor + visibleProfiles.length)} de {totalProfiles}
                     </span>
@@ -1596,7 +1506,6 @@ export default function FeedPage() {
           </>
         ) : (
           <AnimatedBlock
-            disabled={safariDesktop}
             motionProps={{ initial: { opacity: 0 }, animate: { opacity: 1 } }}
             className="text-center py-20"
           >
