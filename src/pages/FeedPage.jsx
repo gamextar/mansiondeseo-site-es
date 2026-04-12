@@ -114,6 +114,7 @@ export default function FeedPage() {
   const previousOrderedStoryIdsRef = useRef('');
   const storiesDragRef = useRef({
     active: false,
+    captured: false,
     startX: 0,
     startScrollLeft: 0,
     moved: false,
@@ -401,6 +402,10 @@ export default function FeedPage() {
     if (!orderedIds || !storiesScrollRef.current || orderedIds === previousOrderedIds) return;
 
     const container = storiesScrollRef.current;
+    if (!previousOrderedIds) {
+      container.scrollLeft = 0;
+      return;
+    }
     const firstUnseen = orderedStoryProfiles.find((profile) => !viewedStoryUsers.has(String(profile?.id || ''))) || orderedStoryProfiles[0];
     const targetNode = storyNodeRefs.current.get(String(firstUnseen?.id || ''));
     if (!targetNode) return;
@@ -686,6 +691,7 @@ export default function FeedPage() {
     stopStoriesMomentum();
     storiesDragRef.current = {
       active: true,
+      captured: false,
       startX: event.clientX,
       startScrollLeft: el.scrollLeft,
       moved: false,
@@ -693,7 +699,6 @@ export default function FeedPage() {
       lastTs: event.timeStamp || performance.now(),
       velocity: 0,
     };
-    el.setPointerCapture?.(event.pointerId);
   }, [stopStoriesMomentum]);
 
   const handleStoriesPointerMove = useCallback((event) => {
@@ -706,8 +711,13 @@ export default function FeedPage() {
     const deltaTs = Math.max(1, now - drag.lastTs);
     const deltaSinceLast = event.clientX - drag.lastX;
     if (Math.abs(deltaX) > 4) {
-      drag.moved = true;
+      if (!drag.moved) {
+        drag.moved = true;
+        drag.captured = true;
+        try { el.setPointerCapture?.(event.pointerId); } catch {}
+      }
     }
+    if (!drag.moved) return;
     el.scrollLeft = drag.startScrollLeft - deltaX;
     drag.velocity = (-deltaSinceLast) / deltaTs;
     drag.lastX = event.clientX;
@@ -720,7 +730,7 @@ export default function FeedPage() {
     const drag = storiesDragRef.current;
     if (!drag.active) return;
     drag.active = false;
-    if (el && event?.pointerId !== undefined) {
+    if (el && drag.captured && event?.pointerId !== undefined) {
       try { el.releasePointerCapture?.(event.pointerId); } catch {}
     }
     storiesMomentumRef.current.velocity = drag.moved ? drag.velocity : 0;
@@ -729,6 +739,7 @@ export default function FeedPage() {
     } else {
       storiesMomentumRef.current.velocity = 0;
     }
+    drag.captured = false;
   }, [startStoriesMomentum]);
 
   const handleStoriesClickCapture = useCallback((event) => {
