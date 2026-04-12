@@ -383,18 +383,19 @@ export default function FeedPage() {
 
   const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
+  const desktopPageSize = Math.max(6, Math.min(60, safeSettings.feedMaxCardsDesktop ?? DESKTOP_FEED_PAGE_SIZE));
   const maxFeedCards = Math.max(
     12,
     isDesktopViewport
-      ? DESKTOP_FEED_PAGE_SIZE
+      ? desktopPageSize
       : (safeSettings.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS)
   );
   const visibleProfiles = useMemo(() => {
     if (!usePagedDesktopFeed) return safeProfiles.slice(0, maxFeedCards);
     const start = Math.max(0, pageCursor - blockCursor);
-    return safeProfiles.slice(start, start + DESKTOP_FEED_PAGE_SIZE);
-  }, [blockCursor, maxFeedCards, pageCursor, safeProfiles, usePagedDesktopFeed]);
-  const currentPage = usePagedDesktopFeed ? Math.floor(pageCursor / DESKTOP_FEED_PAGE_SIZE) + 1 : 1;
+    return safeProfiles.slice(start, start + desktopPageSize);
+  }, [blockCursor, desktopPageSize, maxFeedCards, pageCursor, safeProfiles, usePagedDesktopFeed]);
+  const currentPage = usePagedDesktopFeed ? Math.floor(pageCursor / desktopPageSize) + 1 : 1;
   const totalPages = usePagedDesktopFeed ? Math.max(1, Math.ceil((totalProfiles || 0) / maxFeedCards)) : 1;
   const pageWindow = useMemo(() => {
     if (!usePagedDesktopFeed || totalPages <= 1) return [];
@@ -422,7 +423,7 @@ export default function FeedPage() {
   const goToFeedPage = useCallback(async (page) => {
     if (!usePagedDesktopFeed) return;
     const safePage = Math.max(1, Math.min(totalPages, Number(page) || 1));
-    const nextPageCursor = (safePage - 1) * DESKTOP_FEED_PAGE_SIZE;
+    const nextPageCursor = (safePage - 1) * desktopPageSize;
     if (nextPageCursor === pageCursor && profiles.length > 0) return;
     const nextBlockCursor = Math.floor(nextPageCursor / DESKTOP_FEED_BLOCK_SIZE) * DESKTOP_FEED_BLOCK_SIZE;
     const blockEndCursor = blockCursor + profiles.length;
@@ -449,7 +450,7 @@ export default function FeedPage() {
     }
     const targetTop = Math.max(0, (gridRef.current?.offsetTop || 0) - 24);
     window.scrollTo({ top: targetTop, behavior: 'smooth' });
-  }, [blockCursor, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, usePagedDesktopFeed, viewerPremium]);
+  }, [blockCursor, desktopPageSize, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, usePagedDesktopFeed, viewerPremium]);
 
   useEffect(() => {
     if (!usePagedDesktopFeed || loading) return;
@@ -1386,8 +1387,6 @@ export default function FeedPage() {
                           rank={pageCursor + index + 1}
                           viewerPremium={viewerPremium}
                           settings={safeSettings}
-                          safariDesktopOverride={safariDesktop}
-                          isMobileOverride={false}
                         />
                       </div>
                     ))}
@@ -1431,8 +1430,6 @@ export default function FeedPage() {
                           rank={globalIndex + 1}
                           viewerPremium={viewerPremium}
                           settings={safeSettings}
-                          safariDesktopOverride={safariDesktop}
-                          isMobileOverride={false}
                         />
                         </div>
                       );

@@ -3,7 +3,6 @@ import { MapPin, Shield, Crown, Lock } from 'lucide-react';
 import { getDisplayPhotos, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { formatLocation } from '../lib/location';
 import { resolveMediaUrl } from '../lib/media';
-import { isFirefoxDesktopBrowser, isSafariDesktopBrowser } from '../lib/browser';
 
 // Masquerade mask SVG icon for incognito mode
 const MaskIcon = ({ className = 'w-6 h-6', customSvg = '' }) => {
@@ -75,15 +74,10 @@ export default function ProfileCard({
   rank,
   viewerPremium = false,
   settings = {},
-  safariDesktopOverride,
   isMobileOverride,
 }) {
   const location = useLocation();
   const { id, name, age, role, interests, photos = [], verified, online, premium, blurred } = profile;
-  const safariDesktop = typeof safariDesktopOverride === 'boolean' ? safariDesktopOverride : isSafariDesktopBrowser();
-  const firefoxDesktop = isFirefoxDesktopBrowser();
-  const reducedGlassDesktop = safariDesktop || firefoxDesktop;
-  const reducedEffectsDesktop = firefoxDesktop;
   const roleImg = settings[ROLE_IMG_KEYS[role]] || null;
   const locationText = formatLocation(profile);
   const isMobile = typeof isMobileOverride === 'boolean'
@@ -130,7 +124,7 @@ export default function ProfileCard({
         className="block group rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-mansion-gold/40 focus-visible:ring-offset-0"
       >
         <div
-          className={`relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card ring-1 ring-white/5 ${reducedEffectsDesktop ? 'shadow-[0_8px_16px_rgba(0,0,0,0.18)]' : 'shadow-[0_14px_28px_rgba(0,0,0,0.24)]'}`}
+          className={`relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card ring-1 ring-white/5 shadow-[0_14px_28px_rgba(0,0,0,0.24)]`}
         >
           {/* Photo — use actual photo with blur for blocked cards */}
           {mainPhoto ? (
@@ -138,15 +132,13 @@ export default function ProfileCard({
               src={resolvedMainPhoto}
               alt={cardBlocked ? '' : name}
               referrerPolicy="no-referrer"
-              loading={index < (safariDesktop ? 2 : 6) ? 'eager' : 'lazy'}
-              fetchPriority={index < (safariDesktop ? 1 : 4) ? 'high' : 'auto'}
+              loading={index < 6 ? 'eager' : 'lazy'}
+              fetchPriority={index < 4 ? 'high' : 'auto'}
               decoding="async"
-              className={`absolute inset-0 w-full h-full object-cover ${safariDesktop || reducedEffectsDesktop ? '' : 'lg:transition-all lg:duration-500 lg:scale-105 lg:group-hover:scale-100'}`}
+              className={`absolute inset-0 w-full h-full object-cover lg:transition-all lg:duration-500 lg:scale-105 lg:group-hover:scale-100`}
               style={
                 cardBlocked
-                  ? reducedEffectsDesktop
-                    ? { opacity: 0.55 }
-                    : { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' }
+                  ? { filter: `blur(${blurLevel}px)`, transform: 'scale(1.1)' }
                   : undefined
               }
             />
@@ -154,7 +146,7 @@ export default function ProfileCard({
 
           {/* Incognito mode overlay */}
           {cardBlocked && (
-            <div className={`absolute inset-0 flex items-center justify-center z-10 ${reducedEffectsDesktop ? 'bg-black/52' : 'bg-black/30'}`}>
+            <div className={`absolute inset-0 flex items-center justify-center z-10 bg-black/30`}>
               <div className="flex flex-col items-center gap-1 text-white/70">
                 {blurred
                   ? <MaskIcon className="w-6 h-6" customSvg={settings.incognitoIconSvg || ''} />
@@ -171,25 +163,25 @@ export default function ProfileCard({
           <div className="absolute top-3 left-3 right-3 flex items-start justify-between z-20">
             <div className="flex gap-1.5">
               {typeof rank === 'number' && Number.isFinite(rank) && (
-                <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${reducedGlassDesktop ? 'bg-black/55 border border-white/10' : 'bg-black/45 backdrop-blur-sm border border-white/10'}`}>
+                <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white bg-black/45 backdrop-blur-sm border border-white/10">
                   #{rank}
                 </span>
               )}
               {premium && (
-                <span className={`flex items-center gap-1 border border-mansion-gold/30 rounded-full px-2 py-0.5 text-[10px] font-semibold text-mansion-gold ${reducedGlassDesktop ? 'bg-black/55' : 'bg-mansion-gold/20 backdrop-blur-sm'}`}>
+                <span className="flex items-center gap-1 border border-mansion-gold/30 rounded-full px-2 py-0.5 text-[10px] font-semibold text-mansion-gold bg-mansion-gold/20 backdrop-blur-sm">
                   <Crown className="w-3 h-3" />
                   VIP
                 </span>
               )}
               {verified && (
-                <span className={`flex items-center gap-1 border border-mansion-border/40 rounded-full px-2 py-0.5 text-[10px] font-medium text-text-muted ${reducedGlassDesktop ? 'bg-black/55' : 'bg-mansion-elevated/80 backdrop-blur-sm'}`}>
+                <span className="flex items-center gap-1 border border-mansion-border/40 rounded-full px-2 py-0.5 text-[10px] font-medium text-text-muted bg-mansion-elevated/80 backdrop-blur-sm">
                   <Shield className="w-3 h-3 text-green-400" />
                 </span>
               )}
             </div>
 
             {online && (
-              <span className={`w-3 h-3 rounded-full bg-green-400 border-2 border-black/40 shadow-lg ${safariDesktop ? '' : 'animate-pulse-slow'}`} />
+              <span className="w-3 h-3 rounded-full bg-green-400 border-2 border-black/40 shadow-lg animate-pulse-slow" />
             )}
           </div>
 
