@@ -1409,6 +1409,7 @@ export default function FeedPage() {
                     key={virtualRow.index}
                     ref={firefoxDesktop ? undefined : rowVirtualizer.measureElement}
                     data-index={virtualRow.index}
+                    className={isNewRow ? 'feed-row-enter' : undefined}
                     style={{
                       position: 'absolute',
                       top: 0,
@@ -1424,19 +1425,14 @@ export default function FeedPage() {
                     {rows[virtualRow.index].map((profile, idx) => {
                       const globalIndex = virtualRow.index * cols + idx;
                       return (
-                        <div
-                          key={profile.id}
-                          className={isNewRow ? 'feed-card-enter' : undefined}
-                          style={isNewRow ? { animationDelay: `${idx * 0.06}s` } : undefined}
-                        >
                         <ProfileCard
+                          key={profile.id}
                           profile={profile}
                           index={globalIndex}
                           rank={globalIndex + 1}
                           viewerPremium={viewerPremium}
                           settings={safeSettings}
                         />
-                        </div>
                       );
                     })}
                   </div>
