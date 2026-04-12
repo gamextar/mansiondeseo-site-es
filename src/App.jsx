@@ -41,14 +41,6 @@ const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const TopVisitedPage = lazy(() => import('./pages/TopVisitedPage'));
 
-function isStandaloneMobileApp() {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
-  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
-  if (!standalone) return false;
-  const ua = navigator.userAgent || '';
-  return /iphone|ipad|ipod|android/i.test(ua);
-}
-
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
 
@@ -399,7 +391,6 @@ export default function App() {
   });
   const [bootShieldVisible, setBootShieldVisible] = useState(() => debugFlags.bootShield);
   const [snapshotShieldVisible, setSnapshotShieldVisible] = useState(false);
-  const [startupGateVisible, setStartupGateVisible] = useState(() => !debugFlags.shellOnly && isStandaloneMobileApp());
   const bootstrapStartedRef = useRef(false);
 
   const handleDisableBootDiagnostics = useCallback(() => {
@@ -459,24 +450,6 @@ export default function App() {
     const timer = window.setTimeout(() => setBootShieldVisible(false), 900);
     return () => window.clearTimeout(timer);
   }, [debugFlags.bootShield]);
-
-  useEffect(() => {
-    if (debugFlags.shellOnly) {
-      setStartupGateVisible(false);
-      return undefined;
-    }
-    if (!isStandaloneMobileApp()) {
-      setStartupGateVisible(false);
-      return undefined;
-    }
-
-    setStartupGateVisible(true);
-    const timer = window.setTimeout(() => {
-      setStartupGateVisible(false);
-    }, 950);
-
-    return () => window.clearTimeout(timer);
-  }, [debugFlags.shellOnly]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -651,18 +624,6 @@ export default function App() {
         )}
         {snapshotShieldVisible && (
           <div className="fixed inset-0 z-[9998] bg-mansion-base" aria-hidden="true" />
-        )}
-        {startupGateVisible && !debugFlags.shellOnly && (
-          <div className="fixed inset-0 z-[9997] bg-mansion-base text-text-primary">
-            <div className="flex min-h-screen items-center justify-center px-6">
-              <div className="text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-mansion-gold/20 bg-white/5 shadow-lg shadow-black/30">
-                  <span className="font-display text-2xl font-bold text-gradient-gold">M</span>
-                </div>
-                <p className="mt-5 text-[11px] uppercase tracking-[0.34em] text-text-dim">Mansión Deseo</p>
-              </div>
-            </div>
-          </div>
         )}
         {!debugFlags.shellOnly && !verified && <AgeVerificationModal onVerify={verify} />}
         {!debugFlags.shellOnly && <AppLayout />}
