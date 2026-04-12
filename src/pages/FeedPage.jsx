@@ -682,8 +682,8 @@ export default function FeedPage() {
     stopStoriesBounce();
     const step = () => {
       const current = storiesEdgeOffsetRef.current;
-      const next = current + (target - current) * 0.14;
-      if (Math.abs(next - target) < 0.35) {
+      const next = current + (target - current) * 0.11;
+      if (Math.abs(next - target) < 0.25) {
         storiesEdgeOffsetRef.current = target;
         setStoriesEdgeOffset(target);
         storiesBounceFrameRef.current = null;
@@ -696,7 +696,7 @@ export default function FeedPage() {
     storiesBounceFrameRef.current = requestAnimationFrame(step);
   }, [stopStoriesBounce]);
 
-  const nudgeStoriesEdge = useCallback((direction, magnitude = 24) => {
+  const nudgeStoriesEdge = useCallback((direction, magnitude = 30) => {
     setStoriesEdgeOffsetImmediate(direction * magnitude);
     animateStoriesEdgeOffsetTo(0);
   }, [animateStoriesEdgeOffsetTo, setStoriesEdgeOffsetImmediate]);
@@ -729,7 +729,7 @@ export default function FeedPage() {
       if (currentEl.scrollLeft <= 0 || currentEl.scrollLeft >= maxScrollLeft) {
         currentEl.scrollLeft = Math.min(maxScrollLeft, Math.max(0, currentEl.scrollLeft));
         if (momentum.velocity !== 0) {
-          nudgeStoriesEdge(currentEl.scrollLeft <= 0 ? 1 : -1, Math.min(38, Math.max(14, Math.abs(momentum.velocity) * 24)));
+          nudgeStoriesEdge(currentEl.scrollLeft <= 0 ? 1 : -1, Math.min(54, Math.max(18, Math.abs(momentum.velocity) * 30)));
         }
         momentum.frameId = null;
         momentum.velocity = 0;
