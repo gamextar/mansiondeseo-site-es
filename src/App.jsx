@@ -34,7 +34,7 @@ import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
 import { AuthContext, useAuth } from './lib/authContext';
 import { preloadVideoFeedChunk, preloadVideoFeedData } from './lib/videoFeedWarmup';
-import { getBootDebugFlags } from './lib/bootDebugPrefs';
+import { clearBootDebugFlags, getBootDebugFlags } from './lib/bootDebugPrefs';
 
 const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
@@ -390,6 +390,13 @@ export default function App() {
   const [bootShieldVisible, setBootShieldVisible] = useState(() => debugFlags.bootShield);
   const bootstrapStartedRef = useRef(false);
 
+  const handleDisableBootDiagnostics = useCallback(() => {
+    clearBootDebugFlags();
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
+  }, []);
+
   const setRegistered = useCallback((val) => {
     if (val) {
       localStorage.setItem('mansion_registered', 'true');
@@ -516,13 +523,40 @@ export default function App() {
       <AuthContext.Provider value={{ registered, setRegistered, user, setUser, siteSettings, setSiteSettings }}>
       <UnreadProvider initialUnread={bootstrapUnread} bootstrapResolved={bootstrapResolved}>
       <div className="relative min-h-screen">
+        {debugFlags.shellOnly ? (
+          <div className="fixed inset-0 z-[10000] bg-mansion-base text-text-primary">
+            <div className="flex min-h-screen items-center justify-center px-6">
+              <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-black/30 p-6 text-center shadow-2xl shadow-black/40">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-text-dim">Boot diagnostic</p>
+                <h1 className="mt-3 text-xl font-semibold text-white">Solo shell oscuro</h1>
+                <p className="mt-3 text-sm leading-6 text-text-muted">
+                  La app no se monto. Si aca no ves el flicker, entonces el problema viene del contenido que carga despues del arranque.
+                </p>
+                <div className="mt-6 flex flex-col gap-2">
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-text-primary transition-colors hover:bg-white/10"
+                  >
+                    Recargar shell
+                  </button>
+                  <button
+                    onClick={handleDisableBootDiagnostics}
+                    className="w-full rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-300 transition-colors hover:bg-cyan-500/15"
+                  >
+                    Salir del modo diagnostico
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {bootShieldVisible && (
           <div className="fixed inset-0 z-[9999] bg-mansion-base" aria-hidden="true" />
         )}
-        {!verified && <AgeVerificationModal onVerify={verify} />}
-        <AppLayout />
-        <InstallAppBanner />
-        <ApiDebugOverlay />
+        {!debugFlags.shellOnly && !verified && <AgeVerificationModal onVerify={verify} />}
+        {!debugFlags.shellOnly && <AppLayout />}
+        {!debugFlags.shellOnly && <InstallAppBanner />}
+        {!debugFlags.shellOnly && <ApiDebugOverlay />}
       </div>
       </UnreadProvider>
       </AuthContext.Provider>

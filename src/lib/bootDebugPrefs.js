@@ -4,12 +4,14 @@ const EVENT_NAME = 'mansion-boot-debug-flags-update';
 const DEFAULT_FLAGS = {
   bootShield: false,
   skipBootstrap: false,
+  shellOnly: false,
 };
 
 function normalize(raw = {}) {
   return {
     bootShield: !!raw.bootShield,
     skipBootstrap: !!raw.skipBootstrap,
+    shellOnly: !!raw.shellOnly,
   };
 }
 
@@ -42,6 +44,7 @@ export function getBootDebugFlags() {
   return {
     bootShield: readQueryOverride('boot_shield', stored.bootShield),
     skipBootstrap: readQueryOverride('skip_bootstrap', stored.skipBootstrap),
+    shellOnly: readQueryOverride('shell_only', stored.shellOnly),
   };
 }
 

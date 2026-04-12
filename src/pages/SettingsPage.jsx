@@ -1266,6 +1266,10 @@ export default function SettingsPage() {
                   <p className="text-[10px] uppercase tracking-wider text-text-dim">Skip bootstrap</p>
                   <p className="mt-1 text-sm font-semibold text-text-primary">{bootDebugFlags.skipBootstrap ? 'activo' : 'apagado'}</p>
                 </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2 col-span-2">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Solo shell oscuro</p>
+                  <p className="mt-1 text-sm font-semibold text-text-primary">{bootDebugFlags.shellOnly ? 'activo' : 'apagado'}</p>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -1288,6 +1292,16 @@ export default function SettingsPage() {
                   }`}
                 >
                   Saltar bootstrap: {bootDebugFlags.skipBootstrap ? 'on' : 'off'}
+                </button>
+                <button
+                  onClick={() => applyBootDebugFlags({ ...bootDebugFlags, shellOnly: !bootDebugFlags.shellOnly })}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                    bootDebugFlags.shellOnly
+                      ? 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-300'
+                      : 'bg-mansion-card border border-mansion-border/40 text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  Solo shell oscuro: {bootDebugFlags.shellOnly ? 'on' : 'off'}
                 </button>
               </div>
 
@@ -1315,6 +1329,12 @@ export default function SettingsPage() {
                   className="px-4 py-2 rounded-xl bg-mansion-card border border-mansion-border/40 text-text-muted text-sm font-semibold hover:text-text-primary transition-colors"
                 >
                   Probar ambos
+                </button>
+                <button
+                  onClick={() => applyBootDebugFlags({ bootShield: false, skipBootstrap: false, shellOnly: true }, true)}
+                  className="px-4 py-2 rounded-xl bg-mansion-card border border-mansion-border/40 text-text-muted text-sm font-semibold hover:text-text-primary transition-colors"
+                >
+                  Probar solo shell
                 </button>
                 <button
                   onClick={clearBootDebugAndReload}
