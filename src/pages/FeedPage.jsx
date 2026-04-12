@@ -957,7 +957,7 @@ export default function FeedPage() {
   }, [cols, orderedStoryProfiles.length, safariDesktop, showGridSection, showStoriesSection, storyCircleSize]);
 
   const rowVirtualizer = useWindowVirtualizer({
-    count: rows.length,
+    count: firefoxDesktop ? 0 : rows.length,
     estimateSize: estimateRowHeight,
     overscan: firefoxDesktop ? 2 : 3,
     scrollMargin: gridScrollMargin,
@@ -1281,6 +1281,31 @@ export default function FeedPage() {
         ) : visibleProfiles.length > 0 ? (
           <>
             {showGridSection ? (
+              firefoxDesktop ? (
+                <div
+                  ref={gridRef}
+                  className="grid"
+                  style={{
+                    gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                    gap: `${gap}px`,
+                    opacity: gridOpacity,
+                    transition: gridOpacity === 0 ? 'opacity 0.3s ease' : 'opacity 0.25s ease',
+                  }}
+                >
+                  {visibleProfiles.map((profile, index) => (
+                    <ProfileCard
+                      key={profile.id}
+                      profile={profile}
+                      index={index}
+                      rank={index + 1}
+                      viewerPremium={viewerPremium}
+                      settings={safeSettings}
+                      safariDesktopOverride={safariDesktop}
+                      isMobileOverride={false}
+                    />
+                  ))}
+                </div>
+              ) : (
               <div
                 ref={gridRef}
                 style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', opacity: gridOpacity, transition: gridOpacity === 0 ? 'opacity 0.3s ease' : 'opacity 0.25s ease' }}
@@ -1320,6 +1345,7 @@ export default function FeedPage() {
                   </div>
                 ))}
               </div>
+              )
             ) : (
               <div className="h-24" aria-hidden="true" />
             )}
