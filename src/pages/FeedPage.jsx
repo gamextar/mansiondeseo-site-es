@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Plus, Radio } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 
-const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.045 } } };
+const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } };
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
 import { getProfiles, getToken } from '../lib/api';
@@ -1077,7 +1077,7 @@ export default function FeedPage({ initialData }) {
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${90 + Math.min(index, 10) * 55}ms` : undefined }}
+                style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined }}
               >
                 <button
                   type="button"
@@ -1111,7 +1111,7 @@ export default function FeedPage({ initialData }) {
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${90 + Math.min(index, 10) * 55}ms` : undefined }}
+                style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined }}
               >
                 <button
                   type="button"
@@ -1180,7 +1180,7 @@ export default function FeedPage({ initialData }) {
                       <div
                         key={`${pageCursor}-${profile.id}`}
                         className="feed-card-enter"
-                        style={{ animationDelay: `${0.1 + index * 0.075}s` }}
+                        style={{ animationDelay: isDesktopViewport ? `${0.03 + index * 0.04}s` : `${0.1 + index * 0.075}s` }}
                       >
                         <ProfileCard
                           profile={profile}
