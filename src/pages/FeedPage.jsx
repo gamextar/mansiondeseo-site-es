@@ -21,6 +21,8 @@ import { fetchLivefeedCurrent, fetchLivefeedPayload, selectLivefeedStories, getC
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const MOBILE_MAX_DOM_CARDS = 360;
+const DESKTOP_FEED_PAGE_SIZE = 12;
+const DESKTOP_FEED_BLOCK_SIZE = 72;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
@@ -71,6 +73,8 @@ function setCachedFeed(data) {
       settings: data.settings || {},
       totalProfiles: Number(data.totalProfiles) || 0,
       currentCursor: Number(data.currentCursor) || 0,
+      blockCursor: Number(data.blockCursor ?? data.currentCursor) || 0,
+      pageCursor: Number(data.pageCursor ?? data.currentCursor) || 0,
       pageSize: Number(data.pageSize) || 0,
       nextCursor: data.nextCursor || null,
       hasMore: !!data.hasMore,
@@ -94,7 +98,8 @@ export default function FeedPage() {
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
   const [settings, setSettings] = useState(cached?.settings || {});
   const [nextCursor, setNextCursor] = useState(cached?.nextCursor || null);
-  const [currentCursor, setCurrentCursor] = useState(Number(cached?.currentCursor) || 0);
+  const [blockCursor, setBlockCursor] = useState(Number(cached?.blockCursor ?? cached?.currentCursor) || 0);
+  const [pageCursor, setPageCursor] = useState(Number(cached?.pageCursor ?? cached?.currentCursor) || 0);
   const [totalProfiles, setTotalProfiles] = useState(Number(cached?.totalProfiles) || (Array.isArray(cached?.profiles) ? cached.profiles.length : 0));
   const [hasMore, setHasMore] = useState(
     cached ? (typeof cached?.hasMore === 'boolean' ? cached.hasMore : true) : false
@@ -198,12 +203,12 @@ export default function FeedPage() {
     return () => window.removeEventListener('scroll', unlockAutoLoad);
   }, []);
 
-  const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize } = {}) => {
+  const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize, targetPageCursor } = {}) => {
     const resolvedPageSize = Math.max(
       12,
       Number(pageSize) || (
-        isDesktopViewport
-          ? (settings?.feedMaxCardsDesktop ?? MOBILE_MAX_DOM_CARDS)
+        usePagedDesktopFeed
+          ? DESKTOP_FEED_BLOCK_SIZE
           : (settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS)
       )
     );
@@ -214,7 +219,8 @@ export default function FeedPage() {
       setViewerPremium(c.viewerPremium || false);
       if (c.settings) setSettings(c.settings);
       setNextCursor(c.nextCursor || null);
-      setCurrentCursor(Number(c.currentCursor) || 0);
+      setBlockCursor(Number(c.blockCursor ?? c.currentCursor) || 0);
+      setPageCursor(Number(c.pageCursor ?? c.currentCursor) || 0);
       setTotalProfiles(Number(c.totalProfiles) || (Array.isArray(c.profiles) ? c.profiles.length : 0));
       setHasMore(!!c.hasMore);
     }
@@ -226,7 +232,8 @@ export default function FeedPage() {
         setViewerPremium(data.viewerPremium || false);
         if (data.settings) setSettings(data.settings);
         setNextCursor(data.nextCursor || null);
-        setCurrentCursor(Number(data.cursor) || cursor || 0);
+        setBlockCursor(Number(data.cursor) || cursor || 0);
+        setPageCursor(Number(targetPageCursor ?? data.cursor ?? cursor) || 0);
         setTotalProfiles(Number(data.totalProfiles) || 0);
         setHasMore(!!data.hasMore);
         setCachedFeed({
@@ -235,6 +242,8 @@ export default function FeedPage() {
           settings: data.settings || {},
           totalProfiles: Number(data.totalProfiles) || 0,
           currentCursor: Number(data.cursor) || cursor || 0,
+          blockCursor: Number(data.cursor) || cursor || 0,
+          pageCursor: Number(targetPageCursor ?? data.cursor ?? cursor) || 0,
           pageSize: resolvedPageSize,
           nextCursor: data.nextCursor || null,
           hasMore: !!data.hasMore,
@@ -247,7 +256,8 @@ export default function FeedPage() {
         if (!c) {
           setProfiles([]);
           setNextCursor(null);
-          setCurrentCursor(0);
+          setBlockCursor(0);
+          setPageCursor(0);
           setTotalProfiles(0);
           setHasMore(false);
         }
@@ -255,13 +265,11 @@ export default function FeedPage() {
       .finally(() => {
         if (myId === loadIdRef.current) setLoading(false);
       });
-  }, [isDesktopViewport, settings, usePagedDesktopFeed]);
+  }, [settings, usePagedDesktopFeed]);
 
   const loadMoreProfiles = useCallback(() => {
     if (usePagedDesktopFeed) return Promise.resolve();
-    const maxCards = Math.max(12, isDesktopViewport
-      ? (settings?.feedMaxCardsDesktop ?? MOBILE_MAX_DOM_CARDS)
-      : (settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS));
+    const maxCards = Math.max(12, settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS);
 
     // Hit the API cap — stop
     if (profiles.length >= maxCards) return Promise.resolve();
@@ -293,7 +301,7 @@ export default function FeedPage() {
       })
       .catch(() => { loadMoreFailedRef.current = true; })
       .finally(() => { loadingMoreRef.current = false; setLoadingMore(false); });
-  }, [hasMore, isDesktopViewport, loading, loadingMore, nextCursor, profiles.length, settings, usePagedDesktopFeed]);
+  }, [hasMore, loading, loadingMore, nextCursor, profiles.length, settings, usePagedDesktopFeed]);
 
   // Initial load — runs once on mount
   useEffect(() => {
@@ -303,7 +311,7 @@ export default function FeedPage() {
     const expectedPageSize = Math.max(
       12,
       usePagedDesktopFeed
-        ? (settings?.feedMaxCardsDesktop ?? MOBILE_MAX_DOM_CARDS)
+        ? DESKTOP_FEED_BLOCK_SIZE
         : (settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS)
     );
     const canReuseCachedPagedFeed = !!cachedFeed
@@ -319,7 +327,8 @@ export default function FeedPage() {
     setViewerPremium(cachedFeed.viewerPremium || false);
     if (cachedFeed.settings) setSettings(cachedFeed.settings);
     setNextCursor(cachedFeed.nextCursor || null);
-    setCurrentCursor(Number(cachedFeed.currentCursor) || 0);
+    setBlockCursor(Number(cachedFeed.blockCursor ?? cachedFeed.currentCursor) || 0);
+    setPageCursor(Number(cachedFeed.pageCursor ?? cachedFeed.currentCursor) || 0);
     setTotalProfiles(Number(cachedFeed.totalProfiles) || (Array.isArray(cachedFeed.profiles) ? cachedFeed.profiles.length : 0));
     setHasMore(typeof cachedFeed.hasMore === 'boolean' ? cachedFeed.hasMore : true);
     setLoading(false);
@@ -387,18 +396,19 @@ export default function FeedPage() {
       const nextPageSize = Math.max(
         12,
         usePagedDesktopFeed
-          ? (settings?.feedMaxCardsDesktop ?? MOBILE_MAX_DOM_CARDS)
+          ? DESKTOP_FEED_BLOCK_SIZE
           : (settings?.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS)
       );
       loadProfiles({
         forceFresh: shouldForceFresh,
-        cursor: usePagedDesktopFeed ? 0 : currentCursor,
+        cursor: usePagedDesktopFeed ? Math.floor(pageCursor / DESKTOP_FEED_BLOCK_SIZE) * DESKTOP_FEED_BLOCK_SIZE : 0,
         pageSize: usePagedDesktopFeed ? nextPageSize : undefined,
+        targetPageCursor: usePagedDesktopFeed ? pageCursor : undefined,
       });
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [currentCursor, loadProfiles, settings, usePagedDesktopFeed]);
+  }, [loadProfiles, pageCursor, settings, usePagedDesktopFeed]);
 
   const { indicatorRef } = usePullToRefresh(
     useCallback(() => loadProfiles({ forceFresh: true }), [loadProfiles])
@@ -409,14 +419,15 @@ export default function FeedPage() {
   const maxFeedCards = Math.max(
     12,
     isDesktopViewport
-      ? (safeSettings.feedMaxCardsDesktop ?? MOBILE_MAX_DOM_CARDS)
+      ? DESKTOP_FEED_PAGE_SIZE
       : (safeSettings.feedMaxCardsMobile ?? MOBILE_MAX_DOM_CARDS)
   );
-  const visibleProfiles = useMemo(
-    () => safeProfiles.slice(0, maxFeedCards),
-    [maxFeedCards, safeProfiles]
-  );
-  const currentPage = usePagedDesktopFeed ? Math.floor(currentCursor / maxFeedCards) + 1 : 1;
+  const visibleProfiles = useMemo(() => {
+    if (!usePagedDesktopFeed) return safeProfiles.slice(0, maxFeedCards);
+    const start = Math.max(0, pageCursor - blockCursor);
+    return safeProfiles.slice(start, start + DESKTOP_FEED_PAGE_SIZE);
+  }, [blockCursor, maxFeedCards, pageCursor, safeProfiles, usePagedDesktopFeed]);
+  const currentPage = usePagedDesktopFeed ? Math.floor(pageCursor / DESKTOP_FEED_PAGE_SIZE) + 1 : 1;
   const totalPages = usePagedDesktopFeed ? Math.max(1, Math.ceil((totalProfiles || 0) / maxFeedCards)) : 1;
   const pageWindow = useMemo(() => {
     if (!usePagedDesktopFeed || totalPages <= 1) return [];
@@ -434,7 +445,7 @@ export default function FeedPage() {
     )
   );
   const useHomeStoriesLivefeed = safeSettings.homeStoriesUseLivefeed !== false;
-  const fallbackStoryProfiles = visibleProfiles.filter(p => p.has_active_story).slice(0, storyLimit);
+  const fallbackStoryProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, storyLimit);
   const storyProfiles = useHomeStoriesLivefeed && Array.isArray(liveStoryProfiles) ? liveStoryProfiles : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
@@ -444,19 +455,41 @@ export default function FeedPage() {
   const goToFeedPage = useCallback(async (page) => {
     if (!usePagedDesktopFeed) return;
     const safePage = Math.max(1, Math.min(totalPages, Number(page) || 1));
-    const nextCursor = (safePage - 1) * maxFeedCards;
-    if (nextCursor === currentCursor && profiles.length > 0) return;
-    await loadProfiles({ cursor: nextCursor, pageSize: maxFeedCards });
+    const nextPageCursor = (safePage - 1) * DESKTOP_FEED_PAGE_SIZE;
+    if (nextPageCursor === pageCursor && profiles.length > 0) return;
+    const nextBlockCursor = Math.floor(nextPageCursor / DESKTOP_FEED_BLOCK_SIZE) * DESKTOP_FEED_BLOCK_SIZE;
+    const blockEndCursor = blockCursor + profiles.length;
+    if (nextPageCursor >= blockCursor && nextPageCursor < blockEndCursor) {
+      setPageCursor(nextPageCursor);
+      setCachedFeed({
+        profiles,
+        viewerPremium,
+        settings: safeSettings,
+        totalProfiles,
+        currentCursor: nextBlockCursor,
+        blockCursor: nextBlockCursor,
+        pageCursor: nextPageCursor,
+        pageSize: DESKTOP_FEED_BLOCK_SIZE,
+        nextCursor,
+        hasMore,
+      });
+    } else {
+      await loadProfiles({
+        cursor: nextBlockCursor,
+        pageSize: DESKTOP_FEED_BLOCK_SIZE,
+        targetPageCursor: nextPageCursor,
+      });
+    }
     const targetTop = Math.max(0, (gridRef.current?.offsetTop || 0) - 24);
     window.scrollTo({ top: targetTop, behavior: 'smooth' });
-  }, [currentCursor, loadProfiles, maxFeedCards, profiles.length, totalPages, usePagedDesktopFeed]);
+  }, [blockCursor, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, usePagedDesktopFeed, viewerPremium]);
 
   useEffect(() => {
     if (!usePagedDesktopFeed || loading) return;
     const nextConfig = `${usePagedDesktopFeed ? 'paged' : 'scroll'}:${maxFeedCards}`;
     if (pagedFeedConfigRef.current === nextConfig) return;
     pagedFeedConfigRef.current = nextConfig;
-    loadProfiles({ cursor: 0, pageSize: maxFeedCards });
+    loadProfiles({ cursor: 0, pageSize: DESKTOP_FEED_BLOCK_SIZE, targetPageCursor: 0 });
   }, [loadProfiles, loading, maxFeedCards, usePagedDesktopFeed]);
 
   const viewedRaw = useSyncExternalStore(
@@ -1436,7 +1469,7 @@ export default function FeedPage() {
               totalPages > 1 ? (
                 <div className="flex flex-col gap-3 items-center py-8">
                   <p className="text-sm text-text-muted">
-                    Mostrando {Math.min(totalProfiles, currentCursor + 1)}-{Math.min(totalProfiles, currentCursor + visibleProfiles.length)} de {totalProfiles}
+                    Mostrando {Math.min(totalProfiles, pageCursor + 1)}-{Math.min(totalProfiles, pageCursor + visibleProfiles.length)} de {totalProfiles}
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-2">
                     <button
