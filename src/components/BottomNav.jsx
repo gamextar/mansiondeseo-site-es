@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../lib/authContext';
 import { warmVideoFeed } from '../lib/videoFeedWarmup';
+import { useRef } from 'react';
 
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 
@@ -21,9 +22,12 @@ export default function BottomNav() {
 
   const bottomPadding = siteSettings?.navBottomPadding ?? 24;
   const sidePadding = siteSettings?.navSidePadding ?? 16;
-  const navHeight = siteSettings?.navHeight ?? 71;
   const navOpacity = siteSettings?.navOpacity ?? 40;
   const navBlur = siteSettings?.navBlur ?? 24;
+  // Lock navHeight on first render to prevent resize jump when siteSettings loads
+  const navHeightRef = useRef(siteSettings?.navHeight ?? 71);
+  if (siteSettings?.navHeight) navHeightRef.current = siteSettings.navHeight;
+  const navHeight = navHeightRef.current;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
@@ -40,6 +44,8 @@ export default function BottomNav() {
         paddingBottom: `${bottomPadding}px`,
         paddingLeft: sidePadding,
         paddingRight: sidePadding,
+        isolation: 'isolate',
+        willChange: 'transform',
       }}
     >
       <div
@@ -50,6 +56,7 @@ export default function BottomNav() {
           boxShadow: `0 8px 32px ${shadowColor}`,
           backdropFilter: `blur(${blurAmount})`,
           WebkitBackdropFilter: `blur(${blurAmount})`,
+          touchAction: 'manipulation',
         }}
       >
         <div className="flex items-center justify-around px-3" style={{ height: navHeight }}>
@@ -77,7 +84,7 @@ export default function BottomNav() {
                     warmVideoFeed();
                   }
                 }}
-                className="relative flex flex-col items-center justify-center w-16 h-full group"
+                className="relative flex flex-col items-center justify-center w-14 h-full group"
                 style={{ touchAction: 'manipulation' }}
               >
                 {isActive && (
