@@ -34,21 +34,11 @@ import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
 import { AuthContext, useAuth } from './lib/authContext';
 import { preloadVideoFeedChunk, preloadVideoFeedData } from './lib/videoFeedWarmup';
+import { getBootDebugFlags } from './lib/bootDebugPrefs';
 
 const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const TopVisitedPage = lazy(() => import('./pages/TopVisitedPage'));
-
-function getBootDebugFlags() {
-  if (typeof window === 'undefined') {
-    return { bootShield: false, skipBootstrap: false };
-  }
-  const params = new URLSearchParams(window.location.search);
-  return {
-    bootShield: params.get('boot_shield') === '1',
-    skipBootstrap: params.get('skip_bootstrap') === '1',
-  };
-}
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/'];

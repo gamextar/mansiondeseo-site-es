@@ -7,6 +7,7 @@ import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDeb
 import { estimateRealtimeLoad, getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
 import { getMediaDebugSummary, inspectVisibleMedia, resetMediaDebug, subscribeMediaDebug } from '../lib/mediaDebug';
 import { getDebugPanelPrefs, setDebugPanelPref, subscribeDebugPanelPrefs } from '../lib/debugPanelPrefs';
+import { clearBootDebugFlags, getBootDebugFlags, setBootDebugFlags, subscribeBootDebugFlags } from '../lib/bootDebugPrefs';
 import { ADMIN_SECTIONS } from '../lib/adminSections';
 
 export default function SettingsPage() {
@@ -125,6 +126,7 @@ export default function SettingsPage() {
   const [realtimeDebugSummary, setRealtimeDebugSummary] = useState(() => getRealtimeDebugSummary());
   const [mediaDebugSummary, setMediaDebugSummary] = useState(() => getMediaDebugSummary());
   const [debugPanelPrefs, setDebugPanelPrefs] = useState(() => getDebugPanelPrefs());
+  const [bootDebugFlags, setBootDebugFlagsState] = useState(() => getBootDebugFlags());
   const realtimeEstimate = estimateRealtimeLoad(realtimeDebugSummary);
   const mediaAutoTimerRef = useRef(null);
   const lastMediaAutoKeyRef = useRef('');
@@ -276,12 +278,32 @@ export default function SettingsPage() {
     setDebugPanelPrefs(nextPrefs);
   }), []);
 
+  useEffect(() => subscribeBootDebugFlags((nextFlags) => {
+    setBootDebugFlagsState(nextFlags);
+  }), []);
+
   useEffect(() => {
     const timer = window.setInterval(() => {
       setRealtimeDebugSummary(getRealtimeDebugSummary());
     }, 5_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  const applyBootDebugFlags = (nextFlags, reload = false) => {
+    const next = setBootDebugFlags(nextFlags);
+    setBootDebugFlagsState(next);
+    if (reload && typeof window !== 'undefined') {
+      window.location.reload();
+    }
+  };
+
+  const clearBootDebugAndReload = () => {
+    const next = clearBootDebugFlags();
+    setBootDebugFlagsState(next);
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
+  };
 
   const handleSave = async () => {
     const parsedDraft = Number(avatarSizeDraft);
@@ -1229,6 +1251,79 @@ export default function SettingsPage() {
             <h2 className="text-xs font-bold text-red-400 uppercase tracking-wider">Debug / Zona peligrosa</h2>
           </div>
           <div className="space-y-3">
+            <div className="bg-mansion-card rounded-2xl p-4 border border-cyan-500/20 space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary">Boot diagnostics para PWA</h3>
+                <p className="text-[11px] text-text-dim">Guarda estos flags localmente para poder probar el arranque desde mobile/PWA sin depender de la URL. Los cambios pegan al recargar.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Boot shield</p>
+                  <p className="mt-1 text-sm font-semibold text-text-primary">{bootDebugFlags.bootShield ? 'activo' : 'apagado'}</p>
+                </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Skip bootstrap</p>
+                  <p className="mt-1 text-sm font-semibold text-text-primary">{bootDebugFlags.skipBootstrap ? 'activo' : 'apagado'}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => applyBootDebugFlags({ ...bootDebugFlags, bootShield: !bootDebugFlags.bootShield })}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                    bootDebugFlags.bootShield
+                      ? 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-300'
+                      : 'bg-mansion-card border border-mansion-border/40 text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  Fondo al arrancar: {bootDebugFlags.bootShield ? 'on' : 'off'}
+                </button>
+                <button
+                  onClick={() => applyBootDebugFlags({ ...bootDebugFlags, skipBootstrap: !bootDebugFlags.skipBootstrap })}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                    bootDebugFlags.skipBootstrap
+                      ? 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-300'
+                      : 'bg-mansion-card border border-mansion-border/40 text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  Saltar bootstrap: {bootDebugFlags.skipBootstrap ? 'on' : 'off'}
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => applyBootDebugFlags(bootDebugFlags, true)}
+                  className="px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-sm font-semibold hover:text-cyan-200 transition-colors"
+                >
+                  Aplicar y recargar
+                </button>
+                <button
+                  onClick={() => applyBootDebugFlags({ bootShield: true, skipBootstrap: false }, true)}
+                  className="px-4 py-2 rounded-xl bg-mansion-card border border-mansion-border/40 text-text-muted text-sm font-semibold hover:text-text-primary transition-colors"
+                >
+                  Probar solo fondo
+                </button>
+                <button
+                  onClick={() => applyBootDebugFlags({ bootShield: false, skipBootstrap: true }, true)}
+                  className="px-4 py-2 rounded-xl bg-mansion-card border border-mansion-border/40 text-text-muted text-sm font-semibold hover:text-text-primary transition-colors"
+                >
+                  Probar sin bootstrap
+                </button>
+                <button
+                  onClick={() => applyBootDebugFlags({ bootShield: true, skipBootstrap: true }, true)}
+                  className="px-4 py-2 rounded-xl bg-mansion-card border border-mansion-border/40 text-text-muted text-sm font-semibold hover:text-text-primary transition-colors"
+                >
+                  Probar ambos
+                </button>
+                <button
+                  onClick={clearBootDebugAndReload}
+                  className="px-4 py-2 rounded-xl bg-mansion-crimson/10 border border-mansion-crimson/20 text-mansion-crimson text-sm font-semibold hover:text-red-300 transition-colors"
+                >
+                  Limpiar y recargar normal
+                </button>
+              </div>
+            </div>
             <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-border/20 space-y-3">
               <div>
                 <h3 className="text-sm font-semibold text-text-primary">Bloques visibles del debug</h3>
