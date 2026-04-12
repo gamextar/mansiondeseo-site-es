@@ -440,6 +440,20 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+    const ua = navigator.userAgent || '';
+    const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+    if (!standalone || !isMobile) return undefined;
+
+    const orientationApi = window.screen?.orientation;
+    if (!orientationApi?.lock) return undefined;
+
+    orientationApi.lock('portrait').catch(() => {});
+    return undefined;
+  }, []);
+
+  useEffect(() => {
     if (debugFlags.bootShield) {
       setBootShieldVisible(true);
     }
