@@ -2,4 +2,7 @@ _rewrite.py
 .DS_Store
 node_modules/
 dist/
+build/
 data/
+.wrangler/
+.react-router/
