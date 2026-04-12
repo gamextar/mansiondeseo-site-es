@@ -1,7 +1,7 @@
 import { forwardRef, useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Radio, Plus } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ChevronLeft, ChevronRight, Plus, Radio, Sparkles } from 'lucide-react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '../lib/authContext';
 
@@ -9,6 +9,27 @@ const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.045 } 
 const storyItem = {
   hidden: { opacity: 0, scale: 0.85, y: 8 },
   visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 20 } },
+};
+const desktopPageGridVariants = {
+  initial: { opacity: 0, y: 18, scale: 0.985, filter: 'blur(6px)' },
+  animate: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: 'blur(0px)',
+    transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1], staggerChildren: 0.032, delayChildren: 0.03 },
+  },
+  exit: {
+    opacity: 0,
+    y: -14,
+    scale: 0.992,
+    filter: 'blur(4px)',
+    transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
+  },
+};
+const desktopPageCardVariants = {
+  initial: { opacity: 0, y: 20, scale: 0.96 },
+  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] } },
 };
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
@@ -1073,15 +1094,16 @@ export default function FeedPage() {
   }, [cols, orderedStoryProfiles.length, safariDesktop, showGridSection, showStoriesSection, storyCircleSize]);
 
   const rowVirtualizer = useWindowVirtualizer({
-    count: firefoxDesktop ? 0 : rows.length,
+    count: usePagedDesktopFeed ? 0 : rows.length,
     estimateSize: estimateRowHeight,
     overscan: firefoxDesktop ? 2 : 3,
     scrollMargin: gridScrollMargin,
   });
 
   useEffect(() => {
+    if (usePagedDesktopFeed) return;
     rowVirtualizer.measure();
-  }, [cols, firefoxDesktop, gap, gridScrollMargin, rowVirtualizer, rows.length]);
+  }, [cols, gap, gridScrollMargin, rowVirtualizer, rows.length, usePagedDesktopFeed]);
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
@@ -1397,30 +1419,38 @@ export default function FeedPage() {
         ) : visibleProfiles.length > 0 ? (
           <>
             {showGridSection ? (
-              firefoxDesktop ? (
-                <div
-                  ref={gridRef}
-                  className="grid"
-                  style={{
-                    gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                    gap: `${gap}px`,
-                    opacity: gridOpacity,
-                    transition: gridOpacity === 0 ? 'opacity 0.3s ease' : 'opacity 0.25s ease',
-                  }}
-                >
-                  {visibleProfiles.map((profile, index) => (
-                    <ProfileCard
-                      key={profile.id}
-                      profile={profile}
-                      index={index}
-                      rank={index + 1}
-                      viewerPremium={viewerPremium}
-                      settings={safeSettings}
-                      safariDesktopOverride={safariDesktop}
-                      isMobileOverride={false}
-                    />
-                  ))}
-                </div>
+              usePagedDesktopFeed ? (
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={`desktop-page-${pageCursor}`}
+                    ref={gridRef}
+                    className="grid"
+                    style={{
+                      gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                      gap: `${gap}px`,
+                      opacity: gridOpacity,
+                      transition: gridOpacity === 0 ? 'opacity 0.3s ease' : 'opacity 0.25s ease',
+                    }}
+                    variants={desktopPageGridVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                  >
+                    {visibleProfiles.map((profile, index) => (
+                      <motion.div key={profile.id} variants={desktopPageCardVariants}>
+                        <ProfileCard
+                          profile={profile}
+                          index={index}
+                          rank={pageCursor + index + 1}
+                          viewerPremium={viewerPremium}
+                          settings={safeSettings}
+                          safariDesktopOverride={safariDesktop}
+                          isMobileOverride={false}
+                        />
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                </AnimatePresence>
               ) : (
               <div
                 ref={gridRef}
@@ -1467,40 +1497,67 @@ export default function FeedPage() {
             )}
             {usePagedDesktopFeed ? (
               totalPages > 1 ? (
-                <div className="flex flex-col gap-3 items-center py-8">
-                  <p className="text-sm text-text-muted">
-                    Mostrando {Math.min(totalProfiles, pageCursor + 1)}-{Math.min(totalProfiles, pageCursor + visibleProfiles.length)} de {totalProfiles}
-                  </p>
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => goToFeedPage(currentPage - 1)}
-                      disabled={currentPage <= 1 || loading}
-                      className="px-3 py-2 rounded-xl border border-white/10 bg-mansion-card text-sm text-text-muted disabled:opacity-40"
-                    >
-                      Anterior
-                    </button>
-                    {pageWindow.map((page) => (
-                      <button
-                        key={page}
-                        type="button"
-                        onClick={() => goToFeedPage(page)}
-                        disabled={page === currentPage || loading}
-                        className={`min-w-10 px-3 py-2 rounded-xl text-sm border ${page === currentPage ? 'border-mansion-gold/40 bg-mansion-gold/15 text-mansion-gold' : 'border-white/10 bg-mansion-card text-text-muted'}`}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => goToFeedPage(currentPage + 1)}
-                      disabled={currentPage >= totalPages || loading}
-                      className="px-3 py-2 rounded-xl border border-white/10 bg-mansion-card text-sm text-text-muted disabled:opacity-40"
-                    >
-                      Siguiente
-                    </button>
+                <motion.div
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
+                  className="py-8"
+                >
+                  <div className="mx-auto max-w-3xl rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(212,175,55,0.14),rgba(17,24,39,0.92)_24%,rgba(17,24,39,0.96)_76%,rgba(220,38,38,0.12))] shadow-[0_24px_70px_rgba(0,0,0,0.28)] overflow-hidden">
+                    <div className="flex flex-col gap-4 px-5 py-5 lg:px-6">
+                      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex items-center gap-2 text-mansion-gold">
+                          <Sparkles className="w-4 h-4" />
+                          <span className="text-xs font-semibold uppercase tracking-[0.28em] text-mansion-gold/80">Explorando feed</span>
+                        </div>
+                        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs font-medium text-text-muted">
+                          <span>Página {currentPage} de {totalPages}</span>
+                          <span className="h-1 w-1 rounded-full bg-mansion-gold/60" />
+                          <span>Mostrando {Math.min(totalProfiles, pageCursor + 1)}-{Math.min(totalProfiles, pageCursor + visibleProfiles.length)} de {totalProfiles}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-2.5 lg:justify-between">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => goToFeedPage(currentPage - 1)}
+                            disabled={currentPage <= 1 || loading}
+                            className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-4 py-2.5 text-sm font-medium text-text-muted transition hover:border-mansion-gold/30 hover:text-white disabled:opacity-40"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                            Anterior
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => goToFeedPage(currentPage + 1)}
+                            disabled={currentPage >= totalPages || loading}
+                            className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-4 py-2.5 text-sm font-medium text-text-muted transition hover:border-mansion-gold/30 hover:text-white disabled:opacity-40"
+                          >
+                            Siguiente
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          {pageWindow.map((page) => (
+                            <motion.button
+                              key={page}
+                              type="button"
+                              onClick={() => goToFeedPage(page)}
+                              disabled={page === currentPage || loading}
+                              whileHover={page === currentPage ? undefined : { y: -2, scale: 1.03 }}
+                              whileTap={page === currentPage ? undefined : { scale: 0.97 }}
+                              className={`relative min-w-11 rounded-2xl px-3.5 py-2.5 text-sm font-semibold transition ${page === currentPage
+                                ? 'border border-mansion-gold/40 bg-mansion-gold/15 text-mansion-gold shadow-[0_0_0_1px_rgba(212,175,55,0.08),0_10px_30px_rgba(212,175,55,0.16)]'
+                                : 'border border-white/10 bg-black/20 text-text-muted hover:border-white/20 hover:text-white'}`}
+                            >
+                              {page}
+                            </motion.button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </motion.div>
               ) : null
             ) : (
               <>
