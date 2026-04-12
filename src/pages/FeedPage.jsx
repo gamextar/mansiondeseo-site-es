@@ -108,11 +108,14 @@ export default function FeedPage() {
     frameId: null,
     velocity: 0,
   });
+  const storiesBounceFrameRef = useRef(null);
+  const storiesEdgeOffsetRef = useRef(0);
   const pendingViewedTimerRef = useRef(null);
   const storyNodeRefs = useRef(new Map());
   const storyRectsRef = useRef(new Map());
   const previousOrderedStoryIdsRef = useRef('');
   const initialStoriesAlignedRef = useRef(false);
+  const [storiesEdgeOffset, setStoriesEdgeOffset] = useState(0);
   const storiesDragRef = useRef({
     active: false,
     captured: false,
@@ -660,6 +663,42 @@ export default function FeedPage() {
     event.preventDefault();
   }, []);
 
+  const stopStoriesBounce = useCallback(() => {
+    if (storiesBounceFrameRef.current) {
+      cancelAnimationFrame(storiesBounceFrameRef.current);
+      storiesBounceFrameRef.current = null;
+    }
+  }, []);
+
+  const setStoriesEdgeOffsetImmediate = useCallback((nextValue) => {
+    const clamped = Math.max(-26, Math.min(26, nextValue));
+    storiesEdgeOffsetRef.current = clamped;
+    setStoriesEdgeOffset(clamped);
+  }, []);
+
+  const animateStoriesEdgeOffsetTo = useCallback((target = 0) => {
+    stopStoriesBounce();
+    const step = () => {
+      const current = storiesEdgeOffsetRef.current;
+      const next = current + (target - current) * 0.18;
+      if (Math.abs(next - target) < 0.5) {
+        storiesEdgeOffsetRef.current = target;
+        setStoriesEdgeOffset(target);
+        storiesBounceFrameRef.current = null;
+        return;
+      }
+      storiesEdgeOffsetRef.current = next;
+      setStoriesEdgeOffset(next);
+      storiesBounceFrameRef.current = requestAnimationFrame(step);
+    };
+    storiesBounceFrameRef.current = requestAnimationFrame(step);
+  }, [stopStoriesBounce]);
+
+  const nudgeStoriesEdge = useCallback((direction, magnitude = 18) => {
+    setStoriesEdgeOffsetImmediate(direction * magnitude);
+    animateStoriesEdgeOffsetTo(0);
+  }, [animateStoriesEdgeOffsetTo, setStoriesEdgeOffsetImmediate]);
+
   const stopStoriesMomentum = useCallback(() => {
     const momentum = storiesMomentumRef.current;
     if (momentum.frameId) {
@@ -682,17 +721,20 @@ export default function FeedPage() {
         return;
       }
 
-      currentEl.scrollLeft += momentum.velocity * 16;
+      currentEl.scrollLeft += momentum.velocity * 20;
 
       const maxScrollLeft = Math.max(0, currentEl.scrollWidth - currentEl.clientWidth);
       if (currentEl.scrollLeft <= 0 || currentEl.scrollLeft >= maxScrollLeft) {
         currentEl.scrollLeft = Math.min(maxScrollLeft, Math.max(0, currentEl.scrollLeft));
+        if (momentum.velocity !== 0) {
+          nudgeStoriesEdge(currentEl.scrollLeft <= 0 ? 1 : -1, Math.min(24, Math.max(10, Math.abs(momentum.velocity) * 18)));
+        }
         momentum.frameId = null;
         momentum.velocity = 0;
         return;
       }
 
-      momentum.velocity *= 0.92;
+      momentum.velocity *= 0.945;
       if (Math.abs(momentum.velocity) < 0.01) {
         momentum.frameId = null;
         momentum.velocity = 0;
@@ -704,13 +746,17 @@ export default function FeedPage() {
 
     if (momentum.frameId) cancelAnimationFrame(momentum.frameId);
     momentum.frameId = requestAnimationFrame(step);
-  }, []);
+  }, [nudgeStoriesEdge]);
 
   const handleStoriesPointerDown = useCallback((event) => {
     if (event.pointerType !== 'mouse' || event.button !== 0) return;
     const el = storiesScrollRef.current;
     if (!el || el.scrollWidth <= el.clientWidth) return;
     stopStoriesMomentum();
+    stopStoriesBounce();
+    if (storiesEdgeOffsetRef.current !== 0) {
+      setStoriesEdgeOffsetImmediate(0);
+    }
     storiesDragRef.current = {
       active: true,
       captured: false,
@@ -721,7 +767,7 @@ export default function FeedPage() {
       lastTs: event.timeStamp || performance.now(),
       velocity: 0,
     };
-  }, [stopStoriesMomentum]);
+  }, [setStoriesEdgeOffsetImmediate, stopStoriesBounce, stopStoriesMomentum]);
 
   const handleStoriesPointerMove = useCallback((event) => {
     const el = storiesScrollRef.current;
@@ -739,11 +785,20 @@ export default function FeedPage() {
       }
     }
     if (!drag.moved) return;
-    el.scrollLeft = drag.startScrollLeft - deltaX;
+    const maxScrollLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+    const desiredScrollLeft = drag.startScrollLeft - deltaX;
+    const clampedScrollLeft = Math.min(maxScrollLeft, Math.max(0, desiredScrollLeft));
+    el.scrollLeft = clampedScrollLeft;
+    if (desiredScrollLeft !== clampedScrollLeft) {
+      const overflow = desiredScrollLeft - clampedScrollLeft;
+      setStoriesEdgeOffsetImmediate(Math.max(-24, Math.min(24, overflow * 0.18)));
+    } else if (storiesEdgeOffsetRef.current !== 0) {
+      setStoriesEdgeOffsetImmediate(storiesEdgeOffsetRef.current * 0.72);
+    }
     drag.velocity = (-deltaSinceLast) / deltaTs;
     drag.lastX = event.clientX;
     drag.lastTs = now;
-  }, []);
+  }, [setStoriesEdgeOffsetImmediate]);
 
   const finishStoriesDrag = useCallback((event) => {
     const el = storiesScrollRef.current;
@@ -759,8 +814,11 @@ export default function FeedPage() {
     } else {
       storiesMomentumRef.current.velocity = 0;
     }
+    if (storiesEdgeOffsetRef.current !== 0) {
+      animateStoriesEdgeOffsetTo(0);
+    }
     drag.captured = false;
-  }, [startStoriesMomentum]);
+  }, [animateStoriesEdgeOffsetTo, startStoriesMomentum]);
 
   const handleStoriesClickCapture = useCallback((event) => {
     if (!storiesDragRef.current.moved) return;
@@ -806,7 +864,10 @@ export default function FeedPage() {
     };
   }, [maybeLoadMore]);
 
-  useEffect(() => () => stopStoriesMomentum(), [stopStoriesMomentum]);
+  useEffect(() => () => {
+    stopStoriesMomentum();
+    stopStoriesBounce();
+  }, [stopStoriesBounce, stopStoriesMomentum]);
 
   // ── Virtual scroll setup ────────────────────────────────────────────────
   const gap = safariDesktop ? 16 : 12; // matches lg:gap-4 / gap-3
@@ -868,7 +929,14 @@ export default function FeedPage() {
           disabled={safariDesktop}
           ref={storiesScrollRef}
           className="flex overflow-x-auto scrollbar-hide pb-2 lg:cursor-grab active:lg:cursor-grabbing select-none"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', gap: `${storyCircleGap}px`, touchAction: 'pan-x' }}
+          style={{
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            gap: `${storyCircleGap}px`,
+            touchAction: 'pan-x',
+            transform: `translate3d(${storiesEdgeOffset}px, 0, 0)`,
+            transition: storiesDragRef.current.active ? 'none' : 'transform 180ms cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
           motionProps={{
             variants: stagger,
             initial: 'hidden',
