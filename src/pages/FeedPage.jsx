@@ -1026,7 +1026,14 @@ export default function FeedPage({ initialData }) {
                     type="button"
                     draggable={false}
                     onClick={user.has_active_story && user.active_story_url
-                      ? () => openStoryFromHome(user.id)
+                      ? () => openStoryFromHome({
+                          user_id: user.id,
+                          story_id: user.id,
+                          video_url: user.active_story_url || '',
+                          username: user.username || '',
+                          avatar_url: user.avatar_url || '',
+                          avatar_crop: user.avatar_crop || null,
+                        })
                       : () => navigate('/historia/nueva', { state: { from: '/' } })}
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
