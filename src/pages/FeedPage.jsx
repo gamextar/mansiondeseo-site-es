@@ -144,7 +144,13 @@ export default function FeedPage({ initialData }) {
     velocity: 0,
   });
   const isSafariDesktopRef = useRef(false);
-  const pagedFeedConfigRef = useRef('');
+  // Pre-seed with cached value so the paged-config effect is a no-op on mount
+  // (prevents an unnecessary loadProfiles call every time FeedPage remounts).
+  const pagedFeedConfigRef = useRef(
+    cached
+      ? `paged:${Math.max(6, Math.min(60, cached?.settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE))}`
+      : ''
+  );
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
@@ -174,6 +180,10 @@ export default function FeedPage({ initialData }) {
     return getProfiles({ fresh: forceFresh, cursor, pageSize: resolvedPageSize })
       .then(data => {
         if (myId !== loadIdRef.current) return;
+        // Lock paged-config ref to prevent the config-change effect from
+        // double-firing after loading transitions to false.
+        const resolvedCardsPerPage = Math.max(6, Math.min(60, data.settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE));
+        pagedFeedConfigRef.current = `paged:${resolvedCardsPerPage}`;
         setProfiles(data.profiles || []);
         setViewerPremium(data.viewerPremium || false);
         if (data.settings) setSettings(data.settings);
