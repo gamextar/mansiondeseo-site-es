@@ -616,7 +616,13 @@ export default function VideoFeedPage() {
   const requestedStoryUserId = location.state?.storyUserId || null;
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
-  const initial = applyPendingStoryLikeState(mergeSeedStory(cachedStories(), requestedStorySeed), getPendingStoryLikes());
+  // When opened from a story-bar click (seed provided), skip the cache and start
+  // with ONLY the seed story. This guarantees that stories.length changes 1→N
+  // when the API responds, which triggers the useLayoutEffect scroll-correction
+  // and prevents iOS Safari's scroll-reset from showing the wrong story.
+  const initial = requestedStorySeed
+    ? applyPendingStoryLikeState([requestedStorySeed], getPendingStoryLikes())
+    : applyPendingStoryLikeState(mergeSeedStory(cachedStories(), null), getPendingStoryLikes());
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
@@ -864,6 +870,11 @@ export default function VideoFeedPage() {
     };
   }, [persistStories]);
 
+  // Keep a ref of the current activeDispIdx so the stories-identity layout
+  // effect can read it without being a dep (avoids interrupting user scrolls).
+  const activeDispIdxRef = useRef(activeDispIdx);
+  useLayoutEffect(() => { activeDispIdxRef.current = activeDispIdx; });
+
   useLayoutEffect(() => {
     if (isDesktopViewport) return undefined;
     if (stories.length === 0 || !containerRef.current) return;
@@ -890,6 +901,25 @@ export default function VideoFeedPage() {
 
     return () => cancelAnimationFrame(rafId);
   }, [activeDispIdx, isDesktopViewport, stories.length]);
+
+  // Secondary scroll-anchor: fires on every stories identity change (catches
+  // same-length updates where the primary effect doesn't re-run). Uses a ref
+  // for the index so it reads the latest value without causing extra renders.
+  useLayoutEffect(() => {
+    if (isDesktopViewport) return;
+    const container = containerRef.current;
+    if (!container || stories.length === 0) return;
+    const height = container.clientHeight;
+    if (!height) return;
+    const idx = Math.min(Math.max(activeDispIdxRef.current, 1), stories.length);
+    const want = height * idx;
+    // Only snap back if iOS Safari reset the scrollTop significantly
+    if (Math.abs(container.scrollTop - want) > Math.max(4, height * 0.12)) {
+      container.scrollTop = want;
+      setBoundaryOverlayIdx(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDesktopViewport, stories]);
 
   useEffect(() => {
     try { sessionStorage.setItem('vf_idx', String(activeDispIdx)); } catch {}
