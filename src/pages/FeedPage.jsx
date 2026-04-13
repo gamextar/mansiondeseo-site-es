@@ -109,9 +109,6 @@ export default function FeedPage({ initialData }) {
   );
   const [loading, setLoading] = useState(!cached);
   const [storiesIntroEnabled, setStoriesIntroEnabled] = useState(true);
-  // When profiles are pre-populated from cache, skip card enter animations on
-  // subsequent background updates (prevents flash when stale-refresh fires).
-  const cardAnimEnabledRef = useRef(!cached);
   const storiesIntroConsumedRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -144,13 +141,7 @@ export default function FeedPage({ initialData }) {
     velocity: 0,
   });
   const isSafariDesktopRef = useRef(false);
-  // Pre-seed with cached value so the paged-config effect is a no-op on mount
-  // (prevents an unnecessary loadProfiles call every time FeedPage remounts).
-  const pagedFeedConfigRef = useRef(
-    cached
-      ? `paged:${Math.max(6, Math.min(60, cached?.settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE))}`
-      : ''
-  );
+  const pagedFeedConfigRef = useRef('');
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
@@ -172,18 +163,11 @@ export default function FeedPage({ initialData }) {
       Number(pageSize) || (s?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
     );
     const c = getCachedFeed();
-    if (!c) {
-      setLoading(true);
-      cardAnimEnabledRef.current = true; // no cache → fresh load → animate cards
-    }
+    if (!c) setLoading(true);
     const myId = ++loadIdRef.current;
     return getProfiles({ fresh: forceFresh, cursor, pageSize: resolvedPageSize })
       .then(data => {
         if (myId !== loadIdRef.current) return;
-        // Lock paged-config ref to prevent the config-change effect from
-        // double-firing after loading transitions to false.
-        const resolvedCardsPerPage = Math.max(6, Math.min(60, data.settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE));
-        pagedFeedConfigRef.current = `paged:${resolvedCardsPerPage}`;
         setProfiles(data.profiles || []);
         setViewerPremium(data.viewerPremium || false);
         if (data.settings) setSettings(data.settings);
@@ -239,18 +223,14 @@ export default function FeedPage({ initialData }) {
       return;
     }
 
-    // Cache is valid — show it instantly. Data refreshes on pull-to-refresh
-    // or next explicit navigation. The localStorage cache persists cold starts.
+    // Cache is valid — show it instantly, then silently refresh in background
+    // so data doesn't stay stale across repeated cold starts.
     setLoading(false);
     try {
       sessionStorage.removeItem('mansion_feed_dirty');
       sessionStorage.removeItem('mansion_feed_force_refresh');
     } catch {}
-    // Only refresh if cache is older than 10 minutes (stale but keep no-flash UX).
-    const STALE_MS = 10 * 60 * 1000;
-    if (Date.now() - (cachedFeed.timestamp || 0) > STALE_MS) {
-      loadProfiles({ cursor: 0, pageSize: expectedPageSize });
-    }
+    loadProfiles({ cursor: 0, pageSize: expectedPageSize });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
@@ -395,7 +375,6 @@ export default function FeedPage({ initialData }) {
     const safePage = Math.max(1, Math.min(totalPages, Number(page) || 1));
     const nextPageCursor = (safePage - 1) * cardsPerPage;
     if (nextPageCursor === pageCursor && profiles.length > 0) return;
-    cardAnimEnabledRef.current = true; // always animate cards on explicit page change
     const nextBlockCursor = Math.floor(nextPageCursor / blockSize) * blockSize;
     const blockEndCursor = blockCursor + profiles.length;
     if (nextPageCursor >= blockCursor && nextPageCursor < blockEndCursor) {
@@ -1209,8 +1188,8 @@ export default function FeedPage({ initialData }) {
                     {visibleProfiles.map((profile, index) => (
                       <div
                         key={`${pageCursor}-${profile.id}`}
-                        className={cardAnimEnabledRef.current ? 'feed-card-enter' : ''}
-                        style={cardAnimEnabledRef.current ? { animationDelay: isDesktopViewport ? `${0.03 + index * 0.04}s` : `${0.1 + index * 0.075}s` } : undefined}
+                        className="feed-card-enter"
+                        style={{ animationDelay: isDesktopViewport ? `${0.03 + index * 0.04}s` : `${0.1 + index * 0.075}s` }}
                       >
                         <ProfileCard
                           profile={profile}
