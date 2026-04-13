@@ -223,16 +223,16 @@ export default function FeedPage({ initialData }) {
       return;
     }
 
-    // Cache is valid — show it instantly.
+    // Cache is valid — show it instantly, no background fetch.
+    // Data stays fresh until: pull-to-refresh, cache invalidation (profile edit),
+    // or cache is > 30 minutes old (stale safety net).
     setLoading(false);
     try {
       sessionStorage.removeItem('mansion_feed_dirty');
       sessionStorage.removeItem('mansion_feed_force_refresh');
     } catch {}
-    // Only do a silent background refresh if the cache is older than 3 minutes.
-    // Refreshing on every visit causes profiles/stories to swap visibly mid-render.
     const cacheAgeMs = Date.now() - (Number(cachedFeed.timestamp) || 0);
-    if (cacheAgeMs > 3 * 60 * 1000) {
+    if (cacheAgeMs > 30 * 60 * 1000) {
       loadProfiles({ cursor: 0, pageSize: expectedPageSize });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -491,6 +491,13 @@ export default function FeedPage({ initialData }) {
       container.scrollLeft = 0;
       return;
     }
+
+    // If it's just a reorder (same IDs, different positions due to viewed-status change),
+    // don't scroll — only scroll when genuinely new story IDs appear.
+    const sortedIds = orderedIds.split(',').sort().join(',');
+    const previousSortedIds = previousOrderedIds.split(',').sort().join(',');
+    if (sortedIds === previousSortedIds) return;
+
     const firstUnseen = orderedStoryProfiles.find((profile) => !viewedStoryUsers.has(String(profile?.id || ''))) || orderedStoryProfiles[0];
     const targetNode = storyNodeRefs.current.get(String(firstUnseen?.id || ''));
     if (!targetNode) return;
@@ -500,7 +507,7 @@ export default function FeedPage({ initialData }) {
 
     container.scrollTo({
       left: targetLeft,
-      behavior: previousOrderedIds ? 'smooth' : 'auto',
+      behavior: 'smooth',
     });
   }, [orderedStoryProfiles, viewedStoryUsers]);
 
