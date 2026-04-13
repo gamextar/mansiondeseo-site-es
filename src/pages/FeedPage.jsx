@@ -223,14 +223,18 @@ export default function FeedPage({ initialData }) {
       return;
     }
 
-    // Cache is valid — show it instantly, then silently refresh in background
-    // so data doesn't stay stale across repeated cold starts.
+    // Cache is valid — show it instantly.
     setLoading(false);
     try {
       sessionStorage.removeItem('mansion_feed_dirty');
       sessionStorage.removeItem('mansion_feed_force_refresh');
     } catch {}
-    loadProfiles({ cursor: 0, pageSize: expectedPageSize });
+    // Only do a silent background refresh if the cache is older than 3 minutes.
+    // Refreshing on every visit causes profiles/stories to swap visibly mid-render.
+    const cacheAgeMs = Date.now() - (Number(cachedFeed.timestamp) || 0);
+    if (cacheAgeMs > 3 * 60 * 1000) {
+      loadProfiles({ cursor: 0, pageSize: expectedPageSize });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 

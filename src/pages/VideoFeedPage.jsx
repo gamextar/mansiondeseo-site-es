@@ -608,7 +608,7 @@ export default function VideoFeedPage() {
 
   const cachedStories = () => {
     try {
-      const raw = sessionStorage.getItem('vf_stories');
+      const raw = localStorage.getItem('vf_stories');
       if (raw) return JSON.parse(raw);
     } catch {}
     return [];
@@ -641,7 +641,7 @@ export default function VideoFeedPage() {
 
   const persistStories = useCallback((nextStories) => {
     try {
-      sessionStorage.setItem('vf_stories', JSON.stringify(nextStories));
+      localStorage.setItem('vf_stories', JSON.stringify(nextStories));
     } catch {}
   }, []);
 
