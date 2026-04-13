@@ -751,7 +751,7 @@ export default function ProfilePage() {
                     setUser(prev => prev ? { ...prev, seeking: newSeeking } : prev);
                     // Mark feed as dirty so it reloads with new seeking
                     invalidateProfilesCache();
-                    try { sessionStorage.setItem('mansion_feed_dirty', '1'); sessionStorage.removeItem('mansion_feed'); } catch {}
+                    try { sessionStorage.setItem('mansion_feed_dirty', '1'); localStorage.removeItem('mansion_feed'); } catch {}
                     try {
                       await updateProfile({ seeking: newSeeking });
                     } catch {
@@ -843,7 +843,7 @@ export default function ProfilePage() {
                     setUser(prev => prev ? { ...prev, interests: newInterests } : prev);
                     // Mark feed as dirty so it reloads with new interest priority
                     invalidateProfilesCache();
-                    try { sessionStorage.setItem('mansion_feed_dirty', '1'); sessionStorage.removeItem('mansion_feed'); } catch {}
+                    try { sessionStorage.setItem('mansion_feed_dirty', '1'); localStorage.removeItem('mansion_feed'); } catch {}
                     try {
                       await updateProfile({ interests: newInterests });
                     } catch {

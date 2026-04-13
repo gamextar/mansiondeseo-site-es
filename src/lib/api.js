@@ -750,7 +750,7 @@ function markFeedDirty() {
   try {
     sessionStorage.setItem('mansion_feed_dirty', '1');
     sessionStorage.setItem('mansion_feed_force_refresh', '1');
-    sessionStorage.removeItem('mansion_feed');
+    localStorage.removeItem('mansion_feed');
   } catch {}
 }
 

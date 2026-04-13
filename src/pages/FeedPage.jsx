@@ -59,7 +59,7 @@ const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, moti
 
 function getCachedFeed() {
   try {
-    const raw = sessionStorage.getItem(FEED_CACHE_KEY);
+    const raw = localStorage.getItem(FEED_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed?.profiles)) return parsed;
@@ -72,7 +72,7 @@ function getCachedFeed() {
 
 function setCachedFeed(data) {
   try {
-    sessionStorage.setItem(FEED_CACHE_KEY, JSON.stringify({
+    localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({
       profiles: data.profiles || [],
       viewerPremium: data.viewerPremium || false,
       settings: data.settings || {},
@@ -223,12 +223,14 @@ export default function FeedPage({ initialData }) {
       return;
     }
 
-    // State was already initialized from cache in useState — just clean up flags
+    // Cache is valid — show it instantly, then silently refresh in background
+    // so data doesn't stay stale across repeated cold starts.
     setLoading(false);
     try {
       sessionStorage.removeItem('mansion_feed_dirty');
       sessionStorage.removeItem('mansion_feed_force_refresh');
     } catch {}
+    loadProfiles({ cursor: 0, pageSize: expectedPageSize });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
