@@ -385,6 +385,7 @@ export default function FeedPage({ initialData }) {
     const safePage = Math.max(1, Math.min(totalPages, Number(page) || 1));
     const nextPageCursor = (safePage - 1) * cardsPerPage;
     if (nextPageCursor === pageCursor && profiles.length > 0) return;
+    cardAnimEnabledRef.current = true; // always animate cards on explicit page change
     const nextBlockCursor = Math.floor(nextPageCursor / blockSize) * blockSize;
     const blockEndCursor = blockCursor + profiles.length;
     if (nextPageCursor >= blockCursor && nextPageCursor < blockEndCursor) {
