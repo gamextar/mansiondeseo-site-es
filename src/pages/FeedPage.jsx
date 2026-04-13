@@ -1198,8 +1198,8 @@ export default function FeedPage({ initialData }) {
                     {visibleProfiles.map((profile, index) => (
                       <div
                         key={`${pageCursor}-${profile.id}`}
-                        className="feed-card-enter"
-                        style={{ animationDelay: isDesktopViewport ? `${0.03 + index * 0.04}s` : `${0.1 + index * 0.075}s` }}
+                        className={cardAnimEnabledRef.current ? 'feed-card-enter' : ''}
+                        style={cardAnimEnabledRef.current ? { animationDelay: isDesktopViewport ? `${0.03 + index * 0.04}s` : `${0.1 + index * 0.075}s` } : undefined}
                       >
                         <ProfileCard
                           profile={profile}
