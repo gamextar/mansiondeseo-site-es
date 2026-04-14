@@ -32,6 +32,18 @@ function getInitialNavSettings() {
   }
 }
 
+function resetDocumentScrollToTop() {
+  if (typeof window === 'undefined') return;
+  const root = document.documentElement;
+  const body = document.body;
+  const previousScrollBehavior = root.style.scrollBehavior;
+  root.style.scrollBehavior = 'auto';
+  window.scrollTo(0, 0);
+  root.scrollTop = 0;
+  if (body) body.scrollTop = 0;
+  root.style.scrollBehavior = previousScrollBehavior;
+}
+
 export default function BottomNav() {
   const location = useLocation();
   const { unreadCount } = useUnreadMessages();
@@ -94,7 +106,9 @@ export default function BottomNav() {
                 onClick={(e) => {
                   if (to === '/' && location.pathname === '/') {
                     window.dispatchEvent(new CustomEvent(HOME_FEED_FOCUS_EVENT));
+                    return;
                   }
+                  resetDocumentScrollToTop();
                   if (to === '/videos') {
                     warmVideoFeed();
                   }
