@@ -65,12 +65,18 @@ export default function BottomNav() {
   // Updated values take effect on next full page load (sessionStorage is saved
   // by bootstrap, so subsequent visits already have the correct values).
   const [dims] = useState(getInitialNavSettings);
-  const { navHeight, navSidePadding: sidePadding, navOpacity, navBlur } = dims;
+  const {
+    navHeight,
+    navBottomPadding,
+    navSidePadding: sidePadding,
+    navOpacity,
+    navBlur,
+  } = dims;
   const navExtraHeight = isStandaloneMobileApp ? 18 : 8;
   const effectiveNavHeight = navHeight + navExtraHeight;
-  const bottomPaddingPx = isStandaloneMobileApp ? 0 : 6;
+  const bottomPaddingPx = Math.max(0, Number(navBottomPadding) || 0);
   const activeIndicatorSize = isStandaloneMobileApp ? 62 : 58;
-  const outerSidePadding = isStandaloneMobileApp ? 12 : sidePadding;
+  const outerSidePadding = Math.max(0, Number(sidePadding) || 0);
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
