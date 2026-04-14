@@ -70,6 +70,9 @@ function AppLayout() {
     FULLSCREEN_PATHS.includes(location.pathname);
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
   const showChrome = !isFullscreen && !isChatDetail;
+  const showDesktopSidebar = showChrome;
+  const showTopNavbar = showChrome;
+  const showBottomNav = (!isChatDetail && !isFullscreen) || standaloneVideosRoute;
   const scrollLockRef = useRef(null);
 
   useEffect(() => {
@@ -191,10 +194,10 @@ function AppLayout() {
 
   return (
     <>
-      {showChrome && <DesktopSidebar />}
-      {showChrome && <Navbar />}
+      {showDesktopSidebar && <DesktopSidebar />}
+      {showTopNavbar && <Navbar />}
 
-      <div className={showChrome ? 'lg:pl-64 xl:pl-72' : ''}>
+      <div className={showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : ''}>
         <Suspense
           fallback={(
             <div className="min-h-screen bg-mansion-base flex items-center justify-center">
@@ -402,7 +405,7 @@ function AppLayout() {
         </Suspense>
       </div>
 
-      {showChrome && <BottomNav />}
+      {showBottomNav && <BottomNav />}
     </>
   );
 }
