@@ -726,7 +726,7 @@ export default function VideoFeedPage() {
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(false);
   const standaloneTopOffset = isStandaloneMobileApp
-    ? 'env(safe-area-inset-top, 0px)'
+    ? '0px'
     : 'calc(env(safe-area-inset-top, 0px) + 48px)';
   const standaloneViewportShellStyle = standaloneMobileRoute
     ? {
