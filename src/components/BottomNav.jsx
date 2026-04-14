@@ -56,8 +56,7 @@ export default function BottomNav() {
   // Updated values take effect on next full page load (sessionStorage is saved
   // by bootstrap, so subsequent visits already have the correct values).
   const [dims] = useState(getInitialNavSettings);
-  const { navHeight, navBottomPadding: bottomPadding, navSidePadding: sidePadding,
-          navOpacity, navBlur } = dims;
+  const { navHeight, navSidePadding: sidePadding, navOpacity, navBlur } = dims;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
@@ -162,7 +161,6 @@ export default function BottomNav() {
                   }
                   if (isActive) return;
                   e.preventDefault();
-                  resetDocumentScrollToTop();
                   if (to === '/videos') {
                     warmVideoFeed();
                   }
