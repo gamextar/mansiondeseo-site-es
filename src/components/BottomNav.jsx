@@ -37,6 +37,18 @@ export default function BottomNav() {
   const { unreadCount } = useUnreadMessages();
   const { user } = useAuth();
 
+  // Detect PWA standalone mode once — affects bottom padding strategy.
+  // In browser mode, 'bottom:0' sits above Safari's address bar so we use
+  // env(safe-area-inset-bottom) instead of the manually-tuned navBottomPadding.
+  const [isPWA] = useState(() => {
+    try {
+      return (
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true
+      );
+    } catch { return false; }
+  });
+
   // All nav dimensions are frozen at mount time from sessionStorage so the nav
   // never resizes/jumps when the bootstrap resolves and siteSettings updates.
   // Updated values take effect on next full page load (sessionStorage is saved
@@ -57,7 +69,9 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
-        paddingBottom: `${bottomPadding}px`,
+        paddingBottom: isPWA
+          ? `${bottomPadding}px`
+          : 'env(safe-area-inset-bottom, 0px)',
         paddingLeft: sidePadding,
         paddingRight: sidePadding,
         isolation: 'isolate',
