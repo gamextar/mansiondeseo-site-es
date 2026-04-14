@@ -68,9 +68,9 @@ export default function BottomNav() {
   const { navHeight, navSidePadding: sidePadding, navOpacity, navBlur } = dims;
   const navExtraHeight = isStandaloneMobileApp ? 18 : 8;
   const effectiveNavHeight = navHeight + navExtraHeight;
-  const bottomPaddingPx = isStandaloneMobileApp ? 2 : 6;
+  const bottomPaddingPx = isStandaloneMobileApp ? 0 : 6;
   const activeIndicatorSize = isStandaloneMobileApp ? 62 : 58;
-  const outerSidePadding = isStandaloneMobileApp ? 0 : sidePadding;
+  const outerSidePadding = isStandaloneMobileApp ? 12 : sidePadding;
   const standaloneVerticalShift = isStandaloneMobileApp ? 12 : 0;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
