@@ -796,6 +796,29 @@ export default function VideoFeedPage() {
     };
   }, [location.key, standaloneMobileRoute]);
 
+  useEffect(() => {
+    if (!standaloneMobileRoute || typeof window === 'undefined') return undefined;
+
+    const { style: bodyStyle } = document.body;
+    const { style: htmlStyle } = document.documentElement;
+    const previousBodyOverflow = bodyStyle.overflow;
+    const previousHtmlOverflow = htmlStyle.overflow;
+    const previousBodyOverscroll = bodyStyle.overscrollBehavior;
+    const previousHtmlOverscroll = htmlStyle.overscrollBehavior;
+
+    bodyStyle.overflow = 'hidden';
+    htmlStyle.overflow = 'hidden';
+    bodyStyle.overscrollBehavior = 'none';
+    htmlStyle.overscrollBehavior = 'none';
+
+    return () => {
+      bodyStyle.overflow = previousBodyOverflow;
+      htmlStyle.overflow = previousHtmlOverflow;
+      bodyStyle.overscrollBehavior = previousBodyOverscroll;
+      htmlStyle.overscrollBehavior = previousHtmlOverscroll;
+    };
+  }, [standaloneMobileRoute]);
+
   const refreshStories = useCallback(async () => {
     const data = await getStories({ focusUserId: requestedStoryUserId || '' });
     const fresh = applyPendingStoryLikeState(mergeSeedStory(data.stories || [], requestedStorySeed), getPendingStoryLikes());
