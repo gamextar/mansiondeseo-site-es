@@ -732,7 +732,7 @@ export default function VideoFeedPage() {
     : undefined;
   const standaloneViewportContentStyle = standaloneMobileRoute
     ? {
-        height: '100lvh',
+        height: 'calc(100lvh + 5px)',
       }
     : undefined;
 
