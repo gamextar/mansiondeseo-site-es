@@ -68,6 +68,19 @@ function AppLayout() {
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
   const showChrome = !isFullscreen && !isChatDetail;
   const scrollLockRef = useRef(null);
+  const routeScrollResetRef = useRef(null);
+
+  const resetDocumentScrollToTop = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const root = document.documentElement;
+    const body = document.body;
+    const previousScrollBehavior = root.style.scrollBehavior;
+    root.style.scrollBehavior = 'auto';
+    window.scrollTo(0, 0);
+    root.scrollTop = 0;
+    if (body) body.scrollTop = 0;
+    root.style.scrollBehavior = previousScrollBehavior;
+  }, []);
 
   useEffect(() => {
     ensureApiDebug();
@@ -92,17 +105,58 @@ function AppLayout() {
     return () => window.clearTimeout(timer);
   }, [user]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.history) return undefined;
+    const previous = window.history.scrollRestoration;
+    try {
+      window.history.scrollRestoration = 'manual';
+    } catch {}
+    return () => {
+      try {
+        window.history.scrollRestoration = previous;
+      } catch {}
+    };
+  }, []);
+
   // Reset scroll to top on every route change, EXCEPT when opening/closing
   // a profile overlay (which manages scroll lock/restore itself).
-  const prevPathnameRef = useRef(location.pathname);
+  const prevLocationKeyRef = useRef(location.key || location.pathname);
   useLayoutEffect(() => {
-    const prev = prevPathnameRef.current;
-    prevPathnameRef.current = location.pathname;
+    const nextKey = location.key || location.pathname;
+    const prev = prevLocationKeyRef.current;
+    prevLocationKeyRef.current = nextKey;
     if (routeOverlayOpen) return; // overlay handles its own scroll
     if (location.state?.backgroundLocation) return; // closing overlay — App handles it
-    if (prev === location.pathname) return; // same route, no reset
-    window.scrollTo(0, 0);
-  }, [location.pathname, location.state, routeOverlayOpen]);
+    if (prev === nextKey) return; // same history entry, no reset
+
+    resetDocumentScrollToTop();
+
+    let rafA = 0;
+    let rafB = 0;
+    let timeoutId = 0;
+
+    rafA = window.requestAnimationFrame(() => {
+      resetDocumentScrollToTop();
+      rafB = window.requestAnimationFrame(() => {
+        resetDocumentScrollToTop();
+      });
+    });
+
+    timeoutId = window.setTimeout(() => {
+      resetDocumentScrollToTop();
+    }, 80);
+
+    routeScrollResetRef.current = { rafA, rafB, timeoutId };
+
+    return () => {
+      if (routeScrollResetRef.current) {
+        if (routeScrollResetRef.current.rafA) window.cancelAnimationFrame(routeScrollResetRef.current.rafA);
+        if (routeScrollResetRef.current.rafB) window.cancelAnimationFrame(routeScrollResetRef.current.rafB);
+        if (routeScrollResetRef.current.timeoutId) window.clearTimeout(routeScrollResetRef.current.timeoutId);
+        routeScrollResetRef.current = null;
+      }
+    };
+  }, [location.key, location.pathname, location.state, resetDocumentScrollToTop, routeOverlayOpen]);
 
   useEffect(() => {
     // Video overlay is fullscreen — no need to lock the background scroll.
