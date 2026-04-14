@@ -145,6 +145,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const revealSentRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
   // Once src is set, never clear it — clearing causes browser to reload the video
   // which produces the black flash/glitch at boundaries. Matches original behavior.
@@ -156,6 +157,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
 
   useEffect(() => {
     revealSentRef.current = false;
+    setIsVideoReady(false);
   }, [activeSrc]);
 
   const notifyRevealReady = useCallback(() => {
@@ -207,6 +209,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     if (!video) return;
 
     const handleReady = () => {
+      setIsVideoReady(true);
       notifyRevealReady();
       attemptPlay();
     };
@@ -261,8 +264,12 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
         <video
           ref={videoRef}
           src={activeSrc}
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
+          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[1400ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+          style={{
+            WebkitTransform: 'translateZ(0)',
+            transform: 'translateZ(0)',
+            opacity: isVideoReady ? 1 : 0,
+          }}
           loop
           playsInline
           webkit-playsinline="true"
@@ -271,6 +278,11 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           preload={isActive ? 'auto' : 'metadata'}
           onEnded={handleVideoEnd}
           onClick={togglePlay}
+        />
+
+        <div
+          className="absolute inset-0 pointer-events-none bg-black transition-opacity duration-[1400ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+          style={{ opacity: isVideoReady ? 0 : 1 }}
         />
 
         <AnimatePresence>
