@@ -71,7 +71,7 @@ export default function BottomNav() {
   const bottomPaddingPx = isStandaloneMobileApp ? 0 : 6;
   const activeIndicatorSize = isStandaloneMobileApp ? 62 : 58;
   const outerSidePadding = isStandaloneMobileApp ? 12 : sidePadding;
-  const standaloneVerticalShift = isStandaloneMobileApp ? 12 : 6;
+  const standaloneVerticalShift = isStandaloneMobileApp ? 12 : 0;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
