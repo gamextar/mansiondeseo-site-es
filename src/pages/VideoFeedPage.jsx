@@ -725,12 +725,10 @@ export default function VideoFeedPage() {
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const standaloneTopOffset = 'calc(env(safe-area-inset-top, 0px) + 48px)';
-  const standaloneBottomOffset = `calc(${Math.max(12, navBottomOffset)}px + env(safe-area-inset-bottom, 0px))`;
-  const standaloneViewportHeight = `calc(100dvh - ${standaloneTopOffset} - ${standaloneBottomOffset})`;
+  const standaloneViewportHeight = `calc(100dvh - ${standaloneTopOffset})`;
   const standaloneViewportShellStyle = standaloneMobileRoute
     ? {
         paddingTop: standaloneTopOffset,
-        paddingBottom: standaloneBottomOffset,
       }
     : undefined;
 
