@@ -725,7 +725,17 @@ export default function VideoFeedPage() {
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const standaloneTopOffset = 'calc(env(safe-area-inset-top, 0px) + 48px)';
-  const standaloneViewportFrameStyle = standaloneMobileRoute ? { top: standaloneTopOffset, bottom: 0 } : undefined;
+  const standaloneViewportShellStyle = standaloneMobileRoute
+    ? {
+        paddingTop: standaloneTopOffset,
+        minHeight: '100lvh',
+      }
+    : undefined;
+  const standaloneViewportContentStyle = standaloneMobileRoute
+    ? {
+        minHeight: `calc(100lvh - ${standaloneTopOffset})`,
+      }
+    : undefined;
 
   const syncMobileViewportToIndex = useCallback((index) => {
     if (isDesktopViewport) return false;
@@ -1099,11 +1109,12 @@ export default function VideoFeedPage() {
   if (loading) {
     return (
       <div
-        className={standaloneMobileRoute ? 'fixed inset-x-0 bg-black z-0' : 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'}
-        style={standaloneViewportFrameStyle}
+        className={standaloneMobileRoute ? 'relative bg-black' : 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'}
+        style={standaloneViewportShellStyle}
       >
         <div
-          className={standaloneMobileRoute ? 'absolute inset-0 flex items-center justify-center' : undefined}
+          className={standaloneMobileRoute ? 'flex items-center justify-center' : undefined}
+          style={standaloneViewportContentStyle}
         >
           <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
         </div>
@@ -1114,8 +1125,8 @@ export default function VideoFeedPage() {
   if (stories.length === 0) {
     return (
       <div
-        className={standaloneMobileRoute ? 'fixed inset-x-0 bg-mansion-base px-6 z-0' : 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'}
-        style={standaloneViewportFrameStyle}
+        className={standaloneMobileRoute ? 'relative bg-mansion-base px-6' : 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'}
+        style={standaloneViewportShellStyle}
       >
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-32 right-[-10%] w-[520px] h-[520px] rounded-full bg-mansion-crimson/10 blur-3xl" />
@@ -1127,7 +1138,7 @@ export default function VideoFeedPage() {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
           className="relative flex flex-col items-center justify-center text-center max-w-sm mx-auto"
-          style={standaloneMobileRoute ? { minHeight: '100%' } : undefined}
+          style={standaloneViewportContentStyle}
         >
           <div className="w-24 h-24 rounded-[2rem] bg-mansion-gold/10 border border-mansion-gold/20 flex items-center justify-center mb-6">
             <Film className="w-12 h-12 text-mansion-gold" />
@@ -1153,8 +1164,8 @@ export default function VideoFeedPage() {
 
   return (
     <div
-      className={standaloneMobileRoute ? 'fixed inset-x-0 bg-black z-0' : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'}
-      style={standaloneViewportFrameStyle}
+      className={standaloneMobileRoute ? 'relative bg-black' : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'}
+      style={standaloneViewportShellStyle}
       onPointerDown={handleOverlayBackdropPointerDown}
     >
       <motion.div
@@ -1165,7 +1176,8 @@ export default function VideoFeedPage() {
       />
 
       <div
-        className={standaloneMobileRoute ? 'absolute inset-0' : 'relative h-full'}
+        className={standaloneMobileRoute ? 'relative' : 'relative h-full'}
+        style={standaloneViewportContentStyle}
       >
         {isOverlayPreview && (
           <button
