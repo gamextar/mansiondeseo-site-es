@@ -476,7 +476,7 @@ export default function FeedPage({ initialData }) {
 
     const currentBlockEnd = blockCursor + profiles.length;
     const remainingAfterCurrentPage = currentBlockEnd - (pageCursor + cardsPerPage);
-    if (remainingAfterCurrentPage > 0) return;
+    if (remainingAfterCurrentPage > cardsPerPage) return;
 
     prefetchProfilesBlock({
       cursor: Number(nextCursor) || currentBlockEnd,
