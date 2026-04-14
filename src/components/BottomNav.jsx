@@ -37,26 +37,12 @@ export default function BottomNav() {
   const { unreadCount } = useUnreadMessages();
   const { user } = useAuth();
 
-  // Detect PWA standalone mode once — affects bottom padding strategy.
-  // In browser mode, 'bottom:0' is the CSS viewport bottom which already sits
-  // above the browser toolbar — no extra padding needed. env(safe-area-inset-bottom)
-  // would add ~21px (home indicator) on top of that, causing a double gap.
-  // In PWA mode we use the manually-tuned navBottomPadding from site settings.
-  const [isPWA] = useState(() => {
-    try {
-      return (
-        window.matchMedia('(display-mode: standalone)').matches ||
-        window.navigator.standalone === true
-      );
-    } catch { return false; }
-  });
-
   // All nav dimensions are frozen at mount time from sessionStorage so the nav
   // never resizes/jumps when the bootstrap resolves and siteSettings updates.
   // Updated values take effect on next full page load (sessionStorage is saved
   // by bootstrap, so subsequent visits already have the correct values).
   const [dims] = useState(getInitialNavSettings);
-  const { navHeight, navBottomPadding: bottomPadding, navSidePadding: sidePadding,
+  const { navHeight, navSidePadding: sidePadding,
           navOpacity, navBlur } = dims;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
@@ -71,7 +57,7 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
-        paddingBottom: isPWA ? `${bottomPadding}px` : '0px',
+        paddingBottom: 'env(safe-area-inset-bottom, 8px)',
         paddingLeft: sidePadding,
         paddingRight: sidePadding,
         isolation: 'isolate',
