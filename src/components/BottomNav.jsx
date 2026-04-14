@@ -38,8 +38,10 @@ export default function BottomNav() {
   const { user } = useAuth();
 
   // Detect PWA standalone mode once — affects bottom padding strategy.
-  // In browser mode, 'bottom:0' sits above Safari's address bar so we use
-  // env(safe-area-inset-bottom) instead of the manually-tuned navBottomPadding.
+  // In browser mode, 'bottom:0' is the CSS viewport bottom which already sits
+  // above the browser toolbar — no extra padding needed. env(safe-area-inset-bottom)
+  // would add ~21px (home indicator) on top of that, causing a double gap.
+  // In PWA mode we use the manually-tuned navBottomPadding from site settings.
   const [isPWA] = useState(() => {
     try {
       return (
@@ -69,9 +71,7 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
-        paddingBottom: isPWA
-          ? `${bottomPadding}px`
-          : 'env(safe-area-inset-bottom, 0px)',
+        paddingBottom: isPWA ? `${bottomPadding}px` : '0px',
         paddingLeft: sidePadding,
         paddingRight: sidePadding,
         isolation: 'isolate',
