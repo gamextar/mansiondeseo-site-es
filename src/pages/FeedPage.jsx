@@ -876,7 +876,14 @@ export default function FeedPage({ initialData }) {
   const gap = 12;
 
   return (
-    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
+    <div
+      className="min-h-dynamic-screen bg-mansion-base pt-navbar lg:pb-8"
+      style={{
+        paddingBottom: isDesktopViewport
+          ? undefined
+          : `calc(${Math.max(12, navBottomOffset)}px + env(safe-area-inset-bottom, 0px))`,
+      }}
+    >
       {/* Pull-to-refresh indicator */}
       <div
         ref={indicatorRef}
