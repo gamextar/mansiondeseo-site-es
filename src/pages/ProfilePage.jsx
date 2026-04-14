@@ -71,7 +71,7 @@ export default function ProfilePage() {
   const navHeight = siteSettings?.navHeight ?? 71;
   const navExtraHeight = isStandaloneMobileApp ? 18 : 8;
   const effectiveNavHeight = navHeight + navExtraHeight;
-  const navBottomPaddingPx = isStandaloneMobileApp ? 2 : 3;
+  const navBottomPaddingPx = isStandaloneMobileApp ? 2 : 6;
   const navBottomOffset = `calc(env(safe-area-inset-bottom, ${navBottomPaddingPx}px) + ${effectiveNavHeight}px)`;
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
