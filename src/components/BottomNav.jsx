@@ -167,9 +167,11 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
-        bottom: isStandaloneMobileApp ? 'calc(env(safe-area-inset-bottom, 0px) * -1)' : '0px',
+        bottom: isStandaloneMobileApp
+          ? `calc(env(safe-area-inset-bottom, 0px) * -1 + ${bottomPaddingPx}px)`
+          : '0px',
         paddingBottom: isStandaloneMobileApp
-          ? `${bottomPaddingPx}px`
+          ? '0px'
           : `calc(env(safe-area-inset-bottom, 0px) + ${bottomPaddingPx}px)`,
         paddingLeft: outerSidePadding,
         paddingRight: outerSidePadding,
