@@ -11,7 +11,7 @@ import {
   BOTTOM_NAV_SIDE_PADDING,
 } from '../lib/bottomNavConfig';
 import { warmVideoFeed } from '../lib/videoFeedWarmup';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 
@@ -48,7 +48,7 @@ export default function BottomNav() {
   const { unreadCount } = useUnreadMessages();
   const { user } = useAuth();
   const pendingNavResetRef = useRef(null);
-  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
+  const isStandaloneMobileApp = detectStandaloneMobile();
   const effectiveNavHeight = BOTTOM_NAV_HEIGHT;
   const bottomPaddingPx = BOTTOM_NAV_BOTTOM_PADDING;
   const activeIndicatorSize = isStandaloneMobileApp ? 66 : 62;
@@ -57,28 +57,6 @@ export default function BottomNav() {
   const borderColor = `rgba(255,255,255,${(0.08 * BOTTOM_NAV_OPACITY / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * BOTTOM_NAV_OPACITY / 100).toFixed(3)})`;
   const blurAmount = BOTTOM_NAV_OPACITY <= 0 ? '0px' : `${BOTTOM_NAV_BLUR}px`;
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const media = window.matchMedia?.('(display-mode: standalone)');
-    const evaluate = () => {
-      const standalone = media?.matches || window.navigator.standalone === true;
-      const ua = window.navigator.userAgent || '';
-      const isMobile = /iphone|ipad|ipod|android/i.test(ua);
-      setIsStandaloneMobileApp(Boolean(standalone && isMobile));
-    };
-
-    evaluate();
-
-    if (!media) return undefined;
-    if (typeof media.addEventListener === 'function') {
-      media.addEventListener('change', evaluate);
-      return () => media.removeEventListener('change', evaluate);
-    }
-
-    media.addListener(evaluate);
-    return () => media.removeListener(evaluate);
-  }, []);
 
   useEffect(() => () => {
     if (!pendingNavResetRef.current || typeof window === 'undefined') return;
@@ -144,9 +122,7 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
-        bottom: isStandaloneMobileApp
-          ? `calc(env(safe-area-inset-bottom, 0px) * -1 + ${bottomPaddingPx}px)`
-          : '0px',
+        bottom: isStandaloneMobileApp ? `${bottomPaddingPx}px` : '0px',
         paddingBottom: isStandaloneMobileApp
           ? '0px'
           : `calc(env(safe-area-inset-bottom, 0px) + ${bottomPaddingPx}px)`,

@@ -68,7 +68,7 @@ function timeAgo(dateStr) {
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { setRegistered, setUser, user } = useAuth();
-  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
+  const isStandaloneMobileApp = detectStandaloneMobile();
   const navBottomOffset = isStandaloneMobileApp
     ? getStandaloneBottomNavOffset()
     : getBrowserBottomNavOffset();
@@ -180,28 +180,6 @@ export default function ProfilePage() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [lightboxOpen, user]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const media = window.matchMedia?.('(display-mode: standalone)');
-    const evaluate = () => {
-      const standalone = media?.matches || window.navigator.standalone === true;
-      const ua = window.navigator.userAgent || '';
-      const isMobile = /iphone|ipad|ipod|android/i.test(ua);
-      setIsStandaloneMobileApp(Boolean(standalone && isMobile));
-    };
-
-    evaluate();
-
-    if (!media) return undefined;
-    if (typeof media.addEventListener === 'function') {
-      media.addEventListener('change', evaluate);
-      return () => media.removeEventListener('change', evaluate);
-    }
-
-    media.addListener(evaluate);
-    return () => media.removeListener(evaluate);
-  }, []);
 
   useEffect(() => {
     if (!user?.id) return;
