@@ -57,7 +57,7 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
-        paddingBottom: `${bottomPadding}px`,
+        paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))',
         paddingLeft: sidePadding,
         paddingRight: sidePadding,
         isolation: 'isolate',
