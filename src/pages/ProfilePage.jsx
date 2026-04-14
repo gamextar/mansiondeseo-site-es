@@ -390,7 +390,7 @@ export default function ProfilePage() {
   } : null;
 
   return (
-    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
+    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar lg:pt-0">
       {cropFile && (
         <ImageCropper
           file={cropFile}

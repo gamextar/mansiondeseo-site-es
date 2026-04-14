@@ -392,7 +392,7 @@ export default function ChatListPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, fetchConversations, subscribe, applyConversationUpdate, applyLocalConversationPreview]);
   return (
-    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
+    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar lg:pt-0">
       {/* Header */}
       <motion.div
         className="px-4 lg:px-8 pt-4 lg:pt-6 pb-3 lg:max-w-3xl lg:mx-auto"

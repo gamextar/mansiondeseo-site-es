@@ -877,7 +877,7 @@ export default function FeedPage({ initialData }) {
 
   return (
     <div
-      className="min-h-dynamic-screen bg-mansion-base pt-navbar lg:pb-8"
+      className="min-h-dynamic-screen bg-mansion-base pt-navbar lg:pt-0 lg:pb-8"
       style={{
         paddingBottom: isDesktopViewport
           ? undefined
