@@ -636,7 +636,6 @@ export default function VideoFeedPage() {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(min-width: 1024px)').matches;
   });
-  const [standaloneViewportPx, setStandaloneViewportPx] = useState(null);
   const initialStoryUserIdRef = useRef(requestedStoryUserId);
   const apiRespondedRef = useRef(false);
 
@@ -726,13 +725,8 @@ export default function VideoFeedPage() {
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const standaloneTopOffset = 'calc(env(safe-area-inset-top, 0px) + 48px)';
-  const standaloneViewportBase = standaloneViewportPx ? `${standaloneViewportPx}px` : '100dvh';
-  const standaloneViewportHeight = `calc(${standaloneViewportBase} - ${standaloneTopOffset})`;
-  const standaloneViewportShellStyle = standaloneMobileRoute
-    ? {
-        paddingTop: standaloneTopOffset,
-      }
-    : undefined;
+  const standaloneViewportShellStyle = standaloneMobileRoute ? { paddingTop: standaloneTopOffset } : undefined;
+  const standaloneViewportFillStyle = standaloneMobileRoute ? { top: standaloneTopOffset, bottom: 0 } : undefined;
 
   const syncMobileViewportToIndex = useCallback((index) => {
     if (isDesktopViewport) return false;
@@ -771,41 +765,6 @@ export default function VideoFeedPage() {
     media.addListener(handleChange);
     return () => media.removeListener(handleChange);
   }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    if (!standaloneMobileRoute) {
-      setStandaloneViewportPx(null);
-      return undefined;
-    }
-
-    let rafId = 0;
-    const syncViewportHeight = () => {
-      if (rafId) window.cancelAnimationFrame(rafId);
-      rafId = window.requestAnimationFrame(() => {
-        const nextHeight = Math.round(window.visualViewport?.height || window.innerHeight || 0);
-        if (nextHeight > 0) {
-          setStandaloneViewportPx((prev) => (prev === nextHeight ? prev : nextHeight));
-        }
-      });
-    };
-
-    syncViewportHeight();
-
-    const viewport = window.visualViewport;
-    window.addEventListener('resize', syncViewportHeight);
-    window.addEventListener('orientationchange', syncViewportHeight);
-    viewport?.addEventListener('resize', syncViewportHeight);
-    viewport?.addEventListener('scroll', syncViewportHeight);
-
-    return () => {
-      if (rafId) window.cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', syncViewportHeight);
-      window.removeEventListener('orientationchange', syncViewportHeight);
-      viewport?.removeEventListener('resize', syncViewportHeight);
-      viewport?.removeEventListener('scroll', syncViewportHeight);
-    };
-  }, [standaloneMobileRoute]);
 
   const refreshStories = useCallback(async () => {
     const data = await getStories({ focusUserId: requestedStoryUserId || '' });
@@ -1145,8 +1104,8 @@ export default function VideoFeedPage() {
         style={standaloneViewportShellStyle}
       >
         <div
-          className={standaloneMobileRoute ? 'flex items-center justify-center' : undefined}
-          style={standaloneMobileRoute ? { minHeight: standaloneViewportHeight } : undefined}
+          className={standaloneMobileRoute ? 'absolute inset-x-0 flex items-center justify-center' : undefined}
+          style={standaloneViewportFillStyle}
         >
           <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
         </div>
@@ -1170,7 +1129,7 @@ export default function VideoFeedPage() {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
           className="relative flex flex-col items-center justify-center text-center max-w-sm mx-auto"
-          style={standaloneMobileRoute ? { minHeight: standaloneViewportHeight } : undefined}
+          style={standaloneMobileRoute ? { minHeight: 'calc(100dvh - var(--safe-top, 0px) - 48px)' } : undefined}
         >
           <div className="w-24 h-24 rounded-[2rem] bg-mansion-gold/10 border border-mansion-gold/20 flex items-center justify-center mb-6">
             <Film className="w-12 h-12 text-mansion-gold" />
@@ -1208,8 +1167,8 @@ export default function VideoFeedPage() {
       />
 
       <div
-        className="relative h-full"
-        style={standaloneMobileRoute ? { height: standaloneViewportHeight } : undefined}
+        className={standaloneMobileRoute ? 'absolute inset-x-0' : 'relative h-full'}
+        style={standaloneMobileRoute ? standaloneViewportFillStyle : undefined}
       >
         {isOverlayPreview && (
           <button
