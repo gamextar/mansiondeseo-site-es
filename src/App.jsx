@@ -29,6 +29,7 @@ import PagoPendientePage from './pages/PagoPendientePage';
 import CoinsPage from './pages/CoinsPage';
 import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
 import StoryUploadPage from './pages/StoryUploadPage';
+import TopVisitedPage from './pages/TopVisitedPage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
@@ -40,7 +41,6 @@ import { lazyWithRetry } from './lib/lazyWithRetry';
 
 const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage'), 'mansion-lazy-retry:video-lab'));
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
-const TopVisitedPage = lazy(lazyWithRetry(() => import('./pages/TopVisitedPage'), 'mansion-lazy-retry:ranking'));
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
