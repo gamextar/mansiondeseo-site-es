@@ -636,7 +636,6 @@ export default function VideoFeedPage() {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(min-width: 1024px)').matches;
   });
-  const [standaloneViewportPx, setStandaloneViewportPx] = useState(null);
   const initialStoryUserIdRef = useRef(requestedStoryUserId);
   const apiRespondedRef = useRef(false);
 
@@ -726,7 +725,6 @@ export default function VideoFeedPage() {
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const standaloneTopOffset = 'calc(env(safe-area-inset-top, 0px) + 48px)';
-  const standaloneViewportHeight = standaloneViewportPx ? `${standaloneViewportPx}px` : '100lvh';
   const standaloneViewportShellStyle = standaloneMobileRoute
     ? {
         paddingTop: standaloneTopOffset,
@@ -734,7 +732,7 @@ export default function VideoFeedPage() {
     : undefined;
   const standaloneViewportContentStyle = standaloneMobileRoute
     ? {
-        height: standaloneViewportHeight,
+        height: '100lvh',
       }
     : undefined;
 
@@ -775,41 +773,6 @@ export default function VideoFeedPage() {
     media.addListener(handleChange);
     return () => media.removeListener(handleChange);
   }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    if (!standaloneMobileRoute) {
-      setStandaloneViewportPx(null);
-      return undefined;
-    }
-
-    let rafId = 0;
-    const syncViewportHeight = () => {
-      if (rafId) window.cancelAnimationFrame(rafId);
-      rafId = window.requestAnimationFrame(() => {
-        const nextHeight = Math.round(window.innerHeight || window.visualViewport?.height || 0);
-        if (nextHeight > 0) {
-          setStandaloneViewportPx((prev) => (prev === nextHeight ? prev : nextHeight));
-        }
-      });
-    };
-
-    syncViewportHeight();
-
-    const viewport = window.visualViewport;
-    window.addEventListener('resize', syncViewportHeight);
-    window.addEventListener('orientationchange', syncViewportHeight);
-    window.addEventListener('pageshow', syncViewportHeight);
-    viewport?.addEventListener('resize', syncViewportHeight);
-
-    return () => {
-      if (rafId) window.cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', syncViewportHeight);
-      window.removeEventListener('orientationchange', syncViewportHeight);
-      window.removeEventListener('pageshow', syncViewportHeight);
-      viewport?.removeEventListener('resize', syncViewportHeight);
-    };
-  }, [standaloneMobileRoute]);
 
   const refreshStories = useCallback(async () => {
     const data = await getStories({ focusUserId: requestedStoryUserId || '' });
