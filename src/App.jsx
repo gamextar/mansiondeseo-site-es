@@ -36,10 +36,11 @@ import ApiDebugOverlay from './components/ApiDebugOverlay';
 import { AuthContext, useAuth } from './lib/authContext';
 import { preloadVideoFeedChunk, preloadVideoFeedData } from './lib/videoFeedWarmup';
 import { clearBootDebugFlags, getBootDebugFlags, subscribeBootDebugFlags } from './lib/bootDebugPrefs';
+import { lazyWithRetry } from './lib/lazyWithRetry';
 
-const VideoLabPage = lazy(() => import('./pages/admin/VideoLabPage'));
+const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage'), 'mansion-lazy-retry:video-lab'));
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
-const TopVisitedPage = lazy(() => import('./pages/TopVisitedPage'));
+const TopVisitedPage = lazy(lazyWithRetry(() => import('./pages/TopVisitedPage'), 'mansion-lazy-retry:ranking'));
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
