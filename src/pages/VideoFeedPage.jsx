@@ -467,19 +467,25 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, s
 
 function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, navBottomOffset, avatarSize, scrollContainerRef, onGift, isOwnStory = false }) {
   if (!story) return null;
+  const actionBottom = typeof navBottomOffset === 'number'
+    ? `${navBottomOffset + 16}px`
+    : `calc(${navBottomOffset} + 16px)`;
+  const infoBottom = typeof navBottomOffset === 'number'
+    ? `${navBottomOffset + 8}px`
+    : `calc(${navBottomOffset} + 8px)`;
 
   return (
     <>
       <div
-        className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
-        style={{ bottom: `${navBottomOffset + 16}px` }}
+        className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-[70] lg:hidden"
+        style={{ bottom: actionBottom }}
       >
         <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} scrollContainerRef={scrollContainerRef} onGift={onGift} isOwnStory={isOwnStory} />
       </div>
 
       <div
-        className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
-        style={{ bottom: `${navBottomOffset + 8}px` }}
+        className="pointer-events-none fixed left-4 right-20 z-[70] lg:hidden"
+        style={{ bottom: infoBottom }}
       >
         <MobileOverlayButton onPress={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1">
           <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
@@ -649,7 +655,6 @@ export default function VideoFeedPage() {
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
   const navHeight = siteSettings?.navHeight ?? 71;
-  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
   const flushPendingViewedStories = useCallback(() => {
     try {
       const rawPending = sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY);
@@ -725,6 +730,9 @@ export default function VideoFeedPage() {
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(false);
+  const effectiveNavHeight = isStandaloneMobileApp ? navHeight + 10 : navHeight;
+  const navBottomPaddingPx = isStandaloneMobileApp ? 4 : 8;
+  const navBottomOffset = `calc(env(safe-area-inset-bottom, ${navBottomPaddingPx}px) + ${effectiveNavHeight}px)`;
   const standaloneTopOffset = isStandaloneMobileApp
     ? '0px'
     : 'calc(env(safe-area-inset-top, 0px) + 48px)';
@@ -1352,8 +1360,8 @@ export default function VideoFeedPage() {
 
         {activeStory && (
         <div
-          className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
-          style={{ bottom: `${navBottomOffset + 16}px` }}
+          className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-[70] lg:hidden"
+          style={{ bottom: `calc(${navBottomOffset} + 16px)` }}
         >
           <MobileActionButtons
             story={activeStory}
@@ -1370,8 +1378,8 @@ export default function VideoFeedPage() {
 
         {activeStory && (
         <div
-          className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
-          style={{ bottom: `${navBottomOffset + 8}px` }}
+          className="pointer-events-none fixed left-4 right-20 z-[70] lg:hidden"
+          style={{ bottom: `calc(${navBottomOffset} + 8px)` }}
         >
           <div className="pointer-events-none flex flex-col items-start gap-2.5 mb-1">
             <MobileOverlayButton

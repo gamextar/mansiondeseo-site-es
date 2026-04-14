@@ -24,6 +24,12 @@ export default function StoryPreviewOverlay({
   const progressRef = useRef(null);
   const rafRef = useRef(null);
   const [isMuted, setIsMuted] = useState(true);
+  const actionBottom = typeof navBottomOffset === 'number'
+    ? navBottomOffset + 16
+    : `calc(${navBottomOffset} + 16px)`;
+  const infoBottom = typeof navBottomOffset === 'number'
+    ? navBottomOffset + 8
+    : `calc(${navBottomOffset} + 8px)`;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -86,7 +92,7 @@ export default function StoryPreviewOverlay({
         )}
 
         {/* Right-side action icons — mobile */}
-        <div className="pointer-events-none absolute right-3 flex flex-col items-center gap-6 z-20 lg:hidden" style={{ bottom: navBottomOffset + 16 }}>
+        <div className="pointer-events-none absolute right-3 flex flex-col items-center gap-6 z-[70] lg:hidden" style={{ bottom: actionBottom }}>
           <div className="flex flex-col items-center">
             <div className="rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center" style={{ width: 52, height: 52 }}>
               <Heart className="w-6 h-6 text-white" />
@@ -136,7 +142,7 @@ export default function StoryPreviewOverlay({
         </div>
 
         {/* User info + caption — mobile */}
-        <div className="absolute left-4 right-20 z-20 lg:hidden" style={{ bottom: navBottomOffset + 8 }}>
+        <div className="absolute left-4 right-20 z-[70] lg:hidden" style={{ bottom: infoBottom }}>
           <div className="flex flex-col items-start gap-2.5 mb-1">
             <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
               {user?.avatar_url

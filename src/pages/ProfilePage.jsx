@@ -59,7 +59,11 @@ function timeAgo(dateStr) {
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { setRegistered, setUser, user, siteSettings } = useAuth();
-  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
+  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(false);
+  const navHeight = siteSettings?.navHeight ?? 71;
+  const effectiveNavHeight = isStandaloneMobileApp ? navHeight + 10 : navHeight;
+  const navBottomPaddingPx = isStandaloneMobileApp ? 4 : 8;
+  const navBottomOffset = `calc(env(safe-area-inset-bottom, ${navBottomPaddingPx}px) + ${effectiveNavHeight}px)`;
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -168,6 +172,28 @@ export default function ProfilePage() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [lightboxOpen, user]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const media = window.matchMedia?.('(display-mode: standalone)');
+    const evaluate = () => {
+      const standalone = media?.matches || window.navigator.standalone === true;
+      const ua = window.navigator.userAgent || '';
+      const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+      setIsStandaloneMobileApp(Boolean(standalone && isMobile));
+    };
+
+    evaluate();
+
+    if (!media) return undefined;
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', evaluate);
+      return () => media.removeEventListener('change', evaluate);
+    }
+
+    media.addListener(evaluate);
+    return () => media.removeListener(evaluate);
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return;

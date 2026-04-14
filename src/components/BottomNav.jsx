@@ -59,6 +59,7 @@ export default function BottomNav() {
   const [dims] = useState(getInitialNavSettings);
   const { navHeight, navSidePadding: sidePadding, navOpacity, navBlur } = dims;
   const effectiveNavHeight = isStandaloneMobileApp ? navHeight + 10 : navHeight;
+  const bottomPaddingPx = isStandaloneMobileApp ? 4 : 8;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
@@ -144,7 +145,7 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
-        paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))',
+        paddingBottom: `max(${bottomPaddingPx}px, env(safe-area-inset-bottom, ${bottomPaddingPx}px))`,
         paddingLeft: sidePadding,
         paddingRight: sidePadding,
         isolation: 'isolate',
@@ -196,14 +197,14 @@ export default function BottomNav() {
                 {isActive && (
                   <motion.div
                     layoutId="bottomnav-indicator"
-                    className="absolute inset-0 mx-auto rounded-2xl bg-white/[0.08]"
+                    className="absolute left-1/2 top-1/2 h-[54px] w-[54px] -translate-x-1/2 -translate-y-1/2 rounded-[1.35rem] bg-white/[0.08]"
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                   />
                 )}
 
                 <div className="relative z-10">
                   <Icon
-                    className={`w-[22px] h-[22px] transition-colors ${
+                    className={`h-[25px] w-[25px] transition-colors ${
                       isActive ? 'text-white' : 'text-white/50 group-hover:text-white/80'
                     }`}
                   />
