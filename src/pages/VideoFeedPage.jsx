@@ -738,8 +738,7 @@ export default function VideoFeedPage() {
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
-  const navExtraHeight = isStandaloneMobileApp ? 18 : 8;
-  const effectiveNavHeight = navHeight + navExtraHeight;
+  const effectiveNavHeight = navHeight;
   const navBottomPaddingPx = Math.max(0, Number(siteSettings?.navBottomPadding ?? 24) || 0);
   const navBottomOffset = isStandaloneMobileApp
     ? `${effectiveNavHeight + navBottomPaddingPx}px`

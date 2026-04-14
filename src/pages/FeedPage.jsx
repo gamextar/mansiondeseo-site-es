@@ -126,9 +126,8 @@ export default function FeedPage({ initialData }) {
   const navigate = useNavigate();
   const location = useLocation();
   const navHeight = siteSettings?.navHeight ?? 71;
-  const navExtraHeight = isStandaloneMobileApp ? 18 : 8;
   const navBottomPaddingPx = Math.max(0, Number(siteSettings?.navBottomPadding ?? 24) || 0);
-  const navBottomOffset = navHeight + navExtraHeight + navBottomPaddingPx;
+  const navBottomOffset = navHeight + navBottomPaddingPx;
   const gridRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const mobileNavVisibilityTimerRef = useRef(null);
