@@ -68,7 +68,7 @@ export default function BottomNav() {
   const { navHeight, navSidePadding: sidePadding, navOpacity, navBlur } = dims;
   const navExtraHeight = isStandaloneMobileApp ? 18 : 8;
   const effectiveNavHeight = navHeight + navExtraHeight;
-  const bottomPaddingPx = isStandaloneMobileApp ? 0 : 6;
+  const bottomPaddingPx = isStandaloneMobileApp ? 0 : 3;
   const activeIndicatorSize = isStandaloneMobileApp ? 62 : 58;
   const outerSidePadding = isStandaloneMobileApp ? 12 : sidePadding;
   const navBottomNudgePx = isStandaloneMobileApp ? 0 : -6;
