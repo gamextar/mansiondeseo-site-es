@@ -386,11 +386,6 @@ export default function SettingsPage() {
         payment_title_coins: paymentTitleCoins,
         payment_descriptor_coins: paymentDescriptorCoins,
         payment_gateway: paymentGateway,
-        nav_bottom_padding: navBottomPadding,
-        nav_side_padding: navSidePadding,
-        nav_height: navHeight,
-        nav_opacity: navOpacity,
-        nav_blur: navBlur,
         story_circle_size: nextPresetMedium,
         story_circle_preset_small: nextPresetSmall,
         story_circle_preset_medium: nextPresetMedium,
@@ -1779,117 +1774,25 @@ export default function SettingsPage() {
                   <Navigation className="w-4 h-4 text-mansion-gold" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Separación inferior</h3>
-                  <p className="text-[11px] text-text-dim">Distancia del borde inferior de pantalla</p>
+                  <h3 className="text-sm font-semibold text-text-primary">Geometría fija</h3>
+                  <p className="text-[11px] text-text-dim">La barra inferior ahora usa una configuración estable por código para evitar desalineaciones entre home, videos y perfil.</p>
                 </div>
               </div>
-              <input type="range" min="0" max="80" value={navBottomPadding} onChange={e => setNavBottomPadding(Number(e.target.value))} className="w-full accent-mansion-gold" />
-              <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>0px</span>
-                <span className="text-mansion-gold font-medium">{navBottomPadding}px</span>
-                <span>80px</span>
-              </div>
-            </div>
-
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Smartphone className="w-4 h-4 text-mansion-gold" />
+              <div className="grid grid-cols-3 gap-2 text-[11px]">
+                <div className="rounded-xl bg-mansion-elevated/60 border border-white/5 p-3">
+                  <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">Abajo</div>
+                  <div className="text-text-primary font-semibold">8px</div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Separación lateral</h3>
-                  <p className="text-[11px] text-text-dim">Margen horizontal de la pill</p>
+                <div className="rounded-xl bg-mansion-elevated/60 border border-white/5 p-3">
+                  <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">Laterales</div>
+                  <div className="text-text-primary font-semibold">8px</div>
+                </div>
+                <div className="rounded-xl bg-mansion-elevated/60 border border-white/5 p-3">
+                  <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">Altura</div>
+                  <div className="text-text-primary font-semibold">80px</div>
                 </div>
               </div>
-              <input type="range" min="0" max="60" value={navSidePadding} onChange={e => setNavSidePadding(Number(e.target.value))} className="w-full accent-mansion-gold" />
-              <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>0px</span>
-                <span className="text-mansion-gold font-medium">{navSidePadding}px</span>
-                <span>60px</span>
-              </div>
-            </div>
-
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Monitor className="w-4 h-4 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Alto de la barra</h3>
-                  <p className="text-[11px] text-text-dim">Altura total de la navbar inferior</p>
-                </div>
-              </div>
-              <input type="range" min="56" max="96" value={navHeight} onChange={e => setNavHeight(Number(e.target.value))} className="w-full accent-mansion-gold" />
-              <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>56px</span>
-                <span className="text-mansion-gold font-medium">{navHeight}px</span>
-                <span>96px</span>
-              </div>
-            </div>
-
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Eye className="w-4 h-4 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Opacidad del fondo móvil</h3>
-                  <p className="text-[11px] text-text-dim">Transparencia de la bottom nav inferior en móvil</p>
-                </div>
-              </div>
-              <input type="range" min="0" max="100" value={navOpacity} onChange={e => setNavOpacity(Number(e.target.value))} className="w-full accent-mansion-gold" />
-              <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>Transparente</span>
-                <span className="text-mansion-gold font-medium">{navOpacity}%</span>
-                <span>Sólido</span>
-              </div>
-              <p className="mt-2 text-[11px] text-text-dim">En 0 también se apagan blur, borde y sombra para que desaparezca visualmente. En desktop no se aplica porque la barra inferior está oculta.</p>
-            </div>
-
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Sliders className="w-4 h-4 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Nivel de blur móvil</h3>
-                  <p className="text-[11px] text-text-dim">Desenfoque del vidrio en la bottom nav inferior</p>
-                </div>
-              </div>
-              <input type="range" min="0" max="40" value={navBlur} onChange={e => setNavBlur(Number(e.target.value))} className="w-full accent-mansion-gold" />
-              <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                <span>0px</span>
-                <span className="text-mansion-gold font-medium">{navBlur}px</span>
-                <span>40px</span>
-              </div>
-              <p className="mt-2 text-[11px] text-text-dim">Default restaurado: 24px.</p>
-            </div>
-
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <h3 className="text-xs font-bold text-text-dim uppercase tracking-wider mb-3">Vista previa bottom nav móvil</h3>
-              <div className="relative bg-mansion-base rounded-xl overflow-hidden" style={{ height: 120 }}>
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(201,168,76,0.16),transparent_45%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent)]" />
-                <div className="absolute bottom-0 left-0 right-0 flex justify-center" style={{ paddingBottom: navBottomPadding, paddingLeft: navSidePadding, paddingRight: navSidePadding }}>
-                  <div
-                    className="w-full rounded-[2rem] border flex items-center justify-around px-3"
-                    style={{
-                      height: navHeight,
-                      backgroundColor: `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`,
-                      borderColor: `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`,
-                      boxShadow: `0 8px 32px rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`,
-                      backdropFilter: `blur(${navOpacity <= 0 ? '0px' : `${navBlur}px`})`,
-                      WebkitBackdropFilter: `blur(${navOpacity <= 0 ? '0px' : `${navBlur}px`})`,
-                    }}
-                  >
-                    {['Inicio','Videos','Chat','Perfil'].map(label => (
-                      <div key={label} className="flex flex-col items-center gap-0.5">
-                        <div className="w-4 h-4 rounded bg-white/20" />
-                        <span className="text-[8px] text-white/40">{label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <p className="mt-3 text-[11px] text-text-dim">Los controles de la bottom nav se retiraron del panel porque estaban generando cálculos inconsistentes en móvil y PWA.</p>
             </div>
           </div>
         </section>}

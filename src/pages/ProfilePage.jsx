@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
+import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
 import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
@@ -66,14 +67,11 @@ function timeAgo(dateStr) {
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { setRegistered, setUser, user, siteSettings } = useAuth();
+  const { setRegistered, setUser, user } = useAuth();
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
-  const navHeight = siteSettings?.navHeight ?? 71;
-  const effectiveNavHeight = navHeight;
-  const navBottomPaddingPx = Math.max(0, Number(siteSettings?.navBottomPadding ?? 24) || 0);
   const navBottomOffset = isStandaloneMobileApp
-    ? `${effectiveNavHeight + navBottomPaddingPx}px`
-    : `calc(env(safe-area-inset-bottom, ${navBottomPaddingPx}px) + ${effectiveNavHeight}px)`;
+    ? getStandaloneBottomNavOffset()
+    : getBrowserBottomNavOffset();
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);

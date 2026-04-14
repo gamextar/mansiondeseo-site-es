@@ -8,6 +8,7 @@ import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
 import { resolveMediaUrl } from '../lib/media';
 import { isSafariDesktopBrowser } from '../lib/browser';
+import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -662,7 +663,6 @@ export default function VideoFeedPage() {
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
-  const navHeight = siteSettings?.navHeight ?? 71;
   const flushPendingViewedStories = useCallback(() => {
     try {
       const rawPending = sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY);
@@ -738,11 +738,9 @@ export default function VideoFeedPage() {
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
-  const effectiveNavHeight = navHeight;
-  const navBottomPaddingPx = Math.max(0, Number(siteSettings?.navBottomPadding ?? 24) || 0);
   const navBottomOffset = isStandaloneMobileApp
-    ? `${effectiveNavHeight + navBottomPaddingPx}px`
-    : `calc(env(safe-area-inset-bottom, ${navBottomPaddingPx}px) + ${effectiveNavHeight}px)`;
+    ? getStandaloneBottomNavOffset()
+    : getBrowserBottomNavOffset();
   const standaloneTopOffset = isStandaloneMobileApp
     ? '0px'
     : 'calc(env(safe-area-inset-top, 0px) + 48px)';

@@ -3,6 +3,13 @@ import { Home, Film, MessageCircle, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../lib/authContext';
+import {
+  BOTTOM_NAV_BLUR,
+  BOTTOM_NAV_BOTTOM_PADDING,
+  BOTTOM_NAV_HEIGHT,
+  BOTTOM_NAV_OPACITY,
+  BOTTOM_NAV_SIDE_PADDING,
+} from '../lib/bottomNavConfig';
 import { warmVideoFeed } from '../lib/videoFeedWarmup';
 import { useEffect, useRef, useState } from 'react';
 
@@ -23,23 +30,6 @@ function detectStandaloneMobile() {
   return Boolean(standalone && isMobile);
 }
 
-// Read nav dimensions from sessionStorage once at module level so the
-// initial render already has the correct values before bootstrap resolves.
-function getInitialNavSettings() {
-  try {
-    const s = JSON.parse(sessionStorage.getItem('mansion_site_settings') || '{}');
-    return {
-      navHeight: Number(s.navHeight) || 71,
-      navBottomPadding: s.navBottomPadding != null ? Number(s.navBottomPadding) : 24,
-      navSidePadding: s.navSidePadding != null ? Number(s.navSidePadding) : 16,
-      navOpacity: s.navOpacity != null ? Number(s.navOpacity) : 40,
-      navBlur: s.navBlur != null ? Number(s.navBlur) : 24,
-    };
-  } catch {
-    return { navHeight: 71, navBottomPadding: 24, navSidePadding: 16, navOpacity: 40, navBlur: 24 };
-  }
-}
-
 function resetDocumentScrollToTop() {
   if (typeof window === 'undefined') return;
   const root = document.documentElement;
@@ -56,36 +46,17 @@ export default function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
-  const { user, siteSettings } = useAuth();
+  const { user } = useAuth();
   const pendingNavResetRef = useRef(null);
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
-
-  // All nav dimensions are frozen at mount time from sessionStorage so the nav
-  // never resizes/jumps when the bootstrap resolves and siteSettings updates.
-  // Updated values take effect on next full page load (sessionStorage is saved
-  // by bootstrap, so subsequent visits already have the correct values).
-  const [initialDims] = useState(getInitialNavSettings);
-  const {
-    navHeight,
-    navBottomPadding,
-    navSidePadding: sidePadding,
-    navOpacity,
-    navBlur,
-  } = {
-    navHeight: Number(siteSettings?.navHeight ?? initialDims.navHeight) || 71,
-    navBottomPadding: siteSettings?.navBottomPadding != null ? Number(siteSettings.navBottomPadding) : initialDims.navBottomPadding,
-    navSidePadding: siteSettings?.navSidePadding != null ? Number(siteSettings.navSidePadding) : initialDims.navSidePadding,
-    navOpacity: siteSettings?.navOpacity != null ? Number(siteSettings.navOpacity) : initialDims.navOpacity,
-    navBlur: siteSettings?.navBlur != null ? Number(siteSettings.navBlur) : initialDims.navBlur,
-  };
-  const effectiveNavHeight = navHeight;
-  const bottomPaddingPx = Math.max(0, Number(navBottomPadding) || 0);
-  const activeIndicatorSize = isStandaloneMobileApp ? 62 : 58;
-  const outerSidePadding = Math.max(0, Number(sidePadding) || 0);
-  const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
-  const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
-  const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
-  const blurAmount = navOpacity <= 0 ? '0px' : `${navBlur}px`;
+  const effectiveNavHeight = BOTTOM_NAV_HEIGHT;
+  const bottomPaddingPx = BOTTOM_NAV_BOTTOM_PADDING;
+  const activeIndicatorSize = isStandaloneMobileApp ? 66 : 62;
+  const outerSidePadding = BOTTOM_NAV_SIDE_PADDING;
+  const bgColor = `rgba(0,0,0,${(BOTTOM_NAV_OPACITY / 100).toFixed(2)})`;
+  const borderColor = `rgba(255,255,255,${(0.08 * BOTTOM_NAV_OPACITY / 100).toFixed(3)})`;
+  const shadowColor = `rgba(0,0,0,${(0.4 * BOTTOM_NAV_OPACITY / 100).toFixed(3)})`;
+  const blurAmount = BOTTOM_NAV_OPACITY <= 0 ? '0px' : `${BOTTOM_NAV_BLUR}px`;
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -195,7 +166,7 @@ export default function BottomNav() {
           touchAction: 'manipulation',
         }}
       >
-        <div className={`flex items-center justify-around ${isStandaloneMobileApp ? 'px-2' : 'px-3'}`} style={{ height: effectiveNavHeight }}>
+        <div className="flex items-center justify-around px-2.5" style={{ height: effectiveNavHeight }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
             const isActive =
               to === '/' || to === '/perfil'
@@ -225,7 +196,7 @@ export default function BottomNav() {
                   navigateAfterScrollReset(to);
                 }}
                 className="relative flex h-full shrink-0 flex-col items-center justify-center group"
-                style={{ touchAction: 'manipulation', width: isStandaloneMobileApp ? 72 : 66 }}
+                style={{ touchAction: 'manipulation', width: isStandaloneMobileApp ? 76 : 70 }}
               >
                 {isActive && (
                   <div className="absolute inset-0 flex items-center justify-center">
