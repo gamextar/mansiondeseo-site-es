@@ -740,7 +740,7 @@ export default function VideoFeedPage() {
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
   const navExtraHeight = isStandaloneMobileApp ? 18 : 8;
   const effectiveNavHeight = navHeight + navExtraHeight;
-  const navBottomPaddingPx = isStandaloneMobileApp ? 2 : 6;
+  const navBottomPaddingPx = isStandaloneMobileApp ? 2 : 3;
   const navBottomOffset = `calc(env(safe-area-inset-bottom, ${navBottomPaddingPx}px) + ${effectiveNavHeight}px)`;
   const standaloneTopOffset = isStandaloneMobileApp
     ? '0px'
