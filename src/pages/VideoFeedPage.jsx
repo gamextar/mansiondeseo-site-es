@@ -728,12 +728,11 @@ export default function VideoFeedPage() {
   const standaloneViewportShellStyle = standaloneMobileRoute
     ? {
         paddingTop: standaloneTopOffset,
-        minHeight: '100dvh',
       }
     : undefined;
   const standaloneViewportContentStyle = standaloneMobileRoute
     ? {
-        height: 'calc(100dvh - env(safe-area-inset-top, 0px) - 48px + 8px)',
+        height: 'calc(100lvh + 8px)',
       }
     : undefined;
 
