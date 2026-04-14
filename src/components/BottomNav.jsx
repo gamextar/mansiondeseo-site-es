@@ -56,7 +56,7 @@ export default function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
-  const { user } = useAuth();
+  const { user, siteSettings } = useAuth();
   const pendingNavResetRef = useRef(null);
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
 
@@ -64,14 +64,20 @@ export default function BottomNav() {
   // never resizes/jumps when the bootstrap resolves and siteSettings updates.
   // Updated values take effect on next full page load (sessionStorage is saved
   // by bootstrap, so subsequent visits already have the correct values).
-  const [dims] = useState(getInitialNavSettings);
+  const [initialDims] = useState(getInitialNavSettings);
   const {
     navHeight,
     navBottomPadding,
     navSidePadding: sidePadding,
     navOpacity,
     navBlur,
-  } = dims;
+  } = {
+    navHeight: Number(siteSettings?.navHeight ?? initialDims.navHeight) || 71,
+    navBottomPadding: siteSettings?.navBottomPadding != null ? Number(siteSettings.navBottomPadding) : initialDims.navBottomPadding,
+    navSidePadding: siteSettings?.navSidePadding != null ? Number(siteSettings.navSidePadding) : initialDims.navSidePadding,
+    navOpacity: siteSettings?.navOpacity != null ? Number(siteSettings.navOpacity) : initialDims.navOpacity,
+    navBlur: siteSettings?.navBlur != null ? Number(siteSettings.navBlur) : initialDims.navBlur,
+  };
   const effectiveNavHeight = navHeight;
   const bottomPaddingPx = Math.max(0, Number(navBottomPadding) || 0);
   const activeIndicatorSize = isStandaloneMobileApp ? 62 : 58;
