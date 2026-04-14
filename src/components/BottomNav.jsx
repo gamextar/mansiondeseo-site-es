@@ -167,6 +167,7 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
+        bottom: isStandaloneMobileApp ? 'calc(env(safe-area-inset-bottom, 0px) * -1)' : '0px',
         paddingBottom: isStandaloneMobileApp
           ? `${bottomPaddingPx}px`
           : `calc(env(safe-area-inset-bottom, 0px) + ${bottomPaddingPx}px)`,
@@ -215,8 +216,8 @@ export default function BottomNav() {
                   }
                   navigateAfterScrollReset(to);
                 }}
-                className={`relative flex h-full shrink-0 flex-col items-center justify-center group ${isStandaloneMobileApp ? 'w-[72px]' : 'w-[66px]'}`}
-                style={{ touchAction: 'manipulation' }}
+                className="relative flex h-full shrink-0 flex-col items-center justify-center group"
+                style={{ touchAction: 'manipulation', width: isStandaloneMobileApp ? 72 : 66 }}
               >
                 {isActive && (
                   <div className="absolute inset-0 flex items-center justify-center">
@@ -231,9 +232,10 @@ export default function BottomNav() {
 
                 <div className="relative z-10">
                   <Icon
-                    className={`h-[29px] w-[29px] transition-colors ${
+                    className={`transition-colors ${
                       isActive ? 'text-white' : 'text-white/50 group-hover:text-white/80'
                     }`}
+                    style={{ width: 29, height: 29 }}
                   />
                   {to === '/mensajes' && unreadCount > 0 && (
                     <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] rounded-full bg-mansion-crimson text-white text-[9px] font-bold flex items-center justify-center px-1">
