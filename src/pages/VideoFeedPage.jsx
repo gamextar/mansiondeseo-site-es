@@ -741,7 +741,9 @@ export default function VideoFeedPage() {
   const navExtraHeight = isStandaloneMobileApp ? 18 : 8;
   const effectiveNavHeight = navHeight + navExtraHeight;
   const navBottomPaddingPx = Math.max(0, Number(siteSettings?.navBottomPadding ?? 24) || 0);
-  const navBottomOffset = `calc(env(safe-area-inset-bottom, ${navBottomPaddingPx}px) + ${effectiveNavHeight}px)`;
+  const navBottomOffset = isStandaloneMobileApp
+    ? `${effectiveNavHeight + navBottomPaddingPx}px`
+    : `calc(env(safe-area-inset-bottom, ${navBottomPaddingPx}px) + ${effectiveNavHeight}px)`;
   const standaloneTopOffset = isStandaloneMobileApp
     ? '0px'
     : 'calc(env(safe-area-inset-top, 0px) + 48px)';
