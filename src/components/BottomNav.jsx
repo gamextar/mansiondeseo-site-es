@@ -71,6 +71,7 @@ export default function BottomNav() {
   const bottomPaddingPx = isStandaloneMobileApp ? 0 : 6;
   const activeIndicatorSize = isStandaloneMobileApp ? 62 : 58;
   const outerSidePadding = isStandaloneMobileApp ? 12 : sidePadding;
+  const navBottomNudgePx = isStandaloneMobileApp ? 0 : -6;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
@@ -162,6 +163,7 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
+        bottom: `${navBottomNudgePx}px`,
         paddingBottom: `max(${bottomPaddingPx}px, env(safe-area-inset-bottom, ${bottomPaddingPx}px))`,
         paddingLeft: outerSidePadding,
         paddingRight: outerSidePadding,
