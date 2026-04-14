@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Film, MessageCircle, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
@@ -46,6 +46,7 @@ function resetDocumentScrollToTop() {
 
 export default function BottomNav() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
   const { user } = useAuth();
 
@@ -108,10 +109,16 @@ export default function BottomNav() {
                     window.dispatchEvent(new CustomEvent(HOME_FEED_FOCUS_EVENT));
                     return;
                   }
+                  if (isActive) return;
+                  e.preventDefault();
                   resetDocumentScrollToTop();
                   if (to === '/videos') {
                     warmVideoFeed();
                   }
+                  window.requestAnimationFrame(() => {
+                    resetDocumentScrollToTop();
+                    navigate(to);
+                  });
                 }}
                 className="relative flex flex-col items-center justify-center w-14 h-full group"
                 style={{ touchAction: 'manipulation' }}
