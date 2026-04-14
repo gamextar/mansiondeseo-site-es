@@ -11,7 +11,7 @@ import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
-import { BOTTOM_NAV_BOTTOM_PADDING, BOTTOM_NAV_HEIGHT } from '../lib/bottomNavConfig';
+import { getBottomNavBottomPadding, getBottomNavHeight } from '../lib/bottomNavConfig';
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
@@ -126,7 +126,7 @@ export default function FeedPage({ initialData }) {
   const storiesIntroConsumedRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const navBottomOffset = BOTTOM_NAV_HEIGHT + BOTTOM_NAV_BOTTOM_PADDING;
+  const navBottomOffset = getBottomNavHeight(isStandaloneMobileApp) + getBottomNavBottomPadding(isStandaloneMobileApp);
   const gridRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const mobileNavVisibilityTimerRef = useRef(null);

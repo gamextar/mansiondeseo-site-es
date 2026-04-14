@@ -5,10 +5,10 @@ import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../lib/authContext';
 import {
   BOTTOM_NAV_BLUR,
-  BOTTOM_NAV_BOTTOM_PADDING,
-  BOTTOM_NAV_HEIGHT,
   BOTTOM_NAV_OPACITY,
   BOTTOM_NAV_SIDE_PADDING,
+  getBottomNavBottomPadding,
+  getBottomNavHeight,
 } from '../lib/bottomNavConfig';
 import { warmVideoFeed } from '../lib/videoFeedWarmup';
 import { useEffect, useRef } from 'react';
@@ -49,8 +49,8 @@ export default function BottomNav() {
   const { user } = useAuth();
   const pendingNavResetRef = useRef(null);
   const isStandaloneMobileApp = detectStandaloneMobile();
-  const effectiveNavHeight = BOTTOM_NAV_HEIGHT;
-  const bottomPaddingPx = BOTTOM_NAV_BOTTOM_PADDING;
+  const effectiveNavHeight = getBottomNavHeight(isStandaloneMobileApp);
+  const bottomPaddingPx = getBottomNavBottomPadding(isStandaloneMobileApp);
   const activeIndicatorSize = isStandaloneMobileApp ? 66 : 62;
   const outerSidePadding = BOTTOM_NAV_SIDE_PADDING;
   const bgColor = `rgba(0,0,0,${(BOTTOM_NAV_OPACITY / 100).toFixed(2)})`;
