@@ -138,7 +138,7 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, enableCinematicReveal = false }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
@@ -268,7 +268,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           style={{
             WebkitTransform: 'translateZ(0)',
             transform: 'translateZ(0)',
-            opacity: isVideoReady ? 1 : 0,
+            opacity: enableCinematicReveal ? (isVideoReady ? 1 : 0) : 1,
           }}
           loop
           playsInline
@@ -282,7 +282,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
 
         <div
           className="absolute inset-0 pointer-events-none bg-black transition-opacity duration-[1400ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
-          style={{ opacity: isVideoReady ? 0 : 1 }}
+          style={{ opacity: enableCinematicReveal ? (isVideoReady ? 0 : 1) : 0 }}
         />
 
         <AnimatePresence>
@@ -1274,6 +1274,7 @@ export default function VideoFeedPage() {
               const circularDistance = Math.min(rawDistance, stories.length - rawDistance);
               const isActive = index === activeIndex;
               const shouldLoad = stories.length <= 3 || circularDistance <= 1;
+              const enableCinematicReveal = isActive && !entryRevealReady;
 
               return (
                 <div
@@ -1304,6 +1305,7 @@ export default function VideoFeedPage() {
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={isActive ? handleEntryRevealReady : undefined}
+                  enableCinematicReveal={enableCinematicReveal}
                 />
               </div>
             );
@@ -1326,6 +1328,7 @@ export default function VideoFeedPage() {
             const dist = Math.abs(displayIndex - activeDispIdx);
             const isBoundary = displayIndex <= 1 || displayIndex >= stories.length;
             const shouldLoad = dist <= 3 || isBoundary;
+            const enableCinematicReveal = displayIndex === activeDispIdx && !entryRevealReady;
             return (
               <div
                 key={displayIndex}
@@ -1346,6 +1349,7 @@ export default function VideoFeedPage() {
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
+                  enableCinematicReveal={enableCinematicReveal}
                 />
               </div>
             );
