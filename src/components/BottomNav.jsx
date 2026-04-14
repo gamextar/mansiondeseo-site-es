@@ -70,6 +70,8 @@ export default function BottomNav() {
   const effectiveNavHeight = navHeight + navExtraHeight;
   const bottomPaddingPx = isStandaloneMobileApp ? 2 : 6;
   const activeIndicatorSize = isStandaloneMobileApp ? 62 : 58;
+  const outerSidePadding = isStandaloneMobileApp ? 0 : sidePadding;
+  const standaloneVerticalShift = isStandaloneMobileApp ? 12 : 0;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
@@ -162,13 +164,14 @@ export default function BottomNav() {
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
         paddingBottom: `max(${bottomPaddingPx}px, env(safe-area-inset-bottom, ${bottomPaddingPx}px))`,
-        paddingLeft: sidePadding,
-        paddingRight: sidePadding,
+        paddingLeft: outerSidePadding,
+        paddingRight: outerSidePadding,
         isolation: 'isolate',
+        transform: `translateY(${standaloneVerticalShift}px)`,
       }}
     >
       <div
-        className="pointer-events-auto w-full rounded-[2.15rem] border"
+        className={`pointer-events-auto w-full border ${isStandaloneMobileApp ? 'rounded-[1.7rem]' : 'rounded-[2.15rem]'}`}
         style={{
           backgroundColor: bgColor,
           borderColor,
@@ -178,7 +181,7 @@ export default function BottomNav() {
           touchAction: 'manipulation',
         }}
       >
-        <div className="flex items-center justify-around px-3" style={{ height: effectiveNavHeight }}>
+        <div className={`flex items-center justify-around ${isStandaloneMobileApp ? 'px-2' : 'px-3'}`} style={{ height: effectiveNavHeight }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
             const isActive =
               to === '/' || to === '/perfil'
@@ -207,7 +210,7 @@ export default function BottomNav() {
                   }
                   navigateAfterScrollReset(to);
                 }}
-                className="relative flex h-full w-[66px] shrink-0 flex-col items-center justify-center group"
+                className={`relative flex h-full shrink-0 flex-col items-center justify-center group ${isStandaloneMobileApp ? 'w-[72px]' : 'w-[66px]'}`}
                 style={{ touchAction: 'manipulation' }}
               >
                 {isActive && (
