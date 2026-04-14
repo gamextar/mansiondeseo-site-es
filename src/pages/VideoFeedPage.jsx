@@ -774,6 +774,28 @@ export default function VideoFeedPage() {
     return () => media.removeListener(handleChange);
   }, []);
 
+  useLayoutEffect(() => {
+    if (!standaloneMobileRoute || typeof window === 'undefined') return undefined;
+
+    const resetPageScroll = () => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    resetPageScroll();
+    let rafA = window.requestAnimationFrame(() => {
+      resetPageScroll();
+      rafA = window.requestAnimationFrame(() => {
+        resetPageScroll();
+      });
+    });
+
+    return () => {
+      if (rafA) window.cancelAnimationFrame(rafA);
+    };
+  }, [location.key, standaloneMobileRoute]);
+
   const refreshStories = useCallback(async () => {
     const data = await getStories({ focusUserId: requestedStoryUserId || '' });
     const fresh = applyPendingStoryLikeState(mergeSeedStory(data.stories || [], requestedStorySeed), getPendingStoryLikes());
