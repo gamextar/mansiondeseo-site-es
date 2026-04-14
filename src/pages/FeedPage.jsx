@@ -21,6 +21,14 @@ const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
 
+function detectStandaloneMobile() {
+  if (typeof window === 'undefined') return false;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const ua = window.navigator.userAgent || '';
+  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+  return Boolean(standalone && isMobile);
+}
+
 function getInitialStoryLimit(settings, isDesktopViewport) {
   return Math.max(
     1,
@@ -99,6 +107,7 @@ export default function FeedPage({ initialData }) {
   const desktopStoryRailEnhanced = isDesktopViewport;
   const cached = initialData || getCachedFeed();
   const { user, siteSettings } = useAuth();
+  const isStandaloneMobileApp = detectStandaloneMobile();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [showStoriesSection, setShowStoriesSection] = useState(true);
   const [showGridSection, setShowGridSection] = useState(true);
@@ -116,7 +125,10 @@ export default function FeedPage({ initialData }) {
   const storiesIntroConsumedRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
+  const navHeight = siteSettings?.navHeight ?? 71;
+  const navExtraHeight = isStandaloneMobileApp ? 18 : 8;
+  const navBottomPaddingPx = isStandaloneMobileApp ? 2 : 6;
+  const navBottomOffset = navHeight + navExtraHeight + navBottomPaddingPx;
   const gridRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const mobileNavVisibilityTimerRef = useRef(null);
@@ -965,15 +977,15 @@ export default function FeedPage({ initialData }) {
       {/* Stories section */}
       {showStoriesSection && (
       <div
-        className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0 fade-in-up"
+        className="px-0 lg:px-8 pt-2 lg:pt-4 pb-0 fade-in-up"
       >
-        <div className="flex items-center gap-1.5 mb-3">
+        <div className="flex items-center gap-1.5 mb-3 px-4 lg:px-0">
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="text-text-muted text-sm lg:text-base font-medium">Video Flashes</p>
         </div>
         <AnimatedBlock
           ref={storiesScrollRef}
-          className={`flex overflow-x-auto scrollbar-hide pb-2 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
+          className={`flex overflow-x-auto scrollbar-hide pb-2 pl-4 pr-4 lg:pl-0 lg:pr-0 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
           style={{
             scrollbarWidth: 'none',
             msOverflowStyle: 'none',

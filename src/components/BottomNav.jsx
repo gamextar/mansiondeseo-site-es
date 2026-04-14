@@ -66,10 +66,10 @@ export default function BottomNav() {
   // by bootstrap, so subsequent visits already have the correct values).
   const [dims] = useState(getInitialNavSettings);
   const { navHeight, navSidePadding: sidePadding, navOpacity, navBlur } = dims;
-  const navExtraHeight = isStandaloneMobileApp ? 14 : 4;
+  const navExtraHeight = isStandaloneMobileApp ? 18 : 8;
   const effectiveNavHeight = navHeight + navExtraHeight;
-  const bottomPaddingPx = isStandaloneMobileApp ? 4 : 8;
-  const activeIndicatorSize = isStandaloneMobileApp ? 58 : 54;
+  const bottomPaddingPx = isStandaloneMobileApp ? 2 : 6;
+  const activeIndicatorSize = isStandaloneMobileApp ? 62 : 58;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
@@ -168,7 +168,7 @@ export default function BottomNav() {
       }}
     >
       <div
-        className="pointer-events-auto w-full max-w-[26rem] rounded-[2rem] border"
+        className="pointer-events-auto w-full rounded-[2.15rem] border"
         style={{
           backgroundColor: bgColor,
           borderColor,
@@ -178,7 +178,7 @@ export default function BottomNav() {
           touchAction: 'manipulation',
         }}
       >
-        <div className="flex items-center justify-around px-4" style={{ height: effectiveNavHeight }}>
+        <div className="flex items-center justify-around px-3" style={{ height: effectiveNavHeight }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
             const isActive =
               to === '/' || to === '/perfil'
@@ -207,14 +207,14 @@ export default function BottomNav() {
                   }
                   navigateAfterScrollReset(to);
                 }}
-                className="relative flex h-full w-[60px] shrink-0 flex-col items-center justify-center group"
+                className="relative flex h-full w-[66px] shrink-0 flex-col items-center justify-center group"
                 style={{ touchAction: 'manipulation' }}
               >
                 {isActive && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <motion.div
                       layoutId="bottomnav-indicator"
-                      className="rounded-[1.45rem] bg-white/[0.08]"
+                      className="rounded-[1.55rem] bg-white/[0.08]"
                       style={{ width: activeIndicatorSize, height: activeIndicatorSize }}
                       transition={{ type: 'spring', stiffness: 420, damping: 32 }}
                     />
@@ -223,7 +223,7 @@ export default function BottomNav() {
 
                 <div className="relative z-10">
                   <Icon
-                    className={`h-[27px] w-[27px] transition-colors ${
+                    className={`h-[29px] w-[29px] transition-colors ${
                       isActive ? 'text-white' : 'text-white/50 group-hover:text-white/80'
                     }`}
                   />
