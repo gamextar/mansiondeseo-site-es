@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../lib/authContext';
 import { warmVideoFeed } from '../lib/videoFeedWarmup';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 
@@ -49,6 +49,7 @@ export default function BottomNav() {
   const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
   const { user } = useAuth();
+  const pendingNavResetRef = useRef(null);
 
   // All nav dimensions are frozen at mount time from sessionStorage so the nav
   // never resizes/jumps when the bootstrap resolves and siteSettings updates.
@@ -61,6 +62,56 @@ export default function BottomNav() {
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
   const blurAmount = navOpacity <= 0 ? '0px' : `${navBlur}px`;
+
+  useEffect(() => () => {
+    if (!pendingNavResetRef.current || typeof window === 'undefined') return;
+    if (pendingNavResetRef.current.rafId) window.cancelAnimationFrame(pendingNavResetRef.current.rafId);
+    if (pendingNavResetRef.current.timeoutId) window.clearTimeout(pendingNavResetRef.current.timeoutId);
+    pendingNavResetRef.current = null;
+  }, []);
+
+  const navigateAfterScrollReset = (to) => {
+    if (typeof window === 'undefined') {
+      navigate(to);
+      return;
+    }
+
+    if (pendingNavResetRef.current) {
+      if (pendingNavResetRef.current.rafId) window.cancelAnimationFrame(pendingNavResetRef.current.rafId);
+      if (pendingNavResetRef.current.timeoutId) window.clearTimeout(pendingNavResetRef.current.timeoutId);
+      pendingNavResetRef.current = null;
+    }
+
+    let attempts = 0;
+    const maxAttempts = 8;
+
+    const finish = () => {
+      if (pendingNavResetRef.current?.timeoutId) {
+        window.clearTimeout(pendingNavResetRef.current.timeoutId);
+      }
+      pendingNavResetRef.current = null;
+      navigate(to);
+    };
+
+    const tick = () => {
+      resetDocumentScrollToTop();
+      attempts += 1;
+      const currentScrollY = Number(window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
+      if (currentScrollY <= 1 || attempts >= maxAttempts) {
+        finish();
+        return;
+      }
+      pendingNavResetRef.current = {
+        ...pendingNavResetRef.current,
+        rafId: window.requestAnimationFrame(tick),
+      };
+    };
+
+    pendingNavResetRef.current = {
+      rafId: window.requestAnimationFrame(tick),
+      timeoutId: window.setTimeout(finish, 180),
+    };
+  };
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
@@ -115,10 +166,7 @@ export default function BottomNav() {
                   if (to === '/videos') {
                     warmVideoFeed();
                   }
-                  window.requestAnimationFrame(() => {
-                    resetDocumentScrollToTop();
-                    navigate(to);
-                  });
+                  navigateAfterScrollReset(to);
                 }}
                 className="relative flex flex-col items-center justify-center w-14 h-full group"
                 style={{ touchAction: 'manipulation' }}
