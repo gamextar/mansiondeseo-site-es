@@ -724,7 +724,10 @@ export default function VideoFeedPage() {
     ? stories[desktopActiveIdx - 1] || stories[0] || null
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
-  const standaloneTopOffset = 'calc(env(safe-area-inset-top, 0px) + 48px)';
+  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(false);
+  const standaloneTopOffset = isStandaloneMobileApp
+    ? 'env(safe-area-inset-top, 0px)'
+    : 'calc(env(safe-area-inset-top, 0px) + 48px)';
   const standaloneViewportShellStyle = standaloneMobileRoute
     ? {
         paddingTop: standaloneTopOffset,
@@ -758,19 +761,44 @@ export default function VideoFeedPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
+    const displayModeMedia = window.matchMedia?.('(display-mode: standalone)');
+    const evaluateStandalone = () => {
+      const standalone = displayModeMedia?.matches || window.navigator.standalone === true;
+      const ua = window.navigator.userAgent || '';
+      const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+      setIsStandaloneMobileApp(Boolean(standalone && isMobile));
+    };
+
+    evaluateStandalone();
+
     const media = window.matchMedia('(min-width: 1024px)');
     const handleChange = (event) => {
       setIsDesktopViewport(event.matches);
+      evaluateStandalone();
     };
 
     setIsDesktopViewport(media.matches);
 
     if (typeof media.addEventListener === 'function') {
       media.addEventListener('change', handleChange);
+      if (displayModeMedia && typeof displayModeMedia.addEventListener === 'function') {
+        displayModeMedia.addEventListener('change', evaluateStandalone);
+        return () => {
+          media.removeEventListener('change', handleChange);
+          displayModeMedia.removeEventListener('change', evaluateStandalone);
+        };
+      }
       return () => media.removeEventListener('change', handleChange);
     }
 
     media.addListener(handleChange);
+    if (displayModeMedia?.addListener) {
+      displayModeMedia.addListener(evaluateStandalone);
+      return () => {
+        media.removeListener(handleChange);
+        displayModeMedia.removeListener(evaluateStandalone);
+      };
+    }
     return () => media.removeListener(handleChange);
   }, []);
 

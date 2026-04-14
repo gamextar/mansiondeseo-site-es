@@ -58,11 +58,14 @@ function SEOCityLanding({ variant }) {
 function AppLayout() {
   const location = useLocation();
   const { user } = useAuth();
+  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(false);
   const backgroundLocation = location.state?.backgroundLocation;
   const profileOverlayOpen = location.state?.modal === 'profile' && !!backgroundLocation;
   const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
   const routeOverlayOpen = profileOverlayOpen || videoOverlayOpen;
+  const standaloneVideosRoute = isStandaloneMobileApp && location.pathname.startsWith('/videos');
   const isFullscreen =
+    standaloneVideosRoute ||
     FULLSCREEN_PATHS.some((p) => location.pathname.startsWith(p)) ||
     FULLSCREEN_PATHS.includes(location.pathname);
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
@@ -91,6 +94,29 @@ function AppLayout() {
     const timer = window.setTimeout(warm, 700);
     return () => window.clearTimeout(timer);
   }, [user]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const media = window.matchMedia?.('(display-mode: standalone)');
+    const evaluate = () => {
+      const standalone = media?.matches || window.navigator.standalone === true;
+      const ua = window.navigator.userAgent || '';
+      const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+      setIsStandaloneMobileApp(Boolean(standalone && isMobile));
+    };
+
+    evaluate();
+
+    if (!media) return undefined;
+    const handler = () => evaluate();
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', handler);
+      return () => media.removeEventListener('change', handler);
+    }
+    media.addListener(handler);
+    return () => media.removeListener(handler);
+  }, []);
 
   // Reset scroll to top on every route change, EXCEPT when opening/closing
   // a profile overlay (which manages scroll lock/restore itself).
