@@ -728,12 +728,11 @@ export default function VideoFeedPage() {
   const standaloneViewportShellStyle = standaloneMobileRoute
     ? {
         paddingTop: standaloneTopOffset,
-        height: '100lvh',
       }
     : undefined;
   const standaloneViewportContentStyle = standaloneMobileRoute
     ? {
-        height: `calc(100lvh - ${standaloneTopOffset})`,
+        height: '100lvh',
       }
     : undefined;
 
@@ -1109,7 +1108,7 @@ export default function VideoFeedPage() {
   if (loading) {
     return (
       <div
-        className={standaloneMobileRoute ? 'relative bg-black' : 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'}
+        className={standaloneMobileRoute ? 'relative overflow-hidden bg-black' : 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'}
         style={standaloneViewportShellStyle}
       >
         <div
@@ -1125,7 +1124,7 @@ export default function VideoFeedPage() {
   if (stories.length === 0) {
     return (
       <div
-        className={standaloneMobileRoute ? 'relative bg-mansion-base px-6' : 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'}
+        className={standaloneMobileRoute ? 'relative overflow-hidden bg-mansion-base px-6' : 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'}
         style={standaloneViewportShellStyle}
       >
         <div className="absolute inset-0 pointer-events-none">
@@ -1164,7 +1163,7 @@ export default function VideoFeedPage() {
 
   return (
     <div
-      className={standaloneMobileRoute ? 'relative bg-black' : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'}
+      className={standaloneMobileRoute ? 'relative overflow-hidden bg-black' : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'}
       style={standaloneViewportShellStyle}
       onPointerDown={handleOverlayBackdropPointerDown}
     >
