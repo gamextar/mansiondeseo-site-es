@@ -650,15 +650,6 @@ export default function VideoFeedPage() {
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
   const navHeight = siteSettings?.navHeight ?? 71;
   const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
-  const standaloneTopOffset = 'calc(env(safe-area-inset-top, 0px) + 48px)';
-  const standaloneBottomOffset = `calc(${Math.max(12, navBottomOffset)}px + env(safe-area-inset-bottom, 0px))`;
-  const standaloneViewportHeight = `calc(100dvh - ${standaloneTopOffset} - ${standaloneBottomOffset})`;
-  const standaloneViewportShellStyle = standaloneMobileRoute
-    ? {
-        paddingTop: standaloneTopOffset,
-        paddingBottom: standaloneBottomOffset,
-      }
-    : undefined;
   const flushPendingViewedStories = useCallback(() => {
     try {
       const rawPending = sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY);
@@ -733,6 +724,15 @@ export default function VideoFeedPage() {
     ? stories[desktopActiveIdx - 1] || stories[0] || null
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
+  const standaloneTopOffset = 'calc(env(safe-area-inset-top, 0px) + 48px)';
+  const standaloneBottomOffset = `calc(${Math.max(12, navBottomOffset)}px + env(safe-area-inset-bottom, 0px))`;
+  const standaloneViewportHeight = `calc(100dvh - ${standaloneTopOffset} - ${standaloneBottomOffset})`;
+  const standaloneViewportShellStyle = standaloneMobileRoute
+    ? {
+        paddingTop: standaloneTopOffset,
+        paddingBottom: standaloneBottomOffset,
+      }
+    : undefined;
 
   const syncMobileViewportToIndex = useCallback((index) => {
     if (isDesktopViewport) return false;
