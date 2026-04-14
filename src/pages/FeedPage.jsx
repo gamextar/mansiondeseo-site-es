@@ -1270,49 +1270,56 @@ export default function FeedPage({ initialData }) {
                   </motion.div>
                 </div>
 
-                {/* Desktop pagination bar */}
+                {/* Desktop pagination pill */}
                 <motion.div
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-                  className="hidden lg:block py-6"
+                  initial={{ opacity: 0, y: 18, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
+                  className="pointer-events-none fixed bottom-6 left-[calc(50%+8rem)] z-40 hidden -translate-x-1/2 lg:block xl:left-[calc(50%+9rem)]"
                 >
-                  <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/10 bg-mansion-card/80 px-3 py-3 shadow-[0_16px_36px_rgba(0,0,0,0.18)] backdrop-blur-sm">
-                    <span className="mr-1 text-xs font-medium text-text-muted">
+                  <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-[rgba(14,14,20,0.72)] px-2.5 py-2 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+                    <div className="rounded-full border border-white/8 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium tracking-[0.02em] text-white/58">
                       {Math.min(totalProfiles, pageCursor + 1)}-{Math.min(totalProfiles, pageCursor + visibleProfiles.length)} de {totalProfiles}
-                    </span>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => goToFeedPage(currentPage - 1)}
                       disabled={currentPage <= 1 || loading}
-                      className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-text-muted transition hover:border-white/20 hover:text-white disabled:opacity-40"
+                      aria-label="Pagina anterior"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-white/68 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
                     >
-                      <ChevronLeft className="w-4 h-4" />
-                      Anterior
+                      <ChevronLeft className="h-4 w-4" />
                     </button>
-                    {pageWindow.map((page) => (
-                      <motion.button
-                        key={page}
-                        type="button"
-                        onClick={() => goToFeedPage(page)}
-                        disabled={page === currentPage || loading}
-                        whileHover={page === currentPage ? undefined : { y: -1 }}
-                        whileTap={page === currentPage ? undefined : { scale: 0.98 }}
-                        className={`min-w-10 rounded-xl px-3 py-2 text-sm font-semibold transition ${page === currentPage
-                          ? 'border border-mansion-gold/40 bg-mansion-gold/15 text-mansion-gold'
-                          : 'border border-white/10 bg-black/20 text-text-muted hover:border-white/20 hover:text-white'}`}
-                      >
-                        {page}
-                      </motion.button>
-                    ))}
+
+                    <div className="flex items-center gap-1">
+                      {pageWindow.map((page) => (
+                        <motion.button
+                          key={page}
+                          type="button"
+                          onClick={() => goToFeedPage(page)}
+                          disabled={page === currentPage || loading}
+                          whileHover={page === currentPage ? undefined : { y: -1 }}
+                          whileTap={page === currentPage ? undefined : { scale: 0.97 }}
+                          className={`min-w-9 rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+                            page === currentPage
+                              ? 'bg-white text-black shadow-[0_8px_18px_rgba(255,255,255,0.18)]'
+                              : 'text-white/62 hover:bg-white/[0.08] hover:text-white'
+                          }`}
+                        >
+                          {page}
+                        </motion.button>
+                      ))}
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => goToFeedPage(currentPage + 1)}
                       disabled={currentPage >= totalPages || loading}
-                      className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-text-muted transition hover:border-white/20 hover:text-white disabled:opacity-40"
+                      aria-label="Pagina siguiente"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-white/68 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
                     >
-                      Siguiente
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
                 </motion.div>
