@@ -632,6 +632,9 @@ export default function VideoFeedPage() {
   const [activeDispIdx, setActiveDispIdx] = useState(() => (requestedStoryUserId ? 1 : savedIdx()));
   const [boundaryOverlayIdx, setBoundaryOverlayIdx] = useState(null);
   const [isMuted, setIsMuted] = useState(savedMuted);
+  const [mobileViewportHeight, setMobileViewportHeight] = useState(() => (
+    typeof window !== 'undefined' ? Math.round(window.visualViewport?.height || window.innerHeight || 0) : 0
+  ));
   const [isDesktopViewport, setIsDesktopViewport] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(min-width: 1024px)').matches;
@@ -684,6 +687,28 @@ export default function VideoFeedPage() {
     if (event.target.closest('[data-story-card-frame="true"]')) return;
     closeOverlay();
   }, [closeOverlay, isDesktopViewport, isOverlayPreview]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateViewport = () => {
+      const vv = window.visualViewport;
+      setMobileViewportHeight(Math.round(vv?.height || window.innerHeight || 0));
+    };
+
+    updateViewport();
+
+    const vv = window.visualViewport;
+    window.addEventListener('resize', updateViewport);
+    vv?.addEventListener('resize', updateViewport);
+    vv?.addEventListener('scroll', updateViewport);
+
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('scroll', updateViewport);
+    };
+  }, []);
   const markStoryViewed = useCallback((storyUserId) => {
     const uid = String(storyUserId || '');
     if (!uid) return;
@@ -1140,6 +1165,7 @@ export default function VideoFeedPage() {
   return (
     <div
       className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base"
+      style={isDesktopViewport ? undefined : { height: `${mobileViewportHeight || window.innerHeight || 0}px` }}
       onPointerDown={handleOverlayBackdropPointerDown}
     >
       <motion.div
@@ -1223,7 +1249,11 @@ export default function VideoFeedPage() {
             const isBoundary = displayIndex <= 1 || displayIndex >= stories.length;
             const shouldLoad = dist <= 3 || isBoundary;
             return (
-              <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
+              <div
+                key={displayIndex}
+                className="w-full flex-shrink-0"
+                style={{ height: `${mobileViewportHeight || window.innerHeight || 0}px` }}
+              >
                 <StoryCard
                   story={story}
                   videoSrc={story.video_url}
