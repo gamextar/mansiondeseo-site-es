@@ -42,7 +42,7 @@ export default function BottomNav() {
   // Updated values take effect on next full page load (sessionStorage is saved
   // by bootstrap, so subsequent visits already have the correct values).
   const [dims] = useState(getInitialNavSettings);
-  const { navHeight, navSidePadding: sidePadding,
+  const { navHeight, navBottomPadding: bottomPadding, navSidePadding: sidePadding,
           navOpacity, navBlur } = dims;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
@@ -57,7 +57,7 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
-        paddingBottom: 'env(safe-area-inset-bottom, 8px)',
+        paddingBottom: `${bottomPadding}px`,
         paddingLeft: sidePadding,
         paddingRight: sidePadding,
         isolation: 'isolate',
