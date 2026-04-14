@@ -1095,7 +1095,7 @@ export default function VideoFeedPage() {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center z-40">
+      <div className="fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40">
         <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
     );
@@ -1103,7 +1103,7 @@ export default function VideoFeedPage() {
 
   if (stories.length === 0) {
     return (
-      <div className="fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-40 px-6">
+      <div className="fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-32 right-[-10%] w-[520px] h-[520px] rounded-full bg-mansion-crimson/10 blur-3xl" />
           <div className="absolute bottom-[-12%] left-[-6%] w-[460px] h-[460px] rounded-full bg-mansion-gold/10 blur-3xl" />
@@ -1139,7 +1139,7 @@ export default function VideoFeedPage() {
 
   return (
     <div
-      className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base"
+      className="fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base"
       onPointerDown={handleOverlayBackdropPointerDown}
     >
       <motion.div
