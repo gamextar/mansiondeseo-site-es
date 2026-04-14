@@ -58,8 +58,10 @@ export default function BottomNav() {
   // by bootstrap, so subsequent visits already have the correct values).
   const [dims] = useState(getInitialNavSettings);
   const { navHeight, navSidePadding: sidePadding, navOpacity, navBlur } = dims;
-  const effectiveNavHeight = isStandaloneMobileApp ? navHeight + 10 : navHeight;
+  const navExtraHeight = isStandaloneMobileApp ? 14 : 4;
+  const effectiveNavHeight = navHeight + navExtraHeight;
   const bottomPaddingPx = isStandaloneMobileApp ? 4 : 8;
+  const activeIndicatorSize = isStandaloneMobileApp ? 58 : 54;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
@@ -152,7 +154,7 @@ export default function BottomNav() {
       }}
     >
       <div
-        className="pointer-events-auto w-full max-w-sm rounded-[2rem] border"
+        className="pointer-events-auto w-full max-w-[26rem] rounded-[2rem] border"
         style={{
           backgroundColor: bgColor,
           borderColor,
@@ -162,7 +164,7 @@ export default function BottomNav() {
           touchAction: 'manipulation',
         }}
       >
-        <div className="flex items-center justify-around px-3" style={{ height: effectiveNavHeight }}>
+        <div className="flex items-center justify-around px-4" style={{ height: effectiveNavHeight }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
             const isActive =
               to === '/' || to === '/perfil'
@@ -191,20 +193,23 @@ export default function BottomNav() {
                   }
                   navigateAfterScrollReset(to);
                 }}
-                className="relative flex flex-col items-center justify-center w-14 h-full group"
+                className="relative flex h-full w-[60px] shrink-0 flex-col items-center justify-center group"
                 style={{ touchAction: 'manipulation' }}
               >
                 {isActive && (
-                  <motion.div
-                    layoutId="bottomnav-indicator"
-                    className="absolute left-1/2 top-1/2 h-[54px] w-[54px] -translate-x-1/2 -translate-y-1/2 rounded-[1.35rem] bg-white/[0.08]"
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <motion.div
+                      layoutId="bottomnav-indicator"
+                      className="rounded-[1.45rem] bg-white/[0.08]"
+                      style={{ width: activeIndicatorSize, height: activeIndicatorSize }}
+                      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                    />
+                  </div>
                 )}
 
                 <div className="relative z-10">
                   <Icon
-                    className={`h-[25px] w-[25px] transition-colors ${
+                    className={`h-[27px] w-[27px] transition-colors ${
                       isActive ? 'text-white' : 'text-white/50 group-hover:text-white/80'
                     }`}
                   />

@@ -61,7 +61,8 @@ export default function ProfilePage() {
   const { setRegistered, setUser, user, siteSettings } = useAuth();
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(false);
   const navHeight = siteSettings?.navHeight ?? 71;
-  const effectiveNavHeight = isStandaloneMobileApp ? navHeight + 10 : navHeight;
+  const navExtraHeight = isStandaloneMobileApp ? 14 : 4;
+  const effectiveNavHeight = navHeight + navExtraHeight;
   const navBottomPaddingPx = isStandaloneMobileApp ? 4 : 8;
   const navBottomOffset = `calc(env(safe-area-inset-bottom, ${navBottomPaddingPx}px) + ${effectiveNavHeight}px)`;
   const fileInputRef = useRef(null);

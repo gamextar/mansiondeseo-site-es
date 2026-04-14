@@ -730,7 +730,8 @@ export default function VideoFeedPage() {
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(false);
-  const effectiveNavHeight = isStandaloneMobileApp ? navHeight + 10 : navHeight;
+  const navExtraHeight = isStandaloneMobileApp ? 14 : 4;
+  const effectiveNavHeight = navHeight + navExtraHeight;
   const navBottomPaddingPx = isStandaloneMobileApp ? 4 : 8;
   const navBottomOffset = `calc(env(safe-area-inset-bottom, ${navBottomPaddingPx}px) + ${effectiveNavHeight}px)`;
   const standaloneTopOffset = isStandaloneMobileApp
