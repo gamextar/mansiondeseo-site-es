@@ -70,9 +70,9 @@ function AppLayout() {
     FULLSCREEN_PATHS.includes(location.pathname);
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
   const showChrome = !isFullscreen && !isChatDetail;
-  const showDesktopSidebar = showChrome;
-  const showTopNavbar = showChrome;
-  const showBottomNav = (!isChatDetail && !isFullscreen) || standaloneVideosRoute;
+  const showDesktopSidebar = showChrome && !routeOverlayOpen;
+  const showTopNavbar = showChrome && !routeOverlayOpen;
+  const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
   const scrollLockRef = useRef(null);
 
   useEffect(() => {

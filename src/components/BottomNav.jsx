@@ -50,6 +50,7 @@ export default function BottomNav() {
   const { unreadCount } = useUnreadMessages();
   const { user } = useAuth();
   const pendingNavResetRef = useRef(null);
+  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(false);
 
   // All nav dimensions are frozen at mount time from sessionStorage so the nav
   // never resizes/jumps when the bootstrap resolves and siteSettings updates.
@@ -57,10 +58,33 @@ export default function BottomNav() {
   // by bootstrap, so subsequent visits already have the correct values).
   const [dims] = useState(getInitialNavSettings);
   const { navHeight, navSidePadding: sidePadding, navOpacity, navBlur } = dims;
+  const effectiveNavHeight = isStandaloneMobileApp ? navHeight + 10 : navHeight;
   const bgColor = `rgba(0,0,0,${(navOpacity / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * navOpacity / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * navOpacity / 100).toFixed(3)})`;
   const blurAmount = navOpacity <= 0 ? '0px' : `${navBlur}px`;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const media = window.matchMedia?.('(display-mode: standalone)');
+    const evaluate = () => {
+      const standalone = media?.matches || window.navigator.standalone === true;
+      const ua = window.navigator.userAgent || '';
+      const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+      setIsStandaloneMobileApp(Boolean(standalone && isMobile));
+    };
+
+    evaluate();
+
+    if (!media) return undefined;
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', evaluate);
+      return () => media.removeEventListener('change', evaluate);
+    }
+
+    media.addListener(evaluate);
+    return () => media.removeListener(evaluate);
+  }, []);
 
   useEffect(() => () => {
     if (!pendingNavResetRef.current || typeof window === 'undefined') return;
@@ -137,7 +161,7 @@ export default function BottomNav() {
           touchAction: 'manipulation',
         }}
       >
-        <div className="flex items-center justify-around px-3" style={{ height: navHeight }}>
+        <div className="flex items-center justify-around px-3" style={{ height: effectiveNavHeight }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
             const isActive =
               to === '/' || to === '/perfil'
