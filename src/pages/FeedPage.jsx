@@ -88,6 +88,10 @@ function setCachedFeed(data) {
   } catch {}
 }
 
+function makeFeedBlockKey(cursor, pageSize) {
+  return `${Number(cursor) || 0}:${Number(pageSize) || 0}`;
+}
+
 export default function FeedPage({ initialData }) {
   const safariDesktop = isSafariDesktopBrowser();
   const cols = useGridColumns();
@@ -117,6 +121,8 @@ export default function FeedPage({ initialData }) {
   const [showMobileNav, setShowMobileNav] = useState(false);
   const mobileNavVisibilityTimerRef = useRef(null);
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
+  const prefetchedBlocksRef = useRef(new Map());
+  const prefetchInFlightRef = useRef(new Map());
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
     frameId: null,
@@ -156,39 +162,74 @@ export default function FeedPage({ initialData }) {
 
 
 
-  const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize, targetPageCursor } = {}) => {
+  const applyLoadedProfiles = useCallback(({ data, cursor = 0, resolvedPageSize, targetPageCursor }) => {
+    setProfiles(data.profiles || []);
+    setViewerPremium(data.viewerPremium || false);
+    if (data.settings) setSettings(data.settings);
+    setNextCursor(data.nextCursor || null);
+    setBlockCursor(Number(data.cursor) || cursor || 0);
+    setPageCursor(Number(targetPageCursor ?? data.cursor ?? cursor) || 0);
+    setTotalProfiles(Number(data.totalProfiles) || 0);
+    setHasMore(!!data.hasMore);
+    setCachedFeed({
+      profiles: data.profiles || [],
+      viewerPremium: data.viewerPremium || false,
+      settings: data.settings || {},
+      totalProfiles: Number(data.totalProfiles) || 0,
+      currentCursor: Number(data.cursor) || cursor || 0,
+      blockCursor: Number(data.cursor) || cursor || 0,
+      pageCursor: Number(targetPageCursor ?? data.cursor ?? cursor) || 0,
+      pageSize: resolvedPageSize,
+      nextCursor: data.nextCursor || null,
+      hasMore: !!data.hasMore,
+    });
+  }, []);
+
+  const fetchProfilesBlock = useCallback(async ({ forceFresh = false, cursor = 0, pageSize } = {}) => {
     const s = settingsRef.current;
     const resolvedPageSize = Math.max(
       12,
       Number(pageSize) || (s?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
     );
+    const data = await getProfiles({ fresh: forceFresh, cursor, pageSize: resolvedPageSize });
+    return { data, resolvedPageSize };
+  }, []);
+
+  const prefetchProfilesBlock = useCallback(({ cursor = 0, pageSize } = {}) => {
+    const key = makeFeedBlockKey(cursor, pageSize);
+    if (prefetchedBlocksRef.current.has(key)) return Promise.resolve(prefetchedBlocksRef.current.get(key));
+    if (prefetchInFlightRef.current.has(key)) return prefetchInFlightRef.current.get(key);
+
+    const task = fetchProfilesBlock({ cursor, pageSize })
+      .then(({ data, resolvedPageSize }) => {
+        const payload = { data, resolvedPageSize, cursor };
+        prefetchedBlocksRef.current.set(key, payload);
+        prefetchInFlightRef.current.delete(key);
+        return payload;
+      })
+      .catch((error) => {
+        prefetchInFlightRef.current.delete(key);
+        throw error;
+      });
+
+    prefetchInFlightRef.current.set(key, task);
+    return task;
+  }, [fetchProfilesBlock]);
+
+  const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize, targetPageCursor } = {}) => {
     const c = getCachedFeed();
     if (!c) setLoading(true);
     const myId = ++loadIdRef.current;
-    return getProfiles({ fresh: forceFresh, cursor, pageSize: resolvedPageSize })
+    return fetchProfilesBlock({ forceFresh, cursor, pageSize })
       .then(data => {
         if (myId !== loadIdRef.current) return;
-        setProfiles(data.profiles || []);
-        setViewerPremium(data.viewerPremium || false);
-        if (data.settings) setSettings(data.settings);
-        setNextCursor(data.nextCursor || null);
-        setBlockCursor(Number(data.cursor) || cursor || 0);
-        setPageCursor(Number(targetPageCursor ?? data.cursor ?? cursor) || 0);
-        setTotalProfiles(Number(data.totalProfiles) || 0);
-        setHasMore(!!data.hasMore);
-        setCachedFeed({
-          profiles: data.profiles || [],
-          viewerPremium: data.viewerPremium || false,
-          settings: data.settings || {},
-          totalProfiles: Number(data.totalProfiles) || 0,
-          currentCursor: Number(data.cursor) || cursor || 0,
-          blockCursor: Number(data.cursor) || cursor || 0,
-          pageCursor: Number(targetPageCursor ?? data.cursor ?? cursor) || 0,
-          pageSize: resolvedPageSize,
-          nextCursor: data.nextCursor || null,
-          hasMore: !!data.hasMore,
+        applyLoadedProfiles({
+          data: data.data,
+          cursor,
+          resolvedPageSize: data.resolvedPageSize,
+          targetPageCursor,
         });
-        return data;
+        return data.data;
       })
       .catch(() => {
         if (myId !== loadIdRef.current) return;
@@ -204,7 +245,7 @@ export default function FeedPage({ initialData }) {
       .finally(() => {
         if (myId === loadIdRef.current) setLoading(false);
       });
-  }, []); // stable — reads settings from settingsRef
+  }, [applyLoadedProfiles, fetchProfilesBlock]); // stable — reads settings from settingsRef
 
   // Initial load — runs once on mount
   useEffect(() => {
@@ -396,23 +437,52 @@ export default function FeedPage({ initialData }) {
         hasMore,
       });
     } else {
-      await loadProfiles({
-        cursor: nextBlockCursor,
-        pageSize: blockSize,
-        targetPageCursor: nextPageCursor,
-      });
+      const prefetchedKey = makeFeedBlockKey(nextBlockCursor, blockSize);
+      const prefetched = prefetchedBlocksRef.current.get(prefetchedKey);
+      if (prefetched) {
+        applyLoadedProfiles({
+          data: prefetched.data,
+          cursor: nextBlockCursor,
+          resolvedPageSize: prefetched.resolvedPageSize,
+          targetPageCursor: nextPageCursor,
+        });
+        prefetchedBlocksRef.current.delete(prefetchedKey);
+      } else {
+        await loadProfiles({
+          cursor: nextBlockCursor,
+          pageSize: blockSize,
+          targetPageCursor: nextPageCursor,
+        });
+      }
     }
     const targetTop = Math.max(0, (gridRef.current?.offsetTop || 0) - 24);
     window.scrollTo({ top: targetTop, behavior: 'smooth' });
-  }, [blockCursor, blockSize, cardsPerPage, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, viewerPremium]);
+  }, [applyLoadedProfiles, blockCursor, blockSize, cardsPerPage, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, viewerPremium]);
 
   useEffect(() => {
     if (loading) return;
     const nextConfig = `paged:${cardsPerPage}`;
     if (pagedFeedConfigRef.current === nextConfig) return;
     pagedFeedConfigRef.current = nextConfig;
+    prefetchedBlocksRef.current.clear();
+    prefetchInFlightRef.current.clear();
     loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
   }, [blockSize, cardsPerPage, loadProfiles, loading]);
+
+  useEffect(() => {
+    if (!isDesktopViewport) return;
+    if (loading || !hasMore || !nextCursor) return;
+    if (!profiles.length) return;
+
+    const currentBlockEnd = blockCursor + profiles.length;
+    const remainingAfterCurrentPage = currentBlockEnd - (pageCursor + cardsPerPage);
+    if (remainingAfterCurrentPage > cardsPerPage) return;
+
+    prefetchProfilesBlock({
+      cursor: Number(nextCursor) || currentBlockEnd,
+      pageSize: blockSize,
+    }).catch(() => {});
+  }, [blockCursor, blockSize, cardsPerPage, hasMore, isDesktopViewport, loading, nextCursor, pageCursor, prefetchProfilesBlock, profiles.length]);
 
   const viewedRaw = useSyncExternalStore(
     useCallback((cb) => {
