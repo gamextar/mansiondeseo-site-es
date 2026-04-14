@@ -26,6 +26,14 @@ const AVATAR_SIZE_DEFAULT = 52;
 const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 
+function detectStandaloneMobile() {
+  if (typeof window === 'undefined') return false;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const ua = window.navigator.userAgent || '';
+  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+  return Boolean(standalone && isMobile);
+}
+
 function normalizeStorySeed(seed) {
   if (!seed || typeof seed !== 'object') return null;
   const userId = String(seed.user_id || seed.id || '').trim();
@@ -729,7 +737,7 @@ export default function VideoFeedPage() {
     ? stories[desktopActiveIdx - 1] || stories[0] || null
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
-  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(false);
+  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
   const navExtraHeight = isStandaloneMobileApp ? 14 : 4;
   const effectiveNavHeight = navHeight + navExtraHeight;
   const navBottomPaddingPx = isStandaloneMobileApp ? 4 : 8;

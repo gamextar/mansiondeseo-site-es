@@ -44,6 +44,14 @@ const fadeUp = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [.25,.46,.45,.94] } },
 };
 
+function detectStandaloneMobile() {
+  if (typeof window === 'undefined') return false;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const ua = window.navigator.userAgent || '';
+  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+  return Boolean(standalone && isMobile);
+}
+
 function timeAgo(dateStr) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr + 'Z').getTime();
@@ -59,7 +67,7 @@ function timeAgo(dateStr) {
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { setRegistered, setUser, user, siteSettings } = useAuth();
-  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(false);
+  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
   const navHeight = siteSettings?.navHeight ?? 71;
   const navExtraHeight = isStandaloneMobileApp ? 14 : 4;
   const effectiveNavHeight = navHeight + navExtraHeight;

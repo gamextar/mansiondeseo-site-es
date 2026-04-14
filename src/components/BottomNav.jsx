@@ -15,6 +15,14 @@ const NAV_ITEMS = [
   { to: '/perfil', icon: User, label: 'Perfil' },
 ];
 
+function detectStandaloneMobile() {
+  if (typeof window === 'undefined') return false;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const ua = window.navigator.userAgent || '';
+  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+  return Boolean(standalone && isMobile);
+}
+
 // Read nav dimensions from sessionStorage once at module level so the
 // initial render already has the correct values before bootstrap resolves.
 function getInitialNavSettings() {
@@ -50,7 +58,7 @@ export default function BottomNav() {
   const { unreadCount } = useUnreadMessages();
   const { user } = useAuth();
   const pendingNavResetRef = useRef(null);
-  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(false);
+  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
 
   // All nav dimensions are frozen at mount time from sessionStorage so the nav
   // never resizes/jumps when the bootstrap resolves and siteSettings updates.
@@ -98,6 +106,12 @@ export default function BottomNav() {
 
   const navigateAfterScrollReset = (to) => {
     if (typeof window === 'undefined') {
+      navigate(to);
+      return;
+    }
+
+    if (isStandaloneMobileApp) {
+      resetDocumentScrollToTop();
       navigate(to);
       return;
     }

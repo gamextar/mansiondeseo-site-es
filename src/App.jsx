@@ -44,6 +44,14 @@ const TopVisitedPage = lazy(() => import('./pages/TopVisitedPage'));
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
 
+function detectStandaloneMobile() {
+  if (typeof window === 'undefined') return false;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const ua = window.navigator.userAgent || '';
+  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+  return Boolean(standalone && isMobile);
+}
+
 function RequireRegistration({ children }) {
   const { registered } = useAuth();
   if (!registered) return <Navigate to="/bienvenida" replace />;
@@ -58,7 +66,7 @@ function SEOCityLanding({ variant }) {
 function AppLayout() {
   const location = useLocation();
   const { user } = useAuth();
-  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(false);
+  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
   const backgroundLocation = location.state?.backgroundLocation;
   const profileOverlayOpen = location.state?.modal === 'profile' && !!backgroundLocation;
   const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
