@@ -118,9 +118,9 @@ export default function LoginPage() {
         </div>
 
         {/* Register link */}
-        <p className="text-center text-text-muted text-sm">
+        <p className="text-center text-text-muted text-base">
           ¿Aún no tenés cuenta?{' '}
-          <Link to="/bienvenida" className="text-mansion-gold font-medium hover:underline">
+          <Link to="/bienvenida" className="text-mansion-gold font-medium hover:underline text-lg">
             Crear acceso
           </Link>
         </p>
