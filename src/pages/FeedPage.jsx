@@ -505,6 +505,21 @@ export default function FeedPage({ initialData }) {
     }).catch(() => {});
   }, [blockCursor, blockSize, cardsPerPage, hasMore, isDesktopViewport, loading, nextCursor, pageCursor, prefetchProfilesBlock, profiles.length]);
 
+  useEffect(() => {
+    if (!isDesktopViewport) return;
+    if (loading) return;
+    if (!profiles.length) return;
+    if (blockCursor <= 0) return;
+
+    const pagesBeforeCurrent = pageCursor - blockCursor;
+    if (pagesBeforeCurrent > cardsPerPage) return;
+
+    prefetchProfilesBlock({
+      cursor: Math.max(0, blockCursor - blockSize),
+      pageSize: blockSize,
+    }).catch(() => {});
+  }, [blockCursor, blockSize, cardsPerPage, isDesktopViewport, loading, pageCursor, prefetchProfilesBlock, profiles.length]);
+
   const viewedRaw = useSyncExternalStore(
     useCallback((cb) => {
       const handler = () => cb();
