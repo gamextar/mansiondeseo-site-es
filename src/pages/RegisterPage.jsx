@@ -1305,8 +1305,11 @@ function StepPhoto({ photoFile, onPhotoSelect }) {
       <h2 className="font-display text-2xl font-bold text-text-primary mb-2">
         Tu foto de perfil
       </h2>
-      <p className="text-text-muted text-sm mb-8">
-        Subi al menos una foto, trata de que sea mas sensual / sugerente que explicita.
+      <p className="text-text-muted text-sm mb-2">
+        Subi al menos una foto, preferentemente algo sensual / sugerente.
+      </p>
+      <p className="text-text-dim text-xs mb-8">
+        No te preocupes, podras subir fotos explicitas en tu galeria.
       </p>
 
       <label htmlFor="photo-upload" className="cursor-pointer block">
@@ -1350,9 +1353,6 @@ function StepPhoto({ photoFile, onPhotoSelect }) {
         />
       )}
 
-      <p className="text-text-dim text-xs mt-6">
-        No te preocupes, podras subir fotos explicitas en tu galeria.
-      </p>
     </div>
   );
 }
