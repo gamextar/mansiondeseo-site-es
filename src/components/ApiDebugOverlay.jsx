@@ -162,7 +162,7 @@ export default function ApiDebugOverlay() {
 
   return (
     <div
-      className="fixed right-3 bottom-3 z-[9999] flex max-h-[min(82vh,900px)] w-[min(760px,calc(100vw-24px))] flex-col rounded-2xl border border-mansion-gold/30 bg-black/85 text-white shadow-2xl backdrop-blur-md"
+      className="fixed right-3 bottom-24 lg:bottom-28 z-[9999] flex max-h-[min(82vh,900px)] w-[min(760px,calc(100vw-24px))] flex-col rounded-2xl border border-mansion-gold/30 bg-black/85 text-white shadow-2xl backdrop-blur-md"
       style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}
     >
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
