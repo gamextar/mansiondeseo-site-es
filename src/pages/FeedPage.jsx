@@ -7,7 +7,7 @@ import { useAuth } from '../lib/authContext';
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } };
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
-import { getProfiles, getToken } from '../lib/api';
+import { getProfiles, getStories, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
@@ -110,6 +110,7 @@ export default function FeedPage({ initialData }) {
   const { user, siteSettings } = useAuth();
   const isStandaloneMobileApp = detectStandaloneMobile();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
+  const [homeStories, setHomeStories] = useState([]);
   const [showStoriesSection, setShowStoriesSection] = useState(true);
   const [showGridSection, setShowGridSection] = useState(true);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
@@ -133,6 +134,7 @@ export default function FeedPage({ initialData }) {
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
   const prefetchedBlocksRef = useRef(new Map());
   const prefetchInFlightRef = useRef(new Map());
+  const storiesLoadIdRef = useRef(0);
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
     frameId: null,
@@ -429,8 +431,11 @@ export default function FeedPage({ initialData }) {
     return Array.from({ length: end - adjustedStart + 1 }, (_, idx) => adjustedStart + idx);
   }, [currentPage, totalPages]);
   const storyLimit = getInitialStoryLimit(safeSettings, isDesktopViewport);
-  const fallbackStoryProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, storyLimit);
-  const storyProfiles = fallbackStoryProfiles;
+  const fallbackStoryProfiles = useMemo(
+    () => safeProfiles.filter((p) => p.has_active_story).slice(0, storyLimit),
+    [safeProfiles, storyLimit]
+  );
+  const storyProfiles = homeStories.length > 0 ? homeStories : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
@@ -761,6 +766,42 @@ export default function FeedPage({ initialData }) {
       },
     });
   }, [location, navigate]);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    const requestId = ++storiesLoadIdRef.current;
+    getStories({ limit: Math.max(1, storyLimit) })
+      .then((data) => {
+        if (requestId !== storiesLoadIdRef.current) return;
+        const nextStories = Array.isArray(data?.stories)
+          ? data.stories
+              .map((story) => ({
+                id: String(story.user_id || story.id || ''),
+                user_id: String(story.user_id || story.id || ''),
+                story_id: String(story.id || ''),
+                name: story.username || '',
+                username: story.username || '',
+                avatar_url: story.avatar_url || '',
+                avatar_crop: story.avatar_crop || null,
+                photos: [],
+                has_active_story: true,
+                active_story_url: story.video_url || '',
+                video_url: story.video_url || '',
+                caption: story.caption || '',
+                likes: Number(story.likes || 0),
+                comments: Number(story.comments || 0),
+                liked: !!story.liked,
+                created_at: story.created_at || '',
+              }))
+              .filter((story) => story.id && story.active_story_url)
+          : [];
+        setHomeStories(nextStories);
+      })
+      .catch(() => {
+        if (requestId !== storiesLoadIdRef.current) return;
+        setHomeStories([]);
+      });
+  }, [storyLimit, user?.id]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
