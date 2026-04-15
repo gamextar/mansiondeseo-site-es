@@ -460,17 +460,11 @@ export default function FeedPage({ initialData }) {
     [cachedStoriesData]
   );
   const [homeStories, setHomeStories] = useState(initialHomeStories);
-  const [homeStoriesResolved, setHomeStoriesResolved] = useState(() => initialHomeStories.length > 0);
   const fallbackStoryProfiles = useMemo(
     () => safeProfiles.filter((p) => p.has_active_story).slice(0, storyLimit),
     [safeProfiles, storyLimit]
   );
-  const storyProfiles = useMemo(() => {
-    if (getToken()) {
-      return homeStoriesResolved ? homeStories : [];
-    }
-    return fallbackStoryProfiles;
-  }, [fallbackStoryProfiles, homeStories, homeStoriesResolved]);
+  const storyProfiles = homeStories.length > 0 ? homeStories : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
@@ -805,9 +799,6 @@ export default function FeedPage({ initialData }) {
   useEffect(() => {
     if (!getToken()) return;
     const requestId = ++storiesLoadIdRef.current;
-    if (initialHomeStories.length === 0) {
-      setHomeStoriesResolved(false);
-    }
     getStories({ limit: Math.max(1, storyLimit) })
       .then((data) => {
         if (requestId !== storiesLoadIdRef.current) return;
@@ -834,14 +825,12 @@ export default function FeedPage({ initialData }) {
               .filter((story) => story.id && story.active_story_url)
           : [];
         setHomeStories(nextStories);
-        setHomeStoriesResolved(true);
       })
       .catch(() => {
         if (requestId !== storiesLoadIdRef.current) return;
         setHomeStories(fallbackStoryProfiles);
-        setHomeStoriesResolved(true);
       });
-  }, [fallbackStoryProfiles, initialHomeStories.length, storyLimit, user?.id]);
+  }, [fallbackStoryProfiles, storyLimit, user?.id]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
