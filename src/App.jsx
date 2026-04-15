@@ -388,7 +388,7 @@ function AppLayout() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className="fixed inset-0 z-[130]"
+              className="fixed inset-0 z-[130] pointer-events-none"
             >
               <motion.div
                 initial={{ opacity: 0 }}

@@ -1236,10 +1236,10 @@ export default function VideoFeedPage() {
     <div
       className={
         standaloneMobileRoute
-          ? 'relative overflow-hidden bg-black'
+          ? 'relative overflow-hidden bg-black pointer-events-auto'
           : desktopOverlayRoute
-            ? 'absolute inset-0 bg-black z-[60]'
-            : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'
+            ? 'absolute inset-0 bg-black z-[60] pointer-events-auto'
+            : 'fixed inset-0 bg-black z-[60] pointer-events-auto lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'
       }
       style={standaloneViewportShellStyle}
       onPointerDown={handleOverlayBackdropPointerDown}
