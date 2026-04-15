@@ -1,4 +1,4 @@
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronRight, Sparkles } from 'lucide-react';
 import { useSeoMeta } from '../lib/seo';
@@ -81,22 +81,10 @@ export default function WelcomePage() {
           Mansión Deseo
         </h1>
 
-        <p className="fade-in-up fade-delay-600 text-text-muted text-sm leading-relaxed mb-10 max-w-xs mx-auto">
+        <p className="fade-in-up fade-delay-600 text-text-muted text-sm leading-relaxed mb-8 max-w-xs mx-auto">
           Un espacio selecto para quienes buscan experiencias únicas con discreción total,
           perfiles verificados y conexiones reales entre parejas y usuarios solos.
         </p>
-
-        <div className="fade-in-up fade-delay-650 grid grid-cols-2 gap-2 mb-8 text-left">
-          <Link to="/parejas" className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-xs text-text-primary hover:border-mansion-gold/30 hover:text-mansion-gold transition-colors">
-            Parejas
-          </Link>
-          <Link to="/swingers" className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-xs text-text-primary hover:border-mansion-gold/30 hover:text-mansion-gold transition-colors">
-            Swingers
-          </Link>
-          <Link to="/mujeres" className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-xs text-text-primary hover:border-mansion-gold/30 hover:text-mansion-gold transition-colors">
-            Mujeres
-          </Link>
-        </div>
 
         {/* CTA */}
         <button
@@ -108,7 +96,7 @@ export default function WelcomePage() {
         </button>
 
         {/* Login link */}
-        <p className="fade-in-up fade-delay-900 text-center mt-6">
+        <p className="fade-in-up fade-delay-900 text-center mt-5">
           <span className="text-text-dim text-sm">¿Ya tienes cuenta? </span>
           <button
             onClick={() => navigate('/login')}
@@ -119,14 +107,14 @@ export default function WelcomePage() {
         </p>
 
         {/* Features strip */}
-        <div className="fade-in-up fade-delay-900 flex items-center justify-center gap-6 mt-10 text-text-dim text-xs">
+        <div className="fade-in-up fade-delay-900 flex items-center justify-center gap-5 mt-8 text-text-dim text-xs">
           <span className="flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-mansion-gold" /> Verificados
+            <Sparkles className="w-3 h-3 text-mansion-gold" /> Perfiles verificados
           </span>
           <span>•</span>
-          <span>Privado</span>
+          <span>Confidencial</span>
           <span>•</span>
-          <span>Selecto</span>
+          <span>Acceso Privado</span>
         </div>
       </div>
     </div>
