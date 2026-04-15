@@ -301,7 +301,7 @@ export default function SEOLandingPage({ variant, citySlug = '' }) {
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-8 lg:px-8">
         <div className="mb-10 flex items-center justify-between">
-          <Link to="/bienvenida" className="inline-flex items-center gap-3">
+          <Link to="/bienvenida?intent=register" className="inline-flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white shadow-elevated">
               <span className="font-display text-lg font-bold">M</span>
             </div>

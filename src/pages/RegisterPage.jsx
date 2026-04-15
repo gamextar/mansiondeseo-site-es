@@ -1875,7 +1875,7 @@ export default function RegisterPage() {
 
   const prev = () => {
     if (step === 0) {
-      navigate('/bienvenida');
+      navigate('/bienvenida?intent=register');
     } else {
       setDirection(-1);
       setStep((s) => s - 1);
