@@ -643,6 +643,7 @@ export default function VideoFeedPage() {
   const requestedStoryUserId = location.state?.storyUserId || null;
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
+  const backgroundLocation = location.state?.backgroundLocation || null;
   // When opened from a story-bar click (seed provided), skip the cache and start
   // with ONLY the seed story. This guarantees that stories.length changes 1→N
   // when the API responds, which triggers the useLayoutEffect scroll-correction
@@ -705,9 +706,20 @@ export default function VideoFeedPage() {
     setIsClosingOverlay(true);
     flushPendingViewedStories();
     requestAnimationFrame(() => {
-      navigate(-1);
+      if (backgroundLocation?.pathname) {
+        navigate(
+          {
+            pathname: backgroundLocation.pathname,
+            search: backgroundLocation.search || '',
+            hash: backgroundLocation.hash || '',
+          },
+          { replace: true, state: backgroundLocation.state || null }
+        );
+        return;
+      }
+      navigate('/', { replace: true });
     });
-  }, [flushPendingViewedStories, navigate]);
+  }, [backgroundLocation, flushPendingViewedStories, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
     if (!isOverlayPreview || !isDesktopViewport) return;
     if (event.target.closest('[data-story-card-frame="true"]')) return;
