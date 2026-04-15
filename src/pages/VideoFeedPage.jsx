@@ -1259,13 +1259,11 @@ export default function VideoFeedPage() {
           <button
             type="button"
             onPointerDown={(event) => {
-              event.preventDefault();
               event.stopPropagation();
-              closeOverlay();
             }}
             onClick={(event) => {
-              event.preventDefault();
               event.stopPropagation();
+              closeOverlay();
             }}
             className="absolute z-30 flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
             style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
