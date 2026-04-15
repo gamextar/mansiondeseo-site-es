@@ -329,40 +329,6 @@ export default function FeedPage({ initialData }) {
   const [gridOpacity, setGridOpacity] = useState(1);
   const viewedStoriesStorageKey = useMemo(() => getViewedStoryUsersKey(user?.id), [user?.id]);
 
-  useEffect(() => {
-    let fadeOutTimer = null;
-    let fadeInTimer = null;
-    const handleHomeFocus = () => {
-      if (window.scrollY <= 0) return;
-      // Fade out → instant jump → fade in
-      setGridOpacity(0);
-      fadeOutTimer = setTimeout(() => {
-        // Force instant jump — overrides any CSS scroll-behavior:smooth
-        document.documentElement.style.scrollBehavior = 'auto';
-        window.scrollTo(0, 0);
-        document.documentElement.style.scrollBehavior = '';
-        fadeInTimer = setTimeout(() => setGridOpacity(1), 16);
-      }, 300);
-    };
-    const handleHomeReset = () => {
-      try {
-        localStorage.removeItem(FEED_CACHE_KEY);
-      } catch {}
-      prefetchedBlocksRef.current.clear();
-      prefetchInFlightRef.current.clear();
-      loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
-      window.scrollTo(0, 0);
-    };
-    window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
-    window.addEventListener(HOME_FEED_RESET_EVENT, handleHomeReset);
-    return () => {
-      window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
-      window.removeEventListener(HOME_FEED_RESET_EVENT, handleHomeReset);
-      clearTimeout(fadeOutTimer);
-      clearTimeout(fadeInTimer);
-    };
-  }, [blockSize, loadProfiles]);
-
   useEffect(() => () => {
     if (pendingViewedTimerRef.current) {
       window.clearTimeout(pendingViewedTimerRef.current);
@@ -527,6 +493,38 @@ export default function FeedPage({ initialData }) {
     const targetTop = Math.max(0, (gridRef.current?.offsetTop || 0) - 24);
     window.scrollTo({ top: targetTop, behavior: 'smooth' });
   }, [applyLoadedProfiles, blockCursor, blockSize, cardsPerPage, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, viewerPremium]);
+
+  useEffect(() => {
+    let fadeOutTimer = null;
+    let fadeInTimer = null;
+    const handleHomeFocus = () => {
+      if (window.scrollY <= 0) return;
+      setGridOpacity(0);
+      fadeOutTimer = setTimeout(() => {
+        document.documentElement.style.scrollBehavior = 'auto';
+        window.scrollTo(0, 0);
+        document.documentElement.style.scrollBehavior = '';
+        fadeInTimer = setTimeout(() => setGridOpacity(1), 16);
+      }, 300);
+    };
+    const handleHomeReset = () => {
+      try {
+        localStorage.removeItem(FEED_CACHE_KEY);
+      } catch {}
+      prefetchedBlocksRef.current.clear();
+      prefetchInFlightRef.current.clear();
+      loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
+    window.addEventListener(HOME_FEED_RESET_EVENT, handleHomeReset);
+    return () => {
+      window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
+      window.removeEventListener(HOME_FEED_RESET_EVENT, handleHomeReset);
+      clearTimeout(fadeOutTimer);
+      clearTimeout(fadeInTimer);
+    };
+  }, [blockSize, loadProfiles]);
 
   useEffect(() => {
     if (loading) return;
