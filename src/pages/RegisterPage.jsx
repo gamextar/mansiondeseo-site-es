@@ -1302,7 +1302,7 @@ function StepPhoto({ photoFile, onPhotoSelect }) {
         Tu foto de perfil
       </h2>
       <p className="text-text-muted text-sm mb-8">
-        Los perfiles con foto reciben 10x más mensajes
+        Subi al menos una foto, trata de que sea mas sensual / sugerente que explicita.
       </p>
 
       <label htmlFor="photo-upload" className="cursor-pointer block">
@@ -1347,7 +1347,7 @@ function StepPhoto({ photoFile, onPhotoSelect }) {
       )}
 
       <p className="text-text-dim text-xs mt-6">
-        Puedes subir tu foto más tarde desde tu perfil
+        No te preocupes, podras subir fotos explicitas en tu galeria.
       </p>
     </div>
   );
@@ -1736,6 +1736,7 @@ export default function RegisterPage() {
     if (step === 2) return seeking.length > 0;
     if (step === 3) return interests.length > 0;
     if (step === 4) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && isAdultBirthdate(info.birthdate) && info.province && (!showCountryPicker || selectedCountry);
+    if (step === 5) return !!photoFile;
     return true;
   };
 
