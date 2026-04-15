@@ -16,6 +16,7 @@ import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStor
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
+const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
 const DEFAULT_CARDS_PER_PAGE = 12;
 const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PREFETCH_PAGES = 6;
@@ -94,6 +95,12 @@ function getCachedFeed() {
     const raw = localStorage.getItem(FEED_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
+    const currentCursor = Number(parsed?.currentCursor) || 0;
+    const blockCursor = Number(parsed?.blockCursor ?? parsed?.currentCursor) || 0;
+    const pageCursor = Number(parsed?.pageCursor ?? parsed?.currentCursor) || 0;
+    // Do not persist deep pagination across refreshes or fresh entries to home.
+    // Only reuse cache when it represents the first page/block.
+    if (currentCursor > 0 || blockCursor > 0 || pageCursor > 0) return null;
     if (Array.isArray(parsed?.profiles)) return parsed;
     if (Array.isArray(parsed)) {
       return { profiles: parsed, viewerPremium: false, settings: {}, timestamp: 0 };
@@ -337,13 +344,24 @@ export default function FeedPage({ initialData }) {
         fadeInTimer = setTimeout(() => setGridOpacity(1), 16);
       }, 300);
     };
+    const handleHomeReset = () => {
+      try {
+        localStorage.removeItem(FEED_CACHE_KEY);
+      } catch {}
+      prefetchedBlocksRef.current.clear();
+      prefetchInFlightRef.current.clear();
+      loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
+      window.scrollTo(0, 0);
+    };
     window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
+    window.addEventListener(HOME_FEED_RESET_EVENT, handleHomeReset);
     return () => {
       window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
+      window.removeEventListener(HOME_FEED_RESET_EVENT, handleHomeReset);
       clearTimeout(fadeOutTimer);
       clearTimeout(fadeInTimer);
     };
-  }, []);
+  }, [blockSize, loadProfiles]);
 
   useEffect(() => () => {
     if (pendingViewedTimerRef.current) {

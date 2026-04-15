@@ -14,6 +14,7 @@ import { warmVideoFeed } from '../lib/videoFeedWarmup';
 import { useEffect, useRef } from 'react';
 
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
+const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
 
 const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio' },
@@ -161,13 +162,16 @@ export default function BottomNav() {
                 }}
                 onClick={(e) => {
                   if (to === '/' && location.pathname === '/') {
-                    window.dispatchEvent(new CustomEvent(HOME_FEED_FOCUS_EVENT));
+                    window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT));
                     return;
                   }
                   if (isActive) return;
                   e.preventDefault();
                   if (to === '/videos') {
                     warmVideoFeed();
+                  }
+                  if (to === '/') {
+                    try { localStorage.removeItem('mansion_feed'); } catch {}
                   }
                   navigateAfterScrollReset(to);
                 }}
