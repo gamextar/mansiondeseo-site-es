@@ -3,7 +3,7 @@ import { Home, Film, MessageCircle, User, Crown, Settings, Camera, Trophy, Heart
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useState } from 'react';
-import { peekOwnProfileDashboard } from '../lib/api';
+import { peekOwnProfileDashboard, warmTopVisitedProfiles } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import AvatarImg from './AvatarImg';
 import { warmVideoFeed } from '../lib/videoFeedWarmup';
@@ -96,9 +96,11 @@ export default function DesktopSidebar() {
               to={to}
               onMouseEnter={() => {
                 if (to === '/videos') warmVideoFeed();
+                if (to === '/ranking') warmTopVisitedProfiles(100, 'all');
               }}
               onFocus={() => {
                 if (to === '/videos') warmVideoFeed();
+                if (to === '/ranking') warmTopVisitedProfiles(100, 'all');
               }}
               onClick={() => {
                 if (to === '/' && location.pathname === '/') {
@@ -106,6 +108,9 @@ export default function DesktopSidebar() {
                 }
                 if (to === '/videos') {
                   warmVideoFeed();
+                }
+                if (to === '/ranking') {
+                  warmTopVisitedProfiles(100, 'all');
                 }
               }}
               className="relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all group"

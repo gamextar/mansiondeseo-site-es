@@ -28,6 +28,7 @@ const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
 const CLIENT_CACHE_VERSION_KEY = 'mansion_client_cache_version';
 const CLIENT_CACHE_VERSION = 'media-paths-v3';
+const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
 const sharedGetCache = new Map();
 const sessionCache = {
   get(key, ttlMs = 0) {
@@ -138,6 +139,17 @@ function mergeMeCache(partialUser) {
 function invalidateUnreadCountCache() {
   sharedGetCache.delete('unreadCount');
   sessionCache.delete('unreadCount');
+}
+
+function getTopVisitedCacheKey(limit, filter) {
+  return `topVisited:${filter}:${limit}`;
+}
+
+function peekSharedGetValue(key, ttlMs = 0) {
+  const cached = sharedGetCache.get(key);
+  if (!cached || cached.value === undefined) return null;
+  if (ttlMs > 0 && Date.now() - (cached.timestamp || 0) > ttlMs) return null;
+  return cached.value;
 }
 
 export function invalidateConversationsCache() {
@@ -1051,11 +1063,33 @@ export async function getTopVisitedProfiles(limit = 100, filter = 'all') {
   const safeFilter = ['all', 'mujeres', 'hombres', 'parejas'].includes(String(filter || '').toLowerCase())
     ? String(filter || 'all').toLowerCase()
     : 'all';
+  const cacheKey = getTopVisitedCacheKey(safeLimit, safeFilter);
+  const sessionKey = `session:${cacheKey}`;
   return sharedGet(
-    `topVisited:${safeFilter}:${safeLimit}`,
-    () => apiFetch(`/rankings/top-visited?limit=${safeLimit}&filter=${encodeURIComponent(safeFilter)}`),
-    { ttlMs: 10 * 60_000 }
+    cacheKey,
+    async () => {
+      const data = await apiFetch(`/rankings/top-visited?limit=${safeLimit}&filter=${encodeURIComponent(safeFilter)}`);
+      sessionCache.set(sessionKey, data);
+      return data;
+    },
+    { ttlMs: TOP_VISITED_CACHE_TTL_MS }
   );
+}
+
+export function peekTopVisitedProfiles(limit = 100, filter = 'all') {
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 100));
+  const safeFilter = ['all', 'mujeres', 'hombres', 'parejas'].includes(String(filter || '').toLowerCase())
+    ? String(filter || 'all').toLowerCase()
+    : 'all';
+  const cacheKey = getTopVisitedCacheKey(safeLimit, safeFilter);
+  return (
+    peekSharedGetValue(cacheKey, TOP_VISITED_CACHE_TTL_MS)
+    || sessionCache.get(`session:${cacheKey}`, TOP_VISITED_CACHE_TTL_MS)
+  );
+}
+
+export function warmTopVisitedProfiles(limit = 100, filter = 'all') {
+  return getTopVisitedProfiles(limit, filter).catch(() => null);
 }
 
 // ── Gifts & Coins ───────────────────────────────────────

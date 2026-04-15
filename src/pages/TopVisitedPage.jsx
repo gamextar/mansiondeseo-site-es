@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Crown, Eye, MapPin, Shield, Trophy } from 'lucide-react';
-import { getTopVisitedProfiles } from '../lib/api';
+import { getTopVisitedProfiles, peekTopVisitedProfiles } from '../lib/api';
 import { formatLocation } from '../lib/location';
 import AvatarImg from '../components/AvatarImg';
 import { isSafariDesktopBrowser } from '../lib/browser';
@@ -118,15 +118,24 @@ function RankCard({ profile, compact = false, safariDesktop = false, imageLoadin
 
 export default function TopVisitedPage() {
   const safariDesktop = isSafariDesktopBrowser();
-  const [profiles, setProfiles] = useState([]);
+  const [profiles, setProfiles] = useState(() => peekTopVisitedProfiles(100, 'all')?.profiles || []);
   const [filter, setFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => profiles.length === 0);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [visibleRestCount, setVisibleRestCount] = useState(18);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    const cached = peekTopVisitedProfiles(100, filter);
+    if (cached?.profiles?.length) {
+      setProfiles(cached.profiles);
+      setLoading(false);
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+      setRefreshing(false);
+    }
     setError('');
 
     getTopVisitedProfiles(100, filter)
@@ -139,7 +148,10 @@ export default function TopVisitedPage() {
         setError(err.message || 'No pudimos cargar el ranking');
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       });
 
     return () => {
@@ -202,6 +214,12 @@ export default function TopVisitedPage() {
                 <Crown className="h-3.5 w-3.5 text-mansion-gold" />
                 tráfico real del sitio
               </span>
+              {refreshing && (
+                <span className="inline-flex items-center gap-2 rounded-full border border-mansion-border/20 bg-black/20 px-3 py-1.5 text-xs text-text-dim">
+                  <span className="h-3 w-3 rounded-full border border-mansion-gold/25 border-t-mansion-gold animate-spin" />
+                  actualizando ranking
+                </span>
+              )}
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
               {RANKING_FILTERS.map((option) => {
@@ -226,8 +244,24 @@ export default function TopVisitedPage() {
         </div>
 
         {loading ? (
-          <div className="flex min-h-[40vh] items-center justify-center">
-            <div className="h-8 w-8 rounded-full border-2 border-mansion-gold/25 border-t-mansion-gold animate-spin" />
+          <div className="mt-8 grid gap-4 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className="overflow-hidden rounded-[1.75rem] border border-mansion-border/25 bg-mansion-card/50 p-5"
+              >
+                <div className="animate-pulse">
+                  <div className="flex items-start gap-4">
+                    <div className="h-20 w-20 rounded-[1.35rem] bg-mansion-elevated/80" />
+                    <div className="min-w-0 flex-1">
+                      <div className="h-5 w-36 rounded-full bg-mansion-elevated/80" />
+                      <div className="mt-3 h-3 w-24 rounded-full bg-mansion-elevated/70" />
+                      <div className="mt-4 h-8 w-full rounded-2xl bg-mansion-elevated/60" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : error ? (
           <div className="mt-6 rounded-[1.75rem] border border-mansion-crimson/20 bg-mansion-card/50 p-6 text-sm text-red-300">
