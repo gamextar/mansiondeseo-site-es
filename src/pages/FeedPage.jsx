@@ -111,6 +111,7 @@ export default function FeedPage({ initialData }) {
   const isStandaloneMobileApp = detectStandaloneMobile();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [homeStories, setHomeStories] = useState([]);
+  const [homeStoriesResolved, setHomeStoriesResolved] = useState(false);
   const [showStoriesSection, setShowStoriesSection] = useState(true);
   const [showGridSection, setShowGridSection] = useState(true);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
@@ -435,7 +436,12 @@ export default function FeedPage({ initialData }) {
     () => safeProfiles.filter((p) => p.has_active_story).slice(0, storyLimit),
     [safeProfiles, storyLimit]
   );
-  const storyProfiles = homeStories.length > 0 ? homeStories : fallbackStoryProfiles;
+  const storyProfiles = useMemo(() => {
+    if (getToken()) {
+      return homeStoriesResolved ? homeStories : [];
+    }
+    return fallbackStoryProfiles;
+  }, [fallbackStoryProfiles, homeStories, homeStoriesResolved]);
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
@@ -770,6 +776,7 @@ export default function FeedPage({ initialData }) {
   useEffect(() => {
     if (!getToken()) return;
     const requestId = ++storiesLoadIdRef.current;
+    setHomeStoriesResolved(false);
     getStories({ limit: Math.max(1, storyLimit) })
       .then((data) => {
         if (requestId !== storiesLoadIdRef.current) return;
@@ -796,12 +803,14 @@ export default function FeedPage({ initialData }) {
               .filter((story) => story.id && story.active_story_url)
           : [];
         setHomeStories(nextStories);
+        setHomeStoriesResolved(true);
       })
       .catch(() => {
         if (requestId !== storiesLoadIdRef.current) return;
-        setHomeStories([]);
+        setHomeStories(fallbackStoryProfiles);
+        setHomeStoriesResolved(true);
       });
-  }, [storyLimit, user?.id]);
+  }, [fallbackStoryProfiles, storyLimit, user?.id]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
