@@ -53,7 +53,7 @@ const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'parej
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const FEED_PROFILE_LIMIT = 42;
-const FEED_SNAPSHOT_LIMIT = 360;
+const FEED_SNAPSHOT_LIMIT = 540;
 const FEED_SNAPSHOT_TTL_MS = 300_000;
 
 function clamp01(value) {
@@ -2054,17 +2054,19 @@ async function handleProfiles(request, env) {
     30_000,
     () => env.DB.prepare('SELECT user_id, video_url FROM stories WHERE active = 1 ORDER BY created_at DESC').all().then(r => r.results).catch(() => [])
   );
+  const countQuery = query.replace(/SELECT[\s\S]+?FROM users u/, 'SELECT COUNT(*) AS total FROM users u');
   const snapshotStartedAt = Date.now();
-  const orderedBaseProfilesPromise = (canUseFeedSnapshot
+  const feedSnapshotDataPromise = (canUseFeedSnapshot
     ? cached(feedSnapshotCacheKey, FEED_SNAPSHOT_TTL_MS, async () => {
         const snapshotWindowLimit = FEED_SNAPSHOT_LIMIT + 1;
         const snapshotDbLimit = roleBuckets.length > 1
           ? Math.max(snapshotWindowLimit * 10, FEED_SNAPSHOT_LIMIT * 10)
           : snapshotWindowLimit;
         const snapshotQuery = `${query} ORDER BY last_active DESC LIMIT ${snapshotDbLimit}`;
-        const [snapshotRows, storyRows] = await Promise.all([
+        const [snapshotRows, storyRows, snapshotCountRow] = await Promise.all([
           env.DB.prepare(snapshotQuery).bind(...params).all().then(r => r.results),
           storyRowsPromise,
+          env.DB.prepare(countQuery).bind(...params).first(),
         ]);
         const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
         const activeStoryUrlMap = new Map();
@@ -2075,7 +2077,10 @@ async function handleProfiles(request, env) {
           }
         }
         const baseProfiles = buildFeedBaseProfiles(snapshotRows, env, activeStoryUserIds, activeStoryUrlMap);
-        return orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, snapshotWindowLimit);
+        return {
+          orderedProfiles: orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, snapshotWindowLimit),
+          totalProfiles: Number(snapshotCountRow?.total ?? 0),
+        };
       })
     : Promise.all([
         env.DB.prepare(`${query} ORDER BY last_active DESC LIMIT ${dbLimit}`).bind(...params).all().then(r => r.results),
@@ -2095,14 +2100,16 @@ async function handleProfiles(request, env) {
           activeStoryUserIds,
           activeStoryUrlMap,
         );
-        return orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, pageWindowLimit);
+        return {
+          orderedProfiles: orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, pageWindowLimit),
+          totalProfiles: null,
+        };
       }))
     .finally(() => {
       markTiming('snapshotMs', snapshotStartedAt);
     });
 
   // Parallel: cached settings + cached profiles + combined favorites + active stories + total count
-  const countQuery = query.replace(/SELECT[\s\S]+?FROM users u/, 'SELECT COUNT(*) AS total FROM users u');
   const favoritesStartedAt = Date.now();
   const favoritesPromise = env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?')
     .bind(auth.sub, auth.sub)
@@ -2111,12 +2118,15 @@ async function handleProfiles(request, env) {
       markTiming('favoritesMs', favoritesStartedAt);
     });
   const countStartedAt = Date.now();
-  const countPromise = cached(`count:${profilesCacheKey}`, 60_000, () => env.DB.prepare(countQuery).bind(...params).first())
-    .finally(() => {
-      markTiming('countMs', countStartedAt);
-    });
-  const [orderedBaseProfiles, { results: allFavRows }, countRow] = await Promise.all([
-    orderedBaseProfilesPromise,
+  const countPromise = (
+    canUseFeedSnapshot
+      ? Promise.resolve(null)
+      : cached(`count:${profilesCacheKey}`, 60_000, () => env.DB.prepare(countQuery).bind(...params).first())
+  ).finally(() => {
+    markTiming('countMs', countStartedAt);
+  });
+  const [{ orderedProfiles: orderedBaseProfiles, totalProfiles: snapshotTotalProfiles }, { results: allFavRows }, countRow] = await Promise.all([
+    feedSnapshotDataPromise,
     favoritesPromise,
     countPromise,
   ]);
@@ -2134,7 +2144,7 @@ async function handleProfiles(request, env) {
   );
   markTiming('personalizeMs', personalizeStartedAt);
 
-  const totalProfiles = Number(countRow?.total ?? profiles.length);
+  const totalProfiles = Number(snapshotTotalProfiles ?? countRow?.total ?? profiles.length);
   const pagedProfiles = profiles.slice(cursor, cursor + reqPageSize);
   const hasMore = totalProfiles > cursor + reqPageSize;
   const nextCursor = hasMore ? cursor + reqPageSize : null;

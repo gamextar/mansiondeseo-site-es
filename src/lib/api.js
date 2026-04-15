@@ -749,9 +749,11 @@ export async function getProfiles({ filter, q, fresh = false, cursor, pageSize }
   if (cursor !== undefined && cursor !== null && cursor !== '') params.set('cursor', String(cursor));
   if (pageSize !== undefined && pageSize !== null && pageSize !== '') params.set('pageSize', String(pageSize));
   const qs = params.toString();
-  // Search queries bypass cache (user expects fresh results), browse is cached longer.
-  if (q || fresh || cursor || pageSize) return apiFetch(`/profiles${qs ? `?${qs}` : ''}`);
-  return sharedGet(`profiles:${filter || 'all'}`, () => apiFetch(`/profiles${qs ? `?${qs}` : ''}`), { ttlMs: 5 * 60_000 });
+  const path = `/profiles${qs ? `?${qs}` : ''}`;
+  // Search queries and forced refreshes bypass cache.
+  if (q || fresh) return apiFetch(path);
+  const cacheKey = `profiles:${filter || 'all'}:${cursor || 0}:${pageSize || 0}`;
+  return sharedGet(cacheKey, () => apiFetch(path), { ttlMs: 5 * 60_000 });
 }
 
 export function invalidateProfilesCache() {
