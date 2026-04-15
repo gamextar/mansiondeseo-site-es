@@ -627,6 +627,7 @@ const USERNAME_REGEX = /^[a-zA-Z0-9._]+$/;
 
 function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePasswordDefault, emailStatus, onEmailBlur, onNavigateRecover }) {
   const [showPassword, setShowPassword] = useState(!hidePasswordDefault);
+  const [passwordTouched, setPasswordTouched] = useState(false);
 
   // Sync with server setting once it arrives (useState only reads initial value once)
   useEffect(() => {
@@ -634,7 +635,7 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
   }, [hidePasswordDefault]);
 
   const borderColor = emailStatus === 'valid' ? 'border-green-500/60' : emailStatus === 'exists' || emailStatus === 'invalid' ? 'border-mansion-crimson/60' : '';
-  const passwordInvalid = password.length > 0 && password.length < 12;
+  const passwordInvalid = passwordTouched && password.length > 0 && password.length < 12;
   const passwordValid = password.length >= 12;
 
   return (
@@ -703,6 +704,7 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => onPasswordChange(e.target.value.slice(0, 50))}
+              onBlur={() => setPasswordTouched(true)}
               placeholder="Mínimo 12 caracteres"
               className={`w-full pl-10 pr-10 ${passwordInvalid ? 'border-mansion-crimson/60' : passwordValid ? 'border-green-500/60' : ''}`}
               autoComplete="new-password"
