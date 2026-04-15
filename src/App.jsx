@@ -68,9 +68,9 @@ function AppLayout() {
   const location = useLocation();
   const { user } = useAuth();
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
-  const backgroundLocation = location.state?.backgroundLocation;
-  const profileOverlayOpen = location.state?.modal === 'profile' && !!backgroundLocation;
-  const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
+  const backgroundLocation = location.state?.backgroundLocation || null;
+  const profileOverlayOpen = location.pathname.startsWith('/perfiles/') && location.state?.modal === 'profile' && !!backgroundLocation;
+  const videoOverlayOpen = location.pathname === '/videos' && location.state?.modal === 'videos' && !!backgroundLocation;
   const routeOverlayOpen = profileOverlayOpen || videoOverlayOpen;
   const standaloneVideosRoute = isStandaloneMobileApp && location.pathname.startsWith('/videos');
   const isFullscreen =

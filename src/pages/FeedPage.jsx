@@ -13,6 +13,7 @@ import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMed
 import { isSafariDesktopBrowser } from '../lib/browser';
 import { getBottomNavBottomPadding, getBottomNavHeight } from '../lib/bottomNavConfig';
 import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsers, getViewedStoryUsersKey } from '../lib/storyViews';
+import { snapshotBackgroundLocation } from '../lib/overlayLocation';
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
@@ -180,6 +181,7 @@ export default function FeedPage({ initialData }) {
   const storiesDragRef = useRef({
     active: false,
     captured: false,
+    pointerId: null,
     startX: 0,
     startScrollLeft: 0,
     moved: false,
@@ -751,7 +753,31 @@ export default function FeedPage({ initialData }) {
     };
   }, [schedulePendingViewedStories]);
 
+  const releaseStoriesPointerCapture = useCallback((pointerId = storiesDragRef.current.pointerId) => {
+    const el = storiesScrollRef.current;
+    const drag = storiesDragRef.current;
+    if (!el || !drag.captured || pointerId === null || pointerId === undefined) return;
+
+    try {
+      el.releasePointerCapture?.(pointerId);
+    } catch {}
+  }, []);
+
+  const resetStoriesDragState = useCallback(() => {
+    releaseStoriesPointerCapture();
+    storiesDragRef.current.active = false;
+    storiesDragRef.current.captured = false;
+    storiesDragRef.current.pointerId = null;
+    storiesDragRef.current.startX = 0;
+    storiesDragRef.current.startScrollLeft = 0;
+    storiesDragRef.current.moved = false;
+    storiesDragRef.current.lastX = 0;
+    storiesDragRef.current.lastTs = 0;
+    storiesDragRef.current.velocity = 0;
+  }, [releaseStoriesPointerCapture]);
+
   const openStoryFromHome = useCallback((storyOrUserId) => {
+    resetStoriesDragState();
     const storyUserId = typeof storyOrUserId === 'object' && storyOrUserId !== null
       ? String(storyOrUserId.user_id || storyOrUserId.id || '')
       : String(storyOrUserId || '');
@@ -777,11 +803,11 @@ export default function FeedPage({ initialData }) {
         storyUserId,
         storySeed,
         modal: 'videos',
-        backgroundLocation: location,
+        backgroundLocation: snapshotBackgroundLocation(location),
         backgroundScrollY,
       },
     });
-  }, [location, navigate]);
+  }, [location, navigate, resetStoriesDragState]);
 
   useEffect(() => {
     if (!getToken()) return;
@@ -910,6 +936,7 @@ export default function FeedPage({ initialData }) {
     storiesDragRef.current = {
       active: true,
       captured: false,
+      pointerId: event.pointerId,
       startX: event.clientX,
       startScrollLeft: el.scrollLeft,
       moved: false,
@@ -954,13 +981,10 @@ export default function FeedPage({ initialData }) {
 
   const finishStoriesDrag = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
-    const el = storiesScrollRef.current;
     const drag = storiesDragRef.current;
     if (!drag.active) return;
     drag.active = false;
-    if (el && drag.captured && event?.pointerId !== undefined) {
-      try { el.releasePointerCapture?.(event.pointerId); } catch {}
-    }
+    releaseStoriesPointerCapture(event?.pointerId ?? drag.pointerId);
     storiesMomentumRef.current.velocity = drag.moved ? drag.velocity : 0;
     if (drag.moved) {
       startStoriesMomentum();
@@ -971,7 +995,8 @@ export default function FeedPage({ initialData }) {
       animateStoriesEdgeOffsetTo(0);
     }
     drag.captured = false;
-  }, [animateStoriesEdgeOffsetTo, desktopStoryRailEnhanced, startStoriesMomentum]);
+    drag.pointerId = null;
+  }, [animateStoriesEdgeOffsetTo, desktopStoryRailEnhanced, releaseStoriesPointerCapture, startStoriesMomentum]);
 
   const handleStoriesClickCapture = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
@@ -987,15 +1012,14 @@ export default function FeedPage({ initialData }) {
     stopStoriesBounce();
     storiesEdgeOffsetRef.current = 0;
     setStoriesEdgeOffset(0);
-    storiesDragRef.current.active = false;
-    storiesDragRef.current.captured = false;
-    storiesDragRef.current.moved = false;
-  }, [desktopStoryRailEnhanced, stopStoriesBounce, stopStoriesMomentum]);
+    resetStoriesDragState();
+  }, [desktopStoryRailEnhanced, resetStoriesDragState, stopStoriesBounce, stopStoriesMomentum]);
 
   useEffect(() => () => {
+    resetStoriesDragState();
     stopStoriesMomentum();
     stopStoriesBounce();
-  }, [stopStoriesBounce, stopStoriesMomentum]);
+  }, [resetStoriesDragState, stopStoriesBounce, stopStoriesMomentum]);
 
   // ── Grid setup ────────────────────────────────────────────────────
   const gap = 12;

@@ -10,6 +10,7 @@ import { resolveMediaUrl } from '../lib/media';
 import { isSafariDesktopBrowser } from '../lib/browser';
 import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
 import { applyPendingViewedStoryUsers, clearPendingViewedStoryUsers, getViewedStoryUsers, markViewedStoryUser, queuePendingViewedStoryUser } from '../lib/storyViews';
+import { stripOverlayLocationState } from '../lib/overlayLocation';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -693,7 +694,7 @@ export default function VideoFeedPage() {
           search: backgroundLocation.search || '',
           hash: backgroundLocation.hash || '',
         },
-        { replace: true, state: backgroundLocation.state || null }
+        { replace: true, state: stripOverlayLocationState(backgroundLocation.state) }
       );
       return;
     }
