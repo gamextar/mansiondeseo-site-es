@@ -1366,9 +1366,9 @@ export default function FeedPage({ initialData }) {
                   initial={{ opacity: 0, y: 18, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-                  className="pointer-events-none fixed bottom-6 left-[calc(50%+8rem)] z-40 hidden -translate-x-1/2 lg:block xl:left-[calc(50%+9rem)]"
+                  className="pointer-events-none fixed bottom-6 left-1/2 z-40 hidden -translate-x-1/2 lg:block"
                 >
-                  <div className="pointer-events-auto flex items-center gap-2.5 rounded-full border border-white/10 bg-[rgba(14,14,20,0.76)] px-3 py-2.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+                  <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-white/10 bg-[rgba(14,14,20,0.78)] px-3.5 py-3 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-xl">
                     <div className="rounded-full border border-white/8 bg-white/[0.04] px-3.5 py-2 text-[11px] font-medium tracking-[0.02em] text-white/58">
                       {Math.min(totalProfiles, pageCursor + 1)}-{Math.min(totalProfiles, pageCursor + visibleProfiles.length)} de {totalProfiles}
                     </div>
@@ -1383,22 +1383,31 @@ export default function FeedPage({ initialData }) {
                       <ChevronLeft className="h-4.5 w-4.5" />
                     </button>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                       {pageWindow.map((page) => (
                         <motion.button
                           key={page}
                           type="button"
                           onClick={() => goToFeedPage(page)}
                           disabled={page === currentPage || loading}
+                          layout
                           whileHover={page === currentPage ? undefined : { y: -1 }}
                           whileTap={page === currentPage ? undefined : { scale: 0.97 }}
-                          className={`min-w-10 rounded-full px-3.5 py-2 text-[15px] font-semibold transition ${
+                          transition={{ layout: { duration: 0.24, ease: [0.22, 1, 0.36, 1] } }}
+                          className={`relative inline-flex h-11 min-w-[3rem] items-center justify-center overflow-hidden rounded-full px-4 text-[15px] font-semibold transition-colors duration-200 ${
                             page === currentPage
-                              ? 'bg-white text-black shadow-[0_8px_18px_rgba(255,255,255,0.18)]'
+                              ? 'text-black'
                               : 'text-white/62 hover:bg-white/[0.08] hover:text-white'
                           }`}
                         >
-                          {page}
+                          {page === currentPage ? (
+                            <motion.span
+                              layoutId="desktop-feed-pagination-active-pill"
+                              className="absolute inset-0 rounded-full bg-white shadow-[0_8px_18px_rgba(255,255,255,0.18)]"
+                              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                            />
+                          ) : null}
+                          <span className="relative z-10">{page}</span>
                         </motion.button>
                       ))}
                     </div>
