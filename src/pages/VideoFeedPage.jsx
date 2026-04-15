@@ -27,6 +27,8 @@ function timeAgo(dateStr) {
 // ── Avatar size fallback; real value comes from siteSettings.videoAvatarSize ─
 const AVATAR_SIZE_DEFAULT = 52;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
+const DESKTOP_RENDER_RADIUS = 1;
+const MOBILE_RENDER_RADIUS = 2;
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -144,6 +146,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
   const revealSentRef = useRef(false);
+  const playIconTimerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
@@ -172,6 +175,22 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     if (!video || !isActive || !activeSrc) return;
     video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
   }, [activeSrc, isActive]);
+
+  const releaseVideoResources = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    try {
+      video.pause();
+    } catch {}
+
+    try {
+      video.removeAttribute('src');
+      video.load();
+    } catch {}
+
+    loadedSrcRef.current = undefined;
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -234,6 +253,14 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     if (video) video.muted = isMuted;
   }, [isMuted]);
 
+  useEffect(() => () => {
+    if (playIconTimerRef.current) {
+      clearTimeout(playIconTimerRef.current);
+    }
+    cancelAnimationFrame(rafRef.current);
+    releaseVideoResources();
+  }, [releaseVideoResources]);
+
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -244,7 +271,10 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       setIsPlaying(false);
     }
     setShowPlayIcon(true);
-    setTimeout(() => setShowPlayIcon(false), 600);
+    if (playIconTimerRef.current) {
+      clearTimeout(playIconTimerRef.current);
+    }
+    playIconTimerRef.current = setTimeout(() => setShowPlayIcon(false), 600);
   };
 
   const handleVideoEnd = () => {
@@ -1275,8 +1305,13 @@ export default function VideoFeedPage() {
               const rawDistance = Math.abs(index - activeIndex);
               const circularDistance = Math.min(rawDistance, stories.length - rawDistance);
               const isActive = index === activeIndex;
-              const shouldLoad = stories.length <= 3 || circularDistance <= 1;
+              const shouldRender = stories.length <= (DESKTOP_RENDER_RADIUS * 2 + 1) || circularDistance <= DESKTOP_RENDER_RADIUS;
+              const shouldLoad = shouldRender;
               const enableCinematicReveal = isActive && !entryRevealReady;
+
+              if (!shouldRender) {
+                return null;
+              }
 
               return (
                 <div
@@ -1328,31 +1363,35 @@ export default function VideoFeedPage() {
         >
           {infiniteStories.map((story, displayIndex) => {
             const dist = Math.abs(displayIndex - activeDispIdx);
-            const isBoundary = displayIndex <= 1 || displayIndex >= stories.length;
-            const shouldLoad = dist <= 3 || isBoundary;
+            const shouldRender = dist <= MOBILE_RENDER_RADIUS;
+            const shouldLoad = shouldRender;
             const enableCinematicReveal = displayIndex === activeDispIdx && !entryRevealReady;
             return (
               <div
                 key={displayIndex}
                 className="h-full w-full flex-shrink-0"
               >
-                <StoryCard
-                  story={story}
-                  videoSrc={story.video_url}
-                  isActive={displayIndex === activeDispIdx}
-                  shouldLoad={shouldLoad}
-                  isMuted={isMuted}
-                  avatarSize={avatarSize}
-                  onLike={handleLike}
-                  navigate={navigate}
-                  gradientHeight={gradientHeight}
-                  gradientOpacity={gradientOpacity}
-                  resetOnDeactivate
-                  onGift={openGiftModal}
-                  isOwnStory={String(story.user_id) === String(user?.id)}
-                  onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
-                  enableCinematicReveal={enableCinematicReveal}
-                />
+                {shouldRender ? (
+                  <StoryCard
+                    story={story}
+                    videoSrc={story.video_url}
+                    isActive={displayIndex === activeDispIdx}
+                    shouldLoad={shouldLoad}
+                    isMuted={isMuted}
+                    avatarSize={avatarSize}
+                    onLike={handleLike}
+                    navigate={navigate}
+                    gradientHeight={gradientHeight}
+                    gradientOpacity={gradientOpacity}
+                    resetOnDeactivate
+                    onGift={openGiftModal}
+                    isOwnStory={String(story.user_id) === String(user?.id)}
+                    onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
+                    enableCinematicReveal={enableCinematicReveal}
+                  />
+                ) : (
+                  <div className="h-full w-full bg-black" />
+                )}
               </div>
             );
           })}
