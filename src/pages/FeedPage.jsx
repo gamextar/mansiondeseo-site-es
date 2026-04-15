@@ -1366,7 +1366,7 @@ export default function FeedPage({ initialData }) {
                   initial={{ opacity: 0, y: 18, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-                  className="pointer-events-none fixed bottom-7 left-[calc(50%+8rem)] z-40 hidden w-max -translate-x-1/2 lg:block xl:left-[calc(50%+9rem)]"
+                  className="pointer-events-none fixed inset-x-0 bottom-7 z-40 hidden justify-center lg:flex"
                 >
                   <div className="pointer-events-auto flex items-center gap-3 rounded-[999px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] px-3.5 py-3 shadow-[0_18px_48px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[22px]">
                     <div className="rounded-full border border-white/10 bg-black/18 px-3.5 py-2 text-[11px] font-medium tracking-[0.02em] text-white/58">
