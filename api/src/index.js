@@ -3370,6 +3370,8 @@ async function loadSettings(env) {
     feedCardsPerPage: parseNumberSetting(settings.feed_cards_per_page, 12),
     feedMaxPages: parseNumberSetting(settings.feed_max_pages, 10),
     feedPrefetchPages: parseNumberSetting(settings.feed_prefetch_pages, 6),
+    homeStoryCountMobile: parseNumberSetting(settings.home_story_count_mobile, 15),
+    homeStoryCountDesktop: parseNumberSetting(settings.home_story_count_desktop, 30),
   };
   // Keep module-level threshold in sync so isOnline() uses the latest value
   _onlineThresholdMs = result.onlineThresholdMinutes * 60_000;
@@ -3429,6 +3431,8 @@ function getPublicSettingsPayload(settings) {
     feedCardsPerPage: settings.feedCardsPerPage,
     feedMaxPages: settings.feedMaxPages,
     feedPrefetchPages: settings.feedPrefetchPages,
+    homeStoryCountMobile: settings.homeStoryCountMobile,
+    homeStoryCountDesktop: settings.homeStoryCountDesktop,
     navBottomPadding: settings.navBottomPadding,
     navSidePadding: settings.navSidePadding,
     navHeight: settings.navHeight,

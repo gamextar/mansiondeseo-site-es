@@ -406,7 +406,10 @@ export default function FeedPage({ initialData }) {
     useCallback(() => loadProfiles({ forceFresh: true }), [loadProfiles])
   );
 
-  const safeSettings = settings && typeof settings === 'object' ? settings : {};
+  const safeSettings = useMemo(() => ({
+    ...((siteSettings && typeof siteSettings === 'object') ? siteSettings : {}),
+    ...((settings && typeof settings === 'object') ? settings : {}),
+  }), [settings, siteSettings]);
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
   const cardsPerPage = Math.max(6, Math.min(60, safeSettings.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE));
   const maxPages = Math.max(1, Math.min(50, safeSettings.feedMaxPages ?? DEFAULT_MAX_PAGES));
