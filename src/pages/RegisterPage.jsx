@@ -1096,7 +1096,7 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
       <div className="space-y-4 max-w-xs mx-auto text-left">
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">
-            Nombre (o alias)
+            Nombre de usuario (o alias)
           </label>
           <div className="relative">
             <input
@@ -1107,7 +1107,7 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
                 onChange({ ...data, name: val });
               }}
               onBlur={onUsernameBlur}
-              placeholder="Tu nombre en la Mansión"
+              placeholder="Tu nombre de usuario en la Mansión"
               maxLength={20}
               className={`w-full pr-10 ${
                 usernameStatus === 'valid' ? 'border-green-500/60' :
