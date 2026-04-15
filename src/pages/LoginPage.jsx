@@ -118,10 +118,10 @@ export default function LoginPage() {
         </div>
 
         {/* Register link */}
-        <p className="text-center text-text-muted text-lg">
+        <p className="text-center text-text-muted text-[17px]">
           ¿Aún no tenés cuenta?{' '}
-          <Link to="/registro" className="text-mansion-gold font-medium hover:underline text-lg">
-            Registrarme
+          <Link to="/registro" className="text-mansion-gold font-medium hover:underline text-[17px]">
+            Registrate
           </Link>
         </p>
       </motion.div>

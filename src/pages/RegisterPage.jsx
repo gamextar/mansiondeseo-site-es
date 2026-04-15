@@ -634,6 +634,7 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
   }, [hidePasswordDefault]);
 
   const borderColor = emailStatus === 'valid' ? 'border-green-500/60' : emailStatus === 'exists' || emailStatus === 'invalid' ? 'border-mansion-crimson/60' : '';
+  const passwordInvalid = password.length > 0 && password.length < 12;
 
   return (
     <div className="text-center">
@@ -702,10 +703,13 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
               value={password}
               onChange={(e) => onPasswordChange(e.target.value.slice(0, 50))}
               placeholder="Mínimo 12 caracteres"
-              className="w-full pl-10 pr-10"
+              className={`w-full pl-10 pr-10 ${passwordInvalid ? 'border-mansion-crimson/60' : ''}`}
               autoComplete="new-password"
               maxLength={50}
             />
+            {passwordInvalid && (
+              <AlertCircle className="absolute right-10 top-1/2 -translate-y-1/2 w-4 h-4 text-mansion-crimson" />
+            )}
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
@@ -714,8 +718,8 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
-          {password.length > 0 && password.length < 12 && (
-            <p className="text-mansion-gold/70 text-[11px] mt-1">Mínimo 12 caracteres ({password.length}/12)</p>
+          {passwordInvalid && (
+            <p className="text-mansion-crimson text-[11px] mt-1">Mínimo 12 caracteres ({password.length}/12)</p>
           )}
         </div>
       </div>
@@ -1107,7 +1111,7 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
                 onChange({ ...data, name: val });
               }}
               onBlur={onUsernameBlur}
-              placeholder="Tu nombre de usuario en la Mansión"
+              placeholder="Evita datos reales como Apellido etc"
               maxLength={20}
               className={`w-full pr-10 ${
                 usernameStatus === 'valid' ? 'border-green-500/60' :
