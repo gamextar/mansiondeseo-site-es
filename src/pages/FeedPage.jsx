@@ -158,6 +158,7 @@ export default function FeedPage({ initialData }) {
   });
   const isSafariDesktopRef = useRef(false);
   const pagedFeedConfigRef = useRef('');
+  const pagedFeedConfigInitializedRef = useRef(false);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
@@ -263,6 +264,7 @@ export default function FeedPage({ initialData }) {
     const cachedFeed = getCachedFeed();
     const currentSettings = settingsRef.current;
     const cachedPageSize = Number(cachedFeed?.pageSize) || 0;
+    const cachedPageCursor = Number(cachedFeed?.pageCursor ?? cachedFeed?.currentCursor) || 0;
     const expectedPageSize = Math.max(
       12,
       (currentSettings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (currentSettings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
@@ -284,7 +286,11 @@ export default function FeedPage({ initialData }) {
     } catch {}
     const cacheAgeMs = Date.now() - (Number(cachedFeed.timestamp) || 0);
     if (cacheAgeMs > 30 * 60 * 1000) {
-      loadProfiles({ cursor: 0, pageSize: expectedPageSize });
+      loadProfiles({
+        cursor: Math.floor(cachedPageCursor / expectedPageSize) * expectedPageSize,
+        pageSize: expectedPageSize,
+        targetPageCursor: cachedPageCursor,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
@@ -472,6 +478,11 @@ export default function FeedPage({ initialData }) {
   useEffect(() => {
     if (loading) return;
     const nextConfig = `paged:${cardsPerPage}`;
+    if (!pagedFeedConfigInitializedRef.current) {
+      pagedFeedConfigRef.current = nextConfig;
+      pagedFeedConfigInitializedRef.current = true;
+      return;
+    }
     if (pagedFeedConfigRef.current === nextConfig) return;
     pagedFeedConfigRef.current = nextConfig;
     prefetchedBlocksRef.current.clear();
