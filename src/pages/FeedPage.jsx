@@ -641,10 +641,7 @@ export default function FeedPage({ initialData }) {
 
   useLayoutEffect(() => {
     const orderedIds = orderedStoryProfiles.map((profile) => String(profile?.id || '')).filter(Boolean).join(',');
-    previousOrderedStoryIdsRef.current = orderedIds;
-  }, [orderedStoryProfiles]);
-
-  useLayoutEffect(() => {
+    const previousOrderedIds = previousOrderedStoryIdsRef.current;
     const nextRects = new Map();
 
     for (const profile of orderedStoryProfiles) {
@@ -654,6 +651,8 @@ export default function FeedPage({ initialData }) {
 
       const rect = node.getBoundingClientRect();
       nextRects.set(key, rect);
+
+      if (!previousOrderedIds || previousOrderedIds === orderedIds) continue;
 
       const previousRect = storyRectsRef.current.get(key);
       if (!previousRect) continue;
@@ -712,6 +711,7 @@ export default function FeedPage({ initialData }) {
     }
 
     storyRectsRef.current = nextRects;
+    previousOrderedStoryIdsRef.current = orderedIds;
   }, [orderedStoryProfiles]);
   const applyPendingViewedStories = useCallback(() => {
     try {

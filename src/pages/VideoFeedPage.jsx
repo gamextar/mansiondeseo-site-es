@@ -754,6 +754,7 @@ export default function VideoFeedPage() {
     if (!uid) return;
     try {
       if (!user?.id) return;
+      if (getViewedStoryUsers(user.id).includes(uid)) return;
       queuePendingViewedStoryUser(user.id, uid);
     } catch {}
   }, [user?.id]);
