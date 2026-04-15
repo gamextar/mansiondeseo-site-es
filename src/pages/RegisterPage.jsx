@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import {
@@ -29,7 +29,7 @@ import ImageCropper from '../components/ImageCropper';
 // Constants
 // ────────────────────────────────────────────
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
 
 const ROLES = [
   {
@@ -1148,6 +1148,7 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
         </div>
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">Fecha de nacimiento</label>
+          <p className="text-[10px] text-text-dim mb-1.5">Solo se mostrara tu edad.</p>
           <div className="grid grid-cols-3 gap-2">
             <select
               value={bdDay}
@@ -1604,10 +1605,6 @@ export default function RegisterPage() {
   const [devCode, setDevCode] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
-  const [turnstileToken, setTurnstileToken] = useState('');
-  const turnstileWidgetRef = useRef(null);
-  const turnstileContainerRef = useRef(null);
-  const setTurnstileTokenBoth = (t) => { setTurnstileToken(t); };
   const [emailStatus, setEmailStatus] = useState('idle'); // idle | checking | valid | exists | invalid
   const [usernameStatus, setUsernameStatus] = useState('idle'); // idle | checking | valid | exists | invalid
 
@@ -1652,47 +1649,6 @@ export default function RegisterPage() {
     };
   }, []);
 
-  // Load Turnstile script once
-  useEffect(() => {
-    if (document.getElementById('cf-turnstile-script')) return;
-    const script = document.createElement('script');
-    script.id = 'cf-turnstile-script';
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
-  }, []);
-
-  // Render Turnstile on the first and final step so the token is fresh at submit time.
-  useEffect(() => {
-    if (step !== 0 && step !== TOTAL_STEPS - 1) return;
-    if (!turnstileContainerRef.current) return;
-
-    const tryRender = () => {
-      if (!window.turnstile) { setTimeout(tryRender, 100); return; }
-      if (turnstileWidgetRef.current != null) {
-        try {
-          window.turnstile.remove(turnstileWidgetRef.current);
-        } catch {
-          // best effort
-        }
-        turnstileWidgetRef.current = null;
-      }
-      setTurnstileTokenBoth('');
-      turnstileWidgetRef.current = window.turnstile.render(turnstileContainerRef.current, {
-        sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA',
-        theme: 'dark',
-        callback: (token) => setTurnstileTokenBoth(token),
-        'expired-callback': () => setTurnstileTokenBoth(''),
-        'error-callback': () => setTurnstileTokenBoth(''),
-      });
-    };
-    tryRender();
-
-    // Recreated intentionally when entering step 0 or the final step.
-    return () => {};
-  }, [step]);
-
   useEffect(() => {
     Promise.all([
       apiDetectCountry().catch(() => ({ country: '' })),
@@ -1717,12 +1673,6 @@ export default function RegisterPage() {
       }
     });
   }, []);
-
-  const toggleInterest = (id) => {
-    setInterests((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
 
   // Auto-advance after first selection on role/seeking steps
   const handleRoleSelect = useCallback(
@@ -1753,9 +1703,8 @@ export default function RegisterPage() {
     if (step === 0) return EMAIL_REGEX.test(email) && isValidEmailTld(email) && password.length >= 12 && emailStatus !== 'exists' && emailStatus !== 'invalid';
     if (step === 1) return !!iAm;
     if (step === 2) return seeking.length > 0;
-    if (step === 3) return interests.length > 0;
-    if (step === 4) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && isAdultBirthdate(info.birthdate) && info.province && (!showCountryPicker || selectedCountry);
-    if (step === 5) return !!photoFile && !!turnstileToken;
+    if (step === 3) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && isAdultBirthdate(info.birthdate) && info.province && (!showCountryPicker || selectedCountry);
+    if (step === 4) return !!photoFile;
     return true;
   };
 
@@ -1845,7 +1794,6 @@ export default function RegisterPage() {
           locality: info.locality,
           bio: info.bio,
           country: selectedCountry || undefined,
-          turnstileToken: turnstileToken || undefined,
         });
 
         // Show verification screen
@@ -1954,20 +1902,16 @@ export default function RegisterPage() {
     switch (step) {
       case 0:
         return (
-          <>
-            <StepEmail
-              email={email}
-              password={password}
-              onEmailChange={setEmail}
-              onPasswordChange={setPassword}
-              hidePasswordDefault={hidePasswordDefault}
-              emailStatus={emailStatus}
-              onEmailBlur={handleEmailBlur}
-              onNavigateRecover={() => navigate(`/recuperar-contrasena?email=${encodeURIComponent(email)}`)}
-            />
-            {/* Turnstile widget renders here on mount */}
-            <div ref={turnstileContainerRef} className="flex justify-center mt-10" />
-          </>
+          <StepEmail
+            email={email}
+            password={password}
+            onEmailChange={setEmail}
+            onPasswordChange={setPassword}
+            hidePasswordDefault={hidePasswordDefault}
+            emailStatus={emailStatus}
+            onEmailBlur={handleEmailBlur}
+            onNavigateRecover={() => navigate(`/recuperar-contrasena?email=${encodeURIComponent(email)}`)}
+          />
         );
       case 1:
         return (
@@ -1990,16 +1934,9 @@ export default function RegisterPage() {
           />
         );
       case 3:
-        return <StepInterests selected={interests} onToggle={toggleInterest} />;
-      case 4:
         return <StepBasicInfo data={info} onChange={setInfo} showCountryPicker={showCountryPicker} allowedCountries={allowedCountries} selectedCountry={selectedCountry} onCountryChange={setSelectedCountry} usernameStatus={usernameStatus} onUsernameBlur={handleUsernameBlur} />;
-      case 5:
-        return (
-          <>
-            <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />
-            <div ref={turnstileContainerRef} className="flex justify-center mt-6" />
-          </>
-        );
+      case 4:
+        return <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />;
       default:
         return null;
     }

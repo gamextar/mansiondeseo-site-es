@@ -1351,24 +1351,8 @@ function calculateAgeFromBirthdate(birthdate) {
 
 async function handleRegister(request, env) {
   const body = await request.json();
-  const { email, password, username, role, seeking, interests, age, birthdate, city, province, locality, bio, marital_status, sexual_orientation, message_block_roles, turnstileToken } = body;
+  const { email, password, username, role, seeking, interests, age, birthdate, city, province, locality, bio, marital_status, sexual_orientation, message_block_roles } = body;
   await ensureUsersMessageBlockRolesColumn(env);
-
-  // Validate Cloudflare Turnstile token (if secret is configured)
-  if (env.TURNSTILE_SECRET) {
-    const ip = request.headers.get('CF-Connecting-IP') || '';
-    const formData = new FormData();
-    formData.append('secret', env.TURNSTILE_SECRET);
-    formData.append('response', turnstileToken || '');
-    if (ip) formData.append('remoteip', ip);
-    const tsRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      body: formData,
-    }).then(r => r.json()).catch(() => ({ success: false }));
-    if (!tsRes.success) {
-      return error('Verificación de seguridad fallida. Por favor intentá de nuevo.', 400);
-    }
-  }
   const provinceValue = String(province ?? city ?? '').trim();
   const localityValue = String(locality || '').trim();
   const maritalStatusValue = String(marital_status || '').trim();
