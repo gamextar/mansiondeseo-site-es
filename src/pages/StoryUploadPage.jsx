@@ -8,6 +8,7 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import { getToken, uploadStory } from '../lib/api';
 import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
+import { removeViewedStoryUser } from '../lib/storyViews';
 
 const LANDSCAPE_WIDTH = 1280;
 const LANDSCAPE_HEIGHT = 720;
@@ -795,10 +796,7 @@ export default function StoryUploadPage() {
 				active_story_url: story?.video_url || null,
 			}));
 			try {
-				const viewed = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
-				const uid = String(user?.id);
-				const filtered = viewed.filter(id => id !== uid);
-				localStorage.setItem('viewed_story_users', JSON.stringify(filtered));
+				removeViewedStoryUser(user?.id, user?.id);
 			} catch {}
 			encodedFileRef.current = null;
 			navigate(returnPath);

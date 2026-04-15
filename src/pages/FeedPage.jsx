@@ -12,6 +12,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
 import { getBottomNavBottomPadding, getBottomNavHeight } from '../lib/bottomNavConfig';
+import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsers, getViewedStoryUsersKey } from '../lib/storyViews';
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
@@ -19,7 +20,6 @@ const DEFAULT_CARDS_PER_PAGE = 12;
 const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PREFETCH_PAGES = 6;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
-const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
 
 function detectStandaloneMobile() {
@@ -296,6 +296,7 @@ export default function FeedPage({ initialData }) {
   }, [navigate]);
 
   const [gridOpacity, setGridOpacity] = useState(1);
+  const viewedStoriesStorageKey = useMemo(() => getViewedStoryUsersKey(user?.id), [user?.id]);
 
   useEffect(() => {
     let fadeOutTimer = null;
@@ -534,7 +535,7 @@ export default function FeedPage({ initialData }) {
         window.removeEventListener(VIEWED_STORIES_EVENT, handler);
       };
     }, []),
-    () => localStorage.getItem('viewed_story_users') || '[]',
+    () => (viewedStoriesStorageKey ? localStorage.getItem(viewedStoriesStorageKey) || '[]' : '[]'),
   );
   const viewedStoryUsers = useMemo(() => {
     try { return new Set(JSON.parse(viewedRaw)); } catch { return new Set(); }
@@ -688,40 +689,21 @@ export default function FeedPage({ initialData }) {
   }, [orderedStoryProfiles]);
   const applyPendingViewedStories = useCallback(() => {
     try {
-      const rawPending = sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY);
-      if (!rawPending) return false;
-      const pending = JSON.parse(rawPending);
-      const nextPending = Array.isArray(pending) ? pending.map((value) => String(value || '')).filter(Boolean) : [];
-      if (nextPending.length === 0) {
-        sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
-        return false;
-      }
-
-      const current = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
-      const seen = new Set(Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : []);
-      let changed = false;
-      for (const userId of nextPending) {
-        if (seen.has(userId)) continue;
-        seen.add(userId);
-        changed = true;
-      }
-      sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
+      if (!user?.id) return false;
+      const changed = applyPendingViewedStoryUsers(user.id);
       if (!changed) return false;
-
-      const merged = [...seen];
-      if (merged.length > 300) merged.splice(0, merged.length - 300);
-      localStorage.setItem('viewed_story_users', JSON.stringify(merged));
       window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
       return true;
     } catch {
       return false;
     }
-  }, []);
+  }, [user?.id]);
 
   const schedulePendingViewedStories = useCallback(() => {
     try {
       if (document.hidden) return;
-      if (!sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY)) return;
+      if (!user?.id) return;
+      if (getPendingViewedStoryUsers(user.id).length === 0) return;
     } catch {
       return;
     }
@@ -732,7 +714,7 @@ export default function FeedPage({ initialData }) {
       applyPendingViewedStories();
       pendingViewedTimerRef.current = null;
     }, VIEWED_STORIES_APPLY_DELAY_MS);
-  }, [applyPendingViewedStories]);
+  }, [applyPendingViewedStories, user?.id]);
 
   useEffect(() => {
     schedulePendingViewedStories();

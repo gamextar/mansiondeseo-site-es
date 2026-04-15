@@ -9,6 +9,7 @@ import AvatarImg from '../components/AvatarImg';
 import { resolveMediaUrl } from '../lib/media';
 import { isSafariDesktopBrowser } from '../lib/browser';
 import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
+import { applyPendingViewedStoryUsers, clearPendingViewedStoryUsers, getViewedStoryUsers, markViewedStoryUser, queuePendingViewedStoryUser } from '../lib/storyViews';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -24,7 +25,6 @@ function timeAgo(dateStr) {
 
 // ── Avatar size fallback; real value comes from siteSettings.videoAvatarSize ─
 const AVATAR_SIZE_DEFAULT = 52;
-const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 
 function detectStandaloneMobile() {
@@ -678,29 +678,12 @@ export default function VideoFeedPage() {
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
   const flushPendingViewedStories = useCallback(() => {
     try {
-      const rawPending = sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY);
-      if (!rawPending) return;
-      const pending = JSON.parse(rawPending);
-      const nextPending = Array.isArray(pending) ? pending.map((value) => String(value || '')).filter(Boolean) : [];
-      sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
-      if (nextPending.length === 0) return;
-
-      const current = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
-      const seen = new Set(Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : []);
-      let changed = false;
-      for (const userId of nextPending) {
-        if (seen.has(userId)) continue;
-        seen.add(userId);
-        changed = true;
-      }
+      if (!user?.id) return;
+      const changed = applyPendingViewedStoryUsers(user.id);
       if (!changed) return;
-
-      const merged = [...seen];
-      if (merged.length > 300) merged.splice(0, merged.length - 300);
-      localStorage.setItem('viewed_story_users', JSON.stringify(merged));
       window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
     } catch {}
-  }, []);
+  }, [user?.id]);
   const closeOverlay = useCallback(() => {
     flushPendingViewedStories();
     if (backgroundLocation?.pathname) {
@@ -725,32 +708,24 @@ export default function VideoFeedPage() {
     const uid = String(storyUserId || '');
     if (!uid) return;
     try {
-      const current = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
-      const seen = new Set(Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : []);
-      if (seen.has(uid)) {
-        sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
+      if (!user?.id) return;
+      if (getViewedStoryUsers(user.id).includes(uid)) {
+        clearPendingViewedStoryUsers(user.id);
         return;
       }
-      seen.add(uid);
-      const merged = [...seen];
-      if (merged.length > 300) merged.splice(0, merged.length - 300);
-      localStorage.setItem('viewed_story_users', JSON.stringify(merged));
-      sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
+      markViewedStoryUser(user.id, uid);
+      clearPendingViewedStoryUsers(user.id);
       window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
     } catch {}
-  }, []);
+  }, [user?.id]);
   const queueStoryViewed = useCallback((storyUserId) => {
     const uid = String(storyUserId || '');
     if (!uid) return;
     try {
-      const current = JSON.parse(sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY) || '[]');
-      const next = Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : [];
-      if (next.includes(uid)) return;
-      next.push(uid);
-      if (next.length > 300) next.splice(0, next.length - 300);
-      sessionStorage.setItem(PENDING_VIEWED_STORIES_KEY, JSON.stringify(next));
+      if (!user?.id) return;
+      queuePendingViewedStoryUser(user.id, uid);
     } catch {}
-  }, []);
+  }, [user?.id]);
 
   const infiniteStories = stories.length > 0
     ? [stories[stories.length - 1], ...stories, stories[0]]
