@@ -18,7 +18,9 @@
     "extract:contactossex:ui": "node scripts/extractor-ui-server.mjs",
     "review:batches:ui": "node scripts/review-batches-server.mjs",
     "preview:pages-deployment": "node scripts/pages-deployment-preview-server.mjs",
-    "migrate:media-domains": "node scripts/migrate-media-domains.mjs"
+    "migrate:media-domains": "node scripts/migrate-media-domains.mjs",
+    "cleanup:women-photo-01": "node scripts/remove-women-photo-01.mjs",
+    "cleanup:role-photo-01": "node scripts/remove-women-photo-01.mjs"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
