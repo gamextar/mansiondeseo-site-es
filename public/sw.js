@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mansion-v4';
+const CACHE_NAME = 'mansion-v5';
 const PRECACHE = ['/', '/index.html'];
 
 self.addEventListener('install', (e) => {
@@ -31,10 +31,10 @@ self.addEventListener('fetch', (e) => {
   // when React.lazy() tries to execute the cached HTML as JavaScript.
   if (url.pathname.startsWith('/assets/')) return;
 
-  // For HTML navigation requests: cache-first with background network update.
-  // This serves the cached shell INSTANTLY on cold PWA launch (eliminating the
-  // blank white flash caused by waiting on a network round-trip), then fetches
-  // a fresh copy in the background to keep the cache up to date.
+  // For HTML navigation requests use network-first.
+  // Serving stale cached HTML after a deploy can reference old hashed Vite
+  // assets, and Cloudflare Pages' SPA fallback then returns index.html for the
+  // missing .js/.css URL, causing MIME type errors and black screens on refresh.
   const isNavigation = request.mode === 'navigate' ||
     (url.origin === self.location.origin &&
       (url.pathname === '/' || url.pathname === '/index.html'));
@@ -42,17 +42,14 @@ self.addEventListener('fetch', (e) => {
   if (isNavigation) {
     e.respondWith(
       caches.open(CACHE_NAME).then((cache) =>
-        cache.match(request).then((cached) => {
-          // Always fetch in background to keep cache fresh
-          const networkUpdate = fetch(request)
-            .then((res) => {
-              if (res.ok) cache.put(request, res.clone());
-              return res;
-            })
-            .catch(() => {});
-          // Serve cache immediately if available, otherwise wait for network
-          return cached || networkUpdate;
-        })
+        fetch(request)
+          .then((res) => {
+            if (res.ok) cache.put(request, res.clone());
+            return res;
+          })
+          .catch(() =>
+            cache.match(request).then((cached) => cached || cache.match('/index.html'))
+          )
       )
     );
     return;
