@@ -1409,17 +1409,13 @@ export default function FeedPage({ initialData }) {
                   transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
                   className="pointer-events-none fixed inset-x-0 bottom-7 z-40 hidden justify-center lg:flex"
                 >
-                  <div className="pointer-events-auto flex items-center gap-3 rounded-[999px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] px-3.5 py-3 shadow-[0_18px_48px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[22px]">
-                    <div className="rounded-full border border-white/10 bg-black/18 px-3.5 py-2 text-[11px] font-medium tracking-[0.02em] text-white/58">
-                      {Math.min(totalProfiles, pageCursor + 1)}-{Math.min(totalProfiles, pageCursor + visibleProfiles.length)} de {totalProfiles}
-                    </div>
-
+                  <div className="pointer-events-auto flex items-center gap-2.5 rounded-[999px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] px-3 py-2 shadow-[0_18px_48px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[22px]">
                     <button
                       type="button"
                       onClick={() => goToFeedPage(currentPage - 1)}
                       disabled={currentPage <= 1 || loading}
                       aria-label="Pagina anterior"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/16 text-white/68 transition-all duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/16 text-white/68 transition-all duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
                     >
                       <ChevronLeft className="h-4.5 w-4.5" />
                     </button>
@@ -1435,7 +1431,7 @@ export default function FeedPage({ initialData }) {
                           whileHover={page === currentPage ? undefined : { y: -1 }}
                           whileTap={page === currentPage ? undefined : { scale: 0.97 }}
                           transition={{ layout: { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 } }}
-                          className={`relative inline-flex h-11 min-w-[3.15rem] items-center justify-center overflow-hidden rounded-full px-4 text-[15px] font-semibold tracking-[-0.01em] transition-colors duration-200 ${
+                          className={`relative inline-flex h-9 min-w-[2.85rem] items-center justify-center overflow-hidden rounded-full px-3.5 text-[15px] font-semibold tracking-[-0.01em] transition-colors duration-200 ${
                             page === currentPage
                               ? 'text-black'
                               : 'text-white/62 hover:bg-white/[0.08] hover:text-white'
@@ -1458,7 +1454,7 @@ export default function FeedPage({ initialData }) {
                       onClick={() => goToFeedPage(currentPage + 1)}
                       disabled={currentPage >= totalPages || loading}
                       aria-label="Pagina siguiente"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/16 text-white/68 transition-all duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/16 text-white/68 transition-all duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
                     >
                       <ChevronRight className="h-4.5 w-4.5" />
                     </button>
