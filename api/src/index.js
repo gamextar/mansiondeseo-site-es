@@ -16,7 +16,12 @@ function cached(key, ttlMs, fetcher) {
 
 function invalidateFeedBrowseCache() {
   for (const key of _cache.keys()) {
-    if (String(key).startsWith('profiles:') || String(key) === 'active_story_users') {
+    if (
+      String(key).startsWith('profiles:') ||
+      String(key).startsWith('count:profiles:') ||
+      String(key).startsWith('feed-snapshot:') ||
+      String(key) === 'active_story_users'
+    ) {
       _cache.delete(key);
     }
   }
@@ -43,6 +48,7 @@ const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'parej
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const FEED_PROFILE_LIMIT = 42;
+const FEED_SNAPSHOT_LIMIT = 360;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -120,6 +126,113 @@ function computeFeedScore(profile, viewerInterests, settings) {
     sharedInterestsScore * settings.feedWeightSharedInterests +
     premiumScore * settings.feedWeightPremium
   );
+}
+
+function normalizeViewerInterestsKey(viewerInterests = []) {
+  if (!Array.isArray(viewerInterests) || viewerInterests.length === 0) return 'none';
+  return [...new Set(
+    viewerInterests
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+  )].sort().join(',') || 'none';
+}
+
+function buildFeedBaseProfiles(rows, env, activeStoryUserIds, activeStoryUrlMap) {
+  return (rows || []).map((u) => {
+    const profileIsPremium = isPremiumActive(u);
+    const hasGhostMode = profileIsPremium && !!u.ghost_mode;
+    const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(u.photos, []), u.avatar_url);
+    const displayPhotos = buildDisplayPhotos(u.avatar_url, galleryPhotos);
+    const profileInterests = safeParseJSON(u.interests, []);
+
+    return {
+      id: u.id,
+      name: u.username,
+      age: getPublicAge(u),
+      ...getLocationFields(u),
+      role: mapRoleToDisplay(u.role),
+      interests: profileInterests,
+      bio: u.bio,
+      photos: galleryPhotos,
+      totalPhotos: displayPhotos.length,
+      verified: !!u.verified,
+      online: isOnline(u.last_active),
+      premium: profileIsPremium,
+      premium_until: u.premium_until || null,
+      ghost_mode: hasGhostMode,
+      fake: !!u.fake,
+      marital_status: u.marital_status || '',
+      sexual_orientation: u.sexual_orientation || '',
+      lastActive: u.last_active,
+      avatar_url: u.avatar_url,
+      avatar_crop: safeParseJSON(u.avatar_crop, null),
+      has_active_story: activeStoryUserIds.has(String(u.id)),
+      active_story_url: activeStoryUrlMap.get(String(u.id)) || null,
+      followers_total: Number(u.followers_total || 0),
+      _roleId: u.role,
+      _profileInterests: profileInterests,
+    };
+  });
+}
+
+function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets, limit = FEED_PROFILE_LIMIT) {
+  const scoredProfiles = (profiles || []).map((profile) => {
+    const matchingInterests = Array.isArray(viewerInterests) && viewerInterests.length > 0
+      ? profile._profileInterests.filter((interest) => viewerInterests.includes(interest)).length
+      : 0;
+
+    return {
+      ...profile,
+      _matchingInterests: matchingInterests,
+      _feedScore: computeFeedScore({
+        ...profile,
+        _matchingInterests: matchingInterests,
+      }, viewerInterests, settings),
+    };
+  });
+
+  if (roleBuckets.length <= 1) {
+    scoredProfiles.sort((a, b) => {
+      if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
+      return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
+    });
+    return scoredProfiles.slice(0, limit);
+  }
+
+  const bucketMap = new Map(roleBuckets.map((bucket) => [bucket.key, []]));
+  for (const profile of scoredProfiles) {
+    const bucketKey = getRoleBucketKey(profile._roleId);
+    if (!bucketMap.has(bucketKey)) continue;
+    bucketMap.get(bucketKey).push(profile);
+  }
+  for (const bucket of roleBuckets) {
+    const list = bucketMap.get(bucket.key) || [];
+    list.sort((a, b) => {
+      if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
+      return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
+    });
+  }
+  return interleaveRoleBuckets(roleBuckets, bucketMap, limit);
+}
+
+function personalizeFeedProfiles(profiles, authUserId, viewerFavorites, favoritedBySet, viewerIsPremium, settings) {
+  return (profiles || [])
+    .filter((profile) => profile.id !== authUserId)
+    .map(({ _profileInterests, _matchingInterests, _feedScore, _roleId, ...profile }) => {
+      const blurred = profile.ghost_mode && !viewerIsPremium && !favoritedBySet.has(profile.id);
+      const visiblePhotos = viewerIsPremium
+        ? profile.totalPhotos
+        : blurred
+          ? 0
+          : Math.min(profile.totalPhotos, settings.freeVisiblePhotos);
+
+      return {
+        ...profile,
+        blurred,
+        visiblePhotos,
+        isFavorited: viewerFavorites.has(profile.id),
+      };
+    });
 }
 
 // ── Helpers ─────────────────────────────────────────────
@@ -1852,6 +1965,7 @@ async function handleProfiles(request, env) {
   // Determine role filter: use viewer's seeking from DB, with frontend filter as fallback
   const viewerSeeking = safeParseJSON(viewer?.seeking, []);
   const viewerInterests = safeParseJSON(viewer?.interests, []);
+  const viewerInterestsKey = normalizeViewerInterestsKey(viewerInterests);
 
   // Build profiles query (don't exclude current user — cache is shared, filter later)
   let query = `
@@ -1906,120 +2020,82 @@ async function handleProfiles(request, env) {
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
-  const windowLimit = cursor + reqPageSize;
-  const pageWindowLimit = windowLimit + 1;
-  const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, reqPageSize * 10) : pageWindowLimit;
-  query += ` ORDER BY last_active DESC LIMIT ${dbLimit}`;
 
   // Cache key for profiles query (shared across all users)
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
   const countryKey = settings.feedFilterByCountry ? country : 'all-countries';
   const profilesCacheKey = `profiles:${seekingKey}:${countryKey}:${search}`;
-  const shouldUseProfilesCache = !fresh && cursor === 0;
+  const feedSnapshotCacheKey = `feed-snapshot:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}`;
+  const windowLimit = cursor + reqPageSize;
+  const pageWindowLimit = windowLimit + 1;
+  const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, reqPageSize * 10) : pageWindowLimit;
+  const canUseFeedSnapshot = !fresh && windowLimit <= FEED_SNAPSHOT_LIMIT;
+  const storyRowsPromise = cached(
+    'active_story_users',
+    30_000,
+    () => env.DB.prepare('SELECT user_id, video_url FROM stories WHERE active = 1 ORDER BY created_at DESC').all().then(r => r.results).catch(() => [])
+  );
+  const orderedBaseProfilesPromise = canUseFeedSnapshot
+    ? cached(feedSnapshotCacheKey, 30_000, async () => {
+        const snapshotWindowLimit = FEED_SNAPSHOT_LIMIT + 1;
+        const snapshotDbLimit = roleBuckets.length > 1
+          ? Math.max(snapshotWindowLimit * 10, FEED_SNAPSHOT_LIMIT * 10)
+          : snapshotWindowLimit;
+        const snapshotQuery = `${query} ORDER BY last_active DESC LIMIT ${snapshotDbLimit}`;
+        const [snapshotRows, storyRows] = await Promise.all([
+          env.DB.prepare(snapshotQuery).bind(...params).all().then(r => r.results),
+          storyRowsPromise,
+        ]);
+        const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
+        const activeStoryUrlMap = new Map();
+        for (const row of (storyRows || [])) {
+          const userId = String(row.user_id);
+          if (!activeStoryUrlMap.has(userId) && row.video_url) {
+            activeStoryUrlMap.set(userId, normalizeStoryVideoUrl(row.video_url, env));
+          }
+        }
+        const baseProfiles = buildFeedBaseProfiles(snapshotRows, env, activeStoryUserIds, activeStoryUrlMap);
+        return orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, snapshotWindowLimit);
+      })
+    : Promise.all([
+        env.DB.prepare(`${query} ORDER BY last_active DESC LIMIT ${dbLimit}`).bind(...params).all().then(r => r.results),
+        storyRowsPromise,
+      ]).then(([results, storyRows]) => {
+        const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
+        const activeStoryUrlMap = new Map();
+        for (const row of (storyRows || [])) {
+          const userId = String(row.user_id);
+          if (!activeStoryUrlMap.has(userId) && row.video_url) {
+            activeStoryUrlMap.set(userId, normalizeStoryVideoUrl(row.video_url, env));
+          }
+        }
+        const baseProfiles = buildFeedBaseProfiles(
+          (results || []).filter((u) => u.id !== auth.sub),
+          env,
+          activeStoryUserIds,
+          activeStoryUrlMap,
+        );
+        return orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, pageWindowLimit);
+      });
 
   // Parallel: cached settings + cached profiles + combined favorites + active stories + total count
-  const countQuery = query.replace(/SELECT[\s\S]+?FROM users u/, 'SELECT COUNT(*) AS total FROM users u').replace(/ORDER BY[\s\S]+$/, '');
-  const [results, { results: allFavRows }, storyRows, countRow] = await Promise.all([
-    shouldUseProfilesCache
-      ? cached(profilesCacheKey, 30_000, () => env.DB.prepare(query).bind(...params).all().then(r => r.results))  // 30s
-      : env.DB.prepare(query).bind(...params).all().then(r => r.results),
+  const countQuery = query.replace(/SELECT[\s\S]+?FROM users u/, 'SELECT COUNT(*) AS total FROM users u');
+  const [orderedBaseProfiles, { results: allFavRows }, countRow] = await Promise.all([
+    orderedBaseProfilesPromise,
     env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?').bind(auth.sub, auth.sub).all(),
-    cached('active_story_users', 30_000, () => env.DB.prepare('SELECT user_id, video_url FROM stories WHERE active = 1 ORDER BY created_at DESC').all().then(r => r.results).catch(() => [])),  // 30s
     cached(`count:${profilesCacheKey}`, 60_000, () => env.DB.prepare(countQuery).bind(...params).first()),
   ]);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
   const viewerFavorites = new Set(allFavRows.filter(r => r.user_id === auth.sub).map(r => r.target_id));
   const favoritedBySet = new Set(allFavRows.filter(r => r.target_id === auth.sub).map(r => r.user_id));
-  const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
-  const activeStoryUrlMap = new Map();
-  for (const r of (storyRows || [])) {
-    const uid = String(r.user_id);
-    if (!activeStoryUrlMap.has(uid) && r.video_url) activeStoryUrlMap.set(uid, normalizeStoryVideoUrl(r.video_url, env));
-  }
-
-  // Filter out current user (cached query includes everyone) + map to frontend shape
-  let profiles = results.filter(u => u.id !== auth.sub).map(u => {
-    const profileIsPremium = isPremiumActive(u);
-    const hasGhostMode = profileIsPremium && !!u.ghost_mode;
-    // Ghost mode blur: blurred unless viewer is premium OR the ghost-mode user has favorited the viewer
-    const blurred = hasGhostMode && !viewerIsPremium && !favoritedBySet.has(u.id);
-    const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(u.photos, []), u.avatar_url);
-    const displayPhotos = buildDisplayPhotos(u.avatar_url, galleryPhotos);
-    // Keep avatar separate from gallery; frontend can merge both when it needs a full media carousel.
-    const visiblePhotos = viewerIsPremium
-      ? displayPhotos.length
-      : blurred
-        ? 0
-        : Math.min(displayPhotos.length, settings.freeVisiblePhotos);
-    const profileInterests = safeParseJSON(u.interests, []);
-    return {
-      id: u.id,
-      name: u.username,
-      age: getPublicAge(u),
-      ...getLocationFields(u),
-      role: mapRoleToDisplay(u.role),
-      interests: profileInterests,
-      bio: u.bio,
-      photos: galleryPhotos,
-      totalPhotos: displayPhotos.length,
-      visiblePhotos,
-      verified: !!u.verified,
-      online: isOnline(u.last_active),
-      premium: profileIsPremium,
-      premium_until: u.premium_until || null,
-      ghost_mode: hasGhostMode,
-      fake: !!u.fake,
-      marital_status: u.marital_status || '',
-      sexual_orientation: u.sexual_orientation || '',
-      blurred,
-      isFavorited: viewerFavorites.has(u.id),
-      lastActive: u.last_active,
-      avatar_url: u.avatar_url,
-      avatar_crop: safeParseJSON(u.avatar_crop, null),
-      has_active_story: activeStoryUserIds.has(String(u.id)),
-      active_story_url: activeStoryUrlMap.get(String(u.id)) || null,
-      followers_total: Number(u.followers_total || 0),
-      _roleId: u.role,
-      _matchingInterests: viewerInterests.length > 0
-        ? profileInterests.filter(i => viewerInterests.includes(i)).length
-        : 0,
-    };
-  });
-
-  profiles = profiles.map((profile) => ({
-    ...profile,
-    _feedScore: computeFeedScore(profile, viewerInterests, settings),
-  }));
-
-  // Sort: weighted feed score first, then last_active as tie-break.
-  if (roleBuckets.length <= 1) {
-    profiles.sort((a, b) => {
-      if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
-      return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
-    });
-  }
-
-  if (roleBuckets.length > 1) {
-    const bucketMap = new Map(roleBuckets.map((bucket) => [bucket.key, []]));
-    for (const profile of profiles) {
-      const bucketKey = getRoleBucketKey(profile._roleId);
-      if (!bucketMap.has(bucketKey)) continue;
-      bucketMap.get(bucketKey).push(profile);
-    }
-    for (const bucket of roleBuckets) {
-      const list = bucketMap.get(bucket.key) || [];
-      list.sort((a, b) => {
-        if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
-        return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
-      });
-    }
-    profiles = interleaveRoleBuckets(roleBuckets, bucketMap, pageWindowLimit);
-  } else {
-    profiles = profiles.slice(0, pageWindowLimit);
-  }
-
-  // Strip internal sort fields
-  profiles = profiles.map(({ _matchingInterests, _roleId, _feedScore, ...p }) => p);
+  const profiles = personalizeFeedProfiles(
+    orderedBaseProfiles,
+    auth.sub,
+    viewerFavorites,
+    favoritedBySet,
+    viewerIsPremium,
+    settings,
+  );
 
   const totalProfiles = Number(countRow?.total ?? profiles.length);
   const pagedProfiles = profiles.slice(cursor, cursor + reqPageSize);
@@ -3388,6 +3464,7 @@ async function handleUpdateSettings(request, env) {
   }
   // Invalidate settings cache so new values take effect immediately
   _cache.delete('settings');
+  invalidateFeedBrowseCache();
   const settings = await loadSettings(env);
   return json({ settings });
 }
