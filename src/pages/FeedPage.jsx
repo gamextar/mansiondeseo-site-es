@@ -180,7 +180,6 @@ export default function FeedPage({ initialData }) {
   const storiesDragRef = useRef({
     active: false,
     captured: false,
-    pointerId: null,
     startX: 0,
     startScrollLeft: 0,
     moved: false,
@@ -753,7 +752,6 @@ export default function FeedPage({ initialData }) {
   }, [schedulePendingViewedStories]);
 
   const openStoryFromHome = useCallback((storyOrUserId) => {
-    resetStoriesInteraction();
     const storyUserId = typeof storyOrUserId === 'object' && storyOrUserId !== null
       ? String(storyOrUserId.user_id || storyOrUserId.id || '')
       : String(storyOrUserId || '');
@@ -783,7 +781,7 @@ export default function FeedPage({ initialData }) {
         backgroundScrollY,
       },
     });
-  }, [location, navigate, resetStoriesInteraction]);
+  }, [location, navigate]);
 
   useEffect(() => {
     if (!getToken()) return;
@@ -797,11 +795,6 @@ export default function FeedPage({ initialData }) {
       return currentIds === nextIds ? current : bootstrapStoryProfiles;
     });
   }, [bootstrapStoryProfiles, user?.id]);
-
-  useEffect(() => {
-    if (location.pathname === '/') return;
-    resetStoriesInteraction();
-  }, [location.pathname, resetStoriesInteraction]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
@@ -864,23 +857,6 @@ export default function FeedPage({ initialData }) {
     momentum.velocity = 0;
   }, []);
 
-  const resetStoriesInteraction = useCallback(() => {
-    const el = storiesScrollRef.current;
-    const drag = storiesDragRef.current;
-    if (el && drag.captured && drag.pointerId !== null && drag.pointerId !== undefined) {
-      try { el.releasePointerCapture?.(drag.pointerId); } catch {}
-    }
-    drag.active = false;
-    drag.captured = false;
-    drag.pointerId = null;
-    drag.moved = false;
-    drag.velocity = 0;
-    stopStoriesMomentum();
-    stopStoriesBounce();
-    storiesEdgeOffsetRef.current = 0;
-    setStoriesEdgeOffset(0);
-  }, [stopStoriesBounce, stopStoriesMomentum]);
-
   const startStoriesMomentum = useCallback(() => {
     const el = storiesScrollRef.current;
     const momentum = storiesMomentumRef.current;
@@ -934,7 +910,6 @@ export default function FeedPage({ initialData }) {
     storiesDragRef.current = {
       active: true,
       captured: false,
-      pointerId: event.pointerId,
       startX: event.clientX,
       startScrollLeft: el.scrollLeft,
       moved: false,
@@ -996,7 +971,6 @@ export default function FeedPage({ initialData }) {
       animateStoriesEdgeOffsetTo(0);
     }
     drag.captured = false;
-    drag.pointerId = null;
   }, [animateStoriesEdgeOffsetTo, desktopStoryRailEnhanced, startStoriesMomentum]);
 
   const handleStoriesClickCapture = useCallback((event) => {
@@ -1009,12 +983,19 @@ export default function FeedPage({ initialData }) {
 
   useEffect(() => {
     if (desktopStoryRailEnhanced) return;
-    resetStoriesInteraction();
-  }, [desktopStoryRailEnhanced, resetStoriesInteraction]);
+    stopStoriesMomentum();
+    stopStoriesBounce();
+    storiesEdgeOffsetRef.current = 0;
+    setStoriesEdgeOffset(0);
+    storiesDragRef.current.active = false;
+    storiesDragRef.current.captured = false;
+    storiesDragRef.current.moved = false;
+  }, [desktopStoryRailEnhanced, stopStoriesBounce, stopStoriesMomentum]);
 
   useEffect(() => () => {
-    resetStoriesInteraction();
-  }, [resetStoriesInteraction]);
+    stopStoriesMomentum();
+    stopStoriesBounce();
+  }, [stopStoriesBounce, stopStoriesMomentum]);
 
   // ── Grid setup ────────────────────────────────────────────────────
   const gap = 12;
