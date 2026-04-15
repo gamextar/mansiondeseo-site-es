@@ -465,6 +465,10 @@ async function apiFetch(path, options = {}) {
   const method = options.method || 'GET';
   const debug = getApiDebugController();
   const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const shouldRequestProfileTimings = debug?.isEnabled?.() && method === 'GET' && path.startsWith('/profiles');
+  const requestPath = shouldRequestProfileTimings
+    ? `${path}${path.includes('?') ? '&' : '?'}timings=1`
+    : path;
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -475,22 +479,13 @@ async function apiFetch(path, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${API_BASE}${requestPath}`, {
     ...options,
     headers,
   });
   const finishedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  const timingHeader = res.headers.get('X-Profiles-Timing') || res.headers.get('Server-Timing') || '';
+  let timingHeader = res.headers.get('X-Profiles-Timing') || '';
   const cacheHeader = res.headers.get('X-Profiles-Cache') || '';
-  debug?.record({
-    method,
-    path,
-    status: res.status,
-    durationMs: Math.round(finishedAt - startedAt),
-    ok: res.ok,
-    timing: timingHeader,
-    cache: cacheHeader,
-  });
 
   // Handle 401 — token expired
   if (res.status === 401 && token) {
@@ -500,6 +495,30 @@ async function apiFetch(path, options = {}) {
   }
 
   const data = await res.json();
+  if (!timingHeader && data?.debugTimings) {
+    timingHeader = [
+      `viewer=${Math.round(data.debugTimings.viewerMs ?? 0)}ms`,
+      `snapshot=${Math.round(data.debugTimings.snapshotMs ?? 0)}ms`,
+      `favorites=${Math.round(data.debugTimings.favoritesMs ?? 0)}ms`,
+      `count=${Math.round(data.debugTimings.countMs ?? 0)}ms`,
+      `personalize=${Math.round(data.debugTimings.personalizeMs ?? 0)}ms`,
+      `total=${Math.round(data.debugTimings.totalMs ?? 0)}ms`,
+    ].join(', ');
+  }
+  const resolvedCacheHeader = cacheHeader || (
+    data?.debugTimings?.cache
+      ? `viewer:${data.debugTimings.cache.viewer}, snapshot:${data.debugTimings.cache.snapshot}, stories:${data.debugTimings.cache.stories}, count:${data.debugTimings.cache.count}`
+      : ''
+  );
+  debug?.record({
+    method,
+    path,
+    status: res.status,
+    durationMs: Math.round(finishedAt - startedAt),
+    ok: res.ok,
+    timing: timingHeader || res.headers.get('Server-Timing') || '',
+    cache: resolvedCacheHeader,
+  });
 
   if (!res.ok) {
     const err = new Error(data.error || 'Error del servidor');
