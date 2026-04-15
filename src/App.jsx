@@ -388,21 +388,21 @@ function AppLayout() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className="fixed inset-0 z-[130]"
+              className="fixed inset-0 z-[130] pointer-events-none"
             >
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-                className="absolute inset-0 bg-black/72 backdrop-blur-[4px]"
+                className="absolute inset-0 bg-black/72 backdrop-blur-[4px] pointer-events-none"
               />
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute inset-0"
+                className="absolute inset-0 pointer-events-auto"
               >
                 <Routes>
                   <Route path="/videos" element={<VideoFeedPage />} />

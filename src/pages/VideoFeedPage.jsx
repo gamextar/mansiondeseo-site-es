@@ -653,6 +653,7 @@ export default function VideoFeedPage() {
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
+  const [isClosingOverlay, setIsClosingOverlay] = useState(false);
   const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
   const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
 
@@ -701,8 +702,11 @@ export default function VideoFeedPage() {
     } catch {}
   }, []);
   const closeOverlay = useCallback(() => {
+    setIsClosingOverlay(true);
     flushPendingViewedStories();
-    navigate(-1);
+    requestAnimationFrame(() => {
+      navigate(-1);
+    });
   }, [flushPendingViewedStories, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
     if (!isOverlayPreview || !isDesktopViewport) return;
@@ -1256,6 +1260,7 @@ export default function VideoFeedPage() {
       }
       style={standaloneViewportShellStyle}
       onPointerDown={handleOverlayBackdropPointerDown}
+      data-overlay-closing={isClosingOverlay ? 'true' : 'false'}
     >
       <motion.div
         className="absolute inset-0 pointer-events-none z-20 bg-black"
@@ -1266,12 +1271,16 @@ export default function VideoFeedPage() {
 
       <div
         className={standaloneMobileRoute ? 'relative' : 'relative h-full'}
-        style={standaloneViewportContentStyle}
+        style={{
+          ...standaloneViewportContentStyle,
+          pointerEvents: isClosingOverlay ? 'none' : undefined,
+        }}
       >
         {isOverlayPreview && (
           <button
             type="button"
             onClick={closeOverlay}
+            disabled={isClosingOverlay}
             className="absolute z-30 flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
             style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
             aria-label="Cerrar"
