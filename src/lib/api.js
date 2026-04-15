@@ -1218,13 +1218,36 @@ export async function adminBulkDeleteUsers(userIds) {
 export async function getStories({ page = 1, limit = 50, focusUserId = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (focusUserId) params.set('focus_user_id', focusUserId);
-  return sharedGet(`stories:${page}:${limit}:${focusUserId || ''}`, () => apiFetch(`/stories?${params}`), { ttlMs: 2 * 60_000 });
+  const cacheKey = `stories:${page}:${limit}:${focusUserId || ''}`;
+  const sessionKey = `stories:${page}:${limit}:${focusUserId || ''}`;
+  const cached = sessionCache.get(sessionKey, 2 * 60_000);
+  if (cached) return Promise.resolve(cached);
+  return sharedGet(cacheKey, () => apiFetch(`/stories?${params}`).then((data) => {
+    sessionCache.set(sessionKey, data);
+    return data;
+  }), { ttlMs: 2 * 60_000 });
+}
+
+export function peekStories({ page = 1, limit = 50, focusUserId = '' } = {}) {
+  const cacheKey = `stories:${page}:${limit}:${focusUserId || ''}`;
+  const sessionKey = `stories:${page}:${limit}:${focusUserId || ''}`;
+  return (
+    sessionCache.get(sessionKey, 2 * 60_000)
+    || peekSharedGetValue(cacheKey, 2 * 60_000)
+    || null
+  );
 }
 
 export function invalidateStoriesCache() {
   for (const key of sharedGetCache.keys()) {
     if (key.startsWith('stories:')) sharedGetCache.delete(key);
   }
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith('stories:')) sessionStorage.removeItem(key);
+    }
+  } catch {}
 }
 
 function invalidateStoryFeedCache() {
