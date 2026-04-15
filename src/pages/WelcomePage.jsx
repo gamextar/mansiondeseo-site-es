@@ -101,7 +101,7 @@ export default function WelcomePage() {
           onClick={() => navigate('/registro')}
           className="fade-in-up fade-delay-700 btn-gold w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 active:scale-[0.97]"
         >
-          Crear acceso
+          Registrarme
           <ChevronRight className="w-5 h-5" />
         </button>
 
