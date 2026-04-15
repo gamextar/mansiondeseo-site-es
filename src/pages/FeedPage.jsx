@@ -801,8 +801,8 @@ export default function FeedPage({ initialData }) {
 
   useEffect(() => {
     if (location.pathname === '/') return;
-    resetStoriesInteraction();
-  }, [location.pathname, resetStoriesInteraction]);
+    resetStoriesInteractionRef.current?.();
+  }, [location.pathname]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
