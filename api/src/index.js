@@ -14,6 +14,11 @@ function cached(key, ttlMs, fetcher) {
   return fetcher().then(val => { _cache.set(key, { val, exp: Date.now() + ttlMs }); return val; });
 }
 
+function isFreshCached(key) {
+  const entry = _cache.get(key);
+  return !!(entry && Date.now() < entry.exp);
+}
+
 function invalidateFeedBrowseCache() {
   for (const key of _cache.keys()) {
     if (
@@ -1942,12 +1947,19 @@ async function handleOwnProfileDashboard(request, env) {
 // ── GET /api/profiles ───────────────────────────────────
 
 async function handleProfiles(request, env) {
+  const requestStartedAt = Date.now();
+  const timings = {};
+  const markTiming = (key, startedAt) => {
+    timings[key] = Date.now() - startedAt;
+  };
+  const formatMs = (value) => Number.isFinite(value) ? Math.max(0, Math.round(value * 10) / 10) : 0;
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   await ensureUserBrowseIndexes(env);
   await ensureProfileVisitStructures(env);
 
   const url = new URL(request.url);
+  const includeTimingDetails = url.searchParams.get('timings') === '1';
   const filter = url.searchParams.get('filter') || 'all';
   const search = url.searchParams.get('q') || '';
   const fresh = url.searchParams.get('fresh') === '1';
@@ -1956,11 +1968,14 @@ async function handleProfiles(request, env) {
   const settings = await cached('settings', 300_000, () => loadSettings(env));
 
   // Use cached viewer data when available to avoid a serial D1 round-trip
+  const viewerStartedAt = Date.now();
   let viewer = fresh ? null : getCachedViewer(auth.sub);
+  const viewerCacheHit = !fresh && !!viewer;
   if (!viewer) {
     viewer = await env.DB.prepare('SELECT premium, premium_until, country, seeking, interests FROM users WHERE id = ?').bind(auth.sub).first();
     if (viewer) setCachedViewer(auth.sub, viewer);
   }
+  markTiming('viewerMs', viewerStartedAt);
   const country = viewer?.country || '';
 
   // Determine role filter: use viewer's seeking from DB, with frontend filter as fallback
@@ -2031,12 +2046,16 @@ async function handleProfiles(request, env) {
   const pageWindowLimit = windowLimit + 1;
   const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, reqPageSize * 10) : pageWindowLimit;
   const canUseFeedSnapshot = !fresh && windowLimit <= FEED_SNAPSHOT_LIMIT;
+  const snapshotCacheHit = canUseFeedSnapshot && isFreshCached(feedSnapshotCacheKey);
+  const storyCacheHit = isFreshCached('active_story_users');
+  const countCacheHit = isFreshCached(`count:${profilesCacheKey}`);
   const storyRowsPromise = cached(
     'active_story_users',
     30_000,
     () => env.DB.prepare('SELECT user_id, video_url FROM stories WHERE active = 1 ORDER BY created_at DESC').all().then(r => r.results).catch(() => [])
   );
-  const orderedBaseProfilesPromise = canUseFeedSnapshot
+  const snapshotStartedAt = Date.now();
+  const orderedBaseProfilesPromise = (canUseFeedSnapshot
     ? cached(feedSnapshotCacheKey, FEED_SNAPSHOT_TTL_MS, async () => {
         const snapshotWindowLimit = FEED_SNAPSHOT_LIMIT + 1;
         const snapshotDbLimit = roleBuckets.length > 1
@@ -2077,18 +2096,34 @@ async function handleProfiles(request, env) {
           activeStoryUrlMap,
         );
         return orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, pageWindowLimit);
-      });
+      }))
+    .finally(() => {
+      markTiming('snapshotMs', snapshotStartedAt);
+    });
 
   // Parallel: cached settings + cached profiles + combined favorites + active stories + total count
   const countQuery = query.replace(/SELECT[\s\S]+?FROM users u/, 'SELECT COUNT(*) AS total FROM users u');
+  const favoritesStartedAt = Date.now();
+  const favoritesPromise = env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?')
+    .bind(auth.sub, auth.sub)
+    .all()
+    .finally(() => {
+      markTiming('favoritesMs', favoritesStartedAt);
+    });
+  const countStartedAt = Date.now();
+  const countPromise = cached(`count:${profilesCacheKey}`, 60_000, () => env.DB.prepare(countQuery).bind(...params).first())
+    .finally(() => {
+      markTiming('countMs', countStartedAt);
+    });
   const [orderedBaseProfiles, { results: allFavRows }, countRow] = await Promise.all([
     orderedBaseProfilesPromise,
-    env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?').bind(auth.sub, auth.sub).all(),
-    cached(`count:${profilesCacheKey}`, 60_000, () => env.DB.prepare(countQuery).bind(...params).first()),
+    favoritesPromise,
+    countPromise,
   ]);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
   const viewerFavorites = new Set(allFavRows.filter(r => r.user_id === auth.sub).map(r => r.target_id));
   const favoritedBySet = new Set(allFavRows.filter(r => r.target_id === auth.sub).map(r => r.user_id));
+  const personalizeStartedAt = Date.now();
   const profiles = personalizeFeedProfiles(
     orderedBaseProfiles,
     auth.sub,
@@ -2097,20 +2132,64 @@ async function handleProfiles(request, env) {
     viewerIsPremium,
     settings,
   );
+  markTiming('personalizeMs', personalizeStartedAt);
 
   const totalProfiles = Number(countRow?.total ?? profiles.length);
   const pagedProfiles = profiles.slice(cursor, cursor + reqPageSize);
   const hasMore = totalProfiles > cursor + reqPageSize;
   const nextCursor = hasMore ? cursor + reqPageSize : null;
 
-  return json({
+  const totalMs = Date.now() - requestStartedAt;
+  const timingHeaders = {
+    'Server-Timing': [
+      `viewer;dur=${formatMs(timings.viewerMs || 0)}`,
+      `snapshot;dur=${formatMs(timings.snapshotMs || 0)}`,
+      `favorites;dur=${formatMs(timings.favoritesMs || 0)}`,
+      `count;dur=${formatMs(timings.countMs || 0)}`,
+      `personalize;dur=${formatMs(timings.personalizeMs || 0)}`,
+      `total;dur=${formatMs(totalMs)}`,
+    ].join(', '),
+    'X-Profiles-Timing': [
+      `viewer=${formatMs(timings.viewerMs || 0)}`,
+      `snapshot=${formatMs(timings.snapshotMs || 0)}`,
+      `favorites=${formatMs(timings.favoritesMs || 0)}`,
+      `count=${formatMs(timings.countMs || 0)}`,
+      `personalize=${formatMs(timings.personalizeMs || 0)}`,
+      `total=${formatMs(totalMs)}`,
+    ].join(', '),
+    'X-Profiles-Cache': [
+      `viewer:${viewerCacheHit ? 'hit' : 'miss'}`,
+      `snapshot:${snapshotCacheHit ? 'hit' : (canUseFeedSnapshot ? 'miss' : 'bypass')}`,
+      `stories:${storyCacheHit ? 'hit' : 'miss'}`,
+      `count:${countCacheHit ? 'hit' : 'miss'}`,
+    ].join(', '),
+  };
+
+  const responseBody = {
     profiles: pagedProfiles,
     viewerPremium: viewerIsPremium,
     settings,
     totalProfiles,
     nextCursor: nextCursor !== null ? String(nextCursor) : null,
     hasMore,
-  });
+  };
+
+  if (includeTimingDetails) {
+    responseBody.debugTimings = {
+      ...timings,
+      totalMs,
+      cache: {
+        viewer: viewerCacheHit ? 'hit' : 'miss',
+        snapshot: snapshotCacheHit ? 'hit' : (canUseFeedSnapshot ? 'miss' : 'bypass'),
+        stories: storyCacheHit ? 'hit' : 'miss',
+        count: countCacheHit ? 'hit' : 'miss',
+      },
+      feedSnapshotLimit: FEED_SNAPSHOT_LIMIT,
+      feedSnapshotTtlMs: FEED_SNAPSHOT_TTL_MS,
+    };
+  }
+
+  return json(responseBody, 200, timingHeaders);
 }
 
 // ── GET /api/profiles/:id ───────────────────────────────
