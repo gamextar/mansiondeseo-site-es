@@ -30,7 +30,7 @@ import CoinsPage from './pages/CoinsPage';
 import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
 import StoryUploadPage from './pages/StoryUploadPage';
 import TopVisitedPage from './pages/TopVisitedPage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -428,6 +428,10 @@ export default function App() {
   const [user, setUserState] = useState(() => getStoredUser());
   const [bootstrapUnread, setBootstrapUnread] = useState(null);
   const [bootstrapResolved, setBootstrapResolved] = useState(() => !getToken());
+  const [bootstrapStories, setBootstrapStories] = useState(() => {
+    const cached = peekAppBootstrap();
+    return Array.isArray(cached?.stories) ? cached.stories : [];
+  });
   const [siteSettings, setSiteSettings] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('mansion_site_settings') || '{}'); } catch { return {}; }
   });
@@ -608,6 +612,7 @@ export default function App() {
         }
 
         setBootstrapUnread(typeof data?.unread === 'number' ? data.unread : null);
+        setBootstrapStories(Array.isArray(data?.stories) ? data.stories : []);
         setBootstrapResolved(true);
 
         if (data?.settings) {
@@ -616,6 +621,7 @@ export default function App() {
         }
       }).catch(() => {
         setBootstrapUnread(null);
+        setBootstrapStories([]);
         setBootstrapResolved(true);
         if (cancelled || !getToken()) return;
         clearAuth();
@@ -645,7 +651,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <AuthContext.Provider value={{ registered, setRegistered, user, setUser, siteSettings, setSiteSettings }}>
+      <AuthContext.Provider value={{ registered, setRegistered, user, setUser, siteSettings, setSiteSettings, bootstrapStories, setBootstrapStories }}>
       <UnreadProvider initialUnread={bootstrapUnread} bootstrapResolved={bootstrapResolved}>
       <div className="relative min-h-screen">
         {debugFlags.shellOnly ? (

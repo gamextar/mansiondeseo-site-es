@@ -766,6 +766,10 @@ export async function getAppBootstrap() {
   }, { ttlMs: 5 * 60_000 });
 }
 
+export function peekAppBootstrap() {
+  return sessionCache.get('appBootstrap', 60 * 60_000);
+}
+
 export async function logout() {
   try {
     await apiFetch('/auth/logout', { method: 'POST' });

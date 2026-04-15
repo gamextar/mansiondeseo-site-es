@@ -4,9 +4,11 @@ export const AuthContext = createContext({
   registered: false,
   user: null,
   siteSettings: {},
+  bootstrapStories: [],
   setRegistered: () => {},
   setUser: () => {},
   setSiteSettings: () => {},
+  setBootstrapStories: () => {},
 });
 
 export function useAuth() {
