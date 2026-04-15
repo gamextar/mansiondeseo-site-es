@@ -1174,12 +1174,18 @@ export default function VideoFeedPage() {
   useEffect(() => {
     if (!isDesktopViewport) return undefined;
     const handleKeyDown = (e) => {
-      if (e.key === 'ArrowLeft') moveDesktopByOne(-1);
-      else if (e.key === 'ArrowRight') moveDesktopByOne(1);
+      if (e.key === 'Escape' && isOverlayPreview) {
+        e.preventDefault();
+        closeOverlay();
+      } else if (e.key === 'ArrowLeft') {
+        moveDesktopByOne(-1);
+      } else if (e.key === 'ArrowRight') {
+        moveDesktopByOne(1);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDesktopViewport, moveDesktopByOne]);
+  }, [closeOverlay, isDesktopViewport, isOverlayPreview, moveDesktopByOne]);
 
   if (loading) {
     return (
@@ -1237,9 +1243,17 @@ export default function VideoFeedPage() {
     );
   }
 
+  const desktopOverlayRoute = isOverlayPreview && isDesktopViewport;
+
   return (
     <div
-      className={standaloneMobileRoute ? 'relative overflow-hidden bg-black' : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'}
+      className={
+        standaloneMobileRoute
+          ? 'relative overflow-hidden bg-black'
+          : desktopOverlayRoute
+            ? 'absolute inset-0 bg-black z-[60]'
+            : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'
+      }
       style={standaloneViewportShellStyle}
       onPointerDown={handleOverlayBackdropPointerDown}
     >
