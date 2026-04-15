@@ -597,34 +597,8 @@ export default function FeedPage({ initialData }) {
 
   useLayoutEffect(() => {
     const orderedIds = orderedStoryProfiles.map((profile) => String(profile?.id || '')).filter(Boolean).join(',');
-    const previousOrderedIds = previousOrderedStoryIdsRef.current;
     previousOrderedStoryIdsRef.current = orderedIds;
-    if (!orderedIds || !storiesScrollRef.current || orderedIds === previousOrderedIds) return;
-
-    const container = storiesScrollRef.current;
-    if (!previousOrderedIds) {
-      container.scrollLeft = 0;
-      return;
-    }
-
-    // If it's just a reorder (same IDs, different positions due to viewed-status change),
-    // don't scroll — only scroll when genuinely new story IDs appear.
-    const sortedIds = orderedIds.split(',').sort().join(',');
-    const previousSortedIds = previousOrderedIds.split(',').sort().join(',');
-    if (sortedIds === previousSortedIds) return;
-
-    const firstUnseen = orderedStoryProfiles.find((profile) => !viewedStoryUsers.has(String(profile?.id || ''))) || orderedStoryProfiles[0];
-    const targetNode = storyNodeRefs.current.get(String(firstUnseen?.id || ''));
-    if (!targetNode) return;
-
-    const targetLeft = Math.max(0, targetNode.offsetLeft - 8);
-    if (Math.abs(container.scrollLeft - targetLeft) < 12) return;
-
-    container.scrollTo({
-      left: targetLeft,
-      behavior: 'smooth',
-    });
-  }, [orderedStoryProfiles, viewedStoryUsers]);
+  }, [orderedStoryProfiles]);
 
   useLayoutEffect(() => {
     const nextRects = new Map();
