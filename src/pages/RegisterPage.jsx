@@ -635,6 +635,7 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
 
   const borderColor = emailStatus === 'valid' ? 'border-green-500/60' : emailStatus === 'exists' || emailStatus === 'invalid' ? 'border-mansion-crimson/60' : '';
   const passwordInvalid = password.length > 0 && password.length < 12;
+  const passwordValid = password.length >= 12;
 
   return (
     <div className="text-center">
@@ -703,10 +704,13 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
               value={password}
               onChange={(e) => onPasswordChange(e.target.value.slice(0, 50))}
               placeholder="Mínimo 12 caracteres"
-              className={`w-full pl-10 pr-10 ${passwordInvalid ? 'border-mansion-crimson/60' : ''}`}
+              className={`w-full pl-10 pr-10 ${passwordInvalid ? 'border-mansion-crimson/60' : passwordValid ? 'border-green-500/60' : ''}`}
               autoComplete="new-password"
               maxLength={50}
             />
+            {passwordValid && (
+              <CheckCircle2 className="absolute right-10 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+            )}
             {passwordInvalid && (
               <AlertCircle className="absolute right-10 top-1/2 -translate-y-1/2 w-4 h-4 text-mansion-crimson" />
             )}
@@ -720,6 +724,9 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
           </div>
           {passwordInvalid && (
             <p className="text-mansion-crimson text-[11px] mt-1">Mínimo 12 caracteres ({password.length}/12)</p>
+          )}
+          {passwordValid && (
+            <p className="text-green-500 text-[11px] mt-1">Contraseña válida ({password.length}/12)</p>
           )}
         </div>
       </div>
