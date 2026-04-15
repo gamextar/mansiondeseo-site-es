@@ -5,6 +5,7 @@ import './index.css'
 import { getBootDebugFlags } from './lib/bootDebugPrefs'
 
 const ASSET_RECOVERY_KEY = 'mansion-asset-recovery-reload';
+const SW_RECOVERY_KEY = 'mansion-sw-recovery-reload';
 
 function isRecoverableAssetUrl(url) {
   const value = String(url || '');
@@ -78,7 +79,23 @@ if (typeof window !== 'undefined') {
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    let hasReloadedForController = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hasReloadedForController) return;
+      hasReloadedForController = true;
+      try {
+        if (sessionStorage.getItem(SW_RECOVERY_KEY) === '1') {
+          sessionStorage.removeItem(SW_RECOVERY_KEY);
+          return;
+        }
+        sessionStorage.setItem(SW_RECOVERY_KEY, '1');
+      } catch {}
+      window.location.reload();
+    });
+
+    navigator.serviceWorker.register('/sw.js').then((registration) => {
+      registration.update().catch(() => {});
+    }).catch(() => {});
   });
 }
 
