@@ -701,7 +701,6 @@ export default function VideoFeedPage() {
   }, [backgroundLocation, flushPendingViewedStories, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
     if (!isOverlayPreview || !isDesktopViewport) return;
-    if (event.target.closest('[data-overlay-close-button="true"]')) return;
     if (event.target.closest('[data-story-card-frame="true"]')) return;
     closeOverlay();
   }, [closeOverlay, isDesktopViewport, isOverlayPreview]);
@@ -1259,11 +1258,7 @@ export default function VideoFeedPage() {
         {isOverlayPreview && (
           <button
             type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              closeOverlay();
-            }}
-            data-overlay-close-button="true"
+            onClick={closeOverlay}
             className="absolute z-30 flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
             style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
             aria-label="Cerrar"

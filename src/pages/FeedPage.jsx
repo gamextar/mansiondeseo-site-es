@@ -7,7 +7,7 @@ import { useAuth } from '../lib/authContext';
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } };
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
-import { getProfiles, getStories, getToken, peekStories } from '../lib/api';
+import { getProfiles, getStories, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
@@ -110,6 +110,7 @@ export default function FeedPage({ initialData }) {
   const { user, siteSettings } = useAuth();
   const isStandaloneMobileApp = detectStandaloneMobile();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
+  const [homeStories, setHomeStories] = useState([]);
   const [showStoriesSection, setShowStoriesSection] = useState(true);
   const [showGridSection, setShowGridSection] = useState(true);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
@@ -430,36 +431,6 @@ export default function FeedPage({ initialData }) {
     return Array.from({ length: end - adjustedStart + 1 }, (_, idx) => adjustedStart + idx);
   }, [currentPage, totalPages]);
   const storyLimit = getInitialStoryLimit(safeSettings, isDesktopViewport);
-  const cachedStoriesData = useMemo(
-    () => (getToken() ? peekStories({ limit: Math.max(1, storyLimit) }) : null),
-    [storyLimit]
-  );
-  const initialHomeStories = useMemo(
-    () => (Array.isArray(cachedStoriesData?.stories)
-      ? cachedStoriesData.stories
-          .map((story) => ({
-            id: String(story.user_id || story.id || ''),
-            user_id: String(story.user_id || story.id || ''),
-            story_id: String(story.id || ''),
-            name: story.username || '',
-            username: story.username || '',
-            avatar_url: story.avatar_url || '',
-            avatar_crop: story.avatar_crop || null,
-            photos: [],
-            has_active_story: true,
-            active_story_url: story.video_url || '',
-            video_url: story.video_url || '',
-            caption: story.caption || '',
-            likes: Number(story.likes || 0),
-            comments: Number(story.comments || 0),
-            liked: !!story.liked,
-            created_at: story.created_at || '',
-          }))
-          .filter((story) => story.id && story.active_story_url)
-      : []),
-    [cachedStoriesData]
-  );
-  const [homeStories, setHomeStories] = useState(initialHomeStories);
   const fallbackStoryProfiles = useMemo(
     () => safeProfiles.filter((p) => p.has_active_story).slice(0, storyLimit),
     [safeProfiles, storyLimit]
@@ -828,9 +799,9 @@ export default function FeedPage({ initialData }) {
       })
       .catch(() => {
         if (requestId !== storiesLoadIdRef.current) return;
-        setHomeStories(fallbackStoryProfiles);
+        setHomeStories([]);
       });
-  }, [fallbackStoryProfiles, storyLimit, user?.id]);
+  }, [storyLimit, user?.id]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
