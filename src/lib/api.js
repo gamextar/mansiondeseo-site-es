@@ -207,6 +207,8 @@ function getApiDebugController() {
       totalMs: value.totalMs,
       avgMs: value.count ? Math.round(value.totalMs / value.count) : 0,
       lastStatus: value.lastStatus,
+      lastTiming: value.lastTiming || '',
+      lastCache: value.lastCache || '',
     }));
 
   const snapshotSessionCounts = () => Object.entries(state.sessionCounts)
@@ -219,6 +221,8 @@ function getApiDebugController() {
       totalMs: value.totalMs,
       avgMs: value.count ? Math.round(value.totalMs / value.count) : 0,
       lastStatus: value.lastStatus,
+      lastTiming: value.lastTiming || '',
+      lastCache: value.lastCache || '',
     }));
 
   const emitUpdate = () => {
@@ -295,7 +299,7 @@ function getApiDebugController() {
       state.counts = {};
       emitUpdate();
     },
-    record({ method, path, status, durationMs, ok }) {
+    record({ method, path, status, durationMs, ok, timing, cache }) {
       if (!state.enabled) return;
       const key = `${method} ${path}`;
       const bucket = state.counts[key] || {
@@ -304,11 +308,15 @@ function getApiDebugController() {
         errors: 0,
         totalMs: 0,
         lastStatus: null,
+        lastTiming: '',
+        lastCache: '',
       };
 
       bucket.count += 1;
       bucket.totalMs += durationMs;
       bucket.lastStatus = status;
+      bucket.lastTiming = timing || bucket.lastTiming || '';
+      bucket.lastCache = cache || bucket.lastCache || '';
       if (ok) bucket.ok += 1;
       else bucket.errors += 1;
       state.counts[key] = bucket;
@@ -319,11 +327,15 @@ function getApiDebugController() {
         errors: 0,
         totalMs: 0,
         lastStatus: null,
+        lastTiming: '',
+        lastCache: '',
       };
 
       sessionBucket.count += 1;
       sessionBucket.totalMs += durationMs;
       sessionBucket.lastStatus = status;
+      sessionBucket.lastTiming = timing || sessionBucket.lastTiming || '';
+      sessionBucket.lastCache = cache || sessionBucket.lastCache || '';
       if (ok) sessionBucket.ok += 1;
       else sessionBucket.errors += 1;
       state.sessionCounts[key] = sessionBucket;
@@ -337,6 +349,8 @@ function getApiDebugController() {
         status,
         durationMs,
         ok,
+        timing: timing || '',
+        cache: cache || '',
       });
       emitUpdate();
     },
@@ -466,12 +480,16 @@ async function apiFetch(path, options = {}) {
     headers,
   });
   const finishedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const timingHeader = res.headers.get('X-Profiles-Timing') || res.headers.get('Server-Timing') || '';
+  const cacheHeader = res.headers.get('X-Profiles-Cache') || '';
   debug?.record({
     method,
     path,
     status: res.status,
     durationMs: Math.round(finishedAt - startedAt),
     ok: res.ok,
+    timing: timingHeader,
+    cache: cacheHeader,
   });
 
   // Handle 401 — token expired

@@ -1491,6 +1491,16 @@ export default function SettingsPage() {
                           </span>
                         </div>
                         <p className="mt-1 text-[11px] text-text-dim">avg {row.avgMs}ms · ok {row.ok} · err {row.errors} · status {row.lastStatus ?? '-'}</p>
+                        {row.lastTiming && (
+                          <p className="mt-1 text-[10px] text-cyan-300 break-all">
+                            timing: {row.lastTiming}
+                          </p>
+                        )}
+                        {row.lastCache && (
+                          <p className="mt-1 text-[10px] text-emerald-300 break-all">
+                            cache: {row.lastCache}
+                          </p>
+                        )}
                       </div>
                     ))
                   )}
