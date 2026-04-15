@@ -264,6 +264,16 @@ export default function ApiDebugOverlay() {
                         <span>err {row.errors}</span>
                         <span>status {row.lastStatus ?? '-'}</span>
                       </div>
+                      {row.lastTiming && (
+                        <p className="mt-1 text-[10px] text-cyan-300 break-all">
+                          timing: {row.lastTiming}
+                        </p>
+                      )}
+                      {row.lastCache && (
+                        <p className="mt-1 text-[10px] text-emerald-300 break-all">
+                          cache: {row.lastCache}
+                        </p>
+                      )}
                     </div>
                   ))
                 )}
