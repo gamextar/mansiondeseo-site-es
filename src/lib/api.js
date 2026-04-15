@@ -23,6 +23,7 @@ const AUTH_ME_CACHE_KEY = 'authMe';
 const AUTH_ME_CACHE_TTL_MS = 60 * 60_000;
 const OWN_PROFILE_DASHBOARD_CACHE_KEY = 'ownProfileDashboard';
 const OWN_PROFILE_DASHBOARD_TTL_MS = 60 * 60_000;
+const EVER_LOGGED_IN_KEY = 'mansion_ever_logged_in';
 const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
@@ -455,9 +456,15 @@ export function setStoredUser(user) {
   if (typeof localStorage === 'undefined') return;
   if (user) {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
+    localStorage.setItem(EVER_LOGGED_IN_KEY, '1');
   } else {
     localStorage.removeItem(USER_KEY);
   }
+}
+
+export function hasEverLoggedIn() {
+  if (typeof localStorage === 'undefined') return false;
+  return localStorage.getItem(EVER_LOGGED_IN_KEY) === '1';
 }
 
 export function clearAuth() {
@@ -502,7 +509,7 @@ async function apiFetch(path, options = {}) {
   // Handle 401 — token expired
   if (res.status === 401 && token) {
     clearAuth();
-    window.location.href = '/bienvenida';
+    window.location.href = '/login';
     throw new Error('Sesión expirada');
   }
 
@@ -608,7 +615,7 @@ async function apiUpload(path, options = {}) {
 
       if (xhr.status === 401 && token) {
         clearAuth();
-        window.location.href = '/bienvenida';
+        window.location.href = '/login';
         reject(new Error('Sesión expirada'));
         return;
       }

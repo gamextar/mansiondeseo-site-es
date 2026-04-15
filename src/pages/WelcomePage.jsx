@@ -1,15 +1,26 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronRight, Sparkles } from 'lucide-react';
 import { useSeoMeta } from '../lib/seo';
+import { getToken, hasEverLoggedIn } from '../lib/api';
 
 export default function WelcomePage() {
   const navigate = useNavigate();
+  const hasToken = !!getToken();
+  const returningUser = hasEverLoggedIn();
   useSeoMeta({
     title: 'Mansión Deseo | Acceso privado para adultos',
     description: 'Comunidad privada y selecta para adultos registrados, pensada para parejas y usuarios solos que valoran perfiles verificados y acceso discreto.',
     canonical: 'https://mansiondeseo.com/bienvenida',
   });
+
+  if (hasToken) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (returningUser) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-mansion-base flex flex-col items-center justify-center relative overflow-hidden px-6">
