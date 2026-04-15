@@ -1009,7 +1009,7 @@ export default function FeedPage({ initialData }) {
 
   return (
     <div
-      className="min-h-dynamic-screen bg-mansion-base pt-navbar lg:pt-0 lg:pb-[52px]"
+      className="min-h-dynamic-screen bg-mansion-base pt-navbar lg:pt-0 lg:pb-[84px]"
       style={{
         paddingBottom: isDesktopViewport
           ? undefined
@@ -1407,7 +1407,7 @@ export default function FeedPage({ initialData }) {
                   initial={{ opacity: 0, y: 18, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-                  className="pointer-events-none fixed inset-x-0 bottom-7 z-40 hidden justify-center lg:flex"
+                  className="pointer-events-none fixed inset-x-0 bottom-[21px] z-40 hidden justify-center lg:flex"
                 >
                   <div className="pointer-events-auto flex items-center gap-2.5 rounded-[999px] border border-black/45 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] px-3 py-2 shadow-[0_18px_48px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[22px]">
                     <button
