@@ -49,6 +49,7 @@ const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const FEED_PROFILE_LIMIT = 42;
 const FEED_SNAPSHOT_LIMIT = 360;
+const FEED_SNAPSHOT_TTL_MS = 300_000;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -2036,7 +2037,7 @@ async function handleProfiles(request, env) {
     () => env.DB.prepare('SELECT user_id, video_url FROM stories WHERE active = 1 ORDER BY created_at DESC').all().then(r => r.results).catch(() => [])
   );
   const orderedBaseProfilesPromise = canUseFeedSnapshot
-    ? cached(feedSnapshotCacheKey, 30_000, async () => {
+    ? cached(feedSnapshotCacheKey, FEED_SNAPSHOT_TTL_MS, async () => {
         const snapshotWindowLimit = FEED_SNAPSHOT_LIMIT + 1;
         const snapshotDbLimit = roleBuckets.length > 1
           ? Math.max(snapshotWindowLimit * 10, FEED_SNAPSHOT_LIMIT * 10)
