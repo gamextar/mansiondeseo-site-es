@@ -1656,14 +1656,22 @@ export default function RegisterPage() {
     document.head.appendChild(script);
   }, []);
 
-  // Render Turnstile widget on step 0 (email/password) — blocks bots before any backend request
+  // Render Turnstile on the first and final step so the token is fresh at submit time.
   useEffect(() => {
-    if (step !== 0) return;
+    if (step !== 0 && step !== TOTAL_STEPS - 1) return;
     if (!turnstileContainerRef.current) return;
 
     const tryRender = () => {
       if (!window.turnstile) { setTimeout(tryRender, 100); return; }
-      if (turnstileWidgetRef.current != null) return; // already rendered
+      if (turnstileWidgetRef.current != null) {
+        try {
+          window.turnstile.remove(turnstileWidgetRef.current);
+        } catch {
+          // best effort
+        }
+        turnstileWidgetRef.current = null;
+      }
+      setTurnstileTokenBoth('');
       turnstileWidgetRef.current = window.turnstile.render(turnstileContainerRef.current, {
         sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA',
         theme: 'dark',
@@ -1674,7 +1682,7 @@ export default function RegisterPage() {
     };
     tryRender();
 
-    // Do NOT destroy the widget when leaving step 0 — token must survive to submit
+    // Recreated intentionally when entering step 0 or the final step.
     return () => {};
   }, [step]);
 
@@ -1735,12 +1743,12 @@ export default function RegisterPage() {
   );
 
   const canNext = () => {
-    if (step === 0) return EMAIL_REGEX.test(email) && isValidEmailTld(email) && password.length >= 12 && emailStatus !== 'exists' && emailStatus !== 'invalid' && !!turnstileToken;
+    if (step === 0) return EMAIL_REGEX.test(email) && isValidEmailTld(email) && password.length >= 12 && emailStatus !== 'exists' && emailStatus !== 'invalid';
     if (step === 1) return !!iAm;
     if (step === 2) return seeking.length > 0;
     if (step === 3) return interests.length > 0;
     if (step === 4) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && isAdultBirthdate(info.birthdate) && info.province && (!showCountryPicker || selectedCountry);
-    if (step === 5) return !!photoFile;
+    if (step === 5) return !!photoFile && !!turnstileToken;
     return true;
   };
 
@@ -1950,7 +1958,7 @@ export default function RegisterPage() {
               onEmailBlur={handleEmailBlur}
               onNavigateRecover={() => navigate(`/recuperar-contrasena?email=${encodeURIComponent(email)}`)}
             />
-            {/* Turnstile widget renders here on mount — invisible challenge */}
+            {/* Turnstile widget renders here on mount */}
             <div ref={turnstileContainerRef} className="flex justify-center mt-10" />
           </>
         );
@@ -1979,7 +1987,12 @@ export default function RegisterPage() {
       case 4:
         return <StepBasicInfo data={info} onChange={setInfo} showCountryPicker={showCountryPicker} allowedCountries={allowedCountries} selectedCountry={selectedCountry} onCountryChange={setSelectedCountry} usernameStatus={usernameStatus} onUsernameBlur={handleUsernameBlur} />;
       case 5:
-        return <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />;
+        return (
+          <>
+            <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />
+            <div ref={turnstileContainerRef} className="flex justify-center mt-6" />
+          </>
+        );
       default:
         return null;
     }
