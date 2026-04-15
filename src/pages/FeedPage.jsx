@@ -1,7 +1,7 @@
 import { forwardRef, useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Plus, Radio } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, Plus, Radio } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } };
@@ -1403,6 +1403,16 @@ export default function FeedPage({ initialData }) {
                   className="pointer-events-none fixed inset-x-0 bottom-[21px] z-40 hidden justify-center lg:flex"
                 >
                   <div className="pointer-events-auto flex items-center gap-2.5 rounded-[999px] border border-black/45 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] px-3 py-2 shadow-[0_18px_48px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[22px]">
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT))}
+                      disabled={currentPage <= 1 || loading}
+                      aria-label="Volver a la pagina principal"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/16 text-white/68 transition-all duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
+                    >
+                      <Home className="h-4.5 w-4.5" />
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => goToFeedPage(currentPage - 1)}
