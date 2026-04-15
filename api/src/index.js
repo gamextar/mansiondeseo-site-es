@@ -2109,11 +2109,16 @@ async function handleProfiles(request, env) {
       markTiming('snapshotMs', snapshotStartedAt);
     });
 
-  // Parallel: cached settings + cached profiles + combined favorites + active stories + total count
+  // Parallel: cached settings + cached profiles + split favorite lookups + active stories + total count
   const favoritesStartedAt = Date.now();
-  const favoritesPromise = env.DB.prepare('SELECT user_id, target_id FROM favorites WHERE user_id = ? OR target_id = ?')
-    .bind(auth.sub, auth.sub)
-    .all()
+  const favoritesPromise = Promise.all([
+    env.DB.prepare('SELECT target_id FROM favorites WHERE user_id = ?')
+      .bind(auth.sub)
+      .all(),
+    env.DB.prepare('SELECT user_id FROM favorites WHERE target_id = ?')
+      .bind(auth.sub)
+      .all(),
+  ])
     .finally(() => {
       markTiming('favoritesMs', favoritesStartedAt);
     });
@@ -2125,14 +2130,14 @@ async function handleProfiles(request, env) {
   ).finally(() => {
     markTiming('countMs', countStartedAt);
   });
-  const [{ orderedProfiles: orderedBaseProfiles, totalProfiles: snapshotTotalProfiles }, { results: allFavRows }, countRow] = await Promise.all([
+  const [{ orderedProfiles: orderedBaseProfiles, totalProfiles: snapshotTotalProfiles }, [viewerFavoritesRowSet, favoritedByRowSet], countRow] = await Promise.all([
     feedSnapshotDataPromise,
     favoritesPromise,
     countPromise,
   ]);
   const viewerIsPremium = viewer && isPremiumActive(viewer);
-  const viewerFavorites = new Set(allFavRows.filter(r => r.user_id === auth.sub).map(r => r.target_id));
-  const favoritedBySet = new Set(allFavRows.filter(r => r.target_id === auth.sub).map(r => r.user_id));
+  const viewerFavorites = new Set((viewerFavoritesRowSet?.results || []).map((row) => row.target_id).filter(Boolean));
+  const favoritedBySet = new Set((favoritedByRowSet?.results || []).map((row) => row.user_id).filter(Boolean));
   const personalizeStartedAt = Date.now();
   const profiles = personalizeFeedProfiles(
     orderedBaseProfiles,
