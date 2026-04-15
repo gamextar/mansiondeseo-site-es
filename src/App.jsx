@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, useLocation, useNavigate, useParams, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X } from 'lucide-react';
 import { useAgeVerified } from './hooks/useAgeVerified';
 import AgeVerificationModal from './components/AgeVerificationModal';
 import Navbar from './components/Navbar';
@@ -67,7 +66,6 @@ function SEOCityLanding({ variant }) {
 
 function AppLayout() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
   const backgroundLocation = location.state?.backgroundLocation;
@@ -202,21 +200,6 @@ function AppLayout() {
     htmlStyle.overflow = previousHtmlOverflow;
     window.scrollTo(0, scrollY);
   }, []);
-
-  const closeVideoOverlayToBackground = useCallback(() => {
-    if (backgroundLocation?.pathname) {
-      navigate(
-        {
-          pathname: backgroundLocation.pathname,
-          search: backgroundLocation.search || '',
-          hash: backgroundLocation.hash || '',
-        },
-        { replace: true, state: backgroundLocation.state || null }
-      );
-      return;
-    }
-    navigate('/', { replace: true });
-  }, [backgroundLocation, navigate]);
 
   return (
     <>
@@ -421,15 +404,6 @@ function AppLayout() {
                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                 className="absolute inset-0 pointer-events-auto"
               >
-                <button
-                  type="button"
-                  onClick={closeVideoOverlayToBackground}
-                  className="absolute z-[200] flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
-                  style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
-                  aria-label="Cerrar"
-                >
-                  <X className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
-                </button>
                 <Routes>
                   <Route path="/videos" element={<VideoFeedPage />} />
                 </Routes>
