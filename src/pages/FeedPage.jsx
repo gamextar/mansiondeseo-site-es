@@ -177,9 +177,11 @@ export default function FeedPage({ initialData }) {
   const previousOrderedStoryIdsRef = useRef('');
   const initialStoriesAlignedRef = useRef(false);
   const [storiesEdgeOffset, setStoriesEdgeOffset] = useState(0);
+  const resetStoriesInteractionRef = useRef(() => {});
   const storiesDragRef = useRef({
     active: false,
     captured: false,
+    pointerId: null,
     startX: 0,
     startScrollLeft: 0,
     moved: false,
@@ -752,6 +754,7 @@ export default function FeedPage({ initialData }) {
   }, [schedulePendingViewedStories]);
 
   const openStoryFromHome = useCallback((storyOrUserId) => {
+    resetStoriesInteractionRef.current?.();
     const storyUserId = typeof storyOrUserId === 'object' && storyOrUserId !== null
       ? String(storyOrUserId.user_id || storyOrUserId.id || '')
       : String(storyOrUserId || '');
@@ -795,6 +798,11 @@ export default function FeedPage({ initialData }) {
       return currentIds === nextIds ? current : bootstrapStoryProfiles;
     });
   }, [bootstrapStoryProfiles, user?.id]);
+
+  useEffect(() => {
+    if (location.pathname === '/') return;
+    resetStoriesInteraction();
+  }, [location.pathname, resetStoriesInteraction]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
@@ -857,6 +865,25 @@ export default function FeedPage({ initialData }) {
     momentum.velocity = 0;
   }, []);
 
+  const resetStoriesInteraction = useCallback(() => {
+    const el = storiesScrollRef.current;
+    const drag = storiesDragRef.current;
+    if (el && drag.captured && drag.pointerId !== null && drag.pointerId !== undefined) {
+      try { el.releasePointerCapture?.(drag.pointerId); } catch {}
+    }
+    drag.active = false;
+    drag.captured = false;
+    drag.pointerId = null;
+    drag.moved = false;
+    drag.velocity = 0;
+    stopStoriesMomentum();
+    stopStoriesBounce();
+    storiesEdgeOffsetRef.current = 0;
+    setStoriesEdgeOffset(0);
+  }, [stopStoriesBounce, stopStoriesMomentum]);
+
+  resetStoriesInteractionRef.current = resetStoriesInteraction;
+
   const startStoriesMomentum = useCallback(() => {
     const el = storiesScrollRef.current;
     const momentum = storiesMomentumRef.current;
@@ -910,6 +937,7 @@ export default function FeedPage({ initialData }) {
     storiesDragRef.current = {
       active: true,
       captured: false,
+      pointerId: event.pointerId,
       startX: event.clientX,
       startScrollLeft: el.scrollLeft,
       moved: false,
@@ -971,6 +999,7 @@ export default function FeedPage({ initialData }) {
       animateStoriesEdgeOffsetTo(0);
     }
     drag.captured = false;
+    drag.pointerId = null;
   }, [animateStoriesEdgeOffsetTo, desktopStoryRailEnhanced, startStoriesMomentum]);
 
   const handleStoriesClickCapture = useCallback((event) => {
@@ -983,19 +1012,12 @@ export default function FeedPage({ initialData }) {
 
   useEffect(() => {
     if (desktopStoryRailEnhanced) return;
-    stopStoriesMomentum();
-    stopStoriesBounce();
-    storiesEdgeOffsetRef.current = 0;
-    setStoriesEdgeOffset(0);
-    storiesDragRef.current.active = false;
-    storiesDragRef.current.captured = false;
-    storiesDragRef.current.moved = false;
-  }, [desktopStoryRailEnhanced, stopStoriesBounce, stopStoriesMomentum]);
+    resetStoriesInteraction();
+  }, [desktopStoryRailEnhanced, resetStoriesInteraction]);
 
   useEffect(() => () => {
-    stopStoriesMomentum();
-    stopStoriesBounce();
-  }, [stopStoriesBounce, stopStoriesMomentum]);
+    resetStoriesInteraction();
+  }, [resetStoriesInteraction]);
 
   // ── Grid setup ────────────────────────────────────────────────────
   const gap = 12;
