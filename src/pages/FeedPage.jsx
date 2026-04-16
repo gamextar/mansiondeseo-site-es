@@ -744,6 +744,7 @@ export default function FeedPage({ initialData }) {
   }, [schedulePendingViewedStories]);
 
   const openStoryFromHome = useCallback((storyOrUserId) => {
+    const singleStoryMode = !!(typeof storyOrUserId === 'object' && storyOrUserId !== null && storyOrUserId.singleStoryMode);
     const storyUserId = typeof storyOrUserId === 'object' && storyOrUserId !== null
       ? String(storyOrUserId.user_id || storyOrUserId.id || '')
       : String(storyOrUserId || '');
@@ -768,6 +769,7 @@ export default function FeedPage({ initialData }) {
       state: {
         storyUserId,
         storySeed,
+        singleStoryMode,
         modal: 'videos',
         backgroundLocation: location,
         backgroundScrollY,
@@ -1063,6 +1065,7 @@ export default function FeedPage({ initialData }) {
                           username: user.username || '',
                           avatar_url: user.avatar_url || '',
                           avatar_crop: user.avatar_crop || null,
+                          singleStoryMode: true,
                         })
                       : () => navigate('/historia/nueva', { state: { from: '/' } })}
                     className="flex flex-col items-center gap-1 w-full"
@@ -1117,6 +1120,7 @@ export default function FeedPage({ initialData }) {
                           username: user.username || '',
                           avatar_url: user.avatar_url || '',
                           avatar_crop: user.avatar_crop || null,
+                          singleStoryMode: true,
                         })
                       : () => navigate('/historia/nueva', { state: { from: '/' } })}
                     className="flex flex-col items-center gap-1 w-full"
@@ -1171,6 +1175,7 @@ export default function FeedPage({ initialData }) {
                           username: user.username || '',
                           avatar_url: user.avatar_url || '',
                           avatar_crop: user.avatar_crop || null,
+                          singleStoryMode: true,
                         })
                       : () => navigate('/historia/nueva', { state: { from: '/' } })}
                     className="flex flex-col items-center gap-1 w-full"

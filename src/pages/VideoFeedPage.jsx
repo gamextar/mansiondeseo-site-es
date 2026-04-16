@@ -645,6 +645,7 @@ export default function VideoFeedPage() {
   };
   const requestedStoryUserId = location.state?.storyUserId || null;
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
+  const requestedSingleStoryMode = location.state?.singleStoryMode === true;
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
   const backgroundLocation = location.state?.backgroundLocation || null;
   // When opened from a story-bar click (seed provided), skip the cache and start
@@ -754,7 +755,7 @@ export default function VideoFeedPage() {
   const activeStory = isDesktopViewport
     ? stories[desktopActiveIdx - 1] || stories[0] || null
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
-  const isOwnStoryEntry = !!requestedStoryUserId && !!user?.id && String(requestedStoryUserId) === String(user.id);
+  const isOwnStoryEntry = requestedSingleStoryMode && !!requestedStoryUserId;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const lockSingleStorySwipe = !isDesktopViewport && isOwnStoryEntry;
   const isStandaloneMobileApp = detectStandaloneMobile();
