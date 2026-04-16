@@ -823,7 +823,7 @@ export default function ProfileDetailPage({ initialData }) {
             className="mb-6"
           >
             <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Sobre {name.split(' ')[0]}</h3>
-            <p className="text-base leading-relaxed text-text-primary break-words [overflow-wrap:anywhere]">
+            <p className="w-full max-w-full whitespace-pre-line break-words [overflow-wrap:anywhere] text-base leading-relaxed text-text-primary">
               {bio}
             </p>
           </MotionDiv>
