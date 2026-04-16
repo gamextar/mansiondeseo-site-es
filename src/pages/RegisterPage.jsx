@@ -502,14 +502,14 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : undefined}
-              className="flex items-center justify-center gap-2 sm:gap-3"
+              className="flex items-end justify-center gap-2 sm:gap-3"
             >
               {role && (
                 <motion.div
                   initial={{ opacity: 0, x: -20, scale: 0.5 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
                   transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
-                  className="flex flex-col items-center"
+                  className="flex flex-col items-center justify-end"
                 >
                   {renderPreviewRole(role)}
                   <span className="text-[10px] text-text-dim mt-0.5">Soy</span>
@@ -531,7 +531,7 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
                   initial={{ opacity: 0, x: 20, scale: 0.5 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
                   transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
-                  className="flex flex-col items-center"
+                  className="flex flex-col items-center justify-end"
                 >
                   <div className="max-w-[240px] overflow-x-hidden overflow-y-hidden overscroll-x-contain scrollbar-hide [-webkit-overflow-scrolling:touch]">
                     <div className="inline-flex min-w-max items-end justify-start gap-0.5 px-1 pb-1">
