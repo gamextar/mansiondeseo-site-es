@@ -1279,18 +1279,18 @@ export default function VideoFeedPage() {
           <button
             type="button"
             onClick={closeToHomeFeed}
-            className="flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+            className="flex h-[52px] w-[52px] lg:h-[72px] lg:w-[72px] items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
             aria-label="Cerrar"
           >
-            <X className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+            <X className="w-6 h-6 lg:w-8 lg:h-8 text-white" />
           </button>
           <button
             type="button"
             onClick={() => setIsMuted((m) => !m)}
-            className="flex h-11 w-11 lg:h-12 lg:w-12 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+            className="flex h-[52px] w-[52px] lg:h-[72px] lg:w-[72px] items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
             aria-label={isMuted ? 'Activar sonido' : 'Silenciar'}
           >
-            {isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+            {isMuted ? <VolumeX className="w-6 h-6 lg:w-8 lg:h-8 text-white" /> : <Volume2 className="w-6 h-6 lg:w-8 lg:h-8 text-white" />}
           </button>
         </div>
         {isDesktopViewport ? (
