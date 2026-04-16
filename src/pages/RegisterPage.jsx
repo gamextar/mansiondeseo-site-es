@@ -538,10 +538,11 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
                     {seekingArr.map((s, i) => (
                       <motion.div
                         key={s}
-                      initial={{ opacity: 0, scale: 0 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={optimizeMotion ? { duration: 0.18, delay: i * 0.04, ease: 'easeOut' } : { delay: i * 0.1 }}
-                    >
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={optimizeMotion ? { duration: 0.18, delay: i * 0.04, ease: 'easeOut' } : { delay: i * 0.1 }}
+                        className="flex h-11 items-end"
+                      >
                         {renderPreviewRole(s)}
                       </motion.div>
                     ))}
