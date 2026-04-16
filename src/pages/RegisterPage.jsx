@@ -1665,6 +1665,9 @@ export default function RegisterPage() {
         hombre: settingsData.settings?.roleHombreImg || '',
         mujer: settingsData.settings?.roleMujerImg || '',
         pareja: settingsData.settings?.roleParejaImg || '',
+        pareja_hombres: settingsData.settings?.roleParejaHombresImg || '',
+        pareja_mujeres: settingsData.settings?.roleParejaMujeresImg || '',
+        trans: settingsData.settings?.roleTransImg || '',
       });
       if (detected && allowed.includes(detected)) {
         setSelectedCountry(detected);

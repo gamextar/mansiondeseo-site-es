@@ -42,8 +42,9 @@ const ROLE_IMG_KEYS = {
   'Hombre Solo': 'galleryHombreImg',
   'Mujer Sola': 'galleryMujerImg',
   'Pareja': 'galleryParejaImg',
-  'Pareja de Hombres': 'galleryParejaImg',
-  'Pareja de Mujeres': 'galleryParejaImg',
+  'Pareja de Hombres': 'galleryParejaHombresImg',
+  'Pareja de Mujeres': 'galleryParejaMujeresImg',
+  Trans: 'galleryTransImg',
 };
 
 const RoleFallbackIcon = ({ role }) => {

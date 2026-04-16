@@ -62,9 +62,15 @@ export default function SettingsPage() {
   const [roleHombreImg, setRoleHombreImg] = useState('');
   const [roleMujerImg, setRoleMujerImg] = useState('');
   const [roleParejaImg, setRoleParejaImg] = useState('');
+  const [roleParejaHombresImg, setRoleParejaHombresImg] = useState('');
+  const [roleParejaMujeresImg, setRoleParejaMujeresImg] = useState('');
+  const [roleTransImg, setRoleTransImg] = useState('');
   const [galleryHombreImg, setGalleryHombreImg] = useState('');
   const [galleryMujerImg, setGalleryMujerImg] = useState('');
   const [galleryParejaImg, setGalleryParejaImg] = useState('');
+  const [galleryParejaHombresImg, setGalleryParejaHombresImg] = useState('');
+  const [galleryParejaMujeresImg, setGalleryParejaMujeresImg] = useState('');
+  const [galleryTransImg, setGalleryTransImg] = useState('');
 
   // Navegacion inferior
   const [navBottomPadding, setNavBottomPadding] = useState(24);
@@ -213,9 +219,15 @@ export default function SettingsPage() {
         setRoleHombreImg(s.roleHombreImg || '');
         setRoleMujerImg(s.roleMujerImg || '');
         setRoleParejaImg(s.roleParejaImg || '');
+        setRoleParejaHombresImg(s.roleParejaHombresImg || '');
+        setRoleParejaMujeresImg(s.roleParejaMujeresImg || '');
+        setRoleTransImg(s.roleTransImg || '');
         setGalleryHombreImg(s.galleryHombreImg || '');
         setGalleryMujerImg(s.galleryMujerImg || '');
         setGalleryParejaImg(s.galleryParejaImg || '');
+        setGalleryParejaHombresImg(s.galleryParejaHombresImg || '');
+        setGalleryParejaMujeresImg(s.galleryParejaMujeresImg || '');
+        setGalleryTransImg(s.galleryTransImg || '');
         setCoinPack1Coins(s.coinPack1Coins || '1000');
         setCoinPack1Price(s.coinPack1Price || '');
         setCoinPack2Coins(s.coinPack2Coins || '2000');
@@ -372,9 +384,15 @@ export default function SettingsPage() {
         role_hombre_img: roleHombreImg,
         role_mujer_img: roleMujerImg,
         role_pareja_img: roleParejaImg,
+        role_pareja_hombres_img: roleParejaHombresImg,
+        role_pareja_mujeres_img: roleParejaMujeresImg,
+        role_trans_img: roleTransImg,
         gallery_hombre_img: galleryHombreImg,
         gallery_mujer_img: galleryMujerImg,
         gallery_pareja_img: galleryParejaImg,
+        gallery_pareja_hombres_img: galleryParejaHombresImg,
+        gallery_pareja_mujeres_img: galleryParejaMujeresImg,
+        gallery_trans_img: galleryTransImg,
         coin_pack_1_coins: coinPack1Coins,
         coin_pack_1_price: coinPack1Price,
         coin_pack_2_coins: coinPack2Coins,
@@ -440,6 +458,9 @@ export default function SettingsPage() {
       setGalleryHombreImg(s.galleryHombreImg || '');
       setGalleryMujerImg(s.galleryMujerImg || '');
       setGalleryParejaImg(s.galleryParejaImg || '');
+      setGalleryParejaHombresImg(s.galleryParejaHombresImg || '');
+      setGalleryParejaMujeresImg(s.galleryParejaMujeresImg || '');
+      setGalleryTransImg(s.galleryTransImg || '');
       setCoinPack1Coins(s.coinPack1Coins || '1000');
       setCoinPack1Price(s.coinPack1Price || '');
       setCoinPack2Coins(s.coinPack2Coins || '2000');
@@ -939,11 +960,14 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {[
                   { label: 'Hombre', value: galleryHombreImg, setter: setGalleryHombreImg, color: '#3B82F6' },
                   { label: 'Mujer', value: galleryMujerImg, setter: setGalleryMujerImg, color: '#EC4899' },
                   { label: 'Pareja', value: galleryParejaImg, setter: setGalleryParejaImg, color: '#8B5CF6' },
+                  { label: 'Pareja Hombres', value: galleryParejaHombresImg, setter: setGalleryParejaHombresImg, color: '#60A5FA' },
+                  { label: 'Pareja Mujeres', value: galleryParejaMujeresImg, setter: setGalleryParejaMujeresImg, color: '#F472B6' },
+                  { label: 'Trans', value: galleryTransImg, setter: setGalleryTransImg, color: '#2DD4BF' },
                 ].map(({ label, value, setter, color }) => (
                   <div key={label} className="flex flex-col items-center gap-2">
                     <span className="text-[11px] font-medium" style={{ color }}>{label}</span>
@@ -990,11 +1014,14 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {[
                   { label: 'Hombre', value: roleHombreImg, setter: setRoleHombreImg, color: '#3B82F6' },
                   { label: 'Mujer', value: roleMujerImg, setter: setRoleMujerImg, color: '#EC4899' },
                   { label: 'Pareja', value: roleParejaImg, setter: setRoleParejaImg, color: '#8B5CF6' },
+                  { label: 'Pareja Hombres', value: roleParejaHombresImg, setter: setRoleParejaHombresImg, color: '#60A5FA' },
+                  { label: 'Pareja Mujeres', value: roleParejaMujeresImg, setter: setRoleParejaMujeresImg, color: '#F472B6' },
+                  { label: 'Trans', value: roleTransImg, setter: setRoleTransImg, color: '#2DD4BF' },
                 ].map(({ label, value, setter, color }) => (
                   <div key={label} className="flex flex-col items-center gap-2">
                     <span className="text-[11px] font-medium" style={{ color }}>{label}</span>
