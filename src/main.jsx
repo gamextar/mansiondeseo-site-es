@@ -82,8 +82,23 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+const rootElement = document.getElementById('root');
+
+ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>,
 )
+
+if (typeof window !== 'undefined') {
+  const hideBootSplash = () => {
+    const splash = document.getElementById('boot-splash');
+    if (splash?.parentNode) {
+      splash.parentNode.removeChild(splash);
+    }
+  };
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(hideBootSplash);
+  });
+  window.setTimeout(hideBootSplash, 1200);
+}

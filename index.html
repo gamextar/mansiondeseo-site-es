@@ -95,9 +95,17 @@
     </script>
     <style>
       html,body{background:#08080E;color-scheme:dark}
+      #boot-splash{
+        position:fixed;
+        inset:0;
+        z-index:2147483647;
+        background:#08080E;
+        pointer-events:none;
+      }
     </style>
   </head>
   <body style="margin:0;background-color:#08080E;color-scheme:dark">
+    <div id="boot-splash" aria-hidden="true"></div>
     <div id="root" style="background-color:#08080E"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
