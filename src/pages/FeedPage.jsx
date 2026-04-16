@@ -1020,7 +1020,7 @@ export default function FeedPage({ initialData }) {
         </div>
         <AnimatedBlock
           ref={storiesScrollRef}
-          className={`flex overflow-x-auto scrollbar-hide pb-2 pl-[18px] pr-[18px] lg:pl-0 lg:pr-0 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
+          className={`flex overflow-x-auto scrollbar-hide pb-2 pl-[21px] pr-[21px] lg:pl-0 lg:pr-0 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
           style={{
             scrollbarWidth: 'none',
             msOverflowStyle: 'none',
