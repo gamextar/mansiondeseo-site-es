@@ -11,6 +11,7 @@ import { chromium } from 'playwright'
 const DEFAULT_MAX_PHOTOS_PER_PROFILE = 12
 const DEFAULT_MAX_VIDEOS_PER_PROFILE = 3
 const MEDIA_REQUEST_TIMEOUT_MS = 15000
+const DEFAULT_IMPORTED_REGISTRY_PATH = path.join(process.cwd(), 'data', 'import-state', 'imported-usernames.json')
 
 function printUsage() {
   console.log(`Uso:
@@ -47,6 +48,8 @@ Opciones:
   --max-photos <n>               Máximo de fotos por perfil. Default: 12
   --max-videos <n>               Máximo de videos por perfil. Default: 3
   --exclude-usernames <csv>      Usernames a excluir del manifest/listado
+  --imported-file <path>         JSON/TXT con usernames ya importados para saltearlos al extraer
+  --ignore-imported-registry     Ignora el registro local de ya importados para esta corrida
   --force                        Reextrae perfiles aunque ya estén marcados en el state
   --delay-ms <n>                 Espera entre perfiles/páginas
   --media-delay-ms <n>           Espera entre descargas de fotos/videos
@@ -104,6 +107,8 @@ const excludedUsernames = new Set(
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean)
 )
+const importedFileArg = takeFlag('--imported-file', '')
+const ignoreImportedRegistry = hasFlag('--ignore-imported-registry')
 const sessionPath = path.resolve(repoRoot, takeFlag('--session', `./data/contactossex-session-${roleGroup}.json`))
 const browserProfileDir = path.resolve(
   repoRoot,
@@ -120,6 +125,7 @@ const loginCredsPath = path.resolve(
 const providedLoginUsername = takeFlag('--login-username', process.env.CONTACTOSSEX_LOGIN_USERNAME || '')
 const providedLoginPassword = takeFlag('--login-password', process.env.CONTACTOSSEX_LOGIN_PASSWORD || '')
 const assetsDir = path.resolve(repoRoot, takeFlag('--assets-dir', `./data/contactossex-assets/${roleGroup}`))
+const importedRegistryPath = path.resolve(repoRoot, importedFileArg || DEFAULT_IMPORTED_REGISTRY_PATH)
 const headless = explicitHeadless ? true : !headed && !manualLogin
 const batchOutputEnabled = !noBatchOutput
 
@@ -144,6 +150,37 @@ async function readJson(filePath, fallback) {
     return JSON.parse(raw)
   } catch {
     return fallback
+  }
+}
+
+async function loadUsernameRegistry(filePath) {
+  if (!filePath || !existsSync(filePath)) return new Set()
+  try {
+    const raw = await fs.readFile(filePath, 'utf8')
+    const trimmed = raw.trim()
+    if (!trimmed) return new Set()
+
+    let usernames = []
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed)) {
+        usernames = parsed
+      } else if (Array.isArray(parsed?.usernames)) {
+        usernames = parsed.usernames
+      } else if (Array.isArray(parsed?.blacklist)) {
+        usernames = parsed.blacklist
+      }
+    } else {
+      usernames = trimmed.split(/\r?\n/g)
+    }
+
+    return new Set(
+      usernames
+        .map((value) => String(value || '').trim().toLowerCase())
+        .filter(Boolean)
+    )
+  } catch {
+    return new Set()
   }
 }
 
@@ -964,6 +1001,9 @@ async function main() {
   const batchPath = path.join(batchDir, `${batchName}.json`)
   const batchManifest = { profiles: [] }
   const selectedRoleGroup = normalizeRoleGroup(roleGroup)
+  const importedUsernames = ignoreImportedRegistry
+    ? new Set()
+    : await loadUsernameRegistry(importedRegistryPath)
 
   if (freshSession && existsSync(browserProfileDir)) {
     await removeDir(browserProfileDir)
@@ -1002,6 +1042,7 @@ async function main() {
     let skippedExcludedUsername = 0
     let skippedExistingAssets = 0
     let skippedExistingKnownProfile = 0
+    let skippedImportedUsername = 0
     let skippedRoleMismatch = 0
     for (const url of urls) {
       if (maxProfiles > 0 && processedThisRun >= maxProfiles) break
@@ -1051,6 +1092,20 @@ async function main() {
         await writeJson(statePath, state)
         skippedThisRun += 1
         skippedExcludedUsername += 1
+        continue
+      }
+      if (importedUsernames.has(String(profile.username || '').trim().toLowerCase())) {
+        console.log(`Saltando username ya importado: ${profile.username}`)
+        state.processedProfiles[url] = {
+          username: profile.username,
+          userId: profile.userId || '',
+          skipped: true,
+          reason: 'already_imported',
+          at: new Date().toISOString(),
+        }
+        await writeJson(statePath, state)
+        skippedThisRun += 1
+        skippedImportedUsername += 1
         continue
       }
       if (selectedRoleGroup !== 'mixto' && roleToGroup(profile.role) !== selectedRoleGroup) {
@@ -1114,6 +1169,7 @@ async function main() {
           existingKnownProfile: skippedExistingKnownProfile,
           existingAssetsDir: skippedExistingAssets,
           excludedUsername: skippedExcludedUsername,
+          importedUsername: skippedImportedUsername,
           missingUsername: skippedMissingUsername,
           roleGroupMismatch: skippedRoleMismatch,
         },
