@@ -11,8 +11,6 @@ import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
-import { getBottomNavBottomPadding, getBottomNavHeight } from '../lib/bottomNavConfig';
-import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsers, getViewedStoryUsersKey } from '../lib/storyViews';
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
@@ -20,15 +18,8 @@ const DEFAULT_CARDS_PER_PAGE = 12;
 const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PREFETCH_PAGES = 6;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
+const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
-
-function detectStandaloneMobile() {
-  if (typeof window === 'undefined') return false;
-  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
-  const ua = window.navigator.userAgent || '';
-  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
-  return Boolean(standalone && isMobile);
-}
 
 function getInitialStoryLimit(settings, isDesktopViewport) {
   return Math.max(
@@ -68,7 +59,7 @@ const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, moti
 
 function getCachedFeed() {
   try {
-    const raw = localStorage.getItem(FEED_CACHE_KEY);
+    const raw = sessionStorage.getItem(FEED_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed?.profiles)) return parsed;
@@ -81,7 +72,7 @@ function getCachedFeed() {
 
 function setCachedFeed(data) {
   try {
-    localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({
+    sessionStorage.setItem(FEED_CACHE_KEY, JSON.stringify({
       profiles: data.profiles || [],
       viewerPremium: data.viewerPremium || false,
       settings: data.settings || {},
@@ -97,10 +88,6 @@ function setCachedFeed(data) {
   } catch {}
 }
 
-function makeFeedBlockKey(cursor, pageSize) {
-  return `${Number(cursor) || 0}:${Number(pageSize) || 0}`;
-}
-
 export default function FeedPage({ initialData }) {
   const safariDesktop = isSafariDesktopBrowser();
   const cols = useGridColumns();
@@ -108,7 +95,6 @@ export default function FeedPage({ initialData }) {
   const desktopStoryRailEnhanced = isDesktopViewport;
   const cached = initialData || getCachedFeed();
   const { user, siteSettings } = useAuth();
-  const isStandaloneMobileApp = detectStandaloneMobile();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [showStoriesSection, setShowStoriesSection] = useState(true);
   const [showGridSection, setShowGridSection] = useState(true);
@@ -126,13 +112,11 @@ export default function FeedPage({ initialData }) {
   const storiesIntroConsumedRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const navBottomOffset = getBottomNavHeight(isStandaloneMobileApp) + getBottomNavBottomPadding(isStandaloneMobileApp);
+  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
   const gridRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const mobileNavVisibilityTimerRef = useRef(null);
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
-  const prefetchedBlocksRef = useRef(new Map());
-  const prefetchInFlightRef = useRef(new Map());
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
     frameId: null,
@@ -158,7 +142,6 @@ export default function FeedPage({ initialData }) {
   });
   const isSafariDesktopRef = useRef(false);
   const pagedFeedConfigRef = useRef('');
-  const pagedFeedConfigInitializedRef = useRef(false);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
@@ -173,74 +156,39 @@ export default function FeedPage({ initialData }) {
 
 
 
-  const applyLoadedProfiles = useCallback(({ data, cursor = 0, resolvedPageSize, targetPageCursor }) => {
-    setProfiles(data.profiles || []);
-    setViewerPremium(data.viewerPremium || false);
-    if (data.settings) setSettings(data.settings);
-    setNextCursor(data.nextCursor || null);
-    setBlockCursor(Number(data.cursor) || cursor || 0);
-    setPageCursor(Number(targetPageCursor ?? data.cursor ?? cursor) || 0);
-    setTotalProfiles(Number(data.totalProfiles) || 0);
-    setHasMore(!!data.hasMore);
-    setCachedFeed({
-      profiles: data.profiles || [],
-      viewerPremium: data.viewerPremium || false,
-      settings: data.settings || {},
-      totalProfiles: Number(data.totalProfiles) || 0,
-      currentCursor: Number(data.cursor) || cursor || 0,
-      blockCursor: Number(data.cursor) || cursor || 0,
-      pageCursor: Number(targetPageCursor ?? data.cursor ?? cursor) || 0,
-      pageSize: resolvedPageSize,
-      nextCursor: data.nextCursor || null,
-      hasMore: !!data.hasMore,
-    });
-  }, []);
-
-  const fetchProfilesBlock = useCallback(async ({ forceFresh = false, cursor = 0, pageSize } = {}) => {
+  const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize, targetPageCursor } = {}) => {
     const s = settingsRef.current;
     const resolvedPageSize = Math.max(
       12,
       Number(pageSize) || (s?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
     );
-    const data = await getProfiles({ fresh: forceFresh, cursor, pageSize: resolvedPageSize });
-    return { data, resolvedPageSize };
-  }, []);
-
-  const prefetchProfilesBlock = useCallback(({ cursor = 0, pageSize } = {}) => {
-    const key = makeFeedBlockKey(cursor, pageSize);
-    if (prefetchedBlocksRef.current.has(key)) return Promise.resolve(prefetchedBlocksRef.current.get(key));
-    if (prefetchInFlightRef.current.has(key)) return prefetchInFlightRef.current.get(key);
-
-    const task = fetchProfilesBlock({ cursor, pageSize })
-      .then(({ data, resolvedPageSize }) => {
-        const payload = { data, resolvedPageSize, cursor };
-        prefetchedBlocksRef.current.set(key, payload);
-        prefetchInFlightRef.current.delete(key);
-        return payload;
-      })
-      .catch((error) => {
-        prefetchInFlightRef.current.delete(key);
-        throw error;
-      });
-
-    prefetchInFlightRef.current.set(key, task);
-    return task;
-  }, [fetchProfilesBlock]);
-
-  const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize, targetPageCursor } = {}) => {
     const c = getCachedFeed();
     if (!c) setLoading(true);
     const myId = ++loadIdRef.current;
-    return fetchProfilesBlock({ forceFresh, cursor, pageSize })
+    return getProfiles({ fresh: forceFresh, cursor, pageSize: resolvedPageSize })
       .then(data => {
         if (myId !== loadIdRef.current) return;
-        applyLoadedProfiles({
-          data: data.data,
-          cursor,
-          resolvedPageSize: data.resolvedPageSize,
-          targetPageCursor,
+        setProfiles(data.profiles || []);
+        setViewerPremium(data.viewerPremium || false);
+        if (data.settings) setSettings(data.settings);
+        setNextCursor(data.nextCursor || null);
+        setBlockCursor(Number(data.cursor) || cursor || 0);
+        setPageCursor(Number(targetPageCursor ?? data.cursor ?? cursor) || 0);
+        setTotalProfiles(Number(data.totalProfiles) || 0);
+        setHasMore(!!data.hasMore);
+        setCachedFeed({
+          profiles: data.profiles || [],
+          viewerPremium: data.viewerPremium || false,
+          settings: data.settings || {},
+          totalProfiles: Number(data.totalProfiles) || 0,
+          currentCursor: Number(data.cursor) || cursor || 0,
+          blockCursor: Number(data.cursor) || cursor || 0,
+          pageCursor: Number(targetPageCursor ?? data.cursor ?? cursor) || 0,
+          pageSize: resolvedPageSize,
+          nextCursor: data.nextCursor || null,
+          hasMore: !!data.hasMore,
         });
-        return data.data;
+        return data;
       })
       .catch(() => {
         if (myId !== loadIdRef.current) return;
@@ -256,7 +204,7 @@ export default function FeedPage({ initialData }) {
       .finally(() => {
         if (myId === loadIdRef.current) setLoading(false);
       });
-  }, [applyLoadedProfiles, fetchProfilesBlock]); // stable — reads settings from settingsRef
+  }, []); // stable — reads settings from settingsRef
 
   // Initial load — runs once on mount
   useEffect(() => {
@@ -264,7 +212,6 @@ export default function FeedPage({ initialData }) {
     const cachedFeed = getCachedFeed();
     const currentSettings = settingsRef.current;
     const cachedPageSize = Number(cachedFeed?.pageSize) || 0;
-    const cachedPageCursor = Number(cachedFeed?.pageCursor ?? cachedFeed?.currentCursor) || 0;
     const expectedPageSize = Math.max(
       12,
       (currentSettings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (currentSettings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
@@ -276,27 +223,16 @@ export default function FeedPage({ initialData }) {
       return;
     }
 
-    // Cache is valid — show it instantly, no background fetch.
-    // Data stays fresh until: pull-to-refresh, cache invalidation (profile edit),
-    // or cache is > 30 minutes old (stale safety net).
+    // State was already initialized from cache in useState — just clean up flags
     setLoading(false);
     try {
       sessionStorage.removeItem('mansion_feed_dirty');
       sessionStorage.removeItem('mansion_feed_force_refresh');
     } catch {}
-    const cacheAgeMs = Date.now() - (Number(cachedFeed.timestamp) || 0);
-    if (cacheAgeMs > 30 * 60 * 1000) {
-      loadProfiles({
-        cursor: Math.floor(cachedPageCursor / expectedPageSize) * expectedPageSize,
-        pageSize: expectedPageSize,
-        targetPageCursor: cachedPageCursor,
-      });
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   const [gridOpacity, setGridOpacity] = useState(1);
-  const viewedStoriesStorageKey = useMemo(() => getViewedStoryUsersKey(user?.id), [user?.id]);
 
   useEffect(() => {
     let fadeOutTimer = null;
@@ -406,10 +342,7 @@ export default function FeedPage({ initialData }) {
     useCallback(() => loadProfiles({ forceFresh: true }), [loadProfiles])
   );
 
-  const safeSettings = useMemo(() => ({
-    ...((siteSettings && typeof siteSettings === 'object') ? siteSettings : {}),
-    ...((settings && typeof settings === 'object') ? settings : {}),
-  }), [settings, siteSettings]);
+  const safeSettings = settings && typeof settings === 'object' ? settings : {};
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
   const cardsPerPage = Math.max(6, Math.min(60, safeSettings.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE));
   const maxPages = Math.max(1, Math.min(50, safeSettings.feedMaxPages ?? DEFAULT_MAX_PAGES));
@@ -423,9 +356,9 @@ export default function FeedPage({ initialData }) {
   const totalPages = Math.min(maxPages, Math.max(1, Math.ceil((totalProfiles || 0) / cardsPerPage)));
   const pageWindow = useMemo(() => {
     if (totalPages <= 1) return [];
-    const start = Math.max(1, currentPage - 1);
-    const end = Math.min(totalPages, start + 2);
-    const adjustedStart = Math.max(1, end - 2);
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, start + 4);
+    const adjustedStart = Math.max(1, end - 4);
     return Array.from({ length: end - adjustedStart + 1 }, (_, idx) => adjustedStart + idx);
   }, [currentPage, totalPages]);
   const storyLimit = getInitialStoryLimit(safeSettings, isDesktopViewport);
@@ -457,72 +390,23 @@ export default function FeedPage({ initialData }) {
         hasMore,
       });
     } else {
-      const prefetchedKey = makeFeedBlockKey(nextBlockCursor, blockSize);
-      const prefetched = prefetchedBlocksRef.current.get(prefetchedKey);
-      if (prefetched) {
-        applyLoadedProfiles({
-          data: prefetched.data,
-          cursor: nextBlockCursor,
-          resolvedPageSize: prefetched.resolvedPageSize,
-          targetPageCursor: nextPageCursor,
-        });
-        prefetchedBlocksRef.current.delete(prefetchedKey);
-      } else {
-        await loadProfiles({
-          cursor: nextBlockCursor,
-          pageSize: blockSize,
-          targetPageCursor: nextPageCursor,
-        });
-      }
+      await loadProfiles({
+        cursor: nextBlockCursor,
+        pageSize: blockSize,
+        targetPageCursor: nextPageCursor,
+      });
     }
     const targetTop = Math.max(0, (gridRef.current?.offsetTop || 0) - 24);
     window.scrollTo({ top: targetTop, behavior: 'smooth' });
-  }, [applyLoadedProfiles, blockCursor, blockSize, cardsPerPage, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, viewerPremium]);
+  }, [blockCursor, blockSize, cardsPerPage, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, viewerPremium]);
 
   useEffect(() => {
     if (loading) return;
     const nextConfig = `paged:${cardsPerPage}`;
-    if (!pagedFeedConfigInitializedRef.current) {
-      pagedFeedConfigRef.current = nextConfig;
-      pagedFeedConfigInitializedRef.current = true;
-      return;
-    }
     if (pagedFeedConfigRef.current === nextConfig) return;
     pagedFeedConfigRef.current = nextConfig;
-    prefetchedBlocksRef.current.clear();
-    prefetchInFlightRef.current.clear();
     loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
   }, [blockSize, cardsPerPage, loadProfiles, loading]);
-
-  useEffect(() => {
-    if (!isDesktopViewport) return;
-    if (loading || !hasMore || !nextCursor) return;
-    if (!profiles.length) return;
-
-    const currentBlockEnd = blockCursor + profiles.length;
-    const remainingAfterCurrentPage = currentBlockEnd - (pageCursor + cardsPerPage);
-    if (remainingAfterCurrentPage > cardsPerPage) return;
-
-    prefetchProfilesBlock({
-      cursor: Number(nextCursor) || currentBlockEnd,
-      pageSize: blockSize,
-    }).catch(() => {});
-  }, [blockCursor, blockSize, cardsPerPage, hasMore, isDesktopViewport, loading, nextCursor, pageCursor, prefetchProfilesBlock, profiles.length]);
-
-  useEffect(() => {
-    if (!isDesktopViewport) return;
-    if (loading) return;
-    if (!profiles.length) return;
-    if (blockCursor <= 0) return;
-
-    const pagesBeforeCurrent = pageCursor - blockCursor;
-    if (pagesBeforeCurrent > cardsPerPage) return;
-
-    prefetchProfilesBlock({
-      cursor: Math.max(0, blockCursor - blockSize),
-      pageSize: blockSize,
-    }).catch(() => {});
-  }, [blockCursor, blockSize, cardsPerPage, isDesktopViewport, loading, pageCursor, prefetchProfilesBlock, profiles.length]);
 
   const viewedRaw = useSyncExternalStore(
     useCallback((cb) => {
@@ -538,7 +422,7 @@ export default function FeedPage({ initialData }) {
         window.removeEventListener(VIEWED_STORIES_EVENT, handler);
       };
     }, []),
-    () => (viewedStoriesStorageKey ? localStorage.getItem(viewedStoriesStorageKey) || '[]' : '[]'),
+    () => localStorage.getItem('viewed_story_users') || '[]',
   );
   const viewedStoryUsers = useMemo(() => {
     try { return new Set(JSON.parse(viewedRaw)); } catch { return new Set(); }
@@ -601,13 +485,6 @@ export default function FeedPage({ initialData }) {
       container.scrollLeft = 0;
       return;
     }
-
-    // If it's just a reorder (same IDs, different positions due to viewed-status change),
-    // don't scroll — only scroll when genuinely new story IDs appear.
-    const sortedIds = orderedIds.split(',').sort().join(',');
-    const previousSortedIds = previousOrderedIds.split(',').sort().join(',');
-    if (sortedIds === previousSortedIds) return;
-
     const firstUnseen = orderedStoryProfiles.find((profile) => !viewedStoryUsers.has(String(profile?.id || ''))) || orderedStoryProfiles[0];
     const targetNode = storyNodeRefs.current.get(String(firstUnseen?.id || ''));
     if (!targetNode) return;
@@ -617,7 +494,7 @@ export default function FeedPage({ initialData }) {
 
     container.scrollTo({
       left: targetLeft,
-      behavior: 'smooth',
+      behavior: previousOrderedIds ? 'smooth' : 'auto',
     });
   }, [orderedStoryProfiles, viewedStoryUsers]);
 
@@ -692,21 +569,40 @@ export default function FeedPage({ initialData }) {
   }, [orderedStoryProfiles]);
   const applyPendingViewedStories = useCallback(() => {
     try {
-      if (!user?.id) return false;
-      const changed = applyPendingViewedStoryUsers(user.id);
+      const rawPending = sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY);
+      if (!rawPending) return false;
+      const pending = JSON.parse(rawPending);
+      const nextPending = Array.isArray(pending) ? pending.map((value) => String(value || '')).filter(Boolean) : [];
+      if (nextPending.length === 0) {
+        sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
+        return false;
+      }
+
+      const current = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
+      const seen = new Set(Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : []);
+      let changed = false;
+      for (const userId of nextPending) {
+        if (seen.has(userId)) continue;
+        seen.add(userId);
+        changed = true;
+      }
+      sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
       if (!changed) return false;
+
+      const merged = [...seen];
+      if (merged.length > 300) merged.splice(0, merged.length - 300);
+      localStorage.setItem('viewed_story_users', JSON.stringify(merged));
       window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
       return true;
     } catch {
       return false;
     }
-  }, [user?.id]);
+  }, []);
 
   const schedulePendingViewedStories = useCallback(() => {
     try {
       if (document.hidden) return;
-      if (!user?.id) return;
-      if (getPendingViewedStoryUsers(user.id).length === 0) return;
+      if (!sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY)) return;
     } catch {
       return;
     }
@@ -717,7 +613,7 @@ export default function FeedPage({ initialData }) {
       applyPendingViewedStories();
       pendingViewedTimerRef.current = null;
     }, VIEWED_STORIES_APPLY_DELAY_MS);
-  }, [applyPendingViewedStories, user?.id]);
+  }, [applyPendingViewedStories]);
 
   useEffect(() => {
     schedulePendingViewedStories();
@@ -967,14 +863,7 @@ export default function FeedPage({ initialData }) {
   const gap = 12;
 
   return (
-    <div
-      className="min-h-dynamic-screen bg-mansion-base pt-navbar lg:pt-0 lg:pb-8"
-      style={{
-        paddingBottom: isDesktopViewport
-          ? undefined
-          : `calc(${Math.max(12, navBottomOffset)}px + env(safe-area-inset-bottom, 0px))`,
-      }}
-    >
+    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
       {/* Pull-to-refresh indicator */}
       <div
         ref={indicatorRef}
@@ -986,15 +875,15 @@ export default function FeedPage({ initialData }) {
       {/* Stories section */}
       {showStoriesSection && (
       <div
-        className="px-0 lg:px-8 pt-2 lg:pt-4 pb-0 fade-in-up"
+        className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0 fade-in-up"
       >
-        <div className="flex items-center gap-1.5 mb-3 px-4 lg:px-0">
+        <div className="flex items-center gap-1.5 mb-3">
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="text-text-muted text-sm lg:text-base font-medium">Video Flashes</p>
         </div>
         <AnimatedBlock
           ref={storiesScrollRef}
-          className={`flex overflow-x-auto scrollbar-hide pb-2 pl-4 pr-4 lg:pl-0 lg:pr-0 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
+          className={`flex overflow-x-auto scrollbar-hide pb-2 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
           style={{
             scrollbarWidth: 'none',
             msOverflowStyle: 'none',
@@ -1361,56 +1250,49 @@ export default function FeedPage({ initialData }) {
                   </motion.div>
                 </div>
 
-                {/* Desktop pagination pill */}
+                {/* Desktop pagination bar */}
                 <motion.div
-                  initial={{ opacity: 0, y: 18, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-                  className="pointer-events-none fixed bottom-6 left-[calc(50%+8rem)] z-40 hidden -translate-x-1/2 lg:block xl:left-[calc(50%+9rem)]"
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
+                  className="hidden lg:block py-6"
                 >
-                  <div className="pointer-events-auto flex items-center gap-2.5 rounded-full border border-white/10 bg-[rgba(14,14,20,0.76)] px-3 py-2.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-                    <div className="rounded-full border border-white/8 bg-white/[0.04] px-3.5 py-2 text-[11px] font-medium tracking-[0.02em] text-white/58">
+                  <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/10 bg-mansion-card/80 px-3 py-3 shadow-[0_16px_36px_rgba(0,0,0,0.18)] backdrop-blur-sm">
+                    <span className="mr-1 text-xs font-medium text-text-muted">
                       {Math.min(totalProfiles, pageCursor + 1)}-{Math.min(totalProfiles, pageCursor + visibleProfiles.length)} de {totalProfiles}
-                    </div>
-
+                    </span>
                     <button
                       type="button"
                       onClick={() => goToFeedPage(currentPage - 1)}
                       disabled={currentPage <= 1 || loading}
-                      aria-label="Pagina anterior"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-white/68 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
+                      className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-text-muted transition hover:border-white/20 hover:text-white disabled:opacity-40"
                     >
-                      <ChevronLeft className="h-4.5 w-4.5" />
+                      <ChevronLeft className="w-4 h-4" />
+                      Anterior
                     </button>
-
-                    <div className="flex items-center gap-1.5">
-                      {pageWindow.map((page) => (
-                        <motion.button
-                          key={page}
-                          type="button"
-                          onClick={() => goToFeedPage(page)}
-                          disabled={page === currentPage || loading}
-                          whileHover={page === currentPage ? undefined : { y: -1 }}
-                          whileTap={page === currentPage ? undefined : { scale: 0.97 }}
-                          className={`min-w-10 rounded-full px-3.5 py-2 text-[15px] font-semibold transition ${
-                            page === currentPage
-                              ? 'bg-white text-black shadow-[0_8px_18px_rgba(255,255,255,0.18)]'
-                              : 'text-white/62 hover:bg-white/[0.08] hover:text-white'
-                          }`}
-                        >
-                          {page}
-                        </motion.button>
-                      ))}
-                    </div>
-
+                    {pageWindow.map((page) => (
+                      <motion.button
+                        key={page}
+                        type="button"
+                        onClick={() => goToFeedPage(page)}
+                        disabled={page === currentPage || loading}
+                        whileHover={page === currentPage ? undefined : { y: -1 }}
+                        whileTap={page === currentPage ? undefined : { scale: 0.98 }}
+                        className={`min-w-10 rounded-xl px-3 py-2 text-sm font-semibold transition ${page === currentPage
+                          ? 'border border-mansion-gold/40 bg-mansion-gold/15 text-mansion-gold'
+                          : 'border border-white/10 bg-black/20 text-text-muted hover:border-white/20 hover:text-white'}`}
+                      >
+                        {page}
+                      </motion.button>
+                    ))}
                     <button
                       type="button"
                       onClick={() => goToFeedPage(currentPage + 1)}
                       disabled={currentPage >= totalPages || loading}
-                      aria-label="Pagina siguiente"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-white/68 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
+                      className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-text-muted transition hover:border-white/20 hover:text-white disabled:opacity-40"
                     >
-                      <ChevronRight className="h-4.5 w-4.5" />
+                      Siguiente
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </motion.div>
