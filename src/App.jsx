@@ -651,7 +651,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <AuthContext.Provider value={{ registered, setRegistered, user, setUser, siteSettings, setSiteSettings, bootstrapStories, setBootstrapStories }}>
+      <AuthContext.Provider value={{ registered, setRegistered, user, setUser, siteSettings, setSiteSettings, bootstrapStories, setBootstrapStories, bootstrapResolved }}>
       <UnreadProvider initialUnread={bootstrapUnread} bootstrapResolved={bootstrapResolved}>
       <div className="relative min-h-screen">
         {debugFlags.shellOnly ? (

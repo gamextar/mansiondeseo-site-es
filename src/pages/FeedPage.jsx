@@ -141,7 +141,7 @@ export default function FeedPage({ initialData }) {
   const isDesktopViewport = cols >= 4;
   const desktopStoryRailEnhanced = isDesktopViewport;
   const cached = initialData || getCachedFeed();
-  const { user, siteSettings, bootstrapStories } = useAuth();
+  const { user, siteSettings, bootstrapStories, bootstrapResolved } = useAuth();
   const isStandaloneMobileApp = detectStandaloneMobile();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [homeStories, setHomeStories] = useState(() => mapStoriesToRailProfiles(bootstrapStories));
@@ -449,7 +449,8 @@ export default function FeedPage({ initialData }) {
     () => safeProfiles.filter((p) => p.has_active_story).slice(0, storyLimit),
     [safeProfiles, storyLimit]
   );
-  const storyProfiles = homeStories.length > 0 ? homeStories : fallbackStoryProfiles;
+  const useFallbackStories = homeStories.length === 0 && (!isStandaloneMobileApp || bootstrapResolved);
+  const storyProfiles = useFallbackStories ? fallbackStoryProfiles : homeStories;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100) - 3);
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
