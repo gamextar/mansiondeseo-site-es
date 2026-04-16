@@ -4,7 +4,6 @@ import { getDisplayPhotos, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { formatLocation } from '../lib/location';
 import { resolveMediaUrl } from '../lib/media';
 import { isSafariDesktopBrowser } from '../lib/browser';
-import { snapshotBackgroundLocation } from '../lib/overlayLocation';
 
 // Masquerade mask SVG icon for incognito mode
 const MaskIcon = ({ className = 'w-6 h-6', customSvg = '' }) => {
@@ -117,7 +116,7 @@ export default function ProfileCard({
         to={`/perfiles/${id}`}
         state={{
           ...(useOverlayNavigation ? {
-            backgroundLocation: snapshotBackgroundLocation(location),
+            backgroundLocation: location,
             backgroundScrollY: window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0,
             modal: 'profile',
           } : {}),
