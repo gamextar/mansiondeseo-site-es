@@ -1018,7 +1018,7 @@ export default function FeedPage({ initialData }) {
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="text-text-muted text-sm lg:text-base font-medium">Video Flashes</p>
         </div>
-        <div className="pl-[5px] pr-[12px] lg:px-0">
+        <div className="pl-[4px] pr-[12px] lg:px-0">
           <AnimatedBlock
             ref={storiesScrollRef}
             className={`flex overflow-x-auto scrollbar-hide pb-2 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
@@ -1048,7 +1048,7 @@ export default function FeedPage({ initialData }) {
           {user && (
             safariDesktop ? (
               <div
-                className={`flex-shrink-0 mr-[2px] ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                className={`flex-shrink-0 mr-[3px] ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
