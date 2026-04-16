@@ -1014,7 +1014,7 @@ export default function FeedPage({ initialData }) {
       <div
         className="px-0 lg:px-8 pt-2 lg:pt-4 pb-0 fade-in-up"
       >
-        <div className="flex items-center gap-1.5 mb-3 px-3 lg:px-0">
+        <div className="flex items-center gap-1.5 mb-3 px-2 lg:px-0">
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="text-text-muted text-sm lg:text-base font-medium">Video Flashes</p>
         </div>
@@ -1292,7 +1292,7 @@ export default function FeedPage({ initialData }) {
 
       {/* Results count */}
       <div
-        className="px-3 lg:px-8 pb-2 fade-in-up fade-delay-300"
+        className="px-2 lg:px-8 pb-2 fade-in-up fade-delay-300"
       >
         <p className="text-text-dim text-xs">
           {visibleProfiles.length} {visibleProfiles.length === 1 ? 'usuario' : 'usuarios'} conectados
@@ -1301,7 +1301,7 @@ export default function FeedPage({ initialData }) {
 
       {/* Grid */}
       <div
-        className="px-3 lg:px-8"
+        className="px-2 lg:px-8"
       >
         {loading ? (
           <div className="flex items-center justify-center py-20">

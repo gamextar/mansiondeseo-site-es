@@ -153,7 +153,7 @@ export default function FavoritesPage() {
     : 'Tus favoritos guardados para volver a verlos rápido.';
 
   return (
-    <div className="min-h-screen bg-mansion-base px-3 pb-28 pt-20 lg:px-8 lg:pb-10">
+    <div className="min-h-screen bg-mansion-base px-2 pb-28 pt-20 lg:px-8 lg:pb-10">
       <div className="mx-auto max-w-6xl">
         <div className="relative overflow-hidden rounded-[2rem] border border-mansion-border/25 bg-[radial-gradient(circle_at_top_left,rgba(201,168,76,0.14),transparent_34%),linear-gradient(180deg,rgba(24,20,29,0.94),rgba(10,10,16,0.92))] p-6 shadow-elevated lg:p-8">
           <div className="pointer-events-none absolute -right-16 top-0 h-40 w-40 rounded-full bg-mansion-gold/10 blur-3xl" />
