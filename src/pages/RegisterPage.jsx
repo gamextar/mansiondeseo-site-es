@@ -456,11 +456,23 @@ function PersonFigure({ type, isActive, size = 'lg', optimizeMotion = false }) {
 // Profile Card Preview ("Ficha")
 // ────────────────────────────────────────────
 
-function FichaPreview({ data, currentStep, optimizeMotion = false }) {
+function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = false }) {
   const { role, seeking, interests, name } = data;
   const seekingArr = Array.isArray(seeking) ? seeking : (seeking ? [seeking] : []);
   const locationText = formatLocation(data);
   const previewAge = calculateAgeFromBirthdate(data.birthdate);
+
+  const renderPreviewRole = (roleId) => {
+    const customImg = roleImages[roleId];
+    if (customImg) {
+      return (
+        <div className="h-11 w-8 overflow-hidden rounded-lg">
+          <img src={customImg} alt="" className="h-full w-full object-cover" />
+        </div>
+      );
+    }
+    return <PersonFigure type={roleId} isActive size="sm" optimizeMotion={optimizeMotion} />;
+  };
 
   if (currentStep < 1 && !role) return null;
 
@@ -496,7 +508,7 @@ function FichaPreview({ data, currentStep, optimizeMotion = false }) {
                   transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
                   className="flex flex-col items-center"
                 >
-                  <PersonFigure type={role} isActive size="sm" optimizeMotion={optimizeMotion} />
+                  {renderPreviewRole(role)}
                   <span className="text-[10px] text-text-dim mt-0.5">Soy</span>
                 </motion.div>
               )}
@@ -523,11 +535,11 @@ function FichaPreview({ data, currentStep, optimizeMotion = false }) {
                     {seekingArr.map((s, i) => (
                       <motion.div
                         key={s}
-                        initial={{ opacity: 0, scale: 0 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={optimizeMotion ? { duration: 0.18, delay: i * 0.04, ease: 'easeOut' } : { delay: i * 0.1 }}
-                      >
-                        <PersonFigure type={s} isActive size="sm" optimizeMotion={optimizeMotion} />
+                      initial={{ opacity: 0, scale: 0 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={optimizeMotion ? { duration: 0.18, delay: i * 0.04, ease: 'easeOut' } : { delay: i * 0.1 }}
+                    >
+                        {renderPreviewRole(s)}
                       </motion.div>
                     ))}
                     </div>
@@ -1997,7 +2009,7 @@ export default function RegisterPage() {
 
       {/* Profile Card Preview */}
       <div className="relative z-10 px-6">
-        <FichaPreview data={fichaData} currentStep={step} optimizeMotion={optimizeOnboardingMotion} />
+      <FichaPreview data={fichaData} currentStep={step} roleImages={roleImages} optimizeMotion={optimizeOnboardingMotion} />
       </div>
 
       {/* Content */}
