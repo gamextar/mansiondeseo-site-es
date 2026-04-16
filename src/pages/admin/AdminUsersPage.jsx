@@ -48,6 +48,7 @@ export default function AdminUsersPage() {
   const [pages, setPages] = useState(1);
   const [query, setQuery] = useState('');
   const [fakeFilter, setFakeFilter] = useState('all');
+  const [duplicateFilter, setDuplicateFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchInput, setSearchInput] = useState('');
@@ -65,7 +66,7 @@ export default function AdminUsersPage() {
   const galleryDragItem = useRef(null);
   const galleryDragOverItem = useRef(null);
 
-  const fetchUsers = useCallback(async (p = page, q = query, fake = fakeFilter, role = roleFilter, status = statusFilter) => {
+  const fetchUsers = useCallback(async (p = page, q = query, fake = fakeFilter, duplicate = duplicateFilter, role = roleFilter, status = statusFilter) => {
     setLoading(true);
     try {
       const data = await adminGetUsers({
@@ -73,6 +74,7 @@ export default function AdminUsersPage() {
         limit: 20,
         q,
         fake: fake === 'all' ? '' : fake,
+        duplicate: duplicate === 'all' ? '' : duplicate,
         role: role === 'all' ? '' : role,
         status: status === 'all' ? '' : status,
       });
@@ -86,9 +88,9 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, query, fakeFilter, roleFilter, statusFilter]);
+  }, [page, query, fakeFilter, duplicateFilter, roleFilter, statusFilter]);
 
-  useEffect(() => { fetchUsers(1, query, fakeFilter, roleFilter, statusFilter); }, [query, fakeFilter, roleFilter, statusFilter]); // eslint-disable-line
+  useEffect(() => { fetchUsers(1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter); }, [query, fakeFilter, duplicateFilter, roleFilter, statusFilter]); // eslint-disable-line
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -106,7 +108,9 @@ export default function AdminUsersPage() {
       const data = await adminGetUserIds({
         q: query,
         fake: '1',
+        duplicate: duplicateFilter === 'all' ? '' : duplicateFilter,
         role: roleFilter === 'all' ? '' : roleFilter,
+        status: statusFilter === 'all' ? '' : statusFilter,
       });
       setSelectedIds(data.ids || []);
     } catch (err) {
@@ -392,6 +396,25 @@ export default function AdminUsersPage() {
           ))}
 
           {[
+            { id: 'all', label: 'Todos los duplicados' },
+            { id: '1', label: 'Solo duplicados' },
+            { id: '0', label: 'Solo no duplicados' },
+          ].map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setDuplicateFilter(option.id)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
+                duplicateFilter === option.id
+                  ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
+                  : 'bg-mansion-card border-mansion-border/20 text-text-dim hover:text-text-primary'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+
+          {[
             { id: 'all', label: 'Todos los roles' },
             { id: 'mujer', label: 'Mujeres' },
             { id: 'hombre', label: 'Hombres' },
@@ -548,7 +571,7 @@ export default function AdminUsersPage() {
         {pages > 1 && (
           <div className="flex items-center justify-center gap-2 mt-4">
             <button
-              onClick={() => fetchUsers(page - 1, query, fakeFilter, roleFilter, statusFilter)}
+              onClick={() => fetchUsers(page - 1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter)}
               disabled={page <= 1}
               className="p-2 rounded-lg bg-mansion-card border border-mansion-border/20 text-text-muted disabled:opacity-30 hover:text-mansion-gold transition-colors"
             >
@@ -556,7 +579,7 @@ export default function AdminUsersPage() {
             </button>
             <span className="text-sm text-text-dim px-3">{page} / {pages}</span>
             <button
-              onClick={() => fetchUsers(page + 1, query, fakeFilter, roleFilter, statusFilter)}
+              onClick={() => fetchUsers(page + 1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter)}
               disabled={page >= pages}
               className="p-2 rounded-lg bg-mansion-card border border-mansion-border/20 text-text-muted disabled:opacity-30 hover:text-mansion-gold transition-colors"
             >

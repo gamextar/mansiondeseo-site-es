@@ -4031,6 +4031,7 @@ async function handleAdminGetUsers(request, env) {
   const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
   const q = (url.searchParams.get('q') || '').trim();
   const fakeFilter = url.searchParams.get('fake');
+  const duplicateFilter = url.searchParams.get('duplicate');
   const roleFilter = (url.searchParams.get('role') || '').trim();
   const statusFilter = (url.searchParams.get('status') || '').trim();
   const offset = (page - 1) * limit;
@@ -4053,6 +4054,11 @@ async function handleAdminGetUsers(request, env) {
   if (fakeFilter === '1' || fakeFilter === '0') {
     filters.push('fake = ?');
     bindings.push(Number(fakeFilter));
+  }
+
+  if (duplicateFilter === '1' || duplicateFilter === '0') {
+    filters.push('duplicate_flag = ?');
+    bindings.push(Number(duplicateFilter));
   }
 
   if (roleFilter === 'mujer' || roleFilter === 'hombre') {
@@ -4120,6 +4126,7 @@ async function handleAdminGetUserIds(request, env) {
   const url = new URL(request.url);
   const q = (url.searchParams.get('q') || '').trim();
   const fakeFilter = url.searchParams.get('fake');
+  const duplicateFilter = url.searchParams.get('duplicate');
   const roleFilter = (url.searchParams.get('role') || '').trim();
   const statusFilter = (url.searchParams.get('status') || '').trim();
 
@@ -4135,6 +4142,11 @@ async function handleAdminGetUserIds(request, env) {
   if (fakeFilter === '1' || fakeFilter === '0') {
     filters.push('fake = ?');
     bindings.push(Number(fakeFilter));
+  }
+
+  if (duplicateFilter === '1' || duplicateFilter === '0') {
+    filters.push('duplicate_flag = ?');
+    bindings.push(Number(duplicateFilter));
   }
 
   if (roleFilter === 'mujer' || roleFilter === 'hombre') {
