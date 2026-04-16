@@ -1442,7 +1442,9 @@ async function handleRegister(request, env) {
   }
 
   // Check duplicate username
-  const existingUsername = await env.DB.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = ?').bind(username, 'verified').first();
+  const existingUsername = await env.DB.prepare(
+    "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 0"
+  ).bind(username).first();
   if (existingUsername) {
     return error('Este nombre de usuario ya está en uso. Elegí otro.', 409);
   }
@@ -1739,7 +1741,9 @@ async function handleCheckUsername(request, env) {
   const { username } = await request.json();
   if (!username) return error('Username requerido');
 
-  const existing = await env.DB.prepare("SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified'")
+  const existing = await env.DB.prepare(
+    "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 0"
+  )
     .bind(username).first();
 
   return json({ exists: !!existing });
