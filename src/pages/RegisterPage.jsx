@@ -503,8 +503,8 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
             >
               {role && (
                 <motion.div
-                  initial={{ opacity: 0, x: -20, scale: 0.5 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  initial={{ opacity: 0, x: -20, y: 2 }}
+                  animate={{ opacity: 1, x: 0, y: 0 }}
                   transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
                   className="flex flex-col items-center"
                 >
@@ -517,8 +517,8 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
 
               {role && seekingArr.length > 0 && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                  initial={{ opacity: 0, y: 2 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={optimizeMotion ? { duration: 0.18, delay: 0.04, ease: 'easeOut' } : { type: 'spring', delay: 0.1 }}
                   className="flex flex-col items-center"
                 >
@@ -531,8 +531,8 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
 
               {seekingArr.length > 0 && (
                 <motion.div
-                  initial={{ opacity: 0, x: 20, scale: 0.5 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  initial={{ opacity: 0, x: 20, y: 2 }}
+                  animate={{ opacity: 1, x: 0, y: 0 }}
                   transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
                   className="flex flex-col items-center"
                 >
@@ -542,8 +542,8 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
                         {seekingArr.map((s, i) => (
                           <motion.div
                             key={s}
-                            initial={{ opacity: 0, scale: 0 }}
-                            animate={{ opacity: 1, scale: 1 }}
+                            initial={{ opacity: 0, y: 2 }}
+                            animate={{ opacity: 1, y: 0 }}
                             transition={optimizeMotion ? { duration: 0.18, delay: i * 0.04, ease: 'easeOut' } : { delay: i * 0.1 }}
                             className="flex h-11 items-end"
                           >
