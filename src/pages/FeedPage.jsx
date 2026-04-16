@@ -1048,7 +1048,7 @@ export default function FeedPage({ initialData }) {
           {user && (
             safariDesktop ? (
               <div
-                className={`flex-shrink-0 mr-[15px] ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                className={`flex-shrink-0 mr-[2px] ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
@@ -1156,7 +1156,7 @@ export default function FeedPage({ initialData }) {
               </div>
             ) : (
               <div
-                className={`flex-shrink-0 mr-[2px] ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                className={`flex-shrink-0 mr-[4px] ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
