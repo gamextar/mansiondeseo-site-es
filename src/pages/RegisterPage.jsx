@@ -118,8 +118,8 @@ function PersonFigure({ type, isActive, size = 'lg', optimizeMotion = false }) {
   const roleData = ALL_ROLE_OPTIONS.find((r) => r.id === type) || ROLES[0];
   const color = isActive ? roleData.color : dimColor;
   const colorDark = isActive ? roleData.colorDark : dimColorDark;
-  const soloSizeClass = size === 'lg' ? 'w-[68px] h-[96px]' : 'w-8 h-11';
-  const pairSizeClass = size === 'lg' ? 'w-[78px] h-[96px]' : 'w-12 h-11';
+  const soloSizeClass = size === 'lg' ? 'w-[68px] h-[96px]' : 'w-9 h-[50px]';
+  const pairSizeClass = size === 'lg' ? 'w-[78px] h-[96px]' : 'w-[54px] h-[50px]';
   const shellTransition = optimizeMotion
     ? { duration: 0.22, ease: 'easeOut' }
     : { type: 'spring', stiffness: 300, damping: 22 };
@@ -466,7 +466,7 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
     const customImg = roleImages[roleId];
     if (customImg) {
       return (
-        <div className="h-11 w-8 overflow-hidden rounded-lg">
+        <div className="h-[50px] w-9 overflow-hidden rounded-lg">
           <img src={customImg} alt="" className="h-full w-full object-cover" />
         </div>
       );
@@ -508,7 +508,7 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
                   transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
                   className="flex flex-col items-center"
                 >
-                  <div className="flex min-h-[48px] items-end justify-center">
+                  <div className="flex min-h-[54px] items-end justify-center">
                     {renderPreviewRole(role)}
                   </div>
                   <span className="text-[10px] text-text-dim mt-0.5">Soy</span>
@@ -532,7 +532,7 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
                   transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
                   className="flex flex-col items-center"
                 >
-                  <div className="flex min-h-[48px] items-end justify-center">
+                  <div className="flex min-h-[54px] items-end justify-center">
                     <div className="flex max-w-[240px] flex-wrap items-end justify-center gap-0.5 px-1">
                       {seekingArr.map((s, i) => (
                         <motion.div
@@ -907,7 +907,7 @@ function SeekingGrid({ selected, onToggle, roleImages = {}, optimizeMotion = fal
   return (
     <div className="text-center">
       <h2 className="font-display text-2xl font-bold text-text-primary mb-2">Busco...</h2>
-      <p className="text-text-muted text-sm mb-8">¿Qué tipo de conexión te interesa? Podés elegir más de uno.</p>
+      <p className="text-text-muted text-sm mb-5">¿Qué tipo de conexión te interesa? Podés elegir más de uno.</p>
 
       <LayoutGroup>
         <div className="grid grid-cols-3 gap-3 justify-center max-w-[420px] mx-auto">
@@ -1999,14 +1999,14 @@ export default function RegisterPage() {
       <div className="relative z-10 flex items-center justify-between px-4 mb-4">
         <button
           onClick={prev}
-          className="text-text-muted hover:text-text-primary transition-colors p-2"
+          className="text-text-muted hover:text-text-primary transition-colors p-3"
         >
-          <ChevronLeft className="w-5 h-5" />
+          <ChevronLeft className="w-6 h-6" />
         </button>
-        <span className="text-text-dim text-xs font-medium">
+        <span className="text-text-dim text-sm font-semibold">
           {step + 1} / {TOTAL_STEPS}
         </span>
-        <div className="w-9" />
+        <div className="w-12" />
       </div>
 
       {/* Profile Card Preview */}
@@ -2053,7 +2053,7 @@ export default function RegisterPage() {
           whileTap={{ scale: 0.97 }}
           onClick={next}
           disabled={!canNext() || submitting}
-          className={`w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 transition-all ${
+          className={`w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2.5 transition-all ${
             canNext() && !submitting
               ? 'btn-gold'
               : 'bg-mansion-elevated text-text-dim cursor-not-allowed'
@@ -2064,7 +2064,7 @@ export default function RegisterPage() {
             : step === TOTAL_STEPS - 1
             ? 'Completar Registro'
             : 'Continuar'}
-          {!submitting && <ChevronRight className="w-5 h-5" />}
+          {!submitting && <ChevronRight className="w-6 h-6" />}
         </motion.button>
 
         {step === 0 && (
