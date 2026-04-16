@@ -822,6 +822,7 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {}, optimi
             <div className="mt-4 grid grid-cols-3 gap-3 justify-center max-w-[420px] mx-auto">
               {OTHER_ROLES.map((role) => {
                 const isActive = selected === role.id;
+                const customImg = roleImages[role.id];
                 return (
                   <motion.button
                     key={role.id}
@@ -834,9 +835,15 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {}, optimi
                       borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
                     }}
                   >
-                    <div className="w-20 h-[102px] flex items-center justify-center">
-                      <PersonFigure type={role.id} isActive={isActive} size="lg" optimizeMotion={optimizeMotion} />
-                    </div>
+                    {customImg ? (
+                      <div className={`w-20 h-[102px] rounded-xl overflow-hidden transition-transform duration-300 ${isActive ? 'scale-110' : 'scale-100'}`}>
+                        <img src={customImg} alt={role.label} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-20 h-[102px] flex items-center justify-center">
+                        <PersonFigure type={role.id} isActive={isActive} size="lg" optimizeMotion={optimizeMotion} />
+                      </div>
+                    )}
                     <span className={`mt-2 font-medium text-sm leading-tight ${isActive ? 'text-text-primary' : 'text-text-muted'}`}>
                       {role.label}
                     </span>
@@ -964,6 +971,7 @@ function SeekingGrid({ selected, onToggle, roleImages = {}, optimizeMotion = fal
             <div className="mt-4 grid grid-cols-3 gap-3 justify-center max-w-[420px] mx-auto">
               {OTHER_ROLES.map((role) => {
                 const isActive = selected.includes(role.id);
+                const customImg = roleImages[role.id];
                 return (
                   <motion.button
                     key={role.id}
@@ -976,9 +984,15 @@ function SeekingGrid({ selected, onToggle, roleImages = {}, optimizeMotion = fal
                       borderColor: isActive ? role.border : 'rgba(42,42,56,0.3)',
                     }}
                   >
-                    <div className="w-20 h-[102px] flex items-center justify-center">
-                      <PersonFigure type={role.id} isActive={isActive} size="lg" optimizeMotion={optimizeMotion} />
-                    </div>
+                    {customImg ? (
+                      <div className={`w-20 h-[102px] rounded-xl overflow-hidden transition-transform duration-300 ${isActive ? 'scale-110' : 'scale-100'}`}>
+                        <img src={customImg} alt={role.label} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-20 h-[102px] flex items-center justify-center">
+                        <PersonFigure type={role.id} isActive={isActive} size="lg" optimizeMotion={optimizeMotion} />
+                      </div>
+                    )}
                     <span className={`mt-2 font-medium text-sm text-center leading-tight ${isActive ? 'text-text-primary' : 'text-text-muted'}`}>
                       {role.label}
                     </span>
