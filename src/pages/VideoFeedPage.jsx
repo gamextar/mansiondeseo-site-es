@@ -652,9 +652,9 @@ export default function VideoFeedPage() {
   // with ONLY the seed story. This guarantees that stories.length changes 1→N
   // when the API responds, which triggers the useLayoutEffect scroll-correction
   // and prevents iOS Safari's scroll-reset from showing the wrong story.
-  const initial = requestedStorySeed
+  const initial = requestedSingleStoryMode && requestedStorySeed
     ? applyPendingStoryLikeState([requestedStorySeed], getPendingStoryLikes())
-    : applyPendingStoryLikeState(mergeSeedStory(cachedStories(), null), getPendingStoryLikes());
+    : applyPendingStoryLikeState(mergeSeedStory(cachedStories(), requestedStorySeed), getPendingStoryLikes());
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
