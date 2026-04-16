@@ -594,19 +594,7 @@ export default function FeedPage({ initialData }) {
   const viewedStoryUsers = useMemo(() => {
     try { return new Set(JSON.parse(viewedRaw)); } catch { return new Set(); }
   }, [viewedRaw]);
-  const orderedStoryProfiles = useMemo(() => {
-    const unseen = [];
-    const seen = [];
-    for (const profile of storyProfiles) {
-      if (!profile?.id) continue;
-      if (viewedStoryUsers.has(String(profile.id))) {
-        seen.push(profile);
-      } else {
-        unseen.push(profile);
-      }
-    }
-    return [...unseen, ...seen];
-  }, [storyProfiles, viewedStoryUsers]);
+  const orderedStoryProfiles = useMemo(() => storyProfiles, [storyProfiles]);
 
   useEffect(() => {
     if (storiesIntroConsumedRef.current) return;
