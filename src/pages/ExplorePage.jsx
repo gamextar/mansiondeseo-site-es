@@ -31,7 +31,7 @@ export default function ExplorePage({ initialData }) {
 
   return (
     <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar lg:pt-0">
-      <div className="px-2 lg:px-8 pt-4 lg:pt-6 pb-3">
+      <div className="px-3 lg:px-8 pt-4 lg:pt-6 pb-3">
         <h1 className="font-display text-2xl font-bold text-text-primary mb-4">Explorar</h1>
 
         <div className="flex gap-2">
@@ -52,7 +52,7 @@ export default function ExplorePage({ initialData }) {
       </div>
 
       {/* Results */}
-      <div className="px-2 lg:px-8 mt-2">
+      <div className="px-3 lg:px-8 mt-2">
         <p className="text-text-dim text-xs mb-3">
           {profiles.length} resultados
         </p>
