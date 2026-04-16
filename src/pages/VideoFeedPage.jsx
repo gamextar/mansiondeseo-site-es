@@ -645,16 +645,13 @@ export default function VideoFeedPage() {
   };
   const requestedStoryUserId = location.state?.storyUserId || null;
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
-  const requestedSingleStoryMode = location.state?.singleStoryMode === true;
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
   const backgroundLocation = location.state?.backgroundLocation || null;
   // When opened from a story-bar click (seed provided), skip the cache and start
   // with ONLY the seed story. This guarantees that stories.length changes 1→N
   // when the API responds, which triggers the useLayoutEffect scroll-correction
   // and prevents iOS Safari's scroll-reset from showing the wrong story.
-  const initial = requestedSingleStoryMode && requestedStorySeed
-    ? applyPendingStoryLikeState([requestedStorySeed], getPendingStoryLikes())
-    : applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
+  const initial = applyPendingStoryLikeState(mergeSeedStory(cachedStories(), requestedStorySeed), getPendingStoryLikes());
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
@@ -755,9 +752,7 @@ export default function VideoFeedPage() {
   const activeStory = isDesktopViewport
     ? stories[desktopActiveIdx - 1] || stories[0] || null
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
-  const isOwnStoryEntry = requestedSingleStoryMode && !!requestedStoryUserId;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
-  const lockSingleStorySwipe = !isDesktopViewport && isOwnStoryEntry;
   const isStandaloneMobileApp = detectStandaloneMobile();
   const navBottomOffset = isStandaloneMobileApp
     ? getStandaloneBottomNavOffset()
@@ -860,16 +855,14 @@ export default function VideoFeedPage() {
   }, [standaloneMobileRoute]);
 
   const refreshStories = useCallback(async () => {
-    const data = await getStories({ focusUserId: isOwnStoryEntry ? requestedStoryUserId : '' });
-    const baseStories = requestedSingleStoryMode
-      ? mergeSeedStory(data.stories || [], requestedStorySeed)
-      : (Array.isArray(data.stories) ? data.stories : []);
+    const data = await getStories();
+    const baseStories = mergeSeedStory(data.stories || [], requestedStorySeed);
     const fresh = applyPendingStoryLikeState(baseStories, getPendingStoryLikes());
     apiRespondedRef.current = true;
     setStories(fresh);
     persistStories(fresh);
     return fresh;
-  }, [isOwnStoryEntry, persistStories, requestedSingleStoryMode, requestedStorySeed, requestedStoryUserId]);
+  }, [persistStories, requestedStorySeed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1336,11 +1329,11 @@ export default function VideoFeedPage() {
         ) : (
         <div
           ref={containerRef}
-          onScroll={lockSingleStorySwipe ? undefined : handleScroll}
-          className={`h-full snap-y snap-mandatory scrollbar-hide ${lockSingleStorySwipe ? 'overflow-hidden' : 'overflow-y-scroll'}`}
+          onScroll={handleScroll}
+          className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
           style={{
-            scrollSnapType: lockSingleStorySwipe ? 'none' : 'y mandatory',
-            touchAction: lockSingleStorySwipe ? 'none' : 'pan-y',
+            scrollSnapType: 'y mandatory',
+            touchAction: 'pan-y',
             overscrollBehavior: 'none',
             WebkitOverflowScrolling: 'touch',
           }}

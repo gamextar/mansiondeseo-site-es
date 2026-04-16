@@ -746,26 +746,9 @@ export default function FeedPage({ initialData }) {
     const storyUserId = typeof storyOrUserId === 'object' && storyOrUserId !== null
       ? String(storyOrUserId.user_id || storyOrUserId.id || '')
       : String(storyOrUserId || '');
-    const storySeed = typeof storyOrUserId === 'object' && storyOrUserId !== null
-      ? {
-          id: String(storyOrUserId.story_id || storyOrUserId.id || storyUserId),
-          story_id: String(storyOrUserId.story_id || storyOrUserId.id || storyUserId),
-          user_id: storyUserId,
-          video_url: storyOrUserId.video_url || storyOrUserId.active_story_url || '',
-          caption: storyOrUserId.caption || '',
-          likes: Number(storyOrUserId.likes || 0),
-          comments: Number(storyOrUserId.comments || 0),
-          created_at: storyOrUserId.created_at || '',
-          username: storyOrUserId.username || storyOrUserId.name || '',
-          avatar_url: storyOrUserId.avatar_url || '',
-          avatar_crop: storyOrUserId.avatar_crop || null,
-          liked: false,
-        }
-      : null;
     navigate('/videos', {
       state: {
         storyUserId,
-        storySeed,
       },
     });
   }, [navigate]);
