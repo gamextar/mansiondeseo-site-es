@@ -1272,27 +1272,29 @@ export default function VideoFeedPage() {
         className={standaloneMobileRoute ? 'relative' : 'relative h-full'}
         style={standaloneViewportContentStyle}
       >
-        <div
-          className="absolute z-30 flex flex-col items-center gap-2"
-          style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
-        >
-          <button
-            type="button"
-            onClick={closeToHomeFeed}
-            className="flex h-[52px] w-[52px] lg:h-[72px] lg:w-[72px] items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
-            aria-label="Cerrar"
+        {isDesktopViewport && (
+          <div
+            className="absolute z-30 flex flex-col items-center gap-2"
+            style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
           >
-            <X className="w-6 h-6 lg:w-8 lg:h-8 text-white" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsMuted((m) => !m)}
-            className="flex h-[52px] w-[52px] lg:h-[72px] lg:w-[72px] items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
-            aria-label={isMuted ? 'Activar sonido' : 'Silenciar'}
-          >
-            {isMuted ? <VolumeX className="w-6 h-6 lg:w-8 lg:h-8 text-white" /> : <Volume2 className="w-6 h-6 lg:w-8 lg:h-8 text-white" />}
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={closeToHomeFeed}
+              className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+              aria-label="Cerrar"
+            >
+              <X className="w-8 h-8 text-white" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsMuted((m) => !m)}
+              className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+              aria-label={isMuted ? 'Activar sonido' : 'Silenciar'}
+            >
+              {isMuted ? <VolumeX className="w-8 h-8 text-white" /> : <Volume2 className="w-8 h-8 text-white" />}
+            </button>
+          </div>
+        )}
         {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">
