@@ -1068,7 +1068,7 @@ export default function FeedPage({ initialData }) {
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
                   >
-                    <div className={`rounded-full ${
+                    <div className={`rounded-full transition-all duration-300 ease-out ${
                       user.has_active_story
                         ? viewedStoryUsers.has(String(user.id))
                           ? 'bg-white/20'
@@ -1122,7 +1122,7 @@ export default function FeedPage({ initialData }) {
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
                   >
-                    <div className={`rounded-full ${
+                    <div className={`rounded-full transition-all duration-300 ease-out ${
                       user.has_active_story
                         ? viewedStoryUsers.has(String(user.id))
                           ? 'bg-white/20'
@@ -1176,7 +1176,7 @@ export default function FeedPage({ initialData }) {
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
                   >
-                    <div className={`rounded-full ${
+                    <div className={`rounded-full transition-all duration-300 ease-out ${
                       user.has_active_story
                         ? viewedStoryUsers.has(String(user.id))
                           ? 'bg-white/20'
@@ -1231,7 +1231,7 @@ export default function FeedPage({ initialData }) {
                   className="flex flex-col items-center gap-1"
                   onDragStart={handleStoriesNativeDragStart}
                 >
-                  <div className={`rounded-full ${
+                  <div className={`rounded-full transition-all duration-300 ease-out ${
                     isViewed
                       ? 'bg-white/20'
                       : 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson'
@@ -1265,7 +1265,7 @@ export default function FeedPage({ initialData }) {
                   className="flex flex-col items-center gap-1"
                   onDragStart={handleStoriesNativeDragStart}
                 >
-                  <div className={`rounded-full ${
+                  <div className={`rounded-full transition-all duration-300 ease-out ${
                     isViewed
                       ? 'bg-white/20'
                       : 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson'

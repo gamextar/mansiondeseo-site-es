@@ -26,6 +26,7 @@ function timeAgo(dateStr) {
 // ── Avatar size fallback; real value comes from siteSettings.videoAvatarSize ─
 const AVATAR_SIZE_DEFAULT = 52;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
+const VIEWED_STORY_SYNC_DELAY_MS = 320;
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -630,6 +631,7 @@ export default function VideoFeedPage() {
   const scrollEndTimer = useRef(null);
   const jumpUnlockTimer = useRef(null);
   const boundaryCooldownTimer = useRef(null);
+  const viewedDispatchTimerRef = useRef(null);
   const lastScrollAtRef = useRef(0);
   const lastDesktopWheelAtRef = useRef(0);
 
@@ -681,7 +683,13 @@ export default function VideoFeedPage() {
       if (!user?.id) return;
       const changed = applyPendingViewedStoryUsers(user.id);
       if (!changed) return;
-      window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
+      if (viewedDispatchTimerRef.current) {
+        window.clearTimeout(viewedDispatchTimerRef.current);
+      }
+      viewedDispatchTimerRef.current = window.setTimeout(() => {
+        window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
+        viewedDispatchTimerRef.current = null;
+      }, VIEWED_STORY_SYNC_DELAY_MS);
     } catch {}
   }, [user?.id]);
   const closeOverlay = useCallback(() => {
@@ -1008,6 +1016,7 @@ export default function VideoFeedPage() {
     clearTimeout(scrollEndTimer.current);
     clearTimeout(jumpUnlockTimer.current);
     clearTimeout(boundaryCooldownTimer.current);
+    clearTimeout(viewedDispatchTimerRef.current);
   }, []);
 
   const settleInfiniteBoundary = useCallback(() => {
