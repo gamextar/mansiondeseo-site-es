@@ -705,10 +705,34 @@ export default function FeedPage({ initialData }) {
     const storyQuery = new URLSearchParams();
     if (storyUserId) storyQuery.set('story', storyUserId);
     storyQuery.set('open', String(openNonce));
+    const targetSearch = `?${storyQuery.toString()}`;
+    const targetUrl = `/videos${targetSearch}`;
+
+    try {
+      sessionStorage.removeItem('vf_idx');
+      sessionStorage.removeItem('vf_prefetched');
+    } catch {}
+
+    let shouldForceHardNavigation = false;
+    try {
+      const lastStoryUserId = sessionStorage.getItem('mansion_last_story_user_id') || '';
+      const lastOpenedAt = Number(sessionStorage.getItem('mansion_last_story_opened_at') || '0') || 0;
+      const sameStory = !!storyUserId && lastStoryUserId === storyUserId;
+      // If the same story is reopened shortly after closing, force a full
+      // navigation to avoid stale in-memory overlay/video state.
+      shouldForceHardNavigation = sameStory && (Date.now() - lastOpenedAt) < 20000;
+      if (storyUserId) sessionStorage.setItem('mansion_last_story_user_id', storyUserId);
+      sessionStorage.setItem('mansion_last_story_opened_at', String(Date.now()));
+    } catch {}
+
+    if (shouldForceHardNavigation) {
+      window.location.assign(targetUrl);
+      return;
+    }
 
     navigate({
       pathname: '/videos',
-      search: `?${storyQuery.toString()}`,
+      search: targetSearch,
     }, {
       state: {
         storyUserId,
