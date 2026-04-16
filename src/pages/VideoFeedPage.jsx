@@ -754,8 +754,9 @@ export default function VideoFeedPage() {
   const activeStory = isDesktopViewport
     ? stories[desktopActiveIdx - 1] || stories[0] || null
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
+  const isOwnStoryEntry = !!requestedStoryUserId && !!user?.id && String(requestedStoryUserId) === String(user.id);
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
-  const lockSingleStorySwipe = !isDesktopViewport && !!requestedStoryUserId;
+  const lockSingleStorySwipe = !isDesktopViewport && isOwnStoryEntry;
   const isStandaloneMobileApp = detectStandaloneMobile();
   const navBottomOffset = isStandaloneMobileApp
     ? getStandaloneBottomNavOffset()
@@ -858,13 +859,13 @@ export default function VideoFeedPage() {
   }, [standaloneMobileRoute]);
 
   const refreshStories = useCallback(async () => {
-    const data = await getStories({ focusUserId: requestedStoryUserId || '' });
+    const data = await getStories({ focusUserId: isOwnStoryEntry ? requestedStoryUserId : '' });
     const fresh = applyPendingStoryLikeState(mergeSeedStory(data.stories || [], requestedStorySeed), getPendingStoryLikes());
     apiRespondedRef.current = true;
     setStories(fresh);
     persistStories(fresh);
     return fresh;
-  }, [persistStories, requestedStorySeed, requestedStoryUserId]);
+  }, [isOwnStoryEntry, persistStories, requestedStorySeed, requestedStoryUserId]);
 
   useEffect(() => {
     let cancelled = false;
