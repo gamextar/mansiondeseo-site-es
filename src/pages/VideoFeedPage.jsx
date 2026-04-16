@@ -736,6 +736,7 @@ export default function VideoFeedPage() {
     ? stories[desktopActiveIdx - 1] || stories[0] || null
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
+  const lockSingleStorySwipe = !isDesktopViewport && !!requestedStoryUserId;
   const isStandaloneMobileApp = detectStandaloneMobile();
   const navBottomOffset = isStandaloneMobileApp
     ? getStandaloneBottomNavOffset()
@@ -1316,11 +1317,11 @@ export default function VideoFeedPage() {
         ) : (
         <div
           ref={containerRef}
-          onScroll={handleScroll}
-          className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+          onScroll={lockSingleStorySwipe ? undefined : handleScroll}
+          className={`h-full snap-y snap-mandatory scrollbar-hide ${lockSingleStorySwipe ? 'overflow-hidden' : 'overflow-y-scroll'}`}
           style={{
-            scrollSnapType: 'y mandatory',
-            touchAction: 'pan-y',
+            scrollSnapType: lockSingleStorySwipe ? 'none' : 'y mandatory',
+            touchAction: lockSingleStorySwipe ? 'none' : 'pan-y',
             overscrollBehavior: 'none',
             WebkitOverflowScrolling: 'touch',
           }}
