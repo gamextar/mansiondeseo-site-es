@@ -15,6 +15,7 @@ import { getBottomNavBottomPadding, getBottomNavHeight } from '../lib/bottomNavC
 import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsers, getViewedStoryUsersKey } from '../lib/storyViews';
 
 const FEED_CACHE_KEY = 'mansion_feed';
+const FEED_CACHE_VERSION = 2;
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
 const DEFAULT_CARDS_PER_PAGE = 12;
@@ -95,6 +96,8 @@ function getCachedFeed() {
     const raw = localStorage.getItem(FEED_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
+    const cacheVersion = Number(parsed?.version || 0);
+    if (cacheVersion !== FEED_CACHE_VERSION) return null;
     const currentCursor = Number(parsed?.currentCursor) || 0;
     const blockCursor = Number(parsed?.blockCursor ?? parsed?.currentCursor) || 0;
     const pageCursor = Number(parsed?.pageCursor ?? parsed?.currentCursor) || 0;
@@ -112,6 +115,7 @@ function getCachedFeed() {
 function setCachedFeed(data) {
   try {
     localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({
+      version: FEED_CACHE_VERSION,
       profiles: data.profiles || [],
       viewerPremium: data.viewerPremium || false,
       settings: data.settings || {},
