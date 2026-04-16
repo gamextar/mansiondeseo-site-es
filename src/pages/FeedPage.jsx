@@ -451,7 +451,7 @@ export default function FeedPage({ initialData }) {
   );
   const storyProfiles = homeStories.length > 0 ? homeStories : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
-  const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
+  const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100) - 1);
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
   const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleInnerGap ?? 3)) / 100));
 
@@ -1048,7 +1048,7 @@ export default function FeedPage({ initialData }) {
           {user && (
             safariDesktop ? (
               <div
-                className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                className={`flex-shrink-0 mr-px ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
@@ -1102,7 +1102,7 @@ export default function FeedPage({ initialData }) {
               </div>
             ) : desktopStoryRailEnhanced ? (
               <div
-                className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                className={`flex-shrink-0 mr-px ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
@@ -1156,7 +1156,7 @@ export default function FeedPage({ initialData }) {
               </div>
             ) : (
               <div
-                className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                className={`flex-shrink-0 mr-px ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
