@@ -485,7 +485,6 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
       style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
     >
       <motion.div
-        layout={optimizeMotion ? undefined : true}
         className="bg-mansion-card/90 backdrop-blur-sm rounded-2xl border border-mansion-border/40 p-3 relative overflow-hidden"
       >
         {/* Gold accent line */}
@@ -495,7 +494,6 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
         <AnimatePresence>
           {(role || seekingArr.length > 0) && (
             <motion.div
-              layout={optimizeMotion ? undefined : true}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : undefined}
