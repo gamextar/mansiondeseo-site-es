@@ -632,6 +632,7 @@ export default function VideoFeedPage() {
   const jumpUnlockTimer = useRef(null);
   const boundaryCooldownTimer = useRef(null);
   const viewedDispatchTimerRef = useRef(null);
+  const overlayCloseViewedTimerRef = useRef(null);
   const lastScrollAtRef = useRef(0);
   const lastDesktopWheelAtRef = useRef(0);
 
@@ -695,6 +696,14 @@ export default function VideoFeedPage() {
   const closeOverlay = useCallback(() => {
     if (!isOverlayPreview) {
       flushPendingViewedStories();
+    } else {
+      if (overlayCloseViewedTimerRef.current) {
+        window.clearTimeout(overlayCloseViewedTimerRef.current);
+      }
+      overlayCloseViewedTimerRef.current = window.setTimeout(() => {
+        flushPendingViewedStories();
+        overlayCloseViewedTimerRef.current = null;
+      }, 220);
     }
     if (backgroundLocation?.pathname) {
       navigate(
@@ -1012,6 +1021,7 @@ export default function VideoFeedPage() {
     clearTimeout(jumpUnlockTimer.current);
     clearTimeout(boundaryCooldownTimer.current);
     clearTimeout(viewedDispatchTimerRef.current);
+    clearTimeout(overlayCloseViewedTimerRef.current);
   }, []);
 
   const settleInfiniteBoundary = useCallback(() => {
