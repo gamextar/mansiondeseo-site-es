@@ -29,7 +29,8 @@ import PagoPendientePage from './pages/PagoPendientePage';
 import CoinsPage from './pages/CoinsPage';
 import PagoMonedasExitosoPage from './pages/PagoMonedasExitosoPage';
 import StoryUploadPage from './pages/StoryUploadPage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
+import TopVisitedPage from './pages/TopVisitedPage';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -40,10 +41,10 @@ import { lazyWithRetry } from './lib/lazyWithRetry';
 
 const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage'), 'mansion-lazy-retry:video-lab'));
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
-const TopVisitedPage = lazy(lazyWithRetry(() => import('./pages/TopVisitedPage'), 'mansion-lazy-retry:ranking'));
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
-const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
+const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/videos', '/black-test'];
+const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -68,9 +69,9 @@ function AppLayout() {
   const location = useLocation();
   const { user } = useAuth();
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
-  const backgroundLocation = location.state?.backgroundLocation;
-  const profileOverlayOpen = location.state?.modal === 'profile' && !!backgroundLocation;
-  const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
+  const backgroundLocation = location.state?.backgroundLocation || null;
+  const profileOverlayOpen = location.pathname.startsWith('/perfiles/') && location.state?.modal === 'profile' && !!backgroundLocation;
+  const videoOverlayOpen = location.pathname === '/videos' && location.state?.modal === 'videos' && !!backgroundLocation;
   const routeOverlayOpen = profileOverlayOpen || videoOverlayOpen;
   const standaloneVideosRoute = isStandaloneMobileApp && location.pathname.startsWith('/videos');
   const isFullscreen =
@@ -139,6 +140,14 @@ function AppLayout() {
     if (routeOverlayOpen) return; // overlay handles its own scroll
     if (location.state?.backgroundLocation) return; // closing overlay — App handles it
     if (prev === location.pathname) return; // same route, no reset
+    if (prev === '/videos' && location.pathname === '/') {
+      try {
+        const saved = Number(sessionStorage.getItem(FEED_SCROLL_KEY) || '0') || 0;
+        sessionStorage.removeItem(FEED_SCROLL_KEY);
+        window.scrollTo(0, saved);
+        return;
+      } catch {}
+    }
     window.scrollTo(0, 0);
   }, [location.pathname, location.state, routeOverlayOpen]);
 
@@ -359,7 +368,7 @@ function AppLayout() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className="fixed inset-0 lg:left-64 xl:left-72 z-[120]"
+              className="fixed inset-0 z-[120]"
             >
               <motion.div
                 initial={{ opacity: 0 }}
@@ -387,27 +396,14 @@ function AppLayout() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className="fixed inset-0 lg:left-64 xl:left-72 z-[130]"
+              transition={{ duration: 0.08, ease: 'linear' }}
+              className="fixed inset-0 z-[130]"
             >
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-                className="absolute inset-0 bg-black/72 backdrop-blur-[4px]"
-              />
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute inset-0"
-              >
+              <div className="absolute inset-0">
                 <Routes>
                   <Route path="/videos" element={<VideoFeedPage />} />
                 </Routes>
-              </motion.div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -428,6 +424,10 @@ export default function App() {
   const [user, setUserState] = useState(() => getStoredUser());
   const [bootstrapUnread, setBootstrapUnread] = useState(null);
   const [bootstrapResolved, setBootstrapResolved] = useState(() => !getToken());
+  const [bootstrapStories, setBootstrapStories] = useState(() => {
+    const cached = peekAppBootstrap();
+    return Array.isArray(cached?.stories) ? cached.stories : [];
+  });
   const [siteSettings, setSiteSettings] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('mansion_site_settings') || '{}'); } catch { return {}; }
   });
@@ -608,6 +608,7 @@ export default function App() {
         }
 
         setBootstrapUnread(typeof data?.unread === 'number' ? data.unread : null);
+        setBootstrapStories(Array.isArray(data?.stories) ? data.stories : []);
         setBootstrapResolved(true);
 
         if (data?.settings) {
@@ -616,6 +617,7 @@ export default function App() {
         }
       }).catch(() => {
         setBootstrapUnread(null);
+        setBootstrapStories([]);
         setBootstrapResolved(true);
         if (cancelled || !getToken()) return;
         clearAuth();
@@ -645,7 +647,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <AuthContext.Provider value={{ registered, setRegistered, user, setUser, siteSettings, setSiteSettings }}>
+      <AuthContext.Provider value={{ registered, setRegistered, user, setUser, siteSettings, setSiteSettings, bootstrapStories, setBootstrapStories }}>
       <UnreadProvider initialUnread={bootstrapUnread} bootstrapResolved={bootstrapResolved}>
       <div className="relative min-h-screen">
         {debugFlags.shellOnly ? (

@@ -1,7 +1,7 @@
 import { forwardRef, useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Plus, Radio } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, Plus, Radio } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } };
@@ -11,15 +11,26 @@ import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
+import { getBottomNavBottomPadding, getBottomNavHeight } from '../lib/bottomNavConfig';
+import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsers, getViewedStoryUsersKey } from '../lib/storyViews';
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
+const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
 const DEFAULT_CARDS_PER_PAGE = 12;
 const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PREFETCH_PAGES = 6;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
-const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
+const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
+
+function detectStandaloneMobile() {
+  if (typeof window === 'undefined') return false;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const ua = window.navigator.userAgent || '';
+  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+  return Boolean(standalone && isMobile);
+}
 
 function getInitialStoryLimit(settings, isDesktopViewport) {
   return Math.max(
@@ -30,6 +41,29 @@ function getInitialStoryLimit(settings, isDesktopViewport) {
         : (settings?.homeStoryCountMobile ?? 15)
     )
   );
+}
+
+function mapStoriesToRailProfiles(stories = []) {
+  return (Array.isArray(stories) ? stories : [])
+    .map((story) => ({
+      id: String(story.user_id || story.id || ''),
+      user_id: String(story.user_id || story.id || ''),
+      story_id: String(story.id || ''),
+      name: story.username || '',
+      username: story.username || '',
+      avatar_url: story.avatar_url || '',
+      avatar_crop: story.avatar_crop || null,
+      photos: [],
+      has_active_story: true,
+      active_story_url: story.video_url || '',
+      video_url: story.video_url || '',
+      caption: story.caption || '',
+      likes: Number(story.likes || 0),
+      comments: Number(story.comments || 0),
+      liked: !!story.liked,
+      created_at: story.created_at || '',
+    }))
+    .filter((story) => story.id && story.active_story_url);
 }
 
 function getGridColumns() {
@@ -59,9 +93,15 @@ const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, moti
 
 function getCachedFeed() {
   try {
-    const raw = sessionStorage.getItem(FEED_CACHE_KEY);
+    const raw = localStorage.getItem(FEED_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
+    const currentCursor = Number(parsed?.currentCursor) || 0;
+    const blockCursor = Number(parsed?.blockCursor ?? parsed?.currentCursor) || 0;
+    const pageCursor = Number(parsed?.pageCursor ?? parsed?.currentCursor) || 0;
+    // Do not persist deep pagination across refreshes or fresh entries to home.
+    // Only reuse cache when it represents the first page/block.
+    if (currentCursor > 0 || blockCursor > 0 || pageCursor > 0) return null;
     if (Array.isArray(parsed?.profiles)) return parsed;
     if (Array.isArray(parsed)) {
       return { profiles: parsed, viewerPremium: false, settings: {}, timestamp: 0 };
@@ -72,7 +112,7 @@ function getCachedFeed() {
 
 function setCachedFeed(data) {
   try {
-    sessionStorage.setItem(FEED_CACHE_KEY, JSON.stringify({
+    localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({
       profiles: data.profiles || [],
       viewerPremium: data.viewerPremium || false,
       settings: data.settings || {},
@@ -88,14 +128,20 @@ function setCachedFeed(data) {
   } catch {}
 }
 
+function makeFeedBlockKey(cursor, pageSize) {
+  return `${Number(cursor) || 0}:${Number(pageSize) || 0}`;
+}
+
 export default function FeedPage({ initialData }) {
   const safariDesktop = isSafariDesktopBrowser();
   const cols = useGridColumns();
   const isDesktopViewport = cols >= 4;
-  const desktopStoryRailEnhanced = isDesktopViewport;
+  const desktopStoryRailEnhanced = false;
   const cached = initialData || getCachedFeed();
-  const { user, siteSettings } = useAuth();
+  const { user, siteSettings, bootstrapStories } = useAuth();
+  const isStandaloneMobileApp = detectStandaloneMobile();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
+  const [homeStories, setHomeStories] = useState(() => mapStoriesToRailProfiles(bootstrapStories));
   const [showStoriesSection, setShowStoriesSection] = useState(true);
   const [showGridSection, setShowGridSection] = useState(true);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
@@ -112,11 +158,13 @@ export default function FeedPage({ initialData }) {
   const storiesIntroConsumedRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + (siteSettings?.navHeight ?? 71);
+  const navBottomOffset = getBottomNavHeight(isStandaloneMobileApp) + getBottomNavBottomPadding(isStandaloneMobileApp);
   const gridRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const mobileNavVisibilityTimerRef = useRef(null);
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
+  const prefetchedBlocksRef = useRef(new Map());
+  const prefetchInFlightRef = useRef(new Map());
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
     frameId: null,
@@ -125,14 +173,12 @@ export default function FeedPage({ initialData }) {
   const storiesBounceFrameRef = useRef(null);
   const storiesEdgeOffsetRef = useRef(0);
   const pendingViewedTimerRef = useRef(null);
-  const storyNodeRefs = useRef(new Map());
-  const storyRectsRef = useRef(new Map());
-  const previousOrderedStoryIdsRef = useRef('');
   const initialStoriesAlignedRef = useRef(false);
   const [storiesEdgeOffset, setStoriesEdgeOffset] = useState(0);
   const storiesDragRef = useRef({
     active: false,
     captured: false,
+    pointerId: null,
     startX: 0,
     startScrollLeft: 0,
     moved: false,
@@ -142,6 +188,7 @@ export default function FeedPage({ initialData }) {
   });
   const isSafariDesktopRef = useRef(false);
   const pagedFeedConfigRef = useRef('');
+  const pagedFeedConfigInitializedRef = useRef(false);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
@@ -156,39 +203,74 @@ export default function FeedPage({ initialData }) {
 
 
 
-  const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize, targetPageCursor } = {}) => {
+  const applyLoadedProfiles = useCallback(({ data, cursor = 0, resolvedPageSize, targetPageCursor }) => {
+    setProfiles(data.profiles || []);
+    setViewerPremium(data.viewerPremium || false);
+    if (data.settings) setSettings(data.settings);
+    setNextCursor(data.nextCursor || null);
+    setBlockCursor(Number(data.cursor) || cursor || 0);
+    setPageCursor(Number(targetPageCursor ?? data.cursor ?? cursor) || 0);
+    setTotalProfiles(Number(data.totalProfiles) || 0);
+    setHasMore(!!data.hasMore);
+    setCachedFeed({
+      profiles: data.profiles || [],
+      viewerPremium: data.viewerPremium || false,
+      settings: data.settings || {},
+      totalProfiles: Number(data.totalProfiles) || 0,
+      currentCursor: Number(data.cursor) || cursor || 0,
+      blockCursor: Number(data.cursor) || cursor || 0,
+      pageCursor: Number(targetPageCursor ?? data.cursor ?? cursor) || 0,
+      pageSize: resolvedPageSize,
+      nextCursor: data.nextCursor || null,
+      hasMore: !!data.hasMore,
+    });
+  }, []);
+
+  const fetchProfilesBlock = useCallback(async ({ forceFresh = false, cursor = 0, pageSize } = {}) => {
     const s = settingsRef.current;
     const resolvedPageSize = Math.max(
       12,
       Number(pageSize) || (s?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
     );
+    const data = await getProfiles({ fresh: forceFresh, cursor, pageSize: resolvedPageSize });
+    return { data, resolvedPageSize };
+  }, []);
+
+  const prefetchProfilesBlock = useCallback(({ cursor = 0, pageSize } = {}) => {
+    const key = makeFeedBlockKey(cursor, pageSize);
+    if (prefetchedBlocksRef.current.has(key)) return Promise.resolve(prefetchedBlocksRef.current.get(key));
+    if (prefetchInFlightRef.current.has(key)) return prefetchInFlightRef.current.get(key);
+
+    const task = fetchProfilesBlock({ cursor, pageSize })
+      .then(({ data, resolvedPageSize }) => {
+        const payload = { data, resolvedPageSize, cursor };
+        prefetchedBlocksRef.current.set(key, payload);
+        prefetchInFlightRef.current.delete(key);
+        return payload;
+      })
+      .catch((error) => {
+        prefetchInFlightRef.current.delete(key);
+        throw error;
+      });
+
+    prefetchInFlightRef.current.set(key, task);
+    return task;
+  }, [fetchProfilesBlock]);
+
+  const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize, targetPageCursor } = {}) => {
     const c = getCachedFeed();
     if (!c) setLoading(true);
     const myId = ++loadIdRef.current;
-    return getProfiles({ fresh: forceFresh, cursor, pageSize: resolvedPageSize })
+    return fetchProfilesBlock({ forceFresh, cursor, pageSize })
       .then(data => {
         if (myId !== loadIdRef.current) return;
-        setProfiles(data.profiles || []);
-        setViewerPremium(data.viewerPremium || false);
-        if (data.settings) setSettings(data.settings);
-        setNextCursor(data.nextCursor || null);
-        setBlockCursor(Number(data.cursor) || cursor || 0);
-        setPageCursor(Number(targetPageCursor ?? data.cursor ?? cursor) || 0);
-        setTotalProfiles(Number(data.totalProfiles) || 0);
-        setHasMore(!!data.hasMore);
-        setCachedFeed({
-          profiles: data.profiles || [],
-          viewerPremium: data.viewerPremium || false,
-          settings: data.settings || {},
-          totalProfiles: Number(data.totalProfiles) || 0,
-          currentCursor: Number(data.cursor) || cursor || 0,
-          blockCursor: Number(data.cursor) || cursor || 0,
-          pageCursor: Number(targetPageCursor ?? data.cursor ?? cursor) || 0,
-          pageSize: resolvedPageSize,
-          nextCursor: data.nextCursor || null,
-          hasMore: !!data.hasMore,
+        applyLoadedProfiles({
+          data: data.data,
+          cursor,
+          resolvedPageSize: data.resolvedPageSize,
+          targetPageCursor,
         });
-        return data;
+        return data.data;
       })
       .catch(() => {
         if (myId !== loadIdRef.current) return;
@@ -204,7 +286,7 @@ export default function FeedPage({ initialData }) {
       .finally(() => {
         if (myId === loadIdRef.current) setLoading(false);
       });
-  }, []); // stable — reads settings from settingsRef
+  }, [applyLoadedProfiles, fetchProfilesBlock]); // stable — reads settings from settingsRef
 
   // Initial load — runs once on mount
   useEffect(() => {
@@ -212,6 +294,7 @@ export default function FeedPage({ initialData }) {
     const cachedFeed = getCachedFeed();
     const currentSettings = settingsRef.current;
     const cachedPageSize = Number(cachedFeed?.pageSize) || 0;
+    const cachedPageCursor = Number(cachedFeed?.pageCursor ?? cachedFeed?.currentCursor) || 0;
     const expectedPageSize = Math.max(
       12,
       (currentSettings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (currentSettings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
@@ -223,39 +306,27 @@ export default function FeedPage({ initialData }) {
       return;
     }
 
-    // State was already initialized from cache in useState — just clean up flags
+    // Cache is valid — show it instantly, no background fetch.
+    // Data stays fresh until: pull-to-refresh, cache invalidation (profile edit),
+    // or cache is > 30 minutes old (stale safety net).
     setLoading(false);
     try {
       sessionStorage.removeItem('mansion_feed_dirty');
       sessionStorage.removeItem('mansion_feed_force_refresh');
     } catch {}
+    const cacheAgeMs = Date.now() - (Number(cachedFeed.timestamp) || 0);
+    if (cacheAgeMs > 30 * 60 * 1000) {
+      loadProfiles({
+        cursor: Math.floor(cachedPageCursor / expectedPageSize) * expectedPageSize,
+        pageSize: expectedPageSize,
+        targetPageCursor: cachedPageCursor,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   const [gridOpacity, setGridOpacity] = useState(1);
-
-  useEffect(() => {
-    let fadeOutTimer = null;
-    let fadeInTimer = null;
-    const handleHomeFocus = () => {
-      if (window.scrollY <= 0) return;
-      // Fade out → instant jump → fade in
-      setGridOpacity(0);
-      fadeOutTimer = setTimeout(() => {
-        // Force instant jump — overrides any CSS scroll-behavior:smooth
-        document.documentElement.style.scrollBehavior = 'auto';
-        window.scrollTo(0, 0);
-        document.documentElement.style.scrollBehavior = '';
-        fadeInTimer = setTimeout(() => setGridOpacity(1), 16);
-      }, 300);
-    };
-    window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
-    return () => {
-      window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
-      clearTimeout(fadeOutTimer);
-      clearTimeout(fadeInTimer);
-    };
-  }, []);
+  const viewedStoriesStorageKey = useMemo(() => getViewedStoryUsersKey(user?.id), [user?.id]);
 
   useEffect(() => () => {
     if (pendingViewedTimerRef.current) {
@@ -303,17 +374,6 @@ export default function FeedPage({ initialData }) {
     };
   }, [isDesktopViewport, pageCursor]);
 
-  const setStoryNodeRef = useCallback((storyId, node) => {
-    const key = String(storyId || '');
-    if (!key) return;
-    if (node) {
-      storyNodeRefs.current.set(key, node);
-    } else {
-      storyNodeRefs.current.delete(key);
-      storyRectsRef.current.delete(key);
-    }
-  }, []);
-
   // Keep a ref of visibleCount so the scroll handler can read it without being a dep
   const visibleCountRef = useRef(0);
 
@@ -342,7 +402,10 @@ export default function FeedPage({ initialData }) {
     useCallback(() => loadProfiles({ forceFresh: true }), [loadProfiles])
   );
 
-  const safeSettings = settings && typeof settings === 'object' ? settings : {};
+  const safeSettings = useMemo(() => ({
+    ...((siteSettings && typeof siteSettings === 'object') ? siteSettings : {}),
+    ...((settings && typeof settings === 'object') ? settings : {}),
+  }), [settings, siteSettings]);
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
   const cardsPerPage = Math.max(6, Math.min(60, safeSettings.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE));
   const maxPages = Math.max(1, Math.min(50, safeSettings.feedMaxPages ?? DEFAULT_MAX_PAGES));
@@ -356,14 +419,21 @@ export default function FeedPage({ initialData }) {
   const totalPages = Math.min(maxPages, Math.max(1, Math.ceil((totalProfiles || 0) / cardsPerPage)));
   const pageWindow = useMemo(() => {
     if (totalPages <= 1) return [];
-    const start = Math.max(1, currentPage - 2);
-    const end = Math.min(totalPages, start + 4);
-    const adjustedStart = Math.max(1, end - 4);
+    const start = Math.max(1, currentPage - 1);
+    const end = Math.min(totalPages, start + 2);
+    const adjustedStart = Math.max(1, end - 2);
     return Array.from({ length: end - adjustedStart + 1 }, (_, idx) => adjustedStart + idx);
   }, [currentPage, totalPages]);
   const storyLimit = getInitialStoryLimit(safeSettings, isDesktopViewport);
-  const fallbackStoryProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, storyLimit);
-  const storyProfiles = fallbackStoryProfiles;
+  const bootstrapStoryProfiles = useMemo(
+    () => mapStoriesToRailProfiles(bootstrapStories).slice(0, storyLimit),
+    [bootstrapStories, storyLimit]
+  );
+  const fallbackStoryProfiles = useMemo(
+    () => safeProfiles.filter((p) => p.has_active_story).slice(0, storyLimit),
+    [safeProfiles, storyLimit]
+  );
+  const storyProfiles = homeStories.length > 0 ? homeStories : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
@@ -390,23 +460,104 @@ export default function FeedPage({ initialData }) {
         hasMore,
       });
     } else {
-      await loadProfiles({
-        cursor: nextBlockCursor,
-        pageSize: blockSize,
-        targetPageCursor: nextPageCursor,
-      });
+      const prefetchedKey = makeFeedBlockKey(nextBlockCursor, blockSize);
+      const prefetched = prefetchedBlocksRef.current.get(prefetchedKey);
+      if (prefetched) {
+        applyLoadedProfiles({
+          data: prefetched.data,
+          cursor: nextBlockCursor,
+          resolvedPageSize: prefetched.resolvedPageSize,
+          targetPageCursor: nextPageCursor,
+        });
+        prefetchedBlocksRef.current.delete(prefetchedKey);
+      } else {
+        await loadProfiles({
+          cursor: nextBlockCursor,
+          pageSize: blockSize,
+          targetPageCursor: nextPageCursor,
+        });
+      }
     }
     const targetTop = Math.max(0, (gridRef.current?.offsetTop || 0) - 24);
     window.scrollTo({ top: targetTop, behavior: 'smooth' });
-  }, [blockCursor, blockSize, cardsPerPage, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, viewerPremium]);
+  }, [applyLoadedProfiles, blockCursor, blockSize, cardsPerPage, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, viewerPremium]);
+
+  useEffect(() => {
+    let fadeOutTimer = null;
+    let fadeInTimer = null;
+    const handleHomeFocus = () => {
+      if (window.scrollY <= 0) return;
+      setGridOpacity(0);
+      fadeOutTimer = setTimeout(() => {
+        document.documentElement.style.scrollBehavior = 'auto';
+        window.scrollTo(0, 0);
+        document.documentElement.style.scrollBehavior = '';
+        fadeInTimer = setTimeout(() => setGridOpacity(1), 16);
+      }, 300);
+    };
+    const handleHomeReset = () => {
+      try {
+        localStorage.removeItem(FEED_CACHE_KEY);
+      } catch {}
+      prefetchedBlocksRef.current.clear();
+      prefetchInFlightRef.current.clear();
+      loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
+    window.addEventListener(HOME_FEED_RESET_EVENT, handleHomeReset);
+    return () => {
+      window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
+      window.removeEventListener(HOME_FEED_RESET_EVENT, handleHomeReset);
+      clearTimeout(fadeOutTimer);
+      clearTimeout(fadeInTimer);
+    };
+  }, [blockSize, loadProfiles]);
 
   useEffect(() => {
     if (loading) return;
     const nextConfig = `paged:${cardsPerPage}`;
+    if (!pagedFeedConfigInitializedRef.current) {
+      pagedFeedConfigRef.current = nextConfig;
+      pagedFeedConfigInitializedRef.current = true;
+      return;
+    }
     if (pagedFeedConfigRef.current === nextConfig) return;
     pagedFeedConfigRef.current = nextConfig;
+    prefetchedBlocksRef.current.clear();
+    prefetchInFlightRef.current.clear();
     loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
   }, [blockSize, cardsPerPage, loadProfiles, loading]);
+
+  useEffect(() => {
+    if (!isDesktopViewport) return;
+    if (loading || !hasMore || !nextCursor) return;
+    if (!profiles.length) return;
+
+    const currentBlockEnd = blockCursor + profiles.length;
+    const remainingAfterCurrentPage = currentBlockEnd - (pageCursor + cardsPerPage);
+    if (remainingAfterCurrentPage > cardsPerPage) return;
+
+    prefetchProfilesBlock({
+      cursor: Number(nextCursor) || currentBlockEnd,
+      pageSize: blockSize,
+    }).catch(() => {});
+  }, [blockCursor, blockSize, cardsPerPage, hasMore, isDesktopViewport, loading, nextCursor, pageCursor, prefetchProfilesBlock, profiles.length]);
+
+  useEffect(() => {
+    if (!isDesktopViewport) return;
+    if (loading) return;
+    if (!profiles.length) return;
+    if (blockCursor <= 0) return;
+
+    const pagesBeforeCurrent = pageCursor - blockCursor;
+    if (pagesBeforeCurrent > cardsPerPage) return;
+
+    prefetchProfilesBlock({
+      cursor: Math.max(0, blockCursor - blockSize),
+      pageSize: blockSize,
+    }).catch(() => {});
+  }, [blockCursor, blockSize, cardsPerPage, isDesktopViewport, loading, pageCursor, prefetchProfilesBlock, profiles.length]);
 
   const viewedRaw = useSyncExternalStore(
     useCallback((cb) => {
@@ -422,24 +573,12 @@ export default function FeedPage({ initialData }) {
         window.removeEventListener(VIEWED_STORIES_EVENT, handler);
       };
     }, []),
-    () => localStorage.getItem('viewed_story_users') || '[]',
+    () => (viewedStoriesStorageKey ? localStorage.getItem(viewedStoriesStorageKey) || '[]' : '[]'),
   );
   const viewedStoryUsers = useMemo(() => {
     try { return new Set(JSON.parse(viewedRaw)); } catch { return new Set(); }
   }, [viewedRaw]);
-  const orderedStoryProfiles = useMemo(() => {
-    const unseen = [];
-    const seen = [];
-    for (const profile of storyProfiles) {
-      if (!profile?.id) continue;
-      if (viewedStoryUsers.has(String(profile.id))) {
-        seen.push(profile);
-      } else {
-        unseen.push(profile);
-      }
-    }
-    return [...unseen, ...seen];
-  }, [storyProfiles, viewedStoryUsers]);
+  const orderedStoryProfiles = storyProfiles;
 
   useEffect(() => {
     if (storiesIntroConsumedRef.current) return;
@@ -474,135 +613,23 @@ export default function FeedPage({ initialData }) {
     };
   }, [orderedStoryProfiles.length, showStoriesSection]);
 
-  useLayoutEffect(() => {
-    const orderedIds = orderedStoryProfiles.map((profile) => String(profile?.id || '')).filter(Boolean).join(',');
-    const previousOrderedIds = previousOrderedStoryIdsRef.current;
-    previousOrderedStoryIdsRef.current = orderedIds;
-    if (!orderedIds || !storiesScrollRef.current || orderedIds === previousOrderedIds) return;
-
-    const container = storiesScrollRef.current;
-    if (!previousOrderedIds) {
-      container.scrollLeft = 0;
-      return;
-    }
-    const firstUnseen = orderedStoryProfiles.find((profile) => !viewedStoryUsers.has(String(profile?.id || ''))) || orderedStoryProfiles[0];
-    const targetNode = storyNodeRefs.current.get(String(firstUnseen?.id || ''));
-    if (!targetNode) return;
-
-    const targetLeft = Math.max(0, targetNode.offsetLeft - 8);
-    if (Math.abs(container.scrollLeft - targetLeft) < 12) return;
-
-    container.scrollTo({
-      left: targetLeft,
-      behavior: previousOrderedIds ? 'smooth' : 'auto',
-    });
-  }, [orderedStoryProfiles, viewedStoryUsers]);
-
-  useLayoutEffect(() => {
-    const nextRects = new Map();
-
-    for (const profile of orderedStoryProfiles) {
-      const key = String(profile?.id || '');
-      const node = storyNodeRefs.current.get(key);
-      if (!key || !node) continue;
-
-      const rect = node.getBoundingClientRect();
-      nextRects.set(key, rect);
-
-      const previousRect = storyRectsRef.current.get(key);
-      if (!previousRect) continue;
-
-      const deltaX = previousRect.left - rect.left;
-      const deltaY = previousRect.top - rect.top;
-      if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue;
-
-      node.style.willChange = 'transform, filter, opacity';
-      const animation = typeof node.animate === 'function'
-        ? node.animate(
-            [
-              {
-                transform: `translate(${deltaX}px, ${deltaY}px) scale(0.96)`,
-                filter: 'brightness(0.88)',
-                opacity: 0.9,
-              },
-              {
-                transform: 'translate(0px, 0px) scale(1)',
-                filter: 'brightness(1)',
-                opacity: 1,
-              },
-            ],
-            {
-              duration: 720,
-              easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-            }
-          )
-        : null;
-
-      if (animation) {
-        animation.onfinish = () => {
-          node.style.willChange = '';
-        };
-      } else {
-        node.style.transition = 'none';
-        node.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(0.96)`;
-        node.style.filter = 'brightness(0.88)';
-        node.style.opacity = '0.9';
-        requestAnimationFrame(() => {
-          node.style.transition = 'transform 720ms cubic-bezier(0.22, 1, 0.36, 1), filter 720ms cubic-bezier(0.22, 1, 0.36, 1), opacity 720ms cubic-bezier(0.22, 1, 0.36, 1)';
-          node.style.transform = 'translate(0px, 0px) scale(1)';
-          node.style.filter = 'brightness(1)';
-          node.style.opacity = '1';
-          const cleanup = () => {
-            node.style.transition = '';
-            node.style.transform = '';
-            node.style.filter = '';
-            node.style.opacity = '';
-            node.style.willChange = '';
-            node.removeEventListener('transitionend', cleanup);
-          };
-          node.addEventListener('transitionend', cleanup);
-        });
-      }
-    }
-
-    storyRectsRef.current = nextRects;
-  }, [orderedStoryProfiles]);
   const applyPendingViewedStories = useCallback(() => {
     try {
-      const rawPending = sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY);
-      if (!rawPending) return false;
-      const pending = JSON.parse(rawPending);
-      const nextPending = Array.isArray(pending) ? pending.map((value) => String(value || '')).filter(Boolean) : [];
-      if (nextPending.length === 0) {
-        sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
-        return false;
-      }
-
-      const current = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
-      const seen = new Set(Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : []);
-      let changed = false;
-      for (const userId of nextPending) {
-        if (seen.has(userId)) continue;
-        seen.add(userId);
-        changed = true;
-      }
-      sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
+      if (!user?.id) return false;
+      const changed = applyPendingViewedStoryUsers(user.id);
       if (!changed) return false;
-
-      const merged = [...seen];
-      if (merged.length > 300) merged.splice(0, merged.length - 300);
-      localStorage.setItem('viewed_story_users', JSON.stringify(merged));
       window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
       return true;
     } catch {
       return false;
     }
-  }, []);
+  }, [user?.id]);
 
   const schedulePendingViewedStories = useCallback(() => {
     try {
       if (document.hidden) return;
-      if (!sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY)) return;
+      if (!user?.id) return;
+      if (getPendingViewedStoryUsers(user.id).length === 0) return;
     } catch {
       return;
     }
@@ -613,7 +640,7 @@ export default function FeedPage({ initialData }) {
       applyPendingViewedStories();
       pendingViewedTimerRef.current = null;
     }, VIEWED_STORIES_APPLY_DELAY_MS);
-  }, [applyPendingViewedStories]);
+  }, [applyPendingViewedStories, user?.id]);
 
   useEffect(() => {
     schedulePendingViewedStories();
@@ -626,7 +653,35 @@ export default function FeedPage({ initialData }) {
     };
   }, [schedulePendingViewedStories]);
 
+  const releaseStoriesPointerCapture = useCallback((pointerId = storiesDragRef.current.pointerId) => {
+    const el = storiesScrollRef.current;
+    const drag = storiesDragRef.current;
+    if (!el || !drag.captured || pointerId === null || pointerId === undefined) return;
+
+    try {
+      el.releasePointerCapture?.(pointerId);
+    } catch {}
+  }, []);
+
+  const resetStoriesDragState = useCallback(() => {
+    releaseStoriesPointerCapture();
+    storiesDragRef.current.active = false;
+    storiesDragRef.current.captured = false;
+    storiesDragRef.current.pointerId = null;
+    storiesDragRef.current.startX = 0;
+    storiesDragRef.current.startScrollLeft = 0;
+    storiesDragRef.current.moved = false;
+    storiesDragRef.current.lastX = 0;
+    storiesDragRef.current.lastTs = 0;
+    storiesDragRef.current.velocity = 0;
+  }, [releaseStoriesPointerCapture]);
+
   const openStoryFromHome = useCallback((storyOrUserId) => {
+    resetStoriesDragState();
+    const backgroundScrollY = Number(window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
+    try {
+      sessionStorage.setItem(FEED_SCROLL_KEY, String(backgroundScrollY));
+    } catch {}
     const storyUserId = typeof storyOrUserId === 'object' && storyOrUserId !== null
       ? String(storyOrUserId.user_id || storyOrUserId.id || '')
       : String(storyOrUserId || '');
@@ -646,17 +701,36 @@ export default function FeedPage({ initialData }) {
           liked: false,
         }
       : null;
-    const backgroundScrollY = Number(window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
-    navigate('/videos', {
+    const openNonce = Date.now();
+    const storyQuery = new URLSearchParams();
+    if (storyUserId) storyQuery.set('story', storyUserId);
+    storyQuery.set('open', String(openNonce));
+
+    navigate({
+      pathname: '/videos',
+      search: `?${storyQuery.toString()}`,
+    }, {
       state: {
         storyUserId,
         storySeed,
-        modal: 'videos',
-        backgroundLocation: location,
-        backgroundScrollY,
+        fromStoryRail: true,
+        fromPathname: location.pathname,
       },
     });
-  }, [location, navigate]);
+  }, [location, navigate, resetStoriesDragState]);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    if (bootstrapStoryProfiles.length === 0) {
+      setHomeStories([]);
+      return;
+    }
+    setHomeStories((current) => {
+      const currentIds = current.map((story) => String(story.story_id || story.id || '')).join(',');
+      const nextIds = bootstrapStoryProfiles.map((story) => String(story.story_id || story.id || '')).join(',');
+      return currentIds === nextIds ? current : bootstrapStoryProfiles;
+    });
+  }, [bootstrapStoryProfiles, user?.id]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
@@ -772,6 +846,7 @@ export default function FeedPage({ initialData }) {
     storiesDragRef.current = {
       active: true,
       captured: false,
+      pointerId: event.pointerId,
       startX: event.clientX,
       startScrollLeft: el.scrollLeft,
       moved: false,
@@ -816,13 +891,10 @@ export default function FeedPage({ initialData }) {
 
   const finishStoriesDrag = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
-    const el = storiesScrollRef.current;
     const drag = storiesDragRef.current;
     if (!drag.active) return;
     drag.active = false;
-    if (el && drag.captured && event?.pointerId !== undefined) {
-      try { el.releasePointerCapture?.(event.pointerId); } catch {}
-    }
+    releaseStoriesPointerCapture(event?.pointerId ?? drag.pointerId);
     storiesMomentumRef.current.velocity = drag.moved ? drag.velocity : 0;
     if (drag.moved) {
       startStoriesMomentum();
@@ -833,7 +905,8 @@ export default function FeedPage({ initialData }) {
       animateStoriesEdgeOffsetTo(0);
     }
     drag.captured = false;
-  }, [animateStoriesEdgeOffsetTo, desktopStoryRailEnhanced, startStoriesMomentum]);
+    drag.pointerId = null;
+  }, [animateStoriesEdgeOffsetTo, desktopStoryRailEnhanced, releaseStoriesPointerCapture, startStoriesMomentum]);
 
   const handleStoriesClickCapture = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
@@ -849,21 +922,27 @@ export default function FeedPage({ initialData }) {
     stopStoriesBounce();
     storiesEdgeOffsetRef.current = 0;
     setStoriesEdgeOffset(0);
-    storiesDragRef.current.active = false;
-    storiesDragRef.current.captured = false;
-    storiesDragRef.current.moved = false;
-  }, [desktopStoryRailEnhanced, stopStoriesBounce, stopStoriesMomentum]);
+    resetStoriesDragState();
+  }, [desktopStoryRailEnhanced, resetStoriesDragState, stopStoriesBounce, stopStoriesMomentum]);
 
   useEffect(() => () => {
+    resetStoriesDragState();
     stopStoriesMomentum();
     stopStoriesBounce();
-  }, [stopStoriesBounce, stopStoriesMomentum]);
+  }, [resetStoriesDragState, stopStoriesBounce, stopStoriesMomentum]);
 
   // ── Grid setup ────────────────────────────────────────────────────
   const gap = 12;
 
   return (
-    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar">
+    <div
+      className="min-h-dynamic-screen bg-mansion-base pt-navbar lg:pt-0 lg:pb-[84px]"
+      style={{
+        paddingBottom: isDesktopViewport
+          ? undefined
+          : `calc(${Math.max(12, navBottomOffset)}px + env(safe-area-inset-bottom, 0px))`,
+      }}
+    >
       {/* Pull-to-refresh indicator */}
       <div
         ref={indicatorRef}
@@ -875,15 +954,15 @@ export default function FeedPage({ initialData }) {
       {/* Stories section */}
       {showStoriesSection && (
       <div
-        className="px-4 lg:px-8 pt-2 lg:pt-4 pb-0 fade-in-up"
+        className="px-0 lg:px-8 pt-2 lg:pt-4 pb-0 fade-in-up"
       >
-        <div className="flex items-center gap-1.5 mb-3">
+        <div className="flex items-center gap-1.5 mb-3 px-4 lg:px-0">
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="text-text-muted text-sm lg:text-base font-medium">Video Flashes</p>
         </div>
         <AnimatedBlock
           ref={storiesScrollRef}
-          className={`flex overflow-x-auto scrollbar-hide pb-2 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
+          className={`flex overflow-x-auto scrollbar-hide pb-2 pl-4 pr-4 lg:pl-0 lg:pr-0 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
           style={{
             scrollbarWidth: 'none',
             msOverflowStyle: 'none',
@@ -1082,7 +1161,6 @@ export default function FeedPage({ initialData }) {
             return safariDesktop ? (
               <div
                 key={`story-${p.id}`}
-                ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined }}
               >
@@ -1116,7 +1194,6 @@ export default function FeedPage({ initialData }) {
             ) : (
               <div
                 key={`story-${p.id}`}
-                ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined }}
               >
@@ -1250,49 +1327,71 @@ export default function FeedPage({ initialData }) {
                   </motion.div>
                 </div>
 
-                {/* Desktop pagination bar */}
+                {/* Desktop pagination pill */}
                 <motion.div
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-                  className="hidden lg:block py-6"
+                  initial={{ opacity: 0, y: 18, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
+                  className="pointer-events-none fixed inset-x-0 bottom-[21px] z-40 hidden justify-center lg:flex"
                 >
-                  <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/10 bg-mansion-card/80 px-3 py-3 shadow-[0_16px_36px_rgba(0,0,0,0.18)] backdrop-blur-sm">
-                    <span className="mr-1 text-xs font-medium text-text-muted">
-                      {Math.min(totalProfiles, pageCursor + 1)}-{Math.min(totalProfiles, pageCursor + visibleProfiles.length)} de {totalProfiles}
-                    </span>
+                  <div className="pointer-events-auto flex items-center gap-2.5 rounded-[999px] border border-black/45 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] px-3 py-2 shadow-[0_18px_48px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[22px]">
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT))}
+                      disabled={currentPage <= 1 || loading}
+                      aria-label="Volver a la pagina principal"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/16 text-white/68 transition-all duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
+                    >
+                      <Home className="h-4.5 w-4.5" />
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => goToFeedPage(currentPage - 1)}
                       disabled={currentPage <= 1 || loading}
-                      className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-text-muted transition hover:border-white/20 hover:text-white disabled:opacity-40"
+                      aria-label="Pagina anterior"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/16 text-white/68 transition-all duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
                     >
-                      <ChevronLeft className="w-4 h-4" />
-                      Anterior
+                      <ChevronLeft className="h-4.5 w-4.5" />
                     </button>
-                    {pageWindow.map((page) => (
-                      <motion.button
-                        key={page}
-                        type="button"
-                        onClick={() => goToFeedPage(page)}
-                        disabled={page === currentPage || loading}
-                        whileHover={page === currentPage ? undefined : { y: -1 }}
-                        whileTap={page === currentPage ? undefined : { scale: 0.98 }}
-                        className={`min-w-10 rounded-xl px-3 py-2 text-sm font-semibold transition ${page === currentPage
-                          ? 'border border-mansion-gold/40 bg-mansion-gold/15 text-mansion-gold'
-                          : 'border border-white/10 bg-black/20 text-text-muted hover:border-white/20 hover:text-white'}`}
-                      >
-                        {page}
-                      </motion.button>
-                    ))}
+
+                    <div className="flex items-center gap-1.5 rounded-full bg-black/14 px-1 py-1">
+                      {pageWindow.map((page) => (
+                        <motion.button
+                          key={page}
+                          type="button"
+                          onClick={() => goToFeedPage(page)}
+                          disabled={page === currentPage || loading}
+                          layout
+                          whileHover={page === currentPage ? undefined : { y: -1 }}
+                          whileTap={page === currentPage ? undefined : { scale: 0.97 }}
+                          transition={{ layout: { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 } }}
+                          className={`relative inline-flex h-9 min-w-[2.85rem] items-center justify-center overflow-hidden rounded-full px-3.5 text-[15px] font-semibold tracking-[-0.01em] transition-colors duration-200 ${
+                            page === currentPage
+                              ? 'text-black'
+                              : 'text-white/62 hover:bg-white/[0.08] hover:text-white'
+                          }`}
+                        >
+                          {page === currentPage ? (
+                            <motion.span
+                              layoutId="desktop-feed-pagination-active-pill"
+                              className="absolute inset-0 rounded-full bg-[linear-gradient(180deg,#ffffff,#ececec)] shadow-[0_10px_24px_rgba(255,255,255,0.16),inset_0_1px_0_rgba(255,255,255,0.85)]"
+                              transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.8 }}
+                            />
+                          ) : null}
+                          <span className="relative z-10">{page}</span>
+                        </motion.button>
+                      ))}
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => goToFeedPage(currentPage + 1)}
                       disabled={currentPage >= totalPages || loading}
-                      className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-text-muted transition hover:border-white/20 hover:text-white disabled:opacity-40"
+                      aria-label="Pagina siguiente"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/16 text-white/68 transition-all duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
                     >
-                      Siguiente
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="h-4.5 w-4.5" />
                     </button>
                   </div>
                 </motion.div>
