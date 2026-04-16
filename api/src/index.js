@@ -41,6 +41,7 @@ let _conversationStateReady = null;
 let _messageConversationIdReady = null;
 let _userBrowseIndexesReady = null;
 let _userFakeColumnReady = null;
+let _userDuplicateFlagColumnReady = null;
 let _userLocalityColumnReady = null;
 let _userBirthdateColumnReady = null;
 let _userMaritalStatusColumnReady = null;
@@ -531,6 +532,32 @@ async function ensureUsersFakeColumn(env) {
   }
 
   return _userFakeColumnReady;
+}
+
+async function ensureUsersDuplicateFlagColumn(env) {
+  if (!_userDuplicateFlagColumnReady) {
+    _userDuplicateFlagColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          'ALTER TABLE users ADD COLUMN duplicate_flag INTEGER NOT NULL DEFAULT 0'
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+
+      await env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_users_duplicate_flag ON users(duplicate_flag)'
+      ).run();
+    })().catch((err) => {
+      _userDuplicateFlagColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userDuplicateFlagColumnReady;
 }
 
 async function ensureUsersLocalityColumn(env) {
@@ -3984,8 +4011,9 @@ async function handleAdminGetUsers(request, env) {
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
   await ensureUsersMessageBlockRolesColumn(env);
+  await ensureUsersDuplicateFlagColumn(env);
   let dataQuery = `SELECT id, email, username, role, seeking, message_block_roles, age, birthdate, city, locality, marital_status, sexual_orientation, country, avatar_url, status,
-    premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, account_status, last_active, last_ip, created_at,
+    premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, duplicate_flag, account_status, last_active, last_ip, created_at,
     (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id
     FROM users`;
   const filters = [];
@@ -4045,6 +4073,7 @@ async function handleAdminGetUsers(request, env) {
       online: isOnline(u.last_active),
       is_admin: !!u.is_admin,
       fake: !!u.fake,
+      duplicate_flag: !!u.duplicate_flag,
       story_id: u.story_id || null,
       interests: undefined,
       photos: undefined,
@@ -4056,6 +4085,7 @@ async function handleAdminGetUsers(request, env) {
 }
 
 async function handleAdminGetUserIds(request, env) {
+  await ensureUsersDuplicateFlagColumn(env);
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -4113,6 +4143,7 @@ async function handleAdminGetUserIds(request, env) {
 // ── Admin: GET /api/admin/users/:id ─────────────────────
 async function handleAdminGetUser(request, env, userId) {
   await ensureUsersMessageBlockRolesColumn(env);
+  await ensureUsersDuplicateFlagColumn(env);
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -4139,6 +4170,7 @@ async function handleAdminGetUser(request, env, userId) {
       online: isOnline(safe.last_active),
       is_admin: !!safe.is_admin,
       fake: !!safe.fake,
+      duplicate_flag: !!safe.duplicate_flag,
     }
   });
 }
@@ -4146,6 +4178,7 @@ async function handleAdminGetUser(request, env, userId) {
 // ── Admin: PUT /api/admin/users/:id ─────────────────────
 async function handleAdminUpdateUser(request, env, userId) {
   await ensureUsersMessageBlockRolesColumn(env);
+  await ensureUsersDuplicateFlagColumn(env);
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -4169,6 +4202,7 @@ async function handleAdminUpdateUser(request, env, userId) {
   if (body.verified !== undefined) { updates.push('verified = ?'); vals.push(body.verified ? 1 : 0); }
   if (body.ghost_mode !== undefined) { updates.push('ghost_mode = ?'); vals.push(body.ghost_mode ? 1 : 0); }
   if (body.fake !== undefined) { updates.push('fake = ?'); vals.push(body.fake ? 1 : 0); }
+  if (body.duplicate_flag !== undefined) { updates.push('duplicate_flag = ?'); vals.push(body.duplicate_flag ? 1 : 0); }
   if (body.marital_status !== undefined) { updates.push('marital_status = ?'); vals.push(body.marital_status || ''); }
   if (body.sexual_orientation !== undefined) { updates.push('sexual_orientation = ?'); vals.push(body.sexual_orientation || ''); }
   if (body.status !== undefined && ['pending', 'verified'].includes(body.status)) { updates.push('status = ?'); vals.push(body.status); }
@@ -4209,6 +4243,7 @@ async function handleAdminUpdateUser(request, env, userId) {
       online: isOnline(safe.last_active),
       is_admin: !!safe.is_admin,
       fake: !!safe.fake,
+      duplicate_flag: !!safe.duplicate_flag,
     }
   });
 }
@@ -5105,6 +5140,7 @@ async function handleRequest(request, env) {
   const method = request.method;
 
   await ensureUsersFakeColumn(env);
+  await ensureUsersDuplicateFlagColumn(env);
   await ensureUsersLocalityColumn(env);
   await ensureUsersBirthdateColumn(env);
   await ensureUsersMaritalStatusColumn(env);

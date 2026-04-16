@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Pause, Play, Film, Pencil } from 'lucide-react';
+import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Pause, Play, Film, Pencil, Copy } from 'lucide-react';
 import { adminGetUsers, adminGetUserIds, adminGetUser, adminUpdateUser, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 import { resolveMediaUrl } from '../../lib/media';
@@ -505,6 +505,7 @@ export default function AdminUsersPage() {
                               <span className="text-text-primary font-medium truncate text-xs">{u.username}</span>
                               {u.online && <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
                               {u.is_admin && <Shield className="w-3 h-3 text-red-400 flex-shrink-0" />}
+                              {u.duplicate_flag && <Copy className="w-3 h-3 text-amber-300 flex-shrink-0" />}
                             </div>
                             <p className="text-[10px] text-text-dim md:hidden truncate">{u.email}</p>
                           </div>
@@ -668,6 +669,9 @@ export default function AdminUsersPage() {
                 {selected.online && (
                   <span className="px-2 py-1 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-semibold">Online</span>
                 )}
+                {selected.duplicate_flag && (
+                  <span className="px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-semibold">Duplicado</span>
+                )}
                 {selected.account_status === 'suspended' && (
                   <span className="px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-semibold">Suspendida</span>
                 )}
@@ -734,6 +738,15 @@ export default function AdminUsersPage() {
                 >
                   <UserCheck className={`w-4 h-4 ${selected.verified ? 'text-green-400' : 'text-text-dim'}`} />
                   <span className="text-xs text-text-primary">{selected.verified ? 'Quitar verificación' : 'Verificar usuario'}</span>
+                </button>
+
+                <button
+                  disabled={actionLoading}
+                  onClick={() => handleAction(selected.id, { duplicate_flag: !selected.duplicate_flag })}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-mansion-elevated hover:bg-amber-500/10 transition-colors text-left"
+                >
+                  <Copy className={`w-4 h-4 ${selected.duplicate_flag ? 'text-amber-300' : 'text-text-dim'}`} />
+                  <span className="text-xs text-text-primary">{selected.duplicate_flag ? 'Quitar marca de duplicado' : 'Marcar como duplicado'}</span>
                 </button>
 
                 {/* Account status: Review / Suspend */}
