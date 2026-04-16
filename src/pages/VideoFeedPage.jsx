@@ -8,8 +8,6 @@ import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
 import { resolveMediaUrl } from '../lib/media';
 import { isSafariDesktopBrowser } from '../lib/browser';
-import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
-import { applyPendingViewedStoryUsers, clearPendingViewedStoryUsers, getViewedStoryUsers, markViewedStoryUser, queuePendingViewedStoryUser } from '../lib/storyViews';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -25,15 +23,8 @@ function timeAgo(dateStr) {
 
 // ── Avatar size fallback; real value comes from siteSettings.videoAvatarSize ─
 const AVATAR_SIZE_DEFAULT = 52;
+const PENDING_VIEWED_STORIES_KEY = 'mansion_pending_viewed_story_users';
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
-
-function detectStandaloneMobile() {
-  if (typeof window === 'undefined') return false;
-  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
-  const ua = window.navigator.userAgent || '';
-  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
-  return Boolean(standalone && isMobile);
-}
 
 function normalizeStorySeed(seed) {
   if (!seed || typeof seed !== 'object') return null;
@@ -138,14 +129,13 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, enableCinematicReveal = false }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
   const revealSentRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
-  const [isVideoReady, setIsVideoReady] = useState(false);
 
   // Once src is set, never clear it — clearing causes browser to reload the video
   // which produces the black flash/glitch at boundaries. Matches original behavior.
@@ -157,7 +147,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
 
   useEffect(() => {
     revealSentRef.current = false;
-    setIsVideoReady(false);
   }, [activeSrc]);
 
   const notifyRevealReady = useCallback(() => {
@@ -209,7 +198,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     if (!video) return;
 
     const handleReady = () => {
-      setIsVideoReady(true);
       notifyRevealReady();
       attemptPlay();
     };
@@ -264,12 +252,8 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
         <video
           ref={videoRef}
           src={activeSrc}
-          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[1400ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
-          style={{
-            WebkitTransform: 'translateZ(0)',
-            transform: 'translateZ(0)',
-            opacity: enableCinematicReveal ? (isVideoReady ? 1 : 0) : 1,
-          }}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
           loop
           playsInline
           webkit-playsinline="true"
@@ -278,11 +262,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           preload={isActive ? 'auto' : 'metadata'}
           onEnded={handleVideoEnd}
           onClick={togglePlay}
-        />
-
-        <div
-          className="absolute inset-0 pointer-events-none bg-black transition-opacity duration-[1400ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
-          style={{ opacity: enableCinematicReveal ? (isVideoReady ? 0 : 1) : 0 }}
         />
 
         <AnimatePresence>
@@ -488,25 +467,19 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, s
 
 function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, navBottomOffset, avatarSize, scrollContainerRef, onGift, isOwnStory = false }) {
   if (!story) return null;
-  const actionBottom = typeof navBottomOffset === 'number'
-    ? `${navBottomOffset + 16}px`
-    : `calc(${navBottomOffset} + 16px)`;
-  const infoBottom = typeof navBottomOffset === 'number'
-    ? `${navBottomOffset + 8}px`
-    : `calc(${navBottomOffset} + 8px)`;
 
   return (
     <>
       <div
-        className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-[70] lg:hidden"
-        style={{ bottom: actionBottom }}
+        className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
+        style={{ bottom: `${navBottomOffset + 16}px` }}
       >
         <MobileActionButtons story={story} onLike={onLike} onToggleMute={onToggleMute} isMuted={isMuted} navigate={navigate} scrollContainerRef={scrollContainerRef} onGift={onGift} isOwnStory={isOwnStory} />
       </div>
 
       <div
-        className="pointer-events-none fixed left-4 right-20 z-[70] lg:hidden"
-        style={{ bottom: infoBottom }}
+        className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
+        style={{ bottom: `${navBottomOffset + 8}px` }}
       >
         <MobileOverlayButton onPress={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} scrollContainerRef={scrollContainerRef} className="pointer-events-auto flex flex-col items-start gap-2.5 mb-1">
           <div className="rounded-full border-2 border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize, height: avatarSize }}>
@@ -635,7 +608,7 @@ export default function VideoFeedPage() {
 
   const cachedStories = () => {
     try {
-      const raw = localStorage.getItem('vf_stories');
+      const raw = sessionStorage.getItem('vf_stories');
       if (raw) return JSON.parse(raw);
     } catch {}
     return [];
@@ -643,14 +616,7 @@ export default function VideoFeedPage() {
   const requestedStoryUserId = location.state?.storyUserId || null;
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
-  const backgroundLocation = location.state?.backgroundLocation || null;
-  // When opened from a story-bar click (seed provided), skip the cache and start
-  // with ONLY the seed story. This guarantees that stories.length changes 1→N
-  // when the API responds, which triggers the useLayoutEffect scroll-correction
-  // and prevents iOS Safari's scroll-reset from showing the wrong story.
-  const initial = requestedStorySeed
-    ? applyPendingStoryLikeState([requestedStorySeed], getPendingStoryLikes())
-    : applyPendingStoryLikeState(mergeSeedStory(cachedStories(), null), getPendingStoryLikes());
+  const initial = applyPendingStoryLikeState(mergeSeedStory(cachedStories(), requestedStorySeed), getPendingStoryLikes());
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
@@ -669,36 +635,44 @@ export default function VideoFeedPage() {
 
   const persistStories = useCallback((nextStories) => {
     try {
-      localStorage.setItem('vf_stories', JSON.stringify(nextStories));
+      sessionStorage.setItem('vf_stories', JSON.stringify(nextStories));
     } catch {}
   }, []);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
+  const navHeight = siteSettings?.navHeight ?? 71;
+  const navBottomOffset = (siteSettings?.navBottomPadding ?? 24) + navHeight;
   const flushPendingViewedStories = useCallback(() => {
     try {
-      if (!user?.id) return;
-      const changed = applyPendingViewedStoryUsers(user.id);
+      const rawPending = sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY);
+      if (!rawPending) return;
+      const pending = JSON.parse(rawPending);
+      const nextPending = Array.isArray(pending) ? pending.map((value) => String(value || '')).filter(Boolean) : [];
+      sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
+      if (nextPending.length === 0) return;
+
+      const current = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
+      const seen = new Set(Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : []);
+      let changed = false;
+      for (const userId of nextPending) {
+        if (seen.has(userId)) continue;
+        seen.add(userId);
+        changed = true;
+      }
       if (!changed) return;
+
+      const merged = [...seen];
+      if (merged.length > 300) merged.splice(0, merged.length - 300);
+      localStorage.setItem('viewed_story_users', JSON.stringify(merged));
       window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
     } catch {}
-  }, [user?.id]);
+  }, []);
   const closeOverlay = useCallback(() => {
     flushPendingViewedStories();
-    if (backgroundLocation?.pathname) {
-      navigate(
-        {
-          pathname: backgroundLocation.pathname,
-          search: backgroundLocation.search || '',
-          hash: backgroundLocation.hash || '',
-        },
-        { replace: true, state: backgroundLocation.state || null }
-      );
-      return;
-    }
-    navigate('/', { replace: true });
-  }, [backgroundLocation, flushPendingViewedStories, navigate]);
+    navigate(-1);
+  }, [flushPendingViewedStories, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
     if (!isOverlayPreview || !isDesktopViewport) return;
     if (event.target.closest('[data-story-card-frame="true"]')) return;
@@ -708,24 +682,32 @@ export default function VideoFeedPage() {
     const uid = String(storyUserId || '');
     if (!uid) return;
     try {
-      if (!user?.id) return;
-      if (getViewedStoryUsers(user.id).includes(uid)) {
-        clearPendingViewedStoryUsers(user.id);
+      const current = JSON.parse(localStorage.getItem('viewed_story_users') || '[]');
+      const seen = new Set(Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : []);
+      if (seen.has(uid)) {
+        sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
         return;
       }
-      markViewedStoryUser(user.id, uid);
-      clearPendingViewedStoryUsers(user.id);
+      seen.add(uid);
+      const merged = [...seen];
+      if (merged.length > 300) merged.splice(0, merged.length - 300);
+      localStorage.setItem('viewed_story_users', JSON.stringify(merged));
+      sessionStorage.removeItem(PENDING_VIEWED_STORIES_KEY);
       window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
     } catch {}
-  }, [user?.id]);
+  }, []);
   const queueStoryViewed = useCallback((storyUserId) => {
     const uid = String(storyUserId || '');
     if (!uid) return;
     try {
-      if (!user?.id) return;
-      queuePendingViewedStoryUser(user.id, uid);
+      const current = JSON.parse(sessionStorage.getItem(PENDING_VIEWED_STORIES_KEY) || '[]');
+      const next = Array.isArray(current) ? current.map((value) => String(value || '')).filter(Boolean) : [];
+      if (next.includes(uid)) return;
+      next.push(uid);
+      if (next.length > 300) next.splice(0, next.length - 300);
+      sessionStorage.setItem(PENDING_VIEWED_STORIES_KEY, JSON.stringify(next));
     } catch {}
-  }, [user?.id]);
+  }, []);
 
   const infiniteStories = stories.length > 0
     ? [stories[stories.length - 1], ...stories, stories[0]]
@@ -735,24 +717,6 @@ export default function VideoFeedPage() {
   const activeStory = isDesktopViewport
     ? stories[desktopActiveIdx - 1] || stories[0] || null
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
-  const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
-  const isStandaloneMobileApp = detectStandaloneMobile();
-  const navBottomOffset = isStandaloneMobileApp
-    ? getStandaloneBottomNavOffset()
-    : getBrowserBottomNavOffset();
-  const standaloneTopOffset = isStandaloneMobileApp
-    ? '0px'
-    : 'calc(env(safe-area-inset-top, 0px) + 48px)';
-  const standaloneViewportShellStyle = standaloneMobileRoute
-    ? {
-        paddingTop: standaloneTopOffset,
-      }
-    : undefined;
-  const standaloneViewportContentStyle = standaloneMobileRoute
-    ? {
-        height: 'calc(100lvh + 8px)',
-      }
-    : undefined;
 
   const syncMobileViewportToIndex = useCallback((index) => {
     if (isDesktopViewport) return false;
@@ -791,51 +755,6 @@ export default function VideoFeedPage() {
     media.addListener(handleChange);
     return () => media.removeListener(handleChange);
   }, []);
-
-  useLayoutEffect(() => {
-    if (!standaloneMobileRoute || typeof window === 'undefined') return undefined;
-
-    const resetPageScroll = () => {
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-    };
-
-    resetPageScroll();
-    let rafA = window.requestAnimationFrame(() => {
-      resetPageScroll();
-      rafA = window.requestAnimationFrame(() => {
-        resetPageScroll();
-      });
-    });
-
-    return () => {
-      if (rafA) window.cancelAnimationFrame(rafA);
-    };
-  }, [location.key, standaloneMobileRoute]);
-
-  useEffect(() => {
-    if (!standaloneMobileRoute || typeof window === 'undefined') return undefined;
-
-    const { style: bodyStyle } = document.body;
-    const { style: htmlStyle } = document.documentElement;
-    const previousBodyOverflow = bodyStyle.overflow;
-    const previousHtmlOverflow = htmlStyle.overflow;
-    const previousBodyOverscroll = bodyStyle.overscrollBehavior;
-    const previousHtmlOverscroll = htmlStyle.overscrollBehavior;
-
-    bodyStyle.overflow = 'hidden';
-    htmlStyle.overflow = 'hidden';
-    bodyStyle.overscrollBehavior = 'none';
-    htmlStyle.overscrollBehavior = 'none';
-
-    return () => {
-      bodyStyle.overflow = previousBodyOverflow;
-      htmlStyle.overflow = previousHtmlOverflow;
-      bodyStyle.overscrollBehavior = previousBodyOverscroll;
-      htmlStyle.overscrollBehavior = previousHtmlOverscroll;
-    };
-  }, [standaloneMobileRoute]);
 
   const refreshStories = useCallback(async () => {
     const data = await getStories({ focusUserId: requestedStoryUserId || '' });
@@ -945,11 +864,6 @@ export default function VideoFeedPage() {
     };
   }, [persistStories]);
 
-  // Keep a ref of the current activeDispIdx so the stories-identity layout
-  // effect can read it without being a dep (avoids interrupting user scrolls).
-  const activeDispIdxRef = useRef(activeDispIdx);
-  useLayoutEffect(() => { activeDispIdxRef.current = activeDispIdx; });
-
   useLayoutEffect(() => {
     if (isDesktopViewport) return undefined;
     if (stories.length === 0 || !containerRef.current) return;
@@ -976,25 +890,6 @@ export default function VideoFeedPage() {
 
     return () => cancelAnimationFrame(rafId);
   }, [activeDispIdx, isDesktopViewport, stories.length]);
-
-  // Secondary scroll-anchor: fires on every stories identity change (catches
-  // same-length updates where the primary effect doesn't re-run). Uses a ref
-  // for the index so it reads the latest value without causing extra renders.
-  useLayoutEffect(() => {
-    if (isDesktopViewport) return;
-    const container = containerRef.current;
-    if (!container || stories.length === 0) return;
-    const height = container.clientHeight;
-    if (!height) return;
-    const idx = Math.min(Math.max(activeDispIdxRef.current, 1), stories.length);
-    const want = height * idx;
-    // Only snap back if iOS Safari reset the scrollTop significantly
-    if (Math.abs(container.scrollTop - want) > Math.max(4, height * 0.12)) {
-      container.scrollTop = want;
-      setBoundaryOverlayIdx(null);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDesktopViewport, stories]);
 
   useEffect(() => {
     try { sessionStorage.setItem('vf_idx', String(activeDispIdx)); } catch {}
@@ -1161,41 +1056,24 @@ export default function VideoFeedPage() {
   useEffect(() => {
     if (!isDesktopViewport) return undefined;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isOverlayPreview) {
-        e.preventDefault();
-        closeOverlay();
-      } else if (e.key === 'ArrowLeft') {
-        moveDesktopByOne(-1);
-      } else if (e.key === 'ArrowRight') {
-        moveDesktopByOne(1);
-      }
+      if (e.key === 'ArrowLeft') moveDesktopByOne(-1);
+      else if (e.key === 'ArrowRight') moveDesktopByOne(1);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [closeOverlay, isDesktopViewport, isOverlayPreview, moveDesktopByOne]);
+  }, [isDesktopViewport, moveDesktopByOne]);
 
   if (loading) {
     return (
-      <div
-        className={standaloneMobileRoute ? 'relative overflow-hidden bg-black' : 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'}
-        style={standaloneViewportShellStyle}
-      >
-        <div
-          className={standaloneMobileRoute ? 'flex items-center justify-center' : undefined}
-          style={standaloneViewportContentStyle}
-        >
-          <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
-        </div>
+      <div className="fixed inset-0 bg-black flex items-center justify-center z-40">
+        <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
     );
   }
 
   if (stories.length === 0) {
     return (
-      <div
-        className={standaloneMobileRoute ? 'relative overflow-hidden bg-mansion-base px-6' : 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'}
-        style={standaloneViewportShellStyle}
-      >
+      <div className="fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-40 px-6">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-32 right-[-10%] w-[520px] h-[520px] rounded-full bg-mansion-crimson/10 blur-3xl" />
           <div className="absolute bottom-[-12%] left-[-6%] w-[460px] h-[460px] rounded-full bg-mansion-gold/10 blur-3xl" />
@@ -1205,8 +1083,7 @@ export default function VideoFeedPage() {
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="relative flex flex-col items-center justify-center text-center max-w-sm mx-auto"
-          style={standaloneViewportContentStyle}
+          className="relative flex flex-col items-center text-center max-w-sm"
         >
           <div className="w-24 h-24 rounded-[2rem] bg-mansion-gold/10 border border-mansion-gold/20 flex items-center justify-center mb-6">
             <Film className="w-12 h-12 text-mansion-gold" />
@@ -1230,18 +1107,9 @@ export default function VideoFeedPage() {
     );
   }
 
-  const desktopOverlayRoute = isOverlayPreview && isDesktopViewport;
-
   return (
     <div
-      className={
-        standaloneMobileRoute
-          ? 'relative overflow-hidden bg-black'
-          : desktopOverlayRoute
-            ? 'absolute inset-0 bg-black z-[60]'
-            : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'
-      }
-      style={standaloneViewportShellStyle}
+      className="fixed inset-0 bg-black z-40 lg:left-64 xl:left-72 lg:bg-mansion-base"
       onPointerDown={handleOverlayBackdropPointerDown}
     >
       <motion.div
@@ -1251,10 +1119,7 @@ export default function VideoFeedPage() {
         transition={{ duration: entryRevealReady ? 0.01 : 0.45, ease: [0.22, 1, 0.36, 1] }}
       />
 
-      <div
-        className={standaloneMobileRoute ? 'relative' : 'relative h-full'}
-        style={standaloneViewportContentStyle}
-      >
+      <div className="relative h-full">
         {isOverlayPreview && (
           <button
             type="button"
@@ -1275,7 +1140,6 @@ export default function VideoFeedPage() {
               const circularDistance = Math.min(rawDistance, stories.length - rawDistance);
               const isActive = index === activeIndex;
               const shouldLoad = stories.length <= 3 || circularDistance <= 1;
-              const enableCinematicReveal = isActive && !entryRevealReady;
 
               return (
                 <div
@@ -1306,7 +1170,6 @@ export default function VideoFeedPage() {
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={isActive ? handleEntryRevealReady : undefined}
-                  enableCinematicReveal={enableCinematicReveal}
                 />
               </div>
             );
@@ -1329,12 +1192,8 @@ export default function VideoFeedPage() {
             const dist = Math.abs(displayIndex - activeDispIdx);
             const isBoundary = displayIndex <= 1 || displayIndex >= stories.length;
             const shouldLoad = dist <= 3 || isBoundary;
-            const enableCinematicReveal = displayIndex === activeDispIdx && !entryRevealReady;
             return (
-              <div
-                key={displayIndex}
-                className="h-full w-full flex-shrink-0"
-              >
+              <div key={displayIndex} className="w-full flex-shrink-0" style={{ height: '100dvh' }}>
                 <StoryCard
                   story={story}
                   videoSrc={story.video_url}
@@ -1350,7 +1209,6 @@ export default function VideoFeedPage() {
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
-                  enableCinematicReveal={enableCinematicReveal}
                 />
               </div>
             );
@@ -1360,8 +1218,8 @@ export default function VideoFeedPage() {
 
         {activeStory && (
         <div
-          className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-[70] lg:hidden"
-          style={{ bottom: `calc(${navBottomOffset} + 16px)` }}
+          className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-50 lg:hidden"
+          style={{ bottom: `${navBottomOffset + 16}px` }}
         >
           <MobileActionButtons
             story={activeStory}
@@ -1378,8 +1236,8 @@ export default function VideoFeedPage() {
 
         {activeStory && (
         <div
-          className="pointer-events-none fixed left-4 right-20 z-[70] lg:hidden"
-          style={{ bottom: `calc(${navBottomOffset} + 8px)` }}
+          className="pointer-events-none fixed left-4 right-20 z-50 lg:hidden"
+          style={{ bottom: `${navBottomOffset + 8}px` }}
         >
           <div className="pointer-events-none flex flex-col items-start gap-2.5 mb-1">
             <MobileOverlayButton
