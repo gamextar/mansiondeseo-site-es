@@ -654,7 +654,7 @@ export default function VideoFeedPage() {
   // and prevents iOS Safari's scroll-reset from showing the wrong story.
   const initial = requestedSingleStoryMode && requestedStorySeed
     ? applyPendingStoryLikeState([requestedStorySeed], getPendingStoryLikes())
-    : applyPendingStoryLikeState(mergeSeedStory(cachedStories(), requestedStorySeed), getPendingStoryLikes());
+    : applyPendingStoryLikeState(cachedStories(), getPendingStoryLikes());
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
@@ -861,12 +861,15 @@ export default function VideoFeedPage() {
 
   const refreshStories = useCallback(async () => {
     const data = await getStories({ focusUserId: isOwnStoryEntry ? requestedStoryUserId : '' });
-    const fresh = applyPendingStoryLikeState(mergeSeedStory(data.stories || [], requestedStorySeed), getPendingStoryLikes());
+    const baseStories = requestedSingleStoryMode
+      ? mergeSeedStory(data.stories || [], requestedStorySeed)
+      : (Array.isArray(data.stories) ? data.stories : []);
+    const fresh = applyPendingStoryLikeState(baseStories, getPendingStoryLikes());
     apiRespondedRef.current = true;
     setStories(fresh);
     persistStories(fresh);
     return fresh;
-  }, [isOwnStoryEntry, persistStories, requestedStorySeed, requestedStoryUserId]);
+  }, [isOwnStoryEntry, persistStories, requestedSingleStoryMode, requestedStorySeed, requestedStoryUserId]);
 
   useEffect(() => {
     let cancelled = false;
