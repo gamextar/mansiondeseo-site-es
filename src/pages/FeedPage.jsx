@@ -22,6 +22,7 @@ const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PREFETCH_PAGES = 6;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
+const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -135,7 +136,7 @@ export default function FeedPage({ initialData }) {
   const safariDesktop = isSafariDesktopBrowser();
   const cols = useGridColumns();
   const isDesktopViewport = cols >= 4;
-  const desktopStoryRailEnhanced = isDesktopViewport;
+  const desktopStoryRailEnhanced = false;
   const cached = initialData || getCachedFeed();
   const { user, siteSettings, bootstrapStories } = useAuth();
   const isStandaloneMobileApp = detectStandaloneMobile();
@@ -172,9 +173,6 @@ export default function FeedPage({ initialData }) {
   const storiesBounceFrameRef = useRef(null);
   const storiesEdgeOffsetRef = useRef(0);
   const pendingViewedTimerRef = useRef(null);
-  const storyNodeRefs = useRef(new Map());
-  const storyRectsRef = useRef(new Map());
-  const previousOrderedStoryIdsRef = useRef('');
   const initialStoriesAlignedRef = useRef(false);
   const [storiesEdgeOffset, setStoriesEdgeOffset] = useState(0);
   const storiesDragRef = useRef({
@@ -375,17 +373,6 @@ export default function FeedPage({ initialData }) {
       }
     };
   }, [isDesktopViewport, pageCursor]);
-
-  const setStoryNodeRef = useCallback((storyId, node) => {
-    const key = String(storyId || '');
-    if (!key) return;
-    if (node) {
-      storyNodeRefs.current.set(key, node);
-    } else {
-      storyNodeRefs.current.delete(key);
-      storyRectsRef.current.delete(key);
-    }
-  }, []);
 
   // Keep a ref of visibleCount so the scroll handler can read it without being a dep
   const visibleCountRef = useRef(0);
@@ -591,19 +578,7 @@ export default function FeedPage({ initialData }) {
   const viewedStoryUsers = useMemo(() => {
     try { return new Set(JSON.parse(viewedRaw)); } catch { return new Set(); }
   }, [viewedRaw]);
-  const orderedStoryProfiles = useMemo(() => {
-    const unseen = [];
-    const seen = [];
-    for (const profile of storyProfiles) {
-      if (!profile?.id) continue;
-      if (viewedStoryUsers.has(String(profile.id))) {
-        seen.push(profile);
-      } else {
-        unseen.push(profile);
-      }
-    }
-    return [...unseen, ...seen];
-  }, [storyProfiles, viewedStoryUsers]);
+  const orderedStoryProfiles = storyProfiles;
 
   useEffect(() => {
     if (storiesIntroConsumedRef.current) return;
@@ -638,80 +613,6 @@ export default function FeedPage({ initialData }) {
     };
   }, [orderedStoryProfiles.length, showStoriesSection]);
 
-  useLayoutEffect(() => {
-    const orderedIds = orderedStoryProfiles.map((profile) => String(profile?.id || '')).filter(Boolean).join(',');
-    previousOrderedStoryIdsRef.current = orderedIds;
-  }, [orderedStoryProfiles]);
-
-  useLayoutEffect(() => {
-    const nextRects = new Map();
-
-    for (const profile of orderedStoryProfiles) {
-      const key = String(profile?.id || '');
-      const node = storyNodeRefs.current.get(key);
-      if (!key || !node) continue;
-
-      const rect = node.getBoundingClientRect();
-      nextRects.set(key, rect);
-
-      const previousRect = storyRectsRef.current.get(key);
-      if (!previousRect) continue;
-
-      const deltaX = previousRect.left - rect.left;
-      const deltaY = previousRect.top - rect.top;
-      if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue;
-
-      node.style.willChange = 'transform, filter, opacity';
-      const animation = typeof node.animate === 'function'
-        ? node.animate(
-            [
-              {
-                transform: `translate(${deltaX}px, ${deltaY}px) scale(0.96)`,
-                filter: 'brightness(0.88)',
-                opacity: 0.9,
-              },
-              {
-                transform: 'translate(0px, 0px) scale(1)',
-                filter: 'brightness(1)',
-                opacity: 1,
-              },
-            ],
-            {
-              duration: 720,
-              easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-            }
-          )
-        : null;
-
-      if (animation) {
-        animation.onfinish = () => {
-          node.style.willChange = '';
-        };
-      } else {
-        node.style.transition = 'none';
-        node.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(0.96)`;
-        node.style.filter = 'brightness(0.88)';
-        node.style.opacity = '0.9';
-        requestAnimationFrame(() => {
-          node.style.transition = 'transform 720ms cubic-bezier(0.22, 1, 0.36, 1), filter 720ms cubic-bezier(0.22, 1, 0.36, 1), opacity 720ms cubic-bezier(0.22, 1, 0.36, 1)';
-          node.style.transform = 'translate(0px, 0px) scale(1)';
-          node.style.filter = 'brightness(1)';
-          node.style.opacity = '1';
-          const cleanup = () => {
-            node.style.transition = '';
-            node.style.transform = '';
-            node.style.filter = '';
-            node.style.opacity = '';
-            node.style.willChange = '';
-            node.removeEventListener('transitionend', cleanup);
-          };
-          node.addEventListener('transitionend', cleanup);
-        });
-      }
-    }
-
-    storyRectsRef.current = nextRects;
-  }, [orderedStoryProfiles]);
   const applyPendingViewedStories = useCallback(() => {
     try {
       if (!user?.id) return false;
@@ -752,8 +653,35 @@ export default function FeedPage({ initialData }) {
     };
   }, [schedulePendingViewedStories]);
 
+  const releaseStoriesPointerCapture = useCallback((pointerId = storiesDragRef.current.pointerId) => {
+    const el = storiesScrollRef.current;
+    const drag = storiesDragRef.current;
+    if (!el || !drag.captured || pointerId === null || pointerId === undefined) return;
+
+    try {
+      el.releasePointerCapture?.(pointerId);
+    } catch {}
+  }, []);
+
+  const resetStoriesDragState = useCallback(() => {
+    releaseStoriesPointerCapture();
+    storiesDragRef.current.active = false;
+    storiesDragRef.current.captured = false;
+    storiesDragRef.current.pointerId = null;
+    storiesDragRef.current.startX = 0;
+    storiesDragRef.current.startScrollLeft = 0;
+    storiesDragRef.current.moved = false;
+    storiesDragRef.current.lastX = 0;
+    storiesDragRef.current.lastTs = 0;
+    storiesDragRef.current.velocity = 0;
+  }, [releaseStoriesPointerCapture]);
+
   const openStoryFromHome = useCallback((storyOrUserId) => {
-    resetStoriesInteraction();
+    resetStoriesDragState();
+    const backgroundScrollY = Number(window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
+    try {
+      sessionStorage.setItem(FEED_SCROLL_KEY, String(backgroundScrollY));
+    } catch {}
     const storyUserId = typeof storyOrUserId === 'object' && storyOrUserId !== null
       ? String(storyOrUserId.user_id || storyOrUserId.id || '')
       : String(storyOrUserId || '');
@@ -773,17 +701,23 @@ export default function FeedPage({ initialData }) {
           liked: false,
         }
       : null;
-    const backgroundScrollY = Number(window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
-    navigate('/videos', {
+    const openNonce = Date.now();
+    const storyQuery = new URLSearchParams();
+    if (storyUserId) storyQuery.set('story', storyUserId);
+    storyQuery.set('open', String(openNonce));
+
+    navigate({
+      pathname: '/videos',
+      search: `?${storyQuery.toString()}`,
+    }, {
       state: {
         storyUserId,
         storySeed,
-        modal: 'videos',
-        backgroundLocation: location,
-        backgroundScrollY,
+        fromStoryRail: true,
+        fromPathname: location.pathname,
       },
     });
-  }, [location, navigate, resetStoriesInteraction]);
+  }, [location, navigate, resetStoriesDragState]);
 
   useEffect(() => {
     if (!getToken()) return;
@@ -797,11 +731,6 @@ export default function FeedPage({ initialData }) {
       return currentIds === nextIds ? current : bootstrapStoryProfiles;
     });
   }, [bootstrapStoryProfiles, user?.id]);
-
-  useEffect(() => {
-    if (location.pathname === '/') return;
-    resetStoriesInteraction();
-  }, [location.pathname, resetStoriesInteraction]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
@@ -863,23 +792,6 @@ export default function FeedPage({ initialData }) {
     }
     momentum.velocity = 0;
   }, []);
-
-  const resetStoriesInteraction = useCallback(() => {
-    const el = storiesScrollRef.current;
-    const drag = storiesDragRef.current;
-    if (el && drag.captured && drag.pointerId !== null && drag.pointerId !== undefined) {
-      try { el.releasePointerCapture?.(drag.pointerId); } catch {}
-    }
-    drag.active = false;
-    drag.captured = false;
-    drag.pointerId = null;
-    drag.moved = false;
-    drag.velocity = 0;
-    stopStoriesMomentum();
-    stopStoriesBounce();
-    storiesEdgeOffsetRef.current = 0;
-    setStoriesEdgeOffset(0);
-  }, [stopStoriesBounce, stopStoriesMomentum]);
 
   const startStoriesMomentum = useCallback(() => {
     const el = storiesScrollRef.current;
@@ -979,13 +891,10 @@ export default function FeedPage({ initialData }) {
 
   const finishStoriesDrag = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
-    const el = storiesScrollRef.current;
     const drag = storiesDragRef.current;
     if (!drag.active) return;
     drag.active = false;
-    if (el && drag.captured && event?.pointerId !== undefined) {
-      try { el.releasePointerCapture?.(event.pointerId); } catch {}
-    }
+    releaseStoriesPointerCapture(event?.pointerId ?? drag.pointerId);
     storiesMomentumRef.current.velocity = drag.moved ? drag.velocity : 0;
     if (drag.moved) {
       startStoriesMomentum();
@@ -997,7 +906,7 @@ export default function FeedPage({ initialData }) {
     }
     drag.captured = false;
     drag.pointerId = null;
-  }, [animateStoriesEdgeOffsetTo, desktopStoryRailEnhanced, startStoriesMomentum]);
+  }, [animateStoriesEdgeOffsetTo, desktopStoryRailEnhanced, releaseStoriesPointerCapture, startStoriesMomentum]);
 
   const handleStoriesClickCapture = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
@@ -1009,12 +918,18 @@ export default function FeedPage({ initialData }) {
 
   useEffect(() => {
     if (desktopStoryRailEnhanced) return;
-    resetStoriesInteraction();
-  }, [desktopStoryRailEnhanced, resetStoriesInteraction]);
+    stopStoriesMomentum();
+    stopStoriesBounce();
+    storiesEdgeOffsetRef.current = 0;
+    setStoriesEdgeOffset(0);
+    resetStoriesDragState();
+  }, [desktopStoryRailEnhanced, resetStoriesDragState, stopStoriesBounce, stopStoriesMomentum]);
 
   useEffect(() => () => {
-    resetStoriesInteraction();
-  }, [resetStoriesInteraction]);
+    resetStoriesDragState();
+    stopStoriesMomentum();
+    stopStoriesBounce();
+  }, [resetStoriesDragState, stopStoriesBounce, stopStoriesMomentum]);
 
   // ── Grid setup ────────────────────────────────────────────────────
   const gap = 12;
@@ -1246,7 +1161,6 @@ export default function FeedPage({ initialData }) {
             return safariDesktop ? (
               <div
                 key={`story-${p.id}`}
-                ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined }}
               >
@@ -1280,7 +1194,6 @@ export default function FeedPage({ initialData }) {
             ) : (
               <div
                 key={`story-${p.id}`}
-                ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: size + 6, animationDelay: storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined }}
               >

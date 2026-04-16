@@ -10,6 +10,7 @@ import { resolveMediaUrl } from '../lib/media';
 import { isSafariDesktopBrowser } from '../lib/browser';
 import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
 import { applyPendingViewedStoryUsers, clearPendingViewedStoryUsers, getViewedStoryUsers, markViewedStoryUser, queuePendingViewedStoryUser } from '../lib/storyViews';
+import { stripOverlayLocationState } from '../lib/overlayLocation';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -26,6 +27,8 @@ function timeAgo(dateStr) {
 // ── Avatar size fallback; real value comes from siteSettings.videoAvatarSize ─
 const AVATAR_SIZE_DEFAULT = 52;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
+const DESKTOP_RENDER_RADIUS = 1;
+const MOBILE_RENDER_RADIUS = 2;
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -143,6 +146,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
   const revealSentRef = useRef(false);
+  const playIconTimerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
@@ -233,6 +237,16 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     if (video) video.muted = isMuted;
   }, [isMuted]);
 
+  useEffect(() => () => {
+    if (playIconTimerRef.current) {
+      clearTimeout(playIconTimerRef.current);
+    }
+    cancelAnimationFrame(rafRef.current);
+    try {
+      videoRef.current?.pause();
+    } catch {}
+  }, []);
+
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -243,7 +257,10 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       setIsPlaying(false);
     }
     setShowPlayIcon(true);
-    setTimeout(() => setShowPlayIcon(false), 600);
+    if (playIconTimerRef.current) {
+      clearTimeout(playIconTimerRef.current);
+    }
+    playIconTimerRef.current = setTimeout(() => setShowPlayIcon(false), 600);
   };
 
   const handleVideoEnd = () => {
@@ -643,6 +660,7 @@ export default function VideoFeedPage() {
   const requestedStoryUserId = location.state?.storyUserId || null;
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
+  const isDismissibleStoryView = isOverlayPreview || !!location.state?.fromStoryRail;
   const backgroundLocation = location.state?.backgroundLocation || null;
   // When opened from a story-bar click (seed provided), skip the cache and start
   // with ONLY the seed story. This guarantees that stories.length changes 1→N
@@ -686,6 +704,10 @@ export default function VideoFeedPage() {
   }, [user?.id]);
   const closeOverlay = useCallback(() => {
     flushPendingViewedStories();
+    if (!backgroundLocation?.pathname && location.state?.fromStoryRail && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
     if (backgroundLocation?.pathname) {
       navigate(
         {
@@ -693,12 +715,12 @@ export default function VideoFeedPage() {
           search: backgroundLocation.search || '',
           hash: backgroundLocation.hash || '',
         },
-        { replace: true, state: backgroundLocation.state || null }
+        { replace: true, state: stripOverlayLocationState(backgroundLocation.state) }
       );
       return;
     }
     navigate('/', { replace: true });
-  }, [backgroundLocation, flushPendingViewedStories, navigate]);
+  }, [backgroundLocation, flushPendingViewedStories, location.state, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
     if (!isOverlayPreview || !isDesktopViewport) return;
     if (event.target.closest('[data-story-card-frame="true"]')) return;
@@ -723,6 +745,7 @@ export default function VideoFeedPage() {
     if (!uid) return;
     try {
       if (!user?.id) return;
+      if (getViewedStoryUsers(user.id).includes(uid)) return;
       queuePendingViewedStoryUser(user.id, uid);
     } catch {}
   }, [user?.id]);
@@ -1161,7 +1184,7 @@ export default function VideoFeedPage() {
   useEffect(() => {
     if (!isDesktopViewport) return undefined;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isOverlayPreview) {
+      if (e.key === 'Escape' && isDismissibleStoryView) {
         e.preventDefault();
         closeOverlay();
       } else if (e.key === 'ArrowLeft') {
@@ -1172,7 +1195,7 @@ export default function VideoFeedPage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [closeOverlay, isDesktopViewport, isOverlayPreview, moveDesktopByOne]);
+  }, [closeOverlay, isDesktopViewport, isDismissibleStoryView, moveDesktopByOne]);
 
   if (loading) {
     return (
@@ -1236,10 +1259,10 @@ export default function VideoFeedPage() {
     <div
       className={
         standaloneMobileRoute
-          ? 'relative overflow-hidden bg-black'
+          ? 'relative overflow-hidden bg-black pointer-events-auto'
           : desktopOverlayRoute
-            ? 'absolute inset-0 bg-black z-[60]'
-            : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'
+            ? 'absolute inset-0 bg-black z-[60] pointer-events-auto'
+            : 'fixed inset-0 bg-black z-[60] pointer-events-auto lg:z-40 lg:bg-mansion-base'
       }
       style={standaloneViewportShellStyle}
       onPointerDown={handleOverlayBackdropPointerDown}
@@ -1255,7 +1278,7 @@ export default function VideoFeedPage() {
         className={standaloneMobileRoute ? 'relative' : 'relative h-full'}
         style={standaloneViewportContentStyle}
       >
-        {isOverlayPreview && (
+        {isDismissibleStoryView && (
           <button
             type="button"
             onClick={closeOverlay}
@@ -1274,8 +1297,13 @@ export default function VideoFeedPage() {
               const rawDistance = Math.abs(index - activeIndex);
               const circularDistance = Math.min(rawDistance, stories.length - rawDistance);
               const isActive = index === activeIndex;
-              const shouldLoad = stories.length <= 3 || circularDistance <= 1;
+              const shouldRender = stories.length <= (DESKTOP_RENDER_RADIUS * 2 + 1) || circularDistance <= DESKTOP_RENDER_RADIUS;
+              const shouldLoad = shouldRender;
               const enableCinematicReveal = isActive && !entryRevealReady;
+
+              if (!shouldRender) {
+                return null;
+              }
 
               return (
                 <div
@@ -1327,31 +1355,35 @@ export default function VideoFeedPage() {
         >
           {infiniteStories.map((story, displayIndex) => {
             const dist = Math.abs(displayIndex - activeDispIdx);
-            const isBoundary = displayIndex <= 1 || displayIndex >= stories.length;
-            const shouldLoad = dist <= 3 || isBoundary;
+            const shouldRender = dist <= MOBILE_RENDER_RADIUS;
+            const shouldLoad = shouldRender;
             const enableCinematicReveal = displayIndex === activeDispIdx && !entryRevealReady;
             return (
               <div
                 key={displayIndex}
                 className="h-full w-full flex-shrink-0"
               >
-                <StoryCard
-                  story={story}
-                  videoSrc={story.video_url}
-                  isActive={displayIndex === activeDispIdx}
-                  shouldLoad={shouldLoad}
-                  isMuted={isMuted}
-                  avatarSize={avatarSize}
-                  onLike={handleLike}
-                  navigate={navigate}
-                  gradientHeight={gradientHeight}
-                  gradientOpacity={gradientOpacity}
-                  resetOnDeactivate
-                  onGift={openGiftModal}
-                  isOwnStory={String(story.user_id) === String(user?.id)}
-                  onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
-                  enableCinematicReveal={enableCinematicReveal}
-                />
+                {shouldRender ? (
+                  <StoryCard
+                    story={story}
+                    videoSrc={story.video_url}
+                    isActive={displayIndex === activeDispIdx}
+                    shouldLoad={shouldLoad}
+                    isMuted={isMuted}
+                    avatarSize={avatarSize}
+                    onLike={handleLike}
+                    navigate={navigate}
+                    gradientHeight={gradientHeight}
+                    gradientOpacity={gradientOpacity}
+                    resetOnDeactivate
+                    onGift={openGiftModal}
+                    isOwnStory={String(story.user_id) === String(user?.id)}
+                    onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
+                    enableCinematicReveal={enableCinematicReveal}
+                  />
+                ) : (
+                  <div className="h-full w-full bg-black" />
+                )}
               </div>
             );
           })}
