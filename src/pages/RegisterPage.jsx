@@ -464,14 +464,17 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
 
   const renderPreviewRole = (roleId) => {
     const customImg = roleImages[roleId];
-    if (customImg) {
-      return (
-        <div className="h-11 w-8 overflow-hidden rounded-lg">
-          <img src={customImg} alt="" className="h-full w-full object-cover" />
-        </div>
-      );
-    }
-    return <PersonFigure type={roleId} isActive size="sm" optimizeMotion={optimizeMotion} />;
+    const content = customImg ? (
+      <img src={customImg} alt="" className="max-h-11 w-auto max-w-full rounded-lg object-contain" />
+    ) : (
+      <PersonFigure type={roleId} isActive size="sm" optimizeMotion={optimizeMotion} />
+    );
+
+    return (
+      <div className="flex h-11 w-12 items-end justify-center">
+        {content}
+      </div>
+    );
   };
 
   if (currentStep < 1 && !role) return null;
