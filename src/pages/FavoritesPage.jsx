@@ -37,11 +37,11 @@ function FollowCard({ profile, tab }) {
     <Link
       to={`/perfiles/${profile.id}`}
       state={{ preview: buildPreview(profile) }}
-      className="group rounded-[2rem] bg-white/[0.03] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.18)] ring-1 ring-white/6 transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.045] hover:ring-white/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/10 lg:p-5"
+      className="group rounded-[2rem] border border-[#3a3127] bg-[linear-gradient(180deg,rgba(24,20,18,0.96),rgba(14,12,12,0.96))] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.18)] transition-all duration-300 hover:-translate-y-1 hover:border-[#5a4a33] hover:bg-[linear-gradient(180deg,rgba(28,24,21,0.98),rgba(16,14,14,0.98))] focus:outline-none focus-visible:border-[#6b5738] lg:p-5"
     >
       <div className="flex items-center gap-4 lg:gap-5">
         <div className="relative shrink-0">
-          <div className="h-36 w-36 overflow-hidden rounded-[1.95rem] bg-mansion-elevated shadow-[0_16px_32px_rgba(0,0,0,0.2)] ring-1 ring-black/18 lg:h-40 lg:w-40 lg:rounded-[2.2rem]">
+          <div className="h-40 w-40 overflow-hidden rounded-[2rem] bg-mansion-elevated shadow-[0_16px_32px_rgba(0,0,0,0.2)] ring-1 ring-[#2b241d] lg:h-44 lg:w-44 lg:rounded-[2.35rem]">
             {profile.avatar_url ? (
               <AvatarImg src={profile.avatar_url} crop={profile.avatar_crop} alt={profile.name} className="h-full w-full" />
             ) : (
@@ -80,7 +80,7 @@ function FollowCard({ profile, tab }) {
           )}
 
           <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.045] px-3 py-1.5 font-medium text-text-primary">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2b241d] px-3 py-1.5 font-medium text-text-primary">
               <Heart className="h-3.5 w-3.5" fill="currentColor" />
               <span className="tabular-nums">{Number(profile.followers_total || 0).toLocaleString('es-AR')}</span>
               <span className="text-text-dim">seguidores</span>
@@ -88,7 +88,7 @@ function FollowCard({ profile, tab }) {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.16em]">
-            <span className="rounded-full bg-white/[0.05] px-3 py-1.5 text-text-primary">
+            <span className="rounded-full bg-[#33291f] px-3 py-1.5 text-mansion-gold">
               {relationLabel}
             </span>
           </div>
@@ -139,10 +139,10 @@ export default function FavoritesPage() {
   return (
     <div className="min-h-screen bg-mansion-base px-3 pb-28 pt-20 lg:px-8 lg:pb-10">
       <div className="mx-auto max-w-6xl">
-        <div className="relative overflow-hidden rounded-[2.2rem] bg-[linear-gradient(180deg,rgba(18,18,24,0.96),rgba(10,10,16,0.96))] p-6 shadow-[0_26px_70px_rgba(0,0,0,0.22)] ring-1 ring-white/5 lg:p-8">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent)]" />
+        <div className="relative overflow-hidden rounded-[2.2rem] border border-[#352d25] bg-[radial-gradient(circle_at_top_left,rgba(201,168,76,0.1),transparent_28%),linear-gradient(180deg,rgba(20,18,18,0.98),rgba(10,10,12,0.98))] p-6 shadow-[0_26px_70px_rgba(0,0,0,0.22)] lg:p-8">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(201,168,76,0.06),transparent)]" />
           <div className="relative">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.045] px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-text-dim">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#2f271f] px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-mansion-gold">
               <Heart className="h-3.5 w-3.5" fill="currentColor" />
               Seguidores
             </div>
@@ -154,13 +154,13 @@ export default function FavoritesPage() {
             </p>
 
             <div className="mt-6 flex flex-wrap gap-2.5">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.045] px-3.5 py-2 text-xs text-text-dim">
-                <Heart className="h-3.5 w-3.5 text-text-primary" fill="currentColor" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2b241d] px-3.5 py-2 text-xs text-text-dim">
+                <Heart className="h-3.5 w-3.5 text-mansion-gold" fill="currentColor" />
                 <span className="tabular-nums">{followersCount.toLocaleString('es-AR')}</span>
                 seguidores
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.045] px-3.5 py-2 text-xs text-text-dim">
-                <Users className="h-3.5 w-3.5 text-text-primary" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2b241d] px-3.5 py-2 text-xs text-text-dim">
+                <Users className="h-3.5 w-3.5 text-mansion-gold" />
                 <span className="tabular-nums">{followingCount.toLocaleString('es-AR')}</span>
                 siguiendo
               </span>
@@ -176,8 +176,8 @@ export default function FavoritesPage() {
                     onClick={() => setTab(option.id)}
                     className={`rounded-full px-4 py-2 text-xs font-medium transition-all ${
                       active
-                        ? 'bg-white/[0.08] text-text-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
-                        : 'bg-white/[0.035] text-text-dim hover:bg-white/[0.06] hover:text-text-primary'
+                        ? 'bg-[#33291f] text-mansion-gold shadow-[inset_0_0_0_1px_rgba(201,168,76,0.18)]'
+                        : 'bg-[#221c17] text-text-dim hover:bg-[#2b241d] hover:text-text-primary'
                     }`}
                   >
                     {option.label}
