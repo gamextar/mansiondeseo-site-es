@@ -41,6 +41,17 @@ if (typeof window !== 'undefined' && window.location.hostname === 'www.mansionde
   window.location.replace(canonicalUrl);
 }
 
+if (typeof document !== 'undefined') {
+  // Keep the shell dark even before CSS assets finish loading.
+  document.documentElement.style.backgroundColor = '#08080E';
+  document.documentElement.style.colorScheme = 'dark';
+  if (document.body) {
+    document.body.style.backgroundColor = '#08080E';
+    document.body.style.colorScheme = 'dark';
+    document.body.style.margin = '0';
+  }
+}
+
 if (typeof window !== 'undefined') {
   const debugFlags = getBootDebugFlags();
   const isRootPath = window.location.pathname === '/' || window.location.pathname === '';
@@ -89,16 +100,3 @@ ReactDOM.createRoot(rootElement).render(
     <App />
   </React.StrictMode>,
 )
-
-if (typeof window !== 'undefined') {
-  const hideBootSplash = () => {
-    const splash = document.getElementById('boot-splash');
-    if (splash?.parentNode) {
-      splash.parentNode.removeChild(splash);
-    }
-  };
-  window.requestAnimationFrame(() => {
-    window.requestAnimationFrame(hideBootSplash);
-  });
-  window.setTimeout(hideBootSplash, 1200);
-}
