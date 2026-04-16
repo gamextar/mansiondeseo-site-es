@@ -485,6 +485,7 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
       style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
     >
       <motion.div
+        layout={optimizeMotion ? undefined : true}
         className="bg-mansion-card/90 backdrop-blur-sm rounded-2xl border border-mansion-border/40 p-3 relative overflow-hidden"
       >
         {/* Gold accent line */}
@@ -494,44 +495,57 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
         <AnimatePresence>
           {(role || seekingArr.length > 0) && (
             <motion.div
+              layout={optimizeMotion ? undefined : true}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : undefined}
-              className="flex items-end justify-center gap-2 sm:gap-3"
+              className="flex items-center justify-center gap-2 sm:gap-3"
             >
               {role && (
-                <div className="flex flex-col items-center">
-                  <div className="flex h-12 items-end justify-center">
-                    {renderPreviewRole(role)}
-                  </div>
+                <motion.div
+                  initial={{ opacity: 0, x: -20, scale: 0.5 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
+                  className="flex flex-col items-center"
+                >
+                  {renderPreviewRole(role)}
                   <span className="text-[10px] text-text-dim mt-0.5">Soy</span>
-                </div>
+                </motion.div>
               )}
 
               {role && seekingArr.length > 0 && (
-                <div className="flex flex-col items-center">
-                  <div className="flex h-12 w-12 items-end justify-center">
-                    <Heart className="mb-1 w-3.5 h-3.5 text-mansion-crimson fill-mansion-crimson" />
-                  </div>
-                  <span className="mt-0.5 text-[10px] invisible select-none">Busco</span>
-                </div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={optimizeMotion ? { duration: 0.18, delay: 0.04, ease: 'easeOut' } : { type: 'spring', delay: 0.1 }}
+                >
+                  <Heart className="w-3.5 h-3.5 text-mansion-crimson fill-mansion-crimson" />
+                </motion.div>
               )}
 
               {seekingArr.length > 0 && (
-                <div className="flex flex-col items-center">
-                  <div className="flex h-12 items-end">
-                    <div className="max-w-[240px] overflow-x-hidden overflow-y-hidden overscroll-x-contain scrollbar-hide [-webkit-overflow-scrolling:touch]">
-                      <div className="inline-flex min-w-max items-end justify-start gap-0.5 px-1">
-                        {seekingArr.map((s) => (
-                          <div key={s} className="flex h-11 items-end">
-                            {renderPreviewRole(s)}
-                          </div>
-                        ))}
-                      </div>
+                <motion.div
+                  initial={{ opacity: 0, x: 20, scale: 0.5 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
+                  className="flex flex-col items-center"
+                >
+                  <div className="max-w-[240px] overflow-x-auto overflow-y-hidden overscroll-x-contain scrollbar-hide [-webkit-overflow-scrolling:touch]">
+                    <div className="inline-flex min-w-max items-end justify-start gap-0.5 px-1 pb-1">
+                    {seekingArr.map((s, i) => (
+                      <motion.div
+                        key={s}
+                      initial={{ opacity: 0, scale: 0 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={optimizeMotion ? { duration: 0.18, delay: i * 0.04, ease: 'easeOut' } : { delay: i * 0.1 }}
+                    >
+                        {renderPreviewRole(s)}
+                      </motion.div>
+                    ))}
                     </div>
                   </div>
                   <span className="text-[10px] text-text-dim mt-0.5">Busco</span>
-                </div>
+                </motion.div>
               )}
             </motion.div>
           )}
