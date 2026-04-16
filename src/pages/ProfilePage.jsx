@@ -463,7 +463,7 @@ export default function ProfilePage() {
         initial="initial"
         animate="animate"
         variants={stagger}
-        className="px-4 lg:px-8 pt-4 lg:pt-6 max-w-2xl lg:mx-auto"
+        className="px-3 lg:px-8 pt-4 lg:pt-6 max-w-2xl lg:mx-auto"
       >
         {/* ── Hero Section ── */}
         <motion.div variants={fadeUp} className="mb-4">

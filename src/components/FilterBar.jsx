@@ -23,7 +23,7 @@ export default function FilterBar({ activeFilter, onFilterChange }) {
 
       <div
         ref={scrollRef}
-        className="flex gap-2 overflow-x-auto scrollbar-hide px-4 lg:px-8 py-3"
+        className="flex gap-2 overflow-x-auto scrollbar-hide px-3 lg:px-8 py-3"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {FILTERS.map((filter) => {
