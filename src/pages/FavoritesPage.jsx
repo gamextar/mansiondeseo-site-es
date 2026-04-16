@@ -40,74 +40,67 @@ function FollowCard({ profile, tab }) {
     <Link
       to={`/perfiles/${profile.id}`}
       state={{ preview: buildPreview(profile) }}
-      className="group relative overflow-hidden rounded-[2rem] bg-[linear-gradient(160deg,rgba(24,20,29,0.96),rgba(12,12,18,0.92))] p-4 shadow-[0_24px_50px_rgba(0,0,0,0.22)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_30px_70px_rgba(0,0,0,0.28)] lg:p-5"
+      className="group rounded-[2rem] bg-white/[0.03] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.18)] ring-1 ring-white/6 transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.045] hover:ring-white/10 lg:p-5"
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(201,168,76,0.16),transparent_70%)]" />
-      <div className="pointer-events-none absolute -right-10 top-4 h-28 w-28 rounded-full bg-mansion-gold/10 blur-3xl" />
-      <div className="pointer-events-none absolute -left-8 bottom-2 h-24 w-24 rounded-full bg-mansion-crimson/10 blur-3xl" />
-
-      <div className="relative flex items-center gap-4 lg:gap-5">
+      <div className="flex items-center gap-4 lg:gap-5">
         <div className="relative shrink-0">
-          <div className="h-24 w-24 overflow-hidden rounded-[1.6rem] bg-mansion-elevated shadow-[0_16px_36px_rgba(0,0,0,0.22)] ring-1 ring-white/8 lg:h-28 lg:w-28 lg:rounded-[1.8rem]">
+          <div className="h-28 w-28 overflow-hidden rounded-[1.75rem] bg-mansion-elevated shadow-[0_16px_32px_rgba(0,0,0,0.2)] ring-1 ring-white/8 lg:h-32 lg:w-32 lg:rounded-[2rem]">
             {profile.avatar_url ? (
               <AvatarImg src={profile.avatar_url} crop={profile.avatar_crop} alt={profile.name} className="h-full w-full" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-text-dim">
-                <Users className="h-7 w-7" />
+                <Users className="h-8 w-8" />
               </div>
             )}
           </div>
           {profile.online && (
-            <span className="absolute -bottom-1 -right-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-emerald-400 px-1.5 text-[9px] font-bold text-black shadow-[0_0_20px_rgba(74,222,128,0.35)]">
-              ON
-            </span>
+            <span className="absolute bottom-2 right-2 inline-flex h-3.5 w-3.5 rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(74,222,128,0.45)]" />
           )}
         </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex items-center gap-2.5">
-                <h3 className="truncate font-display text-[1.15rem] font-semibold text-text-primary transition-colors group-hover:text-mansion-gold lg:text-[1.28rem]">
+              <div className="flex items-center gap-2">
+                <h3 className="truncate text-[1.05rem] font-semibold text-text-primary transition-colors group-hover:text-white lg:text-[1.15rem]">
                   {profile.name}
                 </h3>
-                <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs tabular-nums text-text-dim">
-                  {profile.age}
-                </span>
+                <span className="text-sm tabular-nums text-text-dim">{profile.age}</span>
               </div>
-              <p className="mt-1 text-[11px] uppercase tracking-[0.24em] text-text-dim/85">{profile.role}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {profile.verified && <Shield className="h-4 w-4 text-emerald-400" />}
-              {profile.premium && <Crown className="h-4 w-4 text-mansion-gold" />}
+              <div className="mt-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-text-dim/75">
+                <span>{profile.role}</span>
+                {profile.verified && <Shield className="h-3.5 w-3.5 text-emerald-400" />}
+                {profile.premium && <Crown className="h-3.5 w-3.5 text-mansion-gold" />}
+              </div>
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2.5 text-xs">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-mansion-crimson/12 px-3 py-1.5 font-medium text-mansion-crimson">
+          {location && (
+            <div className="mt-3 inline-flex items-center gap-1.5 text-sm text-text-dim/85">
+              <MapPin className="h-4 w-4" />
+              <span className="truncate">{location}</span>
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.045] px-3 py-1.5 font-medium text-text-primary">
               <Heart className="h-3.5 w-3.5" fill="currentColor" />
               <span className="tabular-nums">{Number(profile.followers_total || 0).toLocaleString('es-AR')}</span>
-              <span className="text-mansion-crimson/80">seguidores</span>
+              <span className="text-text-dim">seguidores</span>
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-mansion-gold/12 px-3 py-1.5 font-medium text-mansion-gold">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.045] px-3 py-1.5 font-medium text-text-primary">
               <Eye className="h-3.5 w-3.5" />
               <span className="tabular-nums">{Number(profile.visits_total || 0).toLocaleString('es-AR')}</span>
-              <span className="text-mansion-gold/75">visitas</span>
+              <span className="text-text-dim">visitas</span>
             </span>
-            {location && (
-              <span className="inline-flex items-center gap-1.5 text-text-dim/90">
-                <MapPin className="h-3.5 w-3.5" />
-                {location}
-              </span>
-            )}
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.2em]">
-            <span className="rounded-full bg-white/[0.04] px-3 py-1.5 text-text-dim">
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.16em]">
+            <span className="rounded-full bg-white/[0.05] px-3 py-1.5 text-text-primary">
               {relationLabel}
             </span>
             {connectedDate && (
-              <span className="text-text-dim/70">desde {connectedDate}</span>
+              <span className="text-text-dim/65">desde {connectedDate}</span>
             )}
           </div>
         </div>
@@ -157,12 +150,10 @@ export default function FavoritesPage() {
   return (
     <div className="min-h-screen bg-mansion-base px-3 pb-28 pt-20 lg:px-8 lg:pb-10">
       <div className="mx-auto max-w-6xl">
-        <div className="relative overflow-hidden rounded-[2.2rem] bg-[radial-gradient(circle_at_top_left,rgba(201,168,76,0.18),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(139,21,56,0.22),transparent_28%),linear-gradient(180deg,rgba(26,20,30,0.96),rgba(10,10,16,0.96))] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.28)] lg:p-8">
-          <div className="pointer-events-none absolute -right-16 top-0 h-40 w-40 rounded-full bg-mansion-gold/10 blur-3xl" />
-          <div className="pointer-events-none absolute -left-10 bottom-0 h-36 w-36 rounded-full bg-mansion-crimson/10 blur-3xl" />
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.03),transparent_28%,transparent_72%,rgba(255,255,255,0.02))]" />
+        <div className="relative overflow-hidden rounded-[2.2rem] bg-[linear-gradient(180deg,rgba(18,18,24,0.96),rgba(10,10,16,0.96))] p-6 shadow-[0_26px_70px_rgba(0,0,0,0.22)] ring-1 ring-white/5 lg:p-8">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent)]" />
           <div className="relative">
-            <div className="inline-flex items-center gap-2 rounded-full bg-mansion-crimson/12 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-mansion-crimson">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.045] px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-text-dim">
               <Heart className="h-3.5 w-3.5" fill="currentColor" />
               Seguidores
             </div>
@@ -174,13 +165,13 @@ export default function FavoritesPage() {
             </p>
 
             <div className="mt-6 flex flex-wrap gap-2.5">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-black/20 px-3.5 py-2 text-xs text-text-dim">
-                <Heart className="h-3.5 w-3.5 text-mansion-crimson" fill="currentColor" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.045] px-3.5 py-2 text-xs text-text-dim">
+                <Heart className="h-3.5 w-3.5 text-text-primary" fill="currentColor" />
                 <span className="tabular-nums">{followersCount.toLocaleString('es-AR')}</span>
                 seguidores
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-black/20 px-3.5 py-2 text-xs text-text-dim">
-                <Users className="h-3.5 w-3.5 text-mansion-gold" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.045] px-3.5 py-2 text-xs text-text-dim">
+                <Users className="h-3.5 w-3.5 text-text-primary" />
                 <span className="tabular-nums">{followingCount.toLocaleString('es-AR')}</span>
                 siguiendo
               </span>
@@ -196,8 +187,8 @@ export default function FavoritesPage() {
                     onClick={() => setTab(option.id)}
                     className={`rounded-full px-4 py-2 text-xs font-medium transition-all ${
                       active
-                        ? 'bg-mansion-gold/14 text-mansion-gold shadow-[inset_0_0_0_1px_rgba(201,168,76,0.22)]'
-                        : 'bg-black/20 text-text-dim hover:bg-white/[0.04] hover:text-text-primary'
+                        ? 'bg-white/[0.08] text-text-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
+                        : 'bg-white/[0.035] text-text-dim hover:bg-white/[0.06] hover:text-text-primary'
                     }`}
                   >
                     {option.label}
