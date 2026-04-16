@@ -727,7 +727,7 @@ export default function ProfileDetailPage({ initialData }) {
           animate: { opacity: 1, y: 0 },
           transition: { delay: 0.15, duration: 0.5, ease: [.25,.46,.45,.94] },
         }}
-        className="relative -mt-20 px-4 z-10 lg:mt-0 lg:px-0 lg:flex-1"
+        className="relative -mt-20 px-4 z-10 min-w-0 lg:mt-0 lg:px-0 lg:flex-1"
       >
         <div className="glass-elevated rounded-[2rem] p-6 shadow-elevated">
           {/* Name row */}
@@ -823,7 +823,7 @@ export default function ProfileDetailPage({ initialData }) {
             className="mb-6"
           >
             <h3 className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2.5">Sobre {name.split(' ')[0]}</h3>
-            <p className="text-base leading-relaxed text-text-primary">
+            <p className="text-base leading-relaxed text-text-primary break-words [overflow-wrap:anywhere]">
               {bio}
             </p>
           </MotionDiv>
