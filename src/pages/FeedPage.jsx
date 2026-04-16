@@ -1,5 +1,5 @@
 import { forwardRef, useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef, useSyncExternalStore } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Home, Plus, Radio } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
@@ -160,7 +160,6 @@ export default function FeedPage({ initialData }) {
   const [storiesIntroEnabled, setStoriesIntroEnabled] = useState(true);
   const storiesIntroConsumedRef = useRef(false);
   const navigate = useNavigate();
-  const location = useLocation();
   const navBottomOffset = getBottomNavHeight(isStandaloneMobileApp) + getBottomNavBottomPadding(isStandaloneMobileApp);
   const gridRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);
@@ -764,18 +763,14 @@ export default function FeedPage({ initialData }) {
           liked: false,
         }
       : null;
-    const backgroundScrollY = Number(window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
     navigate('/videos', {
       state: {
         storyUserId,
         storySeed,
         singleStoryMode,
-        modal: 'videos',
-        backgroundLocation: location,
-        backgroundScrollY,
       },
     });
-  }, [location, navigate]);
+  }, [navigate]);
 
   useEffect(() => {
     if (!getToken()) return;
