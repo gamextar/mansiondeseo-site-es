@@ -500,59 +500,38 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
               className="flex items-end justify-center gap-2 sm:gap-3"
             >
               {role && (
-                <motion.div
-                  initial={{ opacity: 0, x: -20, y: 2 }}
-                  animate={{ opacity: 1, x: 0, y: 0 }}
-                  transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
-                  className="flex flex-col items-center"
-                >
+                <div className="flex flex-col items-center">
                   <div className="flex h-12 items-end justify-center">
                     {renderPreviewRole(role)}
                   </div>
                   <span className="text-[10px] text-text-dim mt-0.5">Soy</span>
-                </motion.div>
+                </div>
               )}
 
               {role && seekingArr.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 2 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={optimizeMotion ? { duration: 0.18, delay: 0.04, ease: 'easeOut' } : { type: 'spring', delay: 0.1 }}
-                  className="flex flex-col items-center"
-                >
+                <div className="flex flex-col items-center">
                   <div className="flex h-12 w-12 items-end justify-center">
                     <Heart className="mb-1 w-3.5 h-3.5 text-mansion-crimson fill-mansion-crimson" />
                   </div>
                   <span className="mt-0.5 text-[10px] invisible select-none">Busco</span>
-                </motion.div>
+                </div>
               )}
 
               {seekingArr.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, x: 20, y: 2 }}
-                  animate={{ opacity: 1, x: 0, y: 0 }}
-                  transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
-                  className="flex flex-col items-center"
-                >
+                <div className="flex flex-col items-center">
                   <div className="flex h-12 items-end">
                     <div className="max-w-[240px] overflow-x-hidden overflow-y-hidden overscroll-x-contain scrollbar-hide [-webkit-overflow-scrolling:touch]">
                       <div className="inline-flex min-w-max items-end justify-start gap-0.5 px-1">
-                        {seekingArr.map((s, i) => (
-                          <motion.div
-                            key={s}
-                            initial={{ opacity: 0, y: 2 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={optimizeMotion ? { duration: 0.18, delay: i * 0.04, ease: 'easeOut' } : { delay: i * 0.1 }}
-                            className="flex h-11 items-end"
-                          >
+                        {seekingArr.map((s) => (
+                          <div key={s} className="flex h-11 items-end">
                             {renderPreviewRole(s)}
-                          </motion.div>
+                          </div>
                         ))}
                       </div>
                     </div>
                   </div>
                   <span className="text-[10px] text-text-dim mt-0.5">Busco</span>
-                </motion.div>
+                </div>
               )}
             </motion.div>
           )}
