@@ -176,22 +176,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
   }, [activeSrc, isActive]);
 
-  const releaseVideoResources = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    try {
-      video.pause();
-    } catch {}
-
-    try {
-      video.removeAttribute('src');
-      video.load();
-    } catch {}
-
-    loadedSrcRef.current = undefined;
-  }, []);
-
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -258,8 +242,10 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       clearTimeout(playIconTimerRef.current);
     }
     cancelAnimationFrame(rafRef.current);
-    releaseVideoResources();
-  }, [releaseVideoResources]);
+    try {
+      videoRef.current?.pause();
+    } catch {}
+  }, []);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -674,6 +660,7 @@ export default function VideoFeedPage() {
   const requestedStoryUserId = location.state?.storyUserId || null;
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
+  const isDismissibleStoryView = isOverlayPreview || !!location.state?.fromStoryRail;
   const backgroundLocation = location.state?.backgroundLocation || null;
   // When opened from a story-bar click (seed provided), skip the cache and start
   // with ONLY the seed story. This guarantees that stories.length changes 1→N
@@ -717,6 +704,10 @@ export default function VideoFeedPage() {
   }, [user?.id]);
   const closeOverlay = useCallback(() => {
     flushPendingViewedStories();
+    if (!backgroundLocation?.pathname && location.state?.fromStoryRail && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
     if (backgroundLocation?.pathname) {
       navigate(
         {
@@ -729,7 +720,7 @@ export default function VideoFeedPage() {
       return;
     }
     navigate('/', { replace: true });
-  }, [backgroundLocation, flushPendingViewedStories, navigate]);
+  }, [backgroundLocation, flushPendingViewedStories, location.state, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
     if (!isOverlayPreview || !isDesktopViewport) return;
     if (event.target.closest('[data-story-card-frame="true"]')) return;
@@ -1193,7 +1184,7 @@ export default function VideoFeedPage() {
   useEffect(() => {
     if (!isDesktopViewport) return undefined;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isOverlayPreview) {
+      if (e.key === 'Escape' && isDismissibleStoryView) {
         e.preventDefault();
         closeOverlay();
       } else if (e.key === 'ArrowLeft') {
@@ -1204,7 +1195,7 @@ export default function VideoFeedPage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [closeOverlay, isDesktopViewport, isOverlayPreview, moveDesktopByOne]);
+  }, [closeOverlay, isDesktopViewport, isDismissibleStoryView, moveDesktopByOne]);
 
   if (loading) {
     return (
@@ -1271,7 +1262,7 @@ export default function VideoFeedPage() {
           ? 'relative overflow-hidden bg-black pointer-events-auto'
           : desktopOverlayRoute
             ? 'absolute inset-0 bg-black z-[60] pointer-events-auto'
-            : 'fixed inset-0 bg-black z-[60] pointer-events-auto lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'
+            : 'fixed inset-0 bg-black z-[60] pointer-events-auto lg:z-40 lg:bg-mansion-base'
       }
       style={standaloneViewportShellStyle}
       onPointerDown={handleOverlayBackdropPointerDown}
@@ -1287,7 +1278,7 @@ export default function VideoFeedPage() {
         className={standaloneMobileRoute ? 'relative' : 'relative h-full'}
         style={standaloneViewportContentStyle}
       >
-        {isOverlayPreview && (
+        {isDismissibleStoryView && (
           <button
             type="button"
             onClick={closeOverlay}

@@ -43,7 +43,8 @@ const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
-const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
+const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/videos', '/black-test'];
+const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -139,6 +140,14 @@ function AppLayout() {
     if (routeOverlayOpen) return; // overlay handles its own scroll
     if (location.state?.backgroundLocation) return; // closing overlay — App handles it
     if (prev === location.pathname) return; // same route, no reset
+    if (prev === '/videos' && location.pathname === '/') {
+      try {
+        const saved = Number(sessionStorage.getItem(FEED_SCROLL_KEY) || '0') || 0;
+        sessionStorage.removeItem(FEED_SCROLL_KEY);
+        window.scrollTo(0, saved);
+        return;
+      } catch {}
+    }
     window.scrollTo(0, 0);
   }, [location.pathname, location.state, routeOverlayOpen]);
 
@@ -387,27 +396,14 @@ function AppLayout() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className="fixed inset-0 z-[130] pointer-events-none"
+              transition={{ duration: 0.08, ease: 'linear' }}
+              className="fixed inset-0 z-[130]"
             >
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-                className="absolute inset-0 bg-black/72 backdrop-blur-[4px] pointer-events-none"
-              />
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute inset-0 pointer-events-none"
-              >
+              <div className="absolute inset-0">
                 <Routes>
                   <Route path="/videos" element={<VideoFeedPage />} />
                 </Routes>
-              </motion.div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
