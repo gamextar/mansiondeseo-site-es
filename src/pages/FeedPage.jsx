@@ -1018,7 +1018,7 @@ export default function FeedPage({ initialData }) {
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="text-text-muted text-sm lg:text-base font-medium">Video Flashes</p>
         </div>
-        <div className="px-[17px] lg:px-0">
+        <div className="px-[15px] lg:px-0">
           <AnimatedBlock
             ref={storiesScrollRef}
             className={`flex overflow-x-auto scrollbar-hide pb-2 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
