@@ -37,11 +37,11 @@ function FollowCard({ profile, tab }) {
     <Link
       to={`/perfiles/${profile.id}`}
       state={{ preview: buildPreview(profile) }}
-      className="group rounded-[2rem] bg-white/[0.03] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.18)] ring-1 ring-white/6 transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.045] hover:ring-white/10 lg:p-5"
+      className="group rounded-[2rem] bg-white/[0.03] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.18)] ring-1 ring-white/6 transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.045] hover:ring-white/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/10 lg:p-5"
     >
       <div className="flex items-center gap-4 lg:gap-5">
         <div className="relative shrink-0">
-          <div className="h-32 w-32 overflow-hidden rounded-[1.85rem] bg-mansion-elevated shadow-[0_16px_32px_rgba(0,0,0,0.2)] ring-1 ring-white/8 lg:h-36 lg:w-36 lg:rounded-[2.1rem]">
+          <div className="h-36 w-36 overflow-hidden rounded-[1.95rem] bg-mansion-elevated shadow-[0_16px_32px_rgba(0,0,0,0.2)] ring-1 ring-black/18 lg:h-40 lg:w-40 lg:rounded-[2.2rem]">
             {profile.avatar_url ? (
               <AvatarImg src={profile.avatar_url} crop={profile.avatar_crop} alt={profile.name} className="h-full w-full" />
             ) : (
@@ -111,7 +111,7 @@ export default function FavoritesPage() {
     setLoading(true);
     setError('');
 
-    getFavorites(tab, 200)
+    getFavorites(tab, 50)
       .then((data) => {
         if (cancelled) return;
         setProfiles(data?.profiles || []);
