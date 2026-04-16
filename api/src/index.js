@@ -199,6 +199,9 @@ function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets,
 
   if (roleBuckets.length <= 1) {
     scoredProfiles.sort((a, b) => {
+      const aFake = Number(a.fake ? 1 : 0);
+      const bFake = Number(b.fake ? 1 : 0);
+      if (aFake !== bFake) return aFake - bFake;
       if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
       return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
     });
@@ -214,6 +217,9 @@ function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets,
   for (const bucket of roleBuckets) {
     const list = bucketMap.get(bucket.key) || [];
     list.sort((a, b) => {
+      const aFake = Number(a.fake ? 1 : 0);
+      const bFake = Number(b.fake ? 1 : 0);
+      if (aFake !== bFake) return aFake - bFake;
       if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
       return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
     });
@@ -1883,7 +1889,7 @@ async function handleAppBootstrap(request, env) {
     }
     storiesQuery += `
         AND s.user_id != ?
-      ORDER BY s.created_at DESC
+      ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC
       LIMIT ?
     `;
     storyBindings.push(auth.sub, storyLimit);
@@ -4753,7 +4759,7 @@ async function handleGetStories(request, env) {
   }
   query += `
       AND (s.user_id != ? OR ? = '')
-    ORDER BY s.created_at DESC
+    ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC
     LIMIT ? OFFSET ?
   `;
   bindings.push(viewerId || '', viewerId || '', limit, offset);
