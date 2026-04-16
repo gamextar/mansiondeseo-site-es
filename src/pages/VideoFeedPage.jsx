@@ -716,6 +716,10 @@ export default function VideoFeedPage() {
     }
     navigate('/', { replace: true });
   }, [backgroundLocation, flushPendingViewedStories, isOverlayPreview, navigate]);
+  const closeToHomeFeed = useCallback(() => {
+    flushPendingViewedStories();
+    navigate('/', { replace: true });
+  }, [flushPendingViewedStories, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
     if (!isOverlayPreview || !isDesktopViewport) return;
     if (event.target.closest('[data-story-card-frame="true"]')) return;
@@ -1268,17 +1272,27 @@ export default function VideoFeedPage() {
         className={standaloneMobileRoute ? 'relative' : 'relative h-full'}
         style={standaloneViewportContentStyle}
       >
-        {isOverlayPreview && (
+        <div
+          className="absolute z-30 flex flex-col items-center gap-2"
+          style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
+        >
           <button
             type="button"
-            onClick={closeOverlay}
-            className="absolute z-30 flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
-            style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
+            onClick={closeToHomeFeed}
+            className="flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
             aria-label="Cerrar"
           >
             <X className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
           </button>
-        )}
+          <button
+            type="button"
+            onClick={() => setIsMuted((m) => !m)}
+            className="flex h-11 w-11 lg:h-12 lg:w-12 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+            aria-label={isMuted ? 'Activar sonido' : 'Silenciar'}
+          >
+            {isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+          </button>
+        </div>
         {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">
