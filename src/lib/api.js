@@ -1222,7 +1222,13 @@ export async function adminBulkDeleteUsers(userIds) {
 export async function getStories({ page = 1, limit = 50, focusUserId = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (focusUserId) params.set('focus_user_id', focusUserId);
-  return sharedGet(`stories:${page}:${limit}:${focusUserId || ''}`, () => apiFetch(`/stories?${params}`), { ttlMs: 2 * 60_000 });
+  const path = `/stories?${params}`;
+  if (focusUserId) {
+    // Reopening the same story reuses the same focus_user_id.
+    // Bypass shared cache/promise reuse on this path to avoid stale modal state.
+    return apiFetch(path);
+  }
+  return sharedGet(`stories:${page}:${limit}:`, () => apiFetch(path), { ttlMs: 2 * 60_000 });
 }
 
 export function invalidateStoriesCache() {
