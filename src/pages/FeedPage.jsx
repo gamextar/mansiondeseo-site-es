@@ -1018,31 +1018,32 @@ export default function FeedPage({ initialData }) {
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="text-text-muted text-sm lg:text-base font-medium">Video Flashes</p>
         </div>
-        <AnimatedBlock
-          ref={storiesScrollRef}
-          className={`flex overflow-x-auto scrollbar-hide pb-2 pl-[21px] pr-[21px] lg:pl-0 lg:pr-0 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
-          style={{
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-            gap: `${storyCircleGap}px`,
-            touchAction: 'pan-x',
-            transform: desktopStoryRailEnhanced ? `translate3d(${storiesEdgeOffset}px, 0, 0)` : 'translate3d(0px, 0, 0)',
-            transition: desktopStoryRailEnhanced && storiesDragRef.current.active ? 'none' : 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
-          }}
-          motionProps={{
-            variants: stagger,
-            initial: 'hidden',
-            animate: 'visible',
-          }}
-          onWheel={handleStoriesWheel}
-          onDragStart={handleStoriesNativeDragStart}
-          onPointerDownCapture={handleStoriesPointerDown}
-          onPointerMove={handleStoriesPointerMove}
-          onPointerUp={finishStoriesDrag}
-          onPointerCancel={finishStoriesDrag}
-          onPointerLeave={finishStoriesDrag}
-          onClickCapture={handleStoriesClickCapture}
-        >
+        <div className="px-[21px] lg:px-0">
+          <AnimatedBlock
+            ref={storiesScrollRef}
+            className={`flex overflow-x-auto scrollbar-hide pb-2 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
+            style={{
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              gap: `${storyCircleGap}px`,
+              touchAction: 'pan-x',
+              transform: desktopStoryRailEnhanced ? `translate3d(${storiesEdgeOffset}px, 0, 0)` : 'translate3d(0px, 0, 0)',
+              transition: desktopStoryRailEnhanced && storiesDragRef.current.active ? 'none' : 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
+            motionProps={{
+              variants: stagger,
+              initial: 'hidden',
+              animate: 'visible',
+            }}
+            onWheel={handleStoriesWheel}
+            onDragStart={handleStoriesNativeDragStart}
+            onPointerDownCapture={handleStoriesPointerDown}
+            onPointerMove={handleStoriesPointerMove}
+            onPointerUp={finishStoriesDrag}
+            onPointerCancel={finishStoriesDrag}
+            onPointerLeave={finishStoriesDrag}
+            onClickCapture={handleStoriesClickCapture}
+          >
           {/* User's own story circle */}
           {user && (
             safariDesktop ? (
@@ -1286,7 +1287,8 @@ export default function FeedPage({ initialData }) {
               </div>
             );
           })}
-        </AnimatedBlock>
+          </AnimatedBlock>
+        </div>
       </div>
       )}
 
