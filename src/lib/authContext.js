@@ -5,7 +5,6 @@ export const AuthContext = createContext({
   user: null,
   siteSettings: {},
   bootstrapStories: [],
-  bootstrapResolved: false,
   setRegistered: () => {},
   setUser: () => {},
   setSiteSettings: () => {},
