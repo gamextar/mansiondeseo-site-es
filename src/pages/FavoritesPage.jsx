@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Crown, Eye, Heart, MapPin, Shield, Users } from 'lucide-react';
+import { Crown, Heart, MapPin, Shield, Users } from 'lucide-react';
 import { getFavorites } from '../lib/api';
 import { formatLocation } from '../lib/location';
 import AvatarImg from '../components/AvatarImg';
@@ -29,9 +29,6 @@ function buildPreview(profile) {
 
 function FollowCard({ profile, tab }) {
   const location = formatLocation(profile);
-  const connectedDate = profile.connected_at
-    ? new Date(`${profile.connected_at}Z`).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
-    : '';
   const relationLabel = tab === 'followers'
     ? (profile.mutual_follow ? 'Lo sigues también' : 'Te sigue')
     : (profile.mutual_follow ? 'También te sigue' : 'Lo sigues');
@@ -44,7 +41,7 @@ function FollowCard({ profile, tab }) {
     >
       <div className="flex items-center gap-4 lg:gap-5">
         <div className="relative shrink-0">
-          <div className="h-28 w-28 overflow-hidden rounded-[1.75rem] bg-mansion-elevated shadow-[0_16px_32px_rgba(0,0,0,0.2)] ring-1 ring-white/8 lg:h-32 lg:w-32 lg:rounded-[2rem]">
+          <div className="h-32 w-32 overflow-hidden rounded-[1.85rem] bg-mansion-elevated shadow-[0_16px_32px_rgba(0,0,0,0.2)] ring-1 ring-white/8 lg:h-36 lg:w-36 lg:rounded-[2.1rem]">
             {profile.avatar_url ? (
               <AvatarImg src={profile.avatar_url} crop={profile.avatar_crop} alt={profile.name} className="h-full w-full" />
             ) : (
@@ -88,20 +85,12 @@ function FollowCard({ profile, tab }) {
               <span className="tabular-nums">{Number(profile.followers_total || 0).toLocaleString('es-AR')}</span>
               <span className="text-text-dim">seguidores</span>
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.045] px-3 py-1.5 font-medium text-text-primary">
-              <Eye className="h-3.5 w-3.5" />
-              <span className="tabular-nums">{Number(profile.visits_total || 0).toLocaleString('es-AR')}</span>
-              <span className="text-text-dim">visitas</span>
-            </span>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.16em]">
             <span className="rounded-full bg-white/[0.05] px-3 py-1.5 text-text-primary">
               {relationLabel}
             </span>
-            {connectedDate && (
-              <span className="text-text-dim/65">desde {connectedDate}</span>
-            )}
           </div>
         </div>
       </div>
