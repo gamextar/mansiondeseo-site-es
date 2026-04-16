@@ -659,6 +659,9 @@ export default function VideoFeedPage() {
   };
   const requestedStoryUserId = location.state?.storyUserId || null;
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
+  const fromPathname = typeof location.state?.fromPathname === 'string' && location.state.fromPathname
+    ? location.state.fromPathname
+    : '/';
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
   const isDismissibleStoryView = isOverlayPreview || !!location.state?.fromStoryRail;
   const backgroundLocation = location.state?.backgroundLocation || null;
@@ -704,8 +707,8 @@ export default function VideoFeedPage() {
   }, [user?.id]);
   const closeOverlay = useCallback(() => {
     flushPendingViewedStories();
-    if (!backgroundLocation?.pathname && location.state?.fromStoryRail && window.history.length > 1) {
-      navigate(-1);
+    if (!backgroundLocation?.pathname && location.state?.fromStoryRail) {
+      navigate(fromPathname, { replace: true });
       return;
     }
     if (backgroundLocation?.pathname) {
@@ -720,7 +723,7 @@ export default function VideoFeedPage() {
       return;
     }
     navigate('/', { replace: true });
-  }, [backgroundLocation, flushPendingViewedStories, location.state, navigate]);
+  }, [backgroundLocation, flushPendingViewedStories, fromPathname, location.state, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
     if (!isOverlayPreview || !isDesktopViewport) return;
     if (event.target.closest('[data-story-card-frame="true"]')) return;
