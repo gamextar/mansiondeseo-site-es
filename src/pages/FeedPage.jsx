@@ -7,7 +7,7 @@ import { useAuth } from '../lib/authContext';
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } };
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
-import { getProfiles, getStories, getToken } from '../lib/api';
+import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
@@ -110,8 +110,6 @@ export default function FeedPage({ initialData }) {
   const { user, siteSettings } = useAuth();
   const isStandaloneMobileApp = detectStandaloneMobile();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
-  const [homeStories, setHomeStories] = useState([]);
-  const [homeStoriesResolved, setHomeStoriesResolved] = useState(false);
   const [showStoriesSection, setShowStoriesSection] = useState(true);
   const [showGridSection, setShowGridSection] = useState(true);
   const [viewerPremium, setViewerPremium] = useState(cached?.viewerPremium || false);
@@ -135,7 +133,6 @@ export default function FeedPage({ initialData }) {
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
   const prefetchedBlocksRef = useRef(new Map());
   const prefetchInFlightRef = useRef(new Map());
-  const storiesLoadIdRef = useRef(0);
   const storiesScrollRef = useRef(null);
   const storiesMomentumRef = useRef({
     frameId: null,
@@ -432,16 +429,8 @@ export default function FeedPage({ initialData }) {
     return Array.from({ length: end - adjustedStart + 1 }, (_, idx) => adjustedStart + idx);
   }, [currentPage, totalPages]);
   const storyLimit = getInitialStoryLimit(safeSettings, isDesktopViewport);
-  const fallbackStoryProfiles = useMemo(
-    () => safeProfiles.filter((p) => p.has_active_story).slice(0, storyLimit),
-    [safeProfiles, storyLimit]
-  );
-  const storyProfiles = useMemo(() => {
-    if (getToken()) {
-      return homeStoriesResolved ? homeStories : [];
-    }
-    return fallbackStoryProfiles;
-  }, [fallbackStoryProfiles, homeStories, homeStoriesResolved]);
+  const fallbackStoryProfiles = safeProfiles.filter(p => p.has_active_story).slice(0, storyLimit);
+  const storyProfiles = fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100));
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
@@ -772,45 +761,6 @@ export default function FeedPage({ initialData }) {
       },
     });
   }, [location, navigate]);
-
-  useEffect(() => {
-    if (!getToken()) return;
-    const requestId = ++storiesLoadIdRef.current;
-    setHomeStoriesResolved(false);
-    getStories({ limit: Math.max(1, storyLimit) })
-      .then((data) => {
-        if (requestId !== storiesLoadIdRef.current) return;
-        const nextStories = Array.isArray(data?.stories)
-          ? data.stories
-              .map((story) => ({
-                id: String(story.user_id || story.id || ''),
-                user_id: String(story.user_id || story.id || ''),
-                story_id: String(story.id || ''),
-                name: story.username || '',
-                username: story.username || '',
-                avatar_url: story.avatar_url || '',
-                avatar_crop: story.avatar_crop || null,
-                photos: [],
-                has_active_story: true,
-                active_story_url: story.video_url || '',
-                video_url: story.video_url || '',
-                caption: story.caption || '',
-                likes: Number(story.likes || 0),
-                comments: Number(story.comments || 0),
-                liked: !!story.liked,
-                created_at: story.created_at || '',
-              }))
-              .filter((story) => story.id && story.active_story_url)
-          : [];
-        setHomeStories(nextStories);
-        setHomeStoriesResolved(true);
-      })
-      .catch(() => {
-        if (requestId !== storiesLoadIdRef.current) return;
-        setHomeStories(fallbackStoryProfiles);
-        setHomeStoriesResolved(true);
-      });
-  }, [fallbackStoryProfiles, storyLimit, user?.id]);
 
   const handleStoriesWheel = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
@@ -1416,10 +1366,10 @@ export default function FeedPage({ initialData }) {
                   initial={{ opacity: 0, y: 18, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-                  className="pointer-events-none fixed inset-x-0 bottom-7 z-40 hidden justify-center lg:flex"
+                  className="pointer-events-none fixed bottom-6 left-[calc(50%+8rem)] z-40 hidden -translate-x-1/2 lg:block xl:left-[calc(50%+9rem)]"
                 >
-                  <div className="pointer-events-auto flex items-center gap-3 rounded-[999px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] px-3.5 py-3 shadow-[0_18px_48px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[22px]">
-                    <div className="rounded-full border border-white/10 bg-black/18 px-3.5 py-2 text-[11px] font-medium tracking-[0.02em] text-white/58">
+                  <div className="pointer-events-auto flex items-center gap-2.5 rounded-full border border-white/10 bg-[rgba(14,14,20,0.76)] px-3 py-2.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+                    <div className="rounded-full border border-white/8 bg-white/[0.04] px-3.5 py-2 text-[11px] font-medium tracking-[0.02em] text-white/58">
                       {Math.min(totalProfiles, pageCursor + 1)}-{Math.min(totalProfiles, pageCursor + visibleProfiles.length)} de {totalProfiles}
                     </div>
 
@@ -1428,36 +1378,27 @@ export default function FeedPage({ initialData }) {
                       onClick={() => goToFeedPage(currentPage - 1)}
                       disabled={currentPage <= 1 || loading}
                       aria-label="Pagina anterior"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/16 text-white/68 transition-all duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-white/68 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
                     >
                       <ChevronLeft className="h-4.5 w-4.5" />
                     </button>
 
-                    <div className="flex items-center gap-1.5 rounded-full bg-black/14 px-1 py-1">
+                    <div className="flex items-center gap-1.5">
                       {pageWindow.map((page) => (
                         <motion.button
                           key={page}
                           type="button"
                           onClick={() => goToFeedPage(page)}
                           disabled={page === currentPage || loading}
-                          layout
                           whileHover={page === currentPage ? undefined : { y: -1 }}
                           whileTap={page === currentPage ? undefined : { scale: 0.97 }}
-                          transition={{ layout: { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 } }}
-                          className={`relative inline-flex h-11 min-w-[3.15rem] items-center justify-center overflow-hidden rounded-full px-4 text-[15px] font-semibold tracking-[-0.01em] transition-colors duration-200 ${
+                          className={`min-w-10 rounded-full px-3.5 py-2 text-[15px] font-semibold transition ${
                             page === currentPage
-                              ? 'text-black'
+                              ? 'bg-white text-black shadow-[0_8px_18px_rgba(255,255,255,0.18)]'
                               : 'text-white/62 hover:bg-white/[0.08] hover:text-white'
                           }`}
                         >
-                          {page === currentPage ? (
-                            <motion.span
-                              layoutId="desktop-feed-pagination-active-pill"
-                              className="absolute inset-0 rounded-full bg-[linear-gradient(180deg,#ffffff,#ececec)] shadow-[0_10px_24px_rgba(255,255,255,0.16),inset_0_1px_0_rgba(255,255,255,0.85)]"
-                              transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.8 }}
-                            />
-                          ) : null}
-                          <span className="relative z-10">{page}</span>
+                          {page}
                         </motion.button>
                       ))}
                     </div>
@@ -1467,7 +1408,7 @@ export default function FeedPage({ initialData }) {
                       onClick={() => goToFeedPage(currentPage + 1)}
                       disabled={currentPage >= totalPages || loading}
                       aria-label="Pagina siguiente"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/16 text-white/68 transition-all duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-white/68 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-35"
                     >
                       <ChevronRight className="h-4.5 w-4.5" />
                     </button>

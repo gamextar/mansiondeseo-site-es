@@ -1830,25 +1830,10 @@ async function handleAppBootstrap(request, env) {
   const authHeader = request.headers.get('Authorization');
   let user = null;
   let unread = 0;
-  let stories = [];
 
   if (authHeader?.startsWith('Bearer ')) {
     const auth = await authenticate(request, env);
     if (!auth) return error('No autorizado', 401);
-
-    const settings = await settingsPromise;
-    const storyLimit = Math.max(
-      1,
-      Math.min(
-        50,
-        Math.round(
-          Math.max(
-            Number(settings?.homeStoryCountDesktop ?? 30) || 30,
-            Number(settings?.homeStoryCountMobile ?? 15) || 15
-          )
-        )
-      )
-    );
 
     // authenticate already fetched SELECT * and cached it — reuse to avoid a second D1 round-trip
     const cachedUser = getCachedFullUser(auth.sub);
@@ -1860,34 +1845,6 @@ async function handleAppBootstrap(request, env) {
       ).bind(auth.sub).first(),
     ]);
     if (!dbUser) return error('Usuario no encontrado', 404);
-    const viewerSeeking = normalizeRoleArray(safeParseJSON(dbUser?.seeking, []), SEEKING_ROLE_IDS, []);
-    const roleFilters = viewerSeeking.length > 0 && viewerSeeking.length < SEEKING_ROLE_IDS.length
-      ? viewerSeeking
-      : [];
-    const roleValues = [...new Set(roleFilters.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])))];
-    const storyBindings = [auth.sub];
-    let storiesQuery = `
-      SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
-             u.username, u.avatar_url, u.avatar_crop,
-             CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
-      FROM stories s
-      JOIN users u ON u.id = s.user_id
-      LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?
-      WHERE s.active = 1
-        AND u.status = 'verified'
-        AND COALESCE(u.account_status, 'active') = 'active'
-    `;
-    if (roleValues.length > 0) {
-      storiesQuery += ` AND u.role IN (${roleValues.map(() => '?').join(', ')})`;
-      storyBindings.push(...roleValues);
-    }
-    storiesQuery += `
-        AND s.user_id != ?
-      ORDER BY s.created_at DESC
-      LIMIT ?
-    `;
-    storyBindings.push(auth.sub, storyLimit);
-    const storiesResult = await env.DB.prepare(storiesQuery).bind(...storyBindings).all();
     user = sanitizeUser(dbUser, env);
     user.has_active_story = !!activeStory;
     if (activeStory) {
@@ -1895,26 +1852,12 @@ async function handleAppBootstrap(request, env) {
       user.active_story_url = normalizeStoryVideoUrl(activeStory.video_url, env);
     }
     unread = Number(unreadRow?.unread || 0);
-    stories = (storiesResult?.results || []).map((r) => ({
-      id: r.id,
-      user_id: r.user_id,
-      video_url: normalizeStoryVideoUrl(r.video_url, env),
-      caption: r.caption || '',
-      likes: r.likes || 0,
-      liked: !!r.liked,
-      comments: r.comments || 0,
-      created_at: r.created_at,
-      username: r.username,
-      avatar_url: r.avatar_url || '',
-      avatar_crop: safeParseJSON(r.avatar_crop, null),
-    }));
   }
 
   const settings = await settingsPromise;
   return json({
     user,
     unread,
-    stories,
     settings: getPublicSettingsPayload(settings),
   });
 }
