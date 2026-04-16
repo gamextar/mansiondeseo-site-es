@@ -1441,12 +1441,34 @@ async function handleRegister(request, env) {
     return error('El nombre de usuario solo puede contener letras, números, puntos y guiones bajos');
   }
 
-  // Check duplicate username
-  const existingUsername = await env.DB.prepare(
-    "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 0"
+  // Check duplicate username against real verified users; fake matches are allowed
+  const conflictingRealUsername = await env.DB.prepare(
+    "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 0 LIMIT 1"
   ).bind(username).first();
-  if (existingUsername) {
+  if (conflictingRealUsername) {
     return error('Este nombre de usuario ya está en uso. Elegí otro.', 409);
+  }
+
+  const conflictingFakeUsernames = await env.DB.prepare(
+    "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 1"
+  ).bind(username).all();
+
+  const conflictingFakeIds = (conflictingFakeUsernames?.results || [])
+    .map((row) => row?.id)
+    .filter(Boolean);
+
+  if (conflictingFakeIds.length > 0) {
+    await Promise.all(conflictingFakeIds.map((id) => (
+      env.DB.prepare(
+        "UPDATE users SET account_status = 'under_review', duplicate_flag = 1 WHERE id = ?"
+      ).bind(id).run()
+    )));
+    conflictingFakeIds.forEach((id) => {
+      _fullUserCache.delete(id);
+      _viewerCache.delete(id);
+      _accountStatusCache.delete(id);
+    });
+    invalidateFeedBrowseCache();
   }
 
   // Check duplicate email
