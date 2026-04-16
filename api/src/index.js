@@ -1397,8 +1397,8 @@ async function handleRegister(request, env) {
     return error('Seeking contiene valores inválidos');
   }
 
-  if (password.length < 12) {
-    return error('La contraseña debe tener al menos 12 caracteres');
+  if (password.length < 10) {
+    return error('La contraseña debe tener al menos 10 caracteres');
   }
 
   if (password.length > 50) {
@@ -1666,8 +1666,8 @@ async function handleResetPassword(request, env) {
     return error('Email, código y nueva contraseña son requeridos');
   }
 
-  if (newPassword.length < 12) {
-    return error('La contraseña debe tener al menos 12 caracteres');
+  if (newPassword.length < 10) {
+    return error('La contraseña debe tener al menos 10 caracteres');
   }
 
   if (newPassword.length > 50) {

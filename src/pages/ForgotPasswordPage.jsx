@@ -53,7 +53,7 @@ export default function ForgotPasswordPage() {
 
   const handleReset = async (e) => {
     e.preventDefault();
-    if (code.length < 6 || newPassword.length < 12) return;
+    if (code.length < 6 || newPassword.length < 10) return;
     setLoading(true);
     setError('');
     try {
@@ -187,7 +187,7 @@ export default function ForgotPasswordPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value.slice(0, 50))}
-                  placeholder="Mínimo 12 caracteres"
+                  placeholder="Mínimo 10 caracteres"
                   className="w-full pl-10 pr-10"
                   autoComplete="new-password"
                   maxLength={50}
@@ -207,7 +207,7 @@ export default function ForgotPasswordPage() {
             <motion.button
               whileTap={{ scale: 0.97 }}
               type="submit"
-              disabled={code.length < 6 || newPassword.length < 12 || loading}
+              disabled={code.length < 6 || newPassword.length < 10 || loading}
               className="btn-gold w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {loading ? 'Actualizando...' : 'Cambiar contraseña'}

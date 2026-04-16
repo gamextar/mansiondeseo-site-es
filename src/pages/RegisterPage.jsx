@@ -635,8 +635,8 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
   }, [hidePasswordDefault]);
 
   const borderColor = emailStatus === 'valid' ? 'border-green-500/60' : emailStatus === 'exists' || emailStatus === 'invalid' ? 'border-mansion-crimson/60' : '';
-  const passwordInvalid = passwordTouched && password.length > 0 && password.length < 12;
-  const passwordValid = password.length >= 12;
+  const passwordInvalid = passwordTouched && password.length > 0 && password.length < 10;
+  const passwordValid = password.length >= 10;
 
   return (
     <div className="text-center">
@@ -705,7 +705,7 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
               value={password}
               onChange={(e) => onPasswordChange(e.target.value.slice(0, 50))}
               onBlur={() => setPasswordTouched(true)}
-              placeholder="Mínimo 12 caracteres"
+              placeholder="Mínimo 10 caracteres"
               className={`w-full pl-10 pr-10 ${passwordInvalid ? 'border-mansion-crimson/60' : passwordValid ? 'border-green-500/60' : ''}`}
               autoComplete="new-password"
               maxLength={50}
@@ -725,10 +725,10 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
             </button>
           </div>
           {passwordInvalid && (
-            <p className="text-mansion-crimson text-[11px] mt-1">Mínimo 12 caracteres ({password.length}/12)</p>
+            <p className="text-mansion-crimson text-[11px] mt-1">Mínimo 10 caracteres ({password.length}/10)</p>
           )}
           {passwordValid && (
-            <p className="text-green-500 text-[11px] mt-1">Contraseña válida ({password.length}/12)</p>
+            <p className="text-green-500 text-[11px] mt-1">Contraseña válida ({password.length}/10)</p>
           )}
         </div>
       </div>
@@ -1702,7 +1702,7 @@ export default function RegisterPage() {
   );
 
   const canNext = () => {
-    if (step === 0) return EMAIL_REGEX.test(email) && isValidEmailTld(email) && password.length >= 12 && emailStatus !== 'exists' && emailStatus !== 'invalid';
+    if (step === 0) return EMAIL_REGEX.test(email) && isValidEmailTld(email) && password.length >= 10 && emailStatus !== 'exists' && emailStatus !== 'invalid';
     if (step === 1) return !!iAm;
     if (step === 2) return seeking.length > 0;
     if (step === 3) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && isAdultBirthdate(info.birthdate) && info.province && (!showCountryPicker || selectedCountry);
