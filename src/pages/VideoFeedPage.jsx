@@ -693,7 +693,9 @@ export default function VideoFeedPage() {
     } catch {}
   }, [user?.id]);
   const closeOverlay = useCallback(() => {
-    flushPendingViewedStories();
+    if (!isOverlayPreview) {
+      flushPendingViewedStories();
+    }
     if (backgroundLocation?.pathname) {
       navigate(
         {
@@ -706,7 +708,7 @@ export default function VideoFeedPage() {
       return;
     }
     navigate('/', { replace: true });
-  }, [backgroundLocation, flushPendingViewedStories, navigate]);
+  }, [backgroundLocation, flushPendingViewedStories, isOverlayPreview, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
     if (!isOverlayPreview || !isDesktopViewport) return;
     if (event.target.closest('[data-story-card-frame="true"]')) return;
@@ -901,13 +903,6 @@ export default function VideoFeedPage() {
     }
     markStoryViewed(activeStory.user_id);
   }, [activeStory?.user_id, isOverlayPreview, markStoryViewed, queueStoryViewed]);
-
-  useEffect(() => {
-    if (!isOverlayPreview) return undefined;
-    return () => {
-      flushPendingViewedStories();
-    };
-  }, [flushPendingViewedStories, isOverlayPreview]);
 
   useEffect(() => {
     return subscribe((event) => {
