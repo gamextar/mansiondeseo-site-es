@@ -533,7 +533,7 @@ function FichaPreview({ data, currentStep, roleImages = {}, optimizeMotion = fal
                   transition={optimizeMotion ? { duration: 0.2, ease: 'easeOut' } : { type: 'spring', stiffness: 300 }}
                   className="flex flex-col items-center"
                 >
-                  <div className="max-w-[240px] overflow-x-auto overflow-y-hidden overscroll-x-contain scrollbar-hide [-webkit-overflow-scrolling:touch]">
+                  <div className="max-w-[240px] overflow-x-hidden overflow-y-hidden overscroll-x-contain scrollbar-hide [-webkit-overflow-scrolling:touch]">
                     <div className="inline-flex min-w-max items-end justify-start gap-0.5 px-1 pb-1">
                     {seekingArr.map((s, i) => (
                       <motion.div
