@@ -1,0 +1,37 @@
+---
+const defaultTargetOrigin = 'https://app.mansiondeseo.com';
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auth Bridge</title>
+  </head>
+  <body>
+    <script is:inline define:vars={{ defaultTargetOrigin }}>
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        const requestedTargetOrigin = params.get('targetOrigin') || defaultTargetOrigin;
+        const allowedTarget = /^https:\/\/app\.mansiondeseo\.com$/i.test(requestedTargetOrigin)
+          ? requestedTargetOrigin
+          : defaultTargetOrigin;
+
+        const payload = {
+          type: 'mansion-auth-bridge-response',
+          token: window.localStorage?.getItem?.('mansion_token') || '',
+          user: window.localStorage?.getItem?.('mansion_user') || '',
+        };
+
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(payload, allowedTarget);
+        }
+
+        if (window.opener && window.opener !== window) {
+          window.opener.postMessage(payload, allowedTarget);
+        }
+      })();
+    </script>
+  </body>
+</html>

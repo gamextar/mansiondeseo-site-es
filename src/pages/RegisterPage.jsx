@@ -20,7 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername, getMe } from '../lib/api';
+import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername, getMe, getToken } from '../lib/api';
 import { calculateAgeFromBirthdate, getLatestAdultBirthdate, isAdultBirthdate } from '../lib/birthdate';
 import { formatLocation } from '../lib/location';
 import ImageCropper from '../components/ImageCropper';
@@ -1636,7 +1636,7 @@ function SuccessScreen({ onEnter }) {
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { setRegistered, setUser } = useAuth();
+  const { registered, user, setRegistered, setUser } = useAuth();
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [email, setEmail] = useState('');
@@ -1662,6 +1662,11 @@ export default function RegisterPage() {
   const [hidePasswordDefault, setHidePasswordDefault] = useState(true);
   const [roleImages, setRoleImages] = useState({});
   const [optimizeOnboardingMotion, setOptimizeOnboardingMotion] = useState(false);
+
+  useEffect(() => {
+    if (!registered && !user && !getToken()) return;
+    navigate('/feed', { replace: true });
+  }, [navigate, registered, user]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;

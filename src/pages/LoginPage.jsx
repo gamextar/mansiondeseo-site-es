@@ -1,18 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { login as apiLogin } from '../lib/api';
+import { getToken, login as apiLogin } from '../lib/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { setRegistered, setUser } = useAuth();
+  const { registered, user, setRegistered, setUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!registered && !user && !getToken()) return;
+    navigate('/feed', { replace: true });
+  }, [navigate, registered, user]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

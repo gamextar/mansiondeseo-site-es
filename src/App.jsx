@@ -12,7 +12,7 @@ import WelcomePage from './pages/WelcomePage';
 import PublicHomePage from './pages/PublicHomePage';
 import SEOLandingPage from './pages/SEOLandingPage';
 import BlackScreenPage from './pages/BlackScreenPage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, importLegacyAuthFromPublicSite } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -661,19 +661,8 @@ export default function App() {
     let cancelled = false;
     let detachVisibilityListener = null;
 
-    const hasSessionSettings = !!siteSettings && Object.keys(siteSettings).length > 0;
-    const hasAuthToken = !!getToken();
-
     if (debugFlags.skipBootstrap) {
       bootstrapStartedRef.current = true;
-      setBootstrapUnread(null);
-      setBootstrapResolved(true);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    if (!hasAuthToken && hasSessionSettings) {
       setBootstrapUnread(null);
       setBootstrapResolved(true);
       return () => {
@@ -712,18 +701,46 @@ export default function App() {
       });
     };
 
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-      const handleVisibilityChange = () => {
-        if (document.visibilityState !== 'visible') return;
-        window.removeEventListener('visibilitychange', handleVisibilityChange);
-        detachVisibilityListener = null;
-        runBootstrap();
-      };
-      detachVisibilityListener = () => window.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.addEventListener('visibilitychange', handleVisibilityChange);
-    } else {
+    const maybeRunBootstrap = async () => {
+      let hasAuthToken = !!getToken();
+      const hasSessionSettings = !!siteSettings && Object.keys(siteSettings).length > 0;
+
+      if (!hasAuthToken && isAppSubdomainHost()) {
+        const imported = await importLegacyAuthFromPublicSite();
+        if (cancelled) return;
+        hasAuthToken = !!getToken();
+        if (imported) {
+          setRegisteredState(true);
+          const importedUser = getStoredUser();
+          if (importedUser) {
+            setUserState(importedUser);
+          }
+        }
+      }
+
+      if (!hasAuthToken && hasSessionSettings) {
+        bootstrapStartedRef.current = true;
+        setBootstrapUnread(null);
+        setBootstrapResolved(true);
+        return;
+      }
+
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        const handleVisibilityChange = () => {
+          if (document.visibilityState !== 'visible') return;
+          window.removeEventListener('visibilitychange', handleVisibilityChange);
+          detachVisibilityListener = null;
+          runBootstrap();
+        };
+        detachVisibilityListener = () => window.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('visibilitychange', handleVisibilityChange);
+        return;
+      }
+
       runBootstrap();
-    }
+    };
+
+    maybeRunBootstrap();
 
     return () => {
       cancelled = true;

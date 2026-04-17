@@ -66,6 +66,26 @@ function formatCount(value) {
   ogLocale="es_AR"
   schemas={schemas}
 >
+  <script is:inline define:vars={{ appSiteOrigin: APP_SITE_ORIGIN }}>
+    (() => {
+      const tokenKey = 'mansion_token';
+      const cookiePrefix = `${encodeURIComponent(tokenKey)}=`;
+      const tokenFromCookie = document.cookie
+        .split('; ')
+        .find((entry) => entry.startsWith(cookiePrefix))
+        ?.slice(cookiePrefix.length);
+      const tokenFromStorage = window.localStorage?.getItem?.(tokenKey) || '';
+
+      if (!tokenFromCookie && tokenFromStorage && window.location.hostname.endsWith('mansiondeseo.com')) {
+        document.cookie = `${cookiePrefix}${encodeURIComponent(tokenFromStorage)}; Domain=.mansiondeseo.com; Path=/; SameSite=Lax; Secure; Max-Age=2592000`;
+      }
+
+      if (tokenFromCookie || tokenFromStorage) {
+        window.location.replace(`${appSiteOrigin}/feed`);
+      }
+    })();
+  </script>
+
   <div class="page-frame">
     <div class="page-background">
       <div class="background-blob left"></div>
