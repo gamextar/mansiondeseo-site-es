@@ -6,7 +6,6 @@ import { useAuth } from '../lib/authContext';
 import { getTopSeoCityStats, formatSeoCityStatsDate } from '../lib/seoCityStats';
 import { getSeoHomeStats, formatSeoHomeStatsDate } from '../lib/seoHomeStats';
 import heroTrioPremium from '../assets/hero-trio-premium.svg';
-import { isAppSubdomainHost } from '../lib/siteDomains';
 
 const countFormatter = new Intl.NumberFormat('es-AR');
 
@@ -74,10 +73,6 @@ export default function PublicHomePage() {
 
   if (user) {
     return <Navigate to="/feed" replace />;
-  }
-
-  if (isAppSubdomainHost()) {
-    return <Navigate to="/login" replace />;
   }
 
   return (

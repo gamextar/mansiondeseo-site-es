@@ -23,7 +23,6 @@ import { lazyWithRetry } from './lib/lazyWithRetry';
 import { useRobotsMeta } from './lib/seo';
 import { getRouteEnabledSeoLocales, isSeoLocale } from './lib/seoLocales';
 import { isSeoIntentVariant } from './lib/seoVariants';
-import { isAppSubdomainHost } from './lib/siteDomains';
 
 const ExplorePage = lazy(lazyWithRetry(() => import('./pages/ExplorePage'), 'mansion-lazy-retry:explore'));
 const ProfileDetailPage = lazy(lazyWithRetry(() => import('./pages/ProfileDetailPage'), 'mansion-lazy-retry:profile-detail'));
@@ -94,12 +93,7 @@ function isPublicSeoRoute(pathname = '') {
 
 function RootEntryPage() {
   const { registered } = useAuth();
-
-  if (isAppSubdomainHost()) {
-    return <Navigate to={registered ? "/feed" : "/login"} replace />;
-  }
-
-  return <PublicHomePage />;
+  return registered ? <Navigate to="/feed" replace /> : <PublicHomePage />;
 }
 
 function AppLayout() {
@@ -123,9 +117,7 @@ function AppLayout() {
   const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen && !isPublicSeoPage);
   const scrollLockRef = useRef(null);
   const routePath = location.pathname || '/';
-  const isAppHost = isAppSubdomainHost();
   const isPrivateNoindexRoute =
-    isAppHost ||
     routePath === '/feed' ||
     routePath === '/explorar' ||
     routePath === '/videos' ||

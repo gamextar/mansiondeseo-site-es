@@ -19,8 +19,6 @@ function resolveApiBase() {
 const API_BASE = resolveApiBase();
 const TOKEN_KEY = 'mansion_token';
 const USER_KEY = 'mansion_user';
-const AUTH_COOKIE_DOMAIN = '.mansiondeseo.com';
-const AUTH_COOKIE_PATH = '/';
 const AUTH_ME_CACHE_KEY = 'authMe';
 const AUTH_ME_CACHE_TTL_MS = 60 * 60_000;
 const OWN_PROFILE_DASHBOARD_CACHE_KEY = 'ownProfileDashboard';
@@ -428,27 +426,16 @@ if (typeof window !== 'undefined') {
 // ── Token management ────────────────────────────────────
 
 export function getToken() {
-  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
-
-  const storageToken = localStorage.getItem(TOKEN_KEY);
-  const cookieToken = getCookieValue(TOKEN_KEY);
-
-  if (!storageToken && cookieToken) {
-    localStorage.setItem(TOKEN_KEY, cookieToken);
-    return cookieToken;
-  }
-
-  return cookieToken || null;
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(TOKEN_KEY);
 }
 
 export function setToken(token) {
   if (typeof localStorage === 'undefined') return;
   if (token) {
     localStorage.setItem(TOKEN_KEY, token);
-    writeAuthCookie(TOKEN_KEY, token);
   } else {
     localStorage.removeItem(TOKEN_KEY);
-    clearAuthCookie(TOKEN_KEY);
   }
   invalidateBootstrapCache();
   invalidateUnreadCountCache();
@@ -484,51 +471,8 @@ export function clearAuth() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem('mansion_registered');
-  clearAuthCookie(TOKEN_KEY);
   invalidateBootstrapCache();
   invalidateUnreadCountCache();
-}
-
-function shouldShareAuthCookie() {
-  if (typeof window === 'undefined') return false;
-  const host = String(window.location.hostname || '').toLowerCase();
-  return host === 'mansiondeseo.com' || host === 'www.mansiondeseo.com' || host === 'app.mansiondeseo.com';
-}
-
-function getCookieValue(name) {
-  if (typeof document === 'undefined') return '';
-  const prefix = `${encodeURIComponent(name)}=`;
-  const match = document.cookie
-    .split('; ')
-    .find((entry) => entry.startsWith(prefix));
-  if (!match) return '';
-  return decodeURIComponent(match.slice(prefix.length));
-}
-
-function writeAuthCookie(name, value) {
-  if (typeof document === 'undefined' || !shouldShareAuthCookie()) return;
-  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = [
-    `${encodeURIComponent(name)}=${encodeURIComponent(value)}`,
-    `Domain=${AUTH_COOKIE_DOMAIN}`,
-    `Path=${AUTH_COOKIE_PATH}`,
-    'SameSite=Lax',
-    secure,
-    'Max-Age=2592000',
-  ].join('; ');
-}
-
-function clearAuthCookie(name) {
-  if (typeof document === 'undefined' || !shouldShareAuthCookie()) return;
-  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = [
-    `${encodeURIComponent(name)}=`,
-    `Domain=${AUTH_COOKIE_DOMAIN}`,
-    `Path=${AUTH_COOKIE_PATH}`,
-    'SameSite=Lax',
-    secure,
-    'Max-Age=0',
-  ].join('; ');
 }
 
 // ── Fetch wrapper ───────────────────────────────────────
