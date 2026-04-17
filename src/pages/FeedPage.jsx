@@ -746,9 +746,13 @@ export default function FeedPage({ initialData }) {
     const storyUserId = typeof storyOrUserId === 'object' && storyOrUserId !== null
       ? String(storyOrUserId.user_id || storyOrUserId.id || '')
       : String(storyOrUserId || '');
+    const storySeed = typeof storyOrUserId === 'object' && storyOrUserId !== null
+      ? storyOrUserId
+      : null;
     navigate('/videos', {
       state: {
         storyUserId,
+        storySeed,
       },
     });
   }, [navigate]);

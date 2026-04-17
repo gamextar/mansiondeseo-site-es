@@ -846,13 +846,13 @@ export default function VideoFeedPage() {
   }, [standaloneMobileRoute]);
 
   const refreshStories = useCallback(async () => {
-    const data = await getStories();
+    const data = await getStories({ focusUserId: requestedStoryUserId || '' });
     const baseStories = mergeSeedStory(data.stories || [], requestedStorySeed);
     const fresh = applyPendingStoryLikeState(baseStories, getPendingStoryLikes());
     apiRespondedRef.current = true;
     setStories(fresh);
     return fresh;
-  }, [requestedStorySeed]);
+  }, [requestedStorySeed, requestedStoryUserId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1273,6 +1273,21 @@ export default function VideoFeedPage() {
               aria-label={isMuted ? 'Activar sonido' : 'Silenciar'}
             >
               {isMuted ? <VolumeX className="w-8 h-8 text-white" /> : <Volume2 className="w-8 h-8 text-white" />}
+            </button>
+          </div>
+        )}
+        {!isDesktopViewport && (
+          <div
+            className="fixed z-[80] lg:hidden"
+            style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 }}
+          >
+            <button
+              type="button"
+              onClick={closeToHomeFeed}
+              className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors active:bg-black/60"
+              aria-label="Cerrar"
+            >
+              <X className="h-7 w-7 text-white" />
             </button>
           </div>
         )}
