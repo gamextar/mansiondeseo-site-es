@@ -21,7 +21,6 @@ const TOKEN_KEY = 'mansion_token';
 const USER_KEY = 'mansion_user';
 const AUTH_COOKIE_DOMAIN = '.mansiondeseo.com';
 const AUTH_COOKIE_PATH = '/';
-const AUTH_BRIDGE_MESSAGE_TYPE = 'mansion-auth-bridge-response';
 const AUTH_ME_CACHE_KEY = 'authMe';
 const AUTH_ME_CACHE_TTL_MS = 60 * 60_000;
 const OWN_PROFILE_DASHBOARD_CACHE_KEY = 'ownProfileDashboard';
@@ -434,17 +433,12 @@ export function getToken() {
   const storageToken = localStorage.getItem(TOKEN_KEY);
   const cookieToken = getCookieValue(TOKEN_KEY);
 
-  if (storageToken && !cookieToken) {
-    writeAuthCookie(TOKEN_KEY, storageToken);
-    return storageToken;
-  }
-
   if (!storageToken && cookieToken) {
     localStorage.setItem(TOKEN_KEY, cookieToken);
     return cookieToken;
   }
 
-  return storageToken || cookieToken || null;
+  return cookieToken || null;
 }
 
 export function setToken(token) {
@@ -493,69 +487,6 @@ export function clearAuth() {
   clearAuthCookie(TOKEN_KEY);
   invalidateBootstrapCache();
   invalidateUnreadCountCache();
-}
-
-export async function importLegacyAuthFromPublicSite() {
-  if (typeof window === 'undefined' || !window.location.hostname) return false;
-  if (getToken()) return false;
-
-  const publicOrigin = 'https://mansiondeseo.com';
-  if (window.location.origin === publicOrigin) return false;
-
-  return new Promise((resolve) => {
-    let settled = false;
-    let iframe = null;
-    let timeoutId = null;
-
-    const cleanup = (result = false) => {
-      if (settled) return;
-      settled = true;
-      window.removeEventListener('message', handleMessage);
-      if (timeoutId) window.clearTimeout(timeoutId);
-      if (iframe?.parentNode) iframe.parentNode.removeChild(iframe);
-      resolve(result);
-    };
-
-    const handleMessage = (event) => {
-      if (event.origin !== publicOrigin) return;
-      if (event.data?.type !== AUTH_BRIDGE_MESSAGE_TYPE) return;
-
-      const token = typeof event.data?.token === 'string' ? event.data.token.trim() : '';
-      const rawUser = typeof event.data?.user === 'string' ? event.data.user : '';
-
-      if (!token) {
-        cleanup(false);
-        return;
-      }
-
-      setToken(token);
-      try {
-        const parsedUser = rawUser ? JSON.parse(rawUser) : null;
-        if (parsedUser && typeof parsedUser === 'object') {
-          setStoredUser(parsedUser);
-        }
-      } catch {}
-      try {
-        localStorage.setItem('mansion_registered', 'true');
-      } catch {}
-      cleanup(true);
-    };
-
-    timeoutId = window.setTimeout(() => cleanup(false), 1800);
-    window.addEventListener('message', handleMessage);
-
-    iframe = document.createElement('iframe');
-    iframe.src = `${publicOrigin}/auth-bridge?targetOrigin=${encodeURIComponent(window.location.origin)}`;
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.tabIndex = -1;
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.opacity = '0';
-    iframe.style.pointerEvents = 'none';
-    document.body.appendChild(iframe);
-  });
 }
 
 function shouldShareAuthCookie() {

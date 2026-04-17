@@ -74,13 +74,8 @@ function formatCount(value) {
         .split('; ')
         .find((entry) => entry.startsWith(cookiePrefix))
         ?.slice(cookiePrefix.length);
-      const tokenFromStorage = window.localStorage?.getItem?.(tokenKey) || '';
 
-      if (!tokenFromCookie && tokenFromStorage && window.location.hostname.endsWith('mansiondeseo.com')) {
-        document.cookie = `${cookiePrefix}${encodeURIComponent(tokenFromStorage)}; Domain=.mansiondeseo.com; Path=/; SameSite=Lax; Secure; Max-Age=2592000`;
-      }
-
-      if (tokenFromCookie || tokenFromStorage) {
+      if (tokenFromCookie) {
         window.location.replace(`${appSiteOrigin}/feed`);
       }
     })();

@@ -12,7 +12,7 @@ import WelcomePage from './pages/WelcomePage';
 import PublicHomePage from './pages/PublicHomePage';
 import SEOLandingPage from './pages/SEOLandingPage';
 import BlackScreenPage from './pages/BlackScreenPage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, importLegacyAuthFromPublicSite } from './lib/api';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -702,21 +702,8 @@ export default function App() {
     };
 
     const maybeRunBootstrap = async () => {
-      let hasAuthToken = !!getToken();
+      const hasAuthToken = !!getToken();
       const hasSessionSettings = !!siteSettings && Object.keys(siteSettings).length > 0;
-
-      if (!hasAuthToken && isAppSubdomainHost()) {
-        const imported = await importLegacyAuthFromPublicSite();
-        if (cancelled) return;
-        hasAuthToken = !!getToken();
-        if (imported) {
-          setRegisteredState(true);
-          const importedUser = getStoredUser();
-          if (importedUser) {
-            setUserState(importedUser);
-          }
-        }
-      }
 
       if (!hasAuthToken && hasSessionSettings) {
         bootstrapStartedRef.current = true;
