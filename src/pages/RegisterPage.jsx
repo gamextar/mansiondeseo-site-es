@@ -20,7 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername, getMe, getToken } from '../lib/api';
+import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername, getMe, getToken, warmAuthenticatedEntry } from '../lib/api';
 import { calculateAgeFromBirthdate, getLatestAdultBirthdate, isAdultBirthdate } from '../lib/birthdate';
 import { formatLocation } from '../lib/location';
 import ImageCropper from '../components/ImageCropper';
@@ -1871,6 +1871,7 @@ export default function RegisterPage() {
   const handleVerified = async (data) => {
     setUser(data.user);
     setRegistered(true);
+    warmAuthenticatedEntry().catch(() => {});
 
     // Save seeking as feed filter preference
     if (seeking.length > 0) {

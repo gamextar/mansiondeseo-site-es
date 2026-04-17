@@ -4,6 +4,7 @@
 
 import { createMutationQueue } from './mutationQueue';
 import { recordD1WriteEstimate } from './d1Debug';
+import { resolveHomeFeedPageSize, setCachedHomeFeed } from './homeFeedCache';
 
 const LEGACY_PROD_API_BASE = 'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api';
 
@@ -767,6 +768,30 @@ export async function getAppBootstrap() {
 
 export function peekAppBootstrap() {
   return sessionCache.get('appBootstrap', 60 * 60_000);
+}
+
+export async function warmAuthenticatedEntry() {
+  const bootstrap = await getAppBootstrap().catch(() => null);
+  const settings = bootstrap?.settings || {};
+  const pageSize = resolveHomeFeedPageSize(settings);
+  const feed = await getProfiles({ cursor: 0, pageSize }).catch(() => null);
+
+  if (feed) {
+    setCachedHomeFeed({
+      profiles: feed.profiles || [],
+      viewerPremium: feed.viewerPremium || false,
+      settings: feed.settings || settings,
+      totalProfiles: Number(feed.totalProfiles) || 0,
+      currentCursor: Number(feed.cursor) || 0,
+      blockCursor: Number(feed.cursor) || 0,
+      pageCursor: 0,
+      pageSize,
+      nextCursor: feed.nextCursor || null,
+      hasMore: !!feed.hasMore,
+    });
+  }
+
+  return { bootstrap, feed };
 }
 
 export async function logout() {

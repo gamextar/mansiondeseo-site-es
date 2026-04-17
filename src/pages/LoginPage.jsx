@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { getToken, login as apiLogin } from '../lib/api';
+import { getToken, login as apiLogin, warmAuthenticatedEntry } from '../lib/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -27,6 +27,10 @@ export default function LoginPage() {
       const data = await apiLogin({ email, password });
       setUser(data.user);
       setRegistered(true);
+      await Promise.race([
+        warmAuthenticatedEntry(),
+        new Promise((resolve) => window.setTimeout(resolve, 220)),
+      ]);
       navigate('/feed');
     } catch (err) {
       setError(err.message || 'Credenciales inválidas');
