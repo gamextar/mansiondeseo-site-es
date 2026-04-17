@@ -636,13 +636,6 @@ export default function VideoFeedPage() {
   const lastScrollAtRef = useRef(0);
   const lastDesktopWheelAtRef = useRef(0);
 
-  const cachedStories = () => {
-    try {
-      const raw = localStorage.getItem('vf_stories');
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return [];
-  };
   const requestedStoryUserId = location.state?.storyUserId || null;
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
@@ -651,7 +644,7 @@ export default function VideoFeedPage() {
   // with ONLY the seed story. This guarantees that stories.length changes 1→N
   // when the API responds, which triggers the useLayoutEffect scroll-correction
   // and prevents iOS Safari's scroll-reset from showing the wrong story.
-  const initial = applyPendingStoryLikeState(mergeSeedStory(cachedStories(), requestedStorySeed), getPendingStoryLikes());
+  const initial = applyPendingStoryLikeState(mergeSeedStory([], requestedStorySeed), getPendingStoryLikes());
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
@@ -667,12 +660,6 @@ export default function VideoFeedPage() {
   });
   const initialStoryUserIdRef = useRef(requestedStoryUserId);
   const apiRespondedRef = useRef(false);
-
-  const persistStories = useCallback((nextStories) => {
-    try {
-      localStorage.setItem('vf_stories', JSON.stringify(nextStories));
-    } catch {}
-  }, []);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
@@ -864,9 +851,8 @@ export default function VideoFeedPage() {
     const fresh = applyPendingStoryLikeState(baseStories, getPendingStoryLikes());
     apiRespondedRef.current = true;
     setStories(fresh);
-    persistStories(fresh);
     return fresh;
-  }, [persistStories, requestedStorySeed]);
+  }, [requestedStorySeed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -925,18 +911,15 @@ export default function VideoFeedPage() {
             ? { ...story, likes: Math.max(0, Number(story.likes || 0) + 1) }
             : story
         ));
-        persistStories(next);
         return next;
       });
     });
-  }, [persistStories, subscribe]);
+  }, [subscribe]);
 
   useEffect(() => {
     const unsubscribeQueue = subscribePendingStoryLikes((pendingLikes) => {
       setStories((prev) => {
-        const next = applyPendingStoryLikeState(prev, pendingLikes);
-        persistStories(next);
-        return next;
+        return applyPendingStoryLikeState(prev, pendingLikes);
       });
     });
 
@@ -949,7 +932,6 @@ export default function VideoFeedPage() {
             ? { ...story, liked: !!synced.liked, likes: Number(synced.likes || 0) }
             : story;
         });
-        persistStories(next);
         return next;
       });
     });
@@ -958,7 +940,7 @@ export default function VideoFeedPage() {
       unsubscribeQueue();
       unsubscribeSync();
     };
-  }, [persistStories]);
+  }, []);
 
   // Keep a ref of the current activeDispIdx so the stories-identity layout
   // effect can read it without being a dep (avoids interrupting user scrolls).
@@ -1136,11 +1118,10 @@ export default function VideoFeedPage() {
             })()
           : s
       );
-      persistStories(next);
       return next;
     });
     if (desiredLiked !== null) enqueueStoryLike(storyId, desiredLiked);
-  }, [persistStories]);
+  }, []);
 
   const scrollByOne = useCallback((dir) => {
     const container = containerRef.current;

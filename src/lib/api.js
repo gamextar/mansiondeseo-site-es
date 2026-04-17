@@ -68,7 +68,6 @@ function clearLegacyMediaCaches() {
       if (!key) continue;
       if (
         key === 'mansion_feed' ||
-        key === 'vf_stories' ||
         key === 'appBootstrap' ||
         key === AUTH_ME_CACHE_KEY ||
         key === OWN_PROFILE_DASHBOARD_CACHE_KEY ||
@@ -1244,8 +1243,8 @@ export function invalidateStoriesCache() {
 function invalidateStoryFeedCache() {
   invalidateStoriesCache();
   try {
-    sessionStorage.removeItem('vf_stories');
     sessionStorage.removeItem('vf_idx');
+    localStorage.removeItem('vf_stories');
   } catch {}
 }
 

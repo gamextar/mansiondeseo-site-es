@@ -23,6 +23,7 @@ const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PREFETCH_PAGES = 3;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
+const STORIES_RAIL_TRANSITION = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -179,7 +180,6 @@ export default function FeedPage({ initialData }) {
   const storyRectsRef = useRef(new Map());
   const previousOrderedStoryIdsRef = useRef('');
   const initialStoriesAlignedRef = useRef(false);
-  const [storiesEdgeOffset, setStoriesEdgeOffset] = useState(0);
   const storiesDragRef = useRef({
     active: false,
     captured: false,
@@ -782,6 +782,13 @@ export default function FeedPage({ initialData }) {
     event.preventDefault();
   }, []);
 
+  const syncStoriesRailTransform = useCallback((offset = storiesEdgeOffsetRef.current) => {
+    const rail = storiesScrollRef.current;
+    if (!rail) return;
+    rail.style.transform = desktopStoryRailEnhanced ? `translate3d(${offset}px, 0, 0)` : 'translate3d(0px, 0, 0)';
+    rail.style.transition = desktopStoryRailEnhanced && storiesDragRef.current.active ? 'none' : STORIES_RAIL_TRANSITION;
+  }, [desktopStoryRailEnhanced]);
+
   const stopStoriesBounce = useCallback(() => {
     if (storiesBounceFrameRef.current) {
       cancelAnimationFrame(storiesBounceFrameRef.current);
@@ -792,8 +799,8 @@ export default function FeedPage({ initialData }) {
   const setStoriesEdgeOffsetImmediate = useCallback((nextValue) => {
     const clamped = Math.max(-42, Math.min(42, nextValue));
     storiesEdgeOffsetRef.current = clamped;
-    setStoriesEdgeOffset(clamped);
-  }, []);
+    syncStoriesRailTransform(clamped);
+  }, [syncStoriesRailTransform]);
 
   const animateStoriesEdgeOffsetTo = useCallback((target = 0) => {
     stopStoriesBounce();
@@ -802,16 +809,16 @@ export default function FeedPage({ initialData }) {
       const next = current + (target - current) * 0.095;
       if (Math.abs(next - target) < 0.18) {
         storiesEdgeOffsetRef.current = target;
-        setStoriesEdgeOffset(target);
+        syncStoriesRailTransform(target);
         storiesBounceFrameRef.current = null;
         return;
       }
       storiesEdgeOffsetRef.current = next;
-      setStoriesEdgeOffset(next);
+      syncStoriesRailTransform(next);
       storiesBounceFrameRef.current = requestAnimationFrame(step);
     };
     storiesBounceFrameRef.current = requestAnimationFrame(step);
-  }, [stopStoriesBounce]);
+  }, [stopStoriesBounce, syncStoriesRailTransform]);
 
   const nudgeStoriesEdge = useCallback((direction, magnitude = 34) => {
     setStoriesEdgeOffsetImmediate(direction * magnitude);
@@ -887,7 +894,8 @@ export default function FeedPage({ initialData }) {
       lastTs: event.timeStamp || performance.now(),
       velocity: 0,
     };
-  }, [desktopStoryRailEnhanced, setStoriesEdgeOffsetImmediate, stopStoriesBounce, stopStoriesMomentum]);
+    syncStoriesRailTransform();
+  }, [desktopStoryRailEnhanced, setStoriesEdgeOffsetImmediate, stopStoriesBounce, stopStoriesMomentum, syncStoriesRailTransform]);
 
   const handleStoriesPointerMove = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
@@ -941,7 +949,8 @@ export default function FeedPage({ initialData }) {
       animateStoriesEdgeOffsetTo(0);
     }
     drag.captured = false;
-  }, [animateStoriesEdgeOffsetTo, desktopStoryRailEnhanced, startStoriesMomentum]);
+    syncStoriesRailTransform();
+  }, [animateStoriesEdgeOffsetTo, desktopStoryRailEnhanced, startStoriesMomentum, syncStoriesRailTransform]);
 
   const handleStoriesClickCapture = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
@@ -956,11 +965,15 @@ export default function FeedPage({ initialData }) {
     stopStoriesMomentum();
     stopStoriesBounce();
     storiesEdgeOffsetRef.current = 0;
-    setStoriesEdgeOffset(0);
     storiesDragRef.current.active = false;
     storiesDragRef.current.captured = false;
     storiesDragRef.current.moved = false;
-  }, [desktopStoryRailEnhanced, stopStoriesBounce, stopStoriesMomentum]);
+    syncStoriesRailTransform(0);
+  }, [desktopStoryRailEnhanced, stopStoriesBounce, stopStoriesMomentum, syncStoriesRailTransform]);
+
+  useEffect(() => {
+    syncStoriesRailTransform(desktopStoryRailEnhanced ? storiesEdgeOffsetRef.current : 0);
+  }, [desktopStoryRailEnhanced, storyCircleGap, syncStoriesRailTransform]);
 
   useEffect(() => () => {
     stopStoriesMomentum();
@@ -1005,8 +1018,8 @@ export default function FeedPage({ initialData }) {
               msOverflowStyle: 'none',
               gap: `${storyCircleGap}px`,
               touchAction: 'pan-x',
-              transform: desktopStoryRailEnhanced ? `translate3d(${storiesEdgeOffset}px, 0, 0)` : 'translate3d(0px, 0, 0)',
-              transition: desktopStoryRailEnhanced && storiesDragRef.current.active ? 'none' : 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+              transform: 'translate3d(0px, 0, 0)',
+              transition: STORIES_RAIL_TRANSITION,
             }}
             motionProps={{
               variants: stagger,
