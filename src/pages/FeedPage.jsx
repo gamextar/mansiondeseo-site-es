@@ -13,15 +13,17 @@ import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMed
 import { isSafariDesktopBrowser } from '../lib/browser';
 import { getBottomNavBottomPadding, getBottomNavHeight } from '../lib/bottomNavConfig';
 import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsers, getViewedStoryUsersKey } from '../lib/storyViews';
-import { DEFAULT_CARDS_PER_PAGE, DEFAULT_PREFETCH_PAGES, FEED_CACHE_KEY, getCachedHomeFeed, setCachedHomeFeed, resolveHomeFeedPageSize } from '../lib/homeFeedCache';
 
+const FEED_CACHE_KEY = 'mansion_feed';
+const FEED_CACHE_VERSION = 2;
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
+const DEFAULT_CARDS_PER_PAGE = 12;
 const DEFAULT_MAX_PAGES = 10;
+const DEFAULT_PREFETCH_PAGES = 3;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
 const STORIES_RAIL_TRANSITION = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
-const INITIAL_FEED_SPINNER_DELAY_MS = 180;
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -90,6 +92,46 @@ const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, moti
   return <motion.div ref={ref} {...rest} {...motionProps}>{children}</motion.div>;
 });
 
+function getCachedFeed() {
+  try {
+    const raw = localStorage.getItem(FEED_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const cacheVersion = Number(parsed?.version || 0);
+    if (cacheVersion !== FEED_CACHE_VERSION) return null;
+    const currentCursor = Number(parsed?.currentCursor) || 0;
+    const blockCursor = Number(parsed?.blockCursor ?? parsed?.currentCursor) || 0;
+    const pageCursor = Number(parsed?.pageCursor ?? parsed?.currentCursor) || 0;
+    // Do not persist deep pagination across refreshes or fresh entries to home.
+    // Only reuse cache when it represents the first page/block.
+    if (currentCursor > 0 || blockCursor > 0 || pageCursor > 0) return null;
+    if (Array.isArray(parsed?.profiles)) return parsed;
+    if (Array.isArray(parsed)) {
+      return { profiles: parsed, viewerPremium: false, settings: {}, timestamp: 0 };
+    }
+    return null;
+  } catch { return null; }
+}
+
+function setCachedFeed(data) {
+  try {
+    localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({
+      version: FEED_CACHE_VERSION,
+      profiles: data.profiles || [],
+      viewerPremium: data.viewerPremium || false,
+      settings: data.settings || {},
+      totalProfiles: Number(data.totalProfiles) || 0,
+      currentCursor: Number(data.currentCursor) || 0,
+      blockCursor: Number(data.blockCursor ?? data.currentCursor) || 0,
+      pageCursor: Number(data.pageCursor ?? data.currentCursor) || 0,
+      pageSize: Number(data.pageSize) || 0,
+      nextCursor: data.nextCursor || null,
+      hasMore: !!data.hasMore,
+      timestamp: Date.now(),
+    }));
+  } catch {}
+}
+
 function makeFeedBlockKey(cursor, pageSize) {
   return `${Number(cursor) || 0}:${Number(pageSize) || 0}`;
 }
@@ -99,7 +141,7 @@ export default function FeedPage({ initialData }) {
   const cols = useGridColumns();
   const isDesktopViewport = cols >= 4;
   const desktopStoryRailEnhanced = isDesktopViewport;
-  const cached = initialData || getCachedHomeFeed();
+  const cached = initialData || getCachedFeed();
   const { user, siteSettings, bootstrapStories } = useAuth();
   const isStandaloneMobileApp = detectStandaloneMobile();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
@@ -116,7 +158,6 @@ export default function FeedPage({ initialData }) {
     cached ? (typeof cached?.hasMore === 'boolean' ? cached.hasMore : true) : false
   );
   const [loading, setLoading] = useState(!cached);
-  const [showLoadingSpinner, setShowLoadingSpinner] = useState(Boolean(cached ? false : false));
   const [storiesIntroEnabled, setStoriesIntroEnabled] = useState(true);
   const storiesIntroConsumedRef = useRef(false);
   const navigate = useNavigate();
@@ -175,7 +216,7 @@ export default function FeedPage({ initialData }) {
     setPageCursor(Number(targetPageCursor ?? data.cursor ?? cursor) || 0);
     setTotalProfiles(Number(data.totalProfiles) || 0);
     setHasMore(!!data.hasMore);
-    setCachedHomeFeed({
+    setCachedFeed({
       profiles: data.profiles || [],
       viewerPremium: data.viewerPremium || false,
       settings: data.settings || {},
@@ -221,7 +262,7 @@ export default function FeedPage({ initialData }) {
   }, [fetchProfilesBlock]);
 
   const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize, targetPageCursor } = {}) => {
-    const c = getCachedHomeFeed();
+    const c = getCachedFeed();
     if (!c) setLoading(true);
     const myId = ++loadIdRef.current;
     return fetchProfilesBlock({ forceFresh, cursor, pageSize })
@@ -254,11 +295,14 @@ export default function FeedPage({ initialData }) {
   // Initial load — runs once on mount
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
-    const cachedFeed = getCachedHomeFeed();
+    const cachedFeed = getCachedFeed();
     const currentSettings = settingsRef.current;
     const cachedPageSize = Number(cachedFeed?.pageSize) || 0;
     const cachedPageCursor = Number(cachedFeed?.pageCursor ?? cachedFeed?.currentCursor) || 0;
-    const expectedPageSize = resolveHomeFeedPageSize(currentSettings);
+    const expectedPageSize = Math.max(
+      12,
+      (currentSettings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (currentSettings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
+    );
     const canReuseCached = !!cachedFeed && cachedPageSize === expectedPageSize;
 
     if (!cachedFeed || !canReuseCached) {
@@ -284,19 +328,6 @@ export default function FeedPage({ initialData }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
-
-  useEffect(() => {
-    if (!loading) {
-      setShowLoadingSpinner(false);
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => {
-      setShowLoadingSpinner(true);
-    }, INITIAL_FEED_SPINNER_DELAY_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [loading]);
 
   const [gridOpacity, setGridOpacity] = useState(1);
   const viewedStoriesStorageKey = useMemo(() => getViewedStoryUsersKey(user?.id), [user?.id]);
@@ -431,7 +462,7 @@ export default function FeedPage({ initialData }) {
     const blockEndCursor = blockCursor + profiles.length;
     if (nextPageCursor >= blockCursor && nextPageCursor < blockEndCursor) {
       setPageCursor(nextPageCursor);
-      setCachedHomeFeed({
+      setCachedFeed({
         profiles,
         viewerPremium,
         settings: safeSettings,
@@ -1270,13 +1301,9 @@ export default function FeedPage({ initialData }) {
         className="px-3 lg:px-8"
       >
         {loading ? (
-          showLoadingSpinner ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
-            </div>
-          ) : (
-            <div className="py-20" aria-hidden="true" />
-          )
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+          </div>
         ) : visibleProfiles.length > 0 ? (
           <>
             {showGridSection ? (
