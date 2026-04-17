@@ -20,7 +20,7 @@ const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
 const DEFAULT_CARDS_PER_PAGE = 12;
 const DEFAULT_MAX_PAGES = 10;
-const DEFAULT_PREFETCH_PAGES = 6;
+const DEFAULT_PREFETCH_PAGES = 3;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
 

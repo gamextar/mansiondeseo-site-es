@@ -1223,7 +1223,7 @@ export async function adminBulkDeleteUsers(userIds) {
 
 // ── Stories ─────────────────────────────────────────────
 
-export async function getStories({ page = 1, limit = 50, focusUserId = '' } = {}) {
+export async function getStories({ page = 1, limit = 25, focusUserId = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (focusUserId) params.set('focus_user_id', focusUserId);
   const path = `/stories?${params}`;
