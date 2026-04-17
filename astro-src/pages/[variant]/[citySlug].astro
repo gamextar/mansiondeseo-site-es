@@ -32,12 +32,13 @@ const {
   pageSchema,
 } = getAstroLandingData({ variant, citySlug });
 
-const statsPills = cityHasStats
+const keywordPills = ['encuentros discretos', 'perfiles verificados', 'adultos registrados', 'contactos privados'];
+const stats = cityHasStats
   ? [
-      `Perfiles activos · ${cityStats.active_profiles_30d}`,
-      `Parejas · ${cityStats.active_couples_30d}`,
-      `Mujeres · ${cityStats.active_women_30d}`,
-      `Hombres · ${cityStats.active_men_30d}`,
+      ['Parejas', cityStats.active_couples_30d],
+      ['Mujeres', cityStats.active_women_30d],
+      ['Hombres', cityStats.active_men_30d],
+      ['Premium', cityStats.premium_profiles],
     ]
   : [];
 ---
@@ -50,98 +51,144 @@ const statsPills = cityHasStats
   ogLocale={localeConfig.hreflang.replace('-', '_')}
   schemas={[faqSchema, pageSchema]}
 >
-  <main class="page-shell">
-    <header class="topbar">
-      <a class="brand" href="/">
-        <span class="brand-mark">M</span>
-        <span>
-          <strong style="display:block;font-size:1.2rem;">Mansion Deseo</strong>
-          <span class="dim" style="font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;">Acceso privado para adultos</span>
-        </span>
-      </a>
+  <main class="page-frame">
+    <div class="page-background">
+      <div class="background-blob left"></div>
+      <div class="background-blob right"></div>
+    </div>
 
-      <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <a class="secondary-button" href={`${APP_SITE_ORIGIN}/login`}>Iniciar sesión</a>
-        <a class="primary-button" href={`${APP_SITE_ORIGIN}/registro`}>Registrarme</a>
-      </div>
-    </header>
+    <div class="page-shell section-spaced" style="position:relative;">
+      <header class="topbar" style="padding-top:0;margin-bottom:40px;">
+        <a class="brand" href="/">
+          <span class="brand-mark">M</span>
+          <span>
+            <strong class="brand-title">Mansión Deseo</strong>
+            <span class="dim" style="display:block;font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;">Acceso privado para adultos</span>
+          </span>
+        </a>
 
-    <section class="surface" style="margin-top:34px;padding:28px;border-radius:36px;">
-      <div class="tag-list">
-        <span class="chip">SEO local</span>
-        <span class="chip">{city?.label || citySlug}</span>
-        <span class="chip">Acceso privado</span>
-      </div>
-
-      <h1 class="headline" style="max-width:18ch;">{page.headline}</h1>
-      <p class="subheadline">{page.intro}</p>
-
-      <div class="button-row">
-        <a class="primary-button" href={`${APP_SITE_ORIGIN}/registro`}>Crear cuenta</a>
-        <a class="secondary-button" href={`/${variant}`}>Ver categoría base</a>
-      </div>
-
-      {statsPills.length > 0 && (
-        <div class="tag-list" style="margin-top:20px;">
-          {statsPills.map((pill) => (
-            <span class="tag-link">{pill}</span>
-          ))}
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <a class="secondary-button" href={`${APP_SITE_ORIGIN}/login`}>Iniciar sesión</a>
+          <a class="primary-button" href={`${APP_SITE_ORIGIN}/registro`}>Registrarme</a>
         </div>
-      )}
+      </header>
 
-      <div class="panel-grid" style="margin-top:26px;">
-        <aside class="card">
-          <p class="eyebrow">Qué encontrás</p>
-          <ul style="margin:16px 0 0;padding:0;list-style:none;display:grid;gap:12px;">
+      <section class="landing-hero-grid">
+        <section>
+          <div class="tag-list">
+            <span class="pill"><span class="pill-dot"></span>SEO local</span>
+            <span class="pill"><span class="pill-dot"></span>{city?.label || citySlug}</span>
+            <span class="pill"><span class="pill-dot"></span>Acceso privado</span>
+          </div>
+
+          <h1 class="headline" style="max-width:18ch;">{page.headline}</h1>
+          <p class="subheadline">{page.intro}</p>
+
+          <div class="tag-list" style="margin-top:20px;">
+            {keywordPills.map((item) => (
+              <span class="tag-link">{item}</span>
+            ))}
+          </div>
+
+          <div class="feature-grid">
+            <div class="card">
+              <div class="feature-icon">L</div>
+              <p style="margin:16px 0 0;font-size:0.95rem;font-weight:600;">Intención + ciudad</p>
+              <p class="dim" style="margin:8px 0 0;line-height:1.7;font-size:0.88rem;">La URL cruza la intención SEO con {city?.label || citySlug} para servir una entrada pública más precisa.</p>
+            </div>
+            <div class="card">
+              <div class="feature-icon">S</div>
+              <p style="margin:16px 0 0;font-size:0.95rem;font-weight:600;">Señal local</p>
+              <p class="dim" style="margin:8px 0 0;line-height:1.7;font-size:0.88rem;">Cuando hay datos verificados, la landing muestra actividad agregada y actualizada por ciudad.</p>
+            </div>
+            <div class="card">
+              <div class="feature-icon">R</div>
+              <p style="margin:16px 0 0;font-size:0.95rem;font-weight:600;">Registro como destino</p>
+              <p class="dim" style="margin:8px 0 0;line-height:1.7;font-size:0.88rem;">La experiencia completa se abre dentro de la app privada, no en la URL pública.</p>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <a class="primary-button" href={`${APP_SITE_ORIGIN}/registro`}>Crear cuenta</a>
+            <a class="secondary-button" href={`/${variant}`}>Ver categoría base</a>
+          </div>
+        </section>
+
+        <aside class="surface" style="padding:28px;border-radius:32px;background:linear-gradient(180deg,rgba(24,20,29,0.92),rgba(10,10,16,0.92));">
+          <div class="eyebrow">Qué encontrás</div>
+
+          <ul class="bullet-list">
             {page.bullets.map((item) => (
-              <li class="surface" style="padding:16px;border-radius:22px;background:rgba(255,255,255,0.04);box-shadow:none;">{item}</li>
+              <li class="bullet-item">
+                <span class="icon-badge">✦</span>
+                <span style="line-height:1.7;color:var(--text);">{item}</span>
+              </li>
             ))}
           </ul>
-        </aside>
 
-        <aside class="card">
-          <p class="eyebrow">Intento + ciudad</p>
-          <p class="muted" style="margin:14px 0 0;line-height:1.8;">
-            Esta URL cruza la intención SEO <strong>{page.focus}</strong> con la ciudad <strong>{city?.label || citySlug}</strong> para servir una entrada pública más específica, con datos reales cuando existen.
-          </p>
+          <div class="card" style="margin-top:22px;background:rgba(0,0,0,0.2);padding:18px 20px;">
+            <div class="eyebrow" style="color:var(--dim);">Actividad local</div>
+            {cityHasStats ? (
+              <>
+                <p style="margin:10px 0 0;line-height:1.8;color:var(--text);">
+                  Hay {cityStats.active_profiles_30d} perfiles verificados activos en los últimos 30 días {city?.cityHint || ''}.
+                </p>
+                <div class="metric-grid">
+                  {stats.map(([label, value]) => (
+                    <div class="metric-card">
+                      <p class="metric-label">{label}</p>
+                      <p class="metric-value">{value}</p>
+                    </div>
+                  ))}
+                </div>
+                <p class="dim" style="margin:12px 0 0;font-size:0.82rem;line-height:1.7;">
+                  Datos agregados y actualizados para reforzar la landing local sin volverla un panel.
+                </p>
+              </>
+            ) : (
+              <p style="margin:10px 0 0;line-height:1.8;color:var(--text);">
+                Esta landing ya está preparada para captar búsquedas de alta intención {city?.cityHint || ''}. Cuando haya volumen agregado suficiente, mostramos cifras públicas más precisas.
+              </p>
+            )}
+          </div>
         </aside>
-      </div>
-    </section>
+      </section>
 
-    <section class="section-stack">
-      {relatedCityLinks.length > 0 && (
+      <section class="split-section">
         <article class="card">
-          <p class="eyebrow">Otras ciudades activas</p>
-          <div class="tag-list" style="margin-top:16px;">
-            {relatedCityLinks.map((item) => (
-              <a class="tag-link" href={item.to}>{item.label}</a>
+          <h2 style="margin:0;font-size:1.7rem;">Preguntas frecuentes</h2>
+          <div style="margin-top:18px;">
+            {page.faq.map(([question, answer]) => (
+              <div class="faq-item" style="border-radius:22px;border:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.15);padding:18px;">
+                <h3>{question}</h3>
+                <p>{answer}</p>
+              </div>
             ))}
           </div>
         </article>
-      )}
 
-      <article class="card">
-        <p class="eyebrow">Busquedas relacionadas</p>
-        <div class="tag-list" style="margin-top:16px;">
-          {RELATED_KEYWORDS
-            .filter((item) => item.to !== `/${variant}`)
-            .map((item) => (
+        <article class="card" style="background:linear-gradient(180deg,rgba(214,177,109,0.08),rgba(24,20,29,0.88));">
+          <h2 style="margin:0;font-size:1.7rem;">{relatedCityLinks.length ? 'Otras ciudades activas' : 'Últimas búsquedas'}</h2>
+          <p class="dim" style="margin:10px 0 0;line-height:1.8;">
+            {relatedCityLinks.length
+              ? 'Estas ciudades ya muestran actividad verificada y ayudan a reforzar el interlinking de la misma familia SEO.'
+              : 'Desde esta familia ampliamos otras intenciones relacionadas para mantener una navegación útil y coherente.'}
+          </p>
+
+          <div class="tag-list" style="margin-top:18px;">
+            {(relatedCityLinks.length ? relatedCityLinks : RELATED_KEYWORDS.filter((item) => item.to !== `/${variant}`)).map((item) => (
               <a class="tag-link" href={item.to}>{item.label}</a>
             ))}
-        </div>
-      </article>
+          </div>
 
-      <article class="card">
-        <p class="eyebrow">Preguntas frecuentes</p>
-        <div style="margin-top:18px;">
-          {page.faq.map(([question, answer]) => (
-            <div class="faq-item">
-              <h3>{question}</h3>
-              <p>{answer}</p>
-            </div>
-          ))}
-        </div>
-      </article>
-    </section>
+          <div class="card" style="margin-top:22px;background:rgba(0,0,0,0.2);padding:18px 20px;">
+            <div class="eyebrow" style="color:var(--dim);">Adentro de la app</div>
+            <p style="margin:10px 0 0;line-height:1.8;color:var(--text);">
+              La landing pública captura la búsqueda local. El detalle de perfiles, stories y mensajes vive dentro del sitio, detrás del registro.
+            </p>
+          </div>
+        </article>
+      </section>
+    </div>
   </main>
 </BaseLayout>

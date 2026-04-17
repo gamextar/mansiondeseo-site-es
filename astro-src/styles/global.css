@@ -329,6 +329,98 @@ img {
   margin: 24px 0 0;
 }
 
+.landing-hero-grid {
+  display: grid;
+  gap: 22px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--gold);
+  box-shadow: 0 0 18px rgba(214, 177, 109, 0.45);
+}
+
+.bullet-list {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.bullet-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 16px;
+}
+
+.icon-badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: rgba(214, 177, 109, 0.14);
+  color: var(--gold);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.metric-card {
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 14px;
+}
+
+.metric-label {
+  margin: 0;
+  color: var(--dim);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+.metric-value {
+  margin: 6px 0 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.split-section {
+  display: grid;
+  gap: 18px;
+  margin-top: 64px;
+}
+
 .feature-icon {
   width: 44px;
   height: 44px;
@@ -365,6 +457,12 @@ img {
     grid-template-columns: 1.1fr 0.9fr;
   }
 
+  .landing-hero-grid {
+    grid-template-columns: 1.12fr 0.88fr;
+    align-items: stretch;
+    gap: 32px;
+  }
+
   .hero-grid {
     grid-template-columns: 0.94fr 1.06fr;
     align-items: stretch;
@@ -376,6 +474,10 @@ img {
 
   .feature-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .split-section {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
