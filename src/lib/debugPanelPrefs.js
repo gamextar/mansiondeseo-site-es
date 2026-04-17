@@ -4,7 +4,6 @@ const EVENT_NAME = 'mansion-debug-panel-prefs-update';
 const DEFAULT_PREFS = {
   api: true,
   realtime: true,
-  livefeed: false,
   media: false,
 };
 

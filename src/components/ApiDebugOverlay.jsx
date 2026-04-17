@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
 import { estimateRealtimeLoad, getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
-import { getLivefeedDebugSummary, resetLivefeedDebug, subscribeLivefeedDebug } from '../lib/livefeedDebug';
 import { getMediaDebugSummary, inspectVisibleMedia, resetMediaDebug, subscribeMediaDebug } from '../lib/mediaDebug';
 import { getDebugPanelPrefs, setDebugPanelPref, subscribeDebugPanelPrefs } from '../lib/debugPanelPrefs';
 import { getD1DebugSummary, resetD1Debug, subscribeD1Debug } from '../lib/d1Debug';
@@ -27,7 +26,6 @@ function MediaFamilyTable({ title, data }) {
   const rows = [
     ['profiles', 'Profiles'],
     ['stories', 'Stories'],
-    ['livefeed', 'Livefeed'],
     ['assets', 'Assets'],
     ['other', 'Otros'],
   ];
@@ -57,7 +55,6 @@ export default function ApiDebugOverlay() {
   const location = useLocation();
   const [summary, setSummary] = useState(() => getApiDebugSummary());
   const [realtimeSummary, setRealtimeSummary] = useState(() => getRealtimeDebugSummary());
-  const [livefeedSummary, setLivefeedSummary] = useState(() => getLivefeedDebugSummary());
   const [d1Summary, setD1Summary] = useState(() => getD1DebugSummary());
   const [mediaSummary, setMediaSummary] = useState(() => getMediaDebugSummary());
   const [panelPrefs, setPanelPrefs] = useState(() => getDebugPanelPrefs());
@@ -85,10 +82,6 @@ export default function ApiDebugOverlay() {
       setRealtimeSummary(nextSummary);
     });
 
-    const unsubscribeLivefeed = subscribeLivefeedDebug((nextSummary) => {
-      setLivefeedSummary(nextSummary);
-    });
-
     const unsubscribeMedia = subscribeMediaDebug((nextSummary) => {
       setMediaSummary(nextSummary);
     });
@@ -104,7 +97,6 @@ export default function ApiDebugOverlay() {
     return () => {
       unsubscribeApi?.();
       unsubscribeRealtime?.();
-      unsubscribeLivefeed?.();
       unsubscribeMedia?.();
       unsubscribeD1?.();
       unsubscribePrefs?.();
@@ -154,7 +146,6 @@ export default function ApiDebugOverlay() {
   const activePanels = [
     panelPrefs.api,
     panelPrefs.realtime,
-    panelPrefs.livefeed,
     panelPrefs.d1 !== false,
     panelPrefs.media,
   ].filter(Boolean).length;
@@ -176,9 +167,6 @@ export default function ApiDebugOverlay() {
           </TogglePill>
           <TogglePill active={panelPrefs.realtime} onClick={() => setPanelPrefs(setDebugPanelPref('realtime', !panelPrefs.realtime))}>
             WS
-          </TogglePill>
-          <TogglePill active={panelPrefs.livefeed} onClick={() => setPanelPrefs(setDebugPanelPref('livefeed', !panelPrefs.livefeed))}>
-            Livefeed
           </TogglePill>
           <TogglePill active={panelPrefs.d1 !== false} onClick={() => setPanelPrefs(setDebugPanelPref('d1', panelPrefs.d1 === false))}>
             D1
@@ -328,67 +316,6 @@ export default function ApiDebugOverlay() {
                       </div>
                     </div>
                   ))}
-                </div>
-              </div>
-            </section>
-          )}
-
-          {panelPrefs.livefeed && (
-            <section className="rounded-xl border border-fuchsia-500/20 overflow-hidden">
-              <div className="flex items-center justify-between border-b border-fuchsia-500/15 bg-fuchsia-500/5 px-3 py-2">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-fuchsia-300/90">Livefeed</p>
-                  <p className="text-[10px] text-white/55">Mide si el snapshot sale de memoria, red o deduplicacion del request actual.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setLivefeedSummary(resetLivefeedDebug())}
-                  className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/80"
-                >
-                  Reset
-                </button>
-              </div>
-              <div className="space-y-2 px-3 py-3">
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-xl bg-white/5 px-3 py-2">
-                    <p className="text-white/55">Current network</p>
-                    <p className="mt-1 text-lg font-semibold">{livefeedSummary?.totals?.currentNetwork ?? 0}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/5 px-3 py-2">
-                    <p className="text-white/55">Current memory</p>
-                    <p className="mt-1 text-lg font-semibold">{livefeedSummary?.totals?.currentMemory ?? 0}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/5 px-3 py-2">
-                    <p className="text-white/55">Current deduped</p>
-                    <p className="mt-1 text-lg font-semibold">{livefeedSummary?.totals?.currentDeduped ?? 0}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/5 px-3 py-2">
-                    <p className="text-white/55">Payload network</p>
-                    <p className="mt-1 text-lg font-semibold">{livefeedSummary?.totals?.payloadNetwork ?? 0}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-xl bg-white/5 px-3 py-2">
-                    <p className="text-white/55">Ultimo current</p>
-                    <p className="mt-1 text-sm font-semibold text-white">{livefeedSummary?.lastCurrent?.source || '-'}</p>
-                    <p className="mt-1 text-[10px] text-white/55">{livefeedSummary?.lastCurrent?.version || '-'}</p>
-                    <p className="mt-1 text-[10px] text-white/45">{livefeedSummary?.lastCurrent?.fetchedAt || '-'}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/5 px-3 py-2">
-                    <p className="text-white/55">Ultimo payload</p>
-                    <p className="mt-1 text-sm font-semibold text-white">{livefeedSummary?.lastPayload?.version || '-'}</p>
-                    <p className="mt-1 text-[10px] text-white/55 break-all">{livefeedSummary?.lastPayload?.url || '-'}</p>
-                    <p className="mt-1 text-[10px] text-white/45">{livefeedSummary?.lastPayload?.fetchedAt || '-'}</p>
-                  </div>
-                </div>
-                <div className="rounded-xl bg-white/5 px-3 py-2 text-[11px]">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-white/55">Errores</p>
-                    <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-200">
-                      {livefeedSummary?.totals?.errors ?? 0}
-                    </span>
-                  </div>
-                  <p className="mt-2 break-all text-rose-200/85">{livefeedSummary?.lastError || 'Sin errores'}</p>
                 </div>
               </div>
             </section>

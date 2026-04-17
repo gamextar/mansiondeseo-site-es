@@ -9,7 +9,6 @@ function createCounters() {
 function normalizeFamily(url) {
   try {
     const { pathname } = new URL(url);
-    if (pathname.startsWith('/livefeed/')) return 'livefeed';
     if (pathname.startsWith('/stories/')) return 'stories';
     if (pathname.startsWith('/profiles/')) return 'profiles';
     if (pathname.startsWith('/assets/')) return 'assets';
@@ -30,7 +29,6 @@ function accumulateEntry(counter, entry) {
 
 function summarizeFamilies(entries = []) {
   const families = {
-    livefeed: createCounters(),
     stories: createCounters(),
     profiles: createCounters(),
     assets: createCounters(),

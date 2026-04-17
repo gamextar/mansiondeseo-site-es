@@ -415,7 +415,6 @@ export default function SettingsPage() {
         story_circle_inner_gap: storyCircleInnerGap,
         home_story_count_mobile: homeStoryCountMobile,
         home_story_count_desktop: homeStoryCountDesktop,
-        home_stories_use_livefeed: false,
         sidebar_story_ring_width: sidebarStoryRingWidth,
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
@@ -1431,7 +1430,6 @@ export default function SettingsPage() {
                 {[
                   ['api', 'API requests'],
                   ['realtime', 'WebSockets'],
-                  ['livefeed', 'Livefeed'],
                   ['media', 'HIT / MISS media'],
                 ].map(([key, label]) => (
                   <button

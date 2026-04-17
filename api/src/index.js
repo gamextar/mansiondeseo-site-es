@@ -3633,7 +3633,6 @@ async function handleUpdateSettings(request, env) {
     'story_circle_gap',
     'story_circle_border',
     'story_circle_inner_gap',
-    'home_stories_use_livefeed',
     'sidebar_story_ring_width',
     'coin_icon_url',
     'coin_icon_size',
