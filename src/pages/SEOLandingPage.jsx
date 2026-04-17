@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useSeoMeta, useStructuredData } from '../lib/seo';
 import { getGeo } from '../lib/seoGeoCatalog';
 import { DEFAULT_SEO_LOCALE, getSeoLocale } from '../lib/seoLocales';
-import { buildSeoAlternates, buildSeoCanonical, buildSeoPath } from '../lib/seoRouting';
+import { buildSeoAlternates, buildSeoCanonical, buildSeoPublicPath } from '../lib/seoRouting';
 import { formatSeoCityStatsDate, getSeoCityStats, getTopSeoCityStats, hasSeoCityStats } from '../lib/seoCityStats';
 import { getSeoIntentPage } from '../lib/seoIntentCatalog';
 
@@ -351,7 +351,7 @@ export default function SEOLandingPage({ variant, citySlug = '', locale = DEFAUL
         const entryCity = slugToCity(entry.city_slug, locale);
         if (!entryCity) return null;
         return {
-          to: buildSeoPath({ locale, variant, citySlug: entry.city_slug }),
+          to: buildSeoPublicPath({ locale, variant, citySlug: entry.city_slug }),
           label: `${entryCity.label} (${formatCount(entry.active_profiles_30d)})`,
         };
       })
@@ -590,7 +590,7 @@ export default function SEOLandingPage({ variant, citySlug = '', locale = DEFAUL
             <div className="mt-5 flex flex-wrap gap-2">
               {(relatedCityLinks.length ? relatedCityLinks : RELATED.map((item) => ({
                 ...item,
-                to: buildSeoPath({ locale, variant: item.to.replace(/^\//, '') }),
+                to: buildSeoPublicPath({ locale, variant: item.to.replace(/^\//, '') }),
               }))).map((item) => (
                 <Link
                   key={`${item.to}-${item.label}`}

@@ -5,6 +5,7 @@ import { useSeoMeta, useStructuredData } from '../lib/seo';
 import { useAuth } from '../lib/authContext';
 import { getTopSeoCityStats, formatSeoCityStatsDate } from '../lib/seoCityStats';
 import { getSeoHomeStats, formatSeoHomeStatsDate } from '../lib/seoHomeStats';
+import { buildSeoPublicPath } from '../lib/seoRouting';
 import heroTrioPremium from '../assets/hero-trio-premium.svg';
 
 const countFormatter = new Intl.NumberFormat('es-AR');
@@ -210,7 +211,7 @@ export default function PublicHomePage() {
                   {intentLinks.map((item) => (
                     <Link
                       key={`${item.to}-${item.label}`}
-                      to={item.to}
+                      to={buildSeoPublicPath({ variant: item.to.replace(/^\//, '') })}
                       className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:text-white"
                     >
                       {item.label}
@@ -228,7 +229,7 @@ export default function PublicHomePage() {
                   {topCities.map((city) => (
                     <Link
                       key={city.city_slug}
-                      to={`/contactossex/${city.city_slug}`}
+                      to={buildSeoPublicPath({ variant: 'contactossex', citySlug: city.city_slug })}
                       className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:text-white"
                     >
                       {city.locality || city.city_slug}

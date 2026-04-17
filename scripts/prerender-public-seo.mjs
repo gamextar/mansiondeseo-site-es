@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { getGeo, getGeoPagesForLocale } from '../src/lib/seoGeoCatalog.js';
 import { DEFAULT_SEO_LOCALE, getRouteEnabledSeoLocales, getSeoLocale } from '../src/lib/seoLocales.js';
-import { buildSeoAlternates, buildSeoCanonical, buildSeoPath } from '../src/lib/seoRouting.js';
+import { buildSeoAlternates, buildSeoCanonical, buildSeoPath, buildSeoPublicPath } from '../src/lib/seoRouting.js';
 import { getSeoIntentPage } from '../src/lib/seoIntentCatalog.js';
 import { SEO_BASE_INTENTS, SEO_GEO_INTENT_CONFIGS } from '../src/lib/seoVariants.js';
 
@@ -489,13 +489,13 @@ function renderHomeShell() {
           <div class="seo-card seo-section">
             <div class="seo-subtle">Ultimas búsquedas</div>
             <div class="seo-kpis">
-              ${HOME_INTENT_LINKS.map((item) => `<a class="seo-pill" href="${escapeHtml(item.to)}">${escapeHtml(item.label)}</a>`).join('')}
+              ${HOME_INTENT_LINKS.map((item) => `<a class="seo-pill" href="${escapeHtml(buildSeoPublicPath({ variant: item.to.replace(/^\//, '') }))}">${escapeHtml(item.label)}</a>`).join('')}
             </div>
           </div>
           <div class="seo-card seo-section">
             <div class="seo-subtle">Ciudades activas</div>
             <div class="seo-kpis">
-              ${topCities.map((city) => `<a class="seo-pill" href="/contactossex/${escapeHtml(city.city_slug)}">${escapeHtml(city.locality || city.city_slug)}</a>`).join('')}
+              ${topCities.map((city) => `<a class="seo-pill" href="${escapeHtml(buildSeoPublicPath({ variant: 'contactossex', citySlug: city.city_slug }))}">${escapeHtml(city.locality || city.city_slug)}</a>`).join('')}
             </div>
           </div>
         </section>
@@ -526,7 +526,7 @@ function buildLandingData({ variant, citySlug = '', locale = DEFAULT_SEO_LOCALE 
         const entryCity = getGeo(entry.city_slug, locale);
         if (!entryCity) return null;
         return {
-          to: buildSeoPath({ locale, variant, citySlug: entry.city_slug }),
+          to: buildSeoPublicPath({ locale, variant, citySlug: entry.city_slug }),
           label: `${entryCity.label} (${formatCount(entry.active_profiles_30d)})`,
         };
       })
@@ -574,7 +574,7 @@ function renderLandingShell(view) {
   const { page, city, cityStats, cityHasStats, relatedCityLinks } = view;
   const links = relatedCityLinks.length
     ? relatedCityLinks
-    : RELATED_LINKS.map((item) => ({ ...item, to: item.to }));
+    : RELATED_LINKS.map((item) => ({ ...item, to: buildSeoPublicPath({ locale: view.localeConfig.code, variant: item.to.replace(/^\//, '') }) }));
 
   return `
     <div id="seo-prerender">
