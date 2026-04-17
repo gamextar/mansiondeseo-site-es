@@ -1,8 +1,6 @@
 import { useState, useCallback, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useAgeVerified } from './hooks/useAgeVerified';
-import AgeVerificationModal from './components/AgeVerificationModal';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import DesktopSidebar from './components/DesktopSidebar';
@@ -25,6 +23,7 @@ import { lazyWithRetry } from './lib/lazyWithRetry';
 import { useRobotsMeta } from './lib/seo';
 import { getRouteEnabledSeoLocales, isSeoLocale } from './lib/seoLocales';
 import { isSeoIntentVariant } from './lib/seoVariants';
+import { isAppSubdomainHost } from './lib/siteDomains';
 
 const ExplorePage = lazy(lazyWithRetry(() => import('./pages/ExplorePage'), 'mansion-lazy-retry:explore'));
 const ProfileDetailPage = lazy(lazyWithRetry(() => import('./pages/ProfileDetailPage'), 'mansion-lazy-retry:profile-detail'));
@@ -80,6 +79,29 @@ function LocalizedSEOLanding() {
   return <SEOLandingPage locale={locale} variant={variant} citySlug={citySlug || ''} />;
 }
 
+function isPublicSeoRoute(pathname = '') {
+  const path = pathname || '/';
+  if (path === '/') return true;
+
+  const parts = path.split('/').filter(Boolean);
+  if (parts.length === 0) return true;
+
+  if (isSeoIntentVariant(parts[0])) return true;
+  if (parts.length >= 2 && isSeoLocale(parts[0]) && isSeoIntentVariant(parts[1])) return true;
+
+  return false;
+}
+
+function RootEntryPage() {
+  const { registered } = useAuth();
+
+  if (isAppSubdomainHost()) {
+    return <Navigate to={registered ? "/feed" : "/login"} replace />;
+  }
+
+  return <PublicHomePage />;
+}
+
 function AppLayout() {
   const location = useLocation();
   const { user } = useAuth();
@@ -89,19 +111,21 @@ function AppLayout() {
   const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
   const routeOverlayOpen = profileOverlayOpen || videoOverlayOpen;
   const standaloneVideosRoute = isStandaloneMobileApp && location.pathname.startsWith('/videos');
-  const isPublicHome = location.pathname === '/';
+  const isPublicSeoPage = isPublicSeoRoute(location.pathname);
   const isFullscreen =
     standaloneVideosRoute ||
     FULLSCREEN_PATHS.some((p) => location.pathname.startsWith(p)) ||
     FULLSCREEN_PATHS.includes(location.pathname);
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
-  const showChrome = !isFullscreen && !isChatDetail && !isPublicHome;
+  const showChrome = !isFullscreen && !isChatDetail && !isPublicSeoPage;
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const showTopNavbar = showChrome && !routeOverlayOpen;
-  const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
+  const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen && !isPublicSeoPage);
   const scrollLockRef = useRef(null);
   const routePath = location.pathname || '/';
+  const isAppHost = isAppSubdomainHost();
   const isPrivateNoindexRoute =
+    isAppHost ||
     routePath === '/feed' ||
     routePath === '/explorar' ||
     routePath === '/videos' ||
@@ -267,8 +291,10 @@ function AppLayout() {
 
           {/* Public SEO landing pages */}
           <Route path="/parejas" element={<SEOLandingPage variant="parejas" />} />
+          <Route path="/parejas-liberales" element={<SEOLandingPage variant="parejas-liberales" />} />
           <Route path="/trios" element={<SEOLandingPage variant="trios" />} />
           <Route path="/swingers" element={<SEOLandingPage variant="swingers" />} />
+          <Route path="/intercambio-de-parejas" element={<SEOLandingPage variant="intercambio-de-parejas" />} />
           <Route path="/mujeres" element={<SEOLandingPage variant="mujeres" />} />
           <Route path="/hombres" element={<SEOLandingPage variant="hombres" />} />
           <Route path="/trans" element={<SEOLandingPage variant="trans" />} />
@@ -276,9 +302,12 @@ function AppLayout() {
           <Route path="/contactossex" element={<SEOLandingPage variant="contactossex" />} />
           <Route path="/contactossex-argentina" element={<SEOLandingPage variant="contactossex-argentina" />} />
           <Route path="/cornudos-argentina" element={<SEOLandingPage variant="cornudos-argentina" />} />
+          <Route path="/hotwife-argentina" element={<SEOLandingPage variant="hotwife-argentina" />} />
           <Route path="/parejas/:citySlug" element={<SEOCityLanding variant="parejas" />} />
+          <Route path="/parejas-liberales/:citySlug" element={<SEOCityLanding variant="parejas-liberales" />} />
           <Route path="/trios/:citySlug" element={<SEOCityLanding variant="trios" />} />
           <Route path="/swingers/:citySlug" element={<SEOCityLanding variant="swingers" />} />
+          <Route path="/intercambio-de-parejas/:citySlug" element={<SEOCityLanding variant="intercambio-de-parejas" />} />
           <Route path="/mujeres/:citySlug" element={<SEOCityLanding variant="mujeres" />} />
           <Route path="/hombres/:citySlug" element={<SEOCityLanding variant="hombres" />} />
           <Route path="/trans/:citySlug" element={<SEOCityLanding variant="trans" />} />
@@ -286,6 +315,7 @@ function AppLayout() {
           <Route path="/contactossex/:citySlug" element={<SEOCityLanding variant="contactossex" />} />
           <Route path="/contactossex-argentina/:citySlug" element={<SEOCityLanding variant="contactossex-argentina" />} />
           <Route path="/cornudos-argentina/:citySlug" element={<SEOCityLanding variant="cornudos-argentina" />} />
+          <Route path="/hotwife-argentina/:citySlug" element={<SEOCityLanding variant="hotwife-argentina" />} />
           {NON_DEFAULT_ROUTE_LOCALES.length > 0 && (
             <>
               <Route path="/:locale/:variant" element={<LocalizedSEOLanding />} />
@@ -310,7 +340,7 @@ function AppLayout() {
           {/* Standard layout pages (require registration) */}
           <Route
             path="/"
-            element={<PublicHomePage />}
+            element={<RootEntryPage />}
           />
           <Route
             path="/feed"
@@ -473,7 +503,6 @@ function AppLayout() {
 }
 
 export default function App() {
-  const { verified, verify } = useAgeVerified();
   const [debugFlags, setDebugFlags] = useState(() => getBootDebugFlags());
   const [registered, setRegisteredState] = useState(
     () => !!getToken() || localStorage.getItem('mansion_registered') === 'true'
@@ -740,7 +769,6 @@ export default function App() {
         {snapshotShieldVisible && (
           <div className="fixed inset-0 z-[9998] bg-mansion-base" aria-hidden="true" />
         )}
-        {!debugFlags.shellOnly && !verified && <AgeVerificationModal onVerify={verify} />}
         {!debugFlags.shellOnly && <AppLayout />}
         {!debugFlags.shellOnly && <InstallAppBanner />}
         {!debugFlags.shellOnly && <ApiDebugOverlay />}

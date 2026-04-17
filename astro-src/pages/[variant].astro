@@ -1,0 +1,109 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SEO_INTENT_VARIANTS, isSeoIntentVariant } from '../../src/lib/seoVariants.js';
+import { getAstroLandingData, RELATED_KEYWORDS } from '../lib/landingData.js';
+import { APP_SITE_ORIGIN } from '../../src/lib/siteDomains.js';
+
+export function getStaticPaths() {
+  return SEO_INTENT_VARIANTS.map((variant) => ({ params: { variant } }));
+}
+
+const { variant } = Astro.params;
+
+if (!isSeoIntentVariant(variant)) {
+  throw new Error(`Invalid SEO variant: ${variant}`);
+}
+
+const { localeConfig, page, canonical, alternates, faqSchema, pageSchema } = getAstroLandingData({ variant });
+---
+<BaseLayout
+  title={page.title}
+  description={page.description}
+  canonical={canonical}
+  alternates={alternates}
+  htmlLang={localeConfig.language}
+  ogLocale={localeConfig.hreflang.replace('-', '_')}
+  schemas={[faqSchema, pageSchema]}
+>
+  <main class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">M</span>
+        <span>
+          <strong style="display:block;font-size:1.2rem;">Mansion Deseo</strong>
+          <span class="dim" style="font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;">Acceso privado para adultos</span>
+        </span>
+      </a>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <a class="secondary-button" href={`${APP_SITE_ORIGIN}/login`}>Iniciar sesión</a>
+        <a class="primary-button" href={`${APP_SITE_ORIGIN}/registro`}>Registrarme</a>
+      </div>
+    </header>
+
+    <section class="surface" style="margin-top:34px;padding:28px;border-radius:36px;">
+      <div class="tag-list">
+        <span class="chip">Solo mayores registrados</span>
+        <span class="chip">Perfiles verificados</span>
+        <span class="chip">Discreción total</span>
+      </div>
+
+      <h1 class="headline" style="max-width:18ch;">{page.headline}</h1>
+      <p class="subheadline">{page.intro}</p>
+
+      <div class="button-row">
+        <a class="primary-button" href={`${APP_SITE_ORIGIN}/registro`}>Crear cuenta</a>
+        <a class="secondary-button" href={`${APP_SITE_ORIGIN}/login`}>Ya tengo cuenta</a>
+      </div>
+
+      <div class="panel-grid" style="margin-top:26px;">
+        <aside class="card">
+          <p class="eyebrow">Qué encontrás</p>
+          <ul style="margin:16px 0 0;padding:0;list-style:none;display:grid;gap:12px;">
+            {page.bullets.map((item) => (
+              <li class="surface" style="padding:16px;border-radius:22px;background:rgba(255,255,255,0.04);box-shadow:none;">{item}</li>
+            ))}
+          </ul>
+        </aside>
+
+        <aside class="card">
+          <p class="eyebrow">Puente SEO</p>
+          <p class="muted" style="margin:14px 0 0;line-height:1.8;">
+            Esta landing pública está pensada para captar la búsqueda correcta y derivarla a una experiencia privada con filtros, perfiles, stories y mensajes dentro de la app.
+          </p>
+          <div class="tag-list" style="margin-top:18px;">
+            <span class="tag-link">encuentros discretos</span>
+            <span class="tag-link">adultos registrados</span>
+            <span class="tag-link">perfiles verificados</span>
+            <span class="tag-link">acceso controlado</span>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section-stack">
+      <article class="card">
+        <p class="eyebrow">Busquedas relacionadas</p>
+        <div class="tag-list" style="margin-top:16px;">
+          {RELATED_KEYWORDS
+            .filter((item) => item.to !== `/${variant}`)
+            .map((item) => (
+              <a class="tag-link" href={item.to}>{item.label}</a>
+            ))}
+        </div>
+      </article>
+
+      <article class="card">
+        <p class="eyebrow">Preguntas frecuentes</p>
+        <div style="margin-top:18px;">
+          {page.faq.map(([question, answer]) => (
+            <div class="faq-item">
+              <h3>{question}</h3>
+              <p>{answer}</p>
+            </div>
+          ))}
+        </div>
+      </article>
+    </section>
+  </main>
+</BaseLayout>

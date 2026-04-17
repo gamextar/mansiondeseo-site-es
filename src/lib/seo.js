@@ -1,5 +1,16 @@
 import { useEffect } from 'react';
 
+function isPagesPreviewHost() {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname || '';
+  return hostname.endsWith('.pages.dev');
+}
+
+function resolveRobotsContent(robots) {
+  if (isPagesPreviewHost()) return 'noindex,nofollow';
+  return robots;
+}
+
 function upsertMeta(name, content) {
   if (typeof document === 'undefined') return null;
   const attr = name.startsWith('property:') ? 'property' : 'name';
@@ -51,6 +62,7 @@ export function useSeoMeta({
 }) {
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
+    const effectiveRobots = resolveRobotsContent(robots);
 
     const previousTitle = document.title;
     const previousHtmlLang = document.documentElement.lang || '';
@@ -68,7 +80,7 @@ export function useSeoMeta({
 
     if (htmlLang) document.documentElement.lang = htmlLang;
     upsertMeta('description', description);
-    upsertMeta('robots', robots);
+    upsertMeta('robots', effectiveRobots);
     upsertMeta('property:og:title', title);
     upsertMeta('property:og:description', description);
     upsertMeta('property:og:type', ogType);
@@ -123,9 +135,10 @@ export function useStructuredData(data, id = 'structured-data') {
 export function useRobotsMeta(robots = 'index,follow') {
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
+    const effectiveRobots = resolveRobotsContent(robots);
 
     const previousRobots = document.head.querySelector('meta[name="robots"]')?.getAttribute('content') || '';
-    upsertMeta('robots', robots);
+    upsertMeta('robots', effectiveRobots);
 
     return () => {
       upsertMeta('robots', previousRobots);

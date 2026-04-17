@@ -15,6 +15,7 @@ const wranglerTomlPath = path.join(repoRoot, 'wrangler.toml');
 const schemaSqlPath = path.join(repoRoot, 'scripts', 'sql', 'seo-city-stats.sql');
 const defaultOutputPath = path.join(repoRoot, 'data', 'seo', 'seo-city-stats.json');
 const defaultSqlOutputPath = path.join(repoRoot, 'data', 'seo', 'seo-city-stats-upsert.sql');
+const defaultHomeOutputPath = path.join(repoRoot, 'data', 'seo', 'seo-home-stats.json');
 
 function takeFlag(argv, name, fallback = '') {
   const index = argv.indexOf(name);
@@ -95,6 +96,19 @@ function normalizeRow(slug, target, row) {
   };
 }
 
+function normalizeHomeStats(row) {
+  return {
+    active_profiles_30d: numeric(row?.active_profiles_30d),
+    active_couples_30d: numeric(row?.active_couples_30d),
+    active_women_30d: numeric(row?.active_women_30d),
+    active_men_30d: numeric(row?.active_men_30d),
+    active_trans_30d: numeric(row?.active_trans_30d),
+    premium_profiles: numeric(row?.premium_profiles),
+    verified_profiles: numeric(row?.verified_profiles),
+    updated_at: String(row?.updated_at || new Date().toISOString()),
+  };
+}
+
 function buildStatsQuery(target) {
   const whereClause = injectBindings(target.whereSql, target.bindings || []);
   return `
@@ -111,6 +125,24 @@ function buildStatsQuery(target) {
     WHERE status = 'verified'
       AND COALESCE(account_status, 'active') = 'active'
       AND ${whereClause}
+  `.trim();
+}
+
+function buildHomeStatsQuery() {
+  return `
+    SELECT
+      COALESCE(SUM(CASE WHEN datetime(last_active) >= datetime('now', '-30 days') THEN 1 ELSE 0 END), 0) AS active_profiles_30d,
+      COALESCE(SUM(CASE WHEN role IN ('pareja', 'pareja_hombres', 'pareja_mujeres') AND datetime(last_active) >= datetime('now', '-30 days') THEN 1 ELSE 0 END), 0) AS active_couples_30d,
+      COALESCE(SUM(CASE WHEN role = 'mujer' AND datetime(last_active) >= datetime('now', '-30 days') THEN 1 ELSE 0 END), 0) AS active_women_30d,
+      COALESCE(SUM(CASE WHEN role = 'hombre' AND datetime(last_active) >= datetime('now', '-30 days') THEN 1 ELSE 0 END), 0) AS active_men_30d,
+      COALESCE(SUM(CASE WHEN role = 'trans' AND datetime(last_active) >= datetime('now', '-30 days') THEN 1 ELSE 0 END), 0) AS active_trans_30d,
+      COALESCE(SUM(CASE WHEN premium = 1 OR (premium_until IS NOT NULL AND datetime(premium_until) > datetime('now')) THEN 1 ELSE 0 END), 0) AS premium_profiles,
+      COUNT(*) AS verified_profiles,
+      datetime('now') AS updated_at
+    FROM users
+    WHERE status = 'verified'
+      AND COALESCE(account_status, 'active') = 'active'
+      AND datetime(last_active) >= datetime('now', '-30 days')
   `.trim();
 }
 
@@ -153,7 +185,7 @@ INSERT OR REPLACE INTO seo_city_stats (
 function printHelp() {
   console.log(`
 Uso:
-  npm run seo:city-stats -- [--remote|--local] [--out path] [--sql-out path] [--slugs rosario,caba] [--write-d1]
+  npm run seo:city-stats -- [--remote|--local] [--out path] [--sql-out path] [--home-out path] [--slugs rosario,caba] [--write-d1]
 
 Ejemplos:
   npm run seo:city-stats -- --remote
@@ -163,6 +195,7 @@ Ejemplos:
 Salida por defecto:
   JSON: ${path.relative(repoRoot, defaultOutputPath)}
   SQL : ${path.relative(repoRoot, defaultSqlOutputPath)}
+  Home: ${path.relative(repoRoot, defaultHomeOutputPath)}
   `.trim());
 }
 
@@ -175,12 +208,14 @@ function main() {
 
   const outputArg = takeFlag(argv, '--out', '');
   const sqlOutputArg = takeFlag(argv, '--sql-out', '');
+  const homeOutputArg = takeFlag(argv, '--home-out', '');
   const slugsArg = takeFlag(argv, '--slugs', '');
   const writeD1 = hasFlag(argv, '--write-d1');
   const useLocal = hasFlag(argv, '--local');
   const remote = !useLocal || hasFlag(argv, '--remote');
   const outputPath = path.resolve(process.cwd(), outputArg || defaultOutputPath);
   const sqlOutputPath = path.resolve(process.cwd(), sqlOutputArg || defaultSqlOutputPath);
+  const homeOutputPath = path.resolve(process.cwd(), homeOutputArg || defaultHomeOutputPath);
   const requestedSlugs = slugsArg
     ? slugsArg.split(',').map((value) => String(value || '').trim()).filter(Boolean)
     : GEO_STATS_SLUGS;
@@ -202,6 +237,9 @@ function main() {
     rows.push(normalizeRow(slug, target, firstRow));
   }
 
+  const homeResult = runWranglerQuery(dbName, { remote, sql: buildHomeStatsQuery() });
+  const homeStats = normalizeHomeStats(homeResult?.[0]?.results?.[0] || {});
+
   const payload = {
     generatedAt: new Date().toISOString(),
     source: remote ? 'remote' : 'local',
@@ -209,12 +247,20 @@ function main() {
     totalCities: rows.length,
     cities: rows,
   };
+  const homePayload = {
+    generatedAt: new Date().toISOString(),
+    source: remote ? 'remote' : 'local',
+    dbName,
+    stats: homeStats,
+  };
   const upsertSql = buildUpsertSql(rows);
 
   mkdirSync(path.dirname(outputPath), { recursive: true });
   mkdirSync(path.dirname(sqlOutputPath), { recursive: true });
+  mkdirSync(path.dirname(homeOutputPath), { recursive: true });
   writeFileSync(outputPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
   writeFileSync(sqlOutputPath, upsertSql, 'utf8');
+  writeFileSync(homeOutputPath, `${JSON.stringify(homePayload, null, 2)}\n`, 'utf8');
 
   if (writeD1) {
     runWranglerQuery(dbName, { remote, sql: upsertSql });
@@ -222,6 +268,7 @@ function main() {
 
   console.log(`City stats generadas: ${outputPath}`);
   console.log(`SQL de upsert generado: ${sqlOutputPath}`);
+  console.log(`Home stats generadas: ${homeOutputPath}`);
   console.log(`Ciudades procesadas: ${rows.length}`);
   if (writeD1) {
     console.log(`Tabla seo_city_stats actualizada en D1 (${remote ? 'remote' : 'local'})`);

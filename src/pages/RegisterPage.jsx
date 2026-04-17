@@ -639,7 +639,7 @@ function isValidEmailTld(email) {
 }
 const USERNAME_REGEX = /^[a-zA-Z0-9._]+$/;
 
-function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePasswordDefault, emailStatus, onEmailBlur, onNavigateRecover }) {
+function StepEmail({ email, password, birthdate, onBirthdateChange, onEmailChange, onPasswordChange, hidePasswordDefault, emailStatus, onEmailBlur, onNavigateRecover }) {
   const [showPassword, setShowPassword] = useState(!hidePasswordDefault);
   const [passwordTouched, setPasswordTouched] = useState(false);
 
@@ -666,7 +666,7 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
       <h2 className="font-display text-2xl font-bold text-text-primary mb-2">
         Crear acceso
       </h2>
-      <p className="text-text-muted text-sm mb-8">Creá tu cuenta para empezar a explorar el sitio</p>
+      <p className="text-text-muted text-sm mb-8">Creá tu cuenta y confirma tu edad para empezar a explorar el sitio</p>
 
       <div className="space-y-4 max-w-xs mx-auto text-left">
         <div>
@@ -745,6 +745,10 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
             <p className="text-green-500 text-[11px] mt-1">Contraseña válida ({password.length}/10)</p>
           )}
         </div>
+        <BirthdateFields
+          birthdate={birthdate}
+          onBirthdateChange={onBirthdateChange}
+        />
       </div>
     </div>
   );
@@ -1077,13 +1081,10 @@ function StepInterests({ selected, onToggle }) {
   );
 }
 
-function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, selectedCountry, onCountryChange, usernameStatus, onUsernameBlur }) {
-  const [showSuggestions, setShowSuggestions] = useState(false);
+function BirthdateFields({ birthdate, onBirthdateChange, align = 'left' }) {
   const latestAdultBirthdate = getLatestAdultBirthdate();
-  const enteredAge = calculateAgeFromBirthdate(data.birthdate);
-
-  // Local state for partial date selections (survives incomplete picks)
-  const initParts = data.birthdate ? data.birthdate.split('-') : [];
+  const enteredAge = calculateAgeFromBirthdate(birthdate);
+  const initParts = birthdate ? birthdate.split('-') : [];
   const [bdYear, setBdYear] = useState(initParts[0] || '');
   const [bdMonth, setBdMonth] = useState(initParts[1] || '');
   const [bdDay, setBdDay] = useState(initParts[2] || '');
@@ -1099,21 +1100,98 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
     { value: '10', label: 'Octubre' }, { value: '11', label: 'Noviembre' }, { value: '12', label: 'Diciembre' },
   ];
 
-  // Days in selected month/year
+  useEffect(() => {
+    const nextParts = birthdate ? birthdate.split('-') : [];
+    setBdYear(nextParts[0] || '');
+    setBdMonth(nextParts[1] || '');
+    setBdDay(nextParts[2] || '');
+  }, [birthdate]);
+
   const daysInMonth = bdYear && bdMonth
     ? new Date(Number(bdYear), Number(bdMonth), 0).getDate()
     : 31;
 
-  // Sync to parent only when all 3 parts are set
   const syncBirthdate = (y, m, d) => {
     if (y && m && d) {
-      onChange({ ...data, birthdate: `${y}-${m}-${d}` });
-    } else if (data.birthdate) {
-      onChange({ ...data, birthdate: '' });
+      onBirthdateChange(`${y}-${m}-${d}`);
+    } else if (birthdate) {
+      onBirthdateChange('');
     }
   };
 
   const selectClass = "appearance-none bg-mansion-elevated border border-mansion-border/30 text-text-primary rounded-xl px-3 py-3 text-base font-medium focus:outline-none focus:border-mansion-gold/50 focus:ring-1 focus:ring-mansion-gold/20 transition-colors cursor-pointer";
+
+  return (
+    <div className={align === 'center' ? 'text-center' : ''}>
+      <label className="text-text-muted text-xs font-medium mb-1.5 block">Fecha de nacimiento</label>
+      <p className={`text-[10px] text-text-dim mb-1.5 ${align === 'center' ? 'text-center' : ''}`}>Solo se mostrará tu edad. Debes ser mayor de 18 años.</p>
+      <div className="grid grid-cols-3 gap-2">
+        <select
+          value={bdDay}
+          onChange={(e) => {
+            const d = e.target.value;
+            setBdDay(d);
+            syncBirthdate(bdYear, bdMonth, d);
+          }}
+          className={selectClass}
+        >
+          <option value="" disabled>Día</option>
+          {Array.from({ length: daysInMonth }, (_, i) => {
+            const d = String(i + 1).padStart(2, '0');
+            return <option key={d} value={d}>{i + 1}</option>;
+          })}
+        </select>
+        <select
+          value={bdMonth}
+          onChange={(e) => {
+            const newMonth = e.target.value;
+            const maxDay = bdYear ? new Date(Number(bdYear), Number(newMonth), 0).getDate() : 31;
+            const clampedDay = bdDay && Number(bdDay) > maxDay ? String(maxDay).padStart(2, '0') : bdDay;
+            setBdMonth(newMonth);
+            if (clampedDay !== bdDay) setBdDay(clampedDay);
+            syncBirthdate(bdYear, newMonth, clampedDay);
+          }}
+          className={selectClass}
+        >
+          <option value="" disabled>Mes</option>
+          {MONTHS.map((m) => (
+            <option key={m.value} value={m.value}>{m.label}</option>
+          ))}
+        </select>
+        <select
+          value={bdYear}
+          onChange={(e) => {
+            const newYear = e.target.value;
+            const maxDay = bdMonth ? new Date(Number(newYear), Number(bdMonth), 0).getDate() : 31;
+            const clampedDay = bdDay && Number(bdDay) > maxDay ? String(maxDay).padStart(2, '0') : bdDay;
+            setBdYear(newYear);
+            if (clampedDay !== bdDay) setBdDay(clampedDay);
+            syncBirthdate(newYear, bdMonth, clampedDay);
+          }}
+          className={selectClass}
+        >
+          <option value="" disabled>Año</option>
+          {Array.from({ length: defaultYear - minYear + 1 }, (_, i) => {
+            const y = defaultYear - i;
+            return <option key={y} value={String(y)}>{y}</option>;
+          })}
+        </select>
+      </div>
+      {enteredAge && (
+        <p className={`text-[10px] text-text-dim mt-1 ${align === 'center' ? 'text-center' : ''}`}>Edad actual: {enteredAge} años</p>
+      )}
+      {birthdate && !isAdultBirthdate(birthdate) && (
+        <p className={`text-[10px] text-mansion-crimson mt-0.5 ${align === 'center' ? 'text-center' : ''}`}>Debes ser mayor de 18 años</p>
+      )}
+      {!birthdate && (
+        <p className={`text-[10px] text-text-dim mt-0.5 ${align === 'center' ? 'text-center' : ''}`}>Fecha máxima permitida: {latestAdultBirthdate.split('-').reverse().join('/')}</p>
+      )}
+    </div>
+  );
+}
+
+function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, selectedCountry, onCountryChange, usernameStatus, onUsernameBlur }) {
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const ARGENTINA_PROVINCES = [
     'Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba',
@@ -1174,68 +1252,6 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
           )}
           {usernameStatus === 'invalid' && (
             <p className="text-mansion-crimson text-[11px] mt-0.5">Solo letras, números, puntos y guiones bajos</p>
-          )}
-        </div>
-        <div>
-          <label className="text-text-muted text-xs font-medium mb-1.5 block">Fecha de nacimiento</label>
-          <p className="text-[10px] text-text-dim mb-1.5">Solo se mostrara tu edad.</p>
-          <div className="grid grid-cols-3 gap-2">
-            <select
-              value={bdDay}
-              onChange={(e) => {
-                const d = e.target.value;
-                setBdDay(d);
-                syncBirthdate(bdYear, bdMonth, d);
-              }}
-              className={selectClass}
-            >
-              <option value="" disabled>Día</option>
-              {Array.from({ length: daysInMonth }, (_, i) => {
-                const d = String(i + 1).padStart(2, '0');
-                return <option key={d} value={d}>{i + 1}</option>;
-              })}
-            </select>
-            <select
-              value={bdMonth}
-              onChange={(e) => {
-                const newMonth = e.target.value;
-                const maxDay = bdYear ? new Date(Number(bdYear), Number(newMonth), 0).getDate() : 31;
-                const clampedDay = bdDay && Number(bdDay) > maxDay ? String(maxDay).padStart(2, '0') : bdDay;
-                setBdMonth(newMonth);
-                if (clampedDay !== bdDay) setBdDay(clampedDay);
-                syncBirthdate(bdYear, newMonth, clampedDay);
-              }}
-              className={selectClass}
-            >
-              <option value="" disabled>Mes</option>
-              {MONTHS.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-            <select
-              value={bdYear}
-              onChange={(e) => {
-                const newYear = e.target.value;
-                const maxDay = bdMonth ? new Date(Number(newYear), Number(bdMonth), 0).getDate() : 31;
-                const clampedDay = bdDay && Number(bdDay) > maxDay ? String(maxDay).padStart(2, '0') : bdDay;
-                setBdYear(newYear);
-                if (clampedDay !== bdDay) setBdDay(clampedDay);
-                syncBirthdate(newYear, bdMonth, clampedDay);
-              }}
-              className={selectClass}
-            >
-              <option value="" disabled>Año</option>
-              {Array.from({ length: defaultYear - minYear + 1 }, (_, i) => {
-                const y = defaultYear - i;
-                return <option key={y} value={String(y)}>{y}</option>;
-              })}
-            </select>
-          </div>
-          {enteredAge && (
-            <p className="text-[10px] text-text-dim mt-1">Edad actual: {enteredAge} años</p>
-          )}
-          {data.birthdate && !isAdultBirthdate(data.birthdate) && (
-            <p className="text-[10px] text-mansion-crimson mt-0.5">Debes ser mayor de 18 años</p>
           )}
         </div>
         <div>
@@ -1733,10 +1749,10 @@ export default function RegisterPage() {
   );
 
   const canNext = () => {
-    if (step === 0) return EMAIL_REGEX.test(email) && isValidEmailTld(email) && password.length >= 10 && emailStatus !== 'exists' && emailStatus !== 'invalid';
+    if (step === 0) return EMAIL_REGEX.test(email) && isValidEmailTld(email) && password.length >= 10 && isAdultBirthdate(info.birthdate) && emailStatus !== 'exists' && emailStatus !== 'invalid';
     if (step === 1) return !!iAm;
     if (step === 2) return seeking.length > 0;
-    if (step === 3) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && isAdultBirthdate(info.birthdate) && info.province && (!showCountryPicker || selectedCountry);
+    if (step === 3) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && info.province && (!showCountryPicker || selectedCountry);
     if (step === 4) return !!photoFile;
     return true;
   };
@@ -1938,6 +1954,8 @@ export default function RegisterPage() {
           <StepEmail
             email={email}
             password={password}
+            birthdate={info.birthdate}
+            onBirthdateChange={(birthdate) => setInfo((prev) => ({ ...prev, birthdate }))}
             onEmailChange={setEmail}
             onPasswordChange={setPassword}
             hidePasswordDefault={hidePasswordDefault}

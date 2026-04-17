@@ -1,0 +1,147 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { SEO_INTENT_VARIANTS, isSeoIntentVariant } from '../../../src/lib/seoVariants.js';
+import { GEO_SLUGS } from '../../../src/lib/seoGeoCatalog.js';
+import { getAstroLandingData, RELATED_KEYWORDS } from '../../lib/landingData.js';
+import { APP_SITE_ORIGIN } from '../../../src/lib/siteDomains.js';
+
+export function getStaticPaths() {
+  return SEO_INTENT_VARIANTS.flatMap((variant) =>
+    GEO_SLUGS.map((citySlug) => ({
+      params: { variant, citySlug },
+    })),
+  );
+}
+
+const { variant, citySlug } = Astro.params;
+
+if (!isSeoIntentVariant(variant)) {
+  throw new Error(`Invalid SEO variant: ${variant}`);
+}
+
+const {
+  localeConfig,
+  page,
+  city,
+  cityHasStats,
+  cityStats,
+  canonical,
+  alternates,
+  relatedCityLinks,
+  faqSchema,
+  pageSchema,
+} = getAstroLandingData({ variant, citySlug });
+
+const statsPills = cityHasStats
+  ? [
+      `Perfiles activos · ${cityStats.active_profiles_30d}`,
+      `Parejas · ${cityStats.active_couples_30d}`,
+      `Mujeres · ${cityStats.active_women_30d}`,
+      `Hombres · ${cityStats.active_men_30d}`,
+    ]
+  : [];
+---
+<BaseLayout
+  title={page.title}
+  description={page.description}
+  canonical={canonical}
+  alternates={alternates}
+  htmlLang={localeConfig.language}
+  ogLocale={localeConfig.hreflang.replace('-', '_')}
+  schemas={[faqSchema, pageSchema]}
+>
+  <main class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">M</span>
+        <span>
+          <strong style="display:block;font-size:1.2rem;">Mansion Deseo</strong>
+          <span class="dim" style="font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;">Acceso privado para adultos</span>
+        </span>
+      </a>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <a class="secondary-button" href={`${APP_SITE_ORIGIN}/login`}>Iniciar sesión</a>
+        <a class="primary-button" href={`${APP_SITE_ORIGIN}/registro`}>Registrarme</a>
+      </div>
+    </header>
+
+    <section class="surface" style="margin-top:34px;padding:28px;border-radius:36px;">
+      <div class="tag-list">
+        <span class="chip">SEO local</span>
+        <span class="chip">{city?.label || citySlug}</span>
+        <span class="chip">Acceso privado</span>
+      </div>
+
+      <h1 class="headline" style="max-width:18ch;">{page.headline}</h1>
+      <p class="subheadline">{page.intro}</p>
+
+      <div class="button-row">
+        <a class="primary-button" href={`${APP_SITE_ORIGIN}/registro`}>Crear cuenta</a>
+        <a class="secondary-button" href={`/${variant}`}>Ver categoría base</a>
+      </div>
+
+      {statsPills.length > 0 && (
+        <div class="tag-list" style="margin-top:20px;">
+          {statsPills.map((pill) => (
+            <span class="tag-link">{pill}</span>
+          ))}
+        </div>
+      )}
+
+      <div class="panel-grid" style="margin-top:26px;">
+        <aside class="card">
+          <p class="eyebrow">Qué encontrás</p>
+          <ul style="margin:16px 0 0;padding:0;list-style:none;display:grid;gap:12px;">
+            {page.bullets.map((item) => (
+              <li class="surface" style="padding:16px;border-radius:22px;background:rgba(255,255,255,0.04);box-shadow:none;">{item}</li>
+            ))}
+          </ul>
+        </aside>
+
+        <aside class="card">
+          <p class="eyebrow">Intento + ciudad</p>
+          <p class="muted" style="margin:14px 0 0;line-height:1.8;">
+            Esta URL cruza la intención SEO <strong>{page.focus}</strong> con la ciudad <strong>{city?.label || citySlug}</strong> para servir una entrada pública más específica, con datos reales cuando existen.
+          </p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section-stack">
+      {relatedCityLinks.length > 0 && (
+        <article class="card">
+          <p class="eyebrow">Otras ciudades activas</p>
+          <div class="tag-list" style="margin-top:16px;">
+            {relatedCityLinks.map((item) => (
+              <a class="tag-link" href={item.to}>{item.label}</a>
+            ))}
+          </div>
+        </article>
+      )}
+
+      <article class="card">
+        <p class="eyebrow">Busquedas relacionadas</p>
+        <div class="tag-list" style="margin-top:16px;">
+          {RELATED_KEYWORDS
+            .filter((item) => item.to !== `/${variant}`)
+            .map((item) => (
+              <a class="tag-link" href={item.to}>{item.label}</a>
+            ))}
+        </div>
+      </article>
+
+      <article class="card">
+        <p class="eyebrow">Preguntas frecuentes</p>
+        <div style="margin-top:18px;">
+          {page.faq.map(([question, answer]) => (
+            <div class="faq-item">
+              <h3>{question}</h3>
+              <p>{answer}</p>
+            </div>
+          ))}
+        </div>
+      </article>
+    </section>
+  </main>
+</BaseLayout>

@@ -8,6 +8,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "astro:dev": "astro dev",
+    "astro:build": "astro build",
+    "astro:preview": "astro preview",
+    "astro:deploy": "npm run astro:build && npx wrangler pages deploy dist-astro --project-name mansiondeseo-seo --branch main",
     "seo:city-stats": "node scripts/build-seo-city-stats.mjs",
     "check:media-cache": "node scripts/check-media-cache.mjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
@@ -33,6 +37,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "astro": "^6.1.7",
     "autoprefixer": "^10.4.20",
     "playwright": "^1.59.1",
     "postcss": "^8.4.49",

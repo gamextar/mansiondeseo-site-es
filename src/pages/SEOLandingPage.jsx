@@ -118,6 +118,126 @@ function buildLocalizedPage(page, citySlug, variant, cityStats, locale) {
     };
   }
 
+  if (page.focus === 'parejas') {
+    if (hasStats) {
+      return {
+        ...page,
+        title: `Parejas ${citySuffix} | ${activeProfiles} perfiles activos`,
+        description: `Comunidad privada para búsquedas de parejas ${city.cityHint}, con ${activeProfiles} perfiles verificados activos en los últimos 30 días, ${activeCouples} parejas y acceso discreto.`,
+        headline: `Parejas ${city.label} con actividad real y acceso privado`,
+        intro: `Una landing pensada para búsquedas de parejas ${city.cityHint} y para convertir esa intención en registro dentro de Mansión Deseo. La actividad local muestra ${activeProfiles} perfiles verificados activos en los últimos 30 días, con ${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres. Datos actualizados el ${updatedLabel}.${cityIntroSuffix}`,
+        bullets: [
+          `${activeProfiles} perfiles verificados activos en los últimos 30 días`,
+          `${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres con actividad reciente`,
+          `${premiumProfiles} perfiles premium y acceso completo solo para registrados`,
+        ],
+        faq: [
+          [`¿Hay actividad real de parejas ${city.cityHint}?`, `Sí. Según la actualización del ${updatedLabel}, hay ${activeProfiles} perfiles verificados activos en los últimos 30 días, incluyendo ${activeCouples} parejas con actividad reciente.`],
+          ['¿Se puede ver el contenido completo sin registro?', 'No. La landing es pública para captar la búsqueda, pero el detalle de perfiles y la interacción quedan reservados a usuarios registrados.'],
+        ],
+      };
+    }
+
+    return {
+      ...page,
+      title: `Parejas ${citySuffix}`,
+      description: `Búsquedas de parejas ${city.cityHint} en una comunidad privada para adultos registrados, con perfiles verificados, discreción y acceso controlado.`,
+      headline: `Parejas ${city.label}, afinidad real y acceso privado`,
+      intro: `Una landing pensada para captar búsquedas de parejas ${city.cityHint} y llevarlas a una experiencia privada con filtros, perfiles verificados y acceso solo para registrados.${cityIntroSuffix}`,
+      bullets: cityBullets,
+    };
+  }
+
+  if (page.focus === 'parejas liberales') {
+    if (hasStats) {
+      return {
+        ...page,
+        title: `Parejas Liberales ${citySuffix} | ${activeProfiles} perfiles activos`,
+        description: `Comunidad privada para búsquedas de parejas liberales ${city.cityHint}, con ${activeProfiles} perfiles verificados activos en los últimos 30 días y ${activeCouples} parejas con actividad reciente.`,
+        headline: `Parejas liberales ${city.label} con actividad real y acceso privado`,
+        intro: `Una landing pensada para búsquedas de parejas liberales ${city.cityHint} y para convertir esa intención en registro dentro de Mansión Deseo. La actividad local muestra ${activeProfiles} perfiles verificados activos en los últimos 30 días, con ${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres. Datos actualizados el ${updatedLabel}.${cityIntroSuffix}`,
+        bullets: [
+          `${activeProfiles} perfiles verificados activos en los últimos 30 días`,
+          `${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres con actividad reciente`,
+          `${premiumProfiles} perfiles premium y acceso completo solo para registrados`,
+        ],
+        faq: [
+          [`¿Hay actividad real de parejas liberales ${city.cityHint}?`, `Sí. Según la actualización del ${updatedLabel}, hay ${activeProfiles} perfiles verificados activos en los últimos 30 días, incluyendo ${activeCouples} parejas con actividad reciente.`],
+          ['¿Se puede explorar la comunidad completa desde esta página?', 'No. La landing es pública, pero el detalle de perfiles, stories y mensajes queda reservado a usuarios registrados.'],
+        ],
+      };
+    }
+
+    return {
+      ...page,
+      title: `Parejas Liberales ${citySuffix}`,
+      description: `Búsquedas de parejas liberales ${city.cityHint} en una comunidad privada para adultos registrados, con perfiles verificados, discreción y acceso controlado.`,
+      headline: `Parejas liberales ${city.label}, afinidad real y acceso privado`,
+      intro: `Una landing pensada para captar búsquedas de parejas liberales ${city.cityHint} y llevarlas a una experiencia privada con filtros, perfiles verificados y acceso solo para registrados.${cityIntroSuffix}`,
+      bullets: cityBullets,
+    };
+  }
+
+  if (page.focus === 'swingers') {
+    if (hasStats) {
+      return {
+        ...page,
+        title: `Swingers ${citySuffix} | ${activeProfiles} perfiles activos`,
+        description: `Comunidad privada para búsquedas swingers ${city.cityHint}, con ${activeProfiles} perfiles verificados activos en los últimos 30 días, ${activeCouples} parejas y acceso discreto.`,
+        headline: `Swingers ${city.label} con actividad real y acceso privado`,
+        intro: `Una landing pensada para búsquedas swingers ${city.cityHint} y para convertir esa intención en registro dentro de Mansión Deseo. La actividad local muestra ${activeProfiles} perfiles verificados activos en los últimos 30 días, con ${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres. Datos actualizados el ${updatedLabel}.${cityIntroSuffix}`,
+        bullets: [
+          `${activeProfiles} perfiles verificados activos en los últimos 30 días`,
+          `${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres con actividad reciente`,
+          `${premiumProfiles} perfiles premium y acceso completo solo para registrados`,
+        ],
+        faq: [
+          [`¿Hay actividad swingers real ${city.cityHint}?`, `Sí. Según la actualización del ${updatedLabel}, hay ${activeProfiles} perfiles verificados activos en los últimos 30 días, con ${activeCouples} parejas y actividad reciente dentro de la comunidad.`],
+          ['¿El contenido completo es público?', 'No. La landing es pública para captar la búsqueda correcta, pero el detalle de perfiles, stories y mensajes queda reservado a usuarios registrados.'],
+        ],
+      };
+    }
+
+    return {
+      ...page,
+      title: `Swingers ${citySuffix}`,
+      description: `Comunidad privada para búsquedas swingers ${city.cityHint}, con perfiles verificados, discreción y acceso controlado para adultos registrados.`,
+      headline: `Swingers ${city.label}, discreción y afinidad real`,
+      intro: `Una landing pensada para captar búsquedas swingers ${city.cityHint} y llevarlas a una experiencia privada con filtros, perfiles verificados y acceso solo para registrados.${cityIntroSuffix}`,
+      bullets: cityBullets,
+    };
+  }
+
+  if (page.focus === 'intercambio de parejas') {
+    if (hasStats) {
+      return {
+        ...page,
+        title: `Intercambio de Parejas ${citySuffix} | ${activeProfiles} perfiles activos`,
+        description: `Comunidad privada para búsquedas de intercambio de parejas ${city.cityHint}, con ${activeProfiles} perfiles verificados activos en los últimos 30 días y ${activeCouples} parejas con actividad reciente.`,
+        headline: `Intercambio de parejas ${city.label} con actividad real y acceso privado`,
+        intro: `Una landing pensada para búsquedas de intercambio de parejas ${city.cityHint} y para convertir esa intención en registro dentro de Mansión Deseo. La actividad local muestra ${activeProfiles} perfiles verificados activos en los últimos 30 días, con ${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres. Datos actualizados el ${updatedLabel}.${cityIntroSuffix}`,
+        bullets: [
+          `${activeProfiles} perfiles verificados activos en los últimos 30 días`,
+          `${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres con actividad reciente`,
+          `${premiumProfiles} perfiles premium y acceso completo solo para registrados`,
+        ],
+        faq: [
+          [`¿Hay actividad real de intercambio de parejas ${city.cityHint}?`, `Sí. Según la actualización del ${updatedLabel}, hay ${activeProfiles} perfiles verificados activos en los últimos 30 días, incluyendo ${activeCouples} parejas con actividad reciente.`],
+          ['¿El intercambio de parejas se ve completo sin registro?', 'No. La página captura la búsqueda, pero la experiencia completa y privada queda reservada a usuarios registrados.'],
+        ],
+      };
+    }
+
+    return {
+      ...page,
+      title: `Intercambio de Parejas ${citySuffix}`,
+      description: `Búsquedas de intercambio de parejas ${city.cityHint} en una comunidad privada para adultos registrados, con perfiles verificados, discreción y acceso controlado.`,
+      headline: `Intercambio de parejas ${city.label}, discreción y afinidad real`,
+      intro: `Una landing pensada para captar búsquedas de intercambio de parejas ${city.cityHint} y llevarlas a una experiencia privada con filtros, perfiles verificados y acceso solo para registrados.${cityIntroSuffix}`,
+      bullets: cityBullets,
+    };
+  }
+
   if (page.focus === 'cuckold argentina') {
     return {
       ...page,
@@ -148,6 +268,36 @@ function buildLocalizedPage(page, citySlug, variant, cityStats, locale) {
     };
   }
 
+  if (page.focus === 'hotwife argentina') {
+    if (hasStats) {
+      return {
+        ...page,
+        title: `Hotwife ${citySuffix} | ${activeProfiles} perfiles activos`,
+        description: `Búsquedas hotwife ${city.cityHint} en una comunidad privada para adultos registrados, con ${activeProfiles} perfiles verificados activos en los últimos 30 días y acceso discreto.`,
+        headline: `Hotwife ${city.label} con actividad real y acceso privado`,
+        intro: `Una landing pensada para búsquedas hotwife ${city.cityHint} y para convertir esa intención en registro dentro de Mansión Deseo. La actividad local muestra ${activeProfiles} perfiles verificados activos en los últimos 30 días, con ${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres. Datos actualizados el ${updatedLabel}.${cityIntroSuffix}`,
+        bullets: [
+          `${activeProfiles} perfiles verificados activos en los últimos 30 días`,
+          `${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres con actividad reciente`,
+          `${premiumProfiles} perfiles premium y acceso completo solo para registrados`,
+        ],
+        faq: [
+          [`¿Hay actividad hotwife real ${city.cityHint}?`, `Sí. Según la actualización del ${updatedLabel}, hay ${activeProfiles} perfiles verificados activos en los últimos 30 días dentro de la comunidad.`],
+          ['¿La experiencia completa es pública?', 'No. La landing es pública para captar la intención de búsqueda, pero los perfiles y la interacción viven detrás del registro.'],
+        ],
+      };
+    }
+
+    return {
+      ...page,
+      title: `Hotwife ${citySuffix}`,
+      description: `Búsquedas hotwife ${city.cityHint} en una comunidad privada para adultos registrados, con perfiles verificados, discreción y acceso controlado.`,
+      headline: `Hotwife ${city.label}, discreción y afinidad real`,
+      intro: `Una landing pensada para captar búsquedas hotwife ${city.cityHint} y llevarlas a una experiencia privada con perfiles verificados y acceso solo para registrados.${cityIntroSuffix}`,
+      bullets: cityBullets,
+    };
+  }
+
   return {
     ...page,
     title: `${page.headline.split(',')[0]} ${citySuffix}`,
@@ -159,16 +309,18 @@ function buildLocalizedPage(page, citySlug, variant, cityStats, locale) {
 }
 
 const RELATED = [
-  { to: '/contactossex', label: 'Contactossex' },
-  { to: '/contactossex-argentina', label: 'Contactossex AR' },
-  { to: '/cornudos-argentina', label: 'Cornudos AR' },
-  { to: '/cuckold-argentina', label: 'Cuckold AR' },
-  { to: '/parejas', label: 'Parejas' },
+  { to: '/parejas-liberales', label: 'Parejas liberales' },
+  { to: '/intercambio-de-parejas', label: 'Intercambio parejas' },
+  { to: '/cornudos-argentina', label: 'Cornudos' },
+  { to: '/cornudos-argentina', label: 'Maridos cornudos' },
+  { to: '/cuckold-argentina', label: 'Cuckold' },
+  { to: '/hotwife-argentina', label: 'Hotwife' },
   { to: '/trios', label: 'Tríos' },
   { to: '/swingers', label: 'Swingers' },
   { to: '/mujeres', label: 'Mujeres' },
   { to: '/hombres', label: 'Hombres' },
   { to: '/trans', label: 'Trans' },
+  { to: '/contactossex', label: 'Contactossex' },
 ];
 
 function Pill({ icon: Icon, children }) {
@@ -185,7 +337,15 @@ export default function SEOLandingPage({ variant, citySlug = '', locale = DEFAUL
   const city = citySlug ? slugToCity(citySlug, locale) : null;
   const cityStats = city ? getSeoCityStats(citySlug) : null;
   const cityHasStats = hasSeoCityStats(cityStats);
-  const relatedCityLinks = city && (variant === 'contactossex' || variant === 'contactossex-argentina')
+  const relatedCityLinks = city && (
+    variant === 'contactossex' ||
+    variant === 'contactossex-argentina' ||
+    variant === 'swingers' ||
+    variant === 'parejas' ||
+    variant === 'parejas-liberales' ||
+    variant === 'intercambio-de-parejas' ||
+    variant === 'hotwife-argentina'
+  )
     ? getTopSeoCityStats(6, citySlug)
       .map((entry) => {
         const entryCity = slugToCity(entry.city_slug, locale);
@@ -420,12 +580,12 @@ export default function SEOLandingPage({ variant, citySlug = '', locale = DEFAUL
 
             <div className="rounded-[2rem] border border-mansion-border/25 bg-[linear-gradient(180deg,rgba(201,168,76,0.08),rgba(24,20,29,0.88))] p-6">
               <h2 className="font-display text-2xl font-semibold text-text-primary">
-                {relatedCityLinks.length ? 'Otras ciudades activas' : 'Más búsquedas'}
+                {relatedCityLinks.length ? 'Otras ciudades activas' : 'Ultimas busquedas'}
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-text-dim">
                 {relatedCityLinks.length
                   ? 'Estas ciudades ya muestran actividad verificada y ayudan a reforzar el enlazado interno de la familia SEO.'
-                  : 'Usá estas páginas como entrada para términos de alta intención y dejá que el sitio convierta a registro.'}
+                  : 'Agrupamos aca las keywords principales. Desde cada landing se amplian otras ciudades e intenciones relacionadas.'}
               </p>
             <div className="mt-5 flex flex-wrap gap-2">
               {(relatedCityLinks.length ? relatedCityLinks : RELATED.map((item) => ({
@@ -433,7 +593,7 @@ export default function SEOLandingPage({ variant, citySlug = '', locale = DEFAUL
                 to: buildSeoPath({ locale, variant: item.to.replace(/^\//, '') }),
               }))).map((item) => (
                 <Link
-                  key={item.to}
+                  key={`${item.to}-${item.label}`}
                   to={item.to}
                   className="rounded-full border border-white/10 bg-black/20 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:border-mansion-gold/25 hover:text-mansion-gold"
                 >

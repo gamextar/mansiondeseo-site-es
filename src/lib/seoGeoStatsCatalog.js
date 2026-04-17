@@ -35,8 +35,8 @@ export const GEO_STATS_TARGETS = {
     locality: 'Córdoba',
     province: 'Córdoba',
     provinceSlug: 'cordoba',
-    whereSql: '(locality = ? AND city = ?)',
-    bindings: ['Córdoba', 'Córdoba'],
+    whereSql: '(city IN (?, ?) AND locality IN (?, ?, ?))',
+    bindings: ['Córdoba', 'Cordoba', 'Capital', 'Córdoba', 'Cordoba'],
   },
   'cordoba-provincia': {
     citySlug: 'cordoba-provincia',
@@ -51,8 +51,8 @@ export const GEO_STATS_TARGETS = {
     locality: 'Rosario',
     province: 'Santa Fe',
     provinceSlug: 'santa-fe',
-    whereSql: '(locality = ? AND city = ?)',
-    bindings: ['Rosario', 'Santa Fe'],
+    whereSql: '(locality = ? AND city IN (?, ?))',
+    bindings: ['Rosario', 'Santa Fe', 'Santa Fé'],
   },
   mendoza: {
     citySlug: 'mendoza',
@@ -83,8 +83,8 @@ export const GEO_STATS_TARGETS = {
     locality: 'Santa Fe',
     province: 'Santa Fe',
     provinceSlug: 'santa-fe',
-    whereSql: '(city = ? OR locality = ?)',
-    bindings: ['Santa Fe', 'Santa Fe'],
+    whereSql: '(city IN (?, ?) OR locality IN (?, ?))',
+    bindings: ['Santa Fe', 'Santa Fé', 'Santa Fe', 'Santa Fé'],
   },
   neuquen: {
     citySlug: 'neuquen',
