@@ -92,7 +92,7 @@ export default function PagoExitosoPage() {
           )}
 
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/feed')}
             className="w-full py-4 bg-mansion-gold text-black font-bold rounded-xl text-lg hover:brightness-110 transition-all flex items-center justify-center gap-2"
           >
             Volver a la Mansión
@@ -150,7 +150,7 @@ export default function PagoExitosoPage() {
 
         {/* CTA */}
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/feed')}
           className="w-full py-4 bg-mansion-gold text-black font-bold rounded-xl text-lg hover:brightness-110 transition-all"
         >
           Comenzar a explorar

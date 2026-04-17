@@ -3,136 +3,23 @@ import { ArrowRight, Lock, Sparkles, Shield, Users, Heart, Crown, MapPin, Messag
 import { Link } from 'react-router-dom';
 import { useSeoMeta, useStructuredData } from '../lib/seo';
 import { getGeo } from '../lib/seoGeoCatalog';
+import { DEFAULT_SEO_LOCALE, getSeoLocale } from '../lib/seoLocales';
+import { buildSeoAlternates, buildSeoCanonical, buildSeoPath } from '../lib/seoRouting';
+import { formatSeoCityStatsDate, getSeoCityStats, getTopSeoCityStats, hasSeoCityStats } from '../lib/seoCityStats';
+import { getSeoIntentPage } from '../lib/seoIntentCatalog';
 
-const SEO_PAGES = {
-  parejas: {
-    title: 'Parejas en Mansión Deseo | Encuentros privados para adultos registrados',
-    description: 'Descubrí parejas, contactos discretos y perfiles afines en una comunidad privada para adultos registrados, con verificación y acceso controlado.',
-    headline: 'Parejas, complicidad y encuentros discretos',
-    intro: 'Una puerta de entrada pública para quienes buscan contactos entre parejas, parejas abiertas y propuestas afines dentro de una comunidad privada para adultos.',
-    focus: 'parejas',
-    bullets: ['Contactos entre parejas y perfiles afines', 'Búsquedas por intención, afinidad y discreción', 'Acceso solo para adultos registrados'],
-    faq: [
-      ['¿Es público el contenido?', 'La entrada es pública, pero el contenido completo queda dentro del sitio para usuarios registrados.'],
-      ['¿Para quién está pensado?', 'Para adultos que buscan relaciones discretas, parejas abiertas y encuentros afines.'],
-    ],
-  },
-  trios: {
-    title: 'Tríos en Mansión Deseo | Búsquedas discretas para adultos registrados',
-    description: 'Explorá una comunidad privada para adultos registrados que buscan tríos, encuentros compartidos y conexiones discretas.',
-    headline: 'Tríos, química y propuestas sin ruido',
-    intro: 'Una landing pensada para búsquedas de tríos y experiencias compartidas, con contenido privado detrás del registro.',
-    focus: 'tríos',
-    bullets: ['Búsquedas de tríos y experiencias compartidas', 'Ambiente privado, discreto y verificado', 'Perfiles con actividad, fotos y stories'],
-    faq: [
-      ['¿Se puede ver todo sin registrarse?', 'No. La experiencia completa queda reservada a usuarios registrados.'],
-      ['¿Qué muestra esta página?', 'Una introducción pública para captar la intención de búsqueda correcta.'],
-    ],
-  },
-  swingers: {
-    title: 'Swingers en Mansión Deseo | Comunidad privada para adultos registrados',
-    description: 'Encontrá una comunidad orientada a swingers, parejas abiertas y contactos privados para adultos registrados.',
-    headline: 'Swingers, apertura y encuentros privados',
-    intro: 'Pensada para parejas y adultos que buscan una experiencia social más abierta, con discreción, control y perfiles verificados.',
-    focus: 'swingers',
-    bullets: ['Perfiles orientados a parejas abiertas', 'Búsqueda por afinidades y preferencias', 'Registro privado y acceso controlado'],
-    faq: [
-      ['¿Esto es para todos?', 'Está orientado a adultos que realmente buscan ese tipo de dinámica.'],
-      ['¿El sitio es abierto?', 'La presentación es pública; el contenido completo, no.'],
-    ],
-  },
-  mujeres: {
-    title: 'Mujeres en Mansión Deseo | Perfiles privados para adultos registrados',
-    description: 'Explorá perfiles de mujeres dentro de una comunidad privada para adultos registrados, con foco en discreción, afinidad y registro.',
-    headline: 'Mujeres, afinidad y conversaciones privadas',
-    intro: 'Una entrada pública para búsquedas centradas en mujeres, con acceso a perfiles y funciones completas tras el registro.',
-    focus: 'mujeres',
-    bullets: ['Perfiles de mujeres con afinidad real', 'Acceso privado al detalle completo', 'Registro rápido para adultos'],
-    faq: [
-      ['¿Puedo ver perfiles completos?', 'Solo una vista pública; el acceso total requiere registro.'],
-      ['¿Sirve para captar búsquedas?', 'Sí, porque cubre la intención de búsqueda sin exponer contenido privado.'],
-    ],
-  },
-  hombres: {
-    title: 'Hombres en Mansión Deseo | Perfiles privados para adultos registrados',
-    description: 'Descubrí perfiles de hombres y una comunidad privada para adultos registrados con afinidad, filtros y discreción.',
-    headline: 'Hombres, filtros y encuentros afines',
-    intro: 'Una página de entrada pública para búsquedas centradas en hombres, ideal para llevar tráfico orgánico al registro.',
-    focus: 'hombres',
-    bullets: ['Búsquedas por sexo e intención', 'Perfil privado y verificado', 'Acceso completo luego del registro'],
-    faq: [
-      ['¿Se indexa el contenido privado?', 'No, solo esta entrada pública y el contenido preparado para captación.'],
-      ['¿Puedo usarla como landing?', 'Sí, está pensada para eso.'],
-    ],
-  },
-  trans: {
-    title: 'Trans en Mansión Deseo | Comunidad privada para adultos registrados',
-    description: 'Una comunidad privada para adultos registrados con búsquedas trans, perfiles verificados y acceso discreto.',
-    headline: 'Trans, visibilidad y acceso discreto',
-    intro: 'Una página clara y respetuosa para búsquedas trans, diseñada para captar intención sin mostrar contenido privado.',
-    focus: 'trans',
-    bullets: ['Búsquedas trans con filtros reales', 'Contenido privado para registrados', 'Landing con enfoque respetuoso'],
-    faq: [
-      ['¿El contenido es público?', 'No. La página pública solo presenta la propuesta general.'],
-      ['¿Qué ventaja tiene SEO?', 'Te permite posicionar una intención concreta sin exponer el área privada.'],
-    ],
-  },
-  'cuckold-argentina': {
-    title: 'Cuckold Argentina | Encuentros privados para adultos registrados',
-    description: 'Una landing pública para búsquedas de cuckold en Argentina, con una comunidad privada, perfiles verificados y acceso discreto.',
-    headline: 'Cuckold Argentina, discreción y afinidad real',
-    intro: 'Una entrada pública pensada para captar búsquedas de cuckold en Argentina y llevarlas a una experiencia privada para adultos registrados.',
-    focus: 'cuckold argentina',
-    bullets: ['Búsquedas de cuckold en Argentina', 'Perfiles afines y verificados', 'Acceso completo tras el registro'],
-    faq: [
-      ['¿Esto es público?', 'Solo la puerta de entrada. El contenido completo queda para usuarios registrados.'],
-      ['¿Sirve para posicionar la búsqueda?', 'Sí, porque ataca la intención principal con contenido propio y relevante.'],
-    ],
-  },
-  contactossex: {
-    title: 'Contactossex | Alternativa privada para adultos registrados',
-    description: 'Si buscás Contactossex, descubrí una alternativa privada para adultos registrados con perfiles verificados, discreción y acceso controlado.',
-    headline: 'Si buscás Contactossex, esta es tu alternativa privada',
-    intro: 'Una landing orientada a capturar búsquedas de Contactossex y convertirlas en registro dentro de Mansión Deseo.',
-    focus: 'contactossex',
-    bullets: ['Alternativa privada a Contactossex', 'Perfiles verificados y discretos', 'Acceso completo solo para registrados'],
-    faq: [
-      ['¿Es el mismo sitio?', 'No. Es una alternativa propia con foco en privacidad y comunidad verificada.'],
-      ['¿Puedo entrar sin registrarme?', 'Solo a esta landing; el contenido completo sigue siendo privado.'],
-    ],
-  },
-  'contactossex-argentina': {
-    title: 'Contactossex Argentina | Alternativa privada para adultos registrados',
-    description: 'Si buscás contactossex argentina, descubrí una alternativa privada para adultos registrados con perfiles verificados, discreción y acceso controlado.',
-    headline: 'Contactossex Argentina, acceso privado y perfiles verificados',
-    intro: 'Una landing pensada para captar la búsqueda exacta de contactossex argentina y llevar tráfico a una experiencia privada para adultos registrados.',
-    focus: 'contactossex',
-    bullets: ['Búsqueda exacta de contactossex argentina', 'Perfiles verificados y discretos', 'Acceso completo solo para registrados'],
-    faq: [
-      ['¿Qué captura esta página?', 'Captura búsquedas exactas de contactossex argentina y variantes cercanas.'],
-      ['¿Hay contenido público completo?', 'No, solo la puerta de entrada pública.'],
-    ],
-  },
-  'cornudos-argentina': {
-    title: 'Cornudos Argentina | Comunidad privada para adultos registrados',
-    description: 'Una landing pública para búsquedas de cornudos en Argentina, con comunidad privada, perfiles verificados y acceso discreto.',
-    headline: 'Cornudos Argentina, discreción y afinidad real',
-    intro: 'Una entrada pública pensada para captar búsquedas de cornudos y cornudo en Argentina, con acceso privado para adultos registrados.',
-    focus: 'cornudos',
-    bullets: ['Búsquedas de cornudos y cornudo en Argentina', 'Perfiles afines y verificados', 'Acceso completo tras el registro'],
-    faq: [
-      ['¿Esto es público?', 'Solo la puerta de entrada. El contenido completo queda para usuarios registrados.'],
-      ['¿Sirve para posicionar la búsqueda?', 'Sí, porque ataca la intención principal con contenido propio y relevante.'],
-    ],
-  },
-};
-
-function slugToCity(slug) {
-  return getGeo(slug);
+function slugToCity(slug, locale) {
+  return getGeo(slug, locale);
 }
 
-function buildLocalizedPage(page, citySlug, variant) {
-  const city = slugToCity(citySlug);
+const countFormatter = new Intl.NumberFormat('es-AR');
+
+function formatCount(value) {
+  return countFormatter.format(Number(value || 0));
+}
+
+function buildLocalizedPage(page, citySlug, variant, cityStats, locale) {
+  const city = slugToCity(citySlug, locale);
   if (!city) return page;
 
   const citySuffix = `${city.cityHint} | Mansión Deseo`;
@@ -163,8 +50,34 @@ function buildLocalizedPage(page, citySlug, variant) {
       : citySlug === 'cordoba-provincia'
         ? 'Cuckold Provincia de Córdoba'
         : `Cuckold ${city.label}`;
+  const updatedLabel = formatSeoCityStatsDate(cityStats?.updated_at);
+  const hasStats = hasSeoCityStats(cityStats);
+  const activeProfiles = formatCount(cityStats?.active_profiles_30d);
+  const activeCouples = formatCount(cityStats?.active_couples_30d);
+  const activeWomen = formatCount(cityStats?.active_women_30d);
+  const activeMen = formatCount(cityStats?.active_men_30d);
+  const premiumProfiles = formatCount(cityStats?.premium_profiles);
 
   if (variant === 'contactossex-argentina') {
+    if (hasStats) {
+      return {
+        ...page,
+        title: `Contactossex Argentina ${citySuffix} | ${activeProfiles} perfiles activos`,
+        description: `Búsquedas de contactossex argentina ${city.cityHint} con ${activeProfiles} perfiles verificados activos en los últimos 30 días, ${activeCouples} parejas y acceso privado para adultos registrados.`,
+        headline: `Contactossex Argentina ${city.label} con actividad real`,
+        intro: `Si buscás contactossex argentina ${city.cityHint}, acá tenés una alternativa privada con ${activeProfiles} perfiles verificados activos en los últimos 30 días. La base local incluye ${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres. Datos actualizados el ${updatedLabel}.${cityIntroSuffix}`,
+        bullets: [
+          `${activeProfiles} perfiles verificados activos en los últimos 30 días`,
+          `${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres con actividad reciente`,
+          `${premiumProfiles} perfiles premium y acceso completo solo para registrados`,
+        ],
+        faq: [
+          [`¿Cuánta actividad hay ${city.cityHint}?`, `Según la actualización del ${updatedLabel}, hay ${activeProfiles} perfiles verificados activos en los últimos 30 días, incluyendo ${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres.`],
+          ['¿Se puede ver todo sin registrarse?', 'No. La landing es pública para captar la búsqueda, pero el contenido completo y la interacción quedan dentro del sitio para usuarios registrados.'],
+        ],
+      };
+    }
+
     return {
       ...page,
       title: `Contactossex Argentina ${citySuffix}`,
@@ -176,6 +89,25 @@ function buildLocalizedPage(page, citySlug, variant) {
   }
 
   if (page.focus === 'contactossex') {
+    if (hasStats) {
+      return {
+        ...page,
+        title: `Contactossex ${citySuffix} | ${activeProfiles} perfiles activos`,
+        description: `Alternativa privada para quienes buscan ${exactContactossex}, con ${activeProfiles} perfiles verificados activos en los últimos 30 días, ${activeCouples} parejas y acceso controlado.`,
+        headline: `${exactContactossex} con actividad real y acceso privado`,
+        intro: `Una landing pensada para captar búsquedas de ${exactContactossex} y convertirlas en registro dentro de Mansión Deseo. En este momento, la base local muestra ${activeProfiles} perfiles verificados activos en los últimos 30 días, con ${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres. Datos actualizados el ${updatedLabel}.${cityIntroSuffix}`,
+        bullets: [
+          `${activeProfiles} perfiles verificados activos en los últimos 30 días`,
+          `${activeCouples} parejas, ${activeWomen} mujeres y ${activeMen} hombres con actividad reciente`,
+          `${premiumProfiles} perfiles premium y acceso completo solo para registrados`,
+        ],
+        faq: [
+          [`¿Hay actividad real para ${exactContactossex}?`, `Sí. Según la actualización del ${updatedLabel}, hay ${activeProfiles} perfiles verificados activos en los últimos 30 días ${city.cityHint}.`],
+          ['¿Es el mismo sitio?', 'No. Es una alternativa propia, privada y orientada a perfiles verificados, con acceso completo solo después del registro.'],
+        ],
+      };
+    }
+
     return {
       ...page,
       title: `Contactossex ${citySuffix}`,
@@ -248,11 +180,26 @@ function Pill({ icon: Icon, children }) {
   );
 }
 
-export default function SEOLandingPage({ variant, citySlug = '' }) {
-  const page = buildLocalizedPage(SEO_PAGES[variant] || SEO_PAGES.parejas, citySlug, variant);
-  const canonical = citySlug
-    ? `https://mansiondeseo.com/${variant}/${citySlug}`
-    : `https://mansiondeseo.com/${variant}`;
+export default function SEOLandingPage({ variant, citySlug = '', locale = DEFAULT_SEO_LOCALE }) {
+  const localeConfig = getSeoLocale(locale);
+  const city = citySlug ? slugToCity(citySlug, locale) : null;
+  const cityStats = city ? getSeoCityStats(citySlug) : null;
+  const cityHasStats = hasSeoCityStats(cityStats);
+  const relatedCityLinks = city && (variant === 'contactossex' || variant === 'contactossex-argentina')
+    ? getTopSeoCityStats(6, citySlug)
+      .map((entry) => {
+        const entryCity = slugToCity(entry.city_slug, locale);
+        if (!entryCity) return null;
+        return {
+          to: buildSeoPath({ locale, variant, citySlug: entry.city_slug }),
+          label: `${entryCity.label} (${formatCount(entry.active_profiles_30d)})`,
+        };
+      })
+      .filter(Boolean)
+    : [];
+  const page = buildLocalizedPage(getSeoIntentPage(locale, variant), citySlug, variant, cityStats, locale);
+  const canonical = buildSeoCanonical({ locale, variant, citySlug });
+  const alternates = buildSeoAlternates({ variant, citySlug });
   const faqSchema = {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
@@ -271,11 +218,14 @@ export default function SEOLandingPage({ variant, citySlug = '' }) {
     name: page.title,
     description: page.description,
     url: canonical,
+    inLanguage: localeConfig.hreflang,
     isPartOf: {
       '@type': 'WebSite',
       name: 'Mansión Deseo',
       url: 'https://mansiondeseo.com/',
     },
+    ...(city ? { areaServed: city.label } : {}),
+    ...(cityHasStats && cityStats?.updated_at ? { dateModified: `${String(cityStats.updated_at).slice(0, 10)}T00:00:00Z` } : {}),
     about: [
       { '@type': 'Thing', name: page.focus },
       { '@type': 'Thing', name: 'encuentros discretos' },
@@ -283,10 +233,13 @@ export default function SEOLandingPage({ variant, citySlug = '' }) {
     ],
   };
 
-    useSeoMeta({
+  useSeoMeta({
     title: page.title,
     description: page.description,
     canonical,
+    alternates,
+    htmlLang: localeConfig.language,
+    ogLocale: localeConfig.hreflang.replace('-', '_'),
   });
   useStructuredData(faqSchema, `faq-${variant}${citySlug ? `-${citySlug}` : ''}`);
   useStructuredData(pageSchema, `webpage-${variant}${citySlug ? `-${citySlug}` : ''}`);
@@ -384,7 +337,7 @@ export default function SEOLandingPage({ variant, citySlug = '' }) {
           >
             <div className="rounded-[2rem] border border-mansion-border/25 bg-[linear-gradient(180deg,rgba(24,20,29,0.92),rgba(10,10,16,0.92))] p-6 shadow-elevated">
               <div className="inline-flex rounded-full border border-mansion-gold/20 bg-mansion-gold/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-mansion-gold">
-                {citySlug && slugToCity(citySlug) ? `${slugToCity(citySlug).label} · SEO local` : 'Qué encontrás'}
+                {city ? `${city.label} · SEO local` : 'Qué encontrás'}
               </div>
 
               <ul className="mt-5 space-y-3">
@@ -404,9 +357,50 @@ export default function SEOLandingPage({ variant, citySlug = '' }) {
                   Foco SEO
                 </div>
                 <p className="mt-2 text-sm text-text-primary">
-                  {page.focus} y búsquedas relacionadas{citySlug && slugToCity(citySlug) ? ` ${slugToCity(citySlug).cityHint}` : ''}, con acceso completo solo después del registro.
+                  {page.focus} y búsquedas relacionadas{city ? ` ${city.cityHint}` : ''}, con acceso completo solo después del registro.
                 </p>
               </div>
+
+              {city && (
+                <div className="mt-6 rounded-2xl border border-white/8 bg-black/20 p-4">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-text-dim">
+                    <Users className="h-3.5 w-3.5 text-mansion-gold" />
+                    Actividad local
+                  </div>
+                  {cityHasStats ? (
+                    <>
+                      <p className="mt-2 text-sm leading-relaxed text-text-primary">
+                        Hay {formatCount(cityStats.active_profiles_30d)} perfiles verificados activos en los últimos 30 días {city.cityHint}.
+                      </p>
+                      <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-text-dim">
+                        <div className="rounded-2xl border border-white/5 bg-white/5 p-3">
+                          <p className="text-[11px] uppercase tracking-[0.18em]">Parejas</p>
+                          <p className="mt-1 text-lg font-semibold text-text-primary">{formatCount(cityStats.active_couples_30d)}</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/5 bg-white/5 p-3">
+                          <p className="text-[11px] uppercase tracking-[0.18em]">Mujeres</p>
+                          <p className="mt-1 text-lg font-semibold text-text-primary">{formatCount(cityStats.active_women_30d)}</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/5 bg-white/5 p-3">
+                          <p className="text-[11px] uppercase tracking-[0.18em]">Hombres</p>
+                          <p className="mt-1 text-lg font-semibold text-text-primary">{formatCount(cityStats.active_men_30d)}</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/5 bg-white/5 p-3">
+                          <p className="text-[11px] uppercase tracking-[0.18em]">Premium</p>
+                          <p className="mt-1 text-lg font-semibold text-text-primary">{formatCount(cityStats.premium_profiles)}</p>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-xs text-text-dim">
+                        Datos agregados y actualizados el {formatSeoCityStatsDate(cityStats.updated_at)}.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-sm leading-relaxed text-text-primary">
+                      Esta landing ya está preparada para captar búsquedas de alta intención {city.cityHint}. A medida que se consolida la actividad verificada local, vamos mostrando cifras públicas más precisas.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </motion.aside>
         </div>
@@ -425,12 +419,19 @@ export default function SEOLandingPage({ variant, citySlug = '' }) {
           </div>
 
             <div className="rounded-[2rem] border border-mansion-border/25 bg-[linear-gradient(180deg,rgba(201,168,76,0.08),rgba(24,20,29,0.88))] p-6">
-              <h2 className="font-display text-2xl font-semibold text-text-primary">Más búsquedas</h2>
+              <h2 className="font-display text-2xl font-semibold text-text-primary">
+                {relatedCityLinks.length ? 'Otras ciudades activas' : 'Más búsquedas'}
+              </h2>
               <p className="mt-2 text-sm leading-relaxed text-text-dim">
-                Usá estas páginas como entrada para términos de alta intención y dejá que el sitio convierta a registro.
+                {relatedCityLinks.length
+                  ? 'Estas ciudades ya muestran actividad verificada y ayudan a reforzar el enlazado interno de la familia SEO.'
+                  : 'Usá estas páginas como entrada para términos de alta intención y dejá que el sitio convierta a registro.'}
               </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              {RELATED.map((item) => (
+              {(relatedCityLinks.length ? relatedCityLinks : RELATED.map((item) => ({
+                ...item,
+                to: buildSeoPath({ locale, variant: item.to.replace(/^\//, '') }),
+              }))).map((item) => (
                 <Link
                   key={item.to}
                   to={item.to}

@@ -15,9 +15,10 @@ import { useEffect, useRef } from 'react';
 
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
+const HOME_FEED_ROUTES = ['/', '/feed'];
 
 const NAV_ITEMS = [
-  { to: '/', icon: Home, label: 'Inicio' },
+  { to: '/feed', icon: Home, label: 'Inicio' },
   { to: '/videos', icon: Film, label: 'Videos' },
   { to: '/mensajes', icon: MessageCircle, label: 'Mensajes' },
   { to: '/perfil', icon: User, label: 'Perfil' },
@@ -145,9 +146,12 @@ export default function BottomNav() {
       >
         <div className="flex items-center justify-around px-2.5" style={{ height: effectiveNavHeight }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
+            const isHomeRoute = HOME_FEED_ROUTES.includes(location.pathname);
             const isActive =
-              to === '/' || to === '/perfil'
-                ? location.pathname === to
+              to === '/feed'
+                ? isHomeRoute
+                : to === '/perfil'
+                  ? location.pathname === to
                 : location.pathname.startsWith(to);
 
             return (
@@ -161,7 +165,7 @@ export default function BottomNav() {
                   if (to === '/videos') warmVideoFeed();
                 }}
                 onClick={(e) => {
-                  if (to === '/' && location.pathname === '/') {
+                  if (to === '/feed' && isHomeRoute) {
                     window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT));
                     return;
                   }
@@ -170,7 +174,7 @@ export default function BottomNav() {
                   if (to === '/videos') {
                     warmVideoFeed();
                   }
-                  if (to === '/') {
+                  if (to === '/feed') {
                     try { localStorage.removeItem('mansion_feed'); } catch {}
                   }
                   navigateAfterScrollReset(to);

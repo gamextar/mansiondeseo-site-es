@@ -54,8 +54,11 @@ if (typeof document !== 'undefined') {
 
 if (typeof window !== 'undefined') {
   const debugFlags = getBootDebugFlags();
-  const isRootPath = window.location.pathname === '/' || window.location.pathname === '';
-  if (debugFlags.forceBlackTest && isRootPath) {
+  const isAppHomePath =
+    window.location.pathname === '/' ||
+    window.location.pathname === '' ||
+    window.location.pathname === '/feed';
+  if (debugFlags.forceBlackTest && isAppHomePath) {
     window.history.replaceState({}, '', '/black-test');
   }
 

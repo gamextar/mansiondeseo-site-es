@@ -33,7 +33,7 @@ export default function PagoPendientePage() {
         </div>
 
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/feed')}
           className="w-full py-4 bg-white/10 text-white font-semibold rounded-xl hover:bg-white/20 transition-all"
         >
           Volver al inicio

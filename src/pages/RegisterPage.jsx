@@ -1910,7 +1910,7 @@ export default function RegisterPage() {
           <div className="absolute top-1/3 right-0 w-72 h-72 bg-mansion-crimson/5 rounded-full blur-3xl" />
           <div className="absolute bottom-1/3 left-0 w-64 h-64 bg-mansion-gold/5 rounded-full blur-3xl" />
         </div>
-        <SuccessScreen onEnter={() => navigate('/')} />
+        <SuccessScreen onEnter={() => navigate('/feed')} />
       </div>
     );
   }

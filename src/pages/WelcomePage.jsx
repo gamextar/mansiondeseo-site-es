@@ -14,10 +14,11 @@ export default function WelcomePage() {
     title: 'Mansión Deseo | Acceso privado para adultos',
     description: 'Comunidad privada y selecta para adultos registrados, pensada para parejas y usuarios solos que valoran perfiles verificados y acceso discreto.',
     canonical: 'https://mansiondeseo.com/bienvenida',
+    robots: 'noindex,follow',
   });
 
   if (hasToken) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/feed" replace />;
   }
 
   if (returningUser && !registerIntent) {

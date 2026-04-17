@@ -190,7 +190,7 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    if (!user?.is_admin) { navigate('/'); return; }
+    if (!user?.is_admin) { navigate('/feed'); return; }
     getSettings()
       .then(data => {
         const s = data.settings;
@@ -269,7 +269,7 @@ export default function SettingsPage() {
         setResendApiKey(s.resendApiKey || '');
         setMailFrom(s.mailFrom || '');
       })
-      .catch(() => navigate('/'))
+      .catch(() => navigate('/feed'))
       .finally(() => setLoading(false));
     adminGetGifts().then(data => setGifts(data.gifts || [])).catch(() => {});
   }, [user, navigate]);

@@ -98,11 +98,11 @@ export default function ProfileCard({
   const mainPhoto = getPrimaryProfilePhoto(profile);
   const resolvedMainPhoto = resolveMediaUrl(mainPhoto);
   const returnToPath = `${location.pathname}${location.search}${location.hash}`;
-  const useOverlayNavigation = location.pathname === '/' || location.pathname === '/explorar';
+  const useOverlayNavigation = location.pathname === '/' || location.pathname === '/feed' || location.pathname === '/explorar';
 
   const handleOpenProfile = () => {
     if (typeof window === 'undefined') return;
-    if (location.pathname !== '/' && location.pathname !== '/explorar') return;
+    if (location.pathname !== '/' && location.pathname !== '/feed' && location.pathname !== '/explorar') return;
     try {
       sessionStorage.setItem(
         FEED_SCROLL_KEY,

@@ -10,7 +10,7 @@ export default function Navbar() {
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
       <div className="max-w-7xl mx-auto px-3 h-10 flex items-center">
-        <Link to="/" reloadDocument className="flex items-center gap-2">
+        <Link to="/feed" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
             <span className="font-display text-white text-sm font-bold">M</span>
           </div>

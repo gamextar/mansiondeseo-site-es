@@ -1059,7 +1059,7 @@ export default function FeedPage({ initialData }) {
                           avatar_url: user.avatar_url || '',
                           avatar_crop: user.avatar_crop || null,
                         })
-                      : () => navigate('/historia/nueva', { state: { from: '/' } })}
+                      : () => navigate('/historia/nueva', { state: { from: '/feed' } })}
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
                   >
@@ -1087,7 +1087,7 @@ export default function FeedPage({ initialData }) {
                   <button
                     type="button"
                     draggable={false}
-                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/' } }); }}
+                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/feed' } }); }}
                     className="absolute bottom-4 right-0 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
                     onDragStart={handleStoriesNativeDragStart}
                   >
@@ -1113,7 +1113,7 @@ export default function FeedPage({ initialData }) {
                           avatar_url: user.avatar_url || '',
                           avatar_crop: user.avatar_crop || null,
                         })
-                      : () => navigate('/historia/nueva', { state: { from: '/' } })}
+                      : () => navigate('/historia/nueva', { state: { from: '/feed' } })}
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
                   >
@@ -1141,7 +1141,7 @@ export default function FeedPage({ initialData }) {
                   <button
                     type="button"
                     draggable={false}
-                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/' } }); }}
+                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/feed' } }); }}
                     className="absolute bottom-4 right-0 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
                     onDragStart={handleStoriesNativeDragStart}
                   >
@@ -1167,7 +1167,7 @@ export default function FeedPage({ initialData }) {
                           avatar_url: user.avatar_url || '',
                           avatar_crop: user.avatar_crop || null,
                         })
-                      : () => navigate('/historia/nueva', { state: { from: '/' } })}
+                      : () => navigate('/historia/nueva', { state: { from: '/feed' } })}
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
                   >
@@ -1195,7 +1195,7 @@ export default function FeedPage({ initialData }) {
                   <button
                     type="button"
                     draggable={false}
-                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/' } }); }}
+                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/feed' } }); }}
                     className="absolute bottom-4 right-0 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
                     onDragStart={handleStoriesNativeDragStart}
                   >

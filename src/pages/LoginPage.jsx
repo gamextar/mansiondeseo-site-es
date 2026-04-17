@@ -22,7 +22,7 @@ export default function LoginPage() {
       const data = await apiLogin({ email, password });
       setUser(data.user);
       setRegistered(true);
-      navigate('/');
+      navigate('/feed');
     } catch (err) {
       setError(err.message || 'Credenciales inválidas');
     } finally {

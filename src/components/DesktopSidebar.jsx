@@ -10,6 +10,7 @@ import { warmVideoFeed } from '../lib/videoFeedWarmup';
 
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
+const HOME_FEED_ROUTES = ['/', '/feed'];
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -24,7 +25,7 @@ function timeAgo(dateStr) {
 }
 
 const NAV_ITEMS = [
-  { to: '/', icon: Home, label: 'Inicio' },
+  { to: '/feed', icon: Home, label: 'Inicio' },
   { to: '/videos', icon: Film, label: 'Videos' },
   { to: '/seguidores', icon: Heart, label: 'Seguidores' },
   { to: '/ranking', icon: Trophy, label: 'Ranking' },
@@ -47,10 +48,10 @@ export default function DesktopSidebar() {
     <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 xl:w-72 z-40 flex-col bg-mansion-card/50 border-r border-mansion-border/30 backdrop-blur-xl">
       {/* Logo */}
       <Link
-        to="/"
+        to="/feed"
         onClick={() => {
           try { localStorage.removeItem('mansion_feed'); } catch {}
-          if (location.pathname === '/') {
+          if (HOME_FEED_ROUTES.includes(location.pathname)) {
             window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT));
           }
         }}
@@ -93,9 +94,12 @@ export default function DesktopSidebar() {
       {/* Nav items */}
       <nav className="flex-1 px-3 py-4 space-y-1">
         {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
+          const isHomeRoute = HOME_FEED_ROUTES.includes(location.pathname);
           const isActive =
-            to === '/' || to === '/perfil'
-              ? location.pathname === to
+            to === '/feed'
+              ? isHomeRoute
+              : to === '/perfil'
+                ? location.pathname === to
               : to === '/seguidores'
                 ? location.pathname.startsWith('/seguidores') || location.pathname.startsWith('/favoritos')
               : location.pathname.startsWith(to);
@@ -113,10 +117,10 @@ export default function DesktopSidebar() {
                 if (to === '/ranking') warmTopVisitedProfiles(100, 'all');
               }}
               onClick={() => {
-                if (to === '/' && location.pathname === '/') {
+                if (to === '/feed' && isHomeRoute) {
                   window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT));
                 }
-                if (to === '/') {
+                if (to === '/feed') {
                   try { localStorage.removeItem('mansion_feed'); } catch {}
                 }
                 if (to === '/videos') {

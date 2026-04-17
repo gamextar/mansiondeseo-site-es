@@ -28,7 +28,7 @@ export default function VipPage() {
 
   useEffect(() => {
     // If already VIP, redirect to home
-    if (user?.premium) { navigate('/', { replace: true }); return; }
+    if (user?.premium) { navigate('/feed', { replace: true }); return; }
     getPublicSettings().then(data => {
       const s = data.settings;
       const updated = [...DEFAULT_PLANES];

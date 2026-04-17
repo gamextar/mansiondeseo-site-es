@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import WelcomePage from './pages/WelcomePage';
+import PublicHomePage from './pages/PublicHomePage';
 import SEOLandingPage from './pages/SEOLandingPage';
 import BlackScreenPage from './pages/BlackScreenPage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
@@ -21,6 +22,9 @@ import { AuthContext, useAuth } from './lib/authContext';
 import { preloadVideoFeedChunk, preloadVideoFeedData } from './lib/videoFeedWarmup';
 import { clearBootDebugFlags, getBootDebugFlags, subscribeBootDebugFlags } from './lib/bootDebugPrefs';
 import { lazyWithRetry } from './lib/lazyWithRetry';
+import { useRobotsMeta } from './lib/seo';
+import { getRouteEnabledSeoLocales, isSeoLocale } from './lib/seoLocales';
+import { isSeoIntentVariant } from './lib/seoVariants';
 
 const ExplorePage = lazy(lazyWithRetry(() => import('./pages/ExplorePage'), 'mansion-lazy-retry:explore'));
 const ProfileDetailPage = lazy(lazyWithRetry(() => import('./pages/ProfileDetailPage'), 'mansion-lazy-retry:profile-detail'));
@@ -41,6 +45,7 @@ const StoryUploadPage = lazy(lazyWithRetry(() => import('./pages/StoryUploadPage
 const TopVisitedPage = lazy(lazyWithRetry(() => import('./pages/TopVisitedPage'), 'mansion-lazy-retry:top-visited'));
 const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage'), 'mansion-lazy-retry:video-lab'));
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
+const NON_DEFAULT_ROUTE_LOCALES = getRouteEnabledSeoLocales().filter((locale) => locale.pathPrefix);
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
@@ -64,6 +69,17 @@ function SEOCityLanding({ variant }) {
   return <SEOLandingPage variant={variant} citySlug={citySlug || ''} />;
 }
 
+function LocalizedSEOLanding() {
+  const { locale = '', variant = '', citySlug = '' } = useParams();
+  const localeConfig = isSeoLocale(locale) ? NON_DEFAULT_ROUTE_LOCALES.find((entry) => entry.code === locale) : null;
+
+  if (!localeConfig?.pathPrefix || !isSeoIntentVariant(variant)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <SEOLandingPage locale={locale} variant={variant} citySlug={citySlug || ''} />;
+}
+
 function AppLayout() {
   const location = useLocation();
   const { user } = useAuth();
@@ -73,16 +89,43 @@ function AppLayout() {
   const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
   const routeOverlayOpen = profileOverlayOpen || videoOverlayOpen;
   const standaloneVideosRoute = isStandaloneMobileApp && location.pathname.startsWith('/videos');
+  const isPublicHome = location.pathname === '/';
   const isFullscreen =
     standaloneVideosRoute ||
     FULLSCREEN_PATHS.some((p) => location.pathname.startsWith(p)) ||
     FULLSCREEN_PATHS.includes(location.pathname);
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
-  const showChrome = !isFullscreen && !isChatDetail;
+  const showChrome = !isFullscreen && !isChatDetail && !isPublicHome;
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const showTopNavbar = showChrome && !routeOverlayOpen;
   const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
   const scrollLockRef = useRef(null);
+  const routePath = location.pathname || '/';
+  const isPrivateNoindexRoute =
+    routePath === '/feed' ||
+    routePath === '/explorar' ||
+    routePath === '/videos' ||
+    routePath === '/ranking' ||
+    routePath === '/perfil' ||
+    routePath === '/favoritos' ||
+    routePath === '/seguidores' ||
+    routePath === '/configuracion' ||
+    routePath === '/login' ||
+    routePath === '/registro' ||
+    routePath === '/recuperar-contrasena' ||
+    routePath === '/bienvenida' ||
+    routePath === '/vip' ||
+    routePath === '/monedas' ||
+    routePath === '/pago-exitoso' ||
+    routePath === '/pago-monedas-exitoso' ||
+    routePath === '/pago-fallido' ||
+    routePath === '/pago-pendiente' ||
+    routePath === '/black-test' ||
+    routePath.startsWith('/perfiles/') ||
+    routePath.startsWith('/mensajes') ||
+    routePath.startsWith('/admin') ||
+    routePath.startsWith('/historia/');
+  useRobotsMeta(isPrivateNoindexRoute ? 'noindex,follow' : 'index,follow');
 
   useEffect(() => {
     ensureApiDebug();
@@ -243,6 +286,12 @@ function AppLayout() {
           <Route path="/contactossex/:citySlug" element={<SEOCityLanding variant="contactossex" />} />
           <Route path="/contactossex-argentina/:citySlug" element={<SEOCityLanding variant="contactossex-argentina" />} />
           <Route path="/cornudos-argentina/:citySlug" element={<SEOCityLanding variant="cornudos-argentina" />} />
+          {NON_DEFAULT_ROUTE_LOCALES.length > 0 && (
+            <>
+              <Route path="/:locale/:variant" element={<LocalizedSEOLanding />} />
+              <Route path="/:locale/:variant/:citySlug" element={<LocalizedSEOLanding />} />
+            </>
+          )}
 
           {/* Pagos */}
           <Route path="/vip" element={<VipPage />} />
@@ -261,11 +310,7 @@ function AppLayout() {
           {/* Standard layout pages (require registration) */}
           <Route
             path="/"
-            element={
-              <RequireRegistration>
-                <FeedPage />
-              </RequireRegistration>
-            }
+            element={<PublicHomePage />}
           />
           <Route
             path="/feed"
@@ -581,7 +626,7 @@ export default function App() {
       setToken(token);
       localStorage.setItem('mansion_registered', 'true');
       setRegisteredState(true);
-      window.history.replaceState({}, '', '/');
+      window.history.replaceState({}, '', '/feed');
     }
 
     let cancelled = false;

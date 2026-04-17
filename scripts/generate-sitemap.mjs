@@ -1,46 +1,25 @@
 import { writeFile } from 'node:fs/promises';
-import { GEO_PAGES } from '../src/lib/seoGeoCatalog.js';
+import { getGeoPagesForLocale } from '../src/lib/seoGeoCatalog.js';
+import { buildSeoCanonical } from '../src/lib/seoRouting.js';
+import { getSitemapSeoLocales } from '../src/lib/seoLocales.js';
+import { SEO_BASE_INTENTS, SEO_GEO_INTENT_CONFIGS } from '../src/lib/seoVariants.js';
 
-const baseUrls = [
-  ['https://mansiondeseo.com/', 'daily', '1.0'],
-  ['https://mansiondeseo.com/bienvenida', 'weekly', '0.8'],
-  ['https://mansiondeseo.com/registro', 'monthly', '0.7'],
-];
+const urls = [['https://mansiondeseo.com/', 'daily', '1.0']];
 
-const baseIntentUrls = [
-  ['parejas', 'weekly', '0.9'],
-  ['trios', 'weekly', '0.9'],
-  ['swingers', 'weekly', '0.8'],
-  ['mujeres', 'weekly', '0.8'],
-  ['hombres', 'weekly', '0.8'],
-  ['trans', 'weekly', '0.8'],
-  ['cuckold-argentina', 'weekly', '0.8'],
-  ['contactossex', 'weekly', '0.8'],
-  ['contactossex-argentina', 'weekly', '0.9'],
-  ['cornudos-argentina', 'weekly', '0.9'],
-];
+for (const locale of getSitemapSeoLocales()) {
+  for (const [slug, changefreq, priority] of SEO_BASE_INTENTS) {
+    urls.push([buildSeoCanonical({ locale: locale.code, variant: slug }), changefreq, priority]);
+  }
 
-const geoIntentConfigs = [
-  { prefix: 'parejas', priority: '0.8' },
-  { prefix: 'trios', priority: '0.8' },
-  { prefix: 'swingers', priority: '0.78' },
-  { prefix: 'mujeres', priority: '0.78' },
-  { prefix: 'hombres', priority: '0.78' },
-  { prefix: 'trans', priority: '0.78' },
-  { prefix: 'cuckold-argentina', priority: '0.88' },
-  { prefix: 'contactossex', priority: '0.85' },
-  { prefix: 'contactossex-argentina', priority: '0.92' },
-  { prefix: 'cornudos-argentina', priority: '0.92' },
-];
-
-const urls = [
-  ...baseUrls,
-  ...baseIntentUrls.map(([slug, changefreq, priority]) => [`https://mansiondeseo.com/${slug}`, changefreq, priority]),
-];
-
-for (const geoSlug of Object.keys(GEO_PAGES)) {
-  for (const { prefix, priority } of geoIntentConfigs) {
-    urls.push([`https://mansiondeseo.com/${prefix}/${geoSlug}`, 'weekly', priority]);
+  const geoPages = getGeoPagesForLocale(locale.code);
+  for (const geoSlug of Object.keys(geoPages)) {
+    for (const { prefix, priority } of SEO_GEO_INTENT_CONFIGS) {
+      urls.push([
+        buildSeoCanonical({ locale: locale.code, variant: prefix, citySlug: geoSlug }),
+        'weekly',
+        priority,
+      ]);
+    }
   }
 }
 

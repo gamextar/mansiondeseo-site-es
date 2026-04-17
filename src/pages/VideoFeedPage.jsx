@@ -701,11 +701,11 @@ export default function VideoFeedPage() {
       );
       return;
     }
-    navigate('/', { replace: true });
+    navigate('/feed', { replace: true });
   }, [backgroundLocation, flushPendingViewedStories, isOverlayPreview, navigate]);
   const closeToHomeFeed = useCallback(() => {
     flushPendingViewedStories();
-    navigate('/', { replace: true });
+    navigate('/feed', { replace: true });
   }, [flushPendingViewedStories, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
     if (!isOverlayPreview || !isDesktopViewport) return;
