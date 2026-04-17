@@ -268,6 +268,14 @@ function AppLayout() {
             }
           />
           <Route
+            path="/feed"
+            element={
+              <RequireRegistration>
+                <FeedPage />
+              </RequireRegistration>
+            }
+          />
+          <Route
             path="/explorar"
             element={
               <RequireRegistration>
