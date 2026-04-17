@@ -50,6 +50,11 @@ if (typeof document !== 'undefined') {
     document.body.style.colorScheme = 'dark';
     document.body.style.margin = '0';
   }
+
+  const seoPrerender = document.getElementById('seo-prerender');
+  if (seoPrerender) {
+    seoPrerender.remove();
+  }
 }
 
 if (typeof window !== 'undefined') {

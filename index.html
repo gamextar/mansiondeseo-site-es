@@ -18,6 +18,39 @@
         if (robots) robots.setAttribute('content', 'noindex, nofollow');
       })();
     </script>
+    <script>
+      (function () {
+        var path = window.location.pathname || '/';
+        var privateMatchers = [
+          /^\/feed\/?$/,
+          /^\/explorar\/?$/,
+          /^\/videos\/?$/,
+          /^\/ranking\/?$/,
+          /^\/perfil\/?$/,
+          /^\/favoritos\/?$/,
+          /^\/seguidores\/?$/,
+          /^\/configuracion\/?$/,
+          /^\/login\/?$/,
+          /^\/registro\/?$/,
+          /^\/recuperar-contrasena\/?$/,
+          /^\/bienvenida\/?$/,
+          /^\/vip\/?$/,
+          /^\/monedas\/?$/,
+          /^\/pago-exitoso\/?$/,
+          /^\/pago-monedas-exitoso\/?$/,
+          /^\/pago-fallido\/?$/,
+          /^\/pago-pendiente\/?$/,
+          /^\/black-test\/?$/,
+          /^\/mensajes(?:\/.*)?$/,
+          /^\/perfiles\/.+$/,
+          /^\/admin(?:\/.*)?$/,
+          /^\/historia(?:\/.*)?$/,
+        ];
+        if (!privateMatchers.some(function (matcher) { return matcher.test(path); })) return;
+        var robots = document.querySelector('meta[name="robots"]');
+        if (robots) robots.setAttribute('content', 'noindex, follow');
+      })();
+    </script>
 
     <!-- PWA -->
     <meta name="theme-color" content="#08080E" />
