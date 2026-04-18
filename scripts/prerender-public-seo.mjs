@@ -650,20 +650,13 @@ function renderLandingShell(view) {
   `;
 }
 
-function renderPrivateShell(title, heading, body) {
+function renderPrivateShell() {
   return `
-    <div id="seo-prerender">
-      <main class="seo-wrap">
-        <section class="seo-card seo-section">
-          <div class="seo-badge">Área privada</div>
-          <h1 class="seo-title" style="font-size:52px">${escapeHtml(heading)}</h1>
-          <p class="seo-copy">${escapeHtml(body)}</p>
-          <div class="seo-actions">
-            <a class="seo-btn seo-btn-primary" href="/login">Iniciar sesión</a>
-            <a class="seo-btn seo-btn-secondary" href="/registro">Registrarme</a>
-          </div>
-        </section>
-      </main>
+    <div id="seo-prerender" aria-hidden="true" style="min-height:100vh;background:#08080E">
+      <div style="position:fixed;inset:0;background:
+        radial-gradient(circle at top, rgba(255,255,255,0.03), transparent 35%),
+        linear-gradient(180deg, rgba(10,10,16,0.02), rgba(10,10,16,0.18));">
+      </div>
     </div>
   `;
 }
