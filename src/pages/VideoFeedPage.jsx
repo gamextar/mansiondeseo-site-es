@@ -724,7 +724,6 @@ export default function VideoFeedPage() {
   const overlayCloseViewedTimerRef = useRef(null);
   const lastScrollAtRef = useRef(0);
   const lastDesktopWheelAtRef = useRef(0);
-  const pwaAnchorTimersRef = useRef([]);
 
   const requestedStoryUserId = location.state?.storyUserId || null;
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
@@ -742,7 +741,6 @@ export default function VideoFeedPage() {
   const savedMuted = () => { try { return sessionStorage.getItem(VIDEO_FEED_MUTED_KEY) !== '0'; } catch { return true; } };
 
   const [activeDispIdx, setActiveDispIdx] = useState(() => (requestedStoryUserId ? 1 : savedIdx()));
-  const activeDispIdxRef = useRef(activeDispIdx);
   const [boundaryOverlayIdx, setBoundaryOverlayIdx] = useState(null);
   const [isMuted, setIsMuted] = useState(savedMuted);
   const [isDesktopViewport, setIsDesktopViewport] = useState(() => {
@@ -873,41 +871,6 @@ export default function VideoFeedPage() {
     setBoundaryOverlayIdx(null);
     return true;
   }, [isDesktopViewport, stories.length]);
-
-  const forceMobileViewportToIndex = useCallback((index) => {
-    if (isDesktopViewport) return false;
-    const container = containerRef.current;
-    if (!container || stories.length === 0) return false;
-
-    const height = container.clientHeight;
-    if (!height) return false;
-
-    const clampedIndex = Math.min(Math.max(index, 1), stories.length);
-    const nextScrollTop = height * clampedIndex;
-    const previousSnap = container.style.scrollSnapType;
-
-    container.style.scrollSnapType = 'none';
-    container.scrollTop = nextScrollTop;
-    setBoundaryOverlayIdx(null);
-
-    requestAnimationFrame(() => {
-      if (!containerRef.current) return;
-      containerRef.current.style.scrollSnapType = previousSnap || 'y mandatory';
-    });
-
-    return true;
-  }, [isDesktopViewport, stories.length]);
-
-  const schedulePwaViewportAnchor = useCallback(() => {
-    if (!isStandaloneMobileApp || isDesktopViewport || stories.length === 0 || typeof window === 'undefined') return;
-
-    pwaAnchorTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
-    pwaAnchorTimersRef.current = [0, 80, 220, 520].map((delay) => (
-      window.setTimeout(() => {
-        forceMobileViewportToIndex(activeDispIdxRef.current);
-      }, delay)
-    ));
-  }, [forceMobileViewportToIndex, isDesktopViewport, isStandaloneMobileApp, stories.length]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -1089,31 +1052,8 @@ export default function VideoFeedPage() {
 
   // Keep a ref of the current activeDispIdx so the stories-identity layout
   // effect can read it without being a dep (avoids interrupting user scrolls).
+  const activeDispIdxRef = useRef(activeDispIdx);
   useLayoutEffect(() => { activeDispIdxRef.current = activeDispIdx; });
-
-  useEffect(() => {
-    if (!standaloneMobileRoute || !isStandaloneMobileApp || loading || stories.length === 0) return;
-    schedulePwaViewportAnchor();
-  }, [activeDispIdx, isStandaloneMobileApp, loading, schedulePwaViewportAnchor, standaloneMobileRoute, stories.length]);
-
-  useEffect(() => {
-    if (!standaloneMobileRoute || !isStandaloneMobileApp || typeof window === 'undefined') return undefined;
-
-    const anchorWhenVisible = () => {
-      if (document.visibilityState === 'hidden') return;
-      schedulePwaViewportAnchor();
-    };
-
-    window.addEventListener('pageshow', anchorWhenVisible);
-    window.addEventListener('focus', anchorWhenVisible);
-    document.addEventListener('visibilitychange', anchorWhenVisible);
-
-    return () => {
-      window.removeEventListener('pageshow', anchorWhenVisible);
-      window.removeEventListener('focus', anchorWhenVisible);
-      document.removeEventListener('visibilitychange', anchorWhenVisible);
-    };
-  }, [isStandaloneMobileApp, schedulePwaViewportAnchor, standaloneMobileRoute]);
 
   useLayoutEffect(() => {
     if (isDesktopViewport) return undefined;
@@ -1183,8 +1123,6 @@ export default function VideoFeedPage() {
     clearTimeout(boundaryCooldownTimer.current);
     clearTimeout(viewedDispatchTimerRef.current);
     clearTimeout(overlayCloseViewedTimerRef.current);
-    pwaAnchorTimersRef.current.forEach((timerId) => clearTimeout(timerId));
-    pwaAnchorTimersRef.current = [];
   }, []);
 
   const settleInfiniteBoundary = useCallback(() => {
