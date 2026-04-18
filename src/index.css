@@ -131,6 +131,11 @@ body {
     min-height: 100vh;
     min-height: 100dvh;
   }
+
+  .h-dynamic-screen {
+    height: 100vh;
+    height: 100dvh;
+  }
 }
 
 @media (max-width: 1023px) {
