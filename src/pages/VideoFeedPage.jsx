@@ -988,9 +988,7 @@ export default function VideoFeedPage() {
   const navBottomOffset = isStandaloneMobileApp
     ? getStandaloneBottomNavOffset()
     : getBrowserBottomNavOffset();
-  const standaloneTopOffset = isStandaloneMobileApp
-    ? '0px'
-    : 'calc(env(safe-area-inset-top, 0px) + 48px)';
+  const standaloneTopOffset = 'env(safe-area-inset-top, 0px)';
   const standaloneViewportShellStyle = standaloneMobileRoute
     ? {
         paddingTop: standaloneTopOffset,
