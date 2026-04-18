@@ -24,6 +24,8 @@ const DEFAULT_PREFETCH_PAGES = 3;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
 const STORIES_RAIL_TRANSITION = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
+const VIDEO_FEED_INDEX_KEY = 'vf_idx';
+const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -743,18 +745,21 @@ export default function FeedPage({ initialData }) {
   }, [schedulePendingViewedStories]);
 
   const openStoryFromHome = useCallback((storyOrUserId) => {
-    const storyUserId = typeof storyOrUserId === 'object' && storyOrUserId !== null
-      ? String(storyOrUserId.user_id || storyOrUserId.id || '')
-      : String(storyOrUserId || '');
-    const storySeed = typeof storyOrUserId === 'object' && storyOrUserId !== null
+    const story = typeof storyOrUserId === 'object' && storyOrUserId !== null
       ? storyOrUserId
-      : null;
-    navigate('/videos', {
-      state: {
-        storyUserId,
-        storySeed,
-      },
-    });
+      : { user_id: storyOrUserId };
+    const storyId = String(story.story_id || '').trim();
+    const userId = String(story.user_id || story.id || '').trim();
+    const videoUrl = String(story.video_url || story.active_story_url || '').trim();
+
+    try {
+      sessionStorage.removeItem(VIDEO_FEED_INDEX_KEY);
+      if (storyId || userId || videoUrl) {
+        sessionStorage.setItem(VIDEO_FEED_ACTIVE_STORY_KEY, JSON.stringify({ storyId, userId, videoUrl }));
+      }
+    } catch {}
+
+    navigate('/videos');
   }, [navigate]);
 
   useEffect(() => {
