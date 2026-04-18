@@ -48,7 +48,7 @@ function resetDocumentScrollToTop() {
   root.style.scrollBehavior = previousScrollBehavior;
 }
 
-export default function BottomNav({ immersive = false }) {
+export default function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
@@ -128,10 +128,8 @@ export default function BottomNav({ immersive = false }) {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
-        bottom: immersive ? '0px' : (isStandaloneMobileApp ? `${bottomPaddingPx}px` : '0px'),
-        paddingBottom: immersive
-          ? 'max(env(safe-area-inset-bottom, 0px), 8px)'
-          : isStandaloneMobileApp
+        bottom: isStandaloneMobileApp ? `${bottomPaddingPx}px` : '0px',
+        paddingBottom: isStandaloneMobileApp
           ? '0px'
           : `calc(env(safe-area-inset-bottom, 0px) + ${bottomPaddingPx}px)`,
         paddingLeft: outerSidePadding,
