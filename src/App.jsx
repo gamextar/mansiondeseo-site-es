@@ -108,11 +108,6 @@ function AppLayout() {
   const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
   const routeOverlayOpen = profileOverlayOpen || videoOverlayOpen;
   const standaloneVideosRoute = isStandaloneMobileApp && location.pathname.startsWith('/videos');
-  const scrollLockRef = useRef(null);
-  const appShellRef = useRef(null);
-  const routePath = location.pathname || '/';
-  const layoutPath = backgroundLocation?.pathname || routePath;
-  const mobileAppShellEnabled = Boolean(user && isMobileViewport && isMobileAppShellPath(layoutPath));
   const isPublicHome = location.pathname === '/';
   const isFullscreen =
     standaloneVideosRoute ||
@@ -123,6 +118,11 @@ function AppLayout() {
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const showTopNavbar = showChrome && !routeOverlayOpen && !mobileAppShellEnabled;
   const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
+  const scrollLockRef = useRef(null);
+  const appShellRef = useRef(null);
+  const routePath = location.pathname || '/';
+  const layoutPath = backgroundLocation?.pathname || routePath;
+  const mobileAppShellEnabled = Boolean(user && isMobileViewport && isMobileAppShellPath(layoutPath));
   const isPrivateNoindexRoute =
     routePath === '/feed' ||
     routePath === '/explorar' ||
