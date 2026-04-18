@@ -27,6 +27,64 @@ function timeAgo(dateStr) {
 const AVATAR_SIZE_DEFAULT = 52;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORY_SYNC_DELAY_MS = 320;
+const VIDEO_FEED_INDEX_KEY = 'vf_idx';
+const VIDEO_FEED_MUTED_KEY = 'vf_muted';
+const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
+
+function getStoryIdentity(story) {
+  if (!story) return null;
+  const storyId = String(story.story_id || story.id || '').trim();
+  const userId = String(story.user_id || '').trim();
+  const videoUrl = String(story.video_url || '').trim();
+  if (!storyId && !userId && !videoUrl) return null;
+  return { storyId, userId, videoUrl };
+}
+
+function readSavedVideoFeedStory() {
+  try {
+    const raw = sessionStorage.getItem(VIDEO_FEED_ACTIVE_STORY_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      storyId: String(parsed.storyId || '').trim(),
+      userId: String(parsed.userId || '').trim(),
+      videoUrl: String(parsed.videoUrl || '').trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function findSavedStoryIndex(stories, savedStory) {
+  if (!Array.isArray(stories) || !savedStory) return -1;
+  const savedStoryId = String(savedStory.storyId || '').trim();
+  const savedUserId = String(savedStory.userId || '').trim();
+  const savedVideoUrl = String(savedStory.videoUrl || '').trim();
+
+  if (savedStoryId) {
+    const byStoryId = stories.findIndex((story) => String(story?.story_id || story?.id || '').trim() === savedStoryId);
+    if (byStoryId >= 0) return byStoryId;
+  }
+
+  if (savedUserId && savedVideoUrl) {
+    const byUserAndVideo = stories.findIndex((story) => (
+      String(story?.user_id || '').trim() === savedUserId
+      && String(story?.video_url || '').trim() === savedVideoUrl
+    ));
+    if (byUserAndVideo >= 0) return byUserAndVideo;
+  }
+
+  if (savedUserId) {
+    return stories.findIndex((story) => String(story?.user_id || '').trim() === savedUserId);
+  }
+
+  if (savedVideoUrl) {
+    return stories.findIndex((story) => String(story?.video_url || '').trim() === savedVideoUrl);
+  }
+
+  return -1;
+}
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -144,6 +202,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
   const revealSentRef = useRef(false);
+  const userPausedRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
@@ -169,8 +228,12 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
 
   const attemptPlay = useCallback(() => {
     const video = videoRef.current;
-    if (!video || !isActive || !activeSrc) return;
+    if (!video || !isActive || !activeSrc || userPausedRef.current) return;
     video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+  }, [activeSrc, isActive]);
+
+  useEffect(() => {
+    if (isActive) userPausedRef.current = false;
   }, [activeSrc, isActive]);
 
   useEffect(() => {
@@ -230,6 +293,29 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   }, [activeSrc, attemptPlay, isActive, notifyRevealReady]);
 
   useEffect(() => {
+    if (!isActive || !activeSrc || typeof window === 'undefined') return undefined;
+
+    const resumeActiveVideo = () => {
+      if (document.visibilityState === 'hidden' || userPausedRef.current) return;
+      attemptPlay();
+    };
+
+    const timerA = window.setTimeout(resumeActiveVideo, 80);
+    const timerB = window.setTimeout(resumeActiveVideo, 260);
+    window.addEventListener('pageshow', resumeActiveVideo);
+    window.addEventListener('focus', resumeActiveVideo);
+    document.addEventListener('visibilitychange', resumeActiveVideo);
+
+    return () => {
+      window.clearTimeout(timerA);
+      window.clearTimeout(timerB);
+      window.removeEventListener('pageshow', resumeActiveVideo);
+      window.removeEventListener('focus', resumeActiveVideo);
+      document.removeEventListener('visibilitychange', resumeActiveVideo);
+    };
+  }, [activeSrc, attemptPlay, isActive]);
+
+  useEffect(() => {
     const video = videoRef.current;
     if (video) video.muted = isMuted;
   }, [isMuted]);
@@ -238,8 +324,10 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
+      userPausedRef.current = false;
       video.play().then(() => setIsPlaying(true)).catch(() => {});
     } else {
+      userPausedRef.current = true;
       video.pause();
       setIsPlaying(false);
     }
@@ -648,8 +736,8 @@ export default function VideoFeedPage() {
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
-  const savedIdx = () => { try { const v = sessionStorage.getItem('vf_idx'); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
-  const savedMuted = () => { try { return sessionStorage.getItem('vf_muted') !== '0'; } catch { return true; } };
+  const savedIdx = () => { try { const v = sessionStorage.getItem(VIDEO_FEED_INDEX_KEY); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
+  const savedMuted = () => { try { return sessionStorage.getItem(VIDEO_FEED_MUTED_KEY) !== '0'; } catch { return true; } };
 
   const [activeDispIdx, setActiveDispIdx] = useState(() => (requestedStoryUserId ? 1 : savedIdx()));
   const [boundaryOverlayIdx, setBoundaryOverlayIdx] = useState(null);
@@ -659,6 +747,8 @@ export default function VideoFeedPage() {
     return window.matchMedia('(min-width: 1024px)').matches;
   });
   const initialStoryUserIdRef = useRef(requestedStoryUserId);
+  const savedStoryRestoreRef = useRef(requestedStoryUserId ? null : readSavedVideoFeedStory());
+  const savedStoryRestoredRef = useRef(false);
   const apiRespondedRef = useRef(false);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
@@ -892,6 +982,23 @@ export default function VideoFeedPage() {
     if (apiRespondedRef.current) initialStoryUserIdRef.current = null;
   }, [stories, loading, syncMobileViewportToIndex]);
 
+  useLayoutEffect(() => {
+    const savedStory = savedStoryRestoreRef.current;
+    if (requestedStoryUserId || savedStoryRestoredRef.current || !savedStory || stories.length === 0) return;
+
+    const targetIndex = findSavedStoryIndex(stories, savedStory);
+    if (targetIndex < 0) {
+      if (apiRespondedRef.current) savedStoryRestoredRef.current = true;
+      return;
+    }
+
+    const nextIndex = targetIndex + 1;
+    savedStoryRestoredRef.current = true;
+    setActiveDispIdx(nextIndex);
+    setBoundaryOverlayIdx(null);
+    syncMobileViewportToIndex(nextIndex);
+  }, [requestedStoryUserId, stories, syncMobileViewportToIndex]);
+
   useEffect(() => {
     if (!activeStory?.user_id) return;
     if (isOverlayPreview) {
@@ -994,10 +1101,19 @@ export default function VideoFeedPage() {
   }, [isDesktopViewport, stories]);
 
   useEffect(() => {
-    try { sessionStorage.setItem('vf_idx', String(activeDispIdx)); } catch {}
-  }, [activeDispIdx]);
+    const clampedIndex = Math.min(Math.max(activeDispIdx, 1), Math.max(stories.length, 1));
+    const currentStory = stories[clampedIndex - 1] || null;
+    const storyIdentity = getStoryIdentity(currentStory);
+
+    try {
+      sessionStorage.setItem(VIDEO_FEED_INDEX_KEY, String(activeDispIdx));
+      if (storyIdentity) {
+        sessionStorage.setItem(VIDEO_FEED_ACTIVE_STORY_KEY, JSON.stringify(storyIdentity));
+      }
+    } catch {}
+  }, [activeDispIdx, stories]);
   useEffect(() => {
-    try { sessionStorage.setItem('vf_muted', isMuted ? '1' : '0'); } catch {}
+    try { sessionStorage.setItem(VIDEO_FEED_MUTED_KEY, isMuted ? '1' : '0'); } catch {}
   }, [isMuted]);
 
   useEffect(() => () => {
