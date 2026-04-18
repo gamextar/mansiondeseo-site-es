@@ -51,6 +51,18 @@
         if (robots) robots.setAttribute('content', 'noindex, follow');
       })();
     </script>
+    <script>
+      (function () {
+        var path = window.location.pathname || '/';
+        if (path !== '/') return;
+        try {
+          var hasToken = !!window.localStorage.getItem('mansion_token');
+          var registered = window.localStorage.getItem('mansion_registered') === 'true';
+          if (!hasToken && !registered) return;
+          window.location.replace('/feed');
+        } catch (_) {}
+      })();
+    </script>
 
     <!-- PWA -->
     <meta name="theme-color" content="#08080E" />
