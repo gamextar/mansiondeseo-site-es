@@ -29,7 +29,7 @@ const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
 
 function getAppScrollElement() {
   if (typeof document === 'undefined') return null;
-  return document.querySelector('[data-mobile-scroll-shell="true"]');
+  return document.querySelector('[data-mobile-app-shell="true"]');
 }
 
 function getAppScrollTop() {

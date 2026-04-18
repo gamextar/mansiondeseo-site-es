@@ -214,6 +214,42 @@ function AppLayout() {
     return () => media.removeListener(handleChange);
   }, []);
 
+  useEffect(() => {
+    if (!mobileAppShellEnabled || profileOverlayOpen || typeof window === 'undefined') return undefined;
+
+    const { style: bodyStyle } = document.body;
+    const { style: htmlStyle } = document.documentElement;
+    const previousBody = {
+      height: bodyStyle.height,
+      overflow: bodyStyle.overflow,
+      overscrollBehavior: bodyStyle.overscrollBehavior,
+      touchAction: bodyStyle.touchAction,
+    };
+    const previousHtml = {
+      height: htmlStyle.height,
+      overflow: htmlStyle.overflow,
+      overscrollBehavior: htmlStyle.overscrollBehavior,
+    };
+
+    htmlStyle.height = '100%';
+    htmlStyle.overflow = 'hidden';
+    htmlStyle.overscrollBehavior = 'none';
+    bodyStyle.height = '100%';
+    bodyStyle.overflow = 'hidden';
+    bodyStyle.overscrollBehavior = 'none';
+    bodyStyle.touchAction = 'manipulation';
+
+    return () => {
+      htmlStyle.height = previousHtml.height;
+      htmlStyle.overflow = previousHtml.overflow;
+      htmlStyle.overscrollBehavior = previousHtml.overscrollBehavior;
+      bodyStyle.height = previousBody.height;
+      bodyStyle.overflow = previousBody.overflow;
+      bodyStyle.overscrollBehavior = previousBody.overscrollBehavior;
+      bodyStyle.touchAction = previousBody.touchAction;
+    };
+  }, [mobileAppShellEnabled, profileOverlayOpen]);
+
   // Reset scroll to top on every route change, EXCEPT when opening/closing
   // a profile overlay (which manages scroll lock/restore itself).
   const prevPathnameRef = useRef(location.pathname);
@@ -223,8 +259,12 @@ function AppLayout() {
     if (routeOverlayOpen) return; // overlay handles its own scroll
     if (location.state?.backgroundLocation) return; // closing overlay — App handles it
     if (prev === location.pathname) return; // same route, no reset
+    if (mobileAppShellEnabled && appShellRef.current) {
+      appShellRef.current.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      return;
+    }
     window.scrollTo(0, 0);
-  }, [location.pathname, location.state, routeOverlayOpen]);
+  }, [location.pathname, location.state, mobileAppShellEnabled, routeOverlayOpen]);
 
   useEffect(() => {
     // Video overlay is fullscreen — no need to lock the background scroll.
@@ -295,9 +335,10 @@ function AppLayout() {
         data-mobile-app-shell={mobileAppShellEnabled ? 'true' : undefined}
         className={
           mobileAppShellEnabled
-            ? 'min-h-dynamic-screen bg-mansion-base'
+            ? 'fixed inset-0 overflow-y-auto overscroll-y-contain bg-mansion-base scrollbar-hide'
             : (showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : '')
         }
+        style={mobileAppShellEnabled ? { height: '100dvh', WebkitOverflowScrolling: 'touch' } : undefined}
       >
         <Suspense
           fallback={(
