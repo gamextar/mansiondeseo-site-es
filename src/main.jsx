@@ -55,6 +55,9 @@ if (typeof document !== 'undefined') {
 
 function shouldUseStaticHomeOnly() {
   if (typeof window === 'undefined') return false;
+  if (typeof window.__MANSION_USE_STATIC_HOME_ONLY__ === 'boolean') {
+    return window.__MANSION_USE_STATIC_HOME_ONLY__;
+  }
   if (window.location.pathname !== '/') return false;
   try {
     const hasToken = !!window.localStorage.getItem('mansion_token');

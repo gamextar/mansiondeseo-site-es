@@ -54,13 +54,19 @@
     <script>
       (function () {
         var path = window.location.pathname || '/';
-        if (path !== '/') return;
-        try {
-          var hasToken = !!window.localStorage.getItem('mansion_token');
-          var registered = window.localStorage.getItem('mansion_registered') === 'true';
-          if (!hasToken && !registered) return;
-          window.location.replace('/feed');
-        } catch (_) {}
+        var useStaticHomeOnly = false;
+        if (path === '/') {
+          try {
+            var hasToken = !!window.localStorage.getItem('mansion_token');
+            var registered = window.localStorage.getItem('mansion_registered') === 'true';
+            if (hasToken || registered) {
+              window.location.replace('/feed');
+              return;
+            }
+            useStaticHomeOnly = true;
+          } catch (_) {}
+        }
+        window.__MANSION_USE_STATIC_HOME_ONLY__ = useStaticHomeOnly;
       })();
     </script>
 
@@ -152,6 +158,10 @@
   </head>
   <body style="margin:0;background-color:#08080E;color-scheme:dark">
     <div id="root" style="background-color:#08080E"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module">
+      if (!window.__MANSION_USE_STATIC_HOME_ONLY__) {
+        import('/src/main.jsx');
+      }
+    </script>
   </body>
 </html>
