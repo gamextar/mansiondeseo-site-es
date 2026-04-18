@@ -994,11 +994,11 @@ export default function FeedPage({ initialData }) {
 
   return (
     <div
-      className="min-h-dynamic-screen bg-mansion-base pt-navbar lg:pt-0 lg:pb-[84px]"
+      className="min-h-dynamic-screen bg-mansion-base pt-navbar pb-mobile-shell lg:pt-0 lg:pb-[84px]"
       style={{
         paddingBottom: isDesktopViewport
           ? undefined
-          : `calc(${Math.max(12, navBottomOffset)}px + env(safe-area-inset-bottom, 0px))`,
+          : `${Math.max(12, navBottomOffset)}px`,
       }}
     >
       {/* Pull-to-refresh indicator */}
