@@ -142,6 +142,19 @@ function mergeSeedStory(stories, seedStory) {
   return [seedStory, ...filtered];
 }
 
+function findStoryIndexByUser(stories, userId) {
+  const targetUserId = String(userId || '').trim();
+  if (!targetUserId || !Array.isArray(stories)) return -1;
+  return stories.findIndex((story) => String(story?.user_id || '').trim() === targetUserId);
+}
+
+function rotateStoriesToUser(stories, userId) {
+  const list = Array.isArray(stories) ? stories : [];
+  const targetIndex = findStoryIndexByUser(list, userId);
+  if (targetIndex <= 0) return list;
+  return [...list.slice(targetIndex), ...list.slice(0, targetIndex)];
+}
+
 function applyPendingStoryLikeState(inputStories, pendingLikes = {}) {
   if (!Array.isArray(inputStories) || inputStories.length === 0) return inputStories;
 
@@ -1018,7 +1031,10 @@ export default function VideoFeedPage() {
   const refreshStories = useCallback(async () => {
     const data = await getStories({ focusUserId: requestedStoryUserId || '' });
     const baseStories = mergeSeedStory(data.stories || [], requestedStorySeed);
-    const fresh = applyPendingStoryLikeState(baseStories, getPendingStoryLikes());
+    const orderedStories = requestedStoryUserId
+      ? rotateStoriesToUser(baseStories, requestedStoryUserId)
+      : baseStories;
+    const fresh = applyPendingStoryLikeState(orderedStories, getPendingStoryLikes());
     apiRespondedRef.current = true;
     setStories(fresh);
     return fresh;
