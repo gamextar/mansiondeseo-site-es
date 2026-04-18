@@ -996,6 +996,12 @@ export default function VideoFeedPage() {
         paddingTop: standaloneTopOffset,
       }
     : undefined;
+  const standaloneViewportFillStyle = standaloneMobileRoute
+    ? {
+        top: standaloneTopOffset,
+        bottom: '0px',
+      }
+    : undefined;
   const standaloneViewportContentStyle = standaloneMobileRoute
     ? {
         height: 'calc(100lvh + 8px)',
@@ -1550,12 +1556,11 @@ export default function VideoFeedPage() {
     <div
       className={
         standaloneMobileRoute
-          ? 'relative overflow-hidden bg-black'
+          ? 'relative min-h-dynamic-screen overflow-hidden bg-black'
           : desktopOverlayRoute
             ? 'absolute inset-0 bg-black z-[60]'
             : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'
       }
-      style={standaloneViewportShellStyle}
       onPointerDown={handleOverlayBackdropPointerDown}
     >
       <motion.div
@@ -1566,8 +1571,8 @@ export default function VideoFeedPage() {
       />
 
       <div
-        className={standaloneMobileRoute ? 'relative' : 'relative h-full'}
-        style={standaloneViewportContentStyle}
+        className={standaloneMobileRoute ? 'absolute inset-x-0' : 'relative h-full'}
+        style={standaloneMobileRoute ? standaloneViewportFillStyle : standaloneViewportContentStyle}
       >
         {isDesktopViewport && (
           <div
