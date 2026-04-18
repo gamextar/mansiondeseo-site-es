@@ -990,7 +990,7 @@ export default function FeedPage({ initialData }) {
   }, [stopStoriesBounce, stopStoriesMomentum]);
 
   // ── Grid setup ────────────────────────────────────────────────────
-  const gap = 12;
+  const gap = isDesktopViewport ? 12 : 6;
 
   return (
     <div
@@ -1004,21 +1004,19 @@ export default function FeedPage({ initialData }) {
       {/* Pull-to-refresh indicator */}
       <div
         ref={indicatorRef}
-        className="fixed top-16 left-0 right-0 z-50 flex justify-center py-2 pointer-events-none"
+        className="fixed top-[calc(env(safe-area-inset-top,0px)+8px)] lg:top-16 left-0 right-0 z-50 flex justify-center py-2 pointer-events-none"
         style={{ transform: 'translateY(-100%)', opacity: 0, transition: 'transform 0.2s, opacity 0.2s' }}
       >
         <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
       {/* Stories section */}
       {showStoriesSection && (
-      <div
-        className="px-0 lg:px-8 pt-2 lg:pt-4 pb-0 fade-in-up"
-      >
-        <div className="flex items-center gap-1.5 mb-3 px-3 lg:px-0">
+      <div className="px-0 lg:px-8 pt-2 lg:pt-4 pb-0 fade-in-up">
+        <div className="flex items-center gap-1.5 mb-3 px-2 lg:px-0">
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="text-text-muted text-sm lg:text-base font-medium">Video Flashes</p>
         </div>
-        <div className="pl-[4px] pr-[12px] lg:px-0">
+        <div className="pl-[2px] pr-[8px] lg:px-0">
           <AnimatedBlock
             ref={storiesScrollRef}
             className={`flex overflow-x-auto scrollbar-hide pb-2 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
@@ -1293,18 +1291,14 @@ export default function FeedPage({ initialData }) {
       )}
 
       {/* Results count */}
-      <div
-        className="px-3 lg:px-8 pb-2 fade-in-up fade-delay-300"
-      >
+      <div className={`${isDesktopViewport ? 'px-3 lg:px-8' : 'px-2'} pb-2 fade-in-up fade-delay-300`}>
         <p className="text-text-dim text-xs">
           {visibleProfiles.length} {visibleProfiles.length === 1 ? 'usuario' : 'usuarios'} conectados
         </p>
       </div>
 
       {/* Grid */}
-      <div
-        className="px-3 lg:px-8"
-      >
+      <div className={isDesktopViewport ? 'px-3 lg:px-8' : 'px-1'}>
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
@@ -1334,6 +1328,7 @@ export default function FeedPage({ initialData }) {
                           rank={pageCursor + index + 1}
                           viewerPremium={viewerPremium}
                           settings={safeSettings}
+                          immersiveMobile={!isDesktopViewport}
                         />
                       </div>
                     ))}
