@@ -61,11 +61,25 @@ function buildHeaders() {
   return `${blocks.join('\n\n')}\n`;
 }
 
+function collectAppAssetHrefs(html) {
+  const hrefs = [];
+  const seen = new Set();
+  for (const match of html.matchAll(/(?:src|href)="(\/assets\/[^"]+\.(?:js|css))"/g)) {
+    const href = match[1];
+    if (!seen.has(href)) {
+      seen.add(href);
+      hrefs.push(href);
+    }
+  }
+  return hrefs.sort((a, b) => Number(a.endsWith('.js')) - Number(b.endsWith('.js')));
+}
+
 const appHtml = await readFile(indexPath, 'utf8');
 await mkdir(appDir, { recursive: true });
 await rename(indexPath, appPath);
 await addSitemapRoutes();
 await Promise.all([...appRoutes].map((route) => writeAppRoute(route, appHtml)));
+const prewarmAssetHrefs = collectAppAssetHrefs(appHtml);
 
 const staticHomeHtml = `<!doctype html>
 <html lang="es" style="background:#08080e;color-scheme:dark">
@@ -157,6 +171,47 @@ const staticHomeHtml = `<!doctype html>
       </div>
     </section>
   </main>
+  <script>
+    (function(){
+      var assets = ${JSON.stringify(prewarmAssetHrefs)};
+      var warmed = false;
+      function addLink(rel, href, as) {
+        if (!href) return;
+        var previous = document.querySelector('link[data-app-warm][href="' + href + '"]');
+        if (previous && previous.rel === rel) return;
+        if (previous && rel !== 'prefetch') previous.remove();
+        var link = document.createElement('link');
+        link.rel = rel;
+        link.href = href;
+        if (as) link.as = as;
+        link.crossOrigin = 'anonymous';
+        link.dataset.appWarm = 'true';
+        document.head.appendChild(link);
+      }
+      function warm(mode) {
+        if (warmed && mode !== 'preload') return;
+        warmed = true;
+        for (var i = 0; i < assets.length; i += 1) {
+          var href = assets[i];
+          var isCss = href.slice(-4) === '.css';
+          if (mode === 'preload') {
+            addLink(isCss ? 'preload' : 'modulepreload', href, isCss ? 'style' : undefined);
+          } else {
+            addLink('prefetch', href, isCss ? 'style' : 'script');
+          }
+        }
+      }
+      var idle = window.requestIdleCallback || function(cb){ return setTimeout(cb, 900); };
+      idle(function(){ warm('prefetch'); }, { timeout: 1800 });
+      var intentLinks = document.querySelectorAll('a[href^="/registro"],a[href^="/login"],a[href^="/feed"]');
+      var events = ['pointerenter', 'focus', 'touchstart', 'mousedown'];
+      for (var i = 0; i < intentLinks.length; i += 1) {
+        for (var j = 0; j < events.length; j += 1) {
+          intentLinks[i].addEventListener(events[j], function(){ warm('preload'); }, { once: true, passive: true });
+        }
+      }
+    })();
+  </script>
 </body>
 </html>`;
 
