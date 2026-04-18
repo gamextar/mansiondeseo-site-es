@@ -54,7 +54,31 @@
     <script>
       (function () {
         var path = window.location.pathname || '/';
+        var seoVariants = [
+          'parejas',
+          'parejas-liberales',
+          'trios',
+          'swingers',
+          'intercambio-de-parejas',
+          'mujeres',
+          'hombres',
+          'trans',
+          'cuckold-argentina',
+          'contactossex',
+          'contactossex-argentina',
+          'cornudos-argentina',
+          'hotwife-argentina'
+        ];
+        var seoLocales = ['es-ar'];
+        var parts = path.split('/').filter(Boolean);
+        var isSeoRoute =
+          path === '/' ||
+          seoVariants.indexOf(parts[0] || '') !== -1 ||
+          (parts.length >= 2 &&
+            seoLocales.indexOf(parts[0] || '') !== -1 &&
+            seoVariants.indexOf(parts[1] || '') !== -1);
         var useStaticHomeOnly = false;
+        var showSeoShell = false;
         if (path === '/') {
           try {
             var hasToken = !!window.localStorage.getItem('mansion_token');
@@ -64,9 +88,14 @@
               return;
             }
             useStaticHomeOnly = true;
+            showSeoShell = true;
           } catch (_) {}
+        } else if (isSeoRoute) {
+          showSeoShell = true;
         }
         window.__MANSION_USE_STATIC_HOME_ONLY__ = useStaticHomeOnly;
+        window.__MANSION_SHOW_SEO_SHELL__ = showSeoShell;
+        document.documentElement.setAttribute('data-seo-shell-visible', showSeoShell ? '1' : '0');
       })();
     </script>
 
@@ -153,6 +182,8 @@
     }
     </script>
     <style>
+      #seo-prerender{display:none}
+      html[data-seo-shell-visible="1"] #seo-prerender{display:block}
       html,body{background:#08080E;color-scheme:dark}
     </style>
   </head>
