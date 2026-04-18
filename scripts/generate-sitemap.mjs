@@ -6,16 +6,20 @@ import { SEO_BASE_INTENTS, SEO_GEO_INTENT_CONFIGS } from '../src/lib/seoVariants
 
 const urls = [['https://mansiondeseo.com/', 'daily', '1.0']];
 
+function ensureTrailingSlash(url) {
+  return url.endsWith('/') ? url : `${url}/`;
+}
+
 for (const locale of getSitemapSeoLocales()) {
   for (const [slug, changefreq, priority] of SEO_BASE_INTENTS) {
-    urls.push([buildSeoCanonical({ locale: locale.code, variant: slug }), changefreq, priority]);
+    urls.push([ensureTrailingSlash(buildSeoCanonical({ locale: locale.code, variant: slug })), changefreq, priority]);
   }
 
   const geoPages = getGeoPagesForLocale(locale.code);
   for (const geoSlug of Object.keys(geoPages)) {
     for (const { prefix, priority } of SEO_GEO_INTENT_CONFIGS) {
       urls.push([
-        buildSeoCanonical({ locale: locale.code, variant: prefix, citySlug: geoSlug }),
+        ensureTrailingSlash(buildSeoCanonical({ locale: locale.code, variant: prefix, citySlug: geoSlug })),
         'weekly',
         priority,
       ]);
