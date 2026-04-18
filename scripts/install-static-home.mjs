@@ -17,6 +17,7 @@ const appRoutes = new Set([
   'explorar',
   'favoritos',
   'feed',
+  'full-mobile-test',
   'historia/nueva',
   'login',
   'mensajes',
