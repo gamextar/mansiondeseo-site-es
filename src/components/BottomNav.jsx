@@ -174,9 +174,6 @@ export default function BottomNav() {
                   if (to === '/videos') {
                     warmVideoFeed();
                   }
-                  if (to === '/feed') {
-                    try { localStorage.removeItem('mansion_feed'); } catch {}
-                  }
                   navigateAfterScrollReset(to);
                 }}
                 className="relative flex h-full shrink-0 flex-col items-center justify-center group"

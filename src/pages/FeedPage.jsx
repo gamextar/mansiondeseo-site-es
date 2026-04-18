@@ -399,7 +399,6 @@ export default function FeedPage({ initialData }) {
       sessionStorage.removeItem('mansion_feed_dirty');
       const shouldForceFresh = sessionStorage.getItem('mansion_feed_force_refresh') === '1';
       sessionStorage.removeItem('mansion_feed_force_refresh');
-      sessionStorage.removeItem(FEED_CACHE_KEY);
       const s = settingsRef.current;
       const nextBlockSize = (s?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES);
       loadProfiles({

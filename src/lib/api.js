@@ -20,6 +20,7 @@ function resolveApiBase() {
 const API_BASE = resolveApiBase();
 const TOKEN_KEY = 'mansion_token';
 const USER_KEY = 'mansion_user';
+const APP_BOOTSTRAP_CACHE_KEY = 'appBootstrap';
 const AUTH_ME_CACHE_KEY = 'authMe';
 const AUTH_ME_CACHE_TTL_MS = 60 * 60_000;
 const OWN_PROFILE_DASHBOARD_CACHE_KEY = 'ownProfileDashboard';
@@ -57,12 +58,38 @@ const sessionCache = {
   },
 };
 
+const localCache = {
+  get(key, ttlMs = 0) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (ttlMs > 0 && Date.now() - (Number(parsed.timestamp) || 0) > ttlMs) return null;
+      return parsed.value;
+    } catch {
+      return null;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify({ value, timestamp: Date.now() }));
+    } catch {}
+  },
+  delete(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+  },
+};
+
 function clearLegacyMediaCaches() {
   if (typeof window === 'undefined') return;
   try {
     if (localStorage.getItem(CLIENT_CACHE_VERSION_KEY) === CLIENT_CACHE_VERSION) return;
 
     localStorage.removeItem(USER_KEY);
+    localCache.delete(APP_BOOTSTRAP_CACHE_KEY);
 
     for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
       const key = sessionStorage.key(i);
@@ -88,7 +115,8 @@ clearLegacyMediaCaches();
 
 function invalidateBootstrapCache() {
   sharedGetCache.delete('bootstrap');
-  sessionCache.delete('appBootstrap');
+  sessionCache.delete(APP_BOOTSTRAP_CACHE_KEY);
+  localCache.delete(APP_BOOTSTRAP_CACHE_KEY);
 }
 
 function cacheOwnProfileDashboard(data) {
@@ -742,8 +770,11 @@ export async function getMe() {
 }
 
 export async function getAppBootstrap() {
-  const cached = sessionCache.get('appBootstrap', 60 * 60_000);
+  const cached =
+    sessionCache.get(APP_BOOTSTRAP_CACHE_KEY, 60 * 60_000) ||
+    localCache.get(APP_BOOTSTRAP_CACHE_KEY, 60 * 60_000);
   if (cached) {
+    sessionCache.set(APP_BOOTSTRAP_CACHE_KEY, cached);
     if (typeof cached?.unread === 'number') setUnreadCountCache({ unread: cached.unread });
     if (cached?.user) {
       const currentDashboard = sessionCache.get(OWN_PROFILE_DASHBOARD_CACHE_KEY, OWN_PROFILE_DASHBOARD_TTL_MS);
@@ -761,13 +792,17 @@ export async function getAppBootstrap() {
     const data = await apiFetch('/app/bootstrap');
     if (data?.user) cacheMeResponse({ user: data.user });
     if (typeof data?.unread === 'number') setUnreadCountCache({ unread: data.unread });
-    sessionCache.set('appBootstrap', data);
+    sessionCache.set(APP_BOOTSTRAP_CACHE_KEY, data);
+    localCache.set(APP_BOOTSTRAP_CACHE_KEY, data);
     return data;
   }, { ttlMs: 5 * 60_000 });
 }
 
 export function peekAppBootstrap() {
-  return sessionCache.get('appBootstrap', 60 * 60_000);
+  return (
+    sessionCache.get(APP_BOOTSTRAP_CACHE_KEY, 60 * 60_000) ||
+    localCache.get(APP_BOOTSTRAP_CACHE_KEY, 60 * 60_000)
+  );
 }
 
 export async function warmAuthenticatedEntry() {
@@ -836,7 +871,6 @@ function markFeedDirty() {
   try {
     sessionStorage.setItem('mansion_feed_dirty', '1');
     sessionStorage.setItem('mansion_feed_force_refresh', '1');
-    localStorage.removeItem('mansion_feed');
   } catch {}
 }
 
