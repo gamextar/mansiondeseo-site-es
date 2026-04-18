@@ -370,6 +370,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     video.addEventListener('canplay', handleReady);
 
     if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      setIsVideoReady(true);
       notifyRevealReady();
       attemptPlay();
     }
@@ -379,6 +380,17 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       video.removeEventListener('canplay', handleReady);
     };
   }, [activeSrc, attemptPlay, isActive, notifyRevealReady]);
+
+  useEffect(() => {
+    if (!enableCinematicReveal || !isActive || !activeSrc || isVideoReady || typeof window === 'undefined') return undefined;
+
+    const fallbackTimer = window.setTimeout(() => {
+      setIsVideoReady(true);
+      notifyRevealReady();
+    }, 1200);
+
+    return () => window.clearTimeout(fallbackTimer);
+  }, [activeSrc, enableCinematicReveal, isActive, isVideoReady, notifyRevealReady]);
 
   useEffect(() => {
     if (!isActive || !activeSrc || typeof window === 'undefined') return undefined;
@@ -988,6 +1000,17 @@ export default function VideoFeedPage() {
   const navBottomOffset = isStandaloneMobileApp
     ? getStandaloneBottomNavOffset()
     : getBrowserBottomNavOffset();
+  const mobileViewportShellStyle = standaloneMobileRoute
+    ? {
+        minHeight: '100vh',
+        height: '100dvh',
+      }
+    : undefined;
+  const mobileViewportContentStyle = standaloneMobileRoute
+    ? {
+        height: `calc(100dvh - ${navBottomOffset})`,
+      }
+    : undefined;
 
   const syncMobileViewportToIndex = useCallback((index) => {
     if (isDesktopViewport) return false;
@@ -1479,9 +1502,11 @@ export default function VideoFeedPage() {
     return (
       <div
         className={standaloneMobileRoute ? 'relative min-h-dynamic-screen overflow-hidden bg-black' : 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'}
+        style={mobileViewportShellStyle}
       >
         <div
-          className={standaloneMobileRoute ? 'flex h-dynamic-screen items-center justify-center' : undefined}
+          className={standaloneMobileRoute ? 'flex h-full items-center justify-center' : undefined}
+          style={mobileViewportContentStyle}
         >
           <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
         </div>
@@ -1493,6 +1518,7 @@ export default function VideoFeedPage() {
     return (
       <div
         className={standaloneMobileRoute ? 'relative min-h-dynamic-screen overflow-hidden bg-mansion-base px-6' : 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'}
+        style={mobileViewportShellStyle}
       >
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-32 right-[-10%] w-[520px] h-[520px] rounded-full bg-mansion-crimson/10 blur-3xl" />
@@ -1503,7 +1529,8 @@ export default function VideoFeedPage() {
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
-          className={`relative flex flex-col items-center justify-center text-center max-w-sm mx-auto ${standaloneMobileRoute ? 'h-dynamic-screen' : ''}`}
+          className={`relative flex flex-col items-center justify-center text-center max-w-sm mx-auto ${standaloneMobileRoute ? 'h-full' : ''}`}
+          style={mobileViewportContentStyle}
         >
           <div className="w-24 h-24 rounded-[2rem] bg-mansion-gold/10 border border-mansion-gold/20 flex items-center justify-center mb-6">
             <Film className="w-12 h-12 text-mansion-gold" />
@@ -1538,6 +1565,7 @@ export default function VideoFeedPage() {
             ? 'absolute inset-0 bg-black z-[60]'
             : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'
       }
+      style={mobileViewportShellStyle}
       onPointerDown={handleOverlayBackdropPointerDown}
     >
       <motion.div
@@ -1547,9 +1575,7 @@ export default function VideoFeedPage() {
         transition={{ duration: entryRevealReady ? 0.01 : 0.45, ease: [0.22, 1, 0.36, 1] }}
       />
 
-      <div
-        className={standaloneMobileRoute ? 'relative h-dynamic-screen' : 'relative h-full'}
-      >
+      <div className="relative h-full" style={mobileViewportContentStyle}>
         {isDesktopViewport && (
           <div
             className="absolute z-30 flex flex-col items-center gap-2"
