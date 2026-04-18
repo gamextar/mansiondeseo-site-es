@@ -230,12 +230,13 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, enableCinematicReveal = false }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, enableCinematicReveal = false, pauseOnAppBackground = false }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
   const revealSentRef = useRef(false);
   const userPausedRef = useRef(false);
+  const resumeAfterAppFocusRef = useRef(false);
   const recoveryTimerRef = useRef(null);
   const playAttemptIdRef = useRef(0);
   const lastRecoveryAtRef = useRef(0);
@@ -316,7 +317,11 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   }, [activeSrc, isActive, resetSuspendedVideo]);
 
   useEffect(() => {
-    if (isActive) userPausedRef.current = false;
+    if (isActive) {
+      userPausedRef.current = false;
+    } else {
+      resumeAfterAppFocusRef.current = false;
+    }
   }, [activeSrc, isActive]);
 
   useEffect(() => {
@@ -399,6 +404,56 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       document.removeEventListener('visibilitychange', resumeActiveVideo);
     };
   }, [activeSrc, attemptPlay, isActive]);
+
+  useEffect(() => {
+    if (!pauseOnAppBackground || !isActive || !activeSrc || typeof window === 'undefined') return undefined;
+
+    const pauseForBackground = () => {
+      const video = videoRef.current;
+      if (!video || userPausedRef.current) {
+        resumeAfterAppFocusRef.current = false;
+        return;
+      }
+
+      resumeAfterAppFocusRef.current = !video.paused || isPlaying;
+      if (recoveryTimerRef.current) {
+        window.clearTimeout(recoveryTimerRef.current);
+        recoveryTimerRef.current = null;
+      }
+
+      try {
+        video.pause();
+      } catch {}
+      setIsPlaying(false);
+    };
+
+    const resumeFromBackground = () => {
+      if (document.visibilityState === 'hidden' || userPausedRef.current || !resumeAfterAppFocusRef.current) return;
+      resumeAfterAppFocusRef.current = false;
+      window.setTimeout(() => attemptPlay({ verify: true }), 80);
+      window.setTimeout(() => attemptPlay({ verify: true }), 260);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        pauseForBackground();
+        return;
+      }
+      resumeFromBackground();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', pauseForBackground);
+    window.addEventListener('pageshow', resumeFromBackground);
+    window.addEventListener('focus', resumeFromBackground);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', pauseForBackground);
+      window.removeEventListener('pageshow', resumeFromBackground);
+      window.removeEventListener('focus', resumeFromBackground);
+    };
+  }, [activeSrc, attemptPlay, isActive, isPlaying, pauseOnAppBackground]);
 
   useEffect(() => () => {
     if (recoveryTimerRef.current) {
@@ -1638,6 +1693,7 @@ export default function VideoFeedPage() {
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
                   enableCinematicReveal={enableCinematicReveal}
+                  pauseOnAppBackground
                 />
               </div>
             );
