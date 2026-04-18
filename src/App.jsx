@@ -14,6 +14,7 @@ import WelcomePage from './pages/WelcomePage';
 import PublicHomePage from './pages/PublicHomePage';
 import SEOLandingPage from './pages/SEOLandingPage';
 import BlackScreenPage from './pages/BlackScreenPage';
+import MobileFullScreenProbePage from './pages/MobileFullScreenProbePage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
@@ -115,7 +116,8 @@ function AppLayout() {
       normalizedRoutePath === '/favoritos' ||
       normalizedRoutePath === '/seguidores' ||
       normalizedRoutePath === '/configuracion' ||
-      normalizedRoutePath === '/mensajes'
+      normalizedRoutePath === '/mensajes' ||
+      normalizedRoutePath === '/full-mobile-test'
     )
   );
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
@@ -125,6 +127,7 @@ function AppLayout() {
     routePath === '/feed' ||
     routePath === '/explorar' ||
     routePath === '/videos' ||
+    routePath === '/full-mobile-test' ||
     routePath === '/ranking' ||
     routePath === '/perfil' ||
     routePath === '/favoritos' ||
@@ -373,6 +376,14 @@ function AppLayout() {
             element={
               <RequireRegistration>
                 <VideoFeedPage />
+              </RequireRegistration>
+            }
+          />
+          <Route
+            path="/full-mobile-test"
+            element={
+              <RequireRegistration>
+                <MobileFullScreenProbePage />
               </RequireRegistration>
             }
           />
