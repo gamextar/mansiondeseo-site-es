@@ -34,6 +34,10 @@ function detectStandaloneMobile() {
 
 function resetDocumentScrollToTop() {
   if (typeof window === 'undefined') return;
+  const appShell = document.querySelector('[data-mobile-app-shell="true"]');
+  if (appShell) {
+    appShell.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }
   const root = document.documentElement;
   const body = document.body;
   const previousScrollBehavior = root.style.scrollBehavior;

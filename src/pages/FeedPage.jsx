@@ -27,6 +27,35 @@ const STORIES_RAIL_TRANSITION = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)'
 const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
 
+function getAppScrollElement() {
+  if (typeof document === 'undefined') return null;
+  return document.querySelector('[data-mobile-app-shell="true"]');
+}
+
+function getAppScrollTop() {
+  const appShell = getAppScrollElement();
+  if (appShell) return Number(appShell.scrollTop || 0);
+  return Number(window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
+}
+
+function scrollAppTo(top, options = {}) {
+  const appShell = getAppScrollElement();
+  if (appShell) {
+    appShell.scrollTo({ top, left: 0, behavior: options.behavior || 'auto' });
+    return;
+  }
+  window.scrollTo({ top, left: 0, behavior: options.behavior || 'auto' });
+}
+
+function getElementTopInAppScroll(element) {
+  if (!element) return 0;
+  const appShell = getAppScrollElement();
+  if (!appShell) return element.offsetTop || 0;
+  const elementRect = element.getBoundingClientRect();
+  const shellRect = appShell.getBoundingClientRect();
+  return Math.max(0, elementRect.top - shellRect.top + appShell.scrollTop);
+}
+
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
   const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
@@ -495,19 +524,19 @@ export default function FeedPage({ initialData }) {
         });
       }
     }
-    const targetTop = Math.max(0, (gridRef.current?.offsetTop || 0) - 24);
-    window.scrollTo({ top: targetTop, behavior: 'smooth' });
+    const targetTop = Math.max(0, getElementTopInAppScroll(gridRef.current) - 24);
+    scrollAppTo(targetTop, { behavior: 'smooth' });
   }, [applyLoadedProfiles, blockCursor, blockSize, cardsPerPage, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, viewerPremium]);
 
   useEffect(() => {
     let fadeOutTimer = null;
     let fadeInTimer = null;
     const handleHomeFocus = () => {
-      if (window.scrollY <= 0) return;
+      if (getAppScrollTop() <= 0) return;
       setGridOpacity(0);
       fadeOutTimer = setTimeout(() => {
         document.documentElement.style.scrollBehavior = 'auto';
-        window.scrollTo(0, 0);
+        scrollAppTo(0);
         document.documentElement.style.scrollBehavior = '';
         fadeInTimer = setTimeout(() => setGridOpacity(1), 16);
       }, 300);
@@ -519,7 +548,7 @@ export default function FeedPage({ initialData }) {
       prefetchedBlocksRef.current.clear();
       prefetchInFlightRef.current.clear();
       loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
-      window.scrollTo(0, 0);
+      scrollAppTo(0);
     };
     window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
     window.addEventListener(HOME_FEED_RESET_EVENT, handleHomeReset);
