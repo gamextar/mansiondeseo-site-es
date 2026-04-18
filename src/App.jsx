@@ -287,6 +287,7 @@ function AppLayout() {
       <div
         className={showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : ''}
         data-mobile-immersive={immersiveMobileApp ? 'true' : undefined}
+        data-mobile-standalone={isStandaloneMobileApp ? 'true' : undefined}
       >
         <Suspense
           fallback={(
