@@ -1,4 +1,32 @@
+import { useEffect } from 'react';
+
 export default function MobileFullScreenProbePage() {
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlBackground = html.style.background;
+    const previousBodyBackground = body.style.background;
+    const previousBodyColor = body.style.color;
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    const previousThemeColor = themeMeta?.getAttribute('content') ?? null;
+
+    html.style.background = '#d90429';
+    body.style.background = '#d90429';
+    body.style.color = '#ffffff';
+    if (themeMeta) themeMeta.setAttribute('content', '#d90429');
+
+    return () => {
+      html.style.background = previousHtmlBackground;
+      body.style.background = previousBodyBackground;
+      body.style.color = previousBodyColor;
+      if (themeMeta && previousThemeColor !== null) {
+        themeMeta.setAttribute('content', previousThemeColor);
+      }
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#d90429] pb-mobile-legacy-nav lg:pb-8 pt-navbar lg:pt-0 text-white">
       <div className="px-3 pt-4 pb-3">
