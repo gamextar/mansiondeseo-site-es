@@ -4825,7 +4825,8 @@ async function handleGetStories(request, env) {
   const url = new URL(request.url);
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
   const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
-  const offset = (page - 1) * limit;
+  const focusUserId = String(url.searchParams.get('focus_user_id') || '').trim();
+  let offset = (page - 1) * limit;
 
   // Try to get current user for per-user liked status and server-side seeking filter
   const auth = await authenticate(request, env).catch(() => null);
@@ -4845,28 +4846,74 @@ async function handleGetStories(request, env) {
     : [];
   const roleValues = [...new Set(roleFilters.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])))];
 
-  const bindings = [viewerId || ''];
+  const bindings = [];
+  const appendStoryVisibilityFilters = (parts, values, { includeLiked = false } = {}) => {
+    parts.push(`
+      FROM stories s
+      JOIN users u ON u.id = s.user_id
+      ${includeLiked ? 'LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?' : ''}
+      WHERE s.active = 1
+        AND u.status = 'verified'
+        AND COALESCE(u.account_status, 'active') = 'active'
+    `);
+    if (includeLiked) values.push(viewerId || '');
+    if (roleValues.length > 0) {
+      parts.push(` AND u.role IN (${roleValues.map(() => '?').join(', ')})`);
+      values.push(...roleValues);
+    }
+    parts.push(' AND (s.user_id != ? OR ? = \'\' OR s.user_id = ?)');
+    values.push(viewerId || '', viewerId || '', focusUserId);
+  };
+
+  if (focusUserId && page === 1) {
+    const targetParts = ['SELECT s.id, s.created_at, COALESCE(u.fake, 0) AS fake_rank'];
+    const targetBindings = [];
+    appendStoryVisibilityFilters(targetParts, targetBindings);
+    targetParts.push(' AND s.user_id = ?');
+    targetBindings.push(focusUserId);
+    targetParts.push(' ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC, s.id DESC LIMIT 1');
+
+    const target = await env.DB.prepare(targetParts.join('\n')).bind(...targetBindings).first();
+    if (target?.id) {
+      const rankParts = ['SELECT COUNT(*) AS before_count'];
+      const rankBindings = [];
+      appendStoryVisibilityFilters(rankParts, rankBindings);
+      rankParts.push(`
+        AND (
+          COALESCE(u.fake, 0) < ?
+          OR (
+            COALESCE(u.fake, 0) = ?
+            AND (s.created_at > ? OR (s.created_at = ? AND s.id > ?))
+          )
+        )
+      `);
+      rankBindings.push(
+        Number(target.fake_rank || 0),
+        Number(target.fake_rank || 0),
+        target.created_at,
+        target.created_at,
+        target.id
+      );
+
+      const rank = await env.DB.prepare(rankParts.join('\n')).bind(...rankBindings).first();
+      const beforeCount = Math.max(0, Number(rank?.before_count || 0));
+      offset = Math.max(0, beforeCount - Math.floor(limit / 2));
+    }
+  }
+
   let query = `
     SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
            u.username, u.avatar_url, u.avatar_crop,
            CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
-    FROM stories s
-    JOIN users u ON u.id = s.user_id
-    LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?
-    WHERE s.active = 1
-      AND u.status = 'verified'
-      AND COALESCE(u.account_status, 'active') = 'active'
   `;
-  if (roleValues.length > 0) {
-    query += ` AND u.role IN (${roleValues.map(() => '?').join(', ')})`;
-    bindings.push(...roleValues);
-  }
+  const queryParts = [query];
+  appendStoryVisibilityFilters(queryParts, bindings, { includeLiked: true });
+  query = queryParts.join('\n');
   query += `
-      AND (s.user_id != ? OR ? = '')
-    ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC
+    ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC, s.id DESC
     LIMIT ? OFFSET ?
   `;
-  bindings.push(viewerId || '', viewerId || '', limit, offset);
+  bindings.push(limit, offset);
 
   const { results } = await env.DB.prepare(query).bind(...bindings).all();
 

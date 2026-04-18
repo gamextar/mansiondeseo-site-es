@@ -118,7 +118,27 @@ function normalizeStorySeed(seed) {
 function mergeSeedStory(stories, seedStory) {
   const list = Array.isArray(stories) ? stories : [];
   if (!seedStory) return list;
-  const filtered = list.filter((story) => String(story?.user_id || '') !== String(seedStory.user_id));
+  const seedStoryId = String(seedStory.story_id || seedStory.id || '').trim();
+  const seedUserId = String(seedStory.user_id || '').trim();
+  const seedVideoUrl = String(seedStory.video_url || '').trim();
+  const existingIndex = list.findIndex((story) => {
+    const storyId = String(story?.story_id || story?.id || '').trim();
+    const userId = String(story?.user_id || '').trim();
+    const videoUrl = String(story?.video_url || '').trim();
+    if (seedStoryId && storyId && seedStoryId === storyId) return true;
+    if (seedUserId && userId && seedUserId === userId && (!seedVideoUrl || !videoUrl || seedVideoUrl === videoUrl)) return true;
+    return false;
+  });
+
+  if (existingIndex >= 0) {
+    return list.map((story, index) => (
+      index === existingIndex
+        ? { ...seedStory, ...story }
+        : story
+    ));
+  }
+
+  const filtered = list.filter((story) => String(story?.user_id || '') !== seedUserId);
   return [seedStory, ...filtered];
 }
 
