@@ -32,7 +32,7 @@ export default function MobileFullScreenProbePage() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#d90429] pb-mobile-legacy-nav lg:pb-8 pt-navbar lg:pt-0 text-white">
       <video
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-fill"
         src={PROBE_VIDEO_URL}
         autoPlay
         muted
