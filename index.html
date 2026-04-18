@@ -10,94 +10,6 @@
     <meta name="keywords" content="club liberal, parejas liberales, swinger Argentina, cuckold, tríos, ambiente liberal, club privado adultos, intercambio de parejas, comunidad liberal, dating liberal" />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://mansiondeseo.com/" />
-    <script>
-      (function () {
-        var hostname = window.location.hostname || '';
-        if (!hostname.endsWith('.pages.dev')) return;
-        var robots = document.querySelector('meta[name="robots"]');
-        if (robots) robots.setAttribute('content', 'noindex, nofollow');
-      })();
-    </script>
-    <script>
-      (function () {
-        var path = window.location.pathname || '/';
-        var privateMatchers = [
-          /^\/feed\/?$/,
-          /^\/explorar\/?$/,
-          /^\/videos\/?$/,
-          /^\/ranking\/?$/,
-          /^\/perfil\/?$/,
-          /^\/favoritos\/?$/,
-          /^\/seguidores\/?$/,
-          /^\/configuracion\/?$/,
-          /^\/login\/?$/,
-          /^\/registro\/?$/,
-          /^\/recuperar-contrasena\/?$/,
-          /^\/bienvenida\/?$/,
-          /^\/vip\/?$/,
-          /^\/monedas\/?$/,
-          /^\/pago-exitoso\/?$/,
-          /^\/pago-monedas-exitoso\/?$/,
-          /^\/pago-fallido\/?$/,
-          /^\/pago-pendiente\/?$/,
-          /^\/black-test\/?$/,
-          /^\/mensajes(?:\/.*)?$/,
-          /^\/perfiles\/.+$/,
-          /^\/admin(?:\/.*)?$/,
-          /^\/historia(?:\/.*)?$/,
-        ];
-        if (!privateMatchers.some(function (matcher) { return matcher.test(path); })) return;
-        var robots = document.querySelector('meta[name="robots"]');
-        if (robots) robots.setAttribute('content', 'noindex, follow');
-      })();
-    </script>
-    <script>
-      (function () {
-        var path = window.location.pathname || '/';
-        var seoVariants = [
-          'parejas',
-          'parejas-liberales',
-          'trios',
-          'swingers',
-          'intercambio-de-parejas',
-          'mujeres',
-          'hombres',
-          'trans',
-          'cuckold-argentina',
-          'contactossex',
-          'contactossex-argentina',
-          'cornudos-argentina',
-          'hotwife-argentina'
-        ];
-        var seoLocales = ['es-ar'];
-        var parts = path.split('/').filter(Boolean);
-        var isSeoRoute =
-          path === '/' ||
-          seoVariants.indexOf(parts[0] || '') !== -1 ||
-          (parts.length >= 2 &&
-            seoLocales.indexOf(parts[0] || '') !== -1 &&
-            seoVariants.indexOf(parts[1] || '') !== -1);
-        var useStaticHomeOnly = false;
-        var showSeoShell = false;
-        if (path === '/') {
-          try {
-            var hasToken = !!window.localStorage.getItem('mansion_token');
-            var registered = window.localStorage.getItem('mansion_registered') === 'true';
-            if (hasToken || registered) {
-              window.location.replace('/feed');
-              return;
-            }
-            useStaticHomeOnly = true;
-            showSeoShell = true;
-          } catch (_) {}
-        } else if (isSeoRoute) {
-          showSeoShell = true;
-        }
-        window.__MANSION_USE_STATIC_HOME_ONLY__ = useStaticHomeOnly;
-        window.__MANSION_SHOW_SEO_SHELL__ = showSeoShell;
-        document.documentElement.setAttribute('data-seo-shell-visible', showSeoShell ? '1' : '0');
-      })();
-    </script>
 
     <!-- PWA -->
     <meta name="theme-color" content="#08080E" />
@@ -182,17 +94,11 @@
     }
     </script>
     <style>
-      #seo-prerender{display:none}
-      html[data-seo-shell-visible="1"] #seo-prerender{display:block}
       html,body{background:#08080E;color-scheme:dark}
     </style>
   </head>
   <body style="margin:0;background-color:#08080E;color-scheme:dark">
     <div id="root" style="background-color:#08080E"></div>
-    <script type="module">
-      if (!window.__MANSION_USE_STATIC_HOME_ONLY__) {
-        import('/src/main.jsx');
-      }
-    </script>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

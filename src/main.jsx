@@ -50,22 +50,6 @@ if (typeof document !== 'undefined') {
     document.body.style.colorScheme = 'dark';
     document.body.style.margin = '0';
   }
-
-}
-
-function shouldUseStaticHomeOnly() {
-  if (typeof window === 'undefined') return false;
-  if (typeof window.__MANSION_USE_STATIC_HOME_ONLY__ === 'boolean') {
-    return window.__MANSION_USE_STATIC_HOME_ONLY__;
-  }
-  if (window.location.pathname !== '/') return false;
-  try {
-    const hasToken = !!window.localStorage.getItem('mansion_token');
-    const registered = window.localStorage.getItem('mansion_registered') === 'true';
-    return !hasToken && !registered;
-  } catch {
-    return false;
-  }
 }
 
 if (typeof window !== 'undefined') {
@@ -113,19 +97,9 @@ if ('serviceWorker' in navigator) {
 }
 
 const rootElement = document.getElementById('root');
-const useStaticHomeOnly = shouldUseStaticHomeOnly();
 
-if (!useStaticHomeOnly) {
-  if (typeof document !== 'undefined') {
-    const seoPrerender = document.getElementById('seo-prerender');
-    if (seoPrerender) {
-      seoPrerender.remove();
-    }
-  }
-
-  ReactDOM.createRoot(rootElement).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
-  );
-}
+ReactDOM.createRoot(rootElement).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)

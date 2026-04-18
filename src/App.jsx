@@ -1,12 +1,20 @@
 import { useState, useCallback, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useAgeVerified } from './hooks/useAgeVerified';
+import AgeVerificationModal from './components/AgeVerificationModal';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import DesktopSidebar from './components/DesktopSidebar';
+import FeedPage from './pages/FeedPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import WelcomePage from './pages/WelcomePage';
 import PublicHomePage from './pages/PublicHomePage';
 import SEOLandingPage from './pages/SEOLandingPage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, warmTopVisitedProfiles } from './lib/api';
+import BlackScreenPage from './pages/BlackScreenPage';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -18,12 +26,6 @@ import { useRobotsMeta } from './lib/seo';
 import { getRouteEnabledSeoLocales, isSeoLocale } from './lib/seoLocales';
 import { isSeoIntentVariant } from './lib/seoVariants';
 
-const FeedPage = lazy(lazyWithRetry(() => import('./pages/FeedPage'), 'mansion-lazy-retry:feed'));
-const LoginPage = lazy(lazyWithRetry(() => import('./pages/LoginPage'), 'mansion-lazy-retry:login'));
-const RegisterPage = lazy(lazyWithRetry(() => import('./pages/RegisterPage'), 'mansion-lazy-retry:register'));
-const ForgotPasswordPage = lazy(lazyWithRetry(() => import('./pages/ForgotPasswordPage'), 'mansion-lazy-retry:forgot-password'));
-const WelcomePage = lazy(lazyWithRetry(() => import('./pages/WelcomePage'), 'mansion-lazy-retry:welcome'));
-const BlackScreenPage = lazy(lazyWithRetry(() => import('./pages/BlackScreenPage'), 'mansion-lazy-retry:black-test'));
 const ExplorePage = lazy(lazyWithRetry(() => import('./pages/ExplorePage'), 'mansion-lazy-retry:explore'));
 const ProfileDetailPage = lazy(lazyWithRetry(() => import('./pages/ProfileDetailPage'), 'mansion-lazy-retry:profile-detail'));
 const ChatListPage = lazy(lazyWithRetry(() => import('./pages/ChatListPage'), 'mansion-lazy-retry:chat-list'));
@@ -44,17 +46,6 @@ const TopVisitedPage = lazy(lazyWithRetry(() => import('./pages/TopVisitedPage')
 const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage'), 'mansion-lazy-retry:video-lab'));
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const NON_DEFAULT_ROUTE_LOCALES = getRouteEnabledSeoLocales().filter((locale) => locale.pathPrefix);
-
-function preloadCommonPrivateRouteChunks() {
-  return Promise.allSettled([
-    import('./pages/FeedPage'),
-    import('./pages/ExplorePage'),
-    import('./pages/ChatListPage'),
-    import('./pages/ProfilePage'),
-    import('./pages/FavoritesPage'),
-    import('./pages/TopVisitedPage'),
-  ]);
-}
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
@@ -89,24 +80,6 @@ function LocalizedSEOLanding() {
   return <SEOLandingPage locale={locale} variant={variant} citySlug={citySlug || ''} />;
 }
 
-function isPublicSeoRoute(pathname = '') {
-  const path = pathname || '/';
-  if (path === '/') return true;
-
-  const parts = path.split('/').filter(Boolean);
-  if (parts.length === 0) return true;
-
-  if (isSeoIntentVariant(parts[0])) return true;
-  if (parts.length >= 2 && isSeoLocale(parts[0]) && isSeoIntentVariant(parts[1])) return true;
-
-  return false;
-}
-
-function RootEntryPage() {
-  const { registered } = useAuth();
-  return registered ? <Navigate to="/feed" replace /> : <PublicHomePage />;
-}
-
 function AppLayout() {
   const location = useLocation();
   const { user } = useAuth();
@@ -116,16 +89,16 @@ function AppLayout() {
   const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
   const routeOverlayOpen = profileOverlayOpen || videoOverlayOpen;
   const standaloneVideosRoute = isStandaloneMobileApp && location.pathname.startsWith('/videos');
-  const isPublicSeoPage = isPublicSeoRoute(location.pathname);
+  const isPublicHome = location.pathname === '/';
   const isFullscreen =
     standaloneVideosRoute ||
     FULLSCREEN_PATHS.some((p) => location.pathname.startsWith(p)) ||
     FULLSCREEN_PATHS.includes(location.pathname);
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
-  const showChrome = !isFullscreen && !isChatDetail && !isPublicSeoPage;
+  const showChrome = !isFullscreen && !isChatDetail && !isPublicHome;
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const showTopNavbar = showChrome && !routeOverlayOpen;
-  const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen && !isPublicSeoPage);
+  const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
   const scrollLockRef = useRef(null);
   const routePath = location.pathname || '/';
   const isPrivateNoindexRoute =
@@ -164,10 +137,8 @@ function AppLayout() {
     if (typeof window === 'undefined') return undefined;
 
     const warm = () => {
-      preloadCommonPrivateRouteChunks();
       preloadVideoFeedChunk();
       preloadVideoFeedData();
-      warmTopVisitedProfiles(100, 'all');
     };
 
     if (typeof window.requestIdleCallback === 'function') {
@@ -296,10 +267,8 @@ function AppLayout() {
 
           {/* Public SEO landing pages */}
           <Route path="/parejas" element={<SEOLandingPage variant="parejas" />} />
-          <Route path="/parejas-liberales" element={<SEOLandingPage variant="parejas-liberales" />} />
           <Route path="/trios" element={<SEOLandingPage variant="trios" />} />
           <Route path="/swingers" element={<SEOLandingPage variant="swingers" />} />
-          <Route path="/intercambio-de-parejas" element={<SEOLandingPage variant="intercambio-de-parejas" />} />
           <Route path="/mujeres" element={<SEOLandingPage variant="mujeres" />} />
           <Route path="/hombres" element={<SEOLandingPage variant="hombres" />} />
           <Route path="/trans" element={<SEOLandingPage variant="trans" />} />
@@ -307,12 +276,9 @@ function AppLayout() {
           <Route path="/contactossex" element={<SEOLandingPage variant="contactossex" />} />
           <Route path="/contactossex-argentina" element={<SEOLandingPage variant="contactossex-argentina" />} />
           <Route path="/cornudos-argentina" element={<SEOLandingPage variant="cornudos-argentina" />} />
-          <Route path="/hotwife-argentina" element={<SEOLandingPage variant="hotwife-argentina" />} />
           <Route path="/parejas/:citySlug" element={<SEOCityLanding variant="parejas" />} />
-          <Route path="/parejas-liberales/:citySlug" element={<SEOCityLanding variant="parejas-liberales" />} />
           <Route path="/trios/:citySlug" element={<SEOCityLanding variant="trios" />} />
           <Route path="/swingers/:citySlug" element={<SEOCityLanding variant="swingers" />} />
-          <Route path="/intercambio-de-parejas/:citySlug" element={<SEOCityLanding variant="intercambio-de-parejas" />} />
           <Route path="/mujeres/:citySlug" element={<SEOCityLanding variant="mujeres" />} />
           <Route path="/hombres/:citySlug" element={<SEOCityLanding variant="hombres" />} />
           <Route path="/trans/:citySlug" element={<SEOCityLanding variant="trans" />} />
@@ -320,7 +286,6 @@ function AppLayout() {
           <Route path="/contactossex/:citySlug" element={<SEOCityLanding variant="contactossex" />} />
           <Route path="/contactossex-argentina/:citySlug" element={<SEOCityLanding variant="contactossex-argentina" />} />
           <Route path="/cornudos-argentina/:citySlug" element={<SEOCityLanding variant="cornudos-argentina" />} />
-          <Route path="/hotwife-argentina/:citySlug" element={<SEOCityLanding variant="hotwife-argentina" />} />
           {NON_DEFAULT_ROUTE_LOCALES.length > 0 && (
             <>
               <Route path="/:locale/:variant" element={<LocalizedSEOLanding />} />
@@ -345,7 +310,7 @@ function AppLayout() {
           {/* Standard layout pages (require registration) */}
           <Route
             path="/"
-            element={<RootEntryPage />}
+            element={<PublicHomePage />}
           />
           <Route
             path="/feed"
@@ -508,6 +473,7 @@ function AppLayout() {
 }
 
 export default function App() {
+  const { verified, verify } = useAgeVerified();
   const [debugFlags, setDebugFlags] = useState(() => getBootDebugFlags());
   const [registered, setRegisteredState] = useState(
     () => !!getToken() || localStorage.getItem('mansion_registered') === 'true'
@@ -666,8 +632,19 @@ export default function App() {
     let cancelled = false;
     let detachVisibilityListener = null;
 
+    const hasSessionSettings = !!siteSettings && Object.keys(siteSettings).length > 0;
+    const hasAuthToken = !!getToken();
+
     if (debugFlags.skipBootstrap) {
       bootstrapStartedRef.current = true;
+      setBootstrapUnread(null);
+      setBootstrapResolved(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!hasAuthToken && hasSessionSettings) {
       setBootstrapUnread(null);
       setBootstrapResolved(true);
       return () => {
@@ -706,33 +683,18 @@ export default function App() {
       });
     };
 
-    const maybeRunBootstrap = async () => {
-      const hasAuthToken = !!getToken();
-      const hasSessionSettings = !!siteSettings && Object.keys(siteSettings).length > 0;
-
-      if (!hasAuthToken && hasSessionSettings) {
-        bootstrapStartedRef.current = true;
-        setBootstrapUnread(null);
-        setBootstrapResolved(true);
-        return;
-      }
-
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-        const handleVisibilityChange = () => {
-          if (document.visibilityState !== 'visible') return;
-          window.removeEventListener('visibilitychange', handleVisibilityChange);
-          detachVisibilityListener = null;
-          runBootstrap();
-        };
-        detachVisibilityListener = () => window.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('visibilitychange', handleVisibilityChange);
-        return;
-      }
-
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      const handleVisibilityChange = () => {
+        if (document.visibilityState !== 'visible') return;
+        window.removeEventListener('visibilitychange', handleVisibilityChange);
+        detachVisibilityListener = null;
+        runBootstrap();
+      };
+      detachVisibilityListener = () => window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('visibilitychange', handleVisibilityChange);
+    } else {
       runBootstrap();
-    };
-
-    maybeRunBootstrap();
+    }
 
     return () => {
       cancelled = true;
@@ -778,6 +740,7 @@ export default function App() {
         {snapshotShieldVisible && (
           <div className="fixed inset-0 z-[9998] bg-mansion-base" aria-hidden="true" />
         )}
+        {!debugFlags.shellOnly && !verified && <AgeVerificationModal onVerify={verify} />}
         {!debugFlags.shellOnly && <AppLayout />}
         {!debugFlags.shellOnly && <InstallAppBanner />}
         {!debugFlags.shellOnly && <ApiDebugOverlay />}

@@ -10,23 +10,14 @@ function joinPathSegments(segments) {
   return `/${normalized.join('/')}`.replace(/\/+/g, '/');
 }
 
-function withTrailingSlash(pathname) {
-  if (!pathname || pathname === '/') return '/';
-  return pathname.endsWith('/') ? pathname : `${pathname}/`;
-}
-
 export function buildSeoPath({ locale = DEFAULT_SEO_LOCALE, variant = '', citySlug = '' } = {}) {
   const localeConfig = getSeoLocale(locale);
   const base = localeConfig.pathPrefix || '';
   return joinPathSegments([base, variant, citySlug]);
 }
 
-export function buildSeoPublicPath(options = {}) {
-  return withTrailingSlash(buildSeoPath(options));
-}
-
 export function buildSeoCanonical(options = {}) {
-  return `${SITE_ORIGIN}${buildSeoPublicPath(options)}`;
+  return `${SITE_ORIGIN}${buildSeoPath(options)}`;
 }
 
 export function buildSeoAlternates({ variant = '', citySlug = '' } = {}) {

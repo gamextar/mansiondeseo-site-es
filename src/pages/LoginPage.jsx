@@ -1,23 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { getToken, login as apiLogin, warmAuthenticatedEntry } from '../lib/api';
+import { login as apiLogin } from '../lib/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { registered, user, setRegistered, setUser } = useAuth();
+  const { setRegistered, setUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!registered && !user && !getToken()) return;
-    navigate('/feed', { replace: true });
-  }, [navigate, registered, user]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,10 +22,6 @@ export default function LoginPage() {
       const data = await apiLogin({ email, password });
       setUser(data.user);
       setRegistered(true);
-      await Promise.race([
-        warmAuthenticatedEntry(),
-        new Promise((resolve) => window.setTimeout(resolve, 220)),
-      ]);
       navigate('/feed');
     } catch (err) {
       setError(err.message || 'Credenciales inválidas');

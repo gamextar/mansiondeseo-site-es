@@ -50,6 +50,7 @@ export default function DesktopSidebar() {
       <Link
         to="/feed"
         onClick={() => {
+          try { localStorage.removeItem('mansion_feed'); } catch {}
           if (HOME_FEED_ROUTES.includes(location.pathname)) {
             window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT));
           }
@@ -118,6 +119,9 @@ export default function DesktopSidebar() {
               onClick={() => {
                 if (to === '/feed' && isHomeRoute) {
                   window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT));
+                }
+                if (to === '/feed') {
+                  try { localStorage.removeItem('mansion_feed'); } catch {}
                 }
                 if (to === '/videos') {
                   warmVideoFeed();

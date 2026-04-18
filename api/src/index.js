@@ -54,9 +54,8 @@ const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'parej
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const FEED_PROFILE_LIMIT = 42;
-const FEED_SNAPSHOT_LIMIT = 180;
+const FEED_SNAPSHOT_LIMIT = 540;
 const FEED_SNAPSHOT_TTL_MS = 300_000;
-const FEED_QUERY_EXPANSION_FACTOR = 4;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -2145,9 +2144,7 @@ async function handleProfiles(request, env) {
   const feedSnapshotCacheKey = `feed-snapshot:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}`;
   const windowLimit = cursor + reqPageSize;
   const pageWindowLimit = windowLimit + 1;
-  const dbLimit = roleBuckets.length > 1
-    ? Math.max(pageWindowLimit * FEED_QUERY_EXPANSION_FACTOR, reqPageSize * FEED_QUERY_EXPANSION_FACTOR)
-    : pageWindowLimit;
+  const dbLimit = roleBuckets.length > 1 ? Math.max(pageWindowLimit * 10, reqPageSize * 10) : pageWindowLimit;
   const canUseFeedSnapshot = !fresh && windowLimit <= FEED_SNAPSHOT_LIMIT;
   const snapshotCacheHit = canUseFeedSnapshot && isFreshCached(feedSnapshotCacheKey);
   const storyCacheHit = isFreshCached('active_story_users');
@@ -2163,10 +2160,7 @@ async function handleProfiles(request, env) {
     ? cached(feedSnapshotCacheKey, FEED_SNAPSHOT_TTL_MS, async () => {
         const snapshotWindowLimit = FEED_SNAPSHOT_LIMIT + 1;
         const snapshotDbLimit = roleBuckets.length > 1
-          ? Math.max(
-              snapshotWindowLimit * FEED_QUERY_EXPANSION_FACTOR,
-              FEED_SNAPSHOT_LIMIT * FEED_QUERY_EXPANSION_FACTOR,
-            )
+          ? Math.max(snapshotWindowLimit * 10, FEED_SNAPSHOT_LIMIT * 10)
           : snapshotWindowLimit;
         const snapshotQuery = `${query} ORDER BY last_active DESC LIMIT ${snapshotDbLimit}`;
         const [snapshotRows, storyRows, snapshotCountRow] = await Promise.all([

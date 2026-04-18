@@ -761,9 +761,9 @@ export default function ProfilePage() {
                     }
                     // Optimistic update
                     setUser(prev => prev ? { ...prev, seeking: newSeeking } : prev);
-                    // Mark feed as dirty so it refreshes next time without dropping the cached shell.
+                    // Mark feed as dirty so it reloads with new seeking
                     invalidateProfilesCache();
-                    try { sessionStorage.setItem('mansion_feed_dirty', '1'); } catch {}
+                    try { sessionStorage.setItem('mansion_feed_dirty', '1'); localStorage.removeItem('mansion_feed'); } catch {}
                     try {
                       await updateProfile({ seeking: newSeeking });
                     } catch {
@@ -853,9 +853,9 @@ export default function ProfilePage() {
                       ? current.filter(x => x !== interest.id)
                       : [...current, interest.id];
                     setUser(prev => prev ? { ...prev, interests: newInterests } : prev);
-                    // Mark feed as dirty so it refreshes next time without dropping the cached shell.
+                    // Mark feed as dirty so it reloads with new interest priority
                     invalidateProfilesCache();
-                    try { sessionStorage.setItem('mansion_feed_dirty', '1'); } catch {}
+                    try { sessionStorage.setItem('mansion_feed_dirty', '1'); localStorage.removeItem('mansion_feed'); } catch {}
                     try {
                       await updateProfile({ interests: newInterests });
                     } catch {
