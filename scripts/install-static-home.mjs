@@ -85,7 +85,7 @@ const staticHomeHtml = `<!doctype html>
 <html lang="es" style="background:#08080e;color-scheme:dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Mansión Deseo | Club privado para adultos registrados</title>
   <meta name="description" content="Comunidad privada para adultos registrados, pensada para parejas liberales, swingers, tríos y conexiones discretas con perfiles verificados." />
   <meta name="keywords" content="parejas liberales, swingers, cuckold, tríos, contactossex, intercambio de parejas, comunidad liberal, club privado adultos" />
