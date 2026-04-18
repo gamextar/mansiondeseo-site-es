@@ -15,6 +15,7 @@ import PublicHomePage from './pages/PublicHomePage';
 import SEOLandingPage from './pages/SEOLandingPage';
 import BlackScreenPage from './pages/BlackScreenPage';
 import MobileFullScreenProbePage from './pages/MobileFullScreenProbePage';
+import FeedShellProbePage from './pages/FeedShellProbePage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
@@ -117,7 +118,8 @@ function AppLayout() {
       normalizedRoutePath === '/seguidores' ||
       normalizedRoutePath === '/configuracion' ||
       normalizedRoutePath === '/mensajes' ||
-      normalizedRoutePath === '/full-mobile-test'
+      normalizedRoutePath === '/full-mobile-test' ||
+      normalizedRoutePath === '/feed-shell-test'
     )
   );
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
@@ -128,6 +130,7 @@ function AppLayout() {
     routePath === '/explorar' ||
     routePath === '/videos' ||
     routePath === '/full-mobile-test' ||
+    routePath === '/feed-shell-test' ||
     routePath === '/ranking' ||
     routePath === '/perfil' ||
     routePath === '/favoritos' ||
@@ -384,6 +387,14 @@ function AppLayout() {
             element={
               <RequireRegistration>
                 <MobileFullScreenProbePage />
+              </RequireRegistration>
+            }
+          />
+          <Route
+            path="/feed-shell-test"
+            element={
+              <RequireRegistration>
+                <FeedShellProbePage />
               </RequireRegistration>
             }
           />
