@@ -103,9 +103,22 @@ function AppLayout() {
   const scrollLockRef = useRef(null);
   const routePath = location.pathname || '/';
   const normalizedRoutePath = routePath === '/' ? '/' : (routePath.replace(/\/+$/, '') || '/');
-  const immersiveMobileFeed = Boolean(user && isMobileViewport && normalizedRoutePath === '/feed');
+  const immersiveMobileApp = Boolean(
+    user &&
+    isMobileViewport &&
+    (
+      normalizedRoutePath === '/feed' ||
+      normalizedRoutePath === '/explorar' ||
+      normalizedRoutePath === '/ranking' ||
+      normalizedRoutePath === '/perfil' ||
+      normalizedRoutePath === '/favoritos' ||
+      normalizedRoutePath === '/seguidores' ||
+      normalizedRoutePath === '/configuracion' ||
+      normalizedRoutePath === '/mensajes'
+    )
+  );
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
-  const showTopNavbar = showChrome && !routeOverlayOpen && !immersiveMobileFeed;
+  const showTopNavbar = showChrome && !routeOverlayOpen && !immersiveMobileApp;
   const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
   const isPrivateNoindexRoute =
     routePath === '/feed' ||
@@ -273,7 +286,7 @@ function AppLayout() {
 
       <div
         className={showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : ''}
-        data-mobile-immersive={immersiveMobileFeed ? 'true' : undefined}
+        data-mobile-immersive={immersiveMobileApp ? 'true' : undefined}
       >
         <Suspense
           fallback={(
@@ -492,7 +505,7 @@ function AppLayout() {
         </Suspense>
       </div>
 
-      {showBottomNav && <BottomNav immersive={immersiveMobileFeed} />}
+      {showBottomNav && <BottomNav immersive={immersiveMobileApp} />}
     </>
   );
 }

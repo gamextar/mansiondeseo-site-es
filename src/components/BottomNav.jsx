@@ -126,7 +126,7 @@ export default function BottomNav({ immersive = false }) {
       style={{
         bottom: immersive ? '0px' : (isStandaloneMobileApp ? `${bottomPaddingPx}px` : '0px'),
         paddingBottom: immersive
-          ? 'env(safe-area-inset-bottom, 0px)'
+          ? '0px'
           : isStandaloneMobileApp
             ? '0px'
             : `calc(env(safe-area-inset-bottom, 0px) + ${bottomPaddingPx}px)`,
@@ -146,6 +146,7 @@ export default function BottomNav({ immersive = false }) {
           backdropFilter: `blur(${blurAmount})`,
           WebkitBackdropFilter: `blur(${blurAmount})`,
           touchAction: 'manipulation',
+          paddingBottom: immersive ? 'env(safe-area-inset-bottom, 0px)' : undefined,
         }}
       >
         <div className="flex items-center justify-around px-2.5" style={{ height: effectiveNavHeight }}>
