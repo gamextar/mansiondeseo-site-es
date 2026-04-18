@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const PROBE_VIDEO_URL = 'https://media.mansiondeseo.com/stories/demo.mp4';
+const PROBE_VIDEO_URL = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
 
 export default function MobileFullScreenProbePage() {
   useEffect(() => {
