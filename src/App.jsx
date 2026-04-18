@@ -116,7 +116,7 @@ function AppLayout() {
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
   const showChrome = !isFullscreen && !isChatDetail && !isPublicHome;
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
-  const showTopNavbar = showChrome && !routeOverlayOpen;
+  const showTopNavbar = showChrome && !routeOverlayOpen && !mobileAppShellEnabled;
   const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
   const scrollLockRef = useRef(null);
   const appShellRef = useRef(null);
@@ -557,7 +557,7 @@ function AppLayout() {
         </Suspense>
       </div>
 
-      {showBottomNav && <BottomNav />}
+      {showBottomNav && <BottomNav immersive={mobileAppShellEnabled} />}
     </>
   );
 }
