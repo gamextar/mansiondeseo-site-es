@@ -670,7 +670,15 @@ function renderPrivateShell(title, heading, body) {
 
 function injectMeta(template, { title, description, canonical, robots, alternates = [], htmlLang = 'es', ogLocale = 'es_AR', structuredData = [], shellHtml = '' }) {
   const alternateTags = alternates.map(({ hrefLang, href }) => `<link rel="alternate" hreflang="${escapeHtml(hrefLang)}" href="${escapeHtml(href)}" />`).join('\n    ');
-  const structuredScripts = structuredData.map((entry) => `<script type="application/ld+json">\n${escapeJsonForScript(entry)}\n    </script>`).join('\n    ');
+  const structuredScripts = structuredData
+    .map((entry) => {
+      const normalized = entry && typeof entry === 'object' && 'data' in entry
+        ? entry
+        : { data: entry };
+      const dataId = normalized.id ? ` data-seo-id="${escapeHtml(normalized.id)}"` : '';
+      return `<script type="application/ld+json"${dataId}>\n${escapeJsonForScript(normalized.data)}\n    </script>`;
+    })
+    .join('\n    ');
   const shellStyle = `<style>${renderShellCss()}</style>`;
 
   let html = template.replace(/<html lang="[^"]*"/, `<html lang="${htmlLang}"`);
@@ -699,23 +707,29 @@ async function writeRouteHtml(routePath, html) {
 function buildHomeStructuredData() {
   return [
     {
-      '@context': 'https://schema.org',
-      '@type': 'WebSite',
-      name: 'Mansion Deseo',
-      url: `${SITE_ORIGIN}/`,
-      potentialAction: {
-        '@type': 'SearchAction',
-        target: `${SITE_ORIGIN}/contactossex/{search_term_string}`,
-        'query-input': 'required name=search_term_string',
+      id: 'website-home',
+      data: {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'Mansion Deseo',
+        url: `${SITE_ORIGIN}/`,
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: `${SITE_ORIGIN}/contactossex/{search_term_string}`,
+          'query-input': 'required name=search_term_string',
+        },
       },
     },
     {
-      '@context': 'https://schema.org',
-      '@type': 'Organization',
-      name: 'Mansión Deseo',
-      url: `${SITE_ORIGIN}/`,
-      logo: `${SITE_ORIGIN}/icon-512.png`,
-      sameAs: [],
+      id: 'organization-home',
+      data: {
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        name: 'Mansión Deseo',
+        url: `${SITE_ORIGIN}/`,
+        logo: `${SITE_ORIGIN}/icon-512.png`,
+        sameAs: [],
+      },
     },
   ];
 }
@@ -743,6 +757,7 @@ async function main() {
 
     for (const [variant] of SEO_BASE_INTENTS) {
       const data = buildLandingData({ locale: locale.code, variant });
+      const landingIdSuffix = `${variant}`;
       const html = injectMeta(template, {
         title: data.page.title,
         description: data.page.description,
@@ -751,7 +766,10 @@ async function main() {
         alternates: data.alternates,
         htmlLang: data.localeConfig.language,
         ogLocale: data.localeConfig.hreflang.replace('-', '_'),
-        structuredData: [data.pageSchema, data.faqSchema],
+        structuredData: [
+          { id: `webpage-${landingIdSuffix}`, data: data.pageSchema },
+          { id: `faq-${landingIdSuffix}`, data: data.faqSchema },
+        ],
         shellHtml: renderLandingShell(data),
       });
       const routePath = buildSeoPath({ locale: locale.code, variant });
@@ -762,6 +780,7 @@ async function main() {
     for (const geoSlug of Object.keys(geoPages)) {
       for (const { prefix } of SEO_GEO_INTENT_CONFIGS) {
         const data = buildLandingData({ locale: locale.code, variant: prefix, citySlug: geoSlug });
+        const landingIdSuffix = `${prefix}-${geoSlug}`;
         const html = injectMeta(template, {
           title: data.page.title,
           description: data.page.description,
@@ -770,7 +789,10 @@ async function main() {
           alternates: data.alternates,
           htmlLang: data.localeConfig.language,
           ogLocale: data.localeConfig.hreflang.replace('-', '_'),
-          structuredData: [data.pageSchema, data.faqSchema],
+          structuredData: [
+            { id: `webpage-${landingIdSuffix}`, data: data.pageSchema },
+            { id: `faq-${landingIdSuffix}`, data: data.faqSchema },
+          ],
           shellHtml: renderLandingShell(data),
         });
         const routePath = buildSeoPath({ locale: locale.code, variant: prefix, citySlug: geoSlug });
