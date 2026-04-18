@@ -351,6 +351,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       >
         {/* eslint-disable-next-line */}
         <video
+          key={activeSrc || 'empty-video'}
           ref={videoRef}
           src={activeSrc}
           className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[1400ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
@@ -1471,9 +1472,10 @@ export default function VideoFeedPage() {
             const isBoundary = displayIndex <= 1 || displayIndex >= stories.length;
             const shouldLoad = dist <= 3 || isBoundary;
             const enableCinematicReveal = displayIndex === activeDispIdx && !entryRevealReady;
+            const mobileStoryKey = story.story_id || story.id || story.user_id || story.video_url || displayIndex;
             return (
               <div
-                key={displayIndex}
+                key={`${displayIndex}-${mobileStoryKey}`}
                 className="h-full w-full flex-shrink-0"
               >
                 <StoryCard
