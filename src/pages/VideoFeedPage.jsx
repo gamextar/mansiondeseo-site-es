@@ -203,9 +203,13 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const rafRef = useRef(null);
   const revealSentRef = useRef(false);
   const userPausedRef = useRef(false);
+  const recoveryTimerRef = useRef(null);
+  const playAttemptIdRef = useRef(0);
+  const lastRecoveryAtRef = useRef(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
+  const [videoResetToken, setVideoResetToken] = useState(0);
 
   // Once src is set, never clear it — clearing causes browser to reload the video
   // which produces the black flash/glitch at boundaries. Matches original behavior.
@@ -226,11 +230,57 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     onRevealReady();
   }, [isActive, onRevealReady]);
 
-  const attemptPlay = useCallback(() => {
+  const resetSuspendedVideo = useCallback(() => {
+    if (!isActive || !activeSrc || userPausedRef.current) return;
+
+    const now = Date.now();
+    if (now - lastRecoveryAtRef.current < 900) return;
+    lastRecoveryAtRef.current = now;
+
+    const video = videoRef.current;
+    if (video) {
+      try {
+        video.pause();
+        video.load();
+      } catch {}
+    }
+
+    setIsPlaying(false);
+    setIsVideoReady(false);
+    setVideoResetToken((token) => token + 1);
+  }, [activeSrc, isActive]);
+
+  const attemptPlay = useCallback((options = {}) => {
     const video = videoRef.current;
     if (!video || !isActive || !activeSrc || userPausedRef.current) return;
+
+    const { verify = false } = options;
+    const attemptId = playAttemptIdRef.current + 1;
+    playAttemptIdRef.current = attemptId;
+    const startedAt = Number(video.currentTime || 0);
+
+    if (recoveryTimerRef.current) {
+      window.clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = null;
+    }
+
     video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-  }, [activeSrc, isActive]);
+
+    if (!verify || typeof window === 'undefined') return;
+
+    recoveryTimerRef.current = window.setTimeout(() => {
+      recoveryTimerRef.current = null;
+      if (playAttemptIdRef.current !== attemptId || !isActive || userPausedRef.current) return;
+
+      const currentVideo = videoRef.current;
+      if (!currentVideo) return;
+
+      const readyEnough = currentVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+      const advanced = Number(currentVideo.currentTime || 0) > startedAt + 0.04;
+      const looksSuspended = currentVideo.paused || !readyEnough || (!advanced && !currentVideo.ended);
+      if (looksSuspended) resetSuspendedVideo();
+    }, 900);
+  }, [activeSrc, isActive, resetSuspendedVideo]);
 
   useEffect(() => {
     if (isActive) userPausedRef.current = false;
@@ -297,11 +347,12 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
 
     const resumeActiveVideo = () => {
       if (document.visibilityState === 'hidden' || userPausedRef.current) return;
-      attemptPlay();
+      attemptPlay({ verify: true });
     };
 
     const timerA = window.setTimeout(resumeActiveVideo, 80);
     const timerB = window.setTimeout(resumeActiveVideo, 260);
+    const timerC = window.setTimeout(resumeActiveVideo, 900);
     window.addEventListener('pageshow', resumeActiveVideo);
     window.addEventListener('focus', resumeActiveVideo);
     document.addEventListener('visibilitychange', resumeActiveVideo);
@@ -309,11 +360,19 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     return () => {
       window.clearTimeout(timerA);
       window.clearTimeout(timerB);
+      window.clearTimeout(timerC);
       window.removeEventListener('pageshow', resumeActiveVideo);
       window.removeEventListener('focus', resumeActiveVideo);
       document.removeEventListener('visibilitychange', resumeActiveVideo);
     };
   }, [activeSrc, attemptPlay, isActive]);
+
+  useEffect(() => () => {
+    if (recoveryTimerRef.current) {
+      window.clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -323,9 +382,9 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) {
+    if (video.paused || !isPlaying) {
       userPausedRef.current = false;
-      video.play().then(() => setIsPlaying(true)).catch(() => {});
+      attemptPlay({ verify: true });
     } else {
       userPausedRef.current = true;
       video.pause();
@@ -351,7 +410,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       >
         {/* eslint-disable-next-line */}
         <video
-          key={activeSrc || 'empty-video'}
+          key={`${activeSrc || 'empty-video'}-${videoResetToken}`}
           ref={videoRef}
           src={activeSrc}
           className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[1400ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
