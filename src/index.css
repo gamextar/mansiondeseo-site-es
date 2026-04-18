@@ -137,10 +137,6 @@ body {
   [data-mobile-immersive="true"] .pt-navbar {
     padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
   }
-
-  [data-mobile-immersive="true"] .pb-mobile-shell {
-    padding-bottom: calc(80px + 8px);
-  }
 }
 
 /* Input styling */

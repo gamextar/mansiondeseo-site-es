@@ -30,7 +30,7 @@ export default function ExplorePage({ initialData }) {
   }, [search, navigate]);
 
   return (
-    <div className="min-h-screen bg-mansion-base pb-mobile-shell lg:pb-8 pt-navbar lg:pt-0">
+    <div className="min-h-screen bg-mansion-base pb-24 lg:pb-8 pt-navbar lg:pt-0">
       <div className="px-3 lg:px-8 pt-4 lg:pt-6 pb-3">
         <h1 className="font-display text-2xl font-bold text-text-primary mb-4">Explorar</h1>
 
