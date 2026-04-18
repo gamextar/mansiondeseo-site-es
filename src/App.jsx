@@ -109,6 +109,7 @@ function AppLayout() {
     (
       normalizedRoutePath === '/feed' ||
       normalizedRoutePath === '/explorar' ||
+      normalizedRoutePath === '/videos' ||
       normalizedRoutePath === '/ranking' ||
       normalizedRoutePath === '/perfil' ||
       normalizedRoutePath === '/favoritos' ||
