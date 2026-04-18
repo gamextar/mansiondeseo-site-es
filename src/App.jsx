@@ -6,7 +6,7 @@ import BottomNav from './components/BottomNav';
 import DesktopSidebar from './components/DesktopSidebar';
 import PublicHomePage from './pages/PublicHomePage';
 import SEOLandingPage from './pages/SEOLandingPage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, warmTopVisitedProfiles } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -44,6 +44,17 @@ const TopVisitedPage = lazy(lazyWithRetry(() => import('./pages/TopVisitedPage')
 const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage'), 'mansion-lazy-retry:video-lab'));
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const NON_DEFAULT_ROUTE_LOCALES = getRouteEnabledSeoLocales().filter((locale) => locale.pathPrefix);
+
+function preloadCommonPrivateRouteChunks() {
+  return Promise.allSettled([
+    import('./pages/FeedPage'),
+    import('./pages/ExplorePage'),
+    import('./pages/ChatListPage'),
+    import('./pages/ProfilePage'),
+    import('./pages/FavoritesPage'),
+    import('./pages/TopVisitedPage'),
+  ]);
+}
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
@@ -153,8 +164,10 @@ function AppLayout() {
     if (typeof window === 'undefined') return undefined;
 
     const warm = () => {
+      preloadCommonPrivateRouteChunks();
       preloadVideoFeedChunk();
       preloadVideoFeedData();
+      warmTopVisitedProfiles(100, 'all');
     };
 
     if (typeof window.requestIdleCallback === 'function') {
