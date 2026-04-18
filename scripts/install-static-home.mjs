@@ -156,12 +156,11 @@ const staticHomeHtml = `<!doctype html>
       <div class="panel mini">
         <div class="eyebrow">Últimas búsquedas</div>
         <div class="tags">
-          <a class="tag" href="/parejas/">Parejas liberales</a>
-          <a class="tag" href="/trios/">Tríos</a>
+          <a class="tag" href="/parejas-liberales/">Parejas liberales</a>
           <a class="tag" href="/swingers/">Swingers</a>
-          <a class="tag" href="/cuckold-argentina/">Cuckold</a>
           <a class="tag" href="/cornudos-argentina/">Cornudos</a>
-          <a class="tag" href="/contactossex/">Contactossex</a>
+          <a class="tag" href="/cuckold-argentina/">Cuckold</a>
+          <a class="tag" href="/hotwife-argentina/">Hotwife</a>
         </div>
       </div>
       <div class="panel mini">

@@ -14,6 +14,18 @@ const SEO_INTENT_PAGES = {
         ['¿Para quién está pensado?', 'Para adultos que buscan relaciones discretas, parejas abiertas y encuentros afines.'],
       ],
     },
+    'parejas-liberales': {
+      title: 'Parejas liberales | Comunidad privada para adultos registrados',
+      description: 'Una entrada pública para parejas liberales en Argentina, con perfiles verificados, discreción y acceso privado para adultos registrados.',
+      headline: 'Parejas liberales, afinidad y discreción real',
+      intro: 'Una landing pensada para quienes buscan parejas liberales, parejas abiertas y encuentros afines dentro de una comunidad privada para adultos registrados.',
+      focus: 'parejas liberales',
+      bullets: ['Búsquedas de parejas liberales y parejas abiertas', 'Perfiles afines con acceso privado', 'Contenido completo solo para usuarios registrados'],
+      faq: [
+        ['¿El contenido completo es público?', 'No. Esta página es una entrada pública; los perfiles completos, historias y mensajes quedan detrás del registro.'],
+        ['¿Para quién está pensada?', 'Para adultos que buscan parejas liberales, afinidad real y una experiencia más discreta.'],
+      ],
+    },
     trios: {
       title: 'Tríos en Mansión Deseo | Búsquedas discretas para adultos registrados',
       description: 'Explorá una comunidad privada para adultos registrados que buscan tríos, encuentros compartidos y conexiones discretas.',
@@ -84,6 +96,18 @@ const SEO_INTENT_PAGES = {
       faq: [
         ['¿Esto es público?', 'Solo la puerta de entrada. El contenido completo queda para usuarios registrados.'],
         ['¿Sirve para posicionar la búsqueda?', 'Sí, porque ataca la intención principal con contenido propio y relevante.'],
+      ],
+    },
+    'hotwife-argentina': {
+      title: 'Hotwife Argentina | Comunidad privada para adultos registrados',
+      description: 'Landing pública para búsquedas de hotwife en Argentina, con comunidad privada, perfiles verificados y acceso discreto para adultos registrados.',
+      headline: 'Hotwife Argentina, deseo compartido y acceso privado',
+      intro: 'Una entrada pública para búsquedas de hotwife en Argentina, orientada a llevar tráfico de alta intención hacia una experiencia privada y cuidada.',
+      focus: 'hotwife argentina',
+      bullets: ['Búsquedas de hotwife en Argentina', 'Afinidad, discreción y perfiles verificados', 'Acceso completo tras el registro'],
+      faq: [
+        ['¿Esta página muestra contenido explícito?', 'No. Es una landing pública de intención; la experiencia completa queda reservada a usuarios registrados.'],
+        ['¿Por qué tener una página específica?', 'Porque hotwife es una búsqueda con intención propia y conviene tratarla con una landing clara, rápida y dedicada.'],
       ],
     },
     contactossex: {

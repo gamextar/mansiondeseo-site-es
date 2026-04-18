@@ -1,11 +1,12 @@
 export const SEO_BASE_INTENTS = [
-  ['parejas', 'weekly', '0.9'],
+  ['parejas-liberales', 'weekly', '0.95'],
   ['trios', 'weekly', '0.9'],
   ['swingers', 'weekly', '0.8'],
   ['mujeres', 'weekly', '0.8'],
   ['hombres', 'weekly', '0.8'],
   ['trans', 'weekly', '0.8'],
   ['cuckold-argentina', 'weekly', '0.8'],
+  ['hotwife-argentina', 'weekly', '0.85'],
   ['contactossex', 'weekly', '0.8'],
   ['contactossex-argentina', 'weekly', '0.9'],
   ['cornudos-argentina', 'weekly', '0.9'],

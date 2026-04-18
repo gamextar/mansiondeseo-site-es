@@ -7,22 +7,27 @@ import { getSeoIntentPage } from '../src/lib/seoIntentCatalog.js';
 const DIST_DIR = path.resolve('dist');
 const redirectsPath = path.join(DIST_DIR, '_redirects');
 const STATIC_SEO_VARIANTS = [
-  'parejas',
-  'trios',
+  'parejas-liberales',
   'swingers',
-  'cuckold-argentina',
   'cornudos-argentina',
+  'cuckold-argentina',
+  'hotwife-argentina',
   'contactossex',
 ];
 
 const RELATED_LABELS = {
-  parejas: 'Parejas liberales',
-  trios: 'Tríos',
+  'parejas-liberales': 'Parejas liberales',
   swingers: 'Swingers',
-  'cuckold-argentina': 'Cuckold',
   'cornudos-argentina': 'Cornudos',
+  'cuckold-argentina': 'Cuckold',
+  'hotwife-argentina': 'Hotwife',
   contactossex: 'Contactossex',
 };
+
+const CANONICAL_REDIRECTS = [
+  ['/parejas', '/parejas-liberales/'],
+  ['/parejas/', '/parejas-liberales/'],
+];
 
 function escapeHtml(value = '') {
   return String(value)
@@ -217,12 +222,13 @@ async function updateRedirects() {
       `${ensureTrailingSlash(route)} ${target} 200`,
     ];
   });
+  const redirectRules = CANONICAL_REDIRECTS.map(([from, to]) => `${from} ${to} 301`);
   const existingLines = redirects
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line && !seoRules.includes(line));
+    .filter((line) => line && !seoRules.includes(line) && !redirectRules.includes(line));
 
-  await writeFile(redirectsPath, `${[...seoRules, ...existingLines].join('\n')}\n`, 'utf8');
+  await writeFile(redirectsPath, `${[...redirectRules, ...seoRules, ...existingLines].join('\n')}\n`, 'utf8');
 }
 
 await Promise.all(STATIC_SEO_VARIANTS.map(writeSeoPage));
