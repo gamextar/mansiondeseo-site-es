@@ -129,10 +129,6 @@ body {
     padding-top: calc(env(safe-area-inset-top, 0px) + 48px);
   }
 
-  .pt-feed-mobile-safe {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
-  }
-
   /* Full-height accounting for notch in PWA */
   .h-full-safe {
     height: calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
