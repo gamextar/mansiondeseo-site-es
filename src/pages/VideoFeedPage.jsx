@@ -988,20 +988,6 @@ export default function VideoFeedPage() {
   const navBottomOffset = isStandaloneMobileApp
     ? getStandaloneBottomNavOffset()
     : getBrowserBottomNavOffset();
-  const standaloneTopOffset = isStandaloneMobileApp
-    ? '0px'
-    : 'calc(env(safe-area-inset-top, 0px) + 8px)';
-  const standaloneViewportShellStyle = standaloneMobileRoute
-    ? {
-        paddingTop: standaloneTopOffset,
-      }
-    : undefined;
-  const standaloneViewportFillStyle = standaloneMobileRoute
-    ? {
-        top: standaloneTopOffset,
-        bottom: '0px',
-      }
-    : undefined;
   const standaloneViewportContentStyle = standaloneMobileRoute
     ? {
         height: 'calc(100lvh + 8px)',
@@ -1497,8 +1483,7 @@ export default function VideoFeedPage() {
   if (loading) {
     return (
       <div
-        className={standaloneMobileRoute ? 'relative overflow-hidden bg-black' : 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'}
-        style={standaloneViewportShellStyle}
+        className={standaloneMobileRoute ? 'fixed inset-0 overflow-hidden bg-black flex items-center justify-center' : 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'}
       >
         <div
           className={standaloneMobileRoute ? 'flex items-center justify-center' : undefined}
@@ -1513,8 +1498,7 @@ export default function VideoFeedPage() {
   if (stories.length === 0) {
     return (
       <div
-        className={standaloneMobileRoute ? 'relative overflow-hidden bg-mansion-base px-6' : 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'}
-        style={standaloneViewportShellStyle}
+        className={standaloneMobileRoute ? 'fixed inset-0 overflow-hidden bg-mansion-base px-6' : 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'}
       >
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-32 right-[-10%] w-[520px] h-[520px] rounded-full bg-mansion-crimson/10 blur-3xl" />
@@ -1556,7 +1540,7 @@ export default function VideoFeedPage() {
     <div
       className={
         standaloneMobileRoute
-          ? 'relative min-h-dynamic-screen overflow-hidden bg-black'
+          ? 'fixed inset-0 overflow-hidden bg-black'
           : desktopOverlayRoute
             ? 'absolute inset-0 bg-black z-[60]'
             : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'
@@ -1571,8 +1555,8 @@ export default function VideoFeedPage() {
       />
 
       <div
-        className={standaloneMobileRoute ? 'absolute inset-x-0' : 'relative h-full'}
-        style={standaloneMobileRoute ? standaloneViewportFillStyle : standaloneViewportContentStyle}
+        className="relative h-full"
+        style={standaloneMobileRoute ? undefined : standaloneViewportContentStyle}
       >
         {isDesktopViewport && (
           <div
