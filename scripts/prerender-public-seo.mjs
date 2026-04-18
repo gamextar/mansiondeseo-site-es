@@ -42,31 +42,6 @@ const RELATED_LINKS = [
   { to: '/contactossex', label: 'Contactossex' },
 ];
 
-const PRIVATE_STATIC_ROUTES = [
-  '/feed',
-  '/explorar',
-  '/videos',
-  '/ranking',
-  '/perfil',
-  '/favoritos',
-  '/seguidores',
-  '/configuracion',
-  '/login',
-  '/registro',
-  '/recuperar-contrasena',
-  '/bienvenida',
-  '/vip',
-  '/monedas',
-  '/pago-exitoso',
-  '/pago-monedas-exitoso',
-  '/pago-fallido',
-  '/pago-pendiente',
-  '/mensajes',
-  '/admin',
-  '/black-test',
-  '/historia/nueva',
-];
-
 function escapeHtml(value = '') {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -650,17 +625,6 @@ function renderLandingShell(view) {
   `;
 }
 
-function renderPrivateShell() {
-  return `
-    <div id="seo-prerender" aria-hidden="true" style="min-height:100vh;background:#08080E">
-      <div style="position:fixed;inset:0;background:
-        radial-gradient(circle at top, rgba(255,255,255,0.03), transparent 35%),
-        linear-gradient(180deg, rgba(10,10,16,0.02), rgba(10,10,16,0.18));">
-      </div>
-    </div>
-  `;
-}
-
 function injectMeta(template, { title, description, canonical, robots, alternates = [], htmlLang = 'es', ogLocale = 'es_AR', structuredData = [], shellHtml = '' }) {
   const alternateTags = alternates.map(({ hrefLang, href }) => `<link rel="alternate" hreflang="${escapeHtml(hrefLang)}" href="${escapeHtml(href)}" />`).join('\n    ');
   const structuredScripts = structuredData
@@ -793,29 +757,6 @@ async function main() {
         await writeRouteHtml(routePath, html);
       }
     }
-  }
-
-  for (const routePath of PRIVATE_STATIC_ROUTES) {
-    const title = routePath === '/feed'
-      ? 'Feed privado | Mansión Deseo'
-      : 'Área privada | Mansión Deseo';
-    const heading = routePath === '/feed'
-      ? 'Feed privado para usuarios registrados'
-      : 'Área privada para usuarios registrados';
-    const body = 'Esta ruta forma parte de la aplicación privada y no debería indexarse en buscadores. El contenido completo requiere sesión activa.';
-
-    const html = injectMeta(template, {
-      title,
-      description: 'Área privada de Mansión Deseo para usuarios registrados.',
-      canonical: `${SITE_ORIGIN}${routePath}`,
-      robots: 'noindex, follow',
-      htmlLang: 'es',
-      ogLocale: 'es_AR',
-      structuredData: [],
-      shellHtml: renderPrivateShell(title, heading, body),
-    });
-    generatedRoutes.add(routePath);
-    await writeRouteHtml(routePath, html);
   }
 
   const explicitRewrites = [...generatedRoutes]
