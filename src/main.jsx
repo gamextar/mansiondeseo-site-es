@@ -51,9 +51,17 @@ if (typeof document !== 'undefined') {
     document.body.style.margin = '0';
   }
 
-  const seoPrerender = document.getElementById('seo-prerender');
-  if (seoPrerender) {
-    seoPrerender.remove();
+}
+
+function shouldUseStaticHomeOnly() {
+  if (typeof window === 'undefined') return false;
+  if (window.location.pathname !== '/') return false;
+  try {
+    const hasToken = !!window.localStorage.getItem('mansion_token');
+    const registered = window.localStorage.getItem('mansion_registered') === 'true';
+    return !hasToken && !registered;
+  } catch {
+    return false;
   }
 }
 
@@ -102,9 +110,19 @@ if ('serviceWorker' in navigator) {
 }
 
 const rootElement = document.getElementById('root');
+const useStaticHomeOnly = shouldUseStaticHomeOnly();
 
-ReactDOM.createRoot(rootElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+if (!useStaticHomeOnly) {
+  if (typeof document !== 'undefined') {
+    const seoPrerender = document.getElementById('seo-prerender');
+    if (seoPrerender) {
+      seoPrerender.remove();
+    }
+  }
+
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+}
