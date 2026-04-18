@@ -58,21 +58,6 @@ function detectStandaloneMobile() {
   return Boolean(standalone && isMobile);
 }
 
-function isMobileAppShellPath(pathname = '/') {
-  return (
-    pathname === '/feed' ||
-    pathname === '/explorar' ||
-    pathname === '/videos' ||
-    pathname === '/ranking' ||
-    pathname === '/mensajes' ||
-    pathname === '/perfil' ||
-    pathname === '/favoritos' ||
-    pathname === '/seguidores' ||
-    pathname === '/configuracion' ||
-    pathname.startsWith('/perfiles/')
-  );
-}
-
 function RequireRegistration({ children }) {
   const { registered } = useAuth();
   if (!registered) return <Navigate to="/bienvenida" replace />;
@@ -99,10 +84,6 @@ function AppLayout() {
   const location = useLocation();
   const { user } = useAuth();
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
-  const [isMobileViewport, setIsMobileViewport] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia('(max-width: 1023px)').matches;
-  });
   const backgroundLocation = location.state?.backgroundLocation;
   const profileOverlayOpen = location.state?.modal === 'profile' && !!backgroundLocation;
   const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
@@ -119,10 +100,7 @@ function AppLayout() {
   const showTopNavbar = showChrome && !routeOverlayOpen;
   const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
   const scrollLockRef = useRef(null);
-  const appShellRef = useRef(null);
   const routePath = location.pathname || '/';
-  const layoutPath = backgroundLocation?.pathname || routePath;
-  const mobileAppShellEnabled = Boolean(user && isMobileViewport && isMobileAppShellPath(layoutPath));
   const isPrivateNoindexRoute =
     routePath === '/feed' ||
     routePath === '/explorar' ||
@@ -195,61 +173,6 @@ function AppLayout() {
     return () => media.removeListener(handler);
   }, []);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-
-    const media = window.matchMedia('(max-width: 1023px)');
-    const handleChange = (event) => {
-      setIsMobileViewport(event.matches);
-    };
-
-    setIsMobileViewport(media.matches);
-
-    if (typeof media.addEventListener === 'function') {
-      media.addEventListener('change', handleChange);
-      return () => media.removeEventListener('change', handleChange);
-    }
-
-    media.addListener(handleChange);
-    return () => media.removeListener(handleChange);
-  }, []);
-
-  useEffect(() => {
-    if (!mobileAppShellEnabled || profileOverlayOpen || typeof window === 'undefined') return undefined;
-
-    const { style: bodyStyle } = document.body;
-    const { style: htmlStyle } = document.documentElement;
-    const previousBody = {
-      height: bodyStyle.height,
-      overflow: bodyStyle.overflow,
-      overscrollBehavior: bodyStyle.overscrollBehavior,
-      touchAction: bodyStyle.touchAction,
-    };
-    const previousHtml = {
-      height: htmlStyle.height,
-      overflow: htmlStyle.overflow,
-      overscrollBehavior: htmlStyle.overscrollBehavior,
-    };
-
-    htmlStyle.height = '100%';
-    htmlStyle.overflow = 'hidden';
-    htmlStyle.overscrollBehavior = 'none';
-    bodyStyle.height = '100%';
-    bodyStyle.overflow = 'hidden';
-    bodyStyle.overscrollBehavior = 'none';
-    bodyStyle.touchAction = 'manipulation';
-
-    return () => {
-      htmlStyle.height = previousHtml.height;
-      htmlStyle.overflow = previousHtml.overflow;
-      htmlStyle.overscrollBehavior = previousHtml.overscrollBehavior;
-      bodyStyle.height = previousBody.height;
-      bodyStyle.overflow = previousBody.overflow;
-      bodyStyle.overscrollBehavior = previousBody.overscrollBehavior;
-      bodyStyle.touchAction = previousBody.touchAction;
-    };
-  }, [mobileAppShellEnabled, profileOverlayOpen]);
-
   // Reset scroll to top on every route change, EXCEPT when opening/closing
   // a profile overlay (which manages scroll lock/restore itself).
   const prevPathnameRef = useRef(location.pathname);
@@ -259,12 +182,8 @@ function AppLayout() {
     if (routeOverlayOpen) return; // overlay handles its own scroll
     if (location.state?.backgroundLocation) return; // closing overlay — App handles it
     if (prev === location.pathname) return; // same route, no reset
-    if (mobileAppShellEnabled && appShellRef.current) {
-      appShellRef.current.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-      return;
-    }
     window.scrollTo(0, 0);
-  }, [location.pathname, location.state, mobileAppShellEnabled, routeOverlayOpen]);
+  }, [location.pathname, location.state, routeOverlayOpen]);
 
   useEffect(() => {
     // Video overlay is fullscreen — no need to lock the background scroll.
@@ -330,16 +249,7 @@ function AppLayout() {
       {showDesktopSidebar && <DesktopSidebar />}
       {showTopNavbar && <Navbar />}
 
-      <div
-        ref={appShellRef}
-        data-mobile-app-shell={mobileAppShellEnabled ? 'true' : undefined}
-        className={
-          mobileAppShellEnabled
-            ? 'fixed inset-0 overflow-y-auto overscroll-y-contain bg-mansion-base scrollbar-hide'
-            : (showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : '')
-        }
-        style={mobileAppShellEnabled ? { height: '100dvh', WebkitOverflowScrolling: 'touch' } : undefined}
-      >
+      <div className={showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : ''}>
         <Suspense
           fallback={(
             <div className="min-h-screen bg-mansion-base flex items-center justify-center">
