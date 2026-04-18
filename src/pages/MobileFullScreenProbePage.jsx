@@ -18,13 +18,13 @@ export default function MobileFullScreenProbePage() {
     <div
       className="min-h-dynamic-screen bg-[#180202] pt-navbar lg:pt-0 lg:pb-[84px]"
       style={{
-        paddingBottom: `calc(${navBottomOffset} + env(safe-area-inset-bottom, 0px))`,
+        paddingBottom: navBottomOffset,
       }}
     >
       <div
         className="w-full bg-[#d90429] text-white"
         style={{
-          minHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - 8px)',
+          minHeight: `calc(100dvh - env(safe-area-inset-top, 0px) - 8px - ${navBottomOffset})`,
         }}
       >
         <div className="flex min-h-[inherit] flex-col justify-between px-4 py-4">
