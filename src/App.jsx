@@ -102,7 +102,12 @@ function AppLayout() {
   const showChrome = !isFullscreen && !isChatDetail && !isPublicHome;
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const scrollLockRef = useRef(null);
-  const routePath = location.pathname || '/';
+  const routePath = (() => {
+    const rawPath = location.pathname || '/';
+    if (rawPath === '/') return '/';
+    const trimmed = rawPath.replace(/\/+$/, '');
+    return trimmed || '/';
+  })();
   const immersiveMobileApp = Boolean(
     user &&
     isMobileViewport &&
