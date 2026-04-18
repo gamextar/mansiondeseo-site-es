@@ -44,7 +44,7 @@ function resetDocumentScrollToTop() {
   root.style.scrollBehavior = previousScrollBehavior;
 }
 
-export default function BottomNav() {
+export default function BottomNav({ immersiveFeed = false }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
@@ -124,21 +124,23 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
-        bottom: isStandaloneMobileApp ? `${bottomPaddingPx}px` : '0px',
-        paddingBottom: isStandaloneMobileApp
+        bottom: immersiveFeed ? '0px' : (isStandaloneMobileApp ? `${bottomPaddingPx}px` : '0px'),
+        paddingBottom: immersiveFeed
+          ? 'env(safe-area-inset-bottom, 0px)'
+          : isStandaloneMobileApp
           ? '0px'
           : `calc(env(safe-area-inset-bottom, 0px) + ${bottomPaddingPx}px)`,
-        paddingLeft: outerSidePadding,
-        paddingRight: outerSidePadding,
+        paddingLeft: immersiveFeed ? '0px' : outerSidePadding,
+        paddingRight: immersiveFeed ? '0px' : outerSidePadding,
         isolation: 'isolate',
       }}
     >
       <div
-        className={`pointer-events-auto w-full border ${isStandaloneMobileApp ? 'rounded-[1.7rem]' : 'rounded-[2.15rem]'}`}
+        className={`pointer-events-auto w-full border ${immersiveFeed ? 'rounded-none border-x-0 border-b-0' : (isStandaloneMobileApp ? 'rounded-[1.7rem]' : 'rounded-[2.15rem]')}`}
         style={{
           backgroundColor: bgColor,
           borderColor,
-          boxShadow: `0 8px 32px ${shadowColor}`,
+          boxShadow: immersiveFeed ? `0 -10px 32px ${shadowColor}` : `0 8px 32px ${shadowColor}`,
           backdropFilter: `blur(${blurAmount})`,
           WebkitBackdropFilter: `blur(${blurAmount})`,
           touchAction: 'manipulation',

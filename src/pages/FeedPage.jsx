@@ -994,7 +994,7 @@ export default function FeedPage({ initialData }) {
 
   return (
     <div
-      className="min-h-dynamic-screen bg-mansion-base pt-navbar lg:pt-0 lg:pb-[84px]"
+      className="min-h-dynamic-screen bg-mansion-base pt-feed-mobile-safe lg:pt-0 lg:pb-[84px]"
       style={{
         paddingBottom: isDesktopViewport
           ? undefined
@@ -1004,8 +1004,13 @@ export default function FeedPage({ initialData }) {
       {/* Pull-to-refresh indicator */}
       <div
         ref={indicatorRef}
-        className="fixed top-16 left-0 right-0 z-50 flex justify-center py-2 pointer-events-none"
-        style={{ transform: 'translateY(-100%)', opacity: 0, transition: 'transform 0.2s, opacity 0.2s' }}
+        className="fixed left-0 right-0 z-50 flex justify-center py-2 pointer-events-none"
+        style={{
+          top: isDesktopViewport ? '4rem' : 'calc(env(safe-area-inset-top, 0px) + 8px)',
+          transform: 'translateY(-100%)',
+          opacity: 0,
+          transition: 'transform 0.2s, opacity 0.2s',
+        }}
       >
         <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
