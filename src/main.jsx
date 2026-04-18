@@ -99,5 +99,7 @@ if ('serviceWorker' in navigator) {
 const rootElement = document.getElementById('root');
 
 ReactDOM.createRoot(rootElement).render(
-  <App />,
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
 )
