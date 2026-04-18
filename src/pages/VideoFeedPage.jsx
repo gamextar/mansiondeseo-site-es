@@ -814,6 +814,8 @@ export default function VideoFeedPage() {
   const boundaryCooldownTimer = useRef(null);
   const viewedDispatchTimerRef = useRef(null);
   const overlayCloseViewedTimerRef = useRef(null);
+  const pwaReturnAnchorTimersRef = useRef([]);
+  const pwaReturnAnchorDoneRef = useRef(false);
   const lastScrollAtRef = useRef(0);
   const lastDesktopWheelAtRef = useRef(0);
 
@@ -961,6 +963,30 @@ export default function VideoFeedPage() {
 
     container.scrollTop = nextScrollTop;
     setBoundaryOverlayIdx(null);
+    return true;
+  }, [isDesktopViewport, stories.length]);
+
+  const forceMobileViewportToIndex = useCallback((index) => {
+    if (isDesktopViewport) return false;
+    const container = containerRef.current;
+    if (!container || stories.length === 0) return false;
+
+    const height = container.clientHeight;
+    if (!height) return false;
+
+    const clampedIndex = Math.min(Math.max(index, 1), stories.length);
+    const nextScrollTop = height * clampedIndex;
+    const previousSnap = container.style.scrollSnapType;
+
+    container.style.scrollSnapType = 'none';
+    container.scrollTop = nextScrollTop;
+    setBoundaryOverlayIdx(null);
+
+    requestAnimationFrame(() => {
+      if (!containerRef.current) return;
+      containerRef.current.style.scrollSnapType = previousSnap || 'y mandatory';
+    });
+
     return true;
   }, [isDesktopViewport, stories.length]);
 
@@ -1150,6 +1176,27 @@ export default function VideoFeedPage() {
   const activeDispIdxRef = useRef(activeDispIdx);
   useLayoutEffect(() => { activeDispIdxRef.current = activeDispIdx; });
 
+  useEffect(() => {
+    if (!standaloneMobileRoute || !isStandaloneMobileApp || requestedStoryUserId || loading || stories.length === 0) return;
+    if (pwaReturnAnchorDoneRef.current) return;
+
+    const savedStory = savedStoryRestoreRef.current;
+    const targetIndex = findSavedStoryIndex(stories, savedStory);
+    if (targetIndex < 0) return;
+
+    const nextIndex = targetIndex + 1;
+    pwaReturnAnchorDoneRef.current = true;
+    setActiveDispIdx(nextIndex);
+    setBoundaryOverlayIdx(null);
+
+    pwaReturnAnchorTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    pwaReturnAnchorTimersRef.current = [0, 80, 220, 520].map((delay) => (
+      window.setTimeout(() => {
+        forceMobileViewportToIndex(nextIndex);
+      }, delay)
+    ));
+  }, [forceMobileViewportToIndex, isStandaloneMobileApp, loading, requestedStoryUserId, standaloneMobileRoute, stories]);
+
   useLayoutEffect(() => {
     if (isDesktopViewport) return undefined;
     if (stories.length === 0 || !containerRef.current) return;
@@ -1218,6 +1265,8 @@ export default function VideoFeedPage() {
     clearTimeout(boundaryCooldownTimer.current);
     clearTimeout(viewedDispatchTimerRef.current);
     clearTimeout(overlayCloseViewedTimerRef.current);
+    pwaReturnAnchorTimersRef.current.forEach((timerId) => clearTimeout(timerId));
+    pwaReturnAnchorTimersRef.current = [];
   }, []);
 
   const settleInfiniteBoundary = useCallback(() => {
