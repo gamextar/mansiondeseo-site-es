@@ -990,7 +990,7 @@ export default function FeedPage({ initialData }) {
   }, [stopStoriesBounce, stopStoriesMomentum]);
 
   // ── Grid setup ────────────────────────────────────────────────────
-  const gap = 12;
+  const gap = isDesktopViewport ? 12 : 6;
 
   return (
     <div
@@ -1294,7 +1294,7 @@ export default function FeedPage({ initialData }) {
 
       {/* Results count */}
       <div
-        className="px-3 lg:px-8 pb-2 fade-in-up fade-delay-300"
+        className={`${isDesktopViewport ? 'px-3 lg:px-8' : 'px-2'} pb-2 fade-in-up fade-delay-300`}
       >
         <p className="text-text-dim text-xs">
           {visibleProfiles.length} {visibleProfiles.length === 1 ? 'usuario' : 'usuarios'} conectados
@@ -1303,7 +1303,7 @@ export default function FeedPage({ initialData }) {
 
       {/* Grid */}
       <div
-        className="px-3 lg:px-8"
+        className={isDesktopViewport ? 'px-3 lg:px-8' : 'px-1'}
       >
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -1334,6 +1334,7 @@ export default function FeedPage({ initialData }) {
                           rank={pageCursor + index + 1}
                           viewerPremium={viewerPremium}
                           settings={safeSettings}
+                          immersiveMobile={!isDesktopViewport}
                         />
                       </div>
                     ))}

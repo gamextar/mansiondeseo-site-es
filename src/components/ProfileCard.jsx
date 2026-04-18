@@ -78,6 +78,7 @@ export default function ProfileCard({
   settings = {},
   safariDesktopOverride,
   isMobileOverride,
+  immersiveMobile = false,
 }) {
   const location = useLocation();
   const { id, name, age, role, interests, photos = [], verified, online, premium, blurred } = profile;
@@ -112,7 +113,7 @@ export default function ProfileCard({
   };
 
   return (
-    <div className="rounded-2xl overflow-hidden">
+    <div className={immersiveMobile ? 'rounded-xl overflow-hidden' : 'rounded-2xl overflow-hidden'}>
       <Link
         to={`/perfiles/${id}`}
         state={{
@@ -125,10 +126,10 @@ export default function ProfileCard({
           preview: { id, name, age, city: profile.city, province: profile.province, locality: profile.locality, role, photos, avatar_url: profile.avatar_url, avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode },
         }}
         onClick={handleOpenProfile}
-        className="block group rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-mansion-gold/40 focus-visible:ring-offset-0"
+        className={`block group overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-mansion-gold/40 focus-visible:ring-offset-0 ${immersiveMobile ? 'rounded-xl' : 'rounded-2xl'}`}
       >
         <div
-          className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-mansion-card ring-1 ring-white/5 shadow-[0_14px_28px_rgba(0,0,0,0.24)]"
+          className={`relative aspect-[3/4] overflow-hidden bg-mansion-card ${immersiveMobile ? 'rounded-xl ring-0 shadow-[0_8px_18px_rgba(0,0,0,0.2)]' : 'rounded-2xl ring-1 ring-white/5 shadow-[0_14px_28px_rgba(0,0,0,0.24)]'}`}
         >
           {/* Photo — use actual photo with blur for blocked cards */}
           {mainPhoto ? (

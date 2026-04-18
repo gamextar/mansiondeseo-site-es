@@ -84,6 +84,10 @@ function AppLayout() {
   const location = useLocation();
   const { user } = useAuth();
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 1023px)').matches;
+  });
   const backgroundLocation = location.state?.backgroundLocation;
   const profileOverlayOpen = location.state?.modal === 'profile' && !!backgroundLocation;
   const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
@@ -97,10 +101,26 @@ function AppLayout() {
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
   const showChrome = !isFullscreen && !isChatDetail && !isPublicHome;
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
-  const showTopNavbar = showChrome && !routeOverlayOpen;
-  const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
   const scrollLockRef = useRef(null);
   const routePath = location.pathname || '/';
+  const immersiveMobileApp = Boolean(
+    user &&
+    isMobileViewport &&
+    (
+      routePath === '/feed' ||
+      routePath === '/explorar' ||
+      routePath === '/videos' ||
+      routePath === '/ranking' ||
+      routePath === '/perfil' ||
+      routePath === '/favoritos' ||
+      routePath === '/seguidores' ||
+      routePath === '/configuracion' ||
+      routePath === '/mensajes' ||
+      routePath.startsWith('/perfiles/')
+    )
+  );
+  const showTopNavbar = showChrome && !routeOverlayOpen && !immersiveMobileApp;
+  const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
   const isPrivateNoindexRoute =
     routePath === '/feed' ||
     routePath === '/explorar' ||
@@ -171,6 +191,25 @@ function AppLayout() {
     }
     media.addListener(handler);
     return () => media.removeListener(handler);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const media = window.matchMedia('(max-width: 1023px)');
+    const handleChange = (event) => {
+      setIsMobileViewport(event.matches);
+    };
+
+    setIsMobileViewport(media.matches);
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', handleChange);
+      return () => media.removeEventListener('change', handleChange);
+    }
+
+    media.addListener(handleChange);
+    return () => media.removeListener(handleChange);
   }, []);
 
   // Reset scroll to top on every route change, EXCEPT when opening/closing
@@ -249,7 +288,10 @@ function AppLayout() {
       {showDesktopSidebar && <DesktopSidebar />}
       {showTopNavbar && <Navbar />}
 
-      <div className={showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : ''}>
+      <div
+        className={showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : ''}
+        data-mobile-immersive={immersiveMobileApp ? 'true' : undefined}
+      >
         <Suspense
           fallback={(
             <div className="min-h-screen bg-mansion-base flex items-center justify-center">
@@ -467,7 +509,7 @@ function AppLayout() {
         </Suspense>
       </div>
 
-      {showBottomNav && <BottomNav />}
+      {showBottomNav && <BottomNav immersive={immersiveMobileApp} />}
     </>
   );
 }
