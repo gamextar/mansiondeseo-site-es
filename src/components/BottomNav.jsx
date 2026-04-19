@@ -131,7 +131,6 @@ export default function BottomNav({ immersive = false }) {
         paddingLeft: outerSidePadding,
         paddingRight: outerSidePadding,
         isolation: 'isolate',
-        transform: 'translateY(5px)',
       }}
     >
       <div
