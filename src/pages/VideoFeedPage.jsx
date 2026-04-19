@@ -879,14 +879,11 @@ export default function VideoFeedPage() {
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
   const backgroundLocation = location.state?.backgroundLocation || null;
-  // When opened from a story-bar click (seed provided), skip the cache and start
-  // with ONLY the seed story. This guarantees that stories.length changes 1→N
-  // when the API responds, which triggers the useLayoutEffect scroll-correction
-  // and prevents iOS Safari's scroll-reset from showing the wrong story.
-  const initial = applyPendingStoryLikeState(mergeSeedStory([], requestedStorySeed), getPendingStoryLikes());
-
-  const [stories, setStories] = useState(initial);
-  const [loading, setLoading] = useState(initial.length === 0);
+  // Keep the same startup path whether we enter /videos directly or from the
+  // home stories rail. The only difference should be the target story/user,
+  // not the feed boot sequence, otherwise mobile swipe physics can diverge.
+  const [stories, setStories] = useState([]);
+  const [loading, setLoading] = useState(true);
   const savedIdx = () => { try { const v = sessionStorage.getItem(VIDEO_FEED_INDEX_KEY); return v ? Math.max(1, parseInt(v, 10)) : 1; } catch { return 1; } };
   const savedMuted = () => { try { return sessionStorage.getItem(VIDEO_FEED_MUTED_KEY) !== '0'; } catch { return true; } };
 
