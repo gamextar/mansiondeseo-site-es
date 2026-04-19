@@ -985,51 +985,81 @@ export default function VideoFeedPage() {
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const isStandaloneMobileApp = detectStandaloneMobile();
+  const mobileDocumentScrollRoute = standaloneMobileRoute && !isStandaloneMobileApp;
   const navBottomOffset = isStandaloneMobileApp
     ? getStandaloneBottomNavOffset()
     : getBrowserBottomNavOffset();
+  const getMobileScrollHeight = useCallback(() => {
+    if (typeof window === 'undefined') return 0;
+    const container = containerRef.current;
+    const firstSlide = container?.querySelector?.('[data-video-feed-slide="true"]');
+    return Math.round(firstSlide?.getBoundingClientRect?.().height || container?.clientHeight || window.innerHeight || 0);
+  }, []);
+  const getMobileScrollTop = useCallback(() => {
+    if (mobileDocumentScrollRoute && typeof window !== 'undefined') {
+      return Number(window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
+    }
+    return Number(containerRef.current?.scrollTop || 0);
+  }, [mobileDocumentScrollRoute]);
+  const setMobileScrollTop = useCallback((top, behavior = 'auto') => {
+    if (mobileDocumentScrollRoute && typeof window !== 'undefined') {
+      window.scrollTo({ top, behavior });
+      document.documentElement.scrollTop = top;
+      document.body.scrollTop = top;
+      return;
+    }
+    if (containerRef.current) {
+      if (behavior === 'smooth') {
+        containerRef.current.scrollTo({ top, behavior });
+      } else {
+        containerRef.current.scrollTop = top;
+      }
+    }
+  }, [mobileDocumentScrollRoute]);
   const syncMobileViewportToIndex = useCallback((index) => {
     if (isDesktopViewport) return false;
     const container = containerRef.current;
-    if (!container || stories.length === 0) return false;
+    if ((!container && !mobileDocumentScrollRoute) || stories.length === 0) return false;
 
-    const height = container.clientHeight;
+    const height = getMobileScrollHeight();
     if (!height) return false;
 
     const clampedIndex = Math.min(Math.max(index, 1), stories.length);
     const nextScrollTop = height * clampedIndex;
-    if (Math.abs(container.scrollTop - nextScrollTop) <= Math.max(4, height * 0.25)) {
+    if (Math.abs(getMobileScrollTop() - nextScrollTop) <= Math.max(4, height * 0.25)) {
       return true;
     }
 
-    container.scrollTop = nextScrollTop;
+    setMobileScrollTop(nextScrollTop);
     setBoundaryOverlayIdx(null);
     return true;
-  }, [isDesktopViewport, stories.length]);
+  }, [getMobileScrollHeight, getMobileScrollTop, isDesktopViewport, mobileDocumentScrollRoute, setMobileScrollTop, stories.length]);
 
   const forceMobileViewportToIndex = useCallback((index) => {
     if (isDesktopViewport) return false;
     const container = containerRef.current;
-    if (!container || stories.length === 0) return false;
+    if ((!container && !mobileDocumentScrollRoute) || stories.length === 0) return false;
 
-    const height = container.clientHeight;
+    const height = getMobileScrollHeight();
     if (!height) return false;
 
     const clampedIndex = Math.min(Math.max(index, 1), stories.length);
     const nextScrollTop = height * clampedIndex;
-    const previousSnap = container.style.scrollSnapType;
+    const scrollTargetStyle = mobileDocumentScrollRoute ? document.documentElement.style : container.style;
+    const previousSnap = scrollTargetStyle.scrollSnapType;
 
-    container.style.scrollSnapType = 'none';
-    container.scrollTop = nextScrollTop;
+    scrollTargetStyle.scrollSnapType = 'none';
+    setMobileScrollTop(nextScrollTop);
     setBoundaryOverlayIdx(null);
 
     requestAnimationFrame(() => {
-      if (!containerRef.current) return;
-      containerRef.current.style.scrollSnapType = previousSnap || 'y mandatory';
+      const targetStyle = mobileDocumentScrollRoute ? document.documentElement.style : containerRef.current?.style;
+      if (!targetStyle) return;
+      targetStyle.scrollSnapType = previousSnap || 'y mandatory';
     });
 
     return true;
-  }, [isDesktopViewport, stories.length]);
+  }, [getMobileScrollHeight, isDesktopViewport, mobileDocumentScrollRoute, setMobileScrollTop, stories.length]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -1074,6 +1104,7 @@ export default function VideoFeedPage() {
 
   useEffect(() => {
     if (!standaloneMobileRoute || typeof window === 'undefined') return undefined;
+    if (mobileDocumentScrollRoute) return undefined;
 
     const { style: bodyStyle } = document.body;
     const { style: htmlStyle } = document.documentElement;
@@ -1093,7 +1124,33 @@ export default function VideoFeedPage() {
       bodyStyle.overscrollBehavior = previousBodyOverscroll;
       htmlStyle.overscrollBehavior = previousHtmlOverscroll;
     };
-  }, [standaloneMobileRoute]);
+  }, [mobileDocumentScrollRoute, standaloneMobileRoute]);
+
+  useEffect(() => {
+    if (!mobileDocumentScrollRoute || typeof window === 'undefined') return undefined;
+
+    const { style: htmlStyle } = document.documentElement;
+    const { style: bodyStyle } = document.body;
+    const previousHtmlSnap = htmlStyle.scrollSnapType;
+    const previousBodySnap = bodyStyle.scrollSnapType;
+    const previousHtmlOverscroll = htmlStyle.overscrollBehaviorY;
+    const previousBodyOverscroll = bodyStyle.overscrollBehaviorY;
+    const previousScrollBehavior = htmlStyle.scrollBehavior;
+
+    htmlStyle.scrollSnapType = 'y mandatory';
+    bodyStyle.scrollSnapType = 'y mandatory';
+    htmlStyle.overscrollBehaviorY = 'none';
+    bodyStyle.overscrollBehaviorY = 'none';
+    htmlStyle.scrollBehavior = 'auto';
+
+    return () => {
+      htmlStyle.scrollSnapType = previousHtmlSnap;
+      bodyStyle.scrollSnapType = previousBodySnap;
+      htmlStyle.overscrollBehaviorY = previousHtmlOverscroll;
+      bodyStyle.overscrollBehaviorY = previousBodyOverscroll;
+      htmlStyle.scrollBehavior = previousScrollBehavior;
+    };
+  }, [mobileDocumentScrollRoute]);
 
   const refreshStories = useCallback(async () => {
     const data = await getStories({ focusUserId: requestedStoryUserId || '' });
@@ -1240,17 +1297,17 @@ export default function VideoFeedPage() {
 
   useLayoutEffect(() => {
     if (isDesktopViewport) return undefined;
-    if (stories.length === 0 || !containerRef.current) return;
+    if (stories.length === 0 || (!containerRef.current && !mobileDocumentScrollRoute)) return;
 
     const container = containerRef.current;
     const syncInitialPosition = () => {
-      const height = container.clientHeight;
+      const height = getMobileScrollHeight();
       if (!height) return false;
 
       const idx = Math.min(Math.max(activeDispIdx, 1), stories.length);
       const nextScrollTop = height * idx;
-      if (Math.abs(container.scrollTop - nextScrollTop) > Math.max(4, height * 0.25)) {
-        container.scrollTop = nextScrollTop;
+      if (Math.abs(getMobileScrollTop() - nextScrollTop) > Math.max(4, height * 0.25)) {
+        setMobileScrollTop(nextScrollTop);
       }
       setBoundaryOverlayIdx(null);
       return true;
@@ -1263,7 +1320,7 @@ export default function VideoFeedPage() {
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [activeDispIdx, isDesktopViewport, stories.length]);
+  }, [activeDispIdx, getMobileScrollHeight, getMobileScrollTop, isDesktopViewport, mobileDocumentScrollRoute, setMobileScrollTop, stories.length]);
 
   // Secondary scroll-anchor: fires on every stories identity change (catches
   // same-length updates where the primary effect doesn't re-run). Uses a ref
@@ -1271,14 +1328,14 @@ export default function VideoFeedPage() {
   useLayoutEffect(() => {
     if (isDesktopViewport) return;
     const container = containerRef.current;
-    if (!container || stories.length === 0) return;
-    const height = container.clientHeight;
+    if ((!container && !mobileDocumentScrollRoute) || stories.length === 0) return;
+    const height = getMobileScrollHeight();
     if (!height) return;
     const idx = Math.min(Math.max(activeDispIdxRef.current, 1), stories.length);
     const want = height * idx;
     // Only snap back if iOS Safari reset the scrollTop significantly
-    if (Math.abs(container.scrollTop - want) > Math.max(4, height * 0.12)) {
-      container.scrollTop = want;
+    if (Math.abs(getMobileScrollTop() - want) > Math.max(4, height * 0.12)) {
+      setMobileScrollTop(want);
       setBoundaryOverlayIdx(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1312,10 +1369,10 @@ export default function VideoFeedPage() {
 
   const settleInfiniteBoundary = useCallback(() => {
     const container = containerRef.current;
-    if (!container || isJumpingRef.current || stories.length === 0) return;
+    if ((!container && !mobileDocumentScrollRoute) || isJumpingRef.current || stories.length === 0) return;
 
-    const height = container.clientHeight;
-    const rawIndex = Math.round(container.scrollTop / height);
+    const height = getMobileScrollHeight();
+    const rawIndex = Math.round(getMobileScrollTop() / height);
 
     if (rawIndex === 0 || rawIndex >= stories.length + 1) {
       const now = performance.now();
@@ -1335,14 +1392,15 @@ export default function VideoFeedPage() {
       clearTimeout(boundaryCooldownTimer.current);
 
       isJumpingRef.current = true;
-      container.style.scrollSnapType = 'none';
+      const scrollTargetStyle = mobileDocumentScrollRoute ? document.documentElement.style : container.style;
+      scrollTargetStyle.scrollSnapType = 'none';
 
       if (rawIndex === 0) {
-        container.scrollTop = stories.length * height;
+        setMobileScrollTop(stories.length * height);
         setActiveDispIdx(stories.length);
         setBoundaryOverlayIdx(null);
       } else {
-        container.scrollTop = height;
+        setMobileScrollTop(height);
         setActiveDispIdx(1);
         setBoundaryOverlayIdx(null);
       }
@@ -1350,7 +1408,8 @@ export default function VideoFeedPage() {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (containerRef.current) {
-            containerRef.current.style.scrollSnapType = 'y mandatory';
+            const targetStyle = mobileDocumentScrollRoute ? document.documentElement.style : containerRef.current.style;
+            targetStyle.scrollSnapType = 'y mandatory';
           }
           // Short lock to absorb jump noise without making the snap feel sticky
           jumpUnlockTimer.current = setTimeout(() => {
@@ -1359,35 +1418,37 @@ export default function VideoFeedPage() {
         });
       });
     }
-  }, [stories.length]);
+  }, [getMobileScrollHeight, getMobileScrollTop, mobileDocumentScrollRoute, setMobileScrollTop, stories.length]);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return undefined;
+    const scrollTarget = mobileDocumentScrollRoute ? window : containerRef.current;
+    if (!scrollTarget) return undefined;
 
     const handleScrollEnd = () => {
       clearTimeout(scrollEndTimer.current);
       settleInfiniteBoundary();
     };
 
-    container.addEventListener('scrollend', handleScrollEnd);
-    return () => container.removeEventListener('scrollend', handleScrollEnd);
-  }, [settleInfiniteBoundary]);
+    scrollTarget.addEventListener('scrollend', handleScrollEnd);
+    return () => scrollTarget.removeEventListener('scrollend', handleScrollEnd);
+  }, [mobileDocumentScrollRoute, settleInfiniteBoundary]);
 
   const handleScroll = useCallback(() => {
     if (isDesktopViewport) return;
     const container = containerRef.current;
-    if (!container || isJumpingRef.current) return;
+    if ((!container && !mobileDocumentScrollRoute) || isJumpingRef.current) return;
 
     lastScrollAtRef.current = performance.now();
 
     // Safety net: if scrollSnapType got stuck as 'none' from an interrupted jump, restore it
-    if (container.style.scrollSnapType === 'none') {
-      container.style.scrollSnapType = 'y mandatory';
+    const scrollTargetStyle = mobileDocumentScrollRoute ? document.documentElement.style : container.style;
+    if (scrollTargetStyle.scrollSnapType === 'none') {
+      scrollTargetStyle.scrollSnapType = 'y mandatory';
     }
 
-    const height = container.clientHeight;
-    const rawIndex = Math.round(container.scrollTop / height);
+    const height = getMobileScrollHeight();
+    if (!height) return;
+    const rawIndex = Math.round(getMobileScrollTop() / height);
 
     if ((rawIndex === 0 || rawIndex === stories.length + 1) && rawIndex !== boundaryOverlayIdx) {
       setBoundaryOverlayIdx(rawIndex);
@@ -1403,7 +1464,13 @@ export default function VideoFeedPage() {
     scrollEndTimer.current = setTimeout(() => {
       settleInfiniteBoundary();
     }, 90);
-  }, [activeDispIdx, boundaryOverlayIdx, isDesktopViewport, settleInfiniteBoundary, stories.length]);
+  }, [activeDispIdx, boundaryOverlayIdx, getMobileScrollHeight, getMobileScrollTop, isDesktopViewport, mobileDocumentScrollRoute, settleInfiniteBoundary, stories.length]);
+
+  useEffect(() => {
+    if (!mobileDocumentScrollRoute || typeof window === 'undefined') return undefined;
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleScroll, mobileDocumentScrollRoute]);
 
   const handleLike = useCallback((storyId) => {
     let desiredLiked = null;
@@ -1427,17 +1494,24 @@ export default function VideoFeedPage() {
 
   const scrollByOne = useCallback((dir) => {
     const container = containerRef.current;
-    if (!container) return;
-    container.scrollBy({ top: dir * container.clientHeight, behavior: 'smooth' });
-  }, []);
+    if (!container && !mobileDocumentScrollRoute) return;
+    const height = getMobileScrollHeight();
+    if (!height) return;
+    if (mobileDocumentScrollRoute) {
+      window.scrollBy({ top: dir * height, behavior: 'smooth' });
+      return;
+    }
+    container.scrollBy({ top: dir * height, behavior: 'smooth' });
+  }, [getMobileScrollHeight, mobileDocumentScrollRoute]);
 
   const jumpByOne = useCallback((dir) => {
     const container = containerRef.current;
-    if (!container) return;
-    const height = container.clientHeight;
-    const rawIndex = Math.round(container.scrollTop / height);
-    container.scrollTop = (rawIndex + dir) * height;
-  }, []);
+    if (!container && !mobileDocumentScrollRoute) return;
+    const height = getMobileScrollHeight();
+    if (!height) return;
+    const rawIndex = Math.round(getMobileScrollTop() / height);
+    setMobileScrollTop((rawIndex + dir) * height);
+  }, [getMobileScrollHeight, getMobileScrollTop, mobileDocumentScrollRoute, setMobileScrollTop]);
 
   const moveDesktopByOne = useCallback((dir) => {
     if (stories.length === 0) return;
@@ -1477,7 +1551,7 @@ export default function VideoFeedPage() {
   if (loading) {
     return (
       <div
-        className={standaloneMobileRoute ? 'relative min-h-mobile-browser-screen overflow-hidden bg-black' : 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'}
+        className={standaloneMobileRoute ? `relative min-h-mobile-browser-screen bg-black ${mobileDocumentScrollRoute ? '' : 'overflow-hidden'}` : 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'}
       >
         <div
           className={standaloneMobileRoute ? 'flex h-mobile-browser-screen items-center justify-center' : undefined}
@@ -1491,7 +1565,7 @@ export default function VideoFeedPage() {
   if (stories.length === 0) {
     return (
       <div
-        className={standaloneMobileRoute ? 'relative min-h-mobile-browser-screen overflow-hidden bg-mansion-base px-6' : 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'}
+        className={standaloneMobileRoute ? `relative min-h-mobile-browser-screen bg-mansion-base px-6 ${mobileDocumentScrollRoute ? '' : 'overflow-hidden'}` : 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'}
       >
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-32 right-[-10%] w-[520px] h-[520px] rounded-full bg-mansion-crimson/10 blur-3xl" />
@@ -1532,7 +1606,7 @@ export default function VideoFeedPage() {
     <div
       className={
         standaloneMobileRoute
-          ? 'relative min-h-mobile-browser-screen overflow-hidden bg-black'
+          ? `relative min-h-mobile-browser-screen bg-black ${mobileDocumentScrollRoute ? '' : 'overflow-hidden'}`
           : desktopOverlayRoute
             ? 'absolute inset-0 bg-black z-[60]'
             : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'
@@ -1547,7 +1621,11 @@ export default function VideoFeedPage() {
       />
 
       <div
-        className={standaloneMobileRoute ? 'relative h-mobile-browser-screen' : 'relative h-full'}
+        className={
+          standaloneMobileRoute
+            ? (mobileDocumentScrollRoute ? 'relative' : 'relative h-mobile-browser-screen')
+            : 'relative h-full'
+        }
       >
         {isDesktopViewport && (
           <div
@@ -1637,12 +1715,16 @@ export default function VideoFeedPage() {
         ) : (
         <div
           ref={containerRef}
-          onScroll={handleScroll}
-          className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+          onScroll={mobileDocumentScrollRoute ? undefined : handleScroll}
+          className={
+            mobileDocumentScrollRoute
+              ? 'relative snap-y snap-mandatory scrollbar-hide'
+              : 'h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide'
+          }
           style={{
             scrollSnapType: 'y mandatory',
             touchAction: 'pan-y',
-            overscrollBehavior: 'none',
+            overscrollBehavior: mobileDocumentScrollRoute ? 'auto' : 'none',
             WebkitOverflowScrolling: 'touch',
           }}
         >
@@ -1655,7 +1737,8 @@ export default function VideoFeedPage() {
             return (
               <div
                 key={`${displayIndex}-${mobileStoryKey}`}
-                className="h-full w-full flex-shrink-0"
+                data-video-feed-slide="true"
+                className={mobileDocumentScrollRoute ? 'h-mobile-browser-screen w-full snap-start snap-always' : 'h-full w-full flex-shrink-0'}
               >
                 <StoryCard
                   story={story}
