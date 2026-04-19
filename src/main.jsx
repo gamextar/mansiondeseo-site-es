@@ -3,6 +3,12 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 import { getBootDebugFlags } from './lib/bootDebugPrefs'
+import {
+  BOTTOM_NAV_BOTTOM_PADDING,
+  BOTTOM_NAV_HEIGHT,
+  STANDALONE_BOTTOM_NAV_BOTTOM_PADDING,
+  STANDALONE_BOTTOM_NAV_HEIGHT,
+} from './lib/bottomNavConfig'
 
 const ASSET_RECOVERY_KEY = 'mansion-asset-recovery-reload';
 
@@ -57,6 +63,10 @@ if (typeof document !== 'undefined') {
   // Keep the shell dark even before CSS assets finish loading.
   document.documentElement.style.backgroundColor = '#08080E';
   document.documentElement.style.colorScheme = 'dark';
+  document.documentElement.style.setProperty('--bottom-nav-height', `${BOTTOM_NAV_HEIGHT}px`);
+  document.documentElement.style.setProperty('--bottom-nav-bottom-padding', `${BOTTOM_NAV_BOTTOM_PADDING}px`);
+  document.documentElement.style.setProperty('--standalone-bottom-nav-height', `${STANDALONE_BOTTOM_NAV_HEIGHT}px`);
+  document.documentElement.style.setProperty('--standalone-bottom-nav-bottom-padding', `${STANDALONE_BOTTOM_NAV_BOTTOM_PADDING}px`);
   if (document.body) {
     document.body.style.backgroundColor = '#08080E';
     document.body.style.colorScheme = 'dark';
