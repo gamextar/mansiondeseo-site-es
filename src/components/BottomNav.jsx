@@ -127,7 +127,7 @@ export default function BottomNav({ immersive = false }) {
         bottom: isStandaloneMobileApp ? `${bottomPaddingPx}px` : '-15px',
         paddingBottom: isStandaloneMobileApp
           ? '-15px'
-          : `calc(env(safe-area-inset-bottom, 0px) + ${bottomPaddingPx}px)`,
+          : `calc(env(safe-area-inset-bottom, 0px) + 0px)`,
         paddingLeft: outerSidePadding,
         paddingRight: outerSidePadding,
         isolation: 'isolate',
