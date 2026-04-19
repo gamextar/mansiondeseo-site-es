@@ -128,14 +128,15 @@ export default function BottomNav({ immersive = false }) {
         paddingBottom: isStandaloneMobileApp
           ? '0px'
           : `calc(env(safe-area-inset-bottom, 0px) + ${bottomPaddingPx}px)`,
-        paddingLeft: immersive ? '0px' : outerSidePadding,
-        paddingRight: immersive ? '0px' : outerSidePadding,
+        paddingLeft: outerSidePadding,
+        paddingRight: outerSidePadding,
         isolation: 'isolate',
+        transform: 'translateY(5px)',
       }}
     >
       <div
         className={`pointer-events-auto w-full border ${
-          immersive ? 'rounded-none border-x-0 border-b-0' : (isStandaloneMobileApp ? 'rounded-[1.7rem]' : 'rounded-[2.15rem]')
+          isStandaloneMobileApp ? 'rounded-[1.9rem]' : 'rounded-[2.35rem]'
         }`}
         style={{
           backgroundColor: bgColor,
