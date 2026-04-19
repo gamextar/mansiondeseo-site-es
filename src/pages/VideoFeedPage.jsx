@@ -230,7 +230,7 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, enableCinematicReveal = false, pauseOnAppBackground = false }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, enableCinematicReveal = false, pauseOnAppBackground = false, videoScale = 1 }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
@@ -503,8 +503,8 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           src={activeSrc}
           className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[1400ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
           style={{
-            WebkitTransform: 'translateZ(0)',
-            transform: 'translateZ(0)',
+            WebkitTransform: `translateZ(0) scale(${videoScale})`,
+            transform: `translateZ(0) scale(${videoScale})`,
             opacity: enableCinematicReveal ? (isVideoReady ? 1 : 0) : 1,
           }}
           loop
@@ -1674,6 +1674,7 @@ export default function VideoFeedPage() {
                   onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
                   enableCinematicReveal={enableCinematicReveal}
                   pauseOnAppBackground
+                  videoScale={1.1}
                 />
               </div>
             );
