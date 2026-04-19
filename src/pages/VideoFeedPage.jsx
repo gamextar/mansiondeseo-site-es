@@ -1549,7 +1549,7 @@ export default function VideoFeedPage() {
       <div
         className={
           standaloneMobileRoute && !isStandaloneMobileApp
-            ? 'relative -top-16 h-[calc(100lvh+128px)]'
+            ? 'relative -top-24 h-[calc(100lvh+192px)]'
             : standaloneMobileRoute
               ? 'relative h-mobile-browser-screen'
               : 'relative h-full'
