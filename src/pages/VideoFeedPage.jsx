@@ -990,6 +990,9 @@ export default function VideoFeedPage() {
   const navBottomOffset = isStandaloneMobileApp
     ? getStandaloneBottomNavOffset()
     : getBrowserBottomNavOffset();
+  const mobileOverlayBottomOffset = mobileBrowserRoute
+    ? 'env(safe-area-inset-bottom, 0px)'
+    : navBottomOffset;
   const syncMobileViewportToIndex = useCallback((index) => {
     if (isDesktopViewport) return false;
     const container = containerRef.current;
@@ -1695,7 +1698,7 @@ export default function VideoFeedPage() {
         {activeStory && (
         <div
           className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-[70] lg:hidden"
-          style={{ bottom: `calc(${navBottomOffset} + 16px)` }}
+          style={{ bottom: `calc(${mobileOverlayBottomOffset} + 16px)` }}
         >
           <MobileActionButtons
             story={activeStory}
@@ -1713,7 +1716,7 @@ export default function VideoFeedPage() {
         {activeStory && (
         <div
           className="pointer-events-none fixed left-4 right-20 z-[70] lg:hidden"
-          style={{ bottom: `calc(${navBottomOffset} + 8px)` }}
+          style={{ bottom: `calc(${mobileOverlayBottomOffset} + 8px)` }}
         >
           <div className="pointer-events-none flex flex-col items-start gap-2.5 mb-1">
             <MobileOverlayButton
