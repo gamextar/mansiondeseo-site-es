@@ -10,11 +10,13 @@ import { getDebugPanelPrefs, setDebugPanelPref, subscribeDebugPanelPrefs } from 
 import { clearBootDebugFlags, getBootDebugFlags, setBootDebugFlags, subscribeBootDebugFlags } from '../lib/bootDebugPrefs';
 import { ADMIN_SECTIONS } from '../lib/adminSections';
 import {
-  BOTTOM_NAV_BOTTOM_PADDING,
   BOTTOM_NAV_HEIGHT,
+  BOTTOM_NAV_PAGE_EXTRA_PADDING,
   BOTTOM_NAV_SIDE_PADDING,
-  STANDALONE_BOTTOM_NAV_BOTTOM_PADDING,
+  BOTTOM_NAV_VISUAL_OFFSET,
   STANDALONE_BOTTOM_NAV_HEIGHT,
+  STANDALONE_BOTTOM_NAV_PAGE_EXTRA_PADDING,
+  STANDALONE_BOTTOM_NAV_VISUAL_OFFSET,
 } from '../lib/bottomNavConfig';
 
 export default function SettingsPage() {
@@ -1826,8 +1828,12 @@ export default function SettingsPage() {
                   <div className="text-text-primary font-semibold">{BOTTOM_NAV_HEIGHT}px</div>
                 </div>
                 <div className="rounded-xl bg-mansion-elevated/60 border border-white/5 p-3">
-                  <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">Abajo</div>
-                  <div className="text-text-primary font-semibold">{BOTTOM_NAV_BOTTOM_PADDING}px</div>
+                  <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">Offset visual</div>
+                  <div className="text-text-primary font-semibold">{BOTTOM_NAV_VISUAL_OFFSET}px</div>
+                </div>
+                <div className="rounded-xl bg-mansion-elevated/60 border border-white/5 p-3">
+                  <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">Extra página</div>
+                  <div className="text-text-primary font-semibold">{BOTTOM_NAV_PAGE_EXTRA_PADDING}px</div>
                 </div>
                 <div className="rounded-xl bg-mansion-elevated/60 border border-white/5 p-3">
                   <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">Laterales</div>
@@ -1835,7 +1841,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="rounded-xl bg-mansion-elevated/60 border border-white/5 p-3">
                   <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">PWA</div>
-                  <div className="text-text-primary font-semibold">{STANDALONE_BOTTOM_NAV_HEIGHT + STANDALONE_BOTTOM_NAV_BOTTOM_PADDING}px</div>
+                  <div className="text-text-primary font-semibold">{STANDALONE_BOTTOM_NAV_HEIGHT + STANDALONE_BOTTOM_NAV_VISUAL_OFFSET + STANDALONE_BOTTOM_NAV_PAGE_EXTRA_PADDING}px</div>
                 </div>
               </div>
               <p className="mt-3 text-[11px] text-text-dim">Para modificar la geometría, editar <code>src/lib/bottomNavConfig.js</code>. Home, secciones con <code>pb-mobile-legacy-nav</code>, videos y overlays comparten esa fuente.</p>

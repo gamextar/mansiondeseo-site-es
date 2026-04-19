@@ -164,14 +164,16 @@ body {
     padding-bottom: calc(
       env(safe-area-inset-bottom, 0px) +
       var(--bottom-nav-height, 80px) +
-      var(--bottom-nav-bottom-padding, 8px)
+      var(--bottom-nav-visual-offset, 8px) +
+      var(--bottom-nav-page-extra-padding, 0px)
     );
   }
 
   [data-mobile-standalone="true"] .pb-mobile-legacy-nav {
     padding-bottom: calc(
       var(--standalone-bottom-nav-height, 80px) +
-      var(--standalone-bottom-nav-bottom-padding, 8px)
+      var(--standalone-bottom-nav-visual-offset, 8px) +
+      var(--standalone-bottom-nav-page-extra-padding, 0px)
     );
   }
 }

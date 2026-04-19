@@ -7,8 +7,9 @@ import {
   BOTTOM_NAV_BLUR,
   BOTTOM_NAV_OPACITY,
   BOTTOM_NAV_SIDE_PADDING,
-  getBottomNavBottomPadding,
+  getBottomNavPageExtraPadding,
   getBottomNavHeight,
+  getBottomNavVisualOffset,
 } from '../lib/bottomNavConfig';
 import { warmVideoFeed } from '../lib/videoFeedWarmup';
 import { useEffect, useRef } from 'react';
@@ -52,7 +53,8 @@ export default function BottomNav({ immersive = false }) {
   const pendingNavResetRef = useRef(null);
   const isStandaloneMobileApp = detectStandaloneMobile();
   const effectiveNavHeight = getBottomNavHeight(isStandaloneMobileApp);
-  const bottomPaddingPx = getBottomNavBottomPadding(isStandaloneMobileApp);
+  const visualOffsetPx = getBottomNavVisualOffset(isStandaloneMobileApp);
+  const pageExtraPaddingPx = getBottomNavPageExtraPadding(isStandaloneMobileApp);
   const activeIndicatorSize = isStandaloneMobileApp ? 66 : 62;
   const outerSidePadding = BOTTOM_NAV_SIDE_PADDING;
   const bgColor = `rgba(0,0,0,${(BOTTOM_NAV_OPACITY / 100).toFixed(2)})`;
@@ -125,10 +127,10 @@ export default function BottomNav({ immersive = false }) {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
-        bottom: isStandaloneMobileApp ? `${bottomPaddingPx}px` : '0px',
+        bottom: isStandaloneMobileApp ? `${visualOffsetPx}px` : '0px',
         paddingBottom: isStandaloneMobileApp
           ? '0px'
-          : `calc(env(safe-area-inset-bottom, 0px) + ${bottomPaddingPx}px)`,
+          : `calc(env(safe-area-inset-bottom, 0px) + ${visualOffsetPx}px)`,
         paddingLeft: outerSidePadding,
         paddingRight: outerSidePadding,
         isolation: 'isolate',
@@ -140,7 +142,8 @@ export default function BottomNav({ immersive = false }) {
           <div>mode: {isStandaloneMobileApp ? 'standalone' : 'browser'}</div>
           <div>immersive: {immersive ? 'true' : 'false'}</div>
           <div>height: {effectiveNavHeight}px</div>
-          <div>bottomPadding: {bottomPaddingPx}px</div>
+          <div>visualOffset: {visualOffsetPx}px</div>
+          <div>pageExtra: {pageExtraPaddingPx}px</div>
           <div>sidePadding: {outerSidePadding}px</div>
         </div>
       )}
