@@ -233,8 +233,9 @@ function AppLayout() {
     if (routeOverlayOpen) return; // overlay handles its own scroll
     if (location.state?.backgroundLocation) return; // closing overlay — App handles it
     if (prev === location.pathname) return; // same route, no reset
+    if (isMobileViewport && normalizedRoutePath === '/videos') return; // video feed owns its mobile browser offset
     window.scrollTo(0, 0);
-  }, [location.pathname, location.state, routeOverlayOpen]);
+  }, [isMobileViewport, location.pathname, location.state, normalizedRoutePath, routeOverlayOpen]);
 
   useEffect(() => {
     // Video overlay is fullscreen — no need to lock the background scroll.

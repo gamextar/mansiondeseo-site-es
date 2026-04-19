@@ -1076,11 +1076,13 @@ export default function VideoFeedPage() {
         resetPageScroll();
       });
     });
+    const timers = [80, 220, 520].map((delay) => window.setTimeout(resetPageScroll, delay));
 
     return () => {
       if (rafA) window.cancelAnimationFrame(rafA);
+      timers.forEach((timerId) => window.clearTimeout(timerId));
     };
-  }, [location.key, mobileBrowserRoute, standaloneMobileRoute]);
+  }, [loading, location.key, mobileBrowserRoute, standaloneMobileRoute, stories.length]);
 
   useEffect(() => {
     if (!standaloneMobileRoute || !isStandaloneMobileApp || typeof window === 'undefined') return undefined;
