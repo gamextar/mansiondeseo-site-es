@@ -28,6 +28,7 @@ const appRoutes = new Set([
   'pago-monedas-exitoso',
   'pago-pendiente',
   'perfil',
+  'profile-shell-test',
   'ranking',
   'recuperar-contrasena',
   'registro',
