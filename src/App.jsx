@@ -126,7 +126,7 @@ function AppLayout() {
       normalizedRoutePath === '/safe-area-debug'
     )
   );
-  const showMobileBrandOverlay = immersiveMobileApp;
+  const showMobileBrandOverlay = immersiveMobileApp && normalizedRoutePath !== '/videos';
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const showTopNavbar = showChrome && !routeOverlayOpen && !immersiveMobileApp;
   const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
