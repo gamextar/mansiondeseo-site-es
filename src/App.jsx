@@ -126,6 +126,7 @@ function AppLayout() {
       normalizedRoutePath === '/safe-area-debug'
     )
   );
+  const compactTopSpacingForMobileImmersive = immersiveMobileApp;
   const hideTopNavbarForMobileImmersive = immersiveMobileApp && normalizedRoutePath === '/videos';
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const showTopNavbar = showChrome && !routeOverlayOpen && !hideTopNavbarForMobileImmersive;
@@ -301,7 +302,7 @@ function AppLayout() {
       <div
         className={showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : ''}
         data-mobile-immersive={immersiveMobileApp ? 'true' : undefined}
-        data-mobile-topless={hideTopNavbarForMobileImmersive ? 'true' : undefined}
+        data-mobile-compact-top={compactTopSpacingForMobileImmersive ? 'true' : undefined}
         data-mobile-standalone={isStandaloneMobileApp ? 'true' : undefined}
       >
         <Suspense

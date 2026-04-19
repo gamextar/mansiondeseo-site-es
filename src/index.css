@@ -156,7 +156,7 @@ body {
 }
 
 @media (max-width: 1023px) {
-  [data-mobile-topless="true"] .pt-navbar {
+  [data-mobile-compact-top="true"] .pt-navbar {
     padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
   }
 
