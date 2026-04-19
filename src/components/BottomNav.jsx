@@ -122,7 +122,7 @@ export default function BottomNav({ immersive = false }) {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
+      className="fixed bottom--5 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
       style={{
         bottom: isStandaloneMobileApp ? `${bottomPaddingPx}px` : '0px',
         paddingBottom: isStandaloneMobileApp
