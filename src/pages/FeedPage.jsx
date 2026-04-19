@@ -11,7 +11,7 @@ import { getProfiles, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
-import { getBottomNavBottomPadding, getBottomNavHeight } from '../lib/bottomNavConfig';
+import { getBottomNavPagePadding } from '../lib/bottomNavConfig';
 import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsers, getViewedStoryUsersKey } from '../lib/storyViews';
 
 const FEED_CACHE_KEY = 'mansion_feed';
@@ -163,7 +163,7 @@ export default function FeedPage({ initialData }) {
   const [storiesIntroEnabled, setStoriesIntroEnabled] = useState(true);
   const storiesIntroConsumedRef = useRef(false);
   const navigate = useNavigate();
-  const navBottomOffset = getBottomNavHeight(isStandaloneMobileApp) + getBottomNavBottomPadding(isStandaloneMobileApp);
+  const navBottomOffset = getBottomNavPagePadding(isStandaloneMobileApp);
   const gridRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const mobileNavVisibilityTimerRef = useRef(null);
@@ -998,7 +998,7 @@ export default function FeedPage({ initialData }) {
       style={{
         paddingBottom: isDesktopViewport
           ? undefined
-          : `calc(${Math.max(12, navBottomOffset)}px + env(safe-area-inset-bottom, 0px))`,
+          : navBottomOffset,
       }}
     >
       {/* Pull-to-refresh indicator */}

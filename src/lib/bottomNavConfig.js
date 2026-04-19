@@ -21,3 +21,15 @@ export function getStandaloneBottomNavOffset() {
 export function getBrowserBottomNavOffset() {
   return `calc(env(safe-area-inset-bottom, 0px) + ${BOTTOM_NAV_BOTTOM_PADDING}px + ${BOTTOM_NAV_HEIGHT}px)`;
 }
+
+export function getBottomNavPagePadding(isStandalone = false) {
+  return isStandalone ? getStandaloneBottomNavOffset() : getBrowserBottomNavOffset();
+}
+
+export function applyBottomNavCssVariables(root) {
+  if (!root) return;
+  root.style.setProperty('--bottom-nav-height', `${BOTTOM_NAV_HEIGHT}px`);
+  root.style.setProperty('--bottom-nav-bottom-padding', `${BOTTOM_NAV_BOTTOM_PADDING}px`);
+  root.style.setProperty('--standalone-bottom-nav-height', `${STANDALONE_BOTTOM_NAV_HEIGHT}px`);
+  root.style.setProperty('--standalone-bottom-nav-bottom-padding', `${STANDALONE_BOTTOM_NAV_BOTTOM_PADDING}px`);
+}

@@ -1,4 +1,4 @@
-import { getBottomNavBottomPadding, getBottomNavHeight } from '../lib/bottomNavConfig';
+import { getBottomNavPagePadding } from '../lib/bottomNavConfig';
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -12,13 +12,13 @@ const PROBE_IMAGE_URL = '/feed-shell-probe.svg?v=2';
 
 export default function FeedShellProbePage() {
   const isStandaloneMobileApp = detectStandaloneMobile();
-  const navBottomOffset = getBottomNavHeight(isStandaloneMobileApp) + getBottomNavBottomPadding(isStandaloneMobileApp);
+  const navBottomOffset = getBottomNavPagePadding(isStandaloneMobileApp);
 
   return (
     <div
       className="min-h-mobile-browser-screen bg-mansion-base lg:pb-[84px]"
       style={{
-        paddingBottom: `calc(${Math.max(12, navBottomOffset)}px + env(safe-area-inset-bottom, 0px))`,
+        paddingBottom: navBottomOffset,
         backgroundImage: `url(${PROBE_IMAGE_URL})`,
         backgroundSize: '100% 100%',
         backgroundPosition: 'center',

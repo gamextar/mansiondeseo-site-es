@@ -9,6 +9,13 @@ import { getMediaDebugSummary, inspectVisibleMedia, resetMediaDebug, subscribeMe
 import { getDebugPanelPrefs, setDebugPanelPref, subscribeDebugPanelPrefs } from '../lib/debugPanelPrefs';
 import { clearBootDebugFlags, getBootDebugFlags, setBootDebugFlags, subscribeBootDebugFlags } from '../lib/bootDebugPrefs';
 import { ADMIN_SECTIONS } from '../lib/adminSections';
+import {
+  BOTTOM_NAV_BOTTOM_PADDING,
+  BOTTOM_NAV_HEIGHT,
+  BOTTOM_NAV_SIDE_PADDING,
+  STANDALONE_BOTTOM_NAV_BOTTOM_PADDING,
+  STANDALONE_BOTTOM_NAV_HEIGHT,
+} from '../lib/bottomNavConfig';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -1810,24 +1817,28 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Geometría fija</h3>
-                  <p className="text-[11px] text-text-dim">La barra inferior ahora usa una configuración estable por código para evitar desalineaciones entre home, videos y perfil.</p>
+                  <p className="text-[11px] text-text-dim">La barra inferior toma estos valores desde <code>bottomNavConfig.js</code>. Los valores guardados en la API no se usan para la geometría.</p>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-[11px]">
+              <div className="grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
+                <div className="rounded-xl bg-mansion-elevated/60 border border-white/5 p-3">
+                  <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">Altura</div>
+                  <div className="text-text-primary font-semibold">{BOTTOM_NAV_HEIGHT}px</div>
+                </div>
                 <div className="rounded-xl bg-mansion-elevated/60 border border-white/5 p-3">
                   <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">Abajo</div>
-                  <div className="text-text-primary font-semibold">8px</div>
+                  <div className="text-text-primary font-semibold">{BOTTOM_NAV_BOTTOM_PADDING}px</div>
                 </div>
                 <div className="rounded-xl bg-mansion-elevated/60 border border-white/5 p-3">
                   <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">Laterales</div>
-                  <div className="text-text-primary font-semibold">8px</div>
+                  <div className="text-text-primary font-semibold">{BOTTOM_NAV_SIDE_PADDING}px</div>
                 </div>
                 <div className="rounded-xl bg-mansion-elevated/60 border border-white/5 p-3">
-                  <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">Altura</div>
-                  <div className="text-text-primary font-semibold">80px</div>
+                  <div className="text-text-dim uppercase tracking-wider text-[10px] mb-1">PWA</div>
+                  <div className="text-text-primary font-semibold">{STANDALONE_BOTTOM_NAV_HEIGHT + STANDALONE_BOTTOM_NAV_BOTTOM_PADDING}px</div>
                 </div>
               </div>
-              <p className="mt-3 text-[11px] text-text-dim">Los controles de la bottom nav se retiraron del panel porque estaban generando cálculos inconsistentes en móvil y PWA.</p>
+              <p className="mt-3 text-[11px] text-text-dim">Para modificar la geometría, editar <code>src/lib/bottomNavConfig.js</code>. Home, secciones con <code>pb-mobile-legacy-nav</code>, videos y overlays comparten esa fuente.</p>
             </div>
           </div>
         </section>}
