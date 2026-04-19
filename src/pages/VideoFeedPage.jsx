@@ -874,12 +874,6 @@ export default function VideoFeedPage() {
   const pwaReturnAnchorDoneRef = useRef(false);
   const lastScrollAtRef = useRef(0);
   const lastDesktopWheelAtRef = useRef(0);
-  const mobileSwipeGestureRef = useRef({
-    active: false,
-    pointerId: null,
-    startX: 0,
-    startY: 0,
-  });
 
   const requestedStoryUserId = location.state?.storyUserId || null;
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
@@ -982,8 +976,14 @@ export default function VideoFeedPage() {
     } catch {}
   }, [user?.id]);
 
+  const infiniteStories = stories.length > 0
+    ? [stories[stories.length - 1], ...stories, stories[0]]
+    : [];
   const desktopActiveIdx = Math.min(Math.max(activeDispIdx, 1), Math.max(stories.length, 1));
-  const activeStory = stories[desktopActiveIdx - 1] || stories[0] || null;
+  const mobileOverlayIdx = boundaryOverlayIdx ?? activeDispIdx;
+  const activeStory = isDesktopViewport
+    ? stories[desktopActiveIdx - 1] || stories[0] || null
+    : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const isStandaloneMobileApp = detectStandaloneMobile();
   const mobileBrowserRoute = standaloneMobileRoute && !isStandaloneMobileApp;
@@ -1442,7 +1442,7 @@ export default function VideoFeedPage() {
     container.scrollTop = (rawIndex + dir) * height;
   }, []);
 
-  const moveStoryByOne = useCallback((dir) => {
+  const moveDesktopByOne = useCallback((dir) => {
     if (stories.length === 0) return;
     setBoundaryOverlayIdx(null);
     setActiveDispIdx((prev) => {
@@ -1453,40 +1453,6 @@ export default function VideoFeedPage() {
       return current <= 1 ? stories.length : current - 1;
     });
   }, [stories.length]);
-
-  const handleMobileStagePointerDown = useCallback((event) => {
-    if (isDesktopViewport) return;
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    mobileSwipeGestureRef.current = {
-      active: true,
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-    };
-  }, [isDesktopViewport]);
-
-  const handleMobileStagePointerUp = useCallback((event) => {
-    if (isDesktopViewport) return;
-    const gesture = mobileSwipeGestureRef.current;
-    if (!gesture.active || gesture.pointerId !== event.pointerId) return;
-    mobileSwipeGestureRef.current.active = false;
-    mobileSwipeGestureRef.current.pointerId = null;
-
-    const deltaX = event.clientX - gesture.startX;
-    const deltaY = event.clientY - gesture.startY;
-    const absX = Math.abs(deltaX);
-    const absY = Math.abs(deltaY);
-
-    if (absY < 56 || absY <= absX * 1.15) return;
-    moveStoryByOne(deltaY < 0 ? 1 : -1);
-  }, [isDesktopViewport, moveStoryByOne]);
-
-  const handleMobileStagePointerCancel = useCallback((event) => {
-    const gesture = mobileSwipeGestureRef.current;
-    if (!gesture.active || gesture.pointerId !== event.pointerId) return;
-    mobileSwipeGestureRef.current.active = false;
-    mobileSwipeGestureRef.current.pointerId = null;
-  }, []);
 
   const handleDesktopWheel = useCallback((event) => {
     if (!isDesktopViewport) {
@@ -1502,14 +1468,14 @@ export default function VideoFeedPage() {
         e.preventDefault();
         closeOverlay();
       } else if (e.key === 'ArrowLeft') {
-        moveStoryByOne(-1);
+        moveDesktopByOne(-1);
       } else if (e.key === 'ArrowRight') {
-        moveStoryByOne(1);
+        moveDesktopByOne(1);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [closeOverlay, isDesktopViewport, isOverlayPreview, moveStoryByOne]);
+  }, [closeOverlay, isDesktopViewport, isOverlayPreview, moveDesktopByOne]);
 
   if (loading) {
     return (
@@ -1681,40 +1647,31 @@ export default function VideoFeedPage() {
         </div>
         ) : (
         <div
-          className="relative h-full overflow-hidden"
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
           style={{
-            touchAction: 'none',
+            scrollSnapType: 'y mandatory',
+            touchAction: 'pan-y',
             overscrollBehavior: 'none',
+            WebkitOverflowScrolling: 'touch',
           }}
-          onPointerDown={handleMobileStagePointerDown}
-          onPointerUp={handleMobileStagePointerUp}
-          onPointerCancel={handleMobileStagePointerCancel}
         >
-          {stories.map((story, index) => {
-            const activeIndex = desktopActiveIdx - 1;
-            const rawDistance = Math.abs(index - activeIndex);
-            const circularDistance = Math.min(rawDistance, stories.length - rawDistance);
-            const isActive = index === activeIndex;
-            const shouldLoad = stories.length <= 3 || circularDistance <= 1;
-            const enableCinematicReveal = isActive && !entryRevealReady;
+          {infiniteStories.map((story, displayIndex) => {
+            const dist = Math.abs(displayIndex - activeDispIdx);
+            const isBoundary = displayIndex <= 1 || displayIndex >= stories.length;
+            const shouldLoad = dist <= 3 || isBoundary;
+            const enableCinematicReveal = displayIndex === activeDispIdx && !entryRevealReady;
+            const mobileStoryKey = story.story_id || story.id || story.user_id || story.video_url || displayIndex;
             return (
               <div
-                key={story.id}
-                className="absolute inset-0"
-                style={{
-                  opacity: isActive ? 1 : 0,
-                  visibility: isActive ? 'visible' : 'hidden',
-                  pointerEvents: isActive ? 'auto' : 'none',
-                  zIndex: isActive ? 10 : 0,
-                  contain: 'paint',
-                  WebkitBackfaceVisibility: 'hidden',
-                  backfaceVisibility: 'hidden',
-                }}
+                key={`${displayIndex}-${mobileStoryKey}`}
+                className="h-full w-full flex-shrink-0"
               >
                 <StoryCard
                   story={story}
                   videoSrc={story.video_url}
-                  isActive={isActive}
+                  isActive={displayIndex === activeDispIdx}
                   shouldLoad={shouldLoad}
                   isMuted={isMuted}
                   avatarSize={avatarSize}
@@ -1725,7 +1682,7 @@ export default function VideoFeedPage() {
                   resetOnDeactivate
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
-                  onRevealReady={isActive ? handleEntryRevealReady : undefined}
+                  onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
                   enableCinematicReveal={enableCinematicReveal}
                   pauseOnAppBackground
                 />
@@ -1790,14 +1747,14 @@ export default function VideoFeedPage() {
         {stories.length > 1 && (
         <>
           <button
-            onClick={() => (isDesktopViewport ? moveStoryByOne(-1) : jumpByOne(-1))}
+            onClick={() => (isDesktopViewport ? moveDesktopByOne(-1) : jumpByOne(-1))}
             className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-200 ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
             style={{ left: 'calc(50% - 350px)' }}
           >
             <ChevronLeft className="w-9 h-9 text-white/70" />
           </button>
           <button
-            onClick={() => (isDesktopViewport ? moveStoryByOne(1) : jumpByOne(1))}
+            onClick={() => (isDesktopViewport ? moveDesktopByOne(1) : jumpByOne(1))}
             className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-200 ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
             style={{ right: 'calc(50% - 350px)' }}
           >
