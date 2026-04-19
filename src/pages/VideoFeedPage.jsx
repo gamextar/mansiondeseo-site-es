@@ -32,7 +32,6 @@ const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
 const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 68;
 const VIDEO_FEED_RAIL_SOURCE = 'rail';
-const MOBILE_SNAP_SETTLE_DELAY_MS = 150;
 
 function getStoryIdentity(story) {
   if (!story) return null;
@@ -1430,7 +1429,7 @@ export default function VideoFeedPage() {
     clearTimeout(scrollEndTimer.current);
     scrollEndTimer.current = setTimeout(() => {
       settleInfiniteBoundary();
-    }, MOBILE_SNAP_SETTLE_DELAY_MS);
+    }, 90);
   }, [activeDispIdx, boundaryOverlayIdx, isDesktopViewport, settleInfiniteBoundary, stories.length]);
 
   const handleLike = useCallback((storyId) => {
@@ -1677,7 +1676,6 @@ export default function VideoFeedPage() {
           className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
           style={{
             scrollSnapType: 'y mandatory',
-            scrollBehavior: 'smooth',
             touchAction: 'pan-y',
             overscrollBehavior: 'none',
             WebkitOverflowScrolling: 'touch',
