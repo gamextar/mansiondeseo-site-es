@@ -755,20 +755,6 @@ export default function FeedPage({ initialData }) {
     const storyId = String(story.story_id || '').trim();
     const userId = String(story.user_id || story.id || '').trim();
     const videoUrl = String(story.video_url || story.active_story_url || '').trim();
-    const storySeed = userId && videoUrl ? {
-      id: storyId || userId,
-      story_id: storyId || userId,
-      user_id: userId,
-      video_url: videoUrl,
-      caption: String(story.caption || ''),
-      likes: Number(story.likes || 0),
-      liked: !!story.liked,
-      comments: Number(story.comments || 0),
-      created_at: String(story.created_at || ''),
-      username: String(story.username || story.name || ''),
-      avatar_url: String(story.avatar_url || ''),
-      avatar_crop: story.avatar_crop || null,
-    } : null;
 
     try {
       sessionStorage.removeItem(VIDEO_FEED_INDEX_KEY);
@@ -777,12 +763,7 @@ export default function FeedPage({ initialData }) {
       }
     } catch {}
 
-    navigate('/videos', {
-      state: {
-        storyUserId: userId || null,
-        storySeed,
-      },
-    });
+    navigate('/videos');
   }, [navigate]);
 
   useEffect(() => {
