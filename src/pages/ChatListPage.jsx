@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, MessageCircle, Trash2 } from 'lucide-react';
 import { deleteConversation, getConversations, getToken, getStoredUser, invalidateConversationsCache } from '../lib/api';
+import { getBottomNavPagePadding } from '../lib/bottomNavConfig';
 import AvatarImg from '../components/AvatarImg';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { subscribeLocalConversationUpdates } from '../lib/localConversationEvents';
@@ -56,6 +57,34 @@ function setCachedConversations(convs) {
 
 function isConversationCacheFresh(timestamp) {
   return timestamp > 0 && Date.now() - timestamp < CONV_CACHE_TTL_MS;
+}
+
+function detectStandaloneMobile() {
+  if (typeof window === 'undefined') return false;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const ua = window.navigator.userAgent || '';
+  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+  return Boolean(standalone && isMobile);
+}
+
+function getGridColumns() {
+  if (typeof window === 'undefined') return 2;
+  const w = window.innerWidth;
+  if (w >= 1536) return 6;
+  if (w >= 1280) return 5;
+  if (w >= 1024) return 4;
+  if (w >= 768) return 3;
+  return 2;
+}
+
+function useGridColumns() {
+  const [cols, setCols] = useState(getGridColumns);
+  useEffect(() => {
+    const handler = () => setCols(getGridColumns());
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return cols;
 }
 
 function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
@@ -189,6 +218,10 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
 }
 
 export default function ChatListPage() {
+  const cols = useGridColumns();
+  const isDesktopViewport = cols >= 4;
+  const isStandaloneMobileApp = detectStandaloneMobile();
+  const navBottomOffset = getBottomNavPagePadding(isStandaloneMobileApp);
   const cachedState = getCachedConversations();
   const [conversations, setConversations] = useState(cachedState.conversations);
   const [loading, setLoading] = useState(cachedState.conversations.length === 0);
@@ -392,10 +425,13 @@ export default function ChatListPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, fetchConversations, subscribe, applyConversationUpdate, applyLocalConversationPreview]);
   return (
-    <div className="min-h-dynamic-screen bg-mansion-base pb-mobile-legacy-nav lg:pb-8 pt-navbar pt-mobile-brand-overlay lg:pt-0">
+    <div
+      className="min-h-dynamic-screen bg-mansion-base pt-navbar lg:pt-0 lg:pb-[84px]"
+      style={{ paddingBottom: isDesktopViewport ? undefined : navBottomOffset }}
+    >
       {/* Header */}
       <motion.div
-        className="px-3 lg:px-8 pt-9 lg:pt-6 pb-3 lg:max-w-3xl lg:mx-auto"
+        className="px-3 lg:px-8 pt-2 lg:pt-6 pb-3 lg:max-w-3xl lg:mx-auto"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
