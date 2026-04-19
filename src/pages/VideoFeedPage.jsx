@@ -545,7 +545,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
             background: `linear-gradient(to top, rgba(0,0,0,${(gradientOpacity / 100).toFixed(2)}), rgba(0,0,0,0.04), transparent)`,
           }}
         />
-        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none lg:rounded-t-2xl" />
+        <div className="absolute inset-x-0 top-0 hidden h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none lg:block lg:rounded-t-2xl" />
 
         <div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2.5 max-w-[360px]">
           <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="flex flex-col items-start gap-2.5">
