@@ -759,7 +759,7 @@ export default function FeedPage({ initialData }) {
     try {
       sessionStorage.removeItem(VIDEO_FEED_INDEX_KEY);
       if (storyId || userId || videoUrl) {
-        sessionStorage.setItem(VIDEO_FEED_ACTIVE_STORY_KEY, JSON.stringify({ storyId, userId, videoUrl }));
+        sessionStorage.setItem(VIDEO_FEED_ACTIVE_STORY_KEY, JSON.stringify({ storyId, userId, videoUrl, source: 'rail' }));
       }
     } catch {}
 

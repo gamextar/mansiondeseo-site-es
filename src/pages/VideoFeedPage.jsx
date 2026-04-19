@@ -31,6 +31,7 @@ const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
 const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 68;
+const VIDEO_FEED_RAIL_SOURCE = 'rail';
 
 function getStoryIdentity(story) {
   if (!story) return null;
@@ -51,6 +52,7 @@ function readSavedVideoFeedStory() {
       storyId: String(parsed.storyId || '').trim(),
       userId: String(parsed.userId || '').trim(),
       videoUrl: String(parsed.videoUrl || '').trim(),
+      source: String(parsed.source || '').trim(),
     };
   } catch {
     return null;
@@ -62,10 +64,13 @@ function findSavedStoryIndex(stories, savedStory) {
   const savedStoryId = String(savedStory.storyId || '').trim();
   const savedUserId = String(savedStory.userId || '').trim();
   const savedVideoUrl = String(savedStory.videoUrl || '').trim();
+  const requireExactMatch = savedStory.source === VIDEO_FEED_RAIL_SOURCE;
 
   if (savedStoryId) {
     const byStoryId = stories.findIndex((story) => String(story?.story_id || story?.id || '').trim() === savedStoryId);
-    if (byStoryId >= 0) return byStoryId;
+    if (byStoryId >= 0) {
+      if (!requireExactMatch || !savedVideoUrl || String(stories[byStoryId]?.video_url || '').trim() === savedVideoUrl) return byStoryId;
+    }
   }
 
   if (savedUserId && savedVideoUrl) {
@@ -75,6 +80,8 @@ function findSavedStoryIndex(stories, savedStory) {
     ));
     if (byUserAndVideo >= 0) return byUserAndVideo;
   }
+
+  if (requireExactMatch) return -1;
 
   if (savedUserId) {
     return stories.findIndex((story) => String(story?.user_id || '').trim() === savedUserId);
@@ -1172,7 +1179,15 @@ export default function VideoFeedPage() {
     setActiveDispIdx(nextIndex);
     setBoundaryOverlayIdx(null);
     syncMobileViewportToIndex(nextIndex);
-  }, [requestedStoryUserId, stories, syncMobileViewportToIndex]);
+
+    if (savedStory.source === VIDEO_FEED_RAIL_SOURCE && typeof window !== 'undefined') {
+      [0, 80, 180, 360].forEach((delay) => {
+        window.setTimeout(() => {
+          forceMobileViewportToIndex(nextIndex);
+        }, delay);
+      });
+    }
+  }, [forceMobileViewportToIndex, requestedStoryUserId, stories, syncMobileViewportToIndex]);
 
   useEffect(() => {
     if (!activeStory?.user_id) return;
@@ -1304,7 +1319,7 @@ export default function VideoFeedPage() {
     try {
       sessionStorage.setItem(VIDEO_FEED_INDEX_KEY, String(activeDispIdx));
       if (storyIdentity) {
-        sessionStorage.setItem(VIDEO_FEED_ACTIVE_STORY_KEY, JSON.stringify(storyIdentity));
+        sessionStorage.setItem(VIDEO_FEED_ACTIVE_STORY_KEY, JSON.stringify({ ...storyIdentity, source: 'video' }));
       }
     } catch {}
   }, [activeDispIdx, stories]);
