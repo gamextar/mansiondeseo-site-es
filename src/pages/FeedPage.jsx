@@ -16,6 +16,9 @@ import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStor
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const FEED_CACHE_VERSION = 2;
+// Temporal: while we tune mobile geometry, do not reuse persisted feed data.
+// Flip this back to false when the fullscreen/nav tests are finished.
+const TEMP_DISABLE_FEED_CLIENT_CACHE = true;
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
 const DEFAULT_CARDS_PER_PAGE = 12;
@@ -95,6 +98,7 @@ const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, moti
 });
 
 function getCachedFeed() {
+  if (TEMP_DISABLE_FEED_CLIENT_CACHE) return null;
   try {
     const raw = localStorage.getItem(FEED_CACHE_KEY);
     if (!raw) return null;
@@ -116,6 +120,7 @@ function getCachedFeed() {
 }
 
 function setCachedFeed(data) {
+  if (TEMP_DISABLE_FEED_CLIENT_CACHE) return;
   try {
     localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({
       version: FEED_CACHE_VERSION,
@@ -238,7 +243,11 @@ export default function FeedPage({ initialData }) {
       12,
       Number(pageSize) || (s?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
     );
-    const data = await getProfiles({ fresh: forceFresh, cursor, pageSize: resolvedPageSize });
+    const data = await getProfiles({
+      fresh: TEMP_DISABLE_FEED_CLIENT_CACHE || forceFresh,
+      cursor,
+      pageSize: resolvedPageSize,
+    });
     return { data, resolvedPageSize };
   }, []);
 

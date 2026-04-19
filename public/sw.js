@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mansion-v6';
+const CACHE_NAME = 'mansion-v7-feed-nocache';
 const PRECACHE = ['/', '/index.html'];
 
 self.addEventListener('install', (e) => {
@@ -40,6 +40,11 @@ self.addEventListener('fetch', (e) => {
       (url.pathname === '/' || url.pathname === '/index.html'));
 
   if (isNavigation) {
+    if (url.pathname === '/feed' || url.pathname === '/feed/') {
+      e.respondWith(fetch(request));
+      return;
+    }
+
     e.respondWith(
       caches.open(CACHE_NAME).then((cache) =>
         fetch(request)
