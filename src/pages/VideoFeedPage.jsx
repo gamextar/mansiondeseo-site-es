@@ -1532,7 +1532,7 @@ export default function VideoFeedPage() {
     <div
       className={
         standaloneMobileRoute
-          ? 'relative min-h-mobile-browser-screen overflow-hidden bg-black'
+          ? `relative min-h-mobile-browser-screen bg-black ${isStandaloneMobileApp ? 'overflow-hidden' : ''}`
           : desktopOverlayRoute
             ? 'absolute inset-0 bg-black z-[60]'
             : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'
