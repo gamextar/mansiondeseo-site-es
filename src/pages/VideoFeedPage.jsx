@@ -95,6 +95,11 @@ function detectStandaloneMobile() {
   return Boolean(standalone && isMobile);
 }
 
+function detectMobileViewport() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(max-width: 1023px)').matches;
+}
+
 function normalizeStorySeed(seed) {
   if (!seed || typeof seed !== 'object') return null;
   const userId = String(seed.user_id || seed.id || '').trim();
@@ -879,11 +884,13 @@ export default function VideoFeedPage() {
   const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
   const backgroundLocation = location.state?.backgroundLocation || null;
-  // When opened from a story-bar click (seed provided), skip the cache and start
-  // with ONLY the seed story. This guarantees that stories.length changes 1→N
-  // when the API responds, which triggers the useLayoutEffect scroll-correction
-  // and prevents iOS Safari's scroll-reset from showing the wrong story.
-  const initial = applyPendingStoryLikeState(mergeSeedStory([], requestedStorySeed), getPendingStoryLikes());
+  // On mobile, starting from a single seed story makes the scroll-snap list
+  // morph from 1 item to N items, which changes swipe physics versus /videos.
+  // Keep the seed shortcut for desktop only; mobile waits for the real list.
+  const useSeedInitialStory = requestedStorySeed && !detectMobileViewport();
+  const initial = useSeedInitialStory
+    ? applyPendingStoryLikeState(mergeSeedStory([], requestedStorySeed), getPendingStoryLikes())
+    : [];
 
   const [stories, setStories] = useState(initial);
   const [loading, setLoading] = useState(initial.length === 0);
