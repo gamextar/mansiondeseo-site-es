@@ -1,7 +1,7 @@
 export default function ProfileShellProbePage() {
   return (
     <div
-      className="min-h-screen bg-mansion-base pb-mobile-legacy-nav lg:pb-8"
+      className="min-h-mobile-browser-screen bg-mansion-base pb-mobile-legacy-nav lg:pb-8"
       style={{
         backgroundImage: 'url(/feed-shell-probe.svg?v=2)',
         backgroundSize: '100% 100%',

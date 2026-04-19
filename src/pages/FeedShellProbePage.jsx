@@ -16,7 +16,7 @@ export default function FeedShellProbePage() {
 
   return (
     <div
-      className="min-h-dynamic-screen-with-safe bg-mansion-base pt-navbar lg:pt-0 lg:pb-[84px]"
+      className="min-h-mobile-browser-screen bg-mansion-base lg:pb-[84px]"
       style={{
         paddingBottom: `calc(${Math.max(12, navBottomOffset)}px + env(safe-area-inset-bottom, 0px))`,
         backgroundImage: `url(${PROBE_IMAGE_URL})`,
@@ -25,9 +25,11 @@ export default function FeedShellProbePage() {
         backgroundRepeat: 'no-repeat',
       }}
     >
-      <div className="px-4 pt-4 text-white lg:px-8 lg:pt-8">
-        <div className="inline-flex rounded-full border border-white/35 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] backdrop-blur-sm">
-          Feed Shell Test
+      <div className="pt-navbar lg:pt-0">
+        <div className="px-4 pt-4 text-white lg:px-8 lg:pt-8">
+          <div className="inline-flex rounded-full border border-white/35 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] backdrop-blur-sm">
+            Feed Shell Test
+          </div>
         </div>
       </div>
     </div>

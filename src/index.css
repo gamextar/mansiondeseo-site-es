@@ -137,9 +137,21 @@ body {
     min-height: calc(100dvh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
   }
 
+  .min-h-mobile-browser-screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+    min-height: calc(100dvh + max(0px, calc(100lvh - 100dvh)));
+  }
+
   .h-dynamic-screen {
     height: 100vh;
     height: 100dvh;
+  }
+
+  .h-mobile-browser-screen {
+    height: 100vh;
+    height: 100dvh;
+    height: calc(100dvh + max(0px, calc(100lvh - 100dvh)));
   }
 }
 
