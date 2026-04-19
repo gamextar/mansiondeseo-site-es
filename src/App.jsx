@@ -96,17 +96,19 @@ function AppLayout() {
   const profileOverlayOpen = location.state?.modal === 'profile' && !!backgroundLocation;
   const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
   const routeOverlayOpen = profileOverlayOpen || videoOverlayOpen;
+  const routePath = location.pathname || '/';
+  const normalizedRoutePath = routePath === '/' ? '/' : (routePath.replace(/\/+$/, '') || '/');
   const standaloneVideosRoute = isStandaloneMobileApp && location.pathname.startsWith('/videos');
+  const mobileBrowserVideosRoute = isMobileViewport && normalizedRoutePath === '/videos';
   const isPublicHome = location.pathname === '/';
   const isFullscreen =
     standaloneVideosRoute ||
+    mobileBrowserVideosRoute ||
     FULLSCREEN_PATHS.some((p) => location.pathname.startsWith(p)) ||
     FULLSCREEN_PATHS.includes(location.pathname);
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
   const showChrome = !isFullscreen && !isChatDetail && !isPublicHome;
   const scrollLockRef = useRef(null);
-  const routePath = location.pathname || '/';
-  const normalizedRoutePath = routePath === '/' ? '/' : (routePath.replace(/\/+$/, '') || '/');
   const immersiveMobileApp = Boolean(
     user &&
     isMobileViewport &&
