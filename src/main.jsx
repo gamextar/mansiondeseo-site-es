@@ -32,7 +32,19 @@ function tryRecoverFromAssetFailure() {
     }
     sessionStorage.setItem(ASSET_RECOVERY_KEY, '1');
   } catch {}
-  window.location.reload();
+  void (async () => {
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+    } catch {}
+    window.location.reload();
+  })();
   return true;
 }
 
