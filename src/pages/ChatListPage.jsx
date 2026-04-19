@@ -395,7 +395,7 @@ export default function ChatListPage() {
     <div className="min-h-screen bg-mansion-base pb-mobile-legacy-nav lg:pb-8 pt-navbar pt-mobile-brand-overlay lg:pt-0">
       {/* Header */}
       <motion.div
-        className="px-3 lg:px-8 pt-8 lg:pt-6 pb-3 lg:max-w-3xl lg:mx-auto"
+        className="px-3 lg:px-8 pt-7 lg:pt-6 pb-3 lg:max-w-3xl lg:mx-auto"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
