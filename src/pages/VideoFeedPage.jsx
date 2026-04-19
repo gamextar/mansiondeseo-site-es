@@ -1527,11 +1527,14 @@ export default function VideoFeedPage() {
   }
 
   const desktopOverlayRoute = isOverlayPreview && isDesktopViewport;
+  const mobileBrowserRoute = standaloneMobileRoute && !isStandaloneMobileApp;
 
   return (
     <div
       className={
-        standaloneMobileRoute
+        mobileBrowserRoute
+          ? 'relative min-h-screen bg-mansion-base pb-mobile-legacy-nav lg:pb-8'
+          : standaloneMobileRoute
           ? 'relative min-h-mobile-browser-screen overflow-hidden bg-black'
           : desktopOverlayRoute
             ? 'absolute inset-0 bg-black z-[60]'
@@ -1548,8 +1551,8 @@ export default function VideoFeedPage() {
 
       <div
         className={
-          standaloneMobileRoute && !isStandaloneMobileApp
-            ? 'relative -top-24 h-[calc(100lvh+192px)]'
+          mobileBrowserRoute
+            ? 'absolute inset-0 bg-black'
             : standaloneMobileRoute
               ? 'relative h-mobile-browser-screen'
               : 'relative h-full'
