@@ -30,6 +30,7 @@ const VIEWED_STORY_SYNC_DELAY_MS = 320;
 const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
+const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 84;
 
 function getStoryIdentity(story) {
   if (!story) return null;
@@ -985,6 +986,7 @@ export default function VideoFeedPage() {
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const isStandaloneMobileApp = detectStandaloneMobile();
+  const mobileBrowserRoute = standaloneMobileRoute && !isStandaloneMobileApp;
   const navBottomOffset = isStandaloneMobileApp
     ? getStandaloneBottomNavOffset()
     : getBrowserBottomNavOffset();
@@ -1054,9 +1056,10 @@ export default function VideoFeedPage() {
     if (!standaloneMobileRoute || typeof window === 'undefined') return undefined;
 
     const resetPageScroll = () => {
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
+      const nextScrollTop = mobileBrowserRoute ? MOBILE_BROWSER_VIDEO_SCROLL_OFFSET : 0;
+      window.scrollTo(0, nextScrollTop);
+      document.documentElement.scrollTop = nextScrollTop;
+      document.body.scrollTop = nextScrollTop;
     };
 
     resetPageScroll();
@@ -1070,10 +1073,10 @@ export default function VideoFeedPage() {
     return () => {
       if (rafA) window.cancelAnimationFrame(rafA);
     };
-  }, [location.key, standaloneMobileRoute]);
+  }, [location.key, mobileBrowserRoute, standaloneMobileRoute]);
 
   useEffect(() => {
-    if (!standaloneMobileRoute || typeof window === 'undefined') return undefined;
+    if (!standaloneMobileRoute || !isStandaloneMobileApp || typeof window === 'undefined') return undefined;
 
     const { style: bodyStyle } = document.body;
     const { style: htmlStyle } = document.documentElement;
@@ -1093,7 +1096,7 @@ export default function VideoFeedPage() {
       bodyStyle.overscrollBehavior = previousBodyOverscroll;
       htmlStyle.overscrollBehavior = previousHtmlOverscroll;
     };
-  }, [standaloneMobileRoute]);
+  }, [isStandaloneMobileApp, standaloneMobileRoute]);
 
   const refreshStories = useCallback(async () => {
     const data = await getStories({ focusUserId: requestedStoryUserId || '' });
@@ -1527,7 +1530,6 @@ export default function VideoFeedPage() {
   }
 
   const desktopOverlayRoute = isOverlayPreview && isDesktopViewport;
-  const mobileBrowserRoute = standaloneMobileRoute && !isStandaloneMobileApp;
 
   return (
     <div
