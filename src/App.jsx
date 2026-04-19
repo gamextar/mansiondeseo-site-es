@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate } from '
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAgeVerified } from './hooks/useAgeVerified';
 import AgeVerificationModal from './components/AgeVerificationModal';
-import Navbar from './components/Navbar';
+import Navbar, { MobileBrandOverlay } from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import DesktopSidebar from './components/DesktopSidebar';
 import FeedPage from './pages/FeedPage';
@@ -126,10 +126,9 @@ function AppLayout() {
       normalizedRoutePath === '/safe-area-debug'
     )
   );
-  const compactTopSpacingForMobileImmersive = immersiveMobileApp;
-  const hideTopNavbarForMobileImmersive = immersiveMobileApp && normalizedRoutePath === '/videos';
+  const showMobileBrandOverlay = immersiveMobileApp && normalizedRoutePath !== '/videos';
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
-  const showTopNavbar = showChrome && !routeOverlayOpen && !hideTopNavbarForMobileImmersive;
+  const showTopNavbar = showChrome && !routeOverlayOpen && !immersiveMobileApp;
   const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
   const isPrivateNoindexRoute =
     routePath === '/feed' ||
@@ -298,11 +297,11 @@ function AppLayout() {
     <>
       {showDesktopSidebar && <DesktopSidebar />}
       {showTopNavbar && <Navbar />}
+      {showChrome && !routeOverlayOpen && showMobileBrandOverlay && <MobileBrandOverlay />}
 
       <div
         className={showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : ''}
         data-mobile-immersive={immersiveMobileApp ? 'true' : undefined}
-        data-mobile-compact-top={compactTopSpacingForMobileImmersive ? 'true' : undefined}
         data-mobile-standalone={isStandaloneMobileApp ? 'true' : undefined}
       >
         <Suspense
