@@ -1535,7 +1535,7 @@ export default function VideoFeedPage() {
     <div
       className={
         mobileBrowserRoute
-          ? 'relative min-h-[calc(100vh+130px)] bg-mansion-base pb-mobile-legacy-nav lg:pb-8'
+          ? 'relative min-h-[calc(100vh+125px)] bg-mansion-base pb-mobile-legacy-nav lg:pb-8'
           : standaloneMobileRoute
           ? 'relative min-h-mobile-browser-screen overflow-hidden bg-black'
           : desktopOverlayRoute
