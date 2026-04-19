@@ -30,7 +30,7 @@ const VIEWED_STORY_SYNC_DELAY_MS = 320;
 const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
-const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 70;
+const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 68;
 
 function getStoryIdentity(story) {
   if (!story) return null;
