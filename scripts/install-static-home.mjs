@@ -32,6 +32,7 @@ const appRoutes = new Set([
   'ranking',
   'recuperar-contrasena',
   'registro',
+  'safe-area-debug',
   'seguidores',
   'videos',
   'vip',

@@ -17,6 +17,7 @@ import BlackScreenPage from './pages/BlackScreenPage';
 import MobileFullScreenProbePage from './pages/MobileFullScreenProbePage';
 import FeedShellProbePage from './pages/FeedShellProbePage';
 import ProfileShellProbePage from './pages/ProfileShellProbePage';
+import SafeAreaDebugPage from './pages/SafeAreaDebugPage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
@@ -121,7 +122,8 @@ function AppLayout() {
       normalizedRoutePath === '/mensajes' ||
       normalizedRoutePath === '/full-mobile-test' ||
       normalizedRoutePath === '/feed-shell-test' ||
-      normalizedRoutePath === '/profile-shell-test'
+      normalizedRoutePath === '/profile-shell-test' ||
+      normalizedRoutePath === '/safe-area-debug'
     )
   );
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
@@ -134,6 +136,7 @@ function AppLayout() {
     routePath === '/full-mobile-test' ||
     routePath === '/feed-shell-test' ||
     routePath === '/profile-shell-test' ||
+    routePath === '/safe-area-debug' ||
     routePath === '/ranking' ||
     routePath === '/perfil' ||
     routePath === '/favoritos' ||
@@ -406,6 +409,14 @@ function AppLayout() {
             element={
               <RequireRegistration>
                 <ProfileShellProbePage />
+              </RequireRegistration>
+            }
+          />
+          <Route
+            path="/safe-area-debug"
+            element={
+              <RequireRegistration>
+                <SafeAreaDebugPage />
               </RequireRegistration>
             }
           />
