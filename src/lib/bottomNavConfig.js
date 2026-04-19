@@ -8,24 +8,39 @@ export const BOTTOM_NAV_SIDE_PADDING = 8;
 export const BOTTOM_NAV_OPACITY = 40;
 export const BOTTOM_NAV_BLUR = 24;
 
+function readRuntimeNumberOverride(name, fallback) {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = new URLSearchParams(window.location.search).get(name);
+    if (raw === null || raw === '') return fallback;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function getBottomNavHeight(isStandalone = false) {
-  return isStandalone ? STANDALONE_BOTTOM_NAV_HEIGHT : BOTTOM_NAV_HEIGHT;
+  const fallback = isStandalone ? STANDALONE_BOTTOM_NAV_HEIGHT : BOTTOM_NAV_HEIGHT;
+  return readRuntimeNumberOverride('nav_height', fallback);
 }
 
 export function getBottomNavVisualOffset(isStandalone = false) {
-  return isStandalone ? STANDALONE_BOTTOM_NAV_VISUAL_OFFSET : BOTTOM_NAV_VISUAL_OFFSET;
+  const fallback = isStandalone ? STANDALONE_BOTTOM_NAV_VISUAL_OFFSET : BOTTOM_NAV_VISUAL_OFFSET;
+  return readRuntimeNumberOverride('nav_visual', fallback);
 }
 
 export function getBottomNavPageExtraPadding(isStandalone = false) {
-  return isStandalone ? STANDALONE_BOTTOM_NAV_PAGE_EXTRA_PADDING : BOTTOM_NAV_PAGE_EXTRA_PADDING;
+  const fallback = isStandalone ? STANDALONE_BOTTOM_NAV_PAGE_EXTRA_PADDING : BOTTOM_NAV_PAGE_EXTRA_PADDING;
+  return readRuntimeNumberOverride('nav_extra', fallback);
 }
 
 export function getStandaloneBottomNavOffset() {
-  return `${STANDALONE_BOTTOM_NAV_HEIGHT + STANDALONE_BOTTOM_NAV_VISUAL_OFFSET + STANDALONE_BOTTOM_NAV_PAGE_EXTRA_PADDING}px`;
+  return `${getBottomNavHeight(true) + getBottomNavVisualOffset(true) + getBottomNavPageExtraPadding(true)}px`;
 }
 
 export function getBrowserBottomNavOffset() {
-  return `calc(env(safe-area-inset-bottom, 0px) + ${BOTTOM_NAV_VISUAL_OFFSET}px + ${BOTTOM_NAV_HEIGHT}px + ${BOTTOM_NAV_PAGE_EXTRA_PADDING}px)`;
+  return `calc(env(safe-area-inset-bottom, 0px) + ${getBottomNavVisualOffset(false)}px + ${getBottomNavHeight(false)}px + ${getBottomNavPageExtraPadding(false)}px)`;
 }
 
 export function getBottomNavPagePadding(isStandalone = false) {
@@ -34,10 +49,10 @@ export function getBottomNavPagePadding(isStandalone = false) {
 
 export function applyBottomNavCssVariables(root) {
   if (!root) return;
-  root.style.setProperty('--bottom-nav-height', `${BOTTOM_NAV_HEIGHT}px`);
-  root.style.setProperty('--bottom-nav-visual-offset', `${BOTTOM_NAV_VISUAL_OFFSET}px`);
-  root.style.setProperty('--bottom-nav-page-extra-padding', `${BOTTOM_NAV_PAGE_EXTRA_PADDING}px`);
-  root.style.setProperty('--standalone-bottom-nav-height', `${STANDALONE_BOTTOM_NAV_HEIGHT}px`);
-  root.style.setProperty('--standalone-bottom-nav-visual-offset', `${STANDALONE_BOTTOM_NAV_VISUAL_OFFSET}px`);
-  root.style.setProperty('--standalone-bottom-nav-page-extra-padding', `${STANDALONE_BOTTOM_NAV_PAGE_EXTRA_PADDING}px`);
+  root.style.setProperty('--bottom-nav-height', `${getBottomNavHeight(false)}px`);
+  root.style.setProperty('--bottom-nav-visual-offset', `${getBottomNavVisualOffset(false)}px`);
+  root.style.setProperty('--bottom-nav-page-extra-padding', `${getBottomNavPageExtraPadding(false)}px`);
+  root.style.setProperty('--standalone-bottom-nav-height', `${getBottomNavHeight(true)}px`);
+  root.style.setProperty('--standalone-bottom-nav-visual-offset', `${getBottomNavVisualOffset(true)}px`);
+  root.style.setProperty('--standalone-bottom-nav-page-extra-padding', `${getBottomNavPageExtraPadding(true)}px`);
 }
