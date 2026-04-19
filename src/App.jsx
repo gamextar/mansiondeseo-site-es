@@ -131,7 +131,7 @@ function AppLayout() {
   const showMobileBrandOverlay = immersiveMobileApp && normalizedRoutePath !== '/videos';
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const showTopNavbar = showChrome && !routeOverlayOpen && !immersiveMobileApp;
-  const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);
+  const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute || mobileBrowserVideosRoute) && !routeOverlayOpen);
   const isPrivateNoindexRoute =
     routePath === '/feed' ||
     routePath === '/explorar' ||
