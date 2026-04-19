@@ -52,7 +52,7 @@ const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const NON_DEFAULT_ROUTE_LOCALES = getRouteEnabledSeoLocales().filter((locale) => locale.pathPrefix);
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
-const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/mensajes/', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
+const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -126,7 +126,7 @@ function AppLayout() {
       normalizedRoutePath === '/safe-area-debug'
     )
   );
-  const showMobileBrandOverlay = immersiveMobileApp && normalizedRoutePath !== '/videos';
+  const showMobileBrandOverlay = immersiveMobileApp;
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const showTopNavbar = showChrome && !routeOverlayOpen && !immersiveMobileApp;
   const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute) && !routeOverlayOpen);

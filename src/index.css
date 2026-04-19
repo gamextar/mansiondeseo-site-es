@@ -160,6 +160,10 @@ body {
     padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
   }
 
+  .pt-mobile-brand-overlay {
+    padding-top: 40px;
+  }
+
   .pb-mobile-legacy-nav {
     padding-bottom: calc(
       env(safe-area-inset-bottom, 0px) +

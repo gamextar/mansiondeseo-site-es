@@ -9,7 +9,7 @@ export function MobileBrandOverlay() {
       className="fixed top-0 left-0 right-0 z-50 lg:hidden pointer-events-none"
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
-      <div className="max-w-7xl mx-auto pl-1.5 pr-3 h-10 flex items-center">
+      <div className="max-w-7xl mx-auto pl-0 pr-3 h-10 flex items-center">
         <Link
           to="/feed"
           className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-black/28 px-2.5 py-1.5 backdrop-blur-md"

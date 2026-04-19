@@ -402,7 +402,7 @@ export default function ProfilePage() {
   } : null;
 
   return (
-    <div className="min-h-screen bg-mansion-base pb-mobile-legacy-nav lg:pb-8 pt-navbar lg:pt-0">
+    <div className="min-h-screen bg-mansion-base pb-mobile-legacy-nav lg:pb-8 pt-navbar pt-mobile-brand-overlay lg:pt-0">
       {cropFile && (
         <ImageCropper
           file={cropFile}
