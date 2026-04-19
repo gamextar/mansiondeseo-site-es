@@ -1740,26 +1740,24 @@ export default function VideoFeedPage() {
                 data-video-feed-slide="true"
                 className={mobileDocumentScrollRoute ? 'h-mobile-browser-screen w-full snap-start snap-always' : 'h-full w-full flex-shrink-0'}
               >
-                <div className={mobileDocumentScrollRoute ? 'relative -top-16 h-[calc(100%+128px)] w-full' : 'h-full w-full'}>
-                  <StoryCard
-                    story={story}
-                    videoSrc={story.video_url}
-                    isActive={displayIndex === activeDispIdx}
-                    shouldLoad={shouldLoad}
-                    isMuted={isMuted}
-                    avatarSize={avatarSize}
-                    onLike={handleLike}
-                    navigate={navigate}
-                    gradientHeight={gradientHeight}
-                    gradientOpacity={gradientOpacity}
-                    resetOnDeactivate
-                    onGift={openGiftModal}
-                    isOwnStory={String(story.user_id) === String(user?.id)}
-                    onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
-                    enableCinematicReveal={enableCinematicReveal}
-                    pauseOnAppBackground
-                  />
-                </div>
+                <StoryCard
+                  story={story}
+                  videoSrc={story.video_url}
+                  isActive={displayIndex === activeDispIdx}
+                  shouldLoad={shouldLoad}
+                  isMuted={isMuted}
+                  avatarSize={avatarSize}
+                  onLike={handleLike}
+                  navigate={navigate}
+                  gradientHeight={gradientHeight}
+                  gradientOpacity={gradientOpacity}
+                  resetOnDeactivate
+                  onGift={openGiftModal}
+                  isOwnStory={String(story.user_id) === String(user?.id)}
+                  onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
+                  enableCinematicReveal={enableCinematicReveal}
+                  pauseOnAppBackground
+                />
               </div>
             );
           })}
