@@ -132,6 +132,11 @@ body {
     min-height: 100dvh;
   }
 
+  .min-h-dynamic-screen-with-safe {
+    min-height: calc(100vh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
+    min-height: calc(100dvh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
+  }
+
   .h-dynamic-screen {
     height: 100vh;
     height: 100dvh;

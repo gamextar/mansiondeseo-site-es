@@ -16,7 +16,7 @@ export default function FeedShellProbePage() {
 
   return (
     <div
-      className="min-h-dynamic-screen bg-mansion-base pt-navbar lg:pt-0 lg:pb-[84px]"
+      className="min-h-dynamic-screen-with-safe bg-mansion-base pt-navbar lg:pt-0 lg:pb-[84px]"
       style={{
         paddingBottom: `calc(${Math.max(12, navBottomOffset)}px + env(safe-area-inset-bottom, 0px))`,
         backgroundImage: `url(${PROBE_IMAGE_URL})`,
