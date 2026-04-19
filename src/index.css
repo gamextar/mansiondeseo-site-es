@@ -161,7 +161,7 @@ body {
   }
 
   .pb-mobile-legacy-nav {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 80px + 8px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 80px + 7px);
   }
 
   [data-mobile-standalone="true"] .pb-mobile-legacy-nav {
