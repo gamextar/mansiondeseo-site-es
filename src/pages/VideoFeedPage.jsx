@@ -1547,7 +1547,13 @@ export default function VideoFeedPage() {
       />
 
       <div
-        className={standaloneMobileRoute ? 'relative h-mobile-browser-screen' : 'relative h-full'}
+        className={
+          standaloneMobileRoute && !isStandaloneMobileApp
+            ? 'relative -top-16 h-[calc(100lvh+128px)]'
+            : standaloneMobileRoute
+              ? 'relative h-mobile-browser-screen'
+              : 'relative h-full'
+        }
       >
         {isDesktopViewport && (
           <div
@@ -1674,7 +1680,6 @@ export default function VideoFeedPage() {
                   onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
                   enableCinematicReveal={enableCinematicReveal}
                   pauseOnAppBackground
-                  videoScale={1.1}
                 />
               </div>
             );
