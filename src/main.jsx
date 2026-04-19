@@ -69,6 +69,10 @@ if (typeof document !== 'undefined') {
 }
 
 if (typeof window !== 'undefined') {
+  if ('scrollRestoration' in window.history) {
+    window.history.scrollRestoration = 'manual';
+  }
+
   const debugFlags = getBootDebugFlags();
   const isAppHomePath =
     window.location.pathname === '/' ||

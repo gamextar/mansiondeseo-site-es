@@ -62,6 +62,18 @@ function detectStandaloneMobile() {
   return Boolean(standalone && isMobile);
 }
 
+function resetDocumentScrollToTop() {
+  if (typeof window === 'undefined') return;
+  const root = document.documentElement;
+  const body = document.body;
+  const previousScrollBehavior = root.style.scrollBehavior;
+  root.style.scrollBehavior = 'auto';
+  window.scrollTo(0, 0);
+  root.scrollTop = 0;
+  if (body) body.scrollTop = 0;
+  root.style.scrollBehavior = previousScrollBehavior;
+}
+
 function RequireRegistration({ children }) {
   const { registered } = useAuth();
   if (!registered) return <Navigate to="/bienvenida" replace />;
@@ -226,7 +238,7 @@ function AppLayout() {
 
   // Reset scroll to top on every route change, EXCEPT when opening/closing
   // a profile overlay (which manages scroll lock/restore itself).
-  const prevPathnameRef = useRef(location.pathname);
+  const prevPathnameRef = useRef(null);
   useLayoutEffect(() => {
     const prev = prevPathnameRef.current;
     prevPathnameRef.current = location.pathname;
@@ -234,7 +246,27 @@ function AppLayout() {
     if (location.state?.backgroundLocation) return; // closing overlay — App handles it
     if (prev === location.pathname) return; // same route, no reset
     if (isMobileViewport && normalizedRoutePath === '/videos') return; // video feed owns its mobile browser offset
-    window.scrollTo(0, 0);
+    resetDocumentScrollToTop();
+
+    const shouldStabilizeMobileScroll =
+      isMobileViewport &&
+      (normalizedRoutePath === '/perfil' || normalizedRoutePath === '/mensajes');
+
+    if (!shouldStabilizeMobileScroll) return undefined;
+
+    let rafA = 0;
+    let rafB = 0;
+    const timers = [80, 180, 360].map((delay) => window.setTimeout(resetDocumentScrollToTop, delay));
+    rafA = window.requestAnimationFrame(() => {
+      resetDocumentScrollToTop();
+      rafB = window.requestAnimationFrame(resetDocumentScrollToTop);
+    });
+
+    return () => {
+      if (rafA) window.cancelAnimationFrame(rafA);
+      if (rafB) window.cancelAnimationFrame(rafB);
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+    };
   }, [isMobileViewport, location.pathname, location.state, normalizedRoutePath, routeOverlayOpen]);
 
   useEffect(() => {
