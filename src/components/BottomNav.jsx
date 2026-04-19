@@ -59,6 +59,7 @@ export default function BottomNav({ immersive = false }) {
   const borderColor = `rgba(255,255,255,${(0.08 * BOTTOM_NAV_OPACITY / 100).toFixed(3)})`;
   const shadowColor = `rgba(0,0,0,${(0.4 * BOTTOM_NAV_OPACITY / 100).toFixed(3)})`;
   const blurAmount = BOTTOM_NAV_OPACITY <= 0 ? '0px' : `${BOTTOM_NAV_BLUR}px`;
+  const showNavDebug = new URLSearchParams(location.search).get('nav_debug') === '1';
 
   useEffect(() => () => {
     if (!pendingNavResetRef.current || typeof window === 'undefined') return;
@@ -133,6 +134,16 @@ export default function BottomNav({ immersive = false }) {
         isolation: 'isolate',
       }}
     >
+      {showNavDebug && (
+        <div className="absolute left-2 bottom-full mb-2 rounded-xl border border-amber-300/60 bg-black/85 px-3 py-2 text-[10px] font-mono leading-4 text-amber-100 shadow-2xl backdrop-blur-md">
+          <div>nav_debug=1</div>
+          <div>mode: {isStandaloneMobileApp ? 'standalone' : 'browser'}</div>
+          <div>immersive: {immersive ? 'true' : 'false'}</div>
+          <div>height: {effectiveNavHeight}px</div>
+          <div>bottomPadding: {bottomPaddingPx}px</div>
+          <div>sidePadding: {outerSidePadding}px</div>
+        </div>
+      )}
       <div
         className={`pointer-events-auto w-full border ${
           isStandaloneMobileApp ? 'rounded-[1.9rem]' : 'rounded-[2.35rem]'
