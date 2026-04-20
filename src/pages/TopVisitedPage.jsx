@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Crown, Eye, MapPin, Shield, Trophy } from 'lucide-react';
 import { getTopVisitedProfiles, peekTopVisitedProfiles } from '../lib/api';
 import { formatLocation } from '../lib/location';
@@ -38,12 +38,22 @@ function buildPreview(profile) {
 }
 
 function RankCard({ profile, compact = false, safariDesktop = false, imageLoading = 'lazy' }) {
+  const routerLocation = useLocation();
   const location = formatLocation(profile);
+  const useOverlayNavigation = typeof window !== 'undefined' && window.innerWidth >= 1024;
 
   return (
     <Link
       to={`/perfiles/${profile.id}`}
-      state={{ preview: buildPreview(profile) }}
+      state={{
+        ...(useOverlayNavigation ? {
+          backgroundLocation: routerLocation,
+          backgroundScrollY: window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0,
+          modal: 'profile',
+        } : {}),
+        from: `${routerLocation.pathname}${routerLocation.search}${routerLocation.hash}`,
+        preview: buildPreview(profile),
+      }}
       className={`group rounded-[2rem] border border-[#352d25] bg-[linear-gradient(180deg,rgba(24,20,18,0.96),rgba(14,12,12,0.96))] shadow-[0_18px_40px_rgba(0,0,0,0.18)] transition-all ${safariDesktop ? '' : 'duration-300 hover:-translate-y-1 hover:border-[#5a4a33] hover:bg-[linear-gradient(180deg,rgba(28,24,21,0.98),rgba(16,14,14,0.98))]'} ${compact ? 'p-4' : 'p-5'}`}
     >
       <div className="flex items-start gap-4">

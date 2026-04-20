@@ -149,6 +149,29 @@ export default function ChatPage() {
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
   const backTarget = location.state?.from || '/mensajes';
+  const desktopProfileOverlayState = partner ? {
+    backgroundLocation: location,
+    backgroundScrollY: window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0,
+    modal: 'profile',
+    from: `${location.pathname}${location.search}${location.hash}`,
+    returnState: location.state || null,
+    preview: {
+      id: partnerId,
+      name: partner.name,
+      age: partner.age,
+      city: partner.city,
+      province: partner.province,
+      locality: partner.locality,
+      role: partner.role,
+      photos: partner.photos || [],
+      avatar_url: partner.avatar_url,
+      avatar_crop: partner.avatar_crop || null,
+      online: partner.online,
+      premium: partner.premium,
+      blurred: partner.blurred,
+      visiblePhotos: partner.visiblePhotos,
+    },
+  } : null;
 
   // Format DO message to UI format
   function formatMsg(msg) {
@@ -623,26 +646,7 @@ export default function ChatPage() {
           </button>
 
           <div className="relative flex-shrink-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`, {
-            state: {
-              from: location.pathname,
-              returnState: location.state || null,
-              preview: partner ? {
-                id: partnerId,
-                name: partner.name,
-                age: partner.age,
-                city: partner.city,
-                province: partner.province,
-                locality: partner.locality,
-                role: partner.role,
-                photos: partner.photos || [],
-                avatar_url: partner.avatar_url,
-                avatar_crop: partner.avatar_crop || null,
-                online: partner.online,
-                premium: partner.premium,
-                blurred: partner.blurred,
-                visiblePhotos: partner.visiblePhotos,
-              } : null,
-            },
+            state: desktopProfileOverlayState,
           })}>
             <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-mansion-border/40">
               <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt={partner.name} className="w-full h-full" />
@@ -653,26 +657,7 @@ export default function ChatPage() {
           </div>
 
           <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`, {
-            state: {
-              from: location.pathname,
-              returnState: location.state || null,
-              preview: partner ? {
-                id: partnerId,
-                name: partner.name,
-                age: partner.age,
-                city: partner.city,
-                province: partner.province,
-                locality: partner.locality,
-                role: partner.role,
-                photos: partner.photos || [],
-                avatar_url: partner.avatar_url,
-                avatar_crop: partner.avatar_crop || null,
-                online: partner.online,
-                premium: partner.premium,
-                blurred: partner.blurred,
-                visiblePhotos: partner.visiblePhotos,
-              } : null,
-            },
+            state: desktopProfileOverlayState,
           })}>
             <h2 className="font-semibold text-sm text-text-primary truncate">{partner.name}</h2>
             <p className={`text-[11px] ${partnerTyping ? 'text-mansion-gold' : partner.online ? 'text-green-400' : 'text-text-dim'}`}>

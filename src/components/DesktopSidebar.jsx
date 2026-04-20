@@ -44,6 +44,14 @@ export default function DesktopSidebar() {
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
   if (hiddenPaths.some((p) => location.pathname.startsWith(p))) return null;
 
+  const buildDesktopProfileOverlayState = (preview) => ({
+    backgroundLocation: location,
+    backgroundScrollY: window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0,
+    modal: 'profile',
+    from: `${location.pathname}${location.search}${location.hash}`,
+    preview,
+  });
+
   return (
     <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 xl:w-72 z-40 flex-col bg-mansion-card/50 border-r border-mansion-border/30 backdrop-blur-xl">
       {/* Logo */}
@@ -176,7 +184,7 @@ export default function DesktopSidebar() {
             {visitors.slice(0, 5).map((v) => (
               <button
                 key={v.id}
-                onClick={() => navigate(`/perfiles/${v.id}`, { state: { preview: { id: v.id, name: v.name, age: v.age, city: v.city, province: v.province, locality: v.locality, role: v.role, photos: [], avatar_url: v.avatar_url, avatar_crop: v.avatar_crop || null, online: v.online, premium: v.premium } } })}
+                onClick={() => navigate(`/perfiles/${v.id}`, { state: buildDesktopProfileOverlayState({ id: v.id, name: v.name, age: v.age, city: v.city, province: v.province, locality: v.locality, role: v.role, photos: [], avatar_url: v.avatar_url, avatar_crop: v.avatar_crop || null, online: v.online, premium: v.premium }) })}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-mansion-elevated/50 transition-all group"
               >
                 <div className="w-8 h-8 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0">
