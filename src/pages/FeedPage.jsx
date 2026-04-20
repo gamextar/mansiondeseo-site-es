@@ -463,6 +463,9 @@ export default function FeedPage({ initialData }) {
   const storyProfiles = homeStories.length > 0 ? homeStories : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = isDesktopViewport ? STORY_RAIL_GAP_DESKTOP_PX : STORY_RAIL_GAP_MOBILE_PX;
+  if (typeof window !== 'undefined' && typeof console !== 'undefined') {
+    console.debug('Story rail gap (desktop/mobile):', STORY_RAIL_GAP_DESKTOP_PX, STORY_RAIL_GAP_MOBILE_PX, 'used:', storyCircleGap);
+  }
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
   const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleInnerGap ?? 3)) / 100));
   const storyCircleSlotWidth = isDesktopViewport ? storyCircleSize + 6 : storyCircleSize;
@@ -1070,6 +1073,7 @@ export default function FeedPage({ initialData }) {
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true)}
+                data-story-gap={(getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true).marginRight ?? 0)}
               >
                 <div className="relative">
                   <button
@@ -1125,6 +1129,7 @@ export default function FeedPage({ initialData }) {
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true)}
+                data-story-gap={(getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true).marginRight ?? 0)}
               >
                 <div className="relative">
                   <button
@@ -1180,6 +1185,7 @@ export default function FeedPage({ initialData }) {
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true)}
+                data-story-gap={(getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true).marginRight ?? 0)}
               >
                 <div className="relative">
                   <button
@@ -1240,15 +1246,17 @@ export default function FeedPage({ initialData }) {
             const size = storyCircleSize;
             const border = storyCircleBorder;
             const innerGap = storyCircleInnerGap;
+            const itemStyle = getStoryRailItemStyle(
+              storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined,
+              index === orderedStoryProfiles.length - 1
+            );
             return safariDesktop ? (
               <div
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={getStoryRailItemStyle(
-                  storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined,
-                  index === orderedStoryProfiles.length - 1
-                )}
+                style={itemStyle}
+                data-story-gap={itemStyle.marginRight ?? 0}
               >
                 <button
                   type="button"
@@ -1282,10 +1290,8 @@ export default function FeedPage({ initialData }) {
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={getStoryRailItemStyle(
-                  storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined,
-                  index === orderedStoryProfiles.length - 1
-                )}
+                style={itemStyle}
+                data-story-gap={itemStyle.marginRight ?? 0}
               >
                 <button
                   type="button"
