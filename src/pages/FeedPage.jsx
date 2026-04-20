@@ -468,7 +468,7 @@ export default function FeedPage({ initialData }) {
   const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleInnerGap ?? 3)) / 100));
   const storyCircleSlotWidth = isDesktopViewport ? storyCircleSize + 6 : storyCircleSize;
   const ownStorySlotWidth = storyCircleSlotWidth;
-  const ownStoryPlusRight = 0;
+  const ownStoryPlusRight = isDesktopViewport ? 0 : storyCircleGap;
 
   const goToFeedPage = useCallback(async (page) => {
     const safePage = Math.max(1, Math.min(totalPages, Number(page) || 1));
@@ -1030,7 +1030,7 @@ export default function FeedPage({ initialData }) {
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="relative -top-[2px] text-text-muted text-sm lg:text-base font-medium">Video Cards</p>
         </div>
-        <div className="pl-[2px] pr-[8px] lg:px-0">
+        <div className="pl-[2px] pr-[3px] lg:px-0">
           <AnimatedBlock
             ref={storiesScrollRef}
             className={`flex overflow-x-auto scrollbar-hide pb-2 select-none ${desktopStoryRailEnhanced ? 'lg:cursor-grab active:lg:cursor-grabbing' : ''}`}
