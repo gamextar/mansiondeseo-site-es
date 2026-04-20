@@ -461,7 +461,9 @@ export default function FeedPage({ initialData }) {
   );
   const storyProfiles = homeStories.length > 0 ? homeStories : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
-  const storyCircleGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100) - 3);
+  const storyCircleGap = isDesktopViewport
+    ? Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100) - 3)
+    : 6;
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
   const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleInnerGap ?? 3)) / 100));
 
