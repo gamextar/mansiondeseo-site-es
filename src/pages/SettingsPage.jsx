@@ -18,6 +18,7 @@ import {
   STANDALONE_BOTTOM_NAV_PAGE_EXTRA_PADDING,
   STANDALONE_BOTTOM_NAV_VISUAL_OFFSET,
 } from '../lib/bottomNavConfig';
+import { STORY_RAIL_GAP_DESKTOP_PX, STORY_RAIL_GAP_MOBILE_PX } from '../lib/storyRailConfig';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -91,7 +92,6 @@ export default function SettingsPage() {
   const [storyCirclePresetMedium, setStoryCirclePresetMedium] = useState(88);
   const [storyCirclePresetLarge, setStoryCirclePresetLarge] = useState(104);
   const [storyCirclePresetXl, setStoryCirclePresetXl] = useState(154);
-  const [storyCircleGap, setStoryCircleGap] = useState(8);
   const [storyCircleBorder, setStoryCircleBorder] = useState(4);
   const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
   const [homeStoryCountMobile, setHomeStoryCountMobile] = useState(15);
@@ -181,7 +181,7 @@ export default function SettingsPage() {
   const activeStoryPresetBorder = storyPresetEditor === 'xl' ? sidebarStoryRingWidth : storyCircleBorder;
   const activeStoryPresetRingPx = Math.max(1, Math.round((activeStoryPreset.size * activeStoryPresetBorder) / 100));
   const activeStoryPresetInnerGapPx = Math.max(0, Math.round((activeStoryPreset.size * storyCircleInnerGap) / 100));
-  const storyCircleGapPx = Math.max(0, Math.round((storyCirclePresetMedium * storyCircleGap) / 100));
+  const storyCircleGapPx = STORY_RAIL_GAP_DESKTOP_PX;
   const storyCircleBorderPx = Math.max(1, Math.round((storyCirclePresetMedium * storyCircleBorder) / 100));
   const storyCircleInnerGapPx = Math.max(0, Math.round((storyCirclePresetMedium * storyCircleInnerGap) / 100));
 
@@ -257,7 +257,6 @@ export default function SettingsPage() {
         setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? s.storyCircleSize ?? 88);
         setStoryCirclePresetLarge(s.storyCirclePresetLarge ?? 104);
         setStoryCirclePresetXl(s.storyCirclePresetXl ?? s.sidebarAvatarSize ?? 154);
-        setStoryCircleGap(s.storyCircleGap ?? 8);
         setStoryCircleBorder(s.storyCircleBorder ?? 4);
         setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
         setHomeStoryCountMobile(s.homeStoryCountMobile ?? 15);
@@ -419,7 +418,6 @@ export default function SettingsPage() {
         story_circle_preset_large: nextPresetLarge,
         story_circle_preset_xl: nextPresetXl,
         sidebar_avatar_size: nextPresetXl,
-        story_circle_gap: storyCircleGap,
         story_circle_border: storyCircleBorder,
         story_circle_inner_gap: storyCircleInnerGap,
         home_story_count_mobile: homeStoryCountMobile,
@@ -489,7 +487,6 @@ export default function SettingsPage() {
       setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? s.storyCircleSize ?? 88);
       setStoryCirclePresetLarge(s.storyCirclePresetLarge ?? 104);
       setStoryCirclePresetXl(s.storyCirclePresetXl ?? s.sidebarAvatarSize ?? 154);
-      setStoryCircleGap(s.storyCircleGap ?? 8);
       setStoryCircleBorder(s.storyCircleBorder ?? 4);
       setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
       setHomeStoryCountMobile(s.homeStoryCountMobile ?? 15);
@@ -2008,24 +2005,6 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                    <Navigation className="w-4 h-4 text-mansion-gold" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-text-primary">Separación entre stories</h3>
-                    <p className="text-[11px] text-text-dim">Valor global relativo al tamaño del avatar</p>
-                  </div>
-                </div>
-                <input type="range" min="0" max="30" value={storyCircleGap} onChange={e => setStoryCircleGap(Number(e.target.value))} className="w-full accent-mansion-gold" />
-                <div className="flex justify-between text-[11px] text-text-dim mt-1">
-                  <span>0%</span>
-                  <span className="text-mansion-gold font-medium">{storyCircleGap}%</span>
-                  <span>30%</span>
-                </div>
-                <p className="mt-2 text-[11px] text-text-dim">Equivale a {storyCircleGapPx}px con un avatar de {storyCirclePresetMedium}px en Stories.</p>
-              </div>
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
@@ -2063,7 +2042,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                     <p className="text-[10px] text-text-dim">Separación</p>
-                    <p className="text-sm font-semibold text-text-primary">{storyCircleGapPx}px</p>
+                    <p className="text-sm font-semibold text-text-primary">{STORY_RAIL_GAP_MOBILE_PX}px mobile / {storyCircleGapPx}px desktop</p>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                     <p className="text-[10px] text-text-dim">Anillo</p>

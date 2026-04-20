@@ -12,6 +12,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
 import { getBottomNavPagePadding } from '../lib/bottomNavConfig';
+import { STORY_RAIL_GAP_DESKTOP_PX, STORY_RAIL_GAP_MOBILE_PX } from '../lib/storyRailConfig';
 import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsers, getViewedStoryUsersKey } from '../lib/storyViews';
 
 const FEED_CACHE_KEY = 'mansion_feed';
@@ -461,14 +462,12 @@ export default function FeedPage({ initialData }) {
   );
   const storyProfiles = homeStories.length > 0 ? homeStories : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
-  const storyCircleGap = isDesktopViewport
-    ? Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100) - 3)
-    : 5;
+  const storyCircleGap = isDesktopViewport ? STORY_RAIL_GAP_DESKTOP_PX : STORY_RAIL_GAP_MOBILE_PX;
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
   const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleInnerGap ?? 3)) / 100));
   const storyCircleSlotWidth = isDesktopViewport ? storyCircleSize + 6 : storyCircleSize;
   const ownStorySlotWidth = storyCircleSlotWidth;
-  const ownStoryPlusRight = isDesktopViewport ? 0 : storyCircleGap;
+  const ownStoryPlusRight = isDesktopViewport ? 0 : STORY_RAIL_GAP_MOBILE_PX;
 
   const goToFeedPage = useCallback(async (page) => {
     const safePage = Math.max(1, Math.min(totalPages, Number(page) || 1));
