@@ -1050,7 +1050,7 @@ export default function FeedPage({ initialData }) {
           {user && (
             safariDesktop ? (
               <div
-                className={`flex-shrink-0 mr-[2px] ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
@@ -1104,7 +1104,7 @@ export default function FeedPage({ initialData }) {
               </div>
             ) : desktopStoryRailEnhanced ? (
               <div
-                className={`flex-shrink-0 mr-[2px] ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
@@ -1158,7 +1158,7 @@ export default function FeedPage({ initialData }) {
               </div>
             ) : (
               <div
-                className={`flex-shrink-0 mr-[3px] ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
+                className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
