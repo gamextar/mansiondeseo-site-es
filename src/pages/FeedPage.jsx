@@ -1113,7 +1113,7 @@ export default function FeedPage({ initialData }) {
             ) : desktopStoryRailEnhanced ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: storyCircleSlotWidth, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
+                style={{ width: storyCircleSlotWidth + 1, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
                   <button
@@ -1167,7 +1167,7 @@ export default function FeedPage({ initialData }) {
             ) : (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: storyCircleSlotWidth, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
+                style={{ width: storyCircleSlotWidth + 1, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
                   <button
@@ -1211,7 +1211,7 @@ export default function FeedPage({ initialData }) {
                     type="button"
                     draggable={false}
                     onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/feed' } }); }}
-                    className="absolute bottom-4 right-0 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
+                    className="absolute bottom-4 right-[3px] w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
                     onDragStart={handleStoriesNativeDragStart}
                   >
                     <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
