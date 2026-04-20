@@ -636,7 +636,7 @@ export default function ChatPage() {
       {/* Header */}
       <div
         className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 z-30"
-        style={{ paddingTop: 'calc(var(--safe-top) + 51px)' }}
+        style={{ paddingTop: 'calc(var(--safe-top) + 48px)' }}
       >
         <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
           <button
