@@ -468,6 +468,11 @@ export default function FeedPage({ initialData }) {
   const storyCircleSlotWidth = isDesktopViewport ? storyCircleSize + 6 : storyCircleSize;
   const ownStorySlotWidth = storyCircleSlotWidth;
   const ownStoryPlusRight = isDesktopViewport ? 0 : 2;
+  const getStoryRailItemStyle = (animationDelay, isLastItem = false) => ({
+    width: storyCircleSlotWidth,
+    animationDelay,
+    ...(isDesktopViewport || isLastItem ? {} : { marginRight: storyCircleGap }),
+  });
 
   const goToFeedPage = useCallback(async (page) => {
     const safePage = Math.max(1, Math.min(totalPages, Number(page) || 1));
@@ -1036,7 +1041,7 @@ export default function FeedPage({ initialData }) {
             style={{
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
-              gap: `${storyCircleGap}px`,
+              gap: isDesktopViewport ? `${storyCircleGap}px` : '0px',
               touchAction: 'pan-x',
               transform: 'translate3d(0px, 0, 0)',
               transition: STORIES_RAIL_TRANSITION,
@@ -1060,7 +1065,7 @@ export default function FeedPage({ initialData }) {
             safariDesktop ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: ownStorySlotWidth, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
+                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0)}
               >
                 <div className="relative">
                   <button
@@ -1115,7 +1120,7 @@ export default function FeedPage({ initialData }) {
             ) : desktopStoryRailEnhanced ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: ownStorySlotWidth, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
+                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0)}
               >
                 <div className="relative">
                   <button
@@ -1170,7 +1175,7 @@ export default function FeedPage({ initialData }) {
             ) : (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: ownStorySlotWidth, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
+                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0)}
               >
                 <div className="relative">
                   <button
@@ -1236,7 +1241,10 @@ export default function FeedPage({ initialData }) {
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: storyCircleSlotWidth, animationDelay: storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined }}
+                style={getStoryRailItemStyle(
+                  storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined,
+                  index === orderedStoryProfiles.length - 1
+                )}
               >
                 <button
                   type="button"
@@ -1270,7 +1278,10 @@ export default function FeedPage({ initialData }) {
                 key={`story-${p.id}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: storyCircleSlotWidth, animationDelay: storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined }}
+                style={getStoryRailItemStyle(
+                  storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined,
+                  index === orderedStoryProfiles.length - 1
+                )}
               >
                 <button
                   type="button"
