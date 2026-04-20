@@ -113,10 +113,28 @@ function AppLayout() {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(max-width: 1023px)').matches;
   });
+  const lastNonProfileLocationRef = useRef(null);
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/perfiles/')) return;
+    if (location.state?.modal === 'profile') return;
+    lastNonProfileLocationRef.current = {
+      pathname: location.pathname,
+      search: location.search || '',
+      hash: location.hash || '',
+      state: location.state || null,
+      key: location.key,
+    };
+  }, [location]);
+
   const desktopProfileOverlayFallback = useMemo(() => {
     if (isMobileViewport) return null;
     if (!location.pathname.startsWith('/perfiles/')) return null;
     if (location.state?.backgroundLocation) return null;
+
+    if (lastNonProfileLocationRef.current?.pathname) {
+      return lastNonProfileLocationRef.current;
+    }
 
     const from = typeof location.state?.from === 'string' ? location.state.from : '';
     if (!from.startsWith('/')) return null;
