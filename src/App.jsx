@@ -385,6 +385,64 @@ function AppLayout() {
   }, [isMobileViewport, location.pathname, location.state, normalizedRoutePath, routeOverlayOpen]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    if (!isMobileViewport || !isPublicProfileRoute || routeOverlayOpen) return undefined;
+
+    const minScrollTop = MOBILE_BROWSER_IMMERSIVE_SCROLL_OFFSET;
+    const root = document.documentElement;
+    const body = document.body;
+    const previousRootOverscroll = root.style.overscrollBehaviorY;
+    const previousBodyOverscroll = body?.style.overscrollBehaviorY || '';
+    let rafId = 0;
+
+    const clampScroll = () => {
+      const currentScrollTop = Math.max(
+        Number(window.scrollY || 0),
+        Number(root.scrollTop || 0),
+        Number(body?.scrollTop || 0)
+      );
+      if (currentScrollTop >= minScrollTop) return;
+      resetDocumentScroll(minScrollTop);
+    };
+
+    const scheduleClamp = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        clampScroll();
+      });
+    };
+
+    root.style.overscrollBehaviorY = 'none';
+    if (body) body.style.overscrollBehaviorY = 'none';
+
+    clampScroll();
+    const timers = [80, 180, 360, 700].map((delay) => window.setTimeout(clampScroll, delay));
+
+    window.addEventListener('scroll', scheduleClamp);
+    window.addEventListener('touchend', scheduleClamp);
+    window.addEventListener('resize', scheduleClamp);
+    window.addEventListener('orientationchange', scheduleClamp);
+    window.addEventListener('pageshow', scheduleClamp);
+    window.addEventListener('focus', scheduleClamp);
+    window.visualViewport?.addEventListener('resize', scheduleClamp);
+
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+      root.style.overscrollBehaviorY = previousRootOverscroll;
+      if (body) body.style.overscrollBehaviorY = previousBodyOverscroll;
+      window.removeEventListener('scroll', scheduleClamp);
+      window.removeEventListener('touchend', scheduleClamp);
+      window.removeEventListener('resize', scheduleClamp);
+      window.removeEventListener('orientationchange', scheduleClamp);
+      window.removeEventListener('pageshow', scheduleClamp);
+      window.removeEventListener('focus', scheduleClamp);
+      window.visualViewport?.removeEventListener('resize', scheduleClamp);
+    };
+  }, [isMobileViewport, isPublicProfileRoute, routeOverlayOpen]);
+
+  useEffect(() => {
     // Video overlay is fullscreen — no need to lock the background scroll.
     // On iOS PWA with black-translucent, body{position:fixed} breaks viewport
     // calculations for fixed children, causing them to not extend behind the
