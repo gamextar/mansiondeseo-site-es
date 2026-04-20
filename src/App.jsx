@@ -53,12 +53,12 @@ const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const NON_DEFAULT_ROUTE_LOCALES = getRouteEnabledSeoLocales().filter((locale) => locale.pathPrefix);
 const MOBILE_BROWSER_IMMERSIVE_SCROLL_OFFSET = 68;
-const MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX = 18;
-const MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING = 0.35;
-const MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS = 180;
-const MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS = 48;
-const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_MAX_PX = 12;
-const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_RETURN_MS = 220;
+const MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX = 24;
+const MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING = 0.45;
+const MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS = 280;
+const MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS = 140;
+const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_MAX_PX = 10;
+const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_RETURN_MS = 300;
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
@@ -238,7 +238,7 @@ function AppLayout() {
       elastic: readUrlNumberParam(params, 'profile_top_elastic', MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX, 0, 80),
       damping: readUrlNumberParam(params, 'profile_top_damping', MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING, 0.05, 1),
       returnMs: readUrlNumberParam(params, 'profile_top_return', MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS, 0, 800),
-      releaseMs: readUrlNumberParam(params, 'profile_top_release', MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS, 0, 240),
+      releaseMs: readUrlNumberParam(params, 'profile_top_idle', readUrlNumberParam(params, 'profile_top_release', MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS, 0, 400), 0, 400),
       bounce: readUrlNumberParam(params, 'profile_top_bounce', MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_MAX_PX, 0, 80),
       bounceReturnMs: readUrlNumberParam(params, 'profile_top_bounce_return', MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_RETURN_MS, 0, 800),
     };
@@ -477,6 +477,7 @@ function AppLayout() {
     let touching = false;
     let cancelReturnAnimation = null;
     let startupTimerIds = [];
+    let lastPocketScrollAt = 0;
 
     const cancelReturn = () => {
       if (cancelReturnAnimation) {
@@ -549,6 +550,12 @@ function AppLayout() {
     const scheduleSnapBack = () => {
       if (releaseTimerId) window.clearTimeout(releaseTimerId);
       releaseTimerId = window.setTimeout(() => {
+        const now = window.performance?.now?.() ?? Date.now();
+        const quietForMs = now - lastPocketScrollAt;
+        if (quietForMs < releaseDelayMs) {
+          scheduleSnapBack();
+          return;
+        }
         snapBackToTop(false);
       }, releaseDelayMs);
     };
@@ -579,6 +586,7 @@ function AppLayout() {
         }
         return;
       }
+      lastPocketScrollAt = window.performance?.now?.() ?? Date.now();
       scheduleElasticClamp();
       if (!touching) scheduleSnapBack();
     };
@@ -594,6 +602,7 @@ function AppLayout() {
     root.style.overscrollBehaviorY = 'contain';
     if (body) body.style.overscrollBehaviorY = 'contain';
     setTopBounce(0, false);
+    lastPocketScrollAt = window.performance?.now?.() ?? Date.now();
 
     snapBackToTop(true);
     startupTimerIds = [80, 180, 360, 700].map((delay) => window.setTimeout(() => snapBackToTop(true), delay));
