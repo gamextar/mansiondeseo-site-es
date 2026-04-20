@@ -163,6 +163,7 @@ function AppLayout() {
   const standaloneVideosRoute = isStandaloneMobileApp && location.pathname.startsWith('/videos');
   const mobileBrowserVideosRoute = isMobileViewport && normalizedRoutePath === '/videos';
   const isPublicHome = location.pathname === '/';
+  const isPublicProfileRoute = normalizedRoutePath.startsWith('/perfiles/');
   const isFullscreen =
     standaloneVideosRoute ||
     mobileBrowserVideosRoute ||
@@ -180,6 +181,7 @@ function AppLayout() {
       normalizedRoutePath === '/videos' ||
       normalizedRoutePath === '/ranking' ||
       normalizedRoutePath === '/perfil' ||
+      isPublicProfileRoute ||
       normalizedRoutePath === '/favoritos' ||
       normalizedRoutePath === '/seguidores' ||
       normalizedRoutePath === '/configuracion' ||
@@ -191,8 +193,8 @@ function AppLayout() {
       normalizedRoutePath === '/safe-area-debug'
     )
   );
-  const showMobileBrandOverlay = immersiveMobileApp && normalizedRoutePath !== '/videos';
-  const showHiddenMobileBrandOverlay = isMobileViewport && Boolean(isChatDetail);
+  const showMobileBrandOverlay = immersiveMobileApp && normalizedRoutePath !== '/videos' && !isPublicProfileRoute;
+  const showHiddenMobileBrandOverlay = isMobileViewport && (Boolean(isChatDetail) || isPublicProfileRoute);
   const showMobileViewportStabilizer =
     !isStandaloneMobileApp &&
     isMobileViewport &&
@@ -354,7 +356,8 @@ function AppLayout() {
       (
         normalizedRoutePath === '/perfil' ||
         normalizedRoutePath === '/mensajes' ||
-        normalizedRoutePath.startsWith('/mensajes/')
+        normalizedRoutePath.startsWith('/mensajes/') ||
+        isPublicProfileRoute
       );
 
     if (!shouldStabilizeMobileScroll) return undefined;

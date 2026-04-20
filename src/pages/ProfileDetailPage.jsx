@@ -554,7 +554,7 @@ export default function ProfileDetailPage({ initialData }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-mansion-base flex items-center justify-center">
+      <div className="min-h-mobile-browser-screen lg:min-h-screen bg-mansion-base flex items-center justify-center">
         <p className="text-text-muted">Cargando perfil...</p>
       </div>
     );
@@ -562,7 +562,7 @@ export default function ProfileDetailPage({ initialData }) {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-mansion-base flex items-center justify-center">
+      <div className="min-h-mobile-browser-screen lg:min-h-screen bg-mansion-base flex items-center justify-center">
         <p className="text-text-muted">Perfil no encontrado</p>
       </div>
     );
@@ -595,7 +595,7 @@ export default function ProfileDetailPage({ initialData }) {
   const lightboxBlur = Math.round(baseBlur * 2.5);
 
   return (
-    <div className="min-h-screen bg-mansion-base pb-32 lg:pb-16">
+    <div className="min-h-mobile-browser-screen lg:min-h-screen bg-mansion-base pb-mobile-legacy-nav lg:pb-16">
       {/* Desktop: two-column layout / Mobile: stacked */}
       <div className="lg:flex lg:gap-8 lg:px-8 lg:pt-20 lg:max-w-6xl lg:mx-auto">
 
