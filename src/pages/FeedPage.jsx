@@ -466,6 +466,7 @@ export default function FeedPage({ initialData }) {
     : 5;
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
   const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleInnerGap ?? 3)) / 100));
+  const ownStorySlotWidth = isDesktopViewport ? storyCircleSize + 6 : storyCircleSize + 11;
 
   const goToFeedPage = useCallback(async (page) => {
     const safePage = Math.max(1, Math.min(totalPages, Number(page) || 1));
@@ -1058,7 +1059,7 @@ export default function FeedPage({ initialData }) {
             safariDesktop ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: storyCircleSize + 11, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
+                style={{ width: ownStorySlotWidth, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
                   <button
@@ -1112,7 +1113,7 @@ export default function FeedPage({ initialData }) {
             ) : desktopStoryRailEnhanced ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
+                style={{ width: ownStorySlotWidth, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
                   <button
@@ -1166,7 +1167,7 @@ export default function FeedPage({ initialData }) {
             ) : (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
+                style={{ width: ownStorySlotWidth, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
                   <button
