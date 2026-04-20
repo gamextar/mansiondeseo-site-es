@@ -31,7 +31,6 @@ const MESSAGE_BLOCK_META = SEEKING_META;
 const PROFILE_DETAIL_CACHE_PREFIX = 'mansion_profile_detail_';
 const PROFILE_DETAIL_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_PROFILE_SETTINGS = { blurLevel: 14, blurMobile: 14, blurDesktop: 8, freeVisiblePhotos: 1, freeOwnPhotos: 3 };
-const MOBILE_PUBLIC_PROFILE_BROWSER_OFFSET_PX = 68;
 
 function buildPreviewProfile(preview) {
   if (!preview) return null;
@@ -594,16 +593,9 @@ export default function ProfileDetailPage({ initialData }) {
   const heroBlur = Math.round(baseBlur * 1.8);
   const thumbBlur = Math.round(baseBlur * 0.7);
   const lightboxBlur = Math.round(baseBlur * 2.5);
-  const mobileViewportLiftStyle = isMobile
-    ? {
-        top: `-${MOBILE_PUBLIC_PROFILE_BROWSER_OFFSET_PX}px`,
-        marginBottom: `-${MOBILE_PUBLIC_PROFILE_BROWSER_OFFSET_PX}px`,
-      }
-    : undefined;
 
   return (
     <div className="min-h-mobile-browser-screen lg:min-h-screen bg-mansion-base pb-mobile-legacy-nav lg:pb-16">
-      <div className="relative lg:top-0 lg:mb-0" style={mobileViewportLiftStyle}>
       {/* Desktop: two-column layout / Mobile: stacked */}
       <div className="lg:flex lg:gap-8 lg:px-8 lg:pt-20 lg:max-w-6xl lg:mx-auto">
 
@@ -741,7 +733,6 @@ export default function ProfileDetailPage({ initialData }) {
             ))}
           </div>
         )}
-      </div>
       </div>
 
       {/* Profile info */}

@@ -52,6 +52,7 @@ const TopVisitedPage = lazy(lazyWithRetry(() => import('./pages/TopVisitedPage')
 const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage'), 'mansion-lazy-retry:video-lab'));
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const NON_DEFAULT_ROUTE_LOCALES = getRouteEnabledSeoLocales().filter((locale) => locale.pathPrefix);
+const MOBILE_BROWSER_IMMERSIVE_SCROLL_OFFSET = 68;
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
@@ -64,15 +65,15 @@ function detectStandaloneMobile() {
   return Boolean(standalone && isMobile);
 }
 
-function resetDocumentScrollToTop() {
+function resetDocumentScroll(scrollTop = 0) {
   if (typeof window === 'undefined') return;
   const root = document.documentElement;
   const body = document.body;
   const previousScrollBehavior = root.style.scrollBehavior;
   root.style.scrollBehavior = 'auto';
-  window.scrollTo(0, 0);
-  root.scrollTop = 0;
-  if (body) body.scrollTop = 0;
+  window.scrollTo(0, scrollTop);
+  root.scrollTop = scrollTop;
+  if (body) body.scrollTop = scrollTop;
   root.style.scrollBehavior = previousScrollBehavior;
 }
 
@@ -349,8 +350,6 @@ function AppLayout() {
     if (location.state?.backgroundLocation) return; // closing overlay — App handles it
     if (prev === location.pathname) return; // same route, no reset
     if (isMobileViewport && normalizedRoutePath === '/videos') return; // video feed owns its mobile browser offset
-    resetDocumentScrollToTop();
-
     const shouldStabilizeMobileScroll =
       isMobileViewport &&
       (
@@ -360,14 +359,22 @@ function AppLayout() {
         isPublicProfileRoute
       );
 
+    const nextScrollTop =
+      isMobileViewport && isPublicProfileRoute
+        ? MOBILE_BROWSER_IMMERSIVE_SCROLL_OFFSET
+        : 0;
+
+    resetDocumentScroll(nextScrollTop);
+
     if (!shouldStabilizeMobileScroll) return undefined;
 
     let rafA = 0;
     let rafB = 0;
-    const timers = [80, 180, 360].map((delay) => window.setTimeout(resetDocumentScrollToTop, delay));
+    const stabilizeScroll = () => resetDocumentScroll(nextScrollTop);
+    const timers = [80, 180, 360].map((delay) => window.setTimeout(stabilizeScroll, delay));
     rafA = window.requestAnimationFrame(() => {
-      resetDocumentScrollToTop();
-      rafB = window.requestAnimationFrame(resetDocumentScrollToTop);
+      stabilizeScroll();
+      rafB = window.requestAnimationFrame(stabilizeScroll);
     });
 
     return () => {
