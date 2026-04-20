@@ -191,6 +191,7 @@ function AppLayout() {
     )
   );
   const showMobileBrandOverlay = immersiveMobileApp && normalizedRoutePath !== '/videos';
+  const showHiddenMobileBrandOverlay = isMobileViewport && Boolean(isChatDetail);
   const showMobileViewportStabilizer =
     !isStandaloneMobileApp &&
     isMobileViewport &&
@@ -437,6 +438,7 @@ function AppLayout() {
       {showTopNavbar && <Navbar />}
       {showMobileViewportStabilizer && <MobileViewportStabilizer />}
       {showChrome && !routeOverlayOpen && showMobileBrandOverlay && <MobileBrandOverlay />}
+      {!routeOverlayOpen && showHiddenMobileBrandOverlay && <MobileBrandOverlay hidden />}
 
       <div
         className={showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : ''}
