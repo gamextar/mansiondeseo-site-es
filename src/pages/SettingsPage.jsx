@@ -509,6 +509,10 @@ export default function SettingsPage() {
       setEncoderShowProgressHud(s.encoderShowProgressHud === true);
       // Propagate to global context so dependent components update live
       setSiteSettings(s);
+      try {
+        sessionStorage.setItem('mansion_site_settings', JSON.stringify(s));
+        localStorage.removeItem('mansion_feed');
+      } catch {}
       setSaved(true);
       setSaveError('');
       setTimeout(() => setSaved(false), 2000);

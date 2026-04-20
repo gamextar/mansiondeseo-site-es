@@ -107,7 +107,12 @@ function getCachedFeed() {
     // Do not persist deep pagination across refreshes or fresh entries to home.
     // Only reuse cache when it represents the first page/block.
     if (currentCursor > 0 || blockCursor > 0 || pageCursor > 0) return null;
-    if (Array.isArray(parsed?.profiles)) return parsed;
+    if (Array.isArray(parsed?.profiles)) {
+      return {
+        ...parsed,
+        settings: {},
+      };
+    }
     if (Array.isArray(parsed)) {
       return { profiles: parsed, viewerPremium: false, settings: {}, timestamp: 0 };
     }
@@ -121,7 +126,7 @@ function setCachedFeed(data) {
       version: FEED_CACHE_VERSION,
       profiles: data.profiles || [],
       viewerPremium: data.viewerPremium || false,
-      settings: data.settings || {},
+      settings: {},
       totalProfiles: Number(data.totalProfiles) || 0,
       currentCursor: Number(data.currentCursor) || 0,
       blockCursor: Number(data.blockCursor ?? data.currentCursor) || 0,
