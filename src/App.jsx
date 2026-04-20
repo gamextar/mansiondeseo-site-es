@@ -184,6 +184,7 @@ function AppLayout() {
       normalizedRoutePath === '/seguidores' ||
       normalizedRoutePath === '/configuracion' ||
       normalizedRoutePath === '/mensajes' ||
+      normalizedRoutePath.startsWith('/mensajes/') ||
       normalizedRoutePath === '/full-mobile-test' ||
       normalizedRoutePath === '/feed-shell-test' ||
       normalizedRoutePath === '/profile-shell-test' ||

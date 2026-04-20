@@ -630,8 +630,8 @@ export default function ChatPage() {
     <>
     <DesktopSidebar />
     <div
-      className="min-h-screen h-[100dvh] bg-mansion-base flex flex-col overflow-hidden lg:pl-64 xl:pl-72"
-      style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
+      className="min-h-mobile-browser-screen h-mobile-browser-screen bg-mansion-base flex flex-col overflow-hidden lg:pl-64 xl:pl-72"
+      style={viewportHeight ? { minHeight: `${viewportHeight}px`, height: `${viewportHeight}px` } : undefined}
     >
       {/* Header */}
       <div
