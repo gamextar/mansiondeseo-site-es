@@ -424,8 +424,8 @@ export default function FeedPage({ initialData }) {
   );
 
   const safeSettings = useMemo(() => ({
-    ...((siteSettings && typeof siteSettings === 'object') ? siteSettings : {}),
     ...((settings && typeof settings === 'object') ? settings : {}),
+    ...((siteSettings && typeof siteSettings === 'object') ? siteSettings : {}),
   }), [settings, siteSettings]);
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
   const cardsPerPage = Math.max(6, Math.min(60, safeSettings.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE));
