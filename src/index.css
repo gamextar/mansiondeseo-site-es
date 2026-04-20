@@ -6,10 +6,12 @@
    SAFE AREA VARIABLES (notch / PWA fullscreen)
    ═══════════════════════════════════════════ */
 :root {
-  --safe-top: env(safe-area-inset-top, 0px);
+  --visual-viewport-offset-top: 0px;
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--visual-viewport-offset-top, 0px));
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+  --mobile-browser-height-compensation: max(0px, calc(100lvh - 100dvh));
   color-scheme: dark;
   background-color: #08080E;
 }
@@ -114,12 +116,12 @@ body {
   }
 
   .safe-top {
-    padding-top: env(safe-area-inset-top, 0px);
+    padding-top: var(--safe-top);
   }
 
   /* Top padding below transparent navbar (40px nav + safe-area + 8px gap) */
   .pt-navbar {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 48px);
+    padding-top: calc(var(--safe-top) + 48px);
   }
 
   /* Full-height accounting for notch in PWA */
@@ -140,7 +142,7 @@ body {
   .min-h-mobile-browser-screen {
     min-height: 100vh;
     min-height: 100dvh;
-    min-height: calc(100dvh + max(0px, calc(100lvh - 100dvh)));
+    min-height: calc(100dvh + var(--mobile-browser-height-compensation));
   }
 
   .h-dynamic-screen {
@@ -151,13 +153,13 @@ body {
   .h-mobile-browser-screen {
     height: 100vh;
     height: 100dvh;
-    height: calc(100dvh + max(0px, calc(100lvh - 100dvh)));
+    height: calc(100dvh + var(--mobile-browser-height-compensation));
   }
 }
 
 @media (max-width: 1023px) {
   [data-mobile-immersive="true"] .pt-navbar {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+    padding-top: calc(var(--safe-top) + 8px);
   }
 
   .pt-mobile-brand-overlay {

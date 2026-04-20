@@ -7,7 +7,7 @@ export function MobileBrandOverlay() {
       initial={{ y: -12, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       className="fixed top-0 left-0 right-0 z-50 lg:hidden pointer-events-none"
-      style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      style={{ paddingTop: 'var(--safe-top)' }}
     >
       <div className="max-w-7xl mx-auto pl-0 pr-3 h-10 flex items-center">
         <Link
@@ -35,7 +35,7 @@ export default function Navbar() {
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       className="fixed top-0 left-0 right-0 z-50 lg:hidden"
-      style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      style={{ paddingTop: 'var(--safe-top)' }}
     >
       <div className="max-w-7xl mx-auto px-3 h-10 flex items-center">
         <Link to="/feed" className="flex items-center gap-2">

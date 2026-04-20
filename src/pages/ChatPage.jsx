@@ -128,7 +128,6 @@ export default function ChatPage() {
   const [wsState, setWsState] = useState('disconnected');
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
-  const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -252,7 +251,6 @@ export default function ChatPage() {
     const updateViewport = () => {
       const vv = window.visualViewport;
       setViewportHeight(Math.round(vv?.height || window.innerHeight));
-      setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
     };
 
     updateViewport();
@@ -260,12 +258,10 @@ export default function ChatPage() {
     const vv = window.visualViewport;
     window.addEventListener('resize', updateViewport);
     vv?.addEventListener('resize', updateViewport);
-    vv?.addEventListener('scroll', updateViewport);
 
     return () => {
       window.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('resize', updateViewport);
-      vv?.removeEventListener('scroll', updateViewport);
     };
   }, []);
 
@@ -617,7 +613,6 @@ export default function ChatPage() {
       {/* Header */}
       <div
         className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
-        style={viewportOffsetTop ? { transform: `translateY(${viewportOffsetTop}px)` } : undefined}
       >
         <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
           <button

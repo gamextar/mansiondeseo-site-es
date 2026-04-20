@@ -7,6 +7,8 @@ import Navbar, { MobileBrandOverlay } from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import DesktopSidebar from './components/DesktopSidebar';
 import FeedPage from './pages/FeedPage';
+import ChatListPage from './pages/ChatListPage';
+import ChatPage from './pages/ChatPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -18,10 +20,13 @@ import MobileFullScreenProbePage from './pages/MobileFullScreenProbePage';
 import FeedShellProbePage from './pages/FeedShellProbePage';
 import ProfileShellProbePage from './pages/ProfileShellProbePage';
 import SafeAreaDebugPage from './pages/SafeAreaDebugPage';
+import ProfilePage from './pages/ProfilePage';
 import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
+import SafeAreaRuntimeDebugOverlay from './components/SafeAreaRuntimeDebugOverlay';
+import MobileViewportStabilizer from './components/MobileViewportStabilizer';
 import { AuthContext, useAuth } from './lib/authContext';
 import { preloadVideoFeedChunk, preloadVideoFeedData } from './lib/videoFeedWarmup';
 import { clearBootDebugFlags, getBootDebugFlags, subscribeBootDebugFlags } from './lib/bootDebugPrefs';
@@ -32,9 +37,6 @@ import { isSeoIntentVariant } from './lib/seoVariants';
 
 const ExplorePage = lazy(lazyWithRetry(() => import('./pages/ExplorePage'), 'mansion-lazy-retry:explore'));
 const ProfileDetailPage = lazy(lazyWithRetry(() => import('./pages/ProfileDetailPage'), 'mansion-lazy-retry:profile-detail'));
-const ChatListPage = lazy(lazyWithRetry(() => import('./pages/ChatListPage'), 'mansion-lazy-retry:chat-list'));
-const ChatPage = lazy(lazyWithRetry(() => import('./pages/ChatPage'), 'mansion-lazy-retry:chat-detail'));
-const ProfilePage = lazy(lazyWithRetry(() => import('./pages/ProfilePage'), 'mansion-lazy-retry:profile'));
 const FavoritesPage = lazy(lazyWithRetry(() => import('./pages/FavoritesPage'), 'mansion-lazy-retry:favorites'));
 const SettingsPage = lazy(lazyWithRetry(() => import('./pages/SettingsPage'), 'mansion-lazy-retry:settings'));
 const AdminLayout = lazy(lazyWithRetry(() => import('./components/AdminLayout'), 'mansion-lazy-retry:admin-layout'));
@@ -74,6 +76,13 @@ function resetDocumentScrollToTop() {
   root.style.scrollBehavior = previousScrollBehavior;
 }
 
+function syncViewportTopInsetVar() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  const root = document.documentElement;
+  const offsetTop = Math.max(0, Math.round(window.visualViewport?.offsetTop || 0));
+  root.style.setProperty('--visual-viewport-offset-top', `${offsetTop}px`);
+}
+
 function RequireRegistration({ children }) {
   const { registered } = useAuth();
   if (!registered) return <Navigate to="/bienvenida" replace />;
@@ -98,7 +107,7 @@ function LocalizedSEOLanding() {
 
 function AppLayout() {
   const location = useLocation();
-  const { user } = useAuth();
+  const { registered, user } = useAuth();
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -122,7 +131,7 @@ function AppLayout() {
   const showChrome = !isFullscreen && !isChatDetail && !isPublicHome;
   const scrollLockRef = useRef(null);
   const immersiveMobileApp = Boolean(
-    user &&
+    (user || registered) &&
     isMobileViewport &&
     (
       normalizedRoutePath === '/feed' ||
@@ -141,6 +150,12 @@ function AppLayout() {
     )
   );
   const showMobileBrandOverlay = immersiveMobileApp && normalizedRoutePath !== '/videos';
+  const showMobileViewportStabilizer =
+    !isStandaloneMobileApp &&
+    isMobileViewport &&
+    !routeOverlayOpen &&
+    normalizedRoutePath !== '/videos' &&
+    (immersiveMobileApp || isChatDetail);
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const showTopNavbar = showChrome && !routeOverlayOpen && !immersiveMobileApp;
   const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute || mobileBrowserVideosRoute) && !routeOverlayOpen);
@@ -236,6 +251,49 @@ function AppLayout() {
     return () => media.removeListener(updateViewport);
   }, []);
 
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    syncViewportTopInsetVar();
+
+    let rafA = 0;
+    let rafB = 0;
+    const timers = [80, 180, 360].map((delay) => window.setTimeout(syncViewportTopInsetVar, delay));
+
+    rafA = window.requestAnimationFrame(() => {
+      syncViewportTopInsetVar();
+      rafB = window.requestAnimationFrame(syncViewportTopInsetVar);
+    });
+
+    return () => {
+      if (rafA) window.cancelAnimationFrame(rafA);
+      if (rafB) window.cancelAnimationFrame(rafB);
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+    };
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateViewportInset = () => syncViewportTopInsetVar();
+    const vv = window.visualViewport;
+
+    updateViewportInset();
+    window.addEventListener('resize', updateViewportInset);
+    window.addEventListener('orientationchange', updateViewportInset);
+    window.addEventListener('focus', updateViewportInset);
+    window.addEventListener('pageshow', updateViewportInset);
+    vv?.addEventListener('resize', updateViewportInset);
+
+    return () => {
+      window.removeEventListener('resize', updateViewportInset);
+      window.removeEventListener('orientationchange', updateViewportInset);
+      window.removeEventListener('focus', updateViewportInset);
+      window.removeEventListener('pageshow', updateViewportInset);
+      vv?.removeEventListener('resize', updateViewportInset);
+    };
+  }, []);
+
   // Reset scroll to top on every route change, EXCEPT when opening/closing
   // a profile overlay (which manages scroll lock/restore itself).
   const prevPathnameRef = useRef(null);
@@ -250,7 +308,11 @@ function AppLayout() {
 
     const shouldStabilizeMobileScroll =
       isMobileViewport &&
-      (normalizedRoutePath === '/perfil' || normalizedRoutePath === '/mensajes');
+      (
+        normalizedRoutePath === '/perfil' ||
+        normalizedRoutePath === '/mensajes' ||
+        normalizedRoutePath.startsWith('/mensajes/')
+      );
 
     if (!shouldStabilizeMobileScroll) return undefined;
 
@@ -332,6 +394,7 @@ function AppLayout() {
     <>
       {showDesktopSidebar && <DesktopSidebar />}
       {showTopNavbar && <Navbar />}
+      {showMobileViewportStabilizer && <MobileViewportStabilizer />}
       {showChrome && !routeOverlayOpen && showMobileBrandOverlay && <MobileBrandOverlay />}
 
       <div
@@ -865,6 +928,7 @@ export default function App() {
         {!debugFlags.shellOnly && <AppLayout />}
         {!debugFlags.shellOnly && <InstallAppBanner />}
         {!debugFlags.shellOnly && <ApiDebugOverlay />}
+        {!debugFlags.shellOnly && <SafeAreaRuntimeDebugOverlay />}
       </div>
       </UnreadProvider>
       </AuthContext.Provider>
