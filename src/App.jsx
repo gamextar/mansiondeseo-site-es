@@ -476,12 +476,18 @@ function AppLayout() {
     let releaseTimerId = 0;
     let touching = false;
     let cancelReturnAnimation = null;
+    let startupTimerIds = [];
 
     const cancelReturn = () => {
       if (cancelReturnAnimation) {
         cancelReturnAnimation();
         cancelReturnAnimation = null;
       }
+    };
+
+    const clearStartupTimers = () => {
+      startupTimerIds.forEach((timerId) => window.clearTimeout(timerId));
+      startupTimerIds = [];
     };
 
     const setTopBounce = (value, withTransition = false) => {
@@ -528,11 +534,7 @@ function AppLayout() {
         elasticMaxPx,
         overshoot * damping
       );
-      const nextScrollTop = minScrollTop - dampedOvershoot;
       setTopBounce(dampedOvershoot, false);
-
-      if (Math.abs(nextScrollTop - currentScrollTop) < 0.5) return;
-      resetDocumentScroll(nextScrollTop);
     };
 
     const scheduleElasticClamp = () => {
@@ -553,6 +555,7 @@ function AppLayout() {
 
     const handleTouchStart = () => {
       touching = true;
+      clearStartupTimers();
       if (releaseTimerId) {
         window.clearTimeout(releaseTimerId);
         releaseTimerId = 0;
@@ -593,7 +596,7 @@ function AppLayout() {
     setTopBounce(0, false);
 
     snapBackToTop(true);
-    const timers = [80, 180, 360, 700].map((delay) => window.setTimeout(() => snapBackToTop(true), delay));
+    startupTimerIds = [80, 180, 360, 700].map((delay) => window.setTimeout(() => snapBackToTop(true), delay));
 
     window.addEventListener('scroll', handleScroll);
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
@@ -610,7 +613,7 @@ function AppLayout() {
       if (clampRafId) window.cancelAnimationFrame(clampRafId);
       if (releaseTimerId) window.clearTimeout(releaseTimerId);
       cancelReturn();
-      timers.forEach((timerId) => window.clearTimeout(timerId));
+      clearStartupTimers();
       root.style.removeProperty('--public-profile-top-bounce-y');
       root.style.removeProperty('--public-profile-top-bounce-transition');
       root.style.overscrollBehaviorY = previousRootOverscroll;
