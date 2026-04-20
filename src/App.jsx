@@ -98,19 +98,22 @@ function easeOutCubic(t) {
   return 1 - ((1 - t) ** 3);
 }
 
-function animateDocumentScrollTo(targetScrollTop, durationMs) {
+function animateDocumentScrollTo(targetScrollTop, durationMs, onComplete) {
   if (typeof window === 'undefined') return () => {};
 
   const startScrollTop = getDocumentScrollTop();
-  if (Math.abs(startScrollTop - targetScrollTop) < 0.5) {
+  if (Math.abs(startScrollTop - targetScrollTop) < 0.5 || durationMs <= 0) {
     resetDocumentScroll(targetScrollTop);
+    onComplete?.();
     return () => {};
   }
 
   let rafId = 0;
+  let cancelled = false;
   const startedAt = window.performance?.now?.() ?? Date.now();
 
   const tick = (now) => {
+    if (cancelled) return;
     const elapsed = now - startedAt;
     const progress = Math.min(1, elapsed / durationMs);
     const easedProgress = easeOutCubic(progress);
@@ -118,11 +121,15 @@ function animateDocumentScrollTo(targetScrollTop, durationMs) {
     resetDocumentScroll(nextScrollTop);
     if (progress < 1) {
       rafId = window.requestAnimationFrame(tick);
+    } else {
+      resetDocumentScroll(targetScrollTop);
+      onComplete?.();
     }
   };
 
   rafId = window.requestAnimationFrame(tick);
   return () => {
+    cancelled = true;
     if (rafId) window.cancelAnimationFrame(rafId);
   };
 }
@@ -478,12 +485,14 @@ function AppLayout() {
     let cancelReturnAnimation = null;
     let startupTimerIds = [];
     let lastPocketScrollAt = 0;
+    let returningToTop = false;
 
     const cancelReturn = () => {
       if (cancelReturnAnimation) {
         cancelReturnAnimation();
         cancelReturnAnimation = null;
       }
+      returningToTop = false;
     };
 
     const clearStartupTimers = () => {
@@ -511,18 +520,26 @@ function AppLayout() {
       }
       if (immediate) {
         setTopBounce(0, false);
+        returningToTop = false;
         resetDocumentScroll(minScrollTop);
         return;
       }
       if (currentScrollTop >= minScrollTop - 0.5) {
         setTopBounce(0, true);
+        returningToTop = false;
         resetDocumentScroll(minScrollTop);
         return;
       }
       setTopBounce(0, true);
+      returningToTop = true;
       cancelReturnAnimation = animateDocumentScrollTo(
         minScrollTop,
-        returnDurationMs
+        returnDurationMs,
+        () => {
+          returningToTop = false;
+          cancelReturnAnimation = null;
+          setTopBounce(0, true);
+        }
       );
     };
 
@@ -539,7 +556,7 @@ function AppLayout() {
     };
 
     const scheduleElasticClamp = () => {
-      cancelReturn();
+      if (!returningToTop) cancelReturn();
       if (clampRafId) return;
       clampRafId = window.requestAnimationFrame(() => {
         clampRafId = 0;
@@ -548,8 +565,10 @@ function AppLayout() {
     };
 
     const scheduleSnapBack = () => {
+      if (returningToTop) return;
       if (releaseTimerId) window.clearTimeout(releaseTimerId);
       releaseTimerId = window.setTimeout(() => {
+        if (returningToTop) return;
         const now = window.performance?.now?.() ?? Date.now();
         const quietForMs = now - lastPocketScrollAt;
         if (quietForMs < releaseDelayMs) {
@@ -577,6 +596,10 @@ function AppLayout() {
 
     const handleScroll = () => {
       const currentScrollTop = getDocumentScrollTop();
+      if (returningToTop) {
+        if (currentScrollTop >= minScrollTop - 0.5) setTopBounce(0, true);
+        return;
+      }
       if (currentScrollTop >= minScrollTop) {
         cancelReturn();
         setTopBounce(0, false);
