@@ -463,7 +463,7 @@ export default function FeedPage({ initialData }) {
   const storyCircleSize = safeSettings.storyCircleSize || 88;
   const storyCircleGap = isDesktopViewport
     ? Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleGap ?? 8)) / 100) - 3)
-    : 6;
+    : 5;
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
   const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleInnerGap ?? 3)) / 100));
 
@@ -1058,7 +1058,7 @@ export default function FeedPage({ initialData }) {
             safariDesktop ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: storyCircleSize + 6, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
+                style={{ width: storyCircleSize + 11, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
                   <button
@@ -1102,7 +1102,7 @@ export default function FeedPage({ initialData }) {
                     type="button"
                     draggable={false}
                     onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/feed' } }); }}
-                    className="absolute bottom-4 right-1 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
+                    className="absolute bottom-4 right-0 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
                     onDragStart={handleStoriesNativeDragStart}
                   >
                     <Plus className="w-3 h-3 text-mansion-base" strokeWidth={3} />
