@@ -3499,6 +3499,9 @@ async function loadSettings(env) {
     feedPrefetchPages: parseNumberSetting(settings.feed_prefetch_pages, 6),
     homeStoryCountMobile: parseNumberSetting(settings.home_story_count_mobile, 15),
     homeStoryCountDesktop: parseNumberSetting(settings.home_story_count_desktop, 30),
+    storyRailGapMobile: parseNumberSetting(settings.story_rail_gap_mobile, 50),
+    storyRailGapDesktop: parseNumberSetting(settings.story_rail_gap_desktop, 50),
+    storyRailOwnStoryExtraGap: parseNumberSetting(settings.story_rail_own_story_extra_gap, 1),
   };
   // Keep module-level threshold in sync so isOnline() uses the latest value
   _onlineThresholdMs = result.onlineThresholdMinutes * 60_000;
@@ -3566,6 +3569,9 @@ function getPublicSettingsPayload(settings) {
     feedPrefetchPages: settings.feedPrefetchPages,
     homeStoryCountMobile: settings.homeStoryCountMobile,
     homeStoryCountDesktop: settings.homeStoryCountDesktop,
+    storyRailGapMobile: settings.storyRailGapMobile,
+    storyRailGapDesktop: settings.storyRailGapDesktop,
+    storyRailOwnStoryExtraGap: settings.storyRailOwnStoryExtraGap,
     navBottomPadding: settings.navBottomPadding,
     navSidePadding: settings.navSidePadding,
     navHeight: settings.navHeight,
@@ -3670,6 +3676,11 @@ async function handleUpdateSettings(request, env) {
     'feed_cards_per_page',
     'feed_max_pages',
     'feed_prefetch_pages',
+    'home_story_count_mobile',
+    'home_story_count_desktop',
+    'story_rail_gap_mobile',
+    'story_rail_gap_desktop',
+    'story_rail_own_story_extra_gap',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {

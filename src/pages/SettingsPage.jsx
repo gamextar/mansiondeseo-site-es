@@ -18,11 +18,6 @@ import {
   STANDALONE_BOTTOM_NAV_PAGE_EXTRA_PADDING,
   STANDALONE_BOTTOM_NAV_VISUAL_OFFSET,
 } from '../lib/bottomNavConfig';
-import {
-  STORY_RAIL_GAP_DESKTOP_PX,
-  STORY_RAIL_GAP_MOBILE_PX,
-  STORY_RAIL_OWN_STORY_EXTRA_GAP_PX,
-} from '../lib/storyRailConfig';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -100,6 +95,9 @@ export default function SettingsPage() {
   const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
   const [homeStoryCountMobile, setHomeStoryCountMobile] = useState(15);
   const [homeStoryCountDesktop, setHomeStoryCountDesktop] = useState(30);
+  const [storyRailGapMobile, setStoryRailGapMobile] = useState(50);
+  const [storyRailGapDesktop, setStoryRailGapDesktop] = useState(50);
+  const [storyRailOwnStoryExtraGap, setStoryRailOwnStoryExtraGap] = useState(1);
   const [sidebarStoryRingWidth, setSidebarStoryRingWidth] = useState(4);
   const [storyPresetEditor, setStoryPresetEditor] = useState('medium');
   const [avatarSizeDraft, setAvatarSizeDraft] = useState('88');
@@ -185,7 +183,7 @@ export default function SettingsPage() {
   const activeStoryPresetBorder = storyPresetEditor === 'xl' ? sidebarStoryRingWidth : storyCircleBorder;
   const activeStoryPresetRingPx = Math.max(1, Math.round((activeStoryPreset.size * activeStoryPresetBorder) / 100));
   const activeStoryPresetInnerGapPx = Math.max(0, Math.round((activeStoryPreset.size * storyCircleInnerGap) / 100));
-  const storyCircleGapPx = STORY_RAIL_GAP_DESKTOP_PX;
+  const storyCircleGapPx = storyRailGapDesktop;
   const storyCircleBorderPx = Math.max(1, Math.round((storyCirclePresetMedium * storyCircleBorder) / 100));
   const storyCircleInnerGapPx = Math.max(0, Math.round((storyCirclePresetMedium * storyCircleInnerGap) / 100));
 
@@ -265,6 +263,9 @@ export default function SettingsPage() {
         setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
         setHomeStoryCountMobile(s.homeStoryCountMobile ?? 15);
         setHomeStoryCountDesktop(s.homeStoryCountDesktop ?? 30);
+        setStoryRailGapMobile(s.storyRailGapMobile ?? 50);
+        setStoryRailGapDesktop(s.storyRailGapDesktop ?? 50);
+        setStoryRailOwnStoryExtraGap(s.storyRailOwnStoryExtraGap ?? 1);
         setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? 4);
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
@@ -426,6 +427,9 @@ export default function SettingsPage() {
         story_circle_inner_gap: storyCircleInnerGap,
         home_story_count_mobile: homeStoryCountMobile,
         home_story_count_desktop: homeStoryCountDesktop,
+        story_rail_gap_mobile: storyRailGapMobile,
+        story_rail_gap_desktop: storyRailGapDesktop,
+        story_rail_own_story_extra_gap: storyRailOwnStoryExtraGap,
         sidebar_story_ring_width: sidebarStoryRingWidth,
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
@@ -495,6 +499,9 @@ export default function SettingsPage() {
       setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
       setHomeStoryCountMobile(s.homeStoryCountMobile ?? 15);
       setHomeStoryCountDesktop(s.homeStoryCountDesktop ?? 30);
+      setStoryRailGapMobile(s.storyRailGapMobile ?? 50);
+      setStoryRailGapDesktop(s.storyRailGapDesktop ?? 50);
+      setStoryRailOwnStoryExtraGap(s.storyRailOwnStoryExtraGap ?? 1);
       setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? 4);
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
@@ -2009,6 +2016,47 @@ export default function SettingsPage() {
                 </div>
               </div>
 
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                      <Smartphone className="w-4 h-4 text-mansion-gold" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-text-primary">Gap rail mobile</h3>
+                      <p className="text-[11px] text-text-dim">Separación base entre stories en móvil</p>
+                    </div>
+                  </div>
+                  <Counter value={storyRailGapMobile} onChange={setStoryRailGapMobile} min={0} max={120} />
+                </div>
+
+                <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                      <Monitor className="w-4 h-4 text-mansion-gold" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-text-primary">Gap rail desktop</h3>
+                      <p className="text-[11px] text-text-dim">Separación base entre stories en desktop</p>
+                    </div>
+                  </div>
+                  <Counter value={storyRailGapDesktop} onChange={setStoryRailGapDesktop} min={0} max={120} />
+                </div>
+
+                <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                      <Plus className="w-4 h-4 text-mansion-gold" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-text-primary">Extra para Tú</h3>
+                      <p className="text-[11px] text-text-dim">Pixeles extra después del own story</p>
+                    </div>
+                  </div>
+                  <Counter value={storyRailOwnStoryExtraGap} onChange={setStoryRailOwnStoryExtraGap} min={0} max={24} />
+                </div>
+              </div>
+
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
@@ -2029,7 +2077,7 @@ export default function SettingsPage() {
                       className="flex shrink-0 flex-col items-center gap-1"
                       style={{
                         width: storyCirclePresetMedium + 6,
-                        ...(index === 0 && items.length > 1 ? { marginRight: STORY_RAIL_OWN_STORY_EXTRA_GAP_PX } : {}),
+                        ...(index === 0 && items.length > 1 ? { marginRight: storyRailOwnStoryExtraGap } : {}),
                       }}
                     >
                       <div
@@ -2053,7 +2101,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                     <p className="text-[10px] text-text-dim">Separación</p>
-                    <p className="text-sm font-semibold text-text-primary">{STORY_RAIL_GAP_MOBILE_PX}px mobile / {storyCircleGapPx}px desktop / Tú +{STORY_RAIL_OWN_STORY_EXTRA_GAP_PX}px</p>
+                    <p className="text-sm font-semibold text-text-primary">{storyRailGapMobile}px mobile / {storyCircleGapPx}px desktop / Tú +{storyRailOwnStoryExtraGap}px</p>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                     <p className="text-[10px] text-text-dim">Anillo</p>

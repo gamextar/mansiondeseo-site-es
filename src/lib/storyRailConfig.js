@@ -1,3 +1,6 @@
-export const STORY_RAIL_GAP_MOBILE_PX = 10;
-export const STORY_RAIL_GAP_DESKTOP_PX = 10;
-export const STORY_RAIL_OWN_STORY_EXTRA_GAP_PX = 5;
+// Legacy placeholder:
+// the stories rail spacing is now controlled only by Admin CP settings.
+// Effective keys:
+// - story_rail_gap_mobile
+// - story_rail_gap_desktop
+// - story_rail_own_story_extra_gap

@@ -12,11 +12,6 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
 import { getBottomNavPagePadding } from '../lib/bottomNavConfig';
-import {
-  STORY_RAIL_GAP_DESKTOP_PX,
-  STORY_RAIL_GAP_MOBILE_PX,
-  STORY_RAIL_OWN_STORY_EXTRA_GAP_PX,
-} from '../lib/storyRailConfig';
 import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsers, getViewedStoryUsersKey } from '../lib/storyViews';
 
 const FEED_CACHE_KEY = 'mansion_feed';
@@ -466,16 +461,19 @@ export default function FeedPage({ initialData }) {
   );
   const storyProfiles = homeStories.length > 0 ? homeStories : fallbackStoryProfiles;
   const storyCircleSize = safeSettings.storyCircleSize || 88;
-  const storyCircleGap = isDesktopViewport ? STORY_RAIL_GAP_DESKTOP_PX : STORY_RAIL_GAP_MOBILE_PX;
+  const storyRailGapMobile = Math.max(0, Number(safeSettings.storyRailGapMobile ?? 50) || 0);
+  const storyRailGapDesktop = Math.max(0, Number(safeSettings.storyRailGapDesktop ?? 50) || 0);
+  const storyRailOwnStoryExtraGap = Math.max(0, Number(safeSettings.storyRailOwnStoryExtraGap ?? 1) || 0);
+  const storyCircleGap = isDesktopViewport ? storyRailGapDesktop : storyRailGapMobile;
   if (typeof window !== 'undefined' && typeof console !== 'undefined') {
-    console.debug('Story rail gap (desktop/mobile):', STORY_RAIL_GAP_DESKTOP_PX, STORY_RAIL_GAP_MOBILE_PX, 'used:', storyCircleGap);
+    console.debug('Story rail gap (desktop/mobile):', storyRailGapDesktop, storyRailGapMobile, 'used:', storyCircleGap);
   }
   const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
   const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleInnerGap ?? 3)) / 100));
   const storyCircleSlotWidth = isDesktopViewport ? storyCircleSize + 6 : storyCircleSize;
   const ownStorySlotWidth = storyCircleSlotWidth;
   const ownStoryPlusRight = isDesktopViewport ? 0 : 2;
-  const ownStoryExtraGap = storyProfiles.length > 0 ? STORY_RAIL_OWN_STORY_EXTRA_GAP_PX : 0;
+  const ownStoryExtraGap = storyProfiles.length > 0 ? storyRailOwnStoryExtraGap : 0;
   const getStoryRailItemStyle = (animationDelay, extraRightGap = 0) => {
     return {
       width: storyCircleSlotWidth,
