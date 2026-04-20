@@ -56,6 +56,7 @@ const MOBILE_BROWSER_IMMERSIVE_SCROLL_OFFSET = 68;
 const MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX = 18;
 const MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING = 0.35;
 const MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS = 180;
+const MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS = 48;
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
@@ -122,6 +123,14 @@ function animateDocumentScrollTo(targetScrollTop, durationMs) {
   return () => {
     if (rafId) window.cancelAnimationFrame(rafId);
   };
+}
+
+function readUrlNumberParam(params, name, fallback, min, max) {
+  const raw = params.get(name);
+  if (raw === null || raw === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, value));
 }
 
 function syncViewportTopInsetVar() {
@@ -220,6 +229,16 @@ function AppLayout() {
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
   const showChrome = !isFullscreen && !isChatDetail && !isPublicHome;
   const scrollLockRef = useRef(null);
+  const publicProfileScrollTuning = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return {
+      offset: readUrlNumberParam(params, 'profile_top_offset', MOBILE_BROWSER_IMMERSIVE_SCROLL_OFFSET, 0, 160),
+      elastic: readUrlNumberParam(params, 'profile_top_elastic', MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX, 0, 80),
+      damping: readUrlNumberParam(params, 'profile_top_damping', MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING, 0.05, 1),
+      returnMs: readUrlNumberParam(params, 'profile_top_return', MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS, 0, 800),
+      releaseMs: readUrlNumberParam(params, 'profile_top_release', MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS, 0, 240),
+    };
+  }, [location.search]);
   const immersiveMobileApp = Boolean(
     (user || registered) &&
     isMobileViewport &&
@@ -391,11 +410,14 @@ function AppLayout() {
   // a profile overlay (which manages scroll lock/restore itself).
   const prevPathnameRef = useRef(null);
   useLayoutEffect(() => {
+    const routeScrollKey = isPublicProfileRoute
+      ? `${location.pathname}${location.search}`
+      : location.pathname;
     const prev = prevPathnameRef.current;
-    prevPathnameRef.current = location.pathname;
+    prevPathnameRef.current = routeScrollKey;
     if (routeOverlayOpen) return; // overlay handles its own scroll
     if (location.state?.backgroundLocation) return; // closing overlay — App handles it
-    if (prev === location.pathname) return; // same route, no reset
+    if (prev === routeScrollKey) return; // same route/search, no reset
     if (isMobileViewport && normalizedRoutePath === '/videos') return; // video feed owns its mobile browser offset
     const shouldStabilizeMobileScroll =
       isMobileViewport &&
@@ -408,7 +430,7 @@ function AppLayout() {
 
     const nextScrollTop =
       isMobileViewport && isPublicProfileRoute
-        ? MOBILE_BROWSER_IMMERSIVE_SCROLL_OFFSET
+        ? publicProfileScrollTuning.offset
         : 0;
 
     resetDocumentScroll(nextScrollTop);
@@ -429,13 +451,17 @@ function AppLayout() {
       if (rafB) window.cancelAnimationFrame(rafB);
       timers.forEach((timerId) => window.clearTimeout(timerId));
     };
-  }, [isMobileViewport, location.pathname, location.state, normalizedRoutePath, routeOverlayOpen]);
+  }, [isMobileViewport, isPublicProfileRoute, location.pathname, location.search, location.state, normalizedRoutePath, publicProfileScrollTuning.offset, routeOverlayOpen]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     if (!isMobileViewport || !isPublicProfileRoute || routeOverlayOpen) return undefined;
 
-    const minScrollTop = MOBILE_BROWSER_IMMERSIVE_SCROLL_OFFSET;
+    const minScrollTop = publicProfileScrollTuning.offset;
+    const elasticMaxPx = publicProfileScrollTuning.elastic;
+    const damping = publicProfileScrollTuning.damping;
+    const returnDurationMs = publicProfileScrollTuning.returnMs;
+    const releaseDelayMs = publicProfileScrollTuning.releaseMs;
     const root = document.documentElement;
     const body = document.body;
     const previousRootOverscroll = root.style.overscrollBehaviorY;
@@ -454,18 +480,19 @@ function AppLayout() {
 
     const snapBackToTop = (immediate = false) => {
       cancelReturn();
+      const currentScrollTop = getDocumentScrollTop();
+      if (currentScrollTop >= minScrollTop) return;
       if (immediate) {
         resetDocumentScroll(minScrollTop);
         return;
       }
-      const currentScrollTop = getDocumentScrollTop();
       if (currentScrollTop >= minScrollTop - 0.5) {
         resetDocumentScroll(minScrollTop);
         return;
       }
       cancelReturnAnimation = animateDocumentScrollTo(
         minScrollTop,
-        MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS
+        returnDurationMs
       );
     };
 
@@ -475,8 +502,8 @@ function AppLayout() {
 
       const overshoot = minScrollTop - currentScrollTop;
       const dampedOvershoot = Math.min(
-        MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX,
-        overshoot * MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING
+        elasticMaxPx,
+        overshoot * damping
       );
       const nextScrollTop = minScrollTop - dampedOvershoot;
 
@@ -497,7 +524,7 @@ function AppLayout() {
       if (releaseTimerId) window.clearTimeout(releaseTimerId);
       releaseTimerId = window.setTimeout(() => {
         snapBackToTop(false);
-      }, 48);
+      }, releaseDelayMs);
     };
 
     const handleTouchStart = () => {
@@ -515,6 +542,15 @@ function AppLayout() {
     };
 
     const handleScroll = () => {
+      const currentScrollTop = getDocumentScrollTop();
+      if (currentScrollTop >= minScrollTop) {
+        cancelReturn();
+        if (releaseTimerId) {
+          window.clearTimeout(releaseTimerId);
+          releaseTimerId = 0;
+        }
+        return;
+      }
       scheduleElasticClamp();
       if (!touching) scheduleSnapBack();
     };
@@ -562,7 +598,7 @@ function AppLayout() {
       window.removeEventListener('focus', handleViewportChange);
       window.visualViewport?.removeEventListener('resize', handleViewportChange);
     };
-  }, [isMobileViewport, isPublicProfileRoute, routeOverlayOpen]);
+  }, [isMobileViewport, isPublicProfileRoute, publicProfileScrollTuning, routeOverlayOpen]);
 
   useEffect(() => {
     // Video overlay is fullscreen — no need to lock the background scroll.
