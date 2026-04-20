@@ -53,6 +53,9 @@ const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const NON_DEFAULT_ROUTE_LOCALES = getRouteEnabledSeoLocales().filter((locale) => locale.pathPrefix);
 const MOBILE_BROWSER_IMMERSIVE_SCROLL_OFFSET = 68;
+const MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX = 18;
+const MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING = 0.35;
+const MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS = 180;
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
@@ -75,6 +78,50 @@ function resetDocumentScroll(scrollTop = 0) {
   root.scrollTop = scrollTop;
   if (body) body.scrollTop = scrollTop;
   root.style.scrollBehavior = previousScrollBehavior;
+}
+
+function getDocumentScrollTop() {
+  if (typeof window === 'undefined') return 0;
+  const root = document.documentElement;
+  const body = document.body;
+  return Math.max(
+    Number(window.scrollY || 0),
+    Number(root?.scrollTop || 0),
+    Number(body?.scrollTop || 0)
+  );
+}
+
+function easeOutCubic(t) {
+  return 1 - ((1 - t) ** 3);
+}
+
+function animateDocumentScrollTo(targetScrollTop, durationMs) {
+  if (typeof window === 'undefined') return () => {};
+
+  const startScrollTop = getDocumentScrollTop();
+  if (Math.abs(startScrollTop - targetScrollTop) < 0.5) {
+    resetDocumentScroll(targetScrollTop);
+    return () => {};
+  }
+
+  let rafId = 0;
+  const startedAt = window.performance?.now?.() ?? Date.now();
+
+  const tick = (now) => {
+    const elapsed = now - startedAt;
+    const progress = Math.min(1, elapsed / durationMs);
+    const easedProgress = easeOutCubic(progress);
+    const nextScrollTop = startScrollTop + ((targetScrollTop - startScrollTop) * easedProgress);
+    resetDocumentScroll(nextScrollTop);
+    if (progress < 1) {
+      rafId = window.requestAnimationFrame(tick);
+    }
+  };
+
+  rafId = window.requestAnimationFrame(tick);
+  return () => {
+    if (rafId) window.cancelAnimationFrame(rafId);
+  };
 }
 
 function syncViewportTopInsetVar() {
@@ -393,52 +440,127 @@ function AppLayout() {
     const body = document.body;
     const previousRootOverscroll = root.style.overscrollBehaviorY;
     const previousBodyOverscroll = body?.style.overscrollBehaviorY || '';
-    let rafId = 0;
+    let clampRafId = 0;
+    let releaseTimerId = 0;
+    let touching = false;
+    let cancelReturnAnimation = null;
 
-    const clampScroll = () => {
-      const currentScrollTop = Math.max(
-        Number(window.scrollY || 0),
-        Number(root.scrollTop || 0),
-        Number(body?.scrollTop || 0)
-      );
-      if (currentScrollTop >= minScrollTop) return;
-      resetDocumentScroll(minScrollTop);
+    const cancelReturn = () => {
+      if (cancelReturnAnimation) {
+        cancelReturnAnimation();
+        cancelReturnAnimation = null;
+      }
     };
 
-    const scheduleClamp = () => {
-      if (rafId) return;
-      rafId = window.requestAnimationFrame(() => {
-        rafId = 0;
-        clampScroll();
+    const snapBackToTop = (immediate = false) => {
+      cancelReturn();
+      if (immediate) {
+        resetDocumentScroll(minScrollTop);
+        return;
+      }
+      const currentScrollTop = getDocumentScrollTop();
+      if (currentScrollTop >= minScrollTop - 0.5) {
+        resetDocumentScroll(minScrollTop);
+        return;
+      }
+      cancelReturnAnimation = animateDocumentScrollTo(
+        minScrollTop,
+        MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS
+      );
+    };
+
+    const applyElasticClamp = () => {
+      const currentScrollTop = getDocumentScrollTop();
+      if (currentScrollTop >= minScrollTop) return;
+
+      const overshoot = minScrollTop - currentScrollTop;
+      const dampedOvershoot = Math.min(
+        MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX,
+        overshoot * MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING
+      );
+      const nextScrollTop = minScrollTop - dampedOvershoot;
+
+      if (Math.abs(nextScrollTop - currentScrollTop) < 0.5) return;
+      resetDocumentScroll(nextScrollTop);
+    };
+
+    const scheduleElasticClamp = () => {
+      cancelReturn();
+      if (clampRafId) return;
+      clampRafId = window.requestAnimationFrame(() => {
+        clampRafId = 0;
+        applyElasticClamp();
       });
     };
 
-    root.style.overscrollBehaviorY = 'none';
-    if (body) body.style.overscrollBehaviorY = 'none';
+    const scheduleSnapBack = () => {
+      if (releaseTimerId) window.clearTimeout(releaseTimerId);
+      releaseTimerId = window.setTimeout(() => {
+        snapBackToTop(false);
+      }, 48);
+    };
 
-    clampScroll();
-    const timers = [80, 180, 360, 700].map((delay) => window.setTimeout(clampScroll, delay));
+    const handleTouchStart = () => {
+      touching = true;
+      if (releaseTimerId) {
+        window.clearTimeout(releaseTimerId);
+        releaseTimerId = 0;
+      }
+      cancelReturn();
+    };
 
-    window.addEventListener('scroll', scheduleClamp);
-    window.addEventListener('touchend', scheduleClamp);
-    window.addEventListener('resize', scheduleClamp);
-    window.addEventListener('orientationchange', scheduleClamp);
-    window.addEventListener('pageshow', scheduleClamp);
-    window.addEventListener('focus', scheduleClamp);
-    window.visualViewport?.addEventListener('resize', scheduleClamp);
+    const handleTouchEnd = () => {
+      touching = false;
+      scheduleSnapBack();
+    };
+
+    const handleScroll = () => {
+      scheduleElasticClamp();
+      if (!touching) scheduleSnapBack();
+    };
+
+    const handleViewportChange = () => {
+      if (releaseTimerId) {
+        window.clearTimeout(releaseTimerId);
+        releaseTimerId = 0;
+      }
+      snapBackToTop(true);
+    };
+
+    root.style.overscrollBehaviorY = 'contain';
+    if (body) body.style.overscrollBehaviorY = 'contain';
+
+    snapBackToTop(true);
+    const timers = [80, 180, 360, 700].map((delay) => window.setTimeout(() => snapBackToTop(true), delay));
+
+    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleScroll, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('touchcancel', handleTouchEnd);
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('orientationchange', handleViewportChange);
+    window.addEventListener('pageshow', handleViewportChange);
+    window.addEventListener('focus', handleViewportChange);
+    window.visualViewport?.addEventListener('resize', handleViewportChange);
 
     return () => {
-      if (rafId) window.cancelAnimationFrame(rafId);
+      if (clampRafId) window.cancelAnimationFrame(clampRafId);
+      if (releaseTimerId) window.clearTimeout(releaseTimerId);
+      cancelReturn();
       timers.forEach((timerId) => window.clearTimeout(timerId));
       root.style.overscrollBehaviorY = previousRootOverscroll;
       if (body) body.style.overscrollBehaviorY = previousBodyOverscroll;
-      window.removeEventListener('scroll', scheduleClamp);
-      window.removeEventListener('touchend', scheduleClamp);
-      window.removeEventListener('resize', scheduleClamp);
-      window.removeEventListener('orientationchange', scheduleClamp);
-      window.removeEventListener('pageshow', scheduleClamp);
-      window.removeEventListener('focus', scheduleClamp);
-      window.visualViewport?.removeEventListener('resize', scheduleClamp);
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleScroll);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchEnd);
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('orientationchange', handleViewportChange);
+      window.removeEventListener('pageshow', handleViewportChange);
+      window.removeEventListener('focus', handleViewportChange);
+      window.visualViewport?.removeEventListener('resize', handleViewportChange);
     };
   }, [isMobileViewport, isPublicProfileRoute, routeOverlayOpen]);
 
