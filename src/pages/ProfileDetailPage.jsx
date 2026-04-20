@@ -679,6 +679,22 @@ export default function ProfileDetailPage({ initialData }) {
           <ChevronLeft className="w-6 h-6 text-white" />
         </MotionButton>
 
+        {!isOwnProfile && (
+          <MotionButton
+            disabled={disableMountMotion}
+            motionProps={{
+              initial: { opacity: 0, x: 10 },
+              animate: { opacity: 1, x: 0 },
+            }}
+            onClick={handleBack}
+            aria-label="Cerrar perfil"
+            className="hidden lg:flex fixed w-14 h-14 rounded-full bg-black/40 backdrop-blur-md border border-white/10 items-center justify-center z-[70]"
+            style={{ top: 'max(env(safe-area-inset-top, 16px), 16px)', right: 16 }}
+          >
+            <X className="w-5 h-5 text-white" />
+          </MotionButton>
+        )}
+
         {/* Desktop arrow buttons */}
         {displayPhotos.length > 1 && (
           <>
