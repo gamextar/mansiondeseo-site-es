@@ -468,11 +468,15 @@ export default function FeedPage({ initialData }) {
   const storyCircleSlotWidth = isDesktopViewport ? storyCircleSize + 6 : storyCircleSize;
   const ownStorySlotWidth = storyCircleSlotWidth;
   const ownStoryPlusRight = isDesktopViewport ? 0 : 2;
-  const getStoryRailItemStyle = (animationDelay, isLastItem = false) => ({
-    width: storyCircleSlotWidth,
-    animationDelay,
-    ...(isDesktopViewport || isLastItem ? {} : { marginRight: storyCircleGap }),
-  });
+  const getStoryRailItemStyle = (animationDelay, isLastItem = false, isOwnStory = false) => {
+    const baseGap = isLastItem ? 0 : storyCircleGap;
+    const gap = isOwnStory && !isLastItem ? baseGap + 1 : baseGap;
+    return {
+      width: storyCircleSlotWidth,
+      animationDelay,
+      ...(gap > 0 ? { marginRight: gap } : {}),
+    };
+  };
 
   const goToFeedPage = useCallback(async (page) => {
     const safePage = Math.max(1, Math.min(totalPages, Number(page) || 1));
@@ -1041,7 +1045,7 @@ export default function FeedPage({ initialData }) {
             style={{
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
-              gap: isDesktopViewport ? `${storyCircleGap}px` : '0px',
+              gap: '0px',
               touchAction: 'pan-x',
               transform: 'translate3d(0px, 0, 0)',
               transition: STORIES_RAIL_TRANSITION,
@@ -1065,7 +1069,7 @@ export default function FeedPage({ initialData }) {
             safariDesktop ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0)}
+                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true)}
               >
                 <div className="relative">
                   <button
@@ -1120,7 +1124,7 @@ export default function FeedPage({ initialData }) {
             ) : desktopStoryRailEnhanced ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0)}
+                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true)}
               >
                 <div className="relative">
                   <button
@@ -1175,7 +1179,7 @@ export default function FeedPage({ initialData }) {
             ) : (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0)}
+                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true)}
               >
                 <div className="relative">
                   <button
