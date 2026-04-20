@@ -12,7 +12,11 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
 import { getBottomNavPagePadding } from '../lib/bottomNavConfig';
-import { STORY_RAIL_GAP_DESKTOP_PX, STORY_RAIL_GAP_MOBILE_PX } from '../lib/storyRailConfig';
+import {
+  STORY_RAIL_GAP_DESKTOP_PX,
+  STORY_RAIL_GAP_MOBILE_PX,
+  STORY_RAIL_OWN_STORY_EXTRA_GAP_PX,
+} from '../lib/storyRailConfig';
 import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsers, getViewedStoryUsersKey } from '../lib/storyViews';
 
 const FEED_CACHE_KEY = 'mansion_feed';
@@ -471,13 +475,12 @@ export default function FeedPage({ initialData }) {
   const storyCircleSlotWidth = isDesktopViewport ? storyCircleSize + 6 : storyCircleSize;
   const ownStorySlotWidth = storyCircleSlotWidth;
   const ownStoryPlusRight = isDesktopViewport ? 0 : 2;
-  const getStoryRailItemStyle = (animationDelay, isLastItem = false, isOwnStory = false) => {
-    const baseGap = isLastItem ? 0 : storyCircleGap;
-    const gap = isOwnStory && !isLastItem ? baseGap + 1 : baseGap;
+  const ownStoryExtraGap = storyProfiles.length > 0 ? STORY_RAIL_OWN_STORY_EXTRA_GAP_PX : 0;
+  const getStoryRailItemStyle = (animationDelay, extraRightGap = 0) => {
     return {
       width: storyCircleSlotWidth,
       animationDelay,
-      ...(gap > 0 ? { marginRight: gap } : {}),
+      ...(extraRightGap > 0 ? { marginRight: extraRightGap } : {}),
     };
   };
 
@@ -1048,7 +1051,7 @@ export default function FeedPage({ initialData }) {
             style={{
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
-              gap: '0px',
+              gap: `${storyCircleGap}px`,
               touchAction: 'pan-x',
               transform: 'translate3d(0px, 0, 0)',
               transition: STORIES_RAIL_TRANSITION,
@@ -1072,8 +1075,8 @@ export default function FeedPage({ initialData }) {
             safariDesktop ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true)}
-                data-story-gap={(getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true).marginRight ?? 0)}
+                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, ownStoryExtraGap)}
+                data-story-gap={ownStoryExtraGap}
               >
                 <div className="relative">
                   <button
@@ -1128,8 +1131,8 @@ export default function FeedPage({ initialData }) {
             ) : desktopStoryRailEnhanced ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true)}
-                data-story-gap={(getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true).marginRight ?? 0)}
+                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, ownStoryExtraGap)}
+                data-story-gap={ownStoryExtraGap}
               >
                 <div className="relative">
                   <button
@@ -1184,8 +1187,8 @@ export default function FeedPage({ initialData }) {
             ) : (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true)}
-                data-story-gap={(getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, orderedStoryProfiles.length === 0, true).marginRight ?? 0)}
+                style={getStoryRailItemStyle(storiesIntroEnabled ? '30ms' : undefined, ownStoryExtraGap)}
+                data-story-gap={ownStoryExtraGap}
               >
                 <div className="relative">
                   <button
@@ -1247,8 +1250,7 @@ export default function FeedPage({ initialData }) {
             const border = storyCircleBorder;
             const innerGap = storyCircleInnerGap;
             const itemStyle = getStoryRailItemStyle(
-              storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined,
-              index === orderedStoryProfiles.length - 1
+              storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined
             );
             return safariDesktop ? (
               <div

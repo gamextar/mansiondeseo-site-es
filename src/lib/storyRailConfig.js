@@ -1,2 +1,3 @@
 export const STORY_RAIL_GAP_MOBILE_PX = 50;
 export const STORY_RAIL_GAP_DESKTOP_PX = 50;
+export const STORY_RAIL_OWN_STORY_EXTRA_GAP_PX = 1;

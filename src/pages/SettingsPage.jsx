@@ -18,7 +18,11 @@ import {
   STANDALONE_BOTTOM_NAV_PAGE_EXTRA_PADDING,
   STANDALONE_BOTTOM_NAV_VISUAL_OFFSET,
 } from '../lib/bottomNavConfig';
-import { STORY_RAIL_GAP_DESKTOP_PX, STORY_RAIL_GAP_MOBILE_PX } from '../lib/storyRailConfig';
+import {
+  STORY_RAIL_GAP_DESKTOP_PX,
+  STORY_RAIL_GAP_MOBILE_PX,
+  STORY_RAIL_OWN_STORY_EXTRA_GAP_PX,
+} from '../lib/storyRailConfig';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -2019,8 +2023,15 @@ export default function SettingsPage() {
                     { label: 'Tú', active: true, gold: true },
                     { label: 'Luna', active: true },
                     { label: 'Mia', active: false },
-                  ].map((item) => (
-                    <div key={item.label} className="flex shrink-0 flex-col items-center gap-1" style={{ width: storyCirclePresetMedium + 6 }}>
+                  ].map((item, index, items) => (
+                    <div
+                      key={item.label}
+                      className="flex shrink-0 flex-col items-center gap-1"
+                      style={{
+                        width: storyCirclePresetMedium + 6,
+                        ...(index === 0 && items.length > 1 ? { marginRight: STORY_RAIL_OWN_STORY_EXTRA_GAP_PX } : {}),
+                      }}
+                    >
                       <div
                         className={`rounded-full ${item.gold ? 'bg-gradient-to-tr from-mansion-gold via-mansion-crimson to-mansion-gold' : item.active ? 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson' : 'bg-gradient-to-tr from-mansion-border/60 to-mansion-border/40'}`}
                         style={{ width: storyCirclePresetMedium, height: storyCirclePresetMedium, padding: storyCircleBorderPx }}
@@ -2042,7 +2053,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                     <p className="text-[10px] text-text-dim">Separación</p>
-                    <p className="text-sm font-semibold text-text-primary">{STORY_RAIL_GAP_MOBILE_PX}px mobile / {storyCircleGapPx}px desktop</p>
+                    <p className="text-sm font-semibold text-text-primary">{STORY_RAIL_GAP_MOBILE_PX}px mobile / {storyCircleGapPx}px desktop / Tú +{STORY_RAIL_OWN_STORY_EXTRA_GAP_PX}px</p>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-mansion-card/50 p-2.5">
                     <p className="text-[10px] text-text-dim">Anillo</p>
