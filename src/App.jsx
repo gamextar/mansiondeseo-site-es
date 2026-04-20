@@ -230,6 +230,7 @@ function AppLayout() {
   const mobileBrowserVideosRoute = isMobileViewport && normalizedRoutePath === '/videos';
   const isPublicHome = location.pathname === '/';
   const isPublicProfileRoute = normalizedRoutePath.startsWith('/perfiles/');
+  const isMobileBrowserPublicProfileRoute = isMobileViewport && !isStandaloneMobileApp && isPublicProfileRoute;
   const isFullscreen =
     standaloneVideosRoute ||
     mobileBrowserVideosRoute ||
@@ -421,7 +422,7 @@ function AppLayout() {
   // a profile overlay (which manages scroll lock/restore itself).
   const prevPathnameRef = useRef(null);
   useLayoutEffect(() => {
-    const routeScrollKey = isPublicProfileRoute
+    const routeScrollKey = isMobileBrowserPublicProfileRoute
       ? `${location.pathname}${location.search}`
       : location.pathname;
     const prev = prevPathnameRef.current;
@@ -436,11 +437,11 @@ function AppLayout() {
         normalizedRoutePath === '/perfil' ||
         normalizedRoutePath === '/mensajes' ||
         normalizedRoutePath.startsWith('/mensajes/') ||
-        isPublicProfileRoute
+        isMobileBrowserPublicProfileRoute
       );
 
     const nextScrollTop =
-      isMobileViewport && isPublicProfileRoute
+      isMobileBrowserPublicProfileRoute
         ? publicProfileScrollTuning.offset
         : 0;
 
@@ -462,11 +463,11 @@ function AppLayout() {
       if (rafB) window.cancelAnimationFrame(rafB);
       timers.forEach((timerId) => window.clearTimeout(timerId));
     };
-  }, [isMobileViewport, isPublicProfileRoute, location.pathname, location.search, location.state, normalizedRoutePath, publicProfileScrollTuning.offset, routeOverlayOpen]);
+  }, [isMobileBrowserPublicProfileRoute, isMobileViewport, location.pathname, location.search, location.state, normalizedRoutePath, publicProfileScrollTuning.offset, routeOverlayOpen]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
-    if (!isMobileViewport || !isPublicProfileRoute || routeOverlayOpen) return undefined;
+    if (!isMobileBrowserPublicProfileRoute || routeOverlayOpen) return undefined;
 
     const minScrollTop = publicProfileScrollTuning.offset;
     const elasticMaxPx = publicProfileScrollTuning.elastic;
@@ -661,7 +662,7 @@ function AppLayout() {
       window.removeEventListener('focus', handleViewportChange);
       window.visualViewport?.removeEventListener('resize', handleViewportChange);
     };
-  }, [isMobileViewport, isPublicProfileRoute, publicProfileScrollTuning, routeOverlayOpen]);
+  }, [isMobileBrowserPublicProfileRoute, publicProfileScrollTuning, routeOverlayOpen]);
 
   useEffect(() => {
     // Video overlay is fullscreen — no need to lock the background scroll.
