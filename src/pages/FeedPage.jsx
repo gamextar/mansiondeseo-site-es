@@ -1059,7 +1059,7 @@ export default function FeedPage({ initialData }) {
             safariDesktop ? (
               <div
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
-                style={{ width: storyCircleSlotWidth, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
+                style={{ width: storyCircleSlotWidth + 1, animationDelay: storiesIntroEnabled ? '30ms' : undefined }}
               >
                 <div className="relative">
                   <button
