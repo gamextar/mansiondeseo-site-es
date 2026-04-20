@@ -593,6 +593,11 @@ export default function ProfileDetailPage({ initialData }) {
   const heroBlur = Math.round(baseBlur * 1.8);
   const thumbBlur = Math.round(baseBlur * 0.7);
   const lightboxBlur = Math.round(baseBlur * 2.5);
+  const publicProfileTopBounceStyle = {
+    transform: 'translate3d(0, var(--public-profile-top-bounce-y, 0px), 0)',
+    transition: 'var(--public-profile-top-bounce-transition, none)',
+    willChange: 'transform',
+  };
 
   return (
     <div className="min-h-mobile-browser-screen lg:min-h-screen bg-mansion-base pb-mobile-legacy-nav lg:pb-16">
@@ -607,6 +612,7 @@ export default function ProfileDetailPage({ initialData }) {
             initial: { opacity: 0 },
             animate: { opacity: 1 },
           }}
+          style={publicProfileTopBounceStyle}
           className="w-full aspect-[3/4] max-h-[70vh] lg:max-h-[85vh] overflow-hidden lg:rounded-3xl relative"
         >
           {/* Scroll-snap container */}
@@ -652,7 +658,10 @@ export default function ProfileDetailPage({ initialData }) {
         </MotionDiv>
 
         {/* Top nav overlay — photo counter only (back button is fixed) */}
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 pt-14 lg:pt-4 z-[60] pointer-events-none">
+        <div
+          className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 pt-14 lg:pt-4 z-[60] pointer-events-none"
+          style={publicProfileTopBounceStyle}
+        >
           <div className="w-16" />
 
           {/* Photo counter */}
@@ -719,7 +728,13 @@ export default function ProfileDetailPage({ initialData }) {
 
         {/* Interactive dots */}
         {displayPhotos.length > 1 && (
-          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex gap-1.5 lg:bottom-6 z-20">
+          <div
+            className="absolute bottom-24 left-1/2 -translate-x-1/2 flex gap-1.5 lg:bottom-6 z-20"
+            style={{
+              ...publicProfileTopBounceStyle,
+              transform: 'translate3d(-50%, var(--public-profile-top-bounce-y, 0px), 0)',
+            }}
+          >
             {displayPhotos.map((_, i) => (
               <button
                 key={i}
@@ -745,7 +760,7 @@ export default function ProfileDetailPage({ initialData }) {
         }}
         className="relative -mt-20 px-4 z-10 min-w-0 lg:mt-0 lg:px-0 lg:flex-1"
       >
-        <div className="glass-elevated rounded-[2rem] p-6 shadow-elevated">
+        <div className="glass-elevated rounded-[2rem] p-6 shadow-elevated" style={publicProfileTopBounceStyle}>
           {/* Name row */}
           <div className="mb-5">
             <div className="flex items-start justify-between gap-2 mb-1.5">

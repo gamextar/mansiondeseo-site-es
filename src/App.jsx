@@ -57,6 +57,8 @@ const MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX = 18;
 const MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING = 0.35;
 const MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS = 180;
 const MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS = 48;
+const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_MAX_PX = 12;
+const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_RETURN_MS = 220;
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
@@ -237,6 +239,8 @@ function AppLayout() {
       damping: readUrlNumberParam(params, 'profile_top_damping', MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING, 0.05, 1),
       returnMs: readUrlNumberParam(params, 'profile_top_return', MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS, 0, 800),
       releaseMs: readUrlNumberParam(params, 'profile_top_release', MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS, 0, 240),
+      bounce: readUrlNumberParam(params, 'profile_top_bounce', MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_MAX_PX, 0, 80),
+      bounceReturnMs: readUrlNumberParam(params, 'profile_top_bounce_return', MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_RETURN_MS, 0, 800),
     };
   }, [location.search]);
   const immersiveMobileApp = Boolean(
@@ -462,6 +466,8 @@ function AppLayout() {
     const damping = publicProfileScrollTuning.damping;
     const returnDurationMs = publicProfileScrollTuning.returnMs;
     const releaseDelayMs = publicProfileScrollTuning.releaseMs;
+    const bounceMaxPx = publicProfileScrollTuning.bounce;
+    const bounceReturnMs = publicProfileScrollTuning.bounceReturnMs;
     const root = document.documentElement;
     const body = document.body;
     const previousRootOverscroll = root.style.overscrollBehaviorY;
@@ -478,18 +484,35 @@ function AppLayout() {
       }
     };
 
+    const setTopBounce = (value, withTransition = false) => {
+      const nextValue = Math.max(0, Math.min(bounceMaxPx, value));
+      root.style.setProperty(
+        '--public-profile-top-bounce-transition',
+        withTransition
+          ? `transform ${bounceReturnMs}ms cubic-bezier(0.22, 1, 0.36, 1)`
+          : 'none'
+      );
+      root.style.setProperty('--public-profile-top-bounce-y', `${nextValue.toFixed(2)}px`);
+    };
+
     const snapBackToTop = (immediate = false) => {
       cancelReturn();
       const currentScrollTop = getDocumentScrollTop();
-      if (currentScrollTop >= minScrollTop) return;
+      if (currentScrollTop >= minScrollTop) {
+        setTopBounce(0, !immediate);
+        return;
+      }
       if (immediate) {
+        setTopBounce(0, false);
         resetDocumentScroll(minScrollTop);
         return;
       }
       if (currentScrollTop >= minScrollTop - 0.5) {
+        setTopBounce(0, true);
         resetDocumentScroll(minScrollTop);
         return;
       }
+      setTopBounce(0, true);
       cancelReturnAnimation = animateDocumentScrollTo(
         minScrollTop,
         returnDurationMs
@@ -506,6 +529,7 @@ function AppLayout() {
         overshoot * damping
       );
       const nextScrollTop = minScrollTop - dampedOvershoot;
+      setTopBounce(dampedOvershoot, false);
 
       if (Math.abs(nextScrollTop - currentScrollTop) < 0.5) return;
       resetDocumentScroll(nextScrollTop);
@@ -545,6 +569,7 @@ function AppLayout() {
       const currentScrollTop = getDocumentScrollTop();
       if (currentScrollTop >= minScrollTop) {
         cancelReturn();
+        setTopBounce(0, false);
         if (releaseTimerId) {
           window.clearTimeout(releaseTimerId);
           releaseTimerId = 0;
@@ -565,6 +590,7 @@ function AppLayout() {
 
     root.style.overscrollBehaviorY = 'contain';
     if (body) body.style.overscrollBehaviorY = 'contain';
+    setTopBounce(0, false);
 
     snapBackToTop(true);
     const timers = [80, 180, 360, 700].map((delay) => window.setTimeout(() => snapBackToTop(true), delay));
@@ -585,6 +611,8 @@ function AppLayout() {
       if (releaseTimerId) window.clearTimeout(releaseTimerId);
       cancelReturn();
       timers.forEach((timerId) => window.clearTimeout(timerId));
+      root.style.removeProperty('--public-profile-top-bounce-y');
+      root.style.removeProperty('--public-profile-top-bounce-transition');
       root.style.overscrollBehaviorY = previousRootOverscroll;
       if (body) body.style.overscrollBehaviorY = previousBodyOverscroll;
       window.removeEventListener('scroll', handleScroll);
