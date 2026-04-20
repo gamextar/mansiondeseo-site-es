@@ -756,6 +756,15 @@ export default function ProfileDetailPage({ initialData }) {
                 <span className="text-text-muted text-xl font-light shrink-0">{age}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                {!isOwnProfile && (
+                  <button
+                    onClick={handleBack}
+                    aria-label="Cerrar perfil"
+                    className="hidden lg:inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-text-muted hover:text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
                 {online && (
                   <span className="flex items-center gap-1.5 text-xs text-green-400 bg-green-400/10 rounded-full px-2.5 py-1">
                     <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse-slow" />
