@@ -4,7 +4,12 @@ node_modules/
 dist/
 dist-astro/
 build/
-data/
+data/*
+!data/seo/
+data/seo/*
+!data/seo/seo-city-stats.json
+!data/seo/seo-home-stats.json
+!data/seo/seo-city-stats-upsert.sql
 .wrangler/
 .react-router/
 .astro/
