@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAgeVerified } from './hooks/useAgeVerified';
@@ -113,8 +113,31 @@ function AppLayout() {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(max-width: 1023px)').matches;
   });
-  const backgroundLocation = location.state?.backgroundLocation;
-  const profileOverlayOpen = location.state?.modal === 'profile' && !!backgroundLocation;
+  const desktopProfileOverlayFallback = useMemo(() => {
+    if (isMobileViewport) return null;
+    if (!location.pathname.startsWith('/perfiles/')) return null;
+    if (location.state?.backgroundLocation) return null;
+
+    const from = typeof location.state?.from === 'string' ? location.state.from : '';
+    if (!from.startsWith('/')) return null;
+
+    try {
+      const resolved = new URL(from, window.location.origin);
+      return {
+        pathname: resolved.pathname,
+        search: resolved.search,
+        hash: resolved.hash,
+        state: location.state?.returnState || null,
+        key: `desktop-profile-overlay:${resolved.pathname}${resolved.search}${resolved.hash}`,
+      };
+    } catch {
+      return null;
+    }
+  }, [isMobileViewport, location.pathname, location.state]);
+  const backgroundLocation = location.state?.backgroundLocation || desktopProfileOverlayFallback;
+  const profileOverlayOpen =
+    (location.state?.modal === 'profile' && !!backgroundLocation) ||
+    (!!desktopProfileOverlayFallback);
   const videoOverlayOpen = location.state?.modal === 'videos' && !!backgroundLocation;
   const routeOverlayOpen = profileOverlayOpen || videoOverlayOpen;
   const routePath = location.pathname || '/';
