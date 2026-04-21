@@ -436,7 +436,11 @@ export default function FeedPage({ initialData }) {
   }, [loadProfiles, pageCursor]);
 
   const { indicatorRef } = usePullToRefresh(
-    useCallback(() => loadProfiles({ forceFresh: true }), [loadProfiles])
+    useCallback(() => loadProfiles({ forceFresh: true }), [loadProfiles]),
+    {
+      preventNativePull: !isStandaloneMobileApp && !isDesktopViewport,
+      resetScrollOnRelease: !isStandaloneMobileApp && !isDesktopViewport,
+    }
   );
 
   const safeSettings = useMemo(() => ({
