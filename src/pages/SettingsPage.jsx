@@ -19,6 +19,13 @@ import {
   STANDALONE_BOTTOM_NAV_VISUAL_OFFSET,
 } from '../lib/bottomNavConfig';
 
+const STORY_CIRCLE_FALLBACK_SIZE = 88;
+const STORY_CIRCLE_FALLBACK_BORDER_PERCENT = 4;
+const STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT = 3;
+const STORY_RAIL_FALLBACK_GAP_MOBILE = 6;
+const STORY_RAIL_FALLBACK_GAP_DESKTOP = 7;
+const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
+
 export default function SettingsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -88,16 +95,16 @@ export default function SettingsPage() {
   const [navOpacity, setNavOpacity] = useState(40);
   const [navBlur, setNavBlur] = useState(24);
   const [storyCirclePresetSmall, setStoryCirclePresetSmall] = useState(72);
-  const [storyCirclePresetMedium, setStoryCirclePresetMedium] = useState(88);
+  const [storyCirclePresetMedium, setStoryCirclePresetMedium] = useState(STORY_CIRCLE_FALLBACK_SIZE);
   const [storyCirclePresetLarge, setStoryCirclePresetLarge] = useState(104);
   const [storyCirclePresetXl, setStoryCirclePresetXl] = useState(154);
-  const [storyCircleBorder, setStoryCircleBorder] = useState(4);
-  const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(3);
+  const [storyCircleBorder, setStoryCircleBorder] = useState(STORY_CIRCLE_FALLBACK_BORDER_PERCENT);
+  const [storyCircleInnerGap, setStoryCircleInnerGap] = useState(STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT);
   const [homeStoryCountMobile, setHomeStoryCountMobile] = useState(15);
   const [homeStoryCountDesktop, setHomeStoryCountDesktop] = useState(30);
-  const [storyRailGapMobile, setStoryRailGapMobile] = useState(50);
-  const [storyRailGapDesktop, setStoryRailGapDesktop] = useState(50);
-  const [storyRailOwnStoryExtraGap, setStoryRailOwnStoryExtraGap] = useState(1);
+  const [storyRailGapMobile, setStoryRailGapMobile] = useState(STORY_RAIL_FALLBACK_GAP_MOBILE);
+  const [storyRailGapDesktop, setStoryRailGapDesktop] = useState(STORY_RAIL_FALLBACK_GAP_DESKTOP);
+  const [storyRailOwnStoryExtraGap, setStoryRailOwnStoryExtraGap] = useState(STORY_RAIL_FALLBACK_OWN_EXTRA_GAP);
   const [sidebarStoryRingWidth, setSidebarStoryRingWidth] = useState(4);
   const [storyPresetEditor, setStoryPresetEditor] = useState('medium');
   const [avatarSizeDraft, setAvatarSizeDraft] = useState('88');
@@ -256,17 +263,17 @@ export default function SettingsPage() {
         setNavOpacity(s.navOpacity ?? 40);
         setNavBlur(s.navBlur ?? 24);
         setStoryCirclePresetSmall(s.storyCirclePresetSmall ?? 72);
-        setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? s.storyCircleSize ?? 88);
+        setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? s.storyCircleSize ?? STORY_CIRCLE_FALLBACK_SIZE);
         setStoryCirclePresetLarge(s.storyCirclePresetLarge ?? 104);
         setStoryCirclePresetXl(s.storyCirclePresetXl ?? s.sidebarAvatarSize ?? 154);
-        setStoryCircleBorder(s.storyCircleBorder ?? 4);
-        setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
+        setStoryCircleBorder(s.storyCircleBorder ?? STORY_CIRCLE_FALLBACK_BORDER_PERCENT);
+        setStoryCircleInnerGap(s.storyCircleInnerGap ?? STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT);
         setHomeStoryCountMobile(s.homeStoryCountMobile ?? 15);
         setHomeStoryCountDesktop(s.homeStoryCountDesktop ?? 30);
-        setStoryRailGapMobile(s.storyRailGapMobile ?? 50);
-        setStoryRailGapDesktop(s.storyRailGapDesktop ?? 50);
-        setStoryRailOwnStoryExtraGap(s.storyRailOwnStoryExtraGap ?? 1);
-        setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? 4);
+        setStoryRailGapMobile(s.storyRailGapMobile ?? STORY_RAIL_FALLBACK_GAP_MOBILE);
+        setStoryRailGapDesktop(s.storyRailGapDesktop ?? STORY_RAIL_FALLBACK_GAP_DESKTOP);
+        setStoryRailOwnStoryExtraGap(s.storyRailOwnStoryExtraGap ?? STORY_RAIL_FALLBACK_OWN_EXTRA_GAP);
+        setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? STORY_CIRCLE_FALLBACK_BORDER_PERCENT);
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
         setVideoAvatarSize(s.videoAvatarSize ?? 52);
@@ -492,17 +499,17 @@ export default function SettingsPage() {
       setNavOpacity(s.navOpacity ?? 40);
       setNavBlur(s.navBlur ?? 24);
       setStoryCirclePresetSmall(s.storyCirclePresetSmall ?? 72);
-      setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? s.storyCircleSize ?? 88);
+      setStoryCirclePresetMedium(s.storyCirclePresetMedium ?? s.storyCircleSize ?? STORY_CIRCLE_FALLBACK_SIZE);
       setStoryCirclePresetLarge(s.storyCirclePresetLarge ?? 104);
       setStoryCirclePresetXl(s.storyCirclePresetXl ?? s.sidebarAvatarSize ?? 154);
-      setStoryCircleBorder(s.storyCircleBorder ?? 4);
-      setStoryCircleInnerGap(s.storyCircleInnerGap ?? 3);
+      setStoryCircleBorder(s.storyCircleBorder ?? STORY_CIRCLE_FALLBACK_BORDER_PERCENT);
+      setStoryCircleInnerGap(s.storyCircleInnerGap ?? STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT);
       setHomeStoryCountMobile(s.homeStoryCountMobile ?? 15);
       setHomeStoryCountDesktop(s.homeStoryCountDesktop ?? 30);
-      setStoryRailGapMobile(s.storyRailGapMobile ?? 50);
-      setStoryRailGapDesktop(s.storyRailGapDesktop ?? 50);
-      setStoryRailOwnStoryExtraGap(s.storyRailOwnStoryExtraGap ?? 1);
-      setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? 4);
+      setStoryRailGapMobile(s.storyRailGapMobile ?? STORY_RAIL_FALLBACK_GAP_MOBILE);
+      setStoryRailGapDesktop(s.storyRailGapDesktop ?? STORY_RAIL_FALLBACK_GAP_DESKTOP);
+      setStoryRailOwnStoryExtraGap(s.storyRailOwnStoryExtraGap ?? STORY_RAIL_FALLBACK_OWN_EXTRA_GAP);
+      setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? STORY_CIRCLE_FALLBACK_BORDER_PERCENT);
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
       setVideoAvatarSize(s.videoAvatarSize ?? 52);

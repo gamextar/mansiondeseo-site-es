@@ -57,6 +57,12 @@ const FEED_PROFILE_LIMIT = 42;
 const FEED_SNAPSHOT_LIMIT = 180;
 const FEED_SNAPSHOT_TTL_MS = 300_000;
 const FEED_QUERY_EXPANSION_FACTOR = 4;
+const STORY_CIRCLE_FALLBACK_SIZE = 88;
+const STORY_CIRCLE_FALLBACK_BORDER_PERCENT = 4;
+const STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT = 3;
+const STORY_RAIL_FALLBACK_GAP_MOBILE = 6;
+const STORY_RAIL_FALLBACK_GAP_DESKTOP = 7;
+const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -3416,7 +3422,7 @@ async function loadSettings(env) {
   const { results } = await env.DB.prepare('SELECT key, value FROM site_settings').all();
   const settings = {};
   for (const r of results) settings[r.key] = r.value;
-  const storyCirclePresetMedium = parseInt(settings.story_circle_preset_medium || settings.story_circle_size || '88', 10);
+  const storyCirclePresetMedium = parseInt(settings.story_circle_preset_medium || settings.story_circle_size || String(STORY_CIRCLE_FALLBACK_SIZE), 10);
   const storyCirclePresetXl = parseInt(settings.story_circle_preset_xl || settings.sidebar_avatar_size || '154', 10);
   const result = {
     blurLevel: parseInt(settings.blur_level || '14', 10),
@@ -3462,8 +3468,8 @@ async function loadSettings(env) {
     storyCirclePresetLarge: parseInt(settings.story_circle_preset_large || '104', 10),
     storyCirclePresetXl,
     sidebarAvatarSize: storyCirclePresetXl,
-    storyCircleBorder: parseInt(settings.story_circle_border || '4', 10),
-    storyCircleInnerGap: parseInt(settings.story_circle_inner_gap || '3', 10),
+    storyCircleBorder: parseInt(settings.story_circle_border || String(STORY_CIRCLE_FALLBACK_BORDER_PERCENT), 10),
+    storyCircleInnerGap: parseInt(settings.story_circle_inner_gap || String(STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT), 10),
     coinIconUrl: settings.coin_icon_url || '',
     coinIconSize: parseInt(settings.coin_icon_size || '18', 10),
     navBottomPadding: parseInt(settings.nav_bottom_padding || '24', 10),
@@ -3499,9 +3505,9 @@ async function loadSettings(env) {
     feedPrefetchPages: parseNumberSetting(settings.feed_prefetch_pages, 6),
     homeStoryCountMobile: parseNumberSetting(settings.home_story_count_mobile, 15),
     homeStoryCountDesktop: parseNumberSetting(settings.home_story_count_desktop, 30),
-    storyRailGapMobile: parseNumberSetting(settings.story_rail_gap_mobile, 50),
-    storyRailGapDesktop: parseNumberSetting(settings.story_rail_gap_desktop, 50),
-    storyRailOwnStoryExtraGap: parseNumberSetting(settings.story_rail_own_story_extra_gap, 1),
+    storyRailGapMobile: parseNumberSetting(settings.story_rail_gap_mobile, STORY_RAIL_FALLBACK_GAP_MOBILE),
+    storyRailGapDesktop: parseNumberSetting(settings.story_rail_gap_desktop, STORY_RAIL_FALLBACK_GAP_DESKTOP),
+    storyRailOwnStoryExtraGap: parseNumberSetting(settings.story_rail_own_story_extra_gap, STORY_RAIL_FALLBACK_OWN_EXTRA_GAP),
   };
   // Keep module-level threshold in sync so isOnline() uses the latest value
   _onlineThresholdMs = result.onlineThresholdMinutes * 60_000;
@@ -3577,10 +3583,13 @@ function getPublicSettingsPayload(settings) {
     navHeight: settings.navHeight,
     navOpacity: settings.navOpacity,
     navBlur: settings.navBlur,
+    storyCircleSize: settings.storyCircleSize,
     storyCirclePresetSmall: settings.storyCirclePresetSmall,
     storyCirclePresetMedium: settings.storyCirclePresetMedium,
     storyCirclePresetLarge: settings.storyCirclePresetLarge,
     storyCirclePresetXl: settings.storyCirclePresetXl,
+    storyCircleBorder: settings.storyCircleBorder,
+    storyCircleInnerGap: settings.storyCircleInnerGap,
     sidebarAvatarSize: settings.sidebarAvatarSize,
     videoGradientHeight: settings.videoGradientHeight,
     videoGradientOpacity: settings.videoGradientOpacity,

@@ -24,8 +24,19 @@ const DEFAULT_PREFETCH_PAGES = 3;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
 const STORIES_RAIL_TRANSITION = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
+const STORY_CIRCLE_FALLBACK_SIZE = 88;
+const STORY_CIRCLE_FALLBACK_BORDER_PERCENT = 4;
+const STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT = 3;
+const STORY_RAIL_FALLBACK_GAP_MOBILE = 6;
+const STORY_RAIL_FALLBACK_GAP_DESKTOP = 7;
+const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
 const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
+
+function coerceSettingNumber(value, fallback) {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -460,16 +471,28 @@ export default function FeedPage({ initialData }) {
     [safeProfiles, storyLimit]
   );
   const storyProfiles = homeStories.length > 0 ? homeStories : fallbackStoryProfiles;
-  const storyCircleSize = safeSettings.storyCircleSize || 88;
-  const storyRailGapMobile = Math.max(0, Number(safeSettings.storyRailGapMobile ?? 50) || 0);
-  const storyRailGapDesktop = Math.max(0, Number(safeSettings.storyRailGapDesktop ?? 50) || 0);
-  const storyRailOwnStoryExtraGap = Math.max(0, Number(safeSettings.storyRailOwnStoryExtraGap ?? 1) || 0);
+  const storyCircleSize = Math.max(
+    1,
+    Math.round(coerceSettingNumber(
+      safeSettings.storyCircleSize ?? safeSettings.storyCirclePresetMedium,
+      STORY_CIRCLE_FALLBACK_SIZE
+    ))
+  );
+  const storyRailGapMobile = Math.max(0, coerceSettingNumber(safeSettings.storyRailGapMobile, STORY_RAIL_FALLBACK_GAP_MOBILE));
+  const storyRailGapDesktop = Math.max(0, coerceSettingNumber(safeSettings.storyRailGapDesktop, STORY_RAIL_FALLBACK_GAP_DESKTOP));
+  const storyRailOwnStoryExtraGap = Math.max(0, coerceSettingNumber(safeSettings.storyRailOwnStoryExtraGap, STORY_RAIL_FALLBACK_OWN_EXTRA_GAP));
   const storyCircleGap = isDesktopViewport ? storyRailGapDesktop : storyRailGapMobile;
   if (typeof window !== 'undefined' && typeof console !== 'undefined') {
     console.debug('Story rail gap (desktop/mobile):', storyRailGapDesktop, storyRailGapMobile, 'used:', storyCircleGap);
   }
-  const storyCircleBorder = Math.max(1, Math.round((storyCircleSize * (safeSettings.storyCircleBorder ?? 4)) / 100));
-  const storyCircleInnerGap = Math.max(0, Math.round((storyCircleSize * (safeSettings.storyCircleInnerGap ?? 3)) / 100));
+  const storyCircleBorder = Math.max(
+    1,
+    Math.round((storyCircleSize * coerceSettingNumber(safeSettings.storyCircleBorder, STORY_CIRCLE_FALLBACK_BORDER_PERCENT)) / 100)
+  );
+  const storyCircleInnerGap = Math.max(
+    0,
+    Math.round((storyCircleSize * coerceSettingNumber(safeSettings.storyCircleInnerGap, STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT)) / 100)
+  );
   const storyCircleSlotWidth = isDesktopViewport ? storyCircleSize + 6 : storyCircleSize;
   const ownStorySlotWidth = storyCircleSlotWidth;
   const ownStoryPlusRight = isDesktopViewport ? 0 : 2;
