@@ -43,7 +43,7 @@ METRICS_FLUSH_MS = "60000"
 METRICS_FLUSH_REQUESTS = "50"
 PROFILE_VISIT_DEDUPE_MINUTES = "30"
 PAYMENT_BRIDGE_URL = "https://unicoapps-site.pages.dev"
-MAIL_FROM = "noreply@unicoapps.com"
+MAIL_FROM = "noreply@mansiondeseo.com"
 
 [dev]
 port = 8788

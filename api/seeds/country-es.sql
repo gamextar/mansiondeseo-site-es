@@ -12,4 +12,4 @@ INSERT OR REPLACE INTO site_settings (key, value) VALUES
   ('coin_pack_1_price', ''),
   ('coin_pack_2_price', ''),
   ('coin_pack_3_price', ''),
-  ('mail_from', 'noreply@unicoapps.com');
+  ('mail_from', 'noreply@mansiondeseo.com');

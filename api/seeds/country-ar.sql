@@ -6,4 +6,4 @@ INSERT OR REPLACE INTO site_settings (key, value) VALUES
   ('allowed_countries', 'AR'),
   ('feed_filter_by_country', '1'),
   ('payment_gateway', 'mercadopago'),
-  ('mail_from', 'noreply@unicoapps.com');
+  ('mail_from', 'noreply@mansiondeseo.com');

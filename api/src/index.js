@@ -1307,7 +1307,7 @@ async function getResendCredentials(env) {
   for (const r of row.results) map[r.key] = r.value;
   return {
     apiKey: map.resend_api_key || env.RESEND_API_KEY,
-    mailFrom: map.mail_from || env.MAIL_FROM || 'noreply@unicoapps.com',
+    mailFrom: map.mail_from || env.MAIL_FROM || 'noreply@mansiondeseo.com',
   };
 }
 
@@ -3507,7 +3507,7 @@ async function loadSettings(env) {
     encoderPreset: settings.encoder_preset || 'superfast',
     encoderShowProgressHud: settings.encoder_show_progress_hud === '1',
     resendApiKey: settings.resend_api_key || env.RESEND_API_KEY || '',
-    mailFrom: settings.mail_from || env.MAIL_FROM || 'noreply@unicoapps.com',
+    mailFrom: settings.mail_from || env.MAIL_FROM || 'noreply@mansiondeseo.com',
     onlineThresholdMinutes: parseInt(settings.online_threshold_minutes || '60', 10),
     feedFilterByCountry: parseBooleanSetting(settings.feed_filter_by_country, false),
     feedWeightLastActive: parseNumberSetting(settings.feed_weight_last_active, 45),
