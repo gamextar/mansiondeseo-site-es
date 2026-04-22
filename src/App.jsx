@@ -279,8 +279,8 @@ function AppLayout() {
   );
   const showMobileBrandOverlay = immersiveMobileApp && normalizedRoutePath !== '/videos' && !isPublicProfileRoute;
   const suppressMobileBrandOverlayInBrowserFeed =
-    !isStandaloneMobileApp && (normalizedRoutePath === '/feed' || normalizedRoutePath === '/explorar');
-  const showHiddenMobileBrandOverlay = isMobileViewport && (Boolean(isChatDetail) || isPublicProfileRoute);
+    !isStandaloneMobileApp && normalizedRoutePath === '/explorar';
+  const showHiddenMobileBrandOverlay = isMobileViewport && Boolean(isChatDetail);
   const showMobileViewportStabilizer =
     !isStandaloneMobileApp &&
     isMobileViewport &&
