@@ -84,6 +84,8 @@ export default function ProfilePage() {
   const [receivedGifts, setReceivedGifts] = useState([]);
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
+  const avatarUploadSeqRef = useRef(0);
+  const avatarPreviewUrlRef = useRef(null);
   const [galleryEditing, setGalleryEditing] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -188,6 +190,13 @@ export default function ProfilePage() {
       setReceivedGifts(data.gifts || []);
     }).catch(() => {});
   }, [user?.id]);
+
+  useEffect(() => () => {
+    if (avatarPreviewUrlRef.current) {
+      URL.revokeObjectURL(avatarPreviewUrlRef.current);
+      avatarPreviewUrlRef.current = null;
+    }
+  }, []);
 
   // Auto-save reordered photos
   const persistOrder = useCallback(async (newPhotos) => {
@@ -294,14 +303,30 @@ export default function ProfilePage() {
 
   const handleCroppedAvatar = async (croppedFile) => {
     setCropFile(null);
+    const uploadSeq = avatarUploadSeqRef.current + 1;
+    avatarUploadSeqRef.current = uploadSeq;
+    const previewUrl = URL.createObjectURL(croppedFile);
+    const previousAvatarUrl = user?.avatar_url || '';
+    if (avatarPreviewUrlRef.current) URL.revokeObjectURL(avatarPreviewUrlRef.current);
+    avatarPreviewUrlRef.current = previewUrl;
+    setUser(prev => prev ? { ...prev, avatar_url: previewUrl, avatar_crop: null } : prev);
+
     try {
       const data = await uploadImage(croppedFile, { purpose: 'avatar' });
       const nextAvatarUrl = data?.avatar_url || data?.url || '';
-      if (nextAvatarUrl) {
+      if (nextAvatarUrl && avatarUploadSeqRef.current === uploadSeq) {
         setUser(prev => prev ? { ...prev, avatar_url: nextAvatarUrl, avatar_crop: null } : prev);
       }
     } catch (err) {
+      if (avatarUploadSeqRef.current === uploadSeq) {
+        setUser(prev => prev ? { ...prev, avatar_url: previousAvatarUrl, avatar_crop: null } : prev);
+      }
       console.error('Avatar upload error:', err);
+    } finally {
+      if (avatarUploadSeqRef.current === uploadSeq && avatarPreviewUrlRef.current === previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        avatarPreviewUrlRef.current = null;
+      }
     }
   };
 
