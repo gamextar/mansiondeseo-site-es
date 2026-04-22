@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate } from '
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAgeVerified } from './hooks/useAgeVerified';
 import AgeVerificationModal from './components/AgeVerificationModal';
-import Navbar, { MobileBrandOverlay } from './components/Navbar';
+import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import DesktopSidebar from './components/DesktopSidebar';
 import FeedPage from './pages/FeedPage';
@@ -277,10 +277,6 @@ function AppLayout() {
       normalizedRoutePath === '/safe-area-debug'
     )
   );
-  const showMobileBrandOverlay = immersiveMobileApp && normalizedRoutePath !== '/videos' && !isPublicProfileRoute;
-  const suppressMobileBrandOverlayInBrowserFeed =
-    !isStandaloneMobileApp && normalizedRoutePath === '/explorar';
-  const showHiddenMobileBrandOverlay = isMobileViewport && Boolean(isChatDetail);
   const showMobileViewportStabilizer =
     !isStandaloneMobileApp &&
     isMobileViewport &&
@@ -775,8 +771,6 @@ function AppLayout() {
       {showDesktopSidebar && <DesktopSidebar />}
       {showTopNavbar && <Navbar />}
       {showMobileViewportStabilizer && <MobileViewportStabilizer />}
-      {showChrome && !routeOverlayOpen && showMobileBrandOverlay && !suppressMobileBrandOverlayInBrowserFeed && <MobileBrandOverlay />}
-      {!routeOverlayOpen && showHiddenMobileBrandOverlay && <MobileBrandOverlay hidden />}
 
       <div
         className={showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : ''}

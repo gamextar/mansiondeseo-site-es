@@ -1080,8 +1080,9 @@ export default function FeedPage({ initialData }) {
 
   return (
     <div
-      className="min-h-mobile-browser-screen bg-mansion-base pt-navbar lg:pt-0 lg:pb-[84px]"
+      className="min-h-mobile-browser-screen bg-mansion-base lg:pt-0 lg:pb-[84px]"
       style={{
+        paddingTop: isDesktopViewport ? undefined : 'calc(var(--safe-top) + 8px)',
         paddingBottom: isDesktopViewport
           ? undefined
           : mobileFeedBottomPadding,
@@ -1095,6 +1096,25 @@ export default function FeedPage({ initialData }) {
       >
         <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
+      {!isDesktopViewport && (
+        <div className="px-0 pr-3 h-10 flex items-center fade-in-up">
+          <button
+            type="button"
+            onClick={() => navigate('/feed')}
+            className="inline-flex items-center gap-2 rounded-full bg-black/28 px-2.5 py-1.5 backdrop-blur-md"
+          >
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
+              <span className="font-display text-white text-xs font-bold">M</span>
+            </div>
+            <span
+              className="font-display text-[15px] font-semibold text-gradient-gold"
+              style={{ textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}
+            >
+              Mansion Deseo
+            </span>
+          </button>
+        </div>
+      )}
       {/* Stories section */}
       {showStoriesSection && (
       <div className="px-0 lg:px-8 pt-2 lg:pt-4 pb-0 fade-in-up">
