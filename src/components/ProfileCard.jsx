@@ -1,4 +1,5 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useRef } from 'react';
 import { MapPin, Shield, Crown, Lock } from 'lucide-react';
 import { getDisplayPhotos, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { formatLocation } from '../lib/location';
@@ -81,6 +82,8 @@ export default function ProfileCard({
   immersiveMobile = false,
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const touchStartRef = useRef(null);
   const { id, name, age, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const safariDesktop = typeof safariDesktopOverride === 'boolean' ? safariDesktopOverride : isSafariDesktopBrowser();
   const roleImg = settings[ROLE_IMG_KEYS[role]] || null;
@@ -100,6 +103,18 @@ export default function ProfileCard({
   const resolvedMainPhoto = resolveMediaUrl(mainPhoto);
   const returnToPath = `${location.pathname}${location.search}${location.hash}`;
   const useOverlayNavigation = location.pathname === '/' || location.pathname === '/feed' || location.pathname === '/explorar';
+  const profilePath = `/perfiles/${id}`;
+  const profileState = {
+    ...(useOverlayNavigation ? {
+      backgroundLocation: location,
+      backgroundScrollY: typeof window !== 'undefined'
+        ? (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0)
+        : 0,
+      modal: 'profile',
+    } : {}),
+    from: returnToPath,
+    preview: { id, name, age, city: profile.city, province: profile.province, locality: profile.locality, role, photos, avatar_url: profile.avatar_url, avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode },
+  };
 
   const handleOpenProfile = () => {
     if (typeof window === 'undefined') return;
@@ -112,23 +127,46 @@ export default function ProfileCard({
     } catch {}
   };
 
+  const handleTouchStart = (event) => {
+    if (!isMobile) return;
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: event.timeStamp || Date.now(),
+    };
+  };
+
+  const handleTouchEnd = (event) => {
+    if (!isMobile || !touchStartRef.current) return;
+    const touch = event.changedTouches?.[0];
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!touch) return;
+
+    const dx = Math.abs(touch.clientX - start.x);
+    const dy = Math.abs(touch.clientY - start.y);
+    const elapsed = (event.timeStamp || Date.now()) - start.time;
+    if (dx > 10 || dy > 10 || elapsed > 700) return;
+
+    event.preventDefault();
+    handleOpenProfile();
+    navigate(profilePath, { state: profileState });
+  };
+
   return (
     <div className={immersiveMobile ? 'rounded-xl overflow-hidden' : 'rounded-2xl overflow-hidden'}>
       <Link
-        to={`/perfiles/${id}`}
-        state={{
-          ...(useOverlayNavigation ? {
-            backgroundLocation: location,
-            backgroundScrollY: window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0,
-            modal: 'profile',
-          } : {}),
-          from: returnToPath,
-          preview: { id, name, age, city: profile.city, province: profile.province, locality: profile.locality, role, photos, avatar_url: profile.avatar_url, avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode },
-        }}
+        to={profilePath}
+        state={profileState}
         onClick={handleOpenProfile}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         className={`block group overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-mansion-gold/40 focus-visible:ring-offset-0 ${
           immersiveMobile ? 'rounded-xl' : 'rounded-2xl'
         }`}
+        style={{ touchAction: 'manipulation' }}
       >
         <div
           className={`relative aspect-[3/4] overflow-hidden bg-mansion-card ${
@@ -143,6 +181,7 @@ export default function ProfileCard({
               src={resolvedMainPhoto}
               alt={cardBlocked ? '' : name}
               referrerPolicy="no-referrer"
+              draggable={false}
               loading={index < (safariDesktop ? 2 : 6) ? 'eager' : 'lazy'}
               fetchPriority={index < (safariDesktop ? 1 : 4) ? 'high' : 'auto'}
               decoding="async"

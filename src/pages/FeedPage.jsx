@@ -383,7 +383,7 @@ export default function FeedPage({ initialData }) {
       // Add hysteresis + delayed commit so the overlay does not chatter
       // when the bottom edge hovers around the viewport threshold on iOS.
       setShowMobileNav((prev) => {
-        const threshold = prev ? 220 : 110;
+        const threshold = prev ? 320 : 420;
         const next = rect.bottom <= window.innerHeight + threshold;
         if (next === prev) return prev;
         if (mobileNavVisibilityTimerRef.current) {
@@ -393,7 +393,7 @@ export default function FeedPage({ initialData }) {
         mobileNavVisibilityTimerRef.current = window.setTimeout(() => {
           setShowMobileNav(next);
           mobileNavVisibilityTimerRef.current = null;
-        }, next ? 90 : 160);
+        }, next ? 20 : 120);
         return prev;
       });
     };
