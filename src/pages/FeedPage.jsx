@@ -1057,6 +1057,8 @@ export default function FeedPage({ initialData }) {
 
   // ── Grid setup ────────────────────────────────────────────────────
   const gap = isDesktopViewport ? 12 : 6;
+  const mobileFeedBottomPadding = `calc(${navBottomOffset} + 96px)`;
+  const mobilePaginationBottom = `calc(${navBottomOffset} + 10px)`;
 
   return (
     <div
@@ -1064,7 +1066,7 @@ export default function FeedPage({ initialData }) {
       style={{
         paddingBottom: isDesktopViewport
           ? undefined
-          : navBottomOffset,
+          : mobileFeedBottomPadding,
       }}
     >
       {/* Pull-to-refresh indicator */}
@@ -1420,7 +1422,7 @@ export default function FeedPage({ initialData }) {
                 {/* Mobile pagination pill — appears near the bottom nav */}
                 <div
                   className="lg:hidden fixed left-0 right-0 z-40 px-4 pointer-events-none"
-                  style={{ bottom: `calc(${navBottomOffset} + 8px)` }}
+                  style={{ bottom: mobilePaginationBottom }}
                   aria-hidden={!showMobileNav}
                 >
                   <motion.div
@@ -1434,30 +1436,30 @@ export default function FeedPage({ initialData }) {
                     className="flex items-center justify-center"
                     style={{ pointerEvents: showMobileNav ? 'auto' : 'none' }}
                   >
-                    <div className="flex items-center gap-3 rounded-[999px] border border-white/15 bg-black/78 px-3 py-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+                    <div className="flex items-center gap-2 rounded-[999px] border border-white/15 bg-black/78 px-2.5 py-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.32)] backdrop-blur-xl">
                       {currentPage > 1 ? (
                         <button
                           type="button"
                           onClick={() => goToFeedPage(currentPage - 1)}
                           aria-label="Pagina anterior"
-                          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] active:scale-95 transition-transform"
+                          className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] active:scale-95 transition-transform"
                         >
-                          <ChevronLeft className="h-5.5 w-5.5 text-white/82" />
+                          <ChevronLeft className="h-5 w-5 text-white/82" />
                         </button>
-                      ) : <div className="h-11 w-11" />}
-                      <div className="min-w-[4.5rem] text-center">
-                        <span className="text-xs font-semibold text-white/78">{currentPage} / {totalPages}</span>
+                      ) : <div className="h-10 w-10" />}
+                      <div className="min-w-[3.75rem] text-center">
+                        <span className="text-[11px] font-semibold text-white/78">{currentPage} / {totalPages}</span>
                       </div>
                       {currentPage < totalPages ? (
                         <button
                           type="button"
                           onClick={() => goToFeedPage(currentPage + 1)}
                           aria-label="Pagina siguiente"
-                          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] active:scale-95 transition-transform"
+                          className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] active:scale-95 transition-transform"
                         >
-                          <ChevronRight className="h-5.5 w-5.5 text-white/82" />
+                          <ChevronRight className="h-5 w-5 text-white/82" />
                         </button>
-                      ) : <div className="h-11 w-11" />}
+                      ) : <div className="h-10 w-10" />}
                     </div>
                   </motion.div>
                 </div>
