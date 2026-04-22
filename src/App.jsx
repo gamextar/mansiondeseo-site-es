@@ -487,6 +487,7 @@ function AppLayout() {
     let startupTimerIds = [];
     let lastPocketScrollAt = 0;
     let returningToTop = false;
+    let resizeObserver = null;
 
     const cancelReturn = () => {
       if (cancelReturnAnimation) {
@@ -641,10 +642,18 @@ function AppLayout() {
     window.addEventListener('pageshow', handleViewportChange);
     window.addEventListener('focus', handleViewportChange);
     window.visualViewport?.addEventListener('resize', handleViewportChange);
+    if (typeof window.ResizeObserver === 'function') {
+      resizeObserver = new window.ResizeObserver(() => {
+        handleViewportChange();
+      });
+      resizeObserver.observe(root);
+      if (body) resizeObserver.observe(body);
+    }
 
     return () => {
       if (clampRafId) window.cancelAnimationFrame(clampRafId);
       if (releaseTimerId) window.clearTimeout(releaseTimerId);
+      resizeObserver?.disconnect();
       cancelReturn();
       clearStartupTimers();
       root.style.removeProperty('--public-profile-top-bounce-y');

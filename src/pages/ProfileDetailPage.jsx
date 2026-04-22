@@ -141,9 +141,6 @@ export default function ProfileDetailPage({ initialData }) {
   const [giftSent, setGiftSent] = useState(null);
 
   useEffect(() => {
-    if (!isOverlayEntry) {
-      window.scrollTo({ top: 0, behavior: 'instant' });
-    }
     if (!getToken()) { navigate('/login'); return; }
     const nextCachedDetail = readProfileDetailCache(id);
     const nextPreviewProfile = buildPreviewProfile(location.state?.preview || null);
