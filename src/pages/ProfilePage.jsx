@@ -296,11 +296,10 @@ export default function ProfilePage() {
     setCropFile(null);
     try {
       const data = await uploadImage(croppedFile, { purpose: 'avatar' });
-      // Immediately update with upload result
-      setUser(prev => prev ? { ...prev, avatar_url: data.url, avatar_crop: null } : prev);
-      // Then fetch canonical user to ensure state is fully in sync
-      const fresh = await getMe({ force: true }).catch(() => null);
-      if (fresh?.user) setUser(fresh.user);
+      const nextAvatarUrl = data?.avatar_url || data?.url || '';
+      if (nextAvatarUrl) {
+        setUser(prev => prev ? { ...prev, avatar_url: nextAvatarUrl, avatar_crop: null } : prev);
+      }
     } catch (err) {
       console.error('Avatar upload error:', err);
     }

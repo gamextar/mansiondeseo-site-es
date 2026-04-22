@@ -20,7 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername, getMe } from '../lib/api';
+import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername } from '../lib/api';
 import { calculateAgeFromBirthdate, getLatestAdultBirthdate, isAdultBirthdate } from '../lib/birthdate';
 import { formatLocation } from '../lib/location';
 import ImageCropper from '../components/ImageCropper';
@@ -1867,11 +1867,10 @@ export default function RegisterPage() {
     if (photoFile) {
       try {
         const uploadResult = await uploadImage(photoFile, { purpose: 'avatar' });
-        // Immediately update with upload result
-        setUser(prev => prev ? { ...prev, avatar_url: uploadResult.url, avatar_crop: null } : prev);
-        // Then fetch canonical user to ensure state is fully in sync
-        const fresh = await getMe({ force: true }).catch(() => null);
-        if (fresh?.user) setUser(fresh.user);
+        const nextAvatarUrl = uploadResult?.avatar_url || uploadResult?.url || '';
+        if (nextAvatarUrl) {
+          setUser(prev => prev ? { ...prev, avatar_url: nextAvatarUrl, avatar_crop: null } : prev);
+        }
       } catch {
         // Photo upload failed — user can retry later from profile
       }
