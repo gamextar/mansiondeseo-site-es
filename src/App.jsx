@@ -278,6 +278,8 @@ function AppLayout() {
     )
   );
   const showMobileBrandOverlay = immersiveMobileApp && normalizedRoutePath !== '/videos' && !isPublicProfileRoute;
+  const suppressMobileBrandOverlayInBrowserFeed =
+    !isStandaloneMobileApp && (normalizedRoutePath === '/feed' || normalizedRoutePath === '/explorar');
   const showHiddenMobileBrandOverlay = isMobileViewport && (Boolean(isChatDetail) || isPublicProfileRoute);
   const showMobileViewportStabilizer =
     !isStandaloneMobileApp &&
@@ -773,7 +775,7 @@ function AppLayout() {
       {showDesktopSidebar && <DesktopSidebar />}
       {showTopNavbar && <Navbar />}
       {showMobileViewportStabilizer && <MobileViewportStabilizer />}
-      {showChrome && !routeOverlayOpen && showMobileBrandOverlay && <MobileBrandOverlay />}
+      {showChrome && !routeOverlayOpen && showMobileBrandOverlay && !suppressMobileBrandOverlayInBrowserFeed && <MobileBrandOverlay />}
       {!routeOverlayOpen && showHiddenMobileBrandOverlay && <MobileBrandOverlay hidden />}
 
       <div
