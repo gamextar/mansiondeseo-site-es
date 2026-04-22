@@ -13,7 +13,7 @@ head_sampling_rate = 1
 [[d1_databases]]
 binding = "DB"
 database_name = "mansion-deseo-db-es"
-database_id = "89854085-e531-4c4b-bffb-ec0f58d0c717"
+database_id = "d91c5602-6892-404c-a294-e2643e1ec646"
 
 [[r2_buckets]]
 binding = "IMAGES"
