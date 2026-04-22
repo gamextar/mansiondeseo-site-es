@@ -90,6 +90,13 @@ function getGridColumns() {
   return 2;
 }
 
+function getFeedCardsPerPage(settings, isDesktopViewport) {
+  const desktopValue = Number(settings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE);
+  const mobileValue = Number(settings?.feedCardsPerPageMobile ?? desktopValue);
+  const resolved = isDesktopViewport ? desktopValue : mobileValue;
+  return Math.max(6, Math.min(60, Number.isFinite(resolved) ? resolved : DEFAULT_CARDS_PER_PAGE));
+}
+
 function useGridColumns() {
   const [cols, setCols] = useState(getGridColumns);
   useEffect(() => {
@@ -212,7 +219,6 @@ export default function FeedPage({ initialData }) {
   const pagedFeedConfigRef = useRef('');
   const pagedFeedConfigInitializedRef = useRef(false);
   const settingsRef = useRef(settings);
-  settingsRef.current = settings;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -250,9 +256,10 @@ export default function FeedPage({ initialData }) {
 
   const fetchProfilesBlock = useCallback(async ({ forceFresh = false, cursor = 0, pageSize } = {}) => {
     const s = settingsRef.current;
+    const resolvedCardsPerPage = getFeedCardsPerPage(s, isDesktopViewport);
     const resolvedPageSize = Math.max(
       12,
-      Number(pageSize) || (s?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
+      Number(pageSize) || resolvedCardsPerPage * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
     );
     const data = await getProfiles({
       fresh: forceFresh,
@@ -260,7 +267,7 @@ export default function FeedPage({ initialData }) {
       pageSize: resolvedPageSize,
     });
     return { data, resolvedPageSize };
-  }, []);
+  }, [isDesktopViewport]);
 
   const prefetchProfilesBlock = useCallback(({ cursor = 0, pageSize } = {}) => {
     const key = makeFeedBlockKey(cursor, pageSize);
@@ -314,16 +321,17 @@ export default function FeedPage({ initialData }) {
       });
   }, [applyLoadedProfiles, fetchProfilesBlock]); // stable — reads settings from settingsRef
 
-  // Initial load — runs once on mount
+  // Initial/config load — reruns when the viewport crosses the mobile/desktop page-size boundary.
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
     const cachedFeed = getCachedFeed();
     const currentSettings = settingsRef.current;
+    const expectedCardsPerPage = getFeedCardsPerPage(currentSettings, isDesktopViewport);
     const cachedPageSize = Number(cachedFeed?.pageSize) || 0;
     const cachedPageCursor = Number(cachedFeed?.pageCursor ?? cachedFeed?.currentCursor) || 0;
     const expectedPageSize = Math.max(
       12,
-      (currentSettings?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (currentSettings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
+      expectedCardsPerPage * (currentSettings?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
     );
     const canReuseCached = !!cachedFeed && cachedPageSize === expectedPageSize;
 
@@ -349,7 +357,7 @@ export default function FeedPage({ initialData }) {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate]);
+  }, [isDesktopViewport, navigate]);
 
   const [gridOpacity, setGridOpacity] = useState(1);
   const viewedStoriesStorageKey = useMemo(() => getViewedStoryUsersKey(user?.id), [user?.id]);
@@ -423,7 +431,8 @@ export default function FeedPage({ initialData }) {
       sessionStorage.removeItem('mansion_feed_force_refresh');
       sessionStorage.removeItem(FEED_CACHE_KEY);
       const s = settingsRef.current;
-      const nextBlockSize = (s?.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE) * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES);
+      const nextCardsPerPage = getFeedCardsPerPage(s, isDesktopViewport);
+      const nextBlockSize = nextCardsPerPage * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES);
       loadProfiles({
         forceFresh: shouldForceFresh,
         cursor: Math.floor(pageCursor / nextBlockSize) * nextBlockSize,
@@ -433,7 +442,7 @@ export default function FeedPage({ initialData }) {
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [loadProfiles, pageCursor]);
+  }, [isDesktopViewport, loadProfiles, pageCursor]);
 
   const { indicatorRef } = usePullToRefresh(
     useCallback(() => loadProfiles({ forceFresh: true }), [loadProfiles]),
@@ -447,8 +456,9 @@ export default function FeedPage({ initialData }) {
     ...((settings && typeof settings === 'object') ? settings : {}),
     ...((siteSettings && typeof siteSettings === 'object') ? siteSettings : {}),
   }), [settings, siteSettings]);
+  settingsRef.current = safeSettings;
   const safeProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
-  const cardsPerPage = Math.max(6, Math.min(60, safeSettings.feedCardsPerPage ?? DEFAULT_CARDS_PER_PAGE));
+  const cardsPerPage = getFeedCardsPerPage(safeSettings, isDesktopViewport);
   const maxPages = Math.max(1, Math.min(50, safeSettings.feedMaxPages ?? DEFAULT_MAX_PAGES));
   const prefetchPages = Math.max(1, Math.min(20, safeSettings.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES));
   const blockSize = cardsPerPage * prefetchPages;

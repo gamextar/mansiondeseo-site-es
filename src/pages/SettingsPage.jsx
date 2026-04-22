@@ -65,6 +65,7 @@ export default function SettingsPage() {
   const [feedWeightSharedInterests, setFeedWeightSharedInterests] = useState(20);
   const [feedWeightPremium, setFeedWeightPremium] = useState(8);
   const [feedCardsPerPage, setFeedCardsPerPage] = useState(12);
+  const [feedCardsPerPageMobile, setFeedCardsPerPageMobile] = useState(12);
   const [feedMaxPages, setFeedMaxPages] = useState(10);
   const [feedPrefetchPages, setFeedPrefetchPages] = useState(6);
 
@@ -235,6 +236,7 @@ export default function SettingsPage() {
         setFeedWeightSharedInterests(s.feedWeightSharedInterests ?? 20);
         setFeedWeightPremium(s.feedWeightPremium ?? 8);
         setFeedCardsPerPage(s.feedCardsPerPage ?? 12);
+        setFeedCardsPerPageMobile(s.feedCardsPerPageMobile ?? s.feedCardsPerPage ?? 12);
         setFeedMaxPages(s.feedMaxPages ?? 10);
         setFeedPrefetchPages(s.feedPrefetchPages ?? 6);
         setVipPrice3Months(s.vipPrice3Months);
@@ -404,6 +406,7 @@ export default function SettingsPage() {
         feed_weight_shared_interests: feedWeightSharedInterests,
         feed_weight_premium: feedWeightPremium,
         feed_cards_per_page: feedCardsPerPage,
+        feed_cards_per_page_mobile: feedCardsPerPageMobile,
         feed_max_pages: feedMaxPages,
         feed_prefetch_pages: feedPrefetchPages,
         vip_price_monthly: vipPriceMonthly,
@@ -483,6 +486,7 @@ export default function SettingsPage() {
       setFeedWeightSharedInterests(s.feedWeightSharedInterests ?? 20);
       setFeedWeightPremium(s.feedWeightPremium ?? 8);
       setFeedCardsPerPage(s.feedCardsPerPage ?? 12);
+      setFeedCardsPerPageMobile(s.feedCardsPerPageMobile ?? s.feedCardsPerPage ?? 12);
       setFeedMaxPages(s.feedMaxPages ?? 10);
       setFeedPrefetchPages(s.feedPrefetchPages ?? 6);
       setVipPrice3Months(s.vipPrice3Months);
@@ -1230,13 +1234,13 @@ export default function SettingsPage() {
               </div>
 
               <div className="mt-4">
-                <h3 className="text-sm font-semibold text-text-primary mb-1">Paginación del feed (Desktop)</h3>
-                <p className="text-[11px] text-text-dim mb-3">Controla la paginación del feed en escritorio. Las cards totales accesibles = cards × páginas.</p>
-                <div className="grid gap-3 md:grid-cols-3">
+                <h3 className="text-sm font-semibold text-text-primary mb-1">Paginación del feed</h3>
+                <p className="text-[11px] text-text-dim mb-3">Controla cuántos perfiles se muestran por página y cuántos se piden por bloque.</p>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3 flex flex-col gap-2">
                     <div>
-                      <p className="text-sm font-semibold text-text-primary">Cards por página</p>
-                      <p className="text-[11px] text-text-dim">Perfiles visibles en cada página.</p>
+                      <p className="text-sm font-semibold text-text-primary">Desktop</p>
+                      <p className="text-[11px] text-text-dim">Cards visibles por página en escritorio.</p>
                     </div>
                     <div className="flex justify-end">
                       <Counter value={feedCardsPerPage} onChange={setFeedCardsPerPage} min={6} max={60} step={6} />
@@ -1244,8 +1248,17 @@ export default function SettingsPage() {
                   </div>
                   <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3 flex flex-col gap-2">
                     <div>
+                      <p className="text-sm font-semibold text-text-primary">Mobile</p>
+                      <p className="text-[11px] text-text-dim">Cards visibles por página en celulares.</p>
+                    </div>
+                    <div className="flex justify-end">
+                      <Counter value={feedCardsPerPageMobile} onChange={setFeedCardsPerPageMobile} min={6} max={60} step={2} />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3 flex flex-col gap-2">
+                    <div>
                       <p className="text-sm font-semibold text-text-primary">Máx páginas</p>
-                      <p className="text-[11px] text-text-dim">Páginas navegables — {feedCardsPerPage * feedMaxPages} cards máx.</p>
+                      <p className="text-[11px] text-text-dim">Desktop {feedCardsPerPage * feedMaxPages} · Mobile {feedCardsPerPageMobile * feedMaxPages} máx.</p>
                     </div>
                     <div className="flex justify-end">
                       <Counter value={feedMaxPages} onChange={setFeedMaxPages} min={1} max={50} step={1} />
@@ -1254,7 +1267,7 @@ export default function SettingsPage() {
                   <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3 flex flex-col gap-2">
                     <div>
                       <p className="text-sm font-semibold text-text-primary">Precarga</p>
-                      <p className="text-[11px] text-text-dim">Páginas por request — {feedCardsPerPage * feedPrefetchPages} profiles/query.</p>
+                      <p className="text-[11px] text-text-dim">Por request: desktop {feedCardsPerPage * feedPrefetchPages} · mobile {feedCardsPerPageMobile * feedPrefetchPages}.</p>
                     </div>
                     <div className="flex justify-end">
                       <Counter value={feedPrefetchPages} onChange={setFeedPrefetchPages} min={1} max={20} step={1} />
