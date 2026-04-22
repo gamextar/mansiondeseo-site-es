@@ -189,6 +189,8 @@ export default function FeedPage({ initialData }) {
   const navBottomOffset = getBottomNavPagePadding(isStandaloneMobileApp);
   const gridRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);
+  const mobileNavVisibleRef = useRef(false);
+  const mobileNavRafRef = useRef(0);
   const mobileNavVisibilityTimerRef = useRef(null);
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
   const prefetchedBlocksRef = useRef(new Map());
@@ -376,31 +378,45 @@ export default function FeedPage({ initialData }) {
   // Show mobile pagination arrows when user scrolls near the bottom of the grid
   useEffect(() => {
     if (isDesktopViewport) return;
+    const commitMobileNavVisibility = (next, delay) => {
+      if (mobileNavVisibilityTimerRef.current) {
+        window.clearTimeout(mobileNavVisibilityTimerRef.current);
+        mobileNavVisibilityTimerRef.current = null;
+      }
+      mobileNavVisibilityTimerRef.current = window.setTimeout(() => {
+        mobileNavVisibleRef.current = next;
+        setShowMobileNav(next);
+        mobileNavVisibilityTimerRef.current = null;
+      }, delay);
+    };
     const handleScroll = () => {
-      const el = gridRef.current;
-      if (!el) { setShowMobileNav(false); return; }
-      const rect = el.getBoundingClientRect();
-      // Add hysteresis + delayed commit so the overlay does not chatter
-      // when the bottom edge hovers around the viewport threshold on iOS.
-      setShowMobileNav((prev) => {
-        const threshold = prev ? 320 : 420;
-        const next = rect.bottom <= window.innerHeight + threshold;
-        if (next === prev) return prev;
-        if (mobileNavVisibilityTimerRef.current) {
-          window.clearTimeout(mobileNavVisibilityTimerRef.current);
-          mobileNavVisibilityTimerRef.current = null;
+      if (mobileNavRafRef.current) return;
+      mobileNavRafRef.current = window.requestAnimationFrame(() => {
+        mobileNavRafRef.current = 0;
+        const el = gridRef.current;
+        if (!el) {
+          if (mobileNavVisibleRef.current) commitMobileNavVisibility(false, 120);
+          return;
         }
-        mobileNavVisibilityTimerRef.current = window.setTimeout(() => {
-          setShowMobileNav(next);
-          mobileNavVisibilityTimerRef.current = null;
-        }, next ? 20 : 120);
-        return prev;
+        const rect = el.getBoundingClientRect();
+        const viewportHeight = window.visualViewport?.height || window.innerHeight;
+        // Wide hysteresis keeps the fixed pill from chattering during iOS
+        // rubber-band scrolling at the bottom of the document.
+        const prev = mobileNavVisibleRef.current;
+        const threshold = prev ? 760 : 420;
+        const next = rect.bottom <= viewportHeight + threshold;
+        if (next === prev) return;
+        commitMobileNavVisibility(next, next ? 20 : 180);
       });
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
     return () => {
       window.removeEventListener('scroll', handleScroll);
+      if (mobileNavRafRef.current) {
+        window.cancelAnimationFrame(mobileNavRafRef.current);
+        mobileNavRafRef.current = 0;
+      }
       if (mobileNavVisibilityTimerRef.current) {
         window.clearTimeout(mobileNavVisibilityTimerRef.current);
         mobileNavVisibilityTimerRef.current = null;
@@ -1436,7 +1452,7 @@ export default function FeedPage({ initialData }) {
                     className="flex items-center justify-center"
                     style={{ pointerEvents: showMobileNav ? 'auto' : 'none' }}
                   >
-                    <div className="flex items-center gap-2 rounded-[999px] border border-white/15 bg-black/78 px-2.5 py-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+                    <div className="flex items-center gap-2 rounded-[999px] border border-white/15 bg-black/88 px-2.5 py-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.32)]">
                       {currentPage > 1 ? (
                         <button
                           type="button"
