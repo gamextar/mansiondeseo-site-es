@@ -53,12 +53,12 @@ const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const NON_DEFAULT_ROUTE_LOCALES = getRouteEnabledSeoLocales().filter((locale) => locale.pathPrefix);
 const MOBILE_BROWSER_IMMERSIVE_SCROLL_OFFSET = 68;
-const MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX = 24;
-const MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING = 0.45;
-const MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS = 280;
-const MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS = 140;
-const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_MAX_PX = 10;
-const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_RETURN_MS = 300;
+const MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX = 32;
+const MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING = 0.32;
+const MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS = 420;
+const MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS = 80;
+const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_MAX_PX = 14;
+const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_RETURN_MS = 420;
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
@@ -94,16 +94,19 @@ function getDocumentScrollTop() {
   );
 }
 
-function easeOutCubic(t) {
-  return 1 - ((1 - t) ** 3);
+function easeInOutCubic(t) {
+  return t < 0.5
+    ? 4 * t * t * t
+    : 1 - ((-2 * t + 2) ** 3) / 2;
 }
 
-function animateDocumentScrollTo(targetScrollTop, durationMs, onComplete) {
+function animateDocumentScrollTo(targetScrollTop, durationMs, { easing = easeInOutCubic, onUpdate, onComplete } = {}) {
   if (typeof window === 'undefined') return () => {};
 
   const startScrollTop = getDocumentScrollTop();
   if (Math.abs(startScrollTop - targetScrollTop) < 0.5 || durationMs <= 0) {
     resetDocumentScroll(targetScrollTop);
+    onUpdate?.({ scrollTop: targetScrollTop, progress: 1 });
     onComplete?.();
     return () => {};
   }
@@ -116,13 +119,15 @@ function animateDocumentScrollTo(targetScrollTop, durationMs, onComplete) {
     if (cancelled) return;
     const elapsed = now - startedAt;
     const progress = Math.min(1, elapsed / durationMs);
-    const easedProgress = easeOutCubic(progress);
+    const easedProgress = easing(progress);
     const nextScrollTop = startScrollTop + ((targetScrollTop - startScrollTop) * easedProgress);
     resetDocumentScroll(nextScrollTop);
+    onUpdate?.({ scrollTop: nextScrollTop, progress: easedProgress });
     if (progress < 1) {
       rafId = window.requestAnimationFrame(tick);
     } else {
       resetDocumentScroll(targetScrollTop);
+      onUpdate?.({ scrollTop: targetScrollTop, progress: 1 });
       onComplete?.();
     }
   };
@@ -488,6 +493,7 @@ function AppLayout() {
     let lastPocketScrollAt = 0;
     let returningToTop = false;
     let resizeObserver = null;
+    let resizeObserverRafId = 0;
 
     const cancelReturn = () => {
       if (cancelReturnAnimation) {
@@ -513,6 +519,16 @@ function AppLayout() {
       root.style.setProperty('--public-profile-top-bounce-y', `${nextValue.toFixed(2)}px`);
     };
 
+    const getBounceForScrollTop = (scrollTop) => {
+      if (scrollTop >= minScrollTop) return 0;
+      const overshoot = minScrollTop - scrollTop;
+      return Math.min(elasticMaxPx, overshoot * damping);
+    };
+
+    const syncBounceToScrollTop = (scrollTop) => {
+      setTopBounce(getBounceForScrollTop(scrollTop), false);
+    };
+
     const snapBackToTop = (immediate = false) => {
       cancelReturn();
       const currentScrollTop = getDocumentScrollTop();
@@ -532,29 +548,52 @@ function AppLayout() {
         resetDocumentScroll(minScrollTop);
         return;
       }
-      setTopBounce(0, true);
+      syncBounceToScrollTop(currentScrollTop);
       returningToTop = true;
       cancelReturnAnimation = animateDocumentScrollTo(
         minScrollTop,
         returnDurationMs,
-        () => {
-          returningToTop = false;
-          cancelReturnAnimation = null;
-          setTopBounce(0, true);
+        {
+          easing: easeInOutCubic,
+          onUpdate: ({ scrollTop }) => {
+            syncBounceToScrollTop(scrollTop);
+          },
+          onComplete: () => {
+            returningToTop = false;
+            cancelReturnAnimation = null;
+            setTopBounce(0, true);
+          },
         }
       );
+    };
+
+    const snapBackToTopSoftly = () => {
+      if (returningToTop || touching) return;
+      snapBackToTop(false);
+    };
+
+    const scheduleContentSettle = () => {
+      if (touching || returningToTop) return;
+      if (resizeObserverRafId) return;
+      resizeObserverRafId = window.requestAnimationFrame(() => {
+        resizeObserverRafId = 0;
+        snapBackToTopSoftly();
+      });
+    };
+
+    const handleViewportChange = () => {
+      if (releaseTimerId) {
+        window.clearTimeout(releaseTimerId);
+        releaseTimerId = 0;
+      }
+      snapBackToTop(true);
     };
 
     const applyElasticClamp = () => {
       const currentScrollTop = getDocumentScrollTop();
       if (currentScrollTop >= minScrollTop) return;
 
-      const overshoot = minScrollTop - currentScrollTop;
-      const dampedOvershoot = Math.min(
-        elasticMaxPx,
-        overshoot * damping
-      );
-      setTopBounce(dampedOvershoot, false);
+      syncBounceToScrollTop(currentScrollTop);
     };
 
     const scheduleElasticClamp = () => {
@@ -588,6 +627,10 @@ function AppLayout() {
         window.clearTimeout(releaseTimerId);
         releaseTimerId = 0;
       }
+      if (resizeObserverRafId) {
+        window.cancelAnimationFrame(resizeObserverRafId);
+        resizeObserverRafId = 0;
+      }
       cancelReturn();
     };
 
@@ -616,14 +659,6 @@ function AppLayout() {
       if (!touching) scheduleSnapBack();
     };
 
-    const handleViewportChange = () => {
-      if (releaseTimerId) {
-        window.clearTimeout(releaseTimerId);
-        releaseTimerId = 0;
-      }
-      snapBackToTop(true);
-    };
-
     root.style.overscrollBehaviorY = 'contain';
     if (body) body.style.overscrollBehaviorY = 'contain';
     setTopBounce(0, false);
@@ -643,15 +678,14 @@ function AppLayout() {
     window.addEventListener('focus', handleViewportChange);
     window.visualViewport?.addEventListener('resize', handleViewportChange);
     if (typeof window.ResizeObserver === 'function') {
-      resizeObserver = new window.ResizeObserver(() => {
-        handleViewportChange();
-      });
+      resizeObserver = new window.ResizeObserver(scheduleContentSettle);
       resizeObserver.observe(root);
       if (body) resizeObserver.observe(body);
     }
 
     return () => {
       if (clampRafId) window.cancelAnimationFrame(clampRafId);
+      if (resizeObserverRafId) window.cancelAnimationFrame(resizeObserverRafId);
       if (releaseTimerId) window.clearTimeout(releaseTimerId);
       resizeObserver?.disconnect();
       cancelReturn();
