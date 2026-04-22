@@ -577,9 +577,11 @@ export default function FeedPage({ initialData }) {
         });
       }
     }
-    const targetTop = Math.max(0, (gridRef.current?.offsetTop || 0) - 24);
+    const targetTop = isDesktopViewport
+      ? Math.max(0, (gridRef.current?.offsetTop || 0) - 24)
+      : 0;
     window.scrollTo({ top: targetTop, behavior: 'smooth' });
-  }, [applyLoadedProfiles, blockCursor, blockSize, cardsPerPage, hasMore, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, viewerPremium]);
+  }, [applyLoadedProfiles, blockCursor, blockSize, cardsPerPage, hasMore, isDesktopViewport, loadProfiles, nextCursor, pageCursor, profiles, safeSettings, totalPages, totalProfiles, viewerPremium]);
 
   useEffect(() => {
     let fadeOutTimer = null;
