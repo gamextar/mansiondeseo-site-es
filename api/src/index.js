@@ -370,7 +370,7 @@ function sanitizeStorageSegment(input, fallback = 'user') {
 
 function buildProfileMediaKey(username, kind, ext) {
   const slug = sanitizeStorageSegment(username, 'user');
-  if (kind === 'avatar') return `profiles/${slug}/avatar.${ext}`;
+  if (kind === 'avatar') return `profiles/${slug}/avatar-${generateId()}.${ext}`;
   return `profiles/${slug}/photo-${generateId()}.${ext}`;
 }
 
