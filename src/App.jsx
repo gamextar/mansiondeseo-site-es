@@ -21,7 +21,7 @@ import FeedShellProbePage from './pages/FeedShellProbePage';
 import ProfileShellProbePage from './pages/ProfileShellProbePage';
 import SafeAreaDebugPage from './pages/SafeAreaDebugPage';
 import ProfilePage from './pages/ProfilePage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, getMe, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -59,8 +59,6 @@ const MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS = 620;
 const MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS = 140;
 const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_MAX_PX = 22;
 const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_RETURN_MS = 620;
-const AUTH_USER_REFRESH_KEY = 'mansion_auth_user_refresh_version';
-const AUTH_USER_REFRESH_VERSION = 'avatar-startup-sync-v1';
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
@@ -1093,29 +1091,6 @@ export default function App() {
     window.addEventListener('mansion-auth-expired', handleAuthExpired);
     return () => window.removeEventListener('mansion-auth-expired', handleAuthExpired);
   }, []);
-
-  useEffect(() => {
-    if (!getToken()) return undefined;
-
-    try {
-      if (localStorage.getItem(AUTH_USER_REFRESH_KEY) === AUTH_USER_REFRESH_VERSION) return undefined;
-    } catch {}
-
-    let cancelled = false;
-    getMe({ force: true })
-      .then((data) => {
-        if (cancelled || !data?.user) return;
-        setUser(data.user);
-        try {
-          localStorage.setItem(AUTH_USER_REFRESH_KEY, AUTH_USER_REFRESH_VERSION);
-        } catch {}
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [setUser]);
 
   useEffect(() => {
     const unsubscribe = subscribeBootDebugFlags((nextFlags) => {

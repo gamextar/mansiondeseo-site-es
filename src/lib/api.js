@@ -53,19 +53,9 @@ function clearLegacyMediaCaches() {
 
     localStorage.removeItem(USER_KEY);
 
-    for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
-      const key = sessionStorage.key(i);
-      if (!key) continue;
-      if (
-        key === 'mansion_feed' ||
-        key === 'appBootstrap' ||
-        key === AUTH_ME_CACHE_KEY ||
-        key === OWN_PROFILE_DASHBOARD_CACHE_KEY ||
-        key.startsWith('mansion_profile_detail_')
-      ) {
-        sessionStorage.removeItem(key);
-      }
-    }
+    sessionStorage.removeItem('appBootstrap');
+    sessionStorage.removeItem(AUTH_ME_CACHE_KEY);
+    sessionStorage.removeItem(OWN_PROFILE_DASHBOARD_CACHE_KEY);
 
     localStorage.setItem(CLIENT_CACHE_VERSION_KEY, CLIENT_CACHE_VERSION);
   } catch {
@@ -971,10 +961,12 @@ export async function uploadImage(file, { purpose = 'asset' } = {}) {
     body: await file.arrayBuffer(),
   });
   if (purpose === 'avatar') {
+    invalidateMeCache();
     invalidateBootstrapCache();
     invalidateOwnProfileDashboardCache();
     mergeMeCache({ avatar_url: data?.avatar_url || data?.url || '', avatar_crop: null });
   } else if (purpose === 'gallery' && Array.isArray(data?.photos)) {
+    invalidateMeCache();
     invalidateBootstrapCache();
     invalidateOwnProfileDashboardCache();
     mergeMeCache({ photos: data.photos, avatar_url: data?.avatar_url });
