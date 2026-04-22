@@ -447,6 +447,9 @@ export default function FeedPage({ initialData }) {
   const { indicatorRef } = usePullToRefresh(
     useCallback(() => loadProfiles({ forceFresh: true }), [loadProfiles]),
     {
+      threshold: 168,
+      startMaxY: 92,
+      horizontalTolerance: 28,
       preventNativePull: !isStandaloneMobileApp && !isDesktopViewport,
       resetScrollOnRelease: !isStandaloneMobileApp && !isDesktopViewport,
     }
@@ -1414,46 +1417,47 @@ export default function FeedPage({ initialData }) {
             {/* Pagination */}
             {totalPages > 1 && (
               <>
-                {/* Mobile overlay arrows — appear on scroll to bottom */}
+                {/* Mobile pagination pill — appears near the bottom nav */}
                 <div
-                  className="lg:hidden fixed left-0 right-0 top-1/2 z-40 -translate-y-1/2 px-4 pointer-events-none"
+                  className="lg:hidden fixed left-0 right-0 z-40 px-4 pointer-events-none"
+                  style={{ bottom: `calc(${navBottomOffset} + 8px)` }}
                   aria-hidden={!showMobileNav}
                 >
                   <motion.div
                     initial={false}
                     animate={{
                       opacity: showMobileNav ? 1 : 0,
-                      y: showMobileNav ? 0 : 26,
+                      y: showMobileNav ? 0 : 18,
                       scale: showMobileNav ? 1 : 0.96,
                     }}
                     transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
-                    className="flex flex-col items-center gap-3"
+                    className="flex items-center justify-center"
                     style={{ pointerEvents: showMobileNav ? 'auto' : 'none' }}
                   >
-                    <div className="flex w-full items-center justify-between">
+                    <div className="flex items-center gap-3 rounded-[999px] border border-white/15 bg-black/78 px-3 py-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] backdrop-blur-xl">
                       {currentPage > 1 ? (
                         <button
                           type="button"
                           onClick={() => goToFeedPage(currentPage - 1)}
                           aria-label="Pagina anterior"
-                          className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/72 border border-white/15 shadow-lg active:scale-95 transition-transform"
+                          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] active:scale-95 transition-transform"
                         >
-                          <ChevronLeft className="w-7 h-7 text-white/80" />
+                          <ChevronLeft className="h-5.5 w-5.5 text-white/82" />
                         </button>
-                      ) : <div className="w-14" />}
+                      ) : <div className="h-11 w-11" />}
+                      <div className="min-w-[4.5rem] text-center">
+                        <span className="text-xs font-semibold text-white/78">{currentPage} / {totalPages}</span>
+                      </div>
                       {currentPage < totalPages ? (
                         <button
                           type="button"
                           onClick={() => goToFeedPage(currentPage + 1)}
                           aria-label="Pagina siguiente"
-                          className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-black/72 border border-white/15 shadow-lg active:scale-95 transition-transform"
+                          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] active:scale-95 transition-transform"
                         >
-                          <ChevronRight className="w-7 h-7 text-white/80" />
+                          <ChevronRight className="h-5.5 w-5.5 text-white/82" />
                         </button>
-                      ) : <div className="w-14" />}
-                    </div>
-                    <div className="rounded-full bg-black/72 border border-white/15 px-4 py-2 shadow-lg">
-                      <span className="text-xs font-medium text-white/70">{currentPage} / {totalPages}</span>
+                      ) : <div className="h-11 w-11" />}
                     </div>
                   </motion.div>
                 </div>

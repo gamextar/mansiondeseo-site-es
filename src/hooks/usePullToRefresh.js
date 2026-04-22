@@ -3,10 +3,11 @@ import { useEffect, useRef, useCallback } from 'react';
 /**
  * Pull-to-refresh hook.
  * @param {() => Promise<void>} onRefresh - async function to call on refresh
- * @param {{ threshold?: number, containerRef?: React.RefObject<HTMLElement | null>, preventNativePull?: boolean, resetScrollOnRelease?: boolean }} options
+ * @param {{ threshold?: number, startMaxY?: number, horizontalTolerance?: number, containerRef?: React.RefObject<HTMLElement | null>, preventNativePull?: boolean, resetScrollOnRelease?: boolean }} options
  */
-export function usePullToRefresh(onRefresh, { threshold = 120, containerRef, preventNativePull = false, resetScrollOnRelease = false } = {}) {
+export function usePullToRefresh(onRefresh, { threshold = 120, startMaxY = 120, horizontalTolerance = 42, containerRef, preventNativePull = false, resetScrollOnRelease = false } = {}) {
   const startY = useRef(null);
+  const startX = useRef(null);
   const pulling = useRef(false);
   const startedAtTop = useRef(false);
   const refreshing = useRef(false);
@@ -49,6 +50,7 @@ export function usePullToRefresh(onRefresh, { threshold = 120, containerRef, pre
 
   const reset = useCallback((restoreTop = false) => {
     startY.current = null;
+    startX.current = null;
     pulling.current = false;
     startedAtTop.current = false;
     if (indicatorRef.current) {
@@ -72,13 +74,19 @@ export function usePullToRefresh(onRefresh, { threshold = 120, containerRef, pre
       if (refreshing.current) return;
       // Only trigger when scrolled to the very top
       if (!isAtTop()) return;
-      startY.current = e.touches[0].clientY;
+      const touch = e.touches[0];
+      if (touch.clientY > startMaxY) return;
+      startY.current = touch.clientY;
+      startX.current = touch.clientX;
       startedAtTop.current = true;
     };
 
     const onTouchMove = (e) => {
       if (startY.current === null) return;
-      const dy = e.touches[0].clientY - startY.current;
+      const touch = e.touches[0];
+      const dy = touch.clientY - startY.current;
+      const dx = Math.abs(touch.clientX - (startX.current ?? touch.clientX));
+      if (dx > horizontalTolerance && dx > dy * 0.55) { reset(); return; }
       if (dy <= 0) { reset(); return; }
       if (preventNativePull && startedAtTop.current) {
         // Mobile browsers can keep the document displaced after native pull.
@@ -105,6 +113,7 @@ export function usePullToRefresh(onRefresh, { threshold = 120, containerRef, pre
     const onTouchEnd = async () => {
       const shouldRestoreTop = resetScrollOnRelease && startedAtTop.current;
       startY.current = null;
+      startX.current = null;
       if (!pulling.current) {
         // Didn't reach threshold — reset indicator
         reset(shouldRestoreTop);
@@ -143,7 +152,7 @@ export function usePullToRefresh(onRefresh, { threshold = 120, containerRef, pre
       touchEl.removeEventListener('touchend', onTouchEnd);
       touchEl.removeEventListener('touchcancel', onTouchCancel);
     };
-  }, [containerRef, forceScrollTop, getScrollTop, onRefresh, preventNativePull, reset, resetScrollOnRelease, threshold]);
+  }, [containerRef, forceScrollTop, getScrollTop, horizontalTolerance, onRefresh, preventNativePull, reset, resetScrollOnRelease, startMaxY, threshold]);
 
   return { indicatorRef };
 }
