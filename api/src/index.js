@@ -326,6 +326,12 @@ function sanitizeStorageSegment(input, fallback = 'user') {
     .slice(0, 64) || fallback;
 }
 
+function buildProfileMediaKey(username, kind, ext) {
+  const slug = sanitizeStorageSegment(username, 'user');
+  if (kind === 'avatar') return `profiles/${slug}/avatar-${generateId()}.${ext}`;
+  return `profiles/${slug}/photo-${generateId()}.${ext}`;
+}
+
 async function deleteR2KeysBestEffort(env, keys) {
   for (const key of [...new Set(keys.filter(Boolean))]) {
     try {
@@ -2953,28 +2959,38 @@ async function handleUpload(request, env) {
     return error('La imagen no puede superar 5MB');
   }
 
-  // Keep uploads organized by user subfolder: profiles/{userId}/{fileId}.ext
   const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
-  const folder = purpose === 'avatar' || purpose === 'gallery' ? `profiles/${auth.sub}` : 'assets';
-  const key = `${folder}/${generateId()}.${ext}`;
+  const user = await env.DB.prepare('SELECT username, photos, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!user) return error('Usuario no encontrado', 404);
+
+  const key = purpose === 'avatar' || purpose === 'gallery'
+    ? buildProfileMediaKey(user.username, purpose, ext)
+    : `assets/${generateId()}.${ext}`;
 
   await env.IMAGES.put(key, imageData, {
-    httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
+    httpMetadata: {
+      contentType,
+      cacheControl: purpose === 'avatar'
+        ? 'public, max-age=300'
+        : 'public, max-age=31536000, immutable',
+    },
   });
 
   const publicUrl = env.R2_PUBLIC_URL
     ? `${env.R2_PUBLIC_URL}/${key}`
     : `/api/images/${key}`; // Serve via Worker in dev
 
-  const user = await env.DB.prepare('SELECT photos, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
-  if (!user) return error('Usuario no encontrado', 404);
-
   const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
 
   if (purpose === 'avatar') {
+    const previousAvatarKey = extractMediaKey(user.avatar_url, env);
     await env.DB.prepare(`
       UPDATE users SET avatar_url = ?, avatar_crop = NULL WHERE id = ?
     `).bind(publicUrl, auth.sub).run();
+
+    if (previousAvatarKey && previousAvatarKey !== key) {
+      await deleteR2KeysBestEffort(env, [previousAvatarKey]);
+    }
 
     return json({ url: publicUrl, key, avatar_url: publicUrl, photos: galleryPhotos }, 201);
   }
