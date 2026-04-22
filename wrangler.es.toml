@@ -34,7 +34,7 @@ tag = "v2"
 new_sqlite_classes = ["UserNotification"]
 
 [vars]
-R2_PUBLIC_URL = "https://media-es.mansiondeseo.com"
+R2_PUBLIC_URL = "https://pub-da03e197cc8641dd8f5374571f9e711b.r2.dev"
 CORS_ORIGIN = "https://es.mansiondeseo.com,https://mansiondeseo-site-es.pages.dev"
 ENVIRONMENT = "production"
 DEBUG_LOGS = "0"
