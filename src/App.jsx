@@ -283,6 +283,8 @@ function AppLayout() {
     !isStandaloneMobileApp &&
     isMobileViewport &&
     !routeOverlayOpen &&
+    normalizedRoutePath !== '/feed' &&
+    normalizedRoutePath !== '/explorar' &&
     normalizedRoutePath !== '/videos' &&
     (immersiveMobileApp || isChatDetail);
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
