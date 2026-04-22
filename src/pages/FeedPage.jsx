@@ -1118,7 +1118,7 @@ export default function FeedPage({ initialData }) {
       {/* Stories section */}
       {showStoriesSection && (
       <div className="px-0 lg:px-8 pt-0 lg:pt-4 pb-0 fade-in-up">
-        <div className="flex items-start justify-end gap-1.5 mb-3 px-2 lg:px-0">
+        <div className="hidden lg:flex items-start justify-end gap-1.5 mb-3 px-2 lg:px-0">
           <Radio className="w-4 h-4 text-mansion-crimson" />
           <p className="relative -top-[2px] text-text-muted text-sm lg:text-base font-medium">Video Cards</p>
         </div>
