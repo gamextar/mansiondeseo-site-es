@@ -1501,10 +1501,21 @@ export default function VideoFeedPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [closeOverlay, isDesktopViewport, isOverlayPreview, moveDesktopByOne]);
 
+  const desktopOverlayRoute = isOverlayPreview && isDesktopViewport;
+  const desktopStandardRoute = isDesktopViewport && !desktopOverlayRoute;
+
   if (loading) {
     return (
       <div
-        className={standaloneMobileRoute ? 'relative min-h-mobile-browser-screen overflow-hidden bg-black' : 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'}
+        className={
+          standaloneMobileRoute
+            ? 'relative min-h-mobile-browser-screen overflow-hidden bg-black'
+            : desktopOverlayRoute
+              ? 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'
+              : desktopStandardRoute
+                ? 'fixed inset-y-0 right-0 left-0 lg:left-64 xl:left-72 bg-black flex items-center justify-center z-[60] lg:z-40'
+                : 'fixed inset-0 bg-black flex items-center justify-center z-[60] lg:z-40'
+        }
       >
         <div
           className={standaloneMobileRoute ? 'flex h-mobile-browser-screen items-center justify-center' : undefined}
@@ -1518,7 +1529,15 @@ export default function VideoFeedPage() {
   if (stories.length === 0) {
     return (
       <div
-        className={standaloneMobileRoute ? 'relative min-h-mobile-browser-screen overflow-hidden bg-mansion-base px-6' : 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'}
+        className={
+          standaloneMobileRoute
+            ? 'relative min-h-mobile-browser-screen overflow-hidden bg-mansion-base px-6'
+            : desktopOverlayRoute
+              ? 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'
+              : desktopStandardRoute
+                ? 'fixed inset-y-0 right-0 left-0 lg:left-64 xl:left-72 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'
+                : 'fixed inset-0 bg-mansion-base flex flex-col items-center justify-center z-[60] lg:z-40 px-6'
+        }
       >
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-32 right-[-10%] w-[520px] h-[520px] rounded-full bg-mansion-crimson/10 blur-3xl" />
@@ -1552,8 +1571,6 @@ export default function VideoFeedPage() {
       </div>
     );
   }
-
-  const desktopOverlayRoute = isOverlayPreview && isDesktopViewport;
 
   return (
     <div
