@@ -18,9 +18,10 @@ const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
 const CLIENT_CACHE_VERSION_KEY = 'mansion_client_cache_version';
-const CLIENT_CACHE_VERSION = 'media-paths-v6-avatar-startup-sync';
+const CLIENT_CACHE_VERSION = 'media-paths-v7-avatar-race-fix';
 const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
 const sharedGetCache = new Map();
+let avatarUploadCacheSeq = 0;
 const sessionCache = {
   get(key, ttlMs = 0) {
     try {
@@ -955,6 +956,9 @@ export async function debugInspectMediaCache(urls = []) {
 
 export async function uploadImage(file, { purpose = 'asset' } = {}) {
   const qs = purpose ? `?purpose=${encodeURIComponent(purpose)}` : '';
+  const currentAvatarUploadSeq = purpose === 'avatar' ? avatarUploadCacheSeq + 1 : 0;
+  if (purpose === 'avatar') avatarUploadCacheSeq = currentAvatarUploadSeq;
+
   const data = await apiUpload(`/upload${qs}`, {
     method: 'POST',
     headers: { 'Content-Type': file.type },
@@ -964,7 +968,9 @@ export async function uploadImage(file, { purpose = 'asset' } = {}) {
     invalidateMeCache();
     invalidateBootstrapCache();
     invalidateOwnProfileDashboardCache();
-    mergeMeCache({ avatar_url: data?.avatar_url || data?.url || '', avatar_crop: null });
+    if (currentAvatarUploadSeq === avatarUploadCacheSeq) {
+      mergeMeCache({ avatar_url: data?.avatar_url || data?.url || '', avatar_crop: null });
+    }
   } else if (purpose === 'gallery' && Array.isArray(data?.photos)) {
     invalidateMeCache();
     invalidateBootstrapCache();

@@ -174,6 +174,7 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 		: {};
 
 	const handleConfirm = async () => {
+		if (processing) return;
 		setProcessing(true);
 		setError('');
 		try {

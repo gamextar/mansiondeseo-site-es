@@ -1070,14 +1070,19 @@ export default function App() {
   }, []);
 
   const setUser = useCallback((u) => {
+    const persistUser = (next) => {
+      const avatarUrl = typeof next?.avatar_url === 'string' ? next.avatar_url : '';
+      if (!avatarUrl.startsWith('blob:')) setStoredUser(next);
+    };
+
     if (typeof u === 'function') {
       setUserState(prev => {
         const next = u(prev);
-        setStoredUser(next);
+        persistUser(next);
         return next;
       });
     } else {
-      setStoredUser(u);
+      persistUser(u);
       setUserState(u);
     }
   }, []);
