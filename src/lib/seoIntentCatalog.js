@@ -151,12 +151,20 @@ const SEO_INTENT_PAGES = {
   'en-us': {},
 };
 
+SEO_INTENT_PAGES['es-es'] = {
+  ...SEO_INTENT_PAGES['es-ar'],
+  'parejas-liberales': {
+    ...SEO_INTENT_PAGES['es-ar']['parejas-liberales'],
+    description: 'Una entrada pública para parejas liberales en España, con perfiles verificados, discreción y acceso privado para adultos registrados.',
+  },
+};
+
 export function getSeoIntentCatalog(locale = DEFAULT_SEO_LOCALE) {
   return SEO_INTENT_PAGES[locale] || SEO_INTENT_PAGES[DEFAULT_SEO_LOCALE] || {};
 }
 
 export function getSeoIntentPage(locale = DEFAULT_SEO_LOCALE, variant = 'parejas') {
   const catalog = getSeoIntentCatalog(locale);
-  const fallbackCatalog = getSeoIntentCatalog(DEFAULT_SEO_LOCALE);
+  const fallbackCatalog = SEO_INTENT_PAGES['es-ar'] || {};
   return catalog[variant] || fallbackCatalog[variant] || fallbackCatalog.parejas;
 }

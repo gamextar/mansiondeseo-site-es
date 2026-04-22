@@ -6,6 +6,7 @@ import { getBootDebugFlags } from './lib/bootDebugPrefs'
 import {
   applyBottomNavCssVariables,
 } from './lib/bottomNavConfig'
+import { SITE_CONFIG } from './lib/siteConfig'
 
 const ASSET_RECOVERY_KEY = 'mansion-asset-recovery-reload';
 
@@ -51,8 +52,8 @@ function tryRecoverFromAssetFailure() {
   return true;
 }
 
-if (typeof window !== 'undefined' && window.location.hostname === 'www.mansiondeseo.com') {
-  const canonicalUrl = `https://mansiondeseo.com${window.location.pathname}${window.location.search}${window.location.hash}`;
+if (typeof window !== 'undefined' && SITE_CONFIG.redirectHosts.includes(window.location.hostname)) {
+  const canonicalUrl = `${SITE_CONFIG.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
   window.location.replace(canonicalUrl);
 }
 

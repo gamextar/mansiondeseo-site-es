@@ -1,5 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { SITE_LOCALE, SITE_ORIGIN } from '../src/lib/siteConfig.js';
+import { SEO_BASE_INTENTS } from '../src/lib/seoVariants.js';
 
 const DIST_DIR = path.resolve('dist');
 const indexPath = path.join(DIST_DIR, 'index.html');
@@ -41,7 +43,7 @@ const appRoutes = new Set([
 async function addSitemapRoutes() {
   try {
     const sitemap = await readFile(sitemapPath, 'utf8');
-    for (const match of sitemap.matchAll(/<loc>(https:\/\/mansiondeseo\.com\/[^<]*)<\/loc>/g)) {
+    for (const match of sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)) {
       const route = new URL(match[1]).pathname.replace(/^\/+|\/+$/g, '');
       if (route) appRoutes.add(route);
     }
@@ -84,9 +86,33 @@ await rename(indexPath, appPath);
 await addSitemapRoutes();
 await Promise.all([...appRoutes].map((route) => writeAppRoute(route, appHtml)));
 const prewarmAssetHrefs = collectAppAssetHrefs(appHtml);
+const ogLocale = SITE_LOCALE.replace('-', '_');
+const staticHomeStructuredData = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Mansión Deseo',
+  alternateName: 'Mansion Deseo',
+  url: `${SITE_ORIGIN}/`,
+  description: 'Club privado para adultos registrados, parejas liberales, swingers y conexiones discretas.',
+  inLanguage: SITE_LOCALE,
+});
+const intentLabelMap = {
+  'parejas-liberales': 'Parejas liberales',
+  trios: 'Trios',
+  swingers: 'Swingers',
+  contactossex: 'Contactossex',
+  'cornudos-argentina': 'Cornudos',
+  'cuckold-argentina': 'Cuckold',
+  'hotwife-argentina': 'Hotwife',
+};
+const staticIntentTags = SEO_BASE_INTENTS
+  .map(([variant]) => ({ href: `/${variant}/`, label: intentLabelMap[variant] || variant }))
+  .slice(0, 6)
+  .map((item) => `<a class="tag" href="${item.href}">${item.label}</a>`)
+  .join('\n              ');
 
 const staticHomeHtml = `<!doctype html>
-<html lang="es" style="background:#08080e;color-scheme:dark">
+	<html lang="${SITE_LOCALE.split('-')[0] || 'es'}" style="background:#08080e;color-scheme:dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -94,7 +120,7 @@ const staticHomeHtml = `<!doctype html>
   <meta name="description" content="Comunidad privada para adultos registrados, pensada para parejas liberales, swingers, tríos y conexiones discretas con perfiles verificados." />
   <meta name="keywords" content="parejas liberales, swingers, cuckold, tríos, contactossex, intercambio de parejas, comunidad liberal, club privado adultos" />
   <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://mansiondeseo.com/" />
+  <link rel="canonical" href="${SITE_ORIGIN}/" />
   <meta name="theme-color" content="#08080E" />
   <meta name="color-scheme" content="dark" />
   <link rel="manifest" href="/manifest.json" />
@@ -105,14 +131,14 @@ const staticHomeHtml = `<!doctype html>
   <meta property="og:site_name" content="Mansión Deseo" />
   <meta property="og:title" content="Mansión Deseo | Club privado para adultos registrados" />
   <meta property="og:description" content="Comunidad privada para adultos registrados, pensada para parejas liberales, swingers, tríos y conexiones discretas con perfiles verificados." />
-  <meta property="og:image" content="https://mansiondeseo.com/icon-512.png" />
-  <meta property="og:url" content="https://mansiondeseo.com/" />
-  <meta property="og:locale" content="es_AR" />
+  <meta property="og:image" content="${SITE_ORIGIN}/icon-512.png" />
+  <meta property="og:url" content="${SITE_ORIGIN}/" />
+  <meta property="og:locale" content="${ogLocale}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Mansión Deseo | Club privado para adultos registrados" />
   <meta name="twitter:description" content="Comunidad privada para adultos registrados, pensada para parejas liberales, swingers, tríos y conexiones discretas." />
-  <meta name="twitter:image" content="https://mansiondeseo.com/icon-512.png" />
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"Mansión Deseo","alternateName":"Mansion Deseo","url":"https://mansiondeseo.com/","description":"Club privado para adultos registrados, parejas liberales, swingers y conexiones discretas.","inLanguage":"es-AR"}</script>
+  <meta name="twitter:image" content="${SITE_ORIGIN}/icon-512.png" />
+  <script type="application/ld+json">${staticHomeStructuredData}</script>
   <script>
     (function(){
       try {
@@ -160,11 +186,7 @@ const staticHomeHtml = `<!doctype html>
       <div class="panel mini">
         <div class="eyebrow">Últimas búsquedas</div>
         <div class="tags">
-          <a class="tag" href="/parejas-liberales/">Parejas liberales</a>
-          <a class="tag" href="/swingers/">Swingers</a>
-          <a class="tag" href="/cornudos-argentina/">Cornudos</a>
-          <a class="tag" href="/cuckold-argentina/">Cuckold</a>
-          <a class="tag" href="/hotwife-argentina/">Hotwife</a>
+	          ${staticIntentTags}
         </div>
       </div>
       <div class="panel mini">

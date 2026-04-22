@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader, Plus } from 'lucide-react';
 import { createPayment, getPublicSettings } from '../lib/api';
 import { useAuth } from '../lib/authContext';
+import { formatCurrencyAmount, formatNumber } from '../lib/siteConfig';
 
 // Inline coin SVG matching the Navbar style
 function CoinIcon({ className = 'w-5 h-5' }) {
@@ -32,11 +33,11 @@ export default function CoinsPage() {
     getPublicSettings().then(data => {
       const s = data.settings;
       const updated = [...DEFAULT_PACKS];
-      if (s.coinPack1Coins) updated[0] = { ...updated[0], coins: Number(s.coinPack1Coins), label: Number(s.coinPack1Coins).toLocaleString('es-AR'), id: `coins_${s.coinPack1Coins}` };
+      if (s.coinPack1Coins) updated[0] = { ...updated[0], coins: Number(s.coinPack1Coins), label: formatNumber(s.coinPack1Coins), id: `coins_${s.coinPack1Coins}` };
       if (s.coinPack1Price) updated[0] = { ...updated[0], amount: Number(s.coinPack1Price) };
-      if (s.coinPack2Coins) updated[1] = { ...updated[1], coins: Number(s.coinPack2Coins), label: Number(s.coinPack2Coins).toLocaleString('es-AR'), id: `coins_${s.coinPack2Coins}` };
+      if (s.coinPack2Coins) updated[1] = { ...updated[1], coins: Number(s.coinPack2Coins), label: formatNumber(s.coinPack2Coins), id: `coins_${s.coinPack2Coins}` };
       if (s.coinPack2Price) updated[1] = { ...updated[1], amount: Number(s.coinPack2Price) };
-      if (s.coinPack3Coins) updated[2] = { ...updated[2], coins: Number(s.coinPack3Coins), label: Number(s.coinPack3Coins).toLocaleString('es-AR'), id: `coins_${s.coinPack3Coins}` };
+      if (s.coinPack3Coins) updated[2] = { ...updated[2], coins: Number(s.coinPack3Coins), label: formatNumber(s.coinPack3Coins), id: `coins_${s.coinPack3Coins}` };
       if (s.coinPack3Price) updated[2] = { ...updated[2], amount: Number(s.coinPack3Price) };
       setPacks(updated);
       setSelected(updated[1].id);
@@ -83,7 +84,7 @@ export default function CoinsPage() {
           </div>
           <h2 className="text-2xl font-bold">Comprá Monedas</h2>
           <p className="text-gray-400">
-            Tenés <span className="text-mansion-gold font-semibold">{(user?.coins ?? 0).toLocaleString('es-AR')}</span> monedas.
+            Tenés <span className="text-mansion-gold font-semibold">{formatNumber(user?.coins ?? 0)}</span> monedas.
             Usálas para enviar regalos y destacarte.
           </p>
         </div>
@@ -112,7 +113,7 @@ export default function CoinsPage() {
                 <span className="text-gray-500 text-[11px]">monedas</span>
                 {p.amount > 0 && (
                   <span className="text-mansion-gold font-semibold text-sm mt-1">
-                    ${p.amount.toLocaleString('es-AR')}
+                    {formatCurrencyAmount(p.amount)}
                   </span>
                 )}
               </button>
@@ -141,7 +142,7 @@ export default function CoinsPage() {
           ) : (
             <>
               <Plus className="w-5 h-5" />
-              Comprar {pack.label} monedas {pack.amount > 0 ? `— $${pack.amount.toLocaleString('es-AR')} ARS` : ''}
+              Comprar {pack.label} monedas {pack.amount > 0 ? `- ${formatCurrencyAmount(pack.amount)}` : ''}
             </>
           )}
         </button>

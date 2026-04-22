@@ -7,15 +7,14 @@ import { DEFAULT_SEO_LOCALE, getSeoLocale } from '../lib/seoLocales';
 import { buildSeoAlternates, buildSeoCanonical, buildSeoPath } from '../lib/seoRouting';
 import { formatSeoCityStatsDate, getSeoCityStats, getTopSeoCityStats, hasSeoCityStats } from '../lib/seoCityStats';
 import { getSeoIntentPage } from '../lib/seoIntentCatalog';
+import { SITE_CONFIG, SITE_ORIGIN, formatNumber } from '../lib/siteConfig';
 
 function slugToCity(slug, locale) {
   return getGeo(slug, locale);
 }
 
-const countFormatter = new Intl.NumberFormat('es-AR');
-
 function formatCount(value) {
-  return countFormatter.format(Number(value || 0));
+  return formatNumber(value || 0);
 }
 
 function buildLocalizedPage(page, citySlug, variant, cityStats, locale) {
@@ -158,11 +157,8 @@ function buildLocalizedPage(page, citySlug, variant, cityStats, locale) {
   };
 }
 
-const RELATED = [
+const BASE_RELATED = [
   { to: '/contactossex', label: 'Contactossex' },
-  { to: '/contactossex-argentina', label: 'Contactossex AR' },
-  { to: '/cornudos-argentina', label: 'Cornudos AR' },
-  { to: '/cuckold-argentina', label: 'Cuckold AR' },
   { to: '/parejas', label: 'Parejas' },
   { to: '/trios', label: 'Tríos' },
   { to: '/swingers', label: 'Swingers' },
@@ -170,6 +166,16 @@ const RELATED = [
   { to: '/hombres', label: 'Hombres' },
   { to: '/trans', label: 'Trans' },
 ];
+
+const AR_RELATED = [
+  { to: '/contactossex-argentina', label: 'Contactossex AR' },
+  { to: '/cornudos-argentina', label: 'Cornudos AR' },
+  { to: '/cuckold-argentina', label: 'Cuckold AR' },
+];
+
+const RELATED = SITE_CONFIG.country === 'AR'
+  ? [BASE_RELATED[0], ...AR_RELATED, ...BASE_RELATED.slice(1)]
+  : BASE_RELATED;
 
 function Pill({ icon: Icon, children }) {
   return (
@@ -222,7 +228,7 @@ export default function SEOLandingPage({ variant, citySlug = '', locale = DEFAUL
     isPartOf: {
       '@type': 'WebSite',
       name: 'Mansión Deseo',
-      url: 'https://mansiondeseo.com/',
+      url: `${SITE_ORIGIN}/`,
     },
     ...(city ? { areaServed: city.label } : {}),
     ...(cityHasStats && cityStats?.updated_at ? { dateModified: `${String(cityStats.updated_at).slice(0, 10)}T00:00:00Z` } : {}),

@@ -22,6 +22,7 @@
     "cleanup:women-photo-01": "node scripts/remove-women-photo-01.mjs",
     "cleanup:role-photo-01": "node scripts/remove-women-photo-01.mjs",
     "deploy:shared": "node scripts/deploy-shared.mjs",
+    "mirror:country": "node scripts/sync-country-mirror.mjs",
     "postbuild": "node scripts/install-static-home.mjs && node scripts/generate-static-seo-pages.mjs"
   },
   "dependencies": {

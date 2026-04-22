@@ -4,18 +4,7 @@
 
 import { createMutationQueue } from './mutationQueue';
 import { recordD1WriteEstimate } from './d1Debug';
-
-const LEGACY_PROD_API_BASE = 'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api';
-const PROD_APP_API_BASE = 'https://mansiondeseo.com/api';
-
-function resolveApiBase() {
-  const explicitBase = String(import.meta.env.VITE_API_BASE || '').trim();
-  if (explicitBase) return explicitBase.replace(/\/$/, '');
-  if (!import.meta.env.PROD) return '/api';
-  if (typeof window === 'undefined') return PROD_APP_API_BASE;
-  if (window.location.hostname.endsWith('.pages.dev')) return PROD_APP_API_BASE;
-  return '/api';
-}
+import { resolveApiBase } from './siteConfig';
 
 const API_BASE = resolveApiBase();
 const TOKEN_KEY = 'mansion_token';

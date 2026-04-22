@@ -3,20 +3,18 @@ import path from 'node:path';
 import { DEFAULT_SEO_LOCALE, getSeoLocale } from '../src/lib/seoLocales.js';
 import { buildSeoCanonical, buildSeoPath } from '../src/lib/seoRouting.js';
 import { getSeoIntentPage } from '../src/lib/seoIntentCatalog.js';
+import { SITE_ORIGIN } from '../src/lib/siteConfig.js';
+import { SEO_BASE_INTENTS } from '../src/lib/seoVariants.js';
 
 const DIST_DIR = path.resolve('dist');
 const redirectsPath = path.join(DIST_DIR, '_redirects');
-const STATIC_SEO_VARIANTS = [
-  'parejas-liberales',
-  'swingers',
-  'cornudos-argentina',
-  'cuckold-argentina',
-  'hotwife-argentina',
-  'contactossex',
-];
+const STATIC_SEO_VARIANTS = SEO_BASE_INTENTS
+  .map(([variant]) => variant)
+  .filter((variant) => !['mujeres', 'hombres', 'trans'].includes(variant));
 
 const RELATED_LABELS = {
   'parejas-liberales': 'Parejas liberales',
+  trios: 'Trios',
   swingers: 'Swingers',
   'cornudos-argentina': 'Cornudos',
   'cuckold-argentina': 'Cuckold',
@@ -75,7 +73,7 @@ function buildStructuredData({ page, variant, canonical, locale }) {
       isPartOf: {
         '@type': 'WebSite',
         name: 'Mansión Deseo',
-        url: 'https://mansiondeseo.com/',
+        url: `${SITE_ORIGIN}/`,
       },
       about: [
         { '@type': 'Thing', name: page.focus },
@@ -91,7 +89,7 @@ function buildStructuredData({ page, variant, canonical, locale }) {
           '@type': 'ListItem',
           position: 1,
           name: 'Mansión Deseo',
-          item: 'https://mansiondeseo.com/',
+          item: `${SITE_ORIGIN}/`,
         },
         {
           '@type': 'ListItem',
@@ -131,13 +129,13 @@ function renderSeoPage(variant) {
   <meta property="og:site_name" content="Mansión Deseo" />
   <meta property="og:title" content="${escapeHtml(page.title)}" />
   <meta property="og:description" content="${escapeHtml(page.description)}" />
-  <meta property="og:image" content="https://mansiondeseo.com/icon-512.png" />
+  <meta property="og:image" content="${escapeHtml(`${SITE_ORIGIN}/icon-512.png`)}" />
   <meta property="og:url" content="${escapeHtml(canonical)}" />
   <meta property="og:locale" content="${escapeHtml(locale.hreflang.replace('-', '_'))}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${escapeHtml(page.title)}" />
   <meta name="twitter:description" content="${escapeHtml(page.description)}" />
-  <meta name="twitter:image" content="https://mansiondeseo.com/icon-512.png" />
+  <meta name="twitter:image" content="${escapeHtml(`${SITE_ORIGIN}/icon-512.png`)}" />
   <script type="application/ld+json">${escapeJsonScript(structuredData)}</script>
   <style>
     :root{--bg:#08080e;--paper:#11111a;--paper2:#17151f;--ink:#f6efe6;--soft:rgba(246,239,230,.7);--dim:rgba(246,239,230,.5);--gold:#c9a84c;--gold2:#f0d98b;--red:#9b2b40;--line:rgba(255,255,255,.1)}

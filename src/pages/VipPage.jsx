@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Crown, Zap, MessageCircle, Image, EyeOff, Star, ArrowLeft, Loader } from 'lucide-react';
 import { createPayment, getPublicSettings } from '../lib/api';
 import { useAuth } from '../lib/authContext';
+import { formatCurrencyAmount, formatDate } from '../lib/siteConfig';
 
 const DEFAULT_PLANES = [
   { id: 'premium_mensual', label: '1 mes', amount: 2999, popular: false, desc: 'Ideal para probar' },
@@ -84,7 +85,7 @@ export default function VipPage() {
           </h2>
           <p className="text-gray-400">
             {user?.premium && user.premium_until
-              ? <>Tu suscripción vence el <span className="text-mansion-gold font-semibold">{new Date(user.premium_until + 'Z').toLocaleDateString('es-AR')}</span>. Podés extenderla.</>
+              ? <>Tu suscripción vence el <span className="text-mansion-gold font-semibold">{formatDate(user.premium_until.endsWith('Z') ? user.premium_until : `${user.premium_until}Z`)}</span>. Podés extenderla.</>
               : 'Desbloqueá la experiencia completa de Mansión Deseo'
             }
           </p>
@@ -121,7 +122,7 @@ export default function VipPage() {
                 )}
                 <span className="font-bold text-white">{p.label}</span>
                 <span className="text-mansion-gold font-semibold text-sm mt-1">
-                  ${p.amount.toLocaleString('es-AR')}
+                  {formatCurrencyAmount(p.amount)}
                 </span>
                 <span className="text-gray-500 text-xs mt-0.5">{p.desc}</span>
               </button>
@@ -150,7 +151,7 @@ export default function VipPage() {
           ) : (
             <>
               <Crown className="w-5 h-5" />
-              {user?.premium ? 'Extender' : 'Pagar'} ${plan.amount.toLocaleString('es-AR')} ARS
+              {user?.premium ? 'Extender' : 'Pagar'} {formatCurrencyAmount(plan.amount)}
             </>
           )}
         </button>

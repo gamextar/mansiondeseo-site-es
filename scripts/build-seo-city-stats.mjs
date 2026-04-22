@@ -83,7 +83,7 @@ function normalizeRow(slug, target, row) {
     province_slug: target.provinceSlug || '',
     locality: target.locality || GEO_PAGES[slug]?.localityHint || GEO_PAGES[slug]?.label || slug,
     province: target.province || '',
-    country: 'AR',
+    country: String(process.env.SITE_COUNTRY || process.env.VITE_SITE_COUNTRY || 'AR').toUpperCase(),
     active_profiles_30d: numeric(row?.active_profiles_30d),
     active_couples_30d: numeric(row?.active_couples_30d),
     active_women_30d: numeric(row?.active_women_30d),

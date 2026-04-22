@@ -47,6 +47,7 @@ let _userBirthdateColumnReady = null;
 let _userMaritalStatusColumnReady = null;
 let _userSexualOrientationColumnReady = null;
 let _userMessageBlockRolesColumnReady = null;
+let _userLastIpColumnReady = null;
 let _profileVisitStructuresReady = null;
 let _profileStatsBackfillReady = null;
 
@@ -279,19 +280,42 @@ function error(message, status = 400) {
 function getLegacyMediaBases() {
   return [
     'https://pub-c0bc1ab6fb294cc1bb2e231bb55b4afb.r2.dev',
+    'https://pub-da03e197cc8641dd8f5374571f9e711b.r2.dev',
     'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api/images',
   ];
+}
+
+function getMediaPublicBase(env) {
+  return String(env?.R2_PUBLIC_URL || '').replace(/\/$/, '');
+}
+
+function buildPublicMediaUrl(key, env) {
+  const base = getMediaPublicBase(env);
+  return base ? `${base}/${key}` : `/api/media?key=${encodeURIComponent(key)}`;
+}
+
+function getConfiguredMediaBases(env) {
+  return [
+    env?.R2_PUBLIC_URL,
+    ...getLegacyMediaBases(),
+  ]
+    .filter(Boolean)
+    .map((base) => String(base).replace(/\/$/, ''));
 }
 
 function extractMediaKey(url, env) {
   if (!url || typeof url !== 'string') return '';
 
-  const r2Base = String(env?.R2_PUBLIC_URL || '').replace(/\/$/, '');
   const normalizedUrl = url.trim();
-  const bases = [r2Base, ...getLegacyMediaBases()]
-    .filter(Boolean)
-    .map((base) => String(base).replace(/\/$/, ''));
 
+  try {
+    const parsed = new URL(normalizedUrl, 'https://mansiondeseo.local');
+    if (parsed.pathname.endsWith('/api/media')) {
+      return parsed.searchParams.get('key') || '';
+    }
+  } catch {}
+
+  const bases = getConfiguredMediaBases(env).filter((base) => !base.includes('/api/media'));
   for (const base of bases) {
     if (normalizedUrl.startsWith(`${base}/`)) {
       return normalizedUrl.slice(base.length + 1);
@@ -308,11 +332,29 @@ function extractMediaKey(url, env) {
   return normalizedUrl.replace(/^https?:\/\/[^/]+\//, '');
 }
 
+function isTrustedMediaUrl(url, env) {
+  if (!url || typeof url !== 'string') return false;
+  const normalizedUrl = url.trim();
+  if (!normalizedUrl) return false;
+
+  try {
+    const parsed = new URL(normalizedUrl, 'https://mansiondeseo.local');
+    if (parsed.pathname.endsWith('/api/media') && parsed.searchParams.get('key')) return true;
+  } catch {}
+
+  if (normalizedUrl.includes('/api/images/')) return true;
+
+  return getConfiguredMediaBases(env).some((base) => (
+    normalizedUrl === base ||
+    normalizedUrl.startsWith(`${base}/`) ||
+    (base.includes('/api/media') && normalizedUrl.startsWith(`${base}?key=`))
+  ));
+}
+
 function normalizeStoryVideoUrl(url, env) {
   const key = extractMediaKey(url, env);
   if (!key) return url;
-  const r2Base = String(env?.R2_PUBLIC_URL || '').replace(/\/$/, '');
-  return r2Base ? `${r2Base}/${key}` : url;
+  return buildPublicMediaUrl(key, env);
 }
 
 function sanitizeStorageSegment(input, fallback = 'user') {
@@ -681,6 +723,28 @@ async function ensureUsersMessageBlockRolesColumn(env) {
   }
 
   return _userMessageBlockRolesColumnReady;
+}
+
+async function ensureUsersLastIpColumn(env) {
+  if (!_userLastIpColumnReady) {
+    _userLastIpColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          "ALTER TABLE users ADD COLUMN last_ip TEXT NOT NULL DEFAULT ''"
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+    })().catch((err) => {
+      _userLastIpColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userLastIpColumnReady;
 }
 
 function normalizeRoleArray(rawValue, validValues, fallback = []) {
@@ -1202,7 +1266,9 @@ async function authenticate(request, env) {
   if (now - lastUpdate > LAST_ACTIVE_DEBOUNCE_MS) {
     _lastActiveCache.set(userId, now);
     const ip = request.headers.get('CF-Connecting-IP') || '';
-    env.DB.prepare("UPDATE users SET last_active = datetime('now'), last_ip = ? WHERE id = ?").bind(ip, userId).run().catch(() => {});
+    ensureUsersLastIpColumn(env)
+      .then(() => env.DB.prepare("UPDATE users SET last_active = datetime('now'), last_ip = ? WHERE id = ?").bind(ip, userId).run())
+      .catch(() => {});
   }
 
   // Cache account_status check — avoid D1 read on every request.
@@ -1313,7 +1379,7 @@ async function getResendCredentials(env) {
   for (const r of row.results) map[r.key] = r.value;
   return {
     apiKey: map.resend_api_key || env.RESEND_API_KEY,
-    mailFrom: map.mail_from || env.MAIL_FROM || 'noreply@unicoapps.com',
+    mailFrom: map.mail_from || env.MAIL_FROM || 'noreply@mansiondeseo.com',
   };
 }
 
@@ -1321,6 +1387,11 @@ async function sendVerificationEmail(env, toEmail, code) {
   const { apiKey, mailFrom } = await getResendCredentials(env);
   const fromEmail = mailFrom;
   const fromName = 'Mansión Deseo';
+
+  if (!apiKey) {
+    console.error('Resend send failed: RESEND_API_KEY is not configured');
+    return false;
+  }
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -1536,7 +1607,8 @@ async function handleRegister(request, env) {
 
   // Send verification email (MailChannels in production, console in dev)
   if (env.ENVIRONMENT === 'production') {
-    await sendVerificationEmail(env, email.toLowerCase(), code);
+    const sent = await sendVerificationEmail(env, email.toLowerCase(), code);
+    if (!sent) return error('No pudimos enviar el email de verificación. Intentá nuevamente en unos minutos.', 502);
   } else {
     debugLog(env, `📧 VERIFICATION CODE for ${email}: ${code}`);
   }
@@ -1568,16 +1640,19 @@ async function handleVerifyCode(request, env) {
     return error('Código inválido o expirado', 401);
   }
 
-  // Mark token as used
-  await env.DB.prepare('UPDATE verification_tokens SET used = 1 WHERE id = ?')
-    .bind(record.id).run();
-
   // Verify the user
+  await ensureUsersLastIpColumn(env);
   const ipVer = request.headers.get('CF-Connecting-IP') || '';
   await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now'), last_ip = ? WHERE id = ?")
     .bind(ipVer, record.user_id).run();
 
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
+  if (!user) return error('Usuario no encontrado', 404);
+
+  // Mark token as used only after the account verification update succeeds.
+  await env.DB.prepare('UPDATE verification_tokens SET used = 1 WHERE id = ?')
+    .bind(record.id).run();
+
   const token = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
 
   return json({ token, user: sanitizeUser(user, env) });
@@ -1612,7 +1687,8 @@ async function handleResendCode(request, env) {
 
   // Send verification email
   if (env.ENVIRONMENT === 'production') {
-    await sendVerificationEmail(env, email.toLowerCase(), code);
+    const sent = await sendVerificationEmail(env, email.toLowerCase(), code);
+    if (!sent) return error('No pudimos enviar el email de verificación. Intentá nuevamente en unos minutos.', 502);
   } else {
     debugLog(env, `📧 RESEND CODE for ${email}: ${code}`);
   }
@@ -1656,6 +1732,11 @@ async function sendPasswordResetEmail(env, toEmail, code) {
   const { apiKey, mailFrom } = await getResendCredentials(env);
   const fromEmail = mailFrom;
   const fromName = 'Mansión Deseo';
+
+  if (!apiKey) {
+    console.error('Resend send failed: RESEND_API_KEY is not configured');
+    return false;
+  }
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -1810,6 +1891,7 @@ async function handleLogin(request, env) {
   }
 
   // Update online status + IP
+  await ensureUsersLastIpColumn(env);
   const ipLogin = request.headers.get('CF-Connecting-IP') || '';
   await env.DB.prepare("UPDATE users SET online = 1, last_active = datetime('now'), last_ip = ? WHERE id = ?")
     .bind(ipLogin, user.id).run();
@@ -1866,6 +1948,7 @@ async function handleVerifyToken(request, env) {
   let user;
   if (record.user_id) {
     user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
+    await ensureUsersLastIpColumn(env);
     const ipMagic = request.headers.get('CF-Connecting-IP') || '';
     await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now'), last_ip = ? WHERE id = ?")
       .bind(ipMagic, user.id).run();
@@ -2661,6 +2744,7 @@ async function handleGetMessages(request, env, otherUserId) {
   const { results } = await env.DB.prepare(query).bind(...bindings).all();
   const hasMore = results.length > limit;
   const windowedResults = hasMore ? results.slice(1) : results;
+  const settings = await cached('settings', 300_000, () => loadSettings(env));
 
   // Mark as read
   await env.DB.prepare(`
@@ -2674,7 +2758,7 @@ async function handleGetMessages(request, env, otherUserId) {
     id: m.id,
     senderId: m.sender_id === auth.sub ? 'me' : 'them',
     text: m.content,
-    timestamp: new Date(m.created_at + 'Z').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
+    timestamp: new Date(m.created_at + 'Z').toLocaleTimeString(settings.siteLocale, { hour: '2-digit', minute: '2-digit', timeZone: settings.siteTimezone }),
     created_at: m.created_at,
     is_read: m.is_read,
   }));
@@ -2976,10 +3060,7 @@ async function handleUpload(request, env) {
     },
   });
 
-  const publicUrl = env.R2_PUBLIC_URL
-    ? `${env.R2_PUBLIC_URL}/${key}`
-    : `/api/images/${key}`; // Serve via Worker in dev
-
+  const publicUrl = buildPublicMediaUrl(key, env);
   const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
 
   if (purpose === 'avatar') {
@@ -3094,13 +3175,7 @@ async function handleDeletePhoto(request, env) {
 
   // Try to delete from R2 (extract key from URL)
   try {
-    const r2Base = env.R2_PUBLIC_URL || '';
-    let key = '';
-    if (r2Base && url.startsWith(r2Base)) {
-      key = url.slice(r2Base.length + 1); // strip base + '/'
-    } else if (url.includes('/api/images/')) {
-      key = url.split('/api/images/')[1]; // legacy format
-    }
+    const key = extractMediaKey(url, env);
     if (key) {
       await env.IMAGES.delete(key);
     }
@@ -3141,9 +3216,7 @@ async function handleUpdateProfile(request, env) {
   // Validate and allow photos reorder (all URLs must originate from our R2 bucket)
   if (body.photos !== undefined) {
     if (!Array.isArray(body.photos)) return error('photos debe ser un arreglo', 400);
-    const r2Base = env.R2_PUBLIC_URL || '';
-    const legacyBase = 'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api/images';
-    const allValid = body.photos.every(url => typeof url === 'string' && (url.startsWith(r2Base) || url.startsWith(legacyBase)));
+    const allValid = body.photos.every(url => isTrustedMediaUrl(url, env));
     if (!allValid) return error('URL de foto inválida', 400);
     allowedFields.push('photos');
   }
@@ -3440,6 +3513,7 @@ async function loadSettings(env) {
   for (const r of results) settings[r.key] = r.value;
   const storyCirclePresetMedium = parseInt(settings.story_circle_preset_medium || settings.story_circle_size || String(STORY_CIRCLE_FALLBACK_SIZE), 10);
   const storyCirclePresetXl = parseInt(settings.story_circle_preset_xl || settings.sidebar_avatar_size || '154', 10);
+  const siteCountry = settings.site_country || 'AR';
   const result = {
     blurLevel: parseInt(settings.blur_level || '14', 10),
     blurMobile: parseInt(settings.blur_mobile || settings.blur_level || '14', 10),
@@ -3447,8 +3521,10 @@ async function loadSettings(env) {
     freeVisiblePhotos: parseInt(settings.free_visible_photos || '1', 10),
     showVipButton: settings.show_vip_button !== '0',
     dailyMessageLimit: parseInt(settings.daily_message_limit || '5', 10),
-    siteCountry: settings.site_country || 'AR',
-    siteTimezone: settings.site_timezone || 'America/Argentina/Buenos_Aires',
+    siteCountry,
+    siteLocale: settings.site_locale || (siteCountry === 'ES' ? 'es-ES' : 'es-AR'),
+    siteTimezone: settings.site_timezone || (siteCountry === 'ES' ? 'Europe/Madrid' : 'America/Argentina/Buenos_Aires'),
+    siteCurrency: settings.site_currency || (siteCountry === 'ES' ? 'EUR' : 'ARS'),
     hidePasswordRegister: settings.hide_password_register !== '0',
     vipPriceMonthly: settings.vip_price_monthly || '',
     vipPrice3Months: settings.vip_price_3months || '',
@@ -3507,7 +3583,7 @@ async function loadSettings(env) {
     encoderPreset: settings.encoder_preset || 'superfast',
     encoderShowProgressHud: settings.encoder_show_progress_hud === '1',
     resendApiKey: settings.resend_api_key || env.RESEND_API_KEY || '',
-    mailFrom: settings.mail_from || env.MAIL_FROM || 'noreply@unicoapps.com',
+    mailFrom: settings.mail_from || env.MAIL_FROM || 'noreply@mansiondeseo.com',
     onlineThresholdMinutes: parseInt(settings.online_threshold_minutes || '60', 10),
     feedFilterByCountry: parseBooleanSetting(settings.feed_filter_by_country, false),
     feedWeightLastActive: parseNumberSetting(settings.feed_weight_last_active, 45),
@@ -3645,7 +3721,7 @@ async function handleUpdateSettings(request, env) {
   const allowed = [
     'blur_level', 'blur_mobile', 'blur_desktop',
     'free_visible_photos', 'show_vip_button',
-    'daily_message_limit', 'site_country', 'site_timezone',
+    'daily_message_limit', 'site_country', 'site_locale', 'site_timezone', 'site_currency',
     'hide_password_register',
     'vip_price_monthly', 'vip_price_3months', 'vip_price_6months',
     'incognito_icon_svg',
@@ -5145,9 +5221,7 @@ async function handleAdminUploadStory(request, env) {
     httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
   });
 
-  const videoUrl = env.R2_PUBLIC_URL
-    ? `${env.R2_PUBLIC_URL}/${key}`
-    : `/api/images/${key}`;
+  const videoUrl = buildPublicMediaUrl(key, env);
 
   // Delete any previous story for this user (DB + R2)
   const existingAdmin = await env.DB.prepare(
@@ -5248,9 +5322,7 @@ async function handleUploadStory(request, env) {
     httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
   });
 
-  const videoUrl = env.R2_PUBLIC_URL
-    ? `${env.R2_PUBLIC_URL}/${key}`
-    : `/api/images/${key}`;
+  const videoUrl = buildPublicMediaUrl(key, env);
 
   // Delete any previous story from this user (DB + R2)
   const existing = await env.DB.prepare(

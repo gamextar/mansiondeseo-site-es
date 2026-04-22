@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ChevronRight, Sparkles } from 'lucide-react';
 import { useSeoMeta } from '../lib/seo';
 import { getToken, hasEverLoggedIn } from '../lib/api';
+import { SITE_ORIGIN } from '../lib/siteConfig';
 
 export default function WelcomePage() {
   const location = useLocation();
@@ -13,7 +14,7 @@ export default function WelcomePage() {
   useSeoMeta({
     title: 'Mansión Deseo | Acceso privado para adultos',
     description: 'Comunidad privada y selecta para adultos registrados, pensada para parejas y usuarios solos que valoran perfiles verificados y acceso discreto.',
-    canonical: 'https://mansiondeseo.com/bienvenida',
+    canonical: `${SITE_ORIGIN}/bienvenida`,
     robots: 'noindex,follow',
   });
 

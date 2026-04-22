@@ -15,7 +15,7 @@ const DEFAULT_IMPORTED_EMAIL_DOMAIN = 'gamextar.com'
 const DEFAULT_IMPORTED_PASSWORD = 'mansiondeseo26'
 const DEFAULT_BLACKLIST_PATH = path.join(repoRoot, 'data', 'import-blacklists', 'under-review-usernames.json')
 const DEFAULT_IMPORTED_REGISTRY_PATH = path.join(repoRoot, 'data', 'import-state', 'imported-usernames.json')
-const CANONICAL_MEDIA_BASE = 'https://media.mansiondeseo.com'
+const CANONICAL_MEDIA_BASE = (process.env.SITE_MEDIA_BASE || process.env.VITE_SITE_MEDIA_BASE || 'https://media.mansiondeseo.com').replace(/\/+$/, '')
 const LEGACY_MEDIA_BASES = [
   'https://media.unicoapps.com',
   'https://pub-c0bc1ab6fb294cc1bb2e231bb55b4afb.r2.dev',

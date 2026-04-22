@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, ShieldCheck, Sparkles, Users, MapPin, HeartHandshake } from 'lucide-react';
 import { useSeoMeta, useStructuredData } from '../lib/seo';
 import { useAuth } from '../lib/authContext';
+import { SITE_CONFIG, SITE_ORIGIN } from '../lib/siteConfig';
 
 const featureCards = [
   {
@@ -22,14 +23,21 @@ const featureCards = [
   },
 ];
 
-const intentLinks = [
+const BASE_INTENT_LINKS = [
   { to: '/parejas', label: 'Parejas' },
   { to: '/trios', label: 'Trios' },
   { to: '/swingers', label: 'Swingers' },
   { to: '/contactossex', label: 'Contactossex' },
+];
+
+const AR_INTENT_LINKS = [
   { to: '/contactossex-argentina', label: 'Contactossex AR' },
   { to: '/cornudos-argentina', label: 'Cornudos AR' },
 ];
+
+const intentLinks = SITE_CONFIG.country === 'AR'
+  ? [...BASE_INTENT_LINKS, ...AR_INTENT_LINKS]
+  : BASE_INTENT_LINKS;
 
 export default function PublicHomePage() {
   const { user } = useAuth();
@@ -37,17 +45,17 @@ export default function PublicHomePage() {
   useSeoMeta({
     title: 'Mansion Deseo | Club privado para adultos registrados',
     description: 'Comunidad privada para adultos registrados, pensada para parejas, swingers, trios y conexiones discretas con perfiles verificados.',
-    canonical: 'https://mansiondeseo.com/',
+    canonical: `${SITE_ORIGIN}/`,
   });
 
   useStructuredData({
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'Mansion Deseo',
-    url: 'https://mansiondeseo.com/',
+    url: `${SITE_ORIGIN}/`,
     potentialAction: {
       '@type': 'SearchAction',
-      target: 'https://mansiondeseo.com/contactossex/{search_term_string}',
+      target: `${SITE_ORIGIN}/contactossex/{search_term_string}`,
       'query-input': 'required name=search_term_string',
     },
   }, 'website-home');

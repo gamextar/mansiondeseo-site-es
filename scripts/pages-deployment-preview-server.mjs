@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import http from 'node:http';
 import { Buffer } from 'node:buffer';
+import { SITE_ORIGIN } from '../src/lib/siteConfig.js';
 
 const args = process.argv.slice(2);
 
@@ -13,7 +14,7 @@ function readArg(name, fallback = '') {
 
 const deploymentInput = readArg('--deployment', args[0] || '');
 const port = Number(readArg('--port', process.env.PORT || '5173'));
-const apiOrigin = readArg('--api-origin', 'https://mansiondeseo.com');
+const apiOrigin = readArg('--api-origin', SITE_ORIGIN);
 
 if (!deploymentInput || args.includes('--help') || args.includes('-h')) {
   console.log(`

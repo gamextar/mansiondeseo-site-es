@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
 import { getUnreadCount, getToken, invalidateUnreadCache, peekUnreadCountCache, setUnreadCountCache } from '../lib/api';
 import { recordRealtimeDebug, setRealtimeActiveConnections } from '../lib/realtimeDebug';
+import { resolveWsBase } from '../lib/siteConfig';
 
 const UnreadContext = createContext({
   unreadCount: 0,
@@ -8,17 +9,6 @@ const UnreadContext = createContext({
   subscribe: () => () => {},
   setActiveChatId: () => {},
 });
-
-const LEGACY_PROD_WS_BASE = 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev';
-
-function resolveWsBase() {
-  const explicitBase = String(import.meta.env.VITE_WS_BASE || '').trim();
-  if (explicitBase) return explicitBase.replace(/\/$/, '');
-  if (typeof window === 'undefined') return LEGACY_PROD_WS_BASE;
-  if (!import.meta.env.PROD) return `ws://${window.location.hostname}:8787`;
-  if (window.location.hostname.endsWith('.pages.dev')) return LEGACY_PROD_WS_BASE;
-  return `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
-}
 
 const WS_BASE = resolveWsBase();
 const NOTIFICATION_BACKGROUND_GRACE_MS = Infinity; // never disconnect in background — DO hibernates anyway

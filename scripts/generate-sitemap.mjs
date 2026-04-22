@@ -3,8 +3,9 @@ import { getGeoPagesForLocale } from '../src/lib/seoGeoCatalog.js';
 import { buildSeoCanonical } from '../src/lib/seoRouting.js';
 import { getSitemapSeoLocales } from '../src/lib/seoLocales.js';
 import { SEO_BASE_INTENTS, SEO_GEO_INTENT_CONFIGS } from '../src/lib/seoVariants.js';
+import { SITE_ORIGIN } from '../src/lib/siteConfig.js';
 
-const urls = [['https://mansiondeseo.com/', 'daily', '1.0']];
+const urls = [[`${SITE_ORIGIN}/`, 'daily', '1.0']];
 
 function ensureTrailingSlash(url) {
   return url.endsWith('/') ? url : `${url}/`;

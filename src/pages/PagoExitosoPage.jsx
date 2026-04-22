@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Crown, CheckCircle, ChevronRight } from 'lucide-react';
 import { getMe, confirmPayment } from '../lib/api';
 import { useAuth } from '../lib/authContext';
+import { formatNumber } from '../lib/siteConfig';
 
 function CoinIcon({ className = 'w-5 h-5' }) {
   return (
@@ -64,7 +65,7 @@ export default function PagoExitosoPage() {
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">¡Pago aprobado!</h1>
             <p className="text-gray-400 text-lg">
-              Tus <span className="text-mansion-gold font-semibold">{Number(coinsAmount).toLocaleString('es-AR')} monedas</span> fueron acreditadas
+              Tus <span className="text-mansion-gold font-semibold">{formatNumber(coinsAmount)} monedas</span> fueron acreditadas
             </p>
           </div>
 

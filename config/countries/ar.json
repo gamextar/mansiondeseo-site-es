@@ -1,0 +1,15 @@
+{
+  "country": "AR",
+  "locale": "es-AR",
+  "seoLocale": "es-ar",
+  "timezone": "America/Argentina/Buenos_Aires",
+  "currency": "ARS",
+  "origin": "https://mansiondeseo.com",
+  "mediaBase": "https://media.mansiondeseo.com",
+  "apiBase": "https://mansiondeseo.com/api",
+  "wsBase": "wss://mansiondeseo.com",
+  "pagesProject": "mansiondeseo-site",
+  "workerName": "mansion-deseo-api-production",
+  "d1Database": "mansion-deseo-db",
+  "r2Bucket": "mansion-deseo-images"
+}

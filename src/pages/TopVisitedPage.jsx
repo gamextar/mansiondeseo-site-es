@@ -5,6 +5,7 @@ import { getTopVisitedProfiles, peekTopVisitedProfiles } from '../lib/api';
 import { formatLocation } from '../lib/location';
 import AvatarImg from '../components/AvatarImg';
 import { isSafariDesktopBrowser } from '../lib/browser';
+import { formatNumber } from '../lib/siteConfig';
 
 const RANKING_FILTERS = [
   { id: 'all', label: 'Todo' },
@@ -100,7 +101,7 @@ function RankCard({ profile, compact = false, safariDesktop = false, imageLoadin
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2b241d] px-3 py-1.5 font-medium text-text-primary">
               <Eye className="h-3.5 w-3.5" />
-              <span className="tabular-nums">{Number(profile.visits_total || 0).toLocaleString('es-AR')}</span>
+              <span className="tabular-nums">{formatNumber(profile.visits_total || 0)}</span>
               <span className="text-text-dim">visitas</span>
             </span>
             {location && (

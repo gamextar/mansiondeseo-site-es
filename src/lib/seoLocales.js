@@ -1,4 +1,6 @@
-export const DEFAULT_SEO_LOCALE = 'es-ar';
+import { SITE_CONFIG } from './siteConfig.js';
+
+export const DEFAULT_SEO_LOCALE = SITE_CONFIG.seoLocale || 'es-ar';
 
 export const SEO_LOCALES = {
   'es-ar': {
@@ -10,7 +12,7 @@ export const SEO_LOCALES = {
     pathPrefix: '',
     routeEnabled: true,
     sitemapEnabled: true,
-    default: true,
+    default: false,
     geoKey: 'ar',
   },
   'es-es': {
@@ -40,7 +42,23 @@ export const SEO_LOCALES = {
 };
 
 export function getSeoLocale(locale = DEFAULT_SEO_LOCALE) {
-  return SEO_LOCALES[locale] || SEO_LOCALES[DEFAULT_SEO_LOCALE];
+  const fallback = SEO_LOCALES[DEFAULT_SEO_LOCALE] || SEO_LOCALES['es-ar'];
+  const selected = SEO_LOCALES[locale] || fallback;
+  if (selected.code !== DEFAULT_SEO_LOCALE) {
+    const singleCountrySeo = DEFAULT_SEO_LOCALE !== 'es-ar';
+    return {
+      ...selected,
+      routeEnabled: singleCountrySeo ? false : selected.routeEnabled,
+      sitemapEnabled: singleCountrySeo ? false : selected.sitemapEnabled,
+    };
+  }
+  return {
+    ...selected,
+    default: true,
+    routeEnabled: true,
+    sitemapEnabled: true,
+    pathPrefix: '',
+  };
 }
 
 export function isSeoLocale(locale = '') {
@@ -48,9 +66,13 @@ export function isSeoLocale(locale = '') {
 }
 
 export function getRouteEnabledSeoLocales() {
-  return Object.values(SEO_LOCALES).filter((locale) => locale.routeEnabled);
+  return Object.values(SEO_LOCALES)
+    .map((locale) => getSeoLocale(locale.code))
+    .filter((locale) => locale.routeEnabled);
 }
 
 export function getSitemapSeoLocales() {
-  return Object.values(SEO_LOCALES).filter((locale) => locale.sitemapEnabled);
+  return Object.values(SEO_LOCALES)
+    .map((locale) => getSeoLocale(locale.code))
+    .filter((locale) => locale.sitemapEnabled);
 }

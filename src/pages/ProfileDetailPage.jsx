@@ -10,6 +10,7 @@ import { useAuth } from '../lib/authContext';
 import { formatLocation } from '../lib/location';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
 import { resolveMediaUrl } from '../lib/media';
+import { formatNumber } from '../lib/siteConfig';
 
 const ROLE_COLOR = {
   Pareja: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
@@ -837,12 +838,12 @@ export default function ProfileDetailPage({ initialData }) {
             <div className="flex flex-wrap items-center gap-2.5 text-sm text-text-primary">
               <div className="inline-flex items-center gap-2 rounded-full border border-mansion-border/30 bg-mansion-card/50 px-3 py-2">
                 <Heart className="w-4 h-4 text-mansion-crimson" fill="currentColor" />
-                <span className="font-semibold tabular-nums">{followersTotal.toLocaleString('es-AR')}</span>
+                <span className="font-semibold tabular-nums">{formatNumber(followersTotal)}</span>
                 <span className="text-text-dim">seguidores</span>
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-mansion-border/30 bg-mansion-card/50 px-3 py-2">
                 <Eye className="w-4 h-4 text-mansion-gold" />
-                <span className="font-semibold tabular-nums">{visitsTotal.toLocaleString('es-AR')}</span>
+                <span className="font-semibold tabular-nums">{formatNumber(visitsTotal)}</span>
                 <span className="text-text-dim">visitas al perfil</span>
               </div>
             </div>
