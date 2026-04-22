@@ -2655,6 +2655,7 @@ async function handleGetMessages(request, env, otherUserId) {
   const { results } = await env.DB.prepare(query).bind(...bindings).all();
   const hasMore = results.length > limit;
   const windowedResults = hasMore ? results.slice(1) : results;
+  const settings = await cached('settings', 300_000, () => loadSettings(env));
 
   // Mark as read
   await env.DB.prepare(`
@@ -2668,7 +2669,7 @@ async function handleGetMessages(request, env, otherUserId) {
     id: m.id,
     senderId: m.sender_id === auth.sub ? 'me' : 'them',
     text: m.content,
-    timestamp: new Date(m.created_at + 'Z').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
+    timestamp: new Date(m.created_at + 'Z').toLocaleTimeString(settings.siteLocale, { hour: '2-digit', minute: '2-digit', timeZone: settings.siteTimezone }),
     created_at: m.created_at,
     is_read: m.is_read,
   }));
@@ -3424,6 +3425,7 @@ async function loadSettings(env) {
   for (const r of results) settings[r.key] = r.value;
   const storyCirclePresetMedium = parseInt(settings.story_circle_preset_medium || settings.story_circle_size || String(STORY_CIRCLE_FALLBACK_SIZE), 10);
   const storyCirclePresetXl = parseInt(settings.story_circle_preset_xl || settings.sidebar_avatar_size || '154', 10);
+  const siteCountry = settings.site_country || 'AR';
   const result = {
     blurLevel: parseInt(settings.blur_level || '14', 10),
     blurMobile: parseInt(settings.blur_mobile || settings.blur_level || '14', 10),
@@ -3431,8 +3433,10 @@ async function loadSettings(env) {
     freeVisiblePhotos: parseInt(settings.free_visible_photos || '1', 10),
     showVipButton: settings.show_vip_button !== '0',
     dailyMessageLimit: parseInt(settings.daily_message_limit || '5', 10),
-    siteCountry: settings.site_country || 'AR',
-    siteTimezone: settings.site_timezone || 'America/Argentina/Buenos_Aires',
+    siteCountry,
+    siteLocale: settings.site_locale || (siteCountry === 'ES' ? 'es-ES' : 'es-AR'),
+    siteTimezone: settings.site_timezone || (siteCountry === 'ES' ? 'Europe/Madrid' : 'America/Argentina/Buenos_Aires'),
+    siteCurrency: settings.site_currency || (siteCountry === 'ES' ? 'EUR' : 'ARS'),
     hidePasswordRegister: settings.hide_password_register !== '0',
     vipPriceMonthly: settings.vip_price_monthly || '',
     vipPrice3Months: settings.vip_price_3months || '',
@@ -3629,7 +3633,7 @@ async function handleUpdateSettings(request, env) {
   const allowed = [
     'blur_level', 'blur_mobile', 'blur_desktop',
     'free_visible_photos', 'show_vip_button',
-    'daily_message_limit', 'site_country', 'site_timezone',
+    'daily_message_limit', 'site_country', 'site_locale', 'site_timezone', 'site_currency',
     'hide_password_register',
     'vip_price_monthly', 'vip_price_3months', 'vip_price_6months',
     'incognito_icon_svg',

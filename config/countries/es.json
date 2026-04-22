@@ -1,0 +1,15 @@
+{
+  "country": "ES",
+  "locale": "es-ES",
+  "seoLocale": "es-es",
+  "timezone": "Europe/Madrid",
+  "currency": "EUR",
+  "origin": "https://es.mansiondeseo.com",
+  "mediaBase": "https://media-es.mansiondeseo.com",
+  "apiBase": "https://mansion-deseo-api-es.<account-subdomain>.workers.dev/api",
+  "wsBase": "wss://mansion-deseo-api-es.<account-subdomain>.workers.dev",
+  "pagesProject": "mansiondeseo-site-es",
+  "workerName": "mansion-deseo-api-es",
+  "d1Database": "mansion-deseo-db-es",
+  "r2Bucket": "mansion-deseo-images-es"
+}

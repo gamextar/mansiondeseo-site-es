@@ -4,17 +4,7 @@
 // ═══════════════════════════════════════════════════════
 import { recordRealtimeDebug, setRealtimeActiveConnections } from './realtimeDebug';
 import { recordD1WriteEstimate } from './d1Debug';
-
-const LEGACY_PROD_WS_BASE = 'wss://mansion-deseo-api-production.green-silence-8594.workers.dev';
-
-function resolveWsBase() {
-  const explicitBase = String(import.meta.env.VITE_WS_BASE || '').trim();
-  if (explicitBase) return explicitBase.replace(/\/$/, '');
-  if (typeof window === 'undefined') return LEGACY_PROD_WS_BASE;
-  if (!import.meta.env.PROD) return `ws://${window.location.hostname}:8787`;
-  if (window.location.hostname.endsWith('.pages.dev')) return LEGACY_PROD_WS_BASE;
-  return `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
-}
+import { resolveWsBase } from './siteConfig';
 
 const WS_BASE = resolveWsBase();
 const CHAT_BACKGROUND_GRACE_MS = 15_000;

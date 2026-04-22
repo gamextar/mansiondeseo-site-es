@@ -12,7 +12,7 @@ const repoRoot = path.resolve(__dirname, '..')
 const wranglerTomlPath = path.join(repoRoot, 'wrangler.toml')
 
 const FROM_BASE = 'https://media.unicoapps.com'
-const TO_BASE = 'https://media.mansiondeseo.com'
+const TO_BASE = (process.env.SITE_MEDIA_BASE || process.env.VITE_SITE_MEDIA_BASE || 'https://media.mansiondeseo.com').replace(/\/+$/, '')
 
 function parseArgs(argv) {
   return {

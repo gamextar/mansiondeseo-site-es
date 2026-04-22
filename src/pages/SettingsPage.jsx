@@ -52,6 +52,9 @@ export default function SettingsPage() {
 
   // Site
   const [siteCountry, setSiteCountry] = useState('AR');
+  const [siteLocale, setSiteLocale] = useState('es-AR');
+  const [siteTimezone, setSiteTimezone] = useState('America/Argentina/Buenos_Aires');
+  const [siteCurrency, setSiteCurrency] = useState('ARS');
   const [allowedCountries, setAllowedCountries] = useState('AR');
   const [hidePasswordRegister, setHidePasswordRegister] = useState(true);
   const [feedFilterByCountry, setFeedFilterByCountry] = useState(false);
@@ -219,6 +222,9 @@ export default function SettingsPage() {
         setDailyMessageLimit(s.dailyMessageLimit);
         setOnlineThresholdMinutes(s.onlineThresholdMinutes ?? 60);
         setSiteCountry(s.siteCountry);
+        setSiteLocale(s.siteLocale || 'es-AR');
+        setSiteTimezone(s.siteTimezone || 'America/Argentina/Buenos_Aires');
+        setSiteCurrency(s.siteCurrency || 'ARS');
         setAllowedCountries(s.allowedCountries || 'AR');
         setHidePasswordRegister(s.hidePasswordRegister);
         setFeedFilterByCountry(s.feedFilterByCountry === true);
@@ -385,6 +391,9 @@ export default function SettingsPage() {
         daily_message_limit: dailyMessageLimit,
         online_threshold_minutes: onlineThresholdMinutes,
         site_country: siteCountry,
+        site_locale: siteLocale,
+        site_timezone: siteTimezone,
+        site_currency: siteCurrency,
         allowed_countries: allowedCountries,
         hide_password_register: hidePasswordRegister ? '1' : '0',
         feed_filter_by_country: feedFilterByCountry ? '1' : '0',
@@ -461,6 +470,9 @@ export default function SettingsPage() {
       setDailyMessageLimit(s.dailyMessageLimit);
       setOnlineThresholdMinutes(s.onlineThresholdMinutes ?? 60);
       setSiteCountry(s.siteCountry);
+      setSiteLocale(s.siteLocale || 'es-AR');
+      setSiteTimezone(s.siteTimezone || 'America/Argentina/Buenos_Aires');
+      setSiteCurrency(s.siteCurrency || 'ARS');
       setAllowedCountries(s.allowedCountries || 'AR');
       setHidePasswordRegister(s.hidePasswordRegister);
       setFeedFilterByCountry(s.feedFilterByCountry === true);
@@ -1105,6 +1117,39 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <input type="text" value={siteCountry} onChange={e => setSiteCountry(e.target.value.toUpperCase().slice(0, 2))} maxLength={2} className="w-16 text-center text-sm py-2 px-2 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-mansion-gold font-bold uppercase" />
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <label className="space-y-1">
+                  <span className="text-[11px] text-text-dim">Locale</span>
+                  <input
+                    type="text"
+                    value={siteLocale}
+                    onChange={e => setSiteLocale(e.target.value)}
+                    placeholder="es-ES"
+                    className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[11px] text-text-dim">Timezone</span>
+                  <input
+                    type="text"
+                    value={siteTimezone}
+                    onChange={e => setSiteTimezone(e.target.value)}
+                    placeholder="Europe/Madrid"
+                    className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[11px] text-text-dim">Moneda</span>
+                  <input
+                    type="text"
+                    value={siteCurrency}
+                    onChange={e => setSiteCurrency(e.target.value.toUpperCase().slice(0, 3))}
+                    maxLength={3}
+                    placeholder="EUR"
+                    className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-mansion-gold font-mono uppercase"
+                  />
+                </label>
               </div>
             </div>
 

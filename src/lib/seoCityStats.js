@@ -1,4 +1,5 @@
 import seoCityStatsData from '../../data/seo/seo-city-stats.json';
+import { SITE_LOCALE } from './siteConfig';
 
 const cityStatsList = Array.isArray(seoCityStatsData?.cities) ? seoCityStatsData.cities : [];
 const cityStatsBySlug = new Map(cityStatsList.map((entry) => [entry.city_slug, entry]));
@@ -23,7 +24,7 @@ export function formatSeoCityStatsDate(value) {
   const datePart = String(value || '').slice(0, 10);
   const [year, month, day] = datePart.split('-').map(Number);
   if (!year || !month || !day) return '';
-  return new Intl.DateTimeFormat('es-AR', {
+  return new Intl.DateTimeFormat(SITE_LOCALE, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',

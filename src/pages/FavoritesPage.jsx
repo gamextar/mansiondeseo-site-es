@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Crown, Heart, MapPin, Shield, Users } from 'lucide-react';
 import { getFavorites } from '../lib/api';
 import { formatLocation } from '../lib/location';
+import { formatNumber } from '../lib/siteConfig';
 import AvatarImg from '../components/AvatarImg';
 
 const FAVORITE_TABS = [
@@ -92,7 +93,7 @@ function FollowCard({ profile, tab }) {
           <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2b241d] px-3 py-1.5 font-medium text-text-primary">
               <Heart className="h-3.5 w-3.5" fill="currentColor" />
-              <span className="tabular-nums">{Number(profile.followers_total || 0).toLocaleString('es-AR')}</span>
+              <span className="tabular-nums">{formatNumber(profile.followers_total || 0)}</span>
               <span className="text-text-dim">seguidores</span>
             </span>
           </div>
@@ -166,12 +167,12 @@ export default function FavoritesPage() {
             <div className="mt-6 flex flex-wrap gap-2.5">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2b241d] px-3.5 py-2 text-xs text-text-dim">
                 <Heart className="h-3.5 w-3.5 text-mansion-gold" fill="currentColor" />
-                <span className="tabular-nums">{followersCount.toLocaleString('es-AR')}</span>
+                <span className="tabular-nums">{formatNumber(followersCount)}</span>
                 seguidores
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2b241d] px-3.5 py-2 text-xs text-text-dim">
                 <Users className="h-3.5 w-3.5 text-mansion-gold" />
-                <span className="tabular-nums">{followingCount.toLocaleString('es-AR')}</span>
+                <span className="tabular-nums">{formatNumber(followingCount)}</span>
                 siguiendo
               </span>
             </div>

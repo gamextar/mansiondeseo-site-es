@@ -1,6 +1,5 @@
 import { DEFAULT_SEO_LOCALE, getRouteEnabledSeoLocales, getSeoLocale } from './seoLocales.js';
-
-const SITE_ORIGIN = 'https://mansiondeseo.com';
+import { SITE_ORIGIN } from './siteConfig.js';
 
 function joinPathSegments(segments) {
   const normalized = segments

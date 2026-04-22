@@ -1,0 +1,49 @@
+# Mansion Deseo ES - Worker API configuration
+# Fill database_id after: npx wrangler d1 create mansion-deseo-db-es --jurisdiction eu
+
+name = "mansion-deseo-api-es"
+main = "api/src/index.js"
+compatibility_date = "2024-12-01"
+workers_dev = true
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mansion-deseo-db-es"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "mansion-deseo-images-es"
+
+[durable_objects]
+bindings = [
+  { name = "CHAT_ROOMS", class_name = "ChatRoom" },
+  { name = "USER_NOTIFICATIONS", class_name = "UserNotification" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["UserNotification"]
+
+[vars]
+R2_PUBLIC_URL = "https://media-es.mansiondeseo.com"
+CORS_ORIGIN = "https://es.mansiondeseo.com,https://mansiondeseo-site-es.pages.dev"
+ENVIRONMENT = "production"
+DEBUG_LOGS = "0"
+METRICS_LOGS = "0"
+METRICS_FLUSH_MS = "60000"
+METRICS_FLUSH_REQUESTS = "50"
+PROFILE_VISIT_DEDUPE_MINUTES = "30"
+PAYMENT_BRIDGE_URL = "https://unicoapps-site.pages.dev"
+MAIL_FROM = "noreply@unicoapps.com"
+
+[dev]
+port = 8788

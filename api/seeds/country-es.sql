@@ -1,0 +1,15 @@
+INSERT OR REPLACE INTO site_settings (key, value) VALUES
+  ('site_country', 'ES'),
+  ('site_locale', 'es-ES'),
+  ('site_timezone', 'Europe/Madrid'),
+  ('site_currency', 'EUR'),
+  ('allowed_countries', 'ES'),
+  ('feed_filter_by_country', '1'),
+  ('payment_gateway', 'mercadopago'),
+  ('vip_price_monthly', ''),
+  ('vip_price_3months', ''),
+  ('vip_price_6months', ''),
+  ('coin_pack_1_price', ''),
+  ('coin_pack_2_price', ''),
+  ('coin_pack_3_price', ''),
+  ('mail_from', 'noreply@unicoapps.com');
