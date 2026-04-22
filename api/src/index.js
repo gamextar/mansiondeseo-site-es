@@ -1316,6 +1316,11 @@ async function sendVerificationEmail(env, toEmail, code) {
   const fromEmail = mailFrom;
   const fromName = 'Mansión Deseo';
 
+  if (!apiKey) {
+    console.error('Resend send failed: RESEND_API_KEY is not configured');
+    return false;
+  }
+
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -1530,7 +1535,8 @@ async function handleRegister(request, env) {
 
   // Send verification email (MailChannels in production, console in dev)
   if (env.ENVIRONMENT === 'production') {
-    await sendVerificationEmail(env, email.toLowerCase(), code);
+    const sent = await sendVerificationEmail(env, email.toLowerCase(), code);
+    if (!sent) return error('No pudimos enviar el email de verificación. Intentá nuevamente en unos minutos.', 502);
   } else {
     debugLog(env, `📧 VERIFICATION CODE for ${email}: ${code}`);
   }
@@ -1606,7 +1612,8 @@ async function handleResendCode(request, env) {
 
   // Send verification email
   if (env.ENVIRONMENT === 'production') {
-    await sendVerificationEmail(env, email.toLowerCase(), code);
+    const sent = await sendVerificationEmail(env, email.toLowerCase(), code);
+    if (!sent) return error('No pudimos enviar el email de verificación. Intentá nuevamente en unos minutos.', 502);
   } else {
     debugLog(env, `📧 RESEND CODE for ${email}: ${code}`);
   }
@@ -1650,6 +1657,11 @@ async function sendPasswordResetEmail(env, toEmail, code) {
   const { apiKey, mailFrom } = await getResendCredentials(env);
   const fromEmail = mailFrom;
   const fromName = 'Mansión Deseo';
+
+  if (!apiKey) {
+    console.error('Resend send failed: RESEND_API_KEY is not configured');
+    return false;
+  }
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
