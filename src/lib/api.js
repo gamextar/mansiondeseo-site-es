@@ -18,7 +18,7 @@ const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
 const CLIENT_CACHE_VERSION_KEY = 'mansion_client_cache_version';
-const CLIENT_CACHE_VERSION = 'media-paths-v4-avatar-sync';
+const CLIENT_CACHE_VERSION = 'media-paths-v5-avatar-refresh';
 const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
 const sharedGetCache = new Map();
 const sessionCache = {
@@ -716,18 +716,22 @@ export async function requestMagicLink(email) {
   });
 }
 
-export async function getMe() {
-  const cached = sessionCache.get(AUTH_ME_CACHE_KEY, AUTH_ME_CACHE_TTL_MS);
+export async function getMe({ force = false } = {}) {
+  const cached = force ? null : sessionCache.get(AUTH_ME_CACHE_KEY, AUTH_ME_CACHE_TTL_MS);
   if (cached?.user) {
     setStoredUser(cached.user);
     return Promise.resolve(cached);
+  }
+
+  if (force) {
+    invalidateMeCache();
   }
 
   return sharedGet('me', async () => {
     const data = await apiFetch('/auth/me');
     cacheMeResponse(data);
     return data;
-  }, { ttlMs: AUTH_ME_CACHE_TTL_MS });
+  }, { ttlMs: force ? 0 : AUTH_ME_CACHE_TTL_MS });
 }
 
 export async function getAppBootstrap() {
@@ -967,8 +971,12 @@ export async function uploadImage(file, { purpose = 'asset' } = {}) {
     body: await file.arrayBuffer(),
   });
   if (purpose === 'avatar') {
+    invalidateBootstrapCache();
+    invalidateOwnProfileDashboardCache();
     mergeMeCache({ avatar_url: data?.avatar_url || data?.url || '', avatar_crop: null });
   } else if (purpose === 'gallery' && Array.isArray(data?.photos)) {
+    invalidateBootstrapCache();
+    invalidateOwnProfileDashboardCache();
     mergeMeCache({ photos: data.photos, avatar_url: data?.avatar_url });
   }
   return data;

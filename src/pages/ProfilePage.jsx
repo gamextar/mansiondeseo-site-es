@@ -299,7 +299,7 @@ export default function ProfilePage() {
       // Immediately update with upload result
       setUser(prev => prev ? { ...prev, avatar_url: data.url, avatar_crop: null } : prev);
       // Then fetch canonical user to ensure state is fully in sync
-      const fresh = await getMe().catch(() => null);
+      const fresh = await getMe({ force: true }).catch(() => null);
       if (fresh?.user) setUser(fresh.user);
     } catch (err) {
       console.error('Avatar upload error:', err);
