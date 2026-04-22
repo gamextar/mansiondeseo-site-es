@@ -1,5 +1,5 @@
 # Mansion Deseo ES - Worker API configuration
-# Fill database_id after: npx wrangler d1 create mansion-deseo-db-es --jurisdiction eu
+# D1 created with EU data jurisdiction.
 
 name = "mansion-deseo-api-es"
 main = "api/src/index.js"
@@ -13,7 +13,7 @@ head_sampling_rate = 1
 [[d1_databases]]
 binding = "DB"
 database_name = "mansion-deseo-db-es"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "89854085-e531-4c4b-bffb-ec0f58d0c717"
 
 [[r2_buckets]]
 binding = "IMAGES"
