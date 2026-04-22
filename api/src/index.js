@@ -284,15 +284,42 @@ function getLegacyMediaBases() {
   ];
 }
 
+function getMediaPublicBase(env) {
+  return String(env?.MEDIA_PUBLIC_URL || env?.R2_PUBLIC_URL || '').replace(/\/$/, '');
+}
+
+function buildPublicMediaUrl(key, env) {
+  const base = getMediaPublicBase(env);
+  if (!base) return `/api/media?key=${encodeURIComponent(key)}`;
+  if (base.includes('/api/media')) {
+    return `${base}?key=${encodeURIComponent(key)}`;
+  }
+  return `${base}/${key}`;
+}
+
+function getConfiguredMediaBases(env) {
+  return [
+    env?.R2_PUBLIC_URL,
+    env?.MEDIA_PUBLIC_URL,
+    ...getLegacyMediaBases(),
+  ]
+    .filter(Boolean)
+    .map((base) => String(base).replace(/\/$/, ''));
+}
+
 function extractMediaKey(url, env) {
   if (!url || typeof url !== 'string') return '';
 
-  const r2Base = String(env?.R2_PUBLIC_URL || '').replace(/\/$/, '');
   const normalizedUrl = url.trim();
-  const bases = [r2Base, ...getLegacyMediaBases()]
-    .filter(Boolean)
-    .map((base) => String(base).replace(/\/$/, ''));
 
+  try {
+    const parsed = new URL(normalizedUrl, 'https://mansiondeseo.local');
+    if (parsed.pathname.endsWith('/api/media')) {
+      return parsed.searchParams.get('key') || '';
+    }
+  } catch {}
+
+  const bases = getConfiguredMediaBases(env).filter((base) => !base.includes('/api/media'));
   for (const base of bases) {
     if (normalizedUrl.startsWith(`${base}/`)) {
       return normalizedUrl.slice(base.length + 1);
@@ -309,11 +336,29 @@ function extractMediaKey(url, env) {
   return normalizedUrl.replace(/^https?:\/\/[^/]+\//, '');
 }
 
+function isTrustedMediaUrl(url, env) {
+  if (!url || typeof url !== 'string') return false;
+  const normalizedUrl = url.trim();
+  if (!normalizedUrl) return false;
+
+  try {
+    const parsed = new URL(normalizedUrl, 'https://mansiondeseo.local');
+    if (parsed.pathname.endsWith('/api/media') && parsed.searchParams.get('key')) return true;
+  } catch {}
+
+  if (normalizedUrl.includes('/api/images/')) return true;
+
+  return getConfiguredMediaBases(env).some((base) => (
+    normalizedUrl === base ||
+    normalizedUrl.startsWith(`${base}/`) ||
+    (base.includes('/api/media') && normalizedUrl.startsWith(`${base}?key=`))
+  ));
+}
+
 function normalizeStoryVideoUrl(url, env) {
   const key = extractMediaKey(url, env);
   if (!key) return url;
-  const r2Base = String(env?.R2_PUBLIC_URL || '').replace(/\/$/, '');
-  return r2Base ? `${r2Base}/${key}` : url;
+  return buildPublicMediaUrl(key, env);
 }
 
 function sanitizeStorageSegment(input, fallback = 'user') {
@@ -3005,9 +3050,7 @@ async function handleUpload(request, env) {
     httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
   });
 
-  const publicUrl = env.R2_PUBLIC_URL
-    ? `${env.R2_PUBLIC_URL}/${key}`
-    : `/api/images/${key}`; // Serve via Worker in dev
+  const publicUrl = buildPublicMediaUrl(key, env);
 
   const user = await env.DB.prepare('SELECT photos, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
   if (!user) return error('Usuario no encontrado', 404);
@@ -3121,13 +3164,7 @@ async function handleDeletePhoto(request, env) {
 
   // Try to delete from R2 (extract key from URL)
   try {
-    const r2Base = env.R2_PUBLIC_URL || '';
-    let key = '';
-    if (r2Base && url.startsWith(r2Base)) {
-      key = url.slice(r2Base.length + 1); // strip base + '/'
-    } else if (url.includes('/api/images/')) {
-      key = url.split('/api/images/')[1]; // legacy format
-    }
+    const key = extractMediaKey(url, env);
     if (key) {
       await env.IMAGES.delete(key);
     }
@@ -3168,9 +3205,7 @@ async function handleUpdateProfile(request, env) {
   // Validate and allow photos reorder (all URLs must originate from our R2 bucket)
   if (body.photos !== undefined) {
     if (!Array.isArray(body.photos)) return error('photos debe ser un arreglo', 400);
-    const r2Base = env.R2_PUBLIC_URL || '';
-    const legacyBase = 'https://mansion-deseo-api-production.green-silence-8594.workers.dev/api/images';
-    const allValid = body.photos.every(url => typeof url === 'string' && (url.startsWith(r2Base) || url.startsWith(legacyBase)));
+    const allValid = body.photos.every(url => isTrustedMediaUrl(url, env));
     if (!allValid) return error('URL de foto inválida', 400);
     allowedFields.push('photos');
   }
@@ -5175,9 +5210,7 @@ async function handleAdminUploadStory(request, env) {
     httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
   });
 
-  const videoUrl = env.R2_PUBLIC_URL
-    ? `${env.R2_PUBLIC_URL}/${key}`
-    : `/api/images/${key}`;
+  const videoUrl = buildPublicMediaUrl(key, env);
 
   // Delete any previous story for this user (DB + R2)
   const existingAdmin = await env.DB.prepare(
@@ -5278,9 +5311,7 @@ async function handleUploadStory(request, env) {
     httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
   });
 
-  const videoUrl = env.R2_PUBLIC_URL
-    ? `${env.R2_PUBLIC_URL}/${key}`
-    : `/api/images/${key}`;
+  const videoUrl = buildPublicMediaUrl(key, env);
 
   // Delete any previous story from this user (DB + R2)
   const existing = await env.DB.prepare(

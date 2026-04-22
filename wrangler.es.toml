@@ -35,6 +35,7 @@ new_sqlite_classes = ["UserNotification"]
 
 [vars]
 R2_PUBLIC_URL = "https://pub-da03e197cc8641dd8f5374571f9e711b.r2.dev"
+MEDIA_PUBLIC_URL = "https://mansion-deseo-api-es.mansion-es.workers.dev/api/media"
 CORS_ORIGIN = "https://es.mansiondeseo.com,https://mansiondeseo-site-es.pages.dev"
 ENVIRONMENT = "production"
 DEBUG_LOGS = "0"

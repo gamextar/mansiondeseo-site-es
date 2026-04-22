@@ -1684,8 +1684,11 @@ export default function RegisterPage() {
       apiDetectCountry().catch(() => ({ country: '' })),
       getPublicSettings().catch(() => ({ settings: {} })),
     ]).then(([detectData, settingsData]) => {
-      const detected = detectData.country || '';
-      const allowed = (settingsData.settings?.allowedCountries || 'AR').split(',').map(c => c.trim()).filter(Boolean);
+      const detected = String(detectData.country || '').trim().toUpperCase();
+      const allowed = (settingsData.settings?.allowedCountries || 'AR')
+        .split(',')
+        .map(c => c.trim().toUpperCase())
+        .filter(Boolean);
       setDetectedCountry(detected);
       setAllowedCountries(allowed);
       setHidePasswordDefault(settingsData.settings?.hidePasswordRegister !== false);
@@ -1697,7 +1700,10 @@ export default function RegisterPage() {
         pareja_mujeres: settingsData.settings?.roleParejaMujeresImg || '',
         trans: settingsData.settings?.roleTransImg || '',
       });
-      if (detected && allowed.includes(detected)) {
+      if (allowed.length === 1) {
+        setSelectedCountry(allowed[0]);
+        setShowCountryPicker(false);
+      } else if (detected && allowed.includes(detected)) {
         setSelectedCountry(detected);
         setShowCountryPicker(false);
       } else {
