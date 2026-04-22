@@ -47,6 +47,7 @@ let _userBirthdateColumnReady = null;
 let _userMaritalStatusColumnReady = null;
 let _userSexualOrientationColumnReady = null;
 let _userMessageBlockRolesColumnReady = null;
+let _userLastIpColumnReady = null;
 let _profileVisitStructuresReady = null;
 let _profileStatsBackfillReady = null;
 
@@ -677,6 +678,28 @@ async function ensureUsersMessageBlockRolesColumn(env) {
   return _userMessageBlockRolesColumnReady;
 }
 
+async function ensureUsersLastIpColumn(env) {
+  if (!_userLastIpColumnReady) {
+    _userLastIpColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          "ALTER TABLE users ADD COLUMN last_ip TEXT NOT NULL DEFAULT ''"
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+    })().catch((err) => {
+      _userLastIpColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userLastIpColumnReady;
+}
+
 function normalizeRoleArray(rawValue, validValues, fallback = []) {
   const arr = Array.isArray(rawValue) ? rawValue : (rawValue ? [rawValue] : []);
   const filtered = arr
@@ -1196,7 +1219,9 @@ async function authenticate(request, env) {
   if (now - lastUpdate > LAST_ACTIVE_DEBOUNCE_MS) {
     _lastActiveCache.set(userId, now);
     const ip = request.headers.get('CF-Connecting-IP') || '';
-    env.DB.prepare("UPDATE users SET last_active = datetime('now'), last_ip = ? WHERE id = ?").bind(ip, userId).run().catch(() => {});
+    ensureUsersLastIpColumn(env)
+      .then(() => env.DB.prepare("UPDATE users SET last_active = datetime('now'), last_ip = ? WHERE id = ?").bind(ip, userId).run())
+      .catch(() => {});
   }
 
   // Cache account_status check — avoid D1 read on every request.
@@ -1568,16 +1593,19 @@ async function handleVerifyCode(request, env) {
     return error('Código inválido o expirado', 401);
   }
 
-  // Mark token as used
-  await env.DB.prepare('UPDATE verification_tokens SET used = 1 WHERE id = ?')
-    .bind(record.id).run();
-
   // Verify the user
+  await ensureUsersLastIpColumn(env);
   const ipVer = request.headers.get('CF-Connecting-IP') || '';
   await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now'), last_ip = ? WHERE id = ?")
     .bind(ipVer, record.user_id).run();
 
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
+  if (!user) return error('Usuario no encontrado', 404);
+
+  // Mark token as used only after the account verification update succeeds.
+  await env.DB.prepare('UPDATE verification_tokens SET used = 1 WHERE id = ?')
+    .bind(record.id).run();
+
   const token = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
 
   return json({ token, user: sanitizeUser(user, env) });
@@ -1816,6 +1844,7 @@ async function handleLogin(request, env) {
   }
 
   // Update online status + IP
+  await ensureUsersLastIpColumn(env);
   const ipLogin = request.headers.get('CF-Connecting-IP') || '';
   await env.DB.prepare("UPDATE users SET online = 1, last_active = datetime('now'), last_ip = ? WHERE id = ?")
     .bind(ipLogin, user.id).run();
@@ -1872,6 +1901,7 @@ async function handleVerifyToken(request, env) {
   let user;
   if (record.user_id) {
     user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
+    await ensureUsersLastIpColumn(env);
     const ipMagic = request.headers.get('CF-Connecting-IP') || '';
     await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now'), last_ip = ? WHERE id = ?")
       .bind(ipMagic, user.id).run();

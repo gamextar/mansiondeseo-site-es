@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
   coins         INTEGER NOT NULL DEFAULT 0,
   account_status TEXT NOT NULL DEFAULT 'active' CHECK(account_status IN ('active','under_review','suspended')),
   last_active   TEXT DEFAULT (datetime('now')),
+  last_ip       TEXT NOT NULL DEFAULT '',
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
