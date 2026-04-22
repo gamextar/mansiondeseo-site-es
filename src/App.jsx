@@ -53,12 +53,12 @@ const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage
 const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
 const NON_DEFAULT_ROUTE_LOCALES = getRouteEnabledSeoLocales().filter((locale) => locale.pathPrefix);
 const MOBILE_BROWSER_IMMERSIVE_SCROLL_OFFSET = 68;
-const MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX = 32;
-const MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING = 0.32;
-const MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS = 420;
-const MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS = 80;
-const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_MAX_PX = 14;
-const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_RETURN_MS = 420;
+const MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX = 48;
+const MOBILE_PUBLIC_PROFILE_SCROLL_DAMPING = 0.42;
+const MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS = 620;
+const MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS = 140;
+const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_MAX_PX = 22;
+const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_RETURN_MS = 620;
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
