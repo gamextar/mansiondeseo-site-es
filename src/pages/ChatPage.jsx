@@ -273,6 +273,16 @@ export default function ChatPage() {
     });
   }, [scrollToBottom]);
 
+  const resetMobileBrowserChatViewport = useCallback(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    inputRef.current?.blur?.();
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement) activeElement.blur();
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, []);
+
   const captureChatDebug = useCallback((label) => {
     const nextMetrics = readChatDebugMetrics({
       viewportHeight,
@@ -644,6 +654,7 @@ export default function ChatPage() {
 
     return () => {
       cancelled = true;
+      if (isMobileBrowserChat) resetMobileBrowserChatViewport();
       clearTimeout(historyFallbackTimerRef.current);
       clearTimeout(typingTimeoutRef.current);
       stopTypingSignal();
@@ -657,7 +668,7 @@ export default function ChatPage() {
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [id, navigate, partnerId, partnerPreview, requestScrollToBottom, setActiveChatId, refreshUnread, decrementUnread, stopTypingSignal]);
+  }, [decrementUnread, id, isMobileBrowserChat, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, resetMobileBrowserChatViewport, setActiveChatId, stopTypingSignal]);
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;
@@ -849,10 +860,24 @@ export default function ChatPage() {
   };
 
   const handleInputBlur = () => {
+    inputFocusedRef.current = false;
+    composerBottomSettledRef.current = false;
     stopTypingSignal();
+    if (isMobileBrowserChat) {
+      [0, 80, 180].forEach((delay) => {
+        window.setTimeout(() => {
+          window.dispatchEvent(new Event('resize'));
+        }, delay);
+      });
+    }
     if (chatDebugEnabled) {
       requestAnimationFrame(() => captureChatDebug('blur'));
     }
+  };
+
+  const handleBackClick = () => {
+    if (isMobileBrowserChat) resetMobileBrowserChatViewport();
+    navigate(backTarget);
   };
 
   return (
@@ -870,7 +895,7 @@ export default function ChatPage() {
       >
         <div className="relative flex items-center gap-3 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3 lg:gap-3 lg:py-4">
           <button
-            onClick={() => navigate(backTarget)}
+            onClick={handleBackClick}
             className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0 lg:absolute lg:left-1 lg:top-1/2 lg:z-10 lg:w-12 lg:h-12 lg:-translate-y-1/2 lg:bg-mansion-elevated/65 lg:border lg:border-mansion-border/30"
             aria-label="Volver a la lista de chats"
           >
