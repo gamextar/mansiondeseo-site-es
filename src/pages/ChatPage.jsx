@@ -519,7 +519,7 @@ export default function ChatPage() {
 
   if (!partner && !loading) {
     return (
-      <div className="min-h-screen bg-mansion-base flex items-center justify-center">
+      <div className="min-h-screen bg-[#1439d6] flex items-center justify-center">
         <p className="text-text-muted">Conversación no encontrada</p>
       </div>
     );
@@ -527,7 +527,7 @@ export default function ChatPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-mansion-base flex items-center justify-center">
+      <div className="min-h-screen bg-[#1439d6] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
     );
@@ -611,7 +611,7 @@ export default function ChatPage() {
     <>
     <DesktopSidebar />
     <div
-      className="min-h-screen h-[100dvh] bg-mansion-base flex flex-col overflow-hidden lg:pl-64 xl:pl-72"
+      className="min-h-screen h-[100dvh] bg-[#1439d6] flex flex-col overflow-hidden lg:pl-64 xl:pl-72"
       style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
     >
       {/* Header */}
