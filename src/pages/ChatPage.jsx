@@ -137,6 +137,7 @@ export default function ChatPage() {
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
   const [isComposerFocused, setIsComposerFocused] = useState(false);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -155,6 +156,7 @@ export default function ChatPage() {
   const historyFallbackTimerRef = useRef(null);
   const suppressTypingUntilRef = useRef(0);
   const viewportSyncRafRef = useRef(0);
+  const standaloneViewportBaselineRef = useRef(typeof window !== 'undefined' ? window.innerHeight : 0);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
@@ -302,11 +304,25 @@ export default function ChatPage() {
 
     const updateViewport = () => {
       const vv = window.visualViewport;
+      const visualHeight = Math.round(vv?.height || window.innerHeight);
       const offsetTop = isStandaloneMobileApp ? 0 : Math.max(0, vv?.offsetTop || 0);
-      setViewportHeight(Math.round((vv?.height || window.innerHeight) + offsetTop));
+      setViewportHeight(Math.round(visualHeight + offsetTop));
 
       const activeElement = document.activeElement;
       const inputFocused = activeElement === inputRef.current;
+
+      if (isStandaloneMobileApp) {
+        const baseline = standaloneViewportBaselineRef.current || visualHeight;
+        const baselineShouldReset = !inputFocused && Math.abs(baseline - visualHeight) > 120;
+        if (baselineShouldReset || visualHeight > baseline) {
+          standaloneViewportBaselineRef.current = visualHeight;
+        }
+        const keyboardInset = Math.max(0, standaloneViewportBaselineRef.current - visualHeight);
+        setIsKeyboardOpen(Boolean(inputFocused && keyboardInset > 120));
+      } else {
+        setIsKeyboardOpen(false);
+      }
+
       if (!inputFocused) return;
 
       const root = document.documentElement;
@@ -336,6 +352,9 @@ export default function ChatPage() {
       vv?.removeEventListener('scroll', updateViewport);
     };
   }, [isStandaloneMobileApp]);
+
+  const composerCompact = isComposerFocused || isKeyboardOpen;
+  const floatingKeyboardComposer = isStandaloneMobileApp && isKeyboardOpen;
 
   useEffect(() => {
     const token = getToken();
@@ -541,6 +560,11 @@ export default function ChatPage() {
     requestScrollToBottom('smooth');
   }, [partnerTyping]);
 
+  useEffect(() => {
+    if (!floatingKeyboardComposer) return;
+    requestScrollToBottom('auto', { force: false });
+  }, [floatingKeyboardComposer, requestScrollToBottom]);
+
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
     const oldestMessage = messages.find((message) => message.createdAt);
@@ -741,6 +765,7 @@ export default function ChatPage() {
             if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
           className="h-full overflow-y-auto overscroll-y-contain px-4 pt-[calc(var(--safe-top)+88px)] pb-5 space-y-5 lg:px-6 lg:pt-24"
+          style={{ paddingBottom: floatingKeyboardComposer ? '96px' : '20px' }}
         >
           <div
             ref={indicatorRef}
@@ -837,17 +862,19 @@ export default function ChatPage() {
       </div>
 
       {/* Input area */}
-      <div className="safe-bottom relative shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
-        <div className={`flex items-end gap-2 px-3 ${isComposerFocused ? 'py-2' : 'py-3'} lg:px-6 max-w-4xl lg:mx-auto transition-[padding] duration-200`}>
+      <div
+        className={`safe-bottom border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 ${floatingKeyboardComposer ? 'fixed bottom-0 left-0 right-0' : 'relative shrink-0'}`}
+      >
+        <div className={`flex items-end gap-2 px-3 ${composerCompact ? 'py-1.5' : 'py-3'} lg:px-6 max-w-4xl lg:mx-auto transition-[padding] duration-200`}>
 
           {/* Attach photo */}
-          <button className={`flex-shrink-0 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-[width,height,color,background-color] border border-mansion-border/30 ${isComposerFocused ? 'w-10 h-10' : 'w-11 h-11'}`}>
+          <button className={`flex-shrink-0 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-[width,height,color,background-color] border border-mansion-border/30 ${composerCompact ? 'w-9 h-9' : 'w-11 h-11'}`}>
             <ImageIcon className="w-5 h-5" />
           </button>
 
           {/* Textarea + emoji */}
           <div className="flex-1 relative flex items-end">
-            <div className={`flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-[min-height,border-color] ${isComposerFocused ? 'min-h-[40px]' : 'min-h-[44px]'}`}>
+            <div className={`flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-[min-height,border-color] ${composerCompact ? 'min-h-[38px]' : 'min-h-[44px]'}`}>
               <textarea
                 ref={inputRef}
                 value={input}
@@ -864,13 +891,13 @@ export default function ChatPage() {
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
                 disabled={!effectiveCanSend}
                 rows={1}
-                className={`flex-1 resize-none bg-transparent px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50 transition-[padding,min-height] ${isComposerFocused ? 'py-2.5' : 'py-3'}`}
-                style={{ minHeight: isComposerFocused ? '40px' : '44px' }}
+                className={`flex-1 resize-none bg-transparent px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50 transition-[padding,min-height] ${composerCompact ? 'py-2' : 'py-3'}`}
+                style={{ minHeight: composerCompact ? '38px' : '44px' }}
               />
               <button
                 type="button"
                 onClick={() => setShowEmojis(v => !v)}
-                className={`flex-shrink-0 w-10 self-end flex items-center justify-center transition-[color,padding-bottom] ${isComposerFocused ? 'pb-2' : 'pb-2.5'} ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
+                className={`flex-shrink-0 w-10 self-end flex items-center justify-center transition-[color,padding-bottom] ${composerCompact ? 'pb-1.5' : 'pb-2.5'} ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
               >
                 <Smile className="w-5 h-5" />
               </button>
@@ -890,7 +917,7 @@ export default function ChatPage() {
             whileTap={{ scale: 0.9 }}
             onClick={handleSend}
             disabled={!input.trim() || !effectiveCanSend}
-            className={`flex-shrink-0 rounded-2xl flex items-center justify-center transition-all ${isComposerFocused ? 'w-10 h-10' : 'w-11 h-11'} ${
+            className={`flex-shrink-0 rounded-2xl flex items-center justify-center transition-all ${composerCompact ? 'w-9 h-9' : 'w-11 h-11'} ${
               input.trim() && effectiveCanSend
                 ? 'bg-mansion-crimson text-white shadow-glow-crimson'
                 : 'bg-mansion-elevated text-text-dim border border-mansion-border/30'
