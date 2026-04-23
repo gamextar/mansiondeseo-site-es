@@ -1113,7 +1113,7 @@ export default function FeedPage({ initialData }) {
               Mansion Deseo
             </span>
           </button>
-          <div className="relative top-px flex items-center justify-end gap-1.5 pr-2">
+          <div className="relative -top-[2px] flex items-center justify-end gap-1.5 pr-2">
             <Radio className="w-4 h-4 text-mansion-crimson" />
             <p className="text-text-muted text-sm font-medium leading-none">Video Cards</p>
           </div>
