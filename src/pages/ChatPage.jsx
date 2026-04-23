@@ -147,6 +147,7 @@ export default function ChatPage() {
   const initialHistoryLoadedRef = useRef(false);
   const historyFallbackTimerRef = useRef(null);
   const suppressTypingUntilRef = useRef(0);
+  const viewportBaseHeightRef = useRef(0);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
@@ -282,9 +283,18 @@ export default function ChatPage() {
 
     const updateViewport = () => {
       const vv = window.visualViewport;
-      const nextHeight = Math.round(vv?.height || window.innerHeight);
-      const nextInset = Math.max(0, Math.round(window.innerHeight - ((vv?.height || window.innerHeight) + (vv?.offsetTop || 0))));
-      setViewportHeight(nextHeight);
+      const offsetTop = Math.max(0, Math.round(vv?.offsetTop || 0));
+      const visibleHeight = Math.round((vv?.height || window.innerHeight) + offsetTop);
+      const baseCandidate = Math.max(Math.round(window.innerHeight), visibleHeight, viewportBaseHeightRef.current || 0);
+
+      if (!isComposerFocused || visibleHeight >= baseCandidate - 80) {
+        viewportBaseHeightRef.current = baseCandidate;
+      }
+
+      const nextBase = Math.max(viewportBaseHeightRef.current || 0, baseCandidate);
+      const nextInset = Math.max(0, nextBase - visibleHeight);
+
+      setViewportHeight(visibleHeight);
       setKeyboardInset(nextInset);
     };
 
@@ -300,7 +310,7 @@ export default function ChatPage() {
       vv?.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('scroll', updateViewport);
     };
-  }, []);
+  }, [isComposerFocused]);
 
   useEffect(() => {
     const token = getToken();
