@@ -618,7 +618,7 @@ export default function ChatPage() {
       {/* Header */}
       <div
         className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
-        style={viewportOffsetTop ? { transform: `translateY(${viewportOffsetTop}px)` } : undefined}
+        style={isComposerFocused && viewportOffsetTop ? { transform: `translateY(${viewportOffsetTop}px)` } : undefined}
       >
         <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
           <button
@@ -810,7 +810,7 @@ export default function ChatPage() {
       {/* Input area */}
       <div
         className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 transition-[padding-bottom] duration-200"
-        style={isComposerFocused ? { paddingBottom: 'max(4px, calc(env(safe-area-inset-bottom, 0px) * 0.3))' } : undefined}
+        style={isComposerFocused ? { paddingBottom: 'max(2px, calc(env(safe-area-inset-bottom, 0px) * 0.12))' } : undefined}
       >
         <div className="flex items-end gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
 
