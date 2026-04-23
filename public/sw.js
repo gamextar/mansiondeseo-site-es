@@ -1,5 +1,5 @@
-const CACHE_NAME = 'mansion-v9';
-const PRECACHE = ['/', '/index.html'];
+const CACHE_NAME = 'mansion-v10';
+const PRECACHE = ['/', '/index.html', '/app/index.html'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -20,6 +20,12 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const { request } = e;
   const url = new URL(request.url);
+  const appNavigation =
+    url.origin === self.location.origin &&
+    url.pathname !== '/' &&
+    url.pathname !== '/index.html' &&
+    !url.pathname.startsWith('/assets/') &&
+    !url.pathname.startsWith('/api');
 
   // Skip non-GET and API calls
   if (request.method !== 'GET' || url.pathname.startsWith('/api')) return;
@@ -47,9 +53,15 @@ self.addEventListener('fetch', (e) => {
             if (res.ok) cache.put(request, res.clone());
             return res;
           })
-          .catch(() =>
-            cache.match(request).then((cached) => cached || cache.match('/index.html'))
-          )
+          .catch(async () => {
+            const cached = await cache.match(request);
+            if (cached) return cached;
+            if (appNavigation) {
+              const appShell = await cache.match('/app/index.html');
+              if (appShell) return appShell;
+            }
+            return cache.match('/index.html');
+          })
       )
     );
     return;
@@ -70,6 +82,14 @@ self.addEventListener('fetch', (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match('/')))
+      .catch(async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        if (appNavigation) {
+          const appShell = await caches.match('/app/index.html');
+          if (appShell) return appShell;
+        }
+        return caches.match('/');
+      })
   );
 });
