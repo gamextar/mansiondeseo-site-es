@@ -127,9 +127,8 @@ export default function ChatPage() {
   const [showEmojis, setShowEmojis] = useState(false);
   const [wsState, setWsState] = useState('disconnected');
   const [partnerTyping, setPartnerTyping] = useState(false);
-  const [isComposerFocused, setIsComposerFocused] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
-  const [keyboardInset, setKeyboardInset] = useState(0);
+  const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -147,7 +146,6 @@ export default function ChatPage() {
   const initialHistoryLoadedRef = useRef(false);
   const historyFallbackTimerRef = useRef(null);
   const suppressTypingUntilRef = useRef(0);
-  const viewportBaseHeightRef = useRef(0);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
@@ -248,54 +246,13 @@ export default function ChatPage() {
     scheduleTypingStop();
   }, [scheduleTypingStop, stopTypingSignal]);
 
-  useLayoutEffect(() => {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return undefined;
-
-    const { documentElement, body } = document;
-    const previousHtmlOverflow = documentElement.style.overflow;
-    const previousBodyOverflow = body.style.overflow;
-    const previousHtmlOverscroll = documentElement.style.overscrollBehaviorY;
-    const previousBodyOverscroll = body.style.overscrollBehaviorY;
-
-    const resetPageScrollTop = () => {
-      window.scrollTo(0, 0);
-      documentElement.scrollTop = 0;
-      body.scrollTop = 0;
-    };
-
-    documentElement.style.overflow = 'hidden';
-    body.style.overflow = 'hidden';
-    documentElement.style.overscrollBehaviorY = 'none';
-    body.style.overscrollBehaviorY = 'none';
-    resetPageScrollTop();
-
-    return () => {
-      documentElement.style.overflow = previousHtmlOverflow;
-      body.style.overflow = previousBodyOverflow;
-      documentElement.style.overscrollBehaviorY = previousHtmlOverscroll;
-      body.style.overscrollBehaviorY = previousBodyOverscroll;
-      resetPageScrollTop();
-    };
-  }, []);
-
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
     const updateViewport = () => {
       const vv = window.visualViewport;
-      const offsetTop = Math.max(0, Math.round(vv?.offsetTop || 0));
-      const visibleHeight = Math.round((vv?.height || window.innerHeight) + offsetTop);
-      const baseCandidate = Math.max(Math.round(window.innerHeight), visibleHeight, viewportBaseHeightRef.current || 0);
-
-      if (!isComposerFocused || visibleHeight >= baseCandidate - 80) {
-        viewportBaseHeightRef.current = baseCandidate;
-      }
-
-      const nextBase = Math.max(viewportBaseHeightRef.current || 0, baseCandidate);
-      const nextInset = Math.max(0, nextBase - visibleHeight);
-
-      setViewportHeight(visibleHeight);
-      setKeyboardInset(nextInset);
+      setViewportHeight(Math.round(vv?.height || window.innerHeight));
+      setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
     };
 
     updateViewport();
@@ -310,7 +267,7 @@ export default function ChatPage() {
       vv?.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('scroll', updateViewport);
     };
-  }, [isComposerFocused]);
+  }, []);
 
   useEffect(() => {
     const token = getToken();
@@ -516,39 +473,6 @@ export default function ChatPage() {
     requestScrollToBottom('smooth');
   }, [partnerTyping]);
 
-  useEffect(() => {
-    if (!isComposerFocused) return;
-    wasAtBottomRef.current = true;
-    requestScrollToBottom('auto', { force: true });
-  }, [isComposerFocused, viewportHeight, requestScrollToBottom]);
-
-  useEffect(() => {
-    if (!isComposerFocused || typeof window === 'undefined' || typeof document === 'undefined') return undefined;
-
-    const { documentElement, body } = document;
-    const vv = window.visualViewport;
-    const resetPageScrollTop = () => {
-      window.scrollTo(0, 0);
-      documentElement.scrollTop = 0;
-      body.scrollTop = 0;
-    };
-
-    resetPageScrollTop();
-    const timers = [60, 180, 320].map((delay) => window.setTimeout(resetPageScrollTop, delay));
-
-    window.addEventListener('scroll', resetPageScrollTop, { passive: true });
-    vv?.addEventListener('resize', resetPageScrollTop);
-    vv?.addEventListener('scroll', resetPageScrollTop);
-
-    return () => {
-      timers.forEach((timerId) => window.clearTimeout(timerId));
-      window.removeEventListener('scroll', resetPageScrollTop);
-      vv?.removeEventListener('resize', resetPageScrollTop);
-      vv?.removeEventListener('scroll', resetPageScrollTop);
-      resetPageScrollTop();
-    };
-  }, [isComposerFocused]);
-
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
     const oldestMessage = messages.find((message) => message.createdAt);
@@ -595,7 +519,7 @@ export default function ChatPage() {
 
   if (!partner && !loading) {
     return (
-      <div className="min-h-screen bg-[#c1121f] flex items-center justify-center">
+      <div className="min-h-screen bg-mansion-base flex items-center justify-center">
         <p className="text-text-muted">Conversación no encontrada</p>
       </div>
     );
@@ -603,7 +527,7 @@ export default function ChatPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#c1121f] flex items-center justify-center">
+      <div className="min-h-screen bg-mansion-base flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
     );
@@ -683,19 +607,17 @@ export default function ChatPage() {
     handleTypingInput(nextValue);
   };
 
-  const composerMessagesPadding = isComposerFocused ? 12 : 20;
-
   return (
     <>
     <DesktopSidebar />
     <div
-      className="min-h-screen h-[100dvh] bg-[#c1121f] flex flex-col overflow-hidden lg:pl-64 xl:pl-72"
+      className="min-h-screen h-[100dvh] bg-mansion-base flex flex-col overflow-hidden lg:pl-64 xl:pl-72"
       style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
     >
       {/* Header */}
       <div
-        className="glass shrink-0 border-b border-mansion-border/30 z-30"
-        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+        className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
+        style={viewportOffsetTop ? { transform: `translateY(${viewportOffsetTop}px)` } : undefined}
       >
         <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
           <button
@@ -788,9 +710,8 @@ export default function ChatPage() {
             const el = scrollRef.current;
             if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
-          className="h-full overflow-y-auto overscroll-y-contain px-4 pt-4 lg:px-6"
+          className="h-full overflow-y-auto overscroll-y-contain px-4 pt-24 pb-5 space-y-5 lg:px-6 lg:pt-24"
         >
-          <div className="flex min-h-full flex-col">
           <div
             ref={indicatorRef}
             className="sticky top-0 z-10 flex justify-center py-2 pointer-events-none"
@@ -812,7 +733,6 @@ export default function ChatPage() {
           </div>
         )}
 
-        <div className="mt-auto flex flex-col gap-5" style={{ paddingBottom: `${composerMessagesPadding}px` }}>
         <div className="flex items-center justify-center">
           <span className="text-[10px] text-text-dim bg-mansion-elevated px-3 py-1 rounded-full">
             Hoy
@@ -880,20 +800,15 @@ export default function ChatPage() {
 
           <div
             ref={messagesEndRef}
-            className={isComposerFocused ? 'h-2' : 'h-12'}
-            style={{ scrollMarginBottom: `${composerMessagesPadding}px` }}
+            className="h-32"
+            style={{ scrollMarginBottom: '80px' }}
           />
         </div>
-        </div>
-      </div>
       </div>
 
       {/* Input area */}
-      <div
-        className="safe-bottom shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 transition-[padding-bottom,transform] duration-200"
-        style={isComposerFocused ? { paddingBottom: '2px' } : undefined}
-      >
-        <div className={`flex items-end gap-2 px-3 lg:px-6 max-w-4xl lg:mx-auto ${isComposerFocused ? 'py-1' : 'py-3'}`}>
+      <div className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
+        <div className="flex items-end gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
 
           {/* Attach photo */}
           <button className="flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-colors border border-mansion-border/30">
@@ -906,20 +821,10 @@ export default function ChatPage() {
               <textarea
                 ref={inputRef}
                 value={input}
-                autoComplete="off"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
                 onChange={handleInputChange}
-                onBlur={() => {
-                  setIsComposerFocused(false);
-                  stopTypingSignal();
-                }}
+                onBlur={stopTypingSignal}
                 onKeyDown={handleKeyDown}
-                onFocus={() => {
-                  setIsComposerFocused(true);
-                  setShowEmojis(false);
-                }}
+                onFocus={() => setShowEmojis(false)}
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
                 disabled={!effectiveCanSend}
                 rows={1}
