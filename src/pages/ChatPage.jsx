@@ -283,6 +283,27 @@ export default function ChatPage() {
     if (document.body) document.body.scrollTop = 0;
   }, []);
 
+  const settleMobileBrowserChatViewportBeforeExit = useCallback((onComplete) => {
+    if (!isMobileBrowserChat || typeof window === 'undefined') {
+      onComplete?.();
+      return undefined;
+    }
+
+    resetMobileBrowserChatViewport();
+    const timers = [0, 90, 180, 280].map((delay) => window.setTimeout(() => {
+      resetMobileBrowserChatViewport();
+      window.dispatchEvent(new Event('resize'));
+    }, delay));
+    const completeTimer = window.setTimeout(() => {
+      onComplete?.();
+    }, 220);
+
+    return () => {
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+      window.clearTimeout(completeTimer);
+    };
+  }, [isMobileBrowserChat, resetMobileBrowserChatViewport]);
+
   const captureChatDebug = useCallback((label) => {
     const nextMetrics = readChatDebugMetrics({
       viewportHeight,
@@ -876,8 +897,9 @@ export default function ChatPage() {
   };
 
   const handleBackClick = () => {
-    if (isMobileBrowserChat) resetMobileBrowserChatViewport();
-    navigate(backTarget);
+    settleMobileBrowserChatViewportBeforeExit(() => {
+      navigate(backTarget);
+    });
   };
 
   return (
