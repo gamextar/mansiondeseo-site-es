@@ -290,6 +290,7 @@ function AppLayout() {
     !routeOverlayOpen &&
     (
       normalizedRoutePath === '/perfil' ||
+      isPublicProfileRoute ||
       normalizedRoutePath === '/mensajes' ||
       normalizedRoutePath.startsWith('/mensajes/')
     );
