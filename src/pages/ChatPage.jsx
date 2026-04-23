@@ -20,14 +20,6 @@ const CHAT_CACHE_MESSAGE_LIMIT = 60;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
 
-function detectStandaloneMobile() {
-  if (typeof window === 'undefined') return false;
-  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
-  const ua = window.navigator.userAgent || '';
-  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
-  return Boolean(standalone && isMobile);
-}
-
 function getChatCacheKey(partnerId) {
   return `${CHAT_CACHE_PREFIX}${partnerId}`;
 }
@@ -125,9 +117,6 @@ export default function ChatPage() {
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
-  const isMobileBrowserChat = typeof window !== 'undefined'
-    ? window.matchMedia('(max-width: 1023px)').matches && !detectStandaloneMobile()
-    : false;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
   const [input, setInput] = useState('');
@@ -142,7 +131,6 @@ export default function ChatPage() {
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
   const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
-  const [mobileBrowserComposerOffset, setMobileBrowserComposerOffset] = useState(0);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -278,21 +266,8 @@ export default function ChatPage() {
 
     const updateViewport = () => {
       const vv = window.visualViewport;
-      const nextHeight = Math.round(vv?.height || window.innerHeight);
-      const nextOffsetTop = Math.round(vv?.offsetTop || 0);
-      setViewportHeight(nextHeight);
-      setViewportOffsetTop(nextOffsetTop);
-
-      if (isMobileBrowserChat) {
-        const layoutHeight = Math.round(window.innerHeight || nextHeight);
-        const keyboardDelta = Math.max(0, layoutHeight - nextHeight);
-        const keyboardLikelyOpen = keyboardDelta > 160;
-
-        if (!keyboardLikelyOpen) {
-          const browserInset = Math.max(0, layoutHeight - nextHeight - nextOffsetTop);
-          setMobileBrowserComposerOffset(Math.min(24, Math.round(browserInset)));
-        }
-      }
+      setViewportHeight(Math.round(vv?.height || window.innerHeight));
+      setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
     };
 
     updateViewport();
@@ -307,7 +282,7 @@ export default function ChatPage() {
       vv?.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('scroll', updateViewport);
     };
-  }, [isMobileBrowserChat]);
+  }, []);
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -887,13 +862,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input area */}
-      <div
-        ref={composerRef}
-        className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20"
-        style={isMobileBrowserChat && mobileBrowserComposerOffset > 0
-          ? { bottom: `${mobileBrowserComposerOffset}px` }
-          : undefined}
-      >
+      <div ref={composerRef} className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3">
 
           {/* Attach photo */}
