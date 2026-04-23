@@ -1097,11 +1097,11 @@ export default function FeedPage({ initialData }) {
         <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
       {!isDesktopViewport && (
-        <div className="px-0 pr-3 min-h-[47px] pb-0.5 flex items-center justify-between gap-3 fade-in-up">
+        <div className="px-0 pr-3 min-h-[52px] pb-0.5 flex items-center justify-between gap-3 fade-in-up">
           <button
             type="button"
             onClick={() => navigate('/feed')}
-            className="inline-flex items-center gap-2 rounded-full bg-black/28 px-2.5 py-1.5 backdrop-blur-md"
+            className="relative -top-px inline-flex items-center gap-2 rounded-full bg-black/28 px-2.5 py-1.5 backdrop-blur-md"
           >
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
               <span className="font-display text-white text-xs font-bold">M</span>
