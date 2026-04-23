@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mansion-v10';
+const CACHE_NAME = 'mansion-v11';
 const PRECACHE = ['/', '/index.html', '/app/index.html'];
 
 self.addEventListener('install', (e) => {
