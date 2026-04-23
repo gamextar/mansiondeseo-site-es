@@ -621,10 +621,10 @@ export default function ChatPage() {
         className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
         style={viewportOffsetTop ? { transform: `translateY(${viewportOffsetTop}px)` } : undefined}
       >
-        <div className="relative flex items-center gap-3 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3 lg:gap-3 lg:py-4">
+        <div className="flex items-center gap-3 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3 lg:gap-3 lg:py-4">
           <button
             onClick={() => navigate(backTarget)}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0 lg:absolute lg:left-1 lg:top-1/2 lg:z-10 lg:w-12 lg:h-12 lg:-translate-y-1/2 lg:bg-mansion-elevated/65 lg:border lg:border-mansion-border/30"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0 lg:w-12 lg:h-12 lg:bg-mansion-elevated/65 lg:border lg:border-mansion-border/30"
             aria-label="Volver a la lista de chats"
           >
             <ChevronLeft className="w-5 h-5 lg:w-7 lg:h-7" />
@@ -655,9 +655,6 @@ export default function ChatPage() {
             <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-mansion-border/40 lg:w-[58px] lg:h-[58px]">
               <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt={partner.name} className="w-full h-full" />
             </div>
-            {partner.online && (
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-mansion-card lg:w-3.5 lg:h-3.5" />
-            )}
           </div>
 
           <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`, {
@@ -686,7 +683,7 @@ export default function ChatPage() {
               <h2 className="font-semibold text-sm text-text-primary truncate lg:text-[20px]">{partner.name}</h2>
               <span className={`hidden sm:inline-flex flex-shrink-0 items-center gap-1.5 text-[11px] lg:text-[13px] ${partner.online ? 'text-green-400' : 'text-text-dim'}`}>
                 <span className={`w-2 h-2 rounded-full ${partner.online ? 'bg-green-400' : 'bg-text-dim/70'}`} />
-                {partner.online ? 'En línea' : 'Offline'}
+                {partner.online ? 'Online' : 'Offline'}
               </span>
             </div>
             {partnerTyping && (
@@ -694,12 +691,8 @@ export default function ChatPage() {
             )}
           </div>
 
-          {/* Connection status + Limit pill */}
-          <div className="flex-shrink-0 flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${
-              wsState === 'connected' ? 'bg-green-400' : wsState === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
-            }`} title={wsState === 'connected' ? 'Conectado' : wsState === 'connecting' ? 'Conectando...' : 'Desconectado'} />
-            {!isVipUser && (
+          {!isVipUser && (
+            <div className="flex-shrink-0 flex items-center gap-2">
               <div className={`flex items-center gap-2 text-[12px] font-semibold px-3 py-1.5 rounded-full border lg:text-[15px] lg:px-4 lg:py-2 ${
                 effectiveRemaining <= 2
                   ? 'bg-mansion-crimson/10 border-mansion-crimson/30 text-mansion-crimson'
@@ -708,8 +701,8 @@ export default function ChatPage() {
                 <Lock className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
                 <span>{effectiveRemaining} mensajes restantes</span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
