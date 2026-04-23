@@ -442,7 +442,7 @@ export default function ChatListPage() {
         <h1 className="font-display text-2xl font-bold text-text-primary mb-4">Mensajes</h1>
 
         {/* Search bar */}
-        <div className="relative max-w-md">
+        <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" />
           <input
             type="text"
