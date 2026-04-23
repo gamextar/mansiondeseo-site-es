@@ -108,6 +108,13 @@ function updateConversationPreviewCache(partnerId, partner, message) {
   }
 }
 
+function detectStandaloneMobile() {
+  if (typeof window === 'undefined') return false;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const isMobile = window.matchMedia?.('(max-width: 1023px)')?.matches ?? false;
+  return Boolean(standalone && isMobile);
+}
+
 export default function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -128,6 +135,7 @@ export default function ChatPage() {
   const [wsState, setWsState] = useState('disconnected');
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
+  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -272,9 +280,29 @@ export default function ChatPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
+    const updateStandalone = () => {
+      setIsStandaloneMobileApp(detectStandaloneMobile());
+    };
+
+    updateStandalone();
+    window.addEventListener('resize', updateStandalone);
+    window.addEventListener('orientationchange', updateStandalone);
+    window.addEventListener('pageshow', updateStandalone);
+
+    return () => {
+      window.removeEventListener('resize', updateStandalone);
+      window.removeEventListener('orientationchange', updateStandalone);
+      window.removeEventListener('pageshow', updateStandalone);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
     const updateViewport = () => {
       const vv = window.visualViewport;
-      setViewportHeight(Math.round((vv?.height || window.innerHeight) + Math.max(0, vv?.offsetTop || 0)));
+      const offsetTop = isStandaloneMobileApp ? 0 : Math.max(0, vv?.offsetTop || 0);
+      setViewportHeight(Math.round((vv?.height || window.innerHeight) + offsetTop));
 
       const activeElement = document.activeElement;
       const inputFocused = activeElement === inputRef.current;
@@ -306,7 +334,7 @@ export default function ChatPage() {
       vv?.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('scroll', updateViewport);
     };
-  }, []);
+  }, [isStandaloneMobileApp]);
 
   useEffect(() => {
     const token = getToken();
