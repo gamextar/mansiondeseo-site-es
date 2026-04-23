@@ -242,5 +242,13 @@ const staticHomeHtml = `<!doctype html>
 
 await writeFile(indexPath, staticHomeHtml, 'utf8');
 await writeFile(headersPath, buildHeaders(), 'utf8');
-await writeFile(redirectsPath, `/ /index.html 200\n/* /app/index.html 200\n`, 'utf8');
+await writeFile(
+  redirectsPath,
+  `/ /index.html 200
+/mensajes/* /app/index.html 200
+/perfiles/* /app/index.html 200
+/* /app/index.html 200
+`,
+  'utf8',
+);
 console.log(`Installed static home and ${appRoutes.size} static SPA route entries`);
