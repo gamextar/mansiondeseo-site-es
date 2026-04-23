@@ -246,6 +246,36 @@ export default function ChatPage() {
     scheduleTypingStop();
   }, [scheduleTypingStop, stopTypingSignal]);
 
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return undefined;
+
+    const { documentElement, body } = document;
+    const previousHtmlOverflow = documentElement.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    const previousHtmlOverscroll = documentElement.style.overscrollBehaviorY;
+    const previousBodyOverscroll = body.style.overscrollBehaviorY;
+
+    const resetPageScrollTop = () => {
+      window.scrollTo(0, 0);
+      documentElement.scrollTop = 0;
+      body.scrollTop = 0;
+    };
+
+    documentElement.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    documentElement.style.overscrollBehaviorY = 'none';
+    body.style.overscrollBehaviorY = 'none';
+    resetPageScrollTop();
+
+    return () => {
+      documentElement.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+      documentElement.style.overscrollBehaviorY = previousHtmlOverscroll;
+      body.style.overscrollBehaviorY = previousBodyOverscroll;
+      resetPageScrollTop();
+    };
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
@@ -475,6 +505,33 @@ export default function ChatPage() {
     wasAtBottomRef.current = true;
     requestScrollToBottom('auto', { force: true });
   }, [isComposerFocused, viewportHeight, requestScrollToBottom]);
+
+  useEffect(() => {
+    if (!isComposerFocused || typeof window === 'undefined' || typeof document === 'undefined') return undefined;
+
+    const { documentElement, body } = document;
+    const vv = window.visualViewport;
+    const resetPageScrollTop = () => {
+      window.scrollTo(0, 0);
+      documentElement.scrollTop = 0;
+      body.scrollTop = 0;
+    };
+
+    resetPageScrollTop();
+    const timers = [60, 180, 320].map((delay) => window.setTimeout(resetPageScrollTop, delay));
+
+    window.addEventListener('scroll', resetPageScrollTop, { passive: true });
+    vv?.addEventListener('resize', resetPageScrollTop);
+    vv?.addEventListener('scroll', resetPageScrollTop);
+
+    return () => {
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+      window.removeEventListener('scroll', resetPageScrollTop);
+      vv?.removeEventListener('resize', resetPageScrollTop);
+      vv?.removeEventListener('scroll', resetPageScrollTop);
+      resetPageScrollTop();
+    };
+  }, [isComposerFocused]);
 
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
