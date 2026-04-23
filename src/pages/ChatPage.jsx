@@ -135,6 +135,8 @@ export default function ChatPage() {
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
   const chatRef = useRef(null);
+  const headerRef = useRef(null);
+  const composerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const incomingMessageTimersRef = useRef(new Map());
   const lastTypingSentRef = useRef(0);
@@ -149,6 +151,8 @@ export default function ChatPage() {
   const historyFallbackTimerRef = useRef(null);
   const suppressTypingUntilRef = useRef(0);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
+  const [headerHeight, setHeaderHeight] = useState(96);
+  const [composerHeight, setComposerHeight] = useState(84);
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
   const backTarget = location.state?.from || '/mensajes';
@@ -270,6 +274,34 @@ export default function ChatPage() {
       vv?.removeEventListener('scroll', updateViewport);
     };
   }, []);
+
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const measure = () => {
+      const nextHeaderHeight = headerRef.current?.getBoundingClientRect?.().height;
+      const nextComposerHeight = composerRef.current?.getBoundingClientRect?.().height;
+      if (nextHeaderHeight) setHeaderHeight(Math.round(nextHeaderHeight));
+      if (nextComposerHeight) setComposerHeight(Math.round(nextComposerHeight));
+    };
+
+    measure();
+
+    const headerNode = headerRef.current;
+    const composerNode = composerRef.current;
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => measure())
+      : null;
+
+    if (headerNode) resizeObserver?.observe(headerNode);
+    if (composerNode) resizeObserver?.observe(composerNode);
+    window.addEventListener('resize', measure);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [partnerTyping, isVipUser, input, viewportHeight]);
 
   useEffect(() => {
     const token = getToken();
@@ -618,6 +650,7 @@ export default function ChatPage() {
     >
       {/* Header */}
       <div
+        ref={headerRef}
         className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
         style={viewportOffsetTop ? { transform: `translateY(${viewportOffsetTop}px)` } : undefined}
       >
@@ -714,7 +747,11 @@ export default function ChatPage() {
             const el = scrollRef.current;
             if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
-          className="h-full overflow-y-auto overscroll-y-contain px-[5vw] lg:px-[4vw] pt-24 pb-5 space-y-5 lg:pt-24"
+          className="h-full overflow-y-auto overscroll-y-contain px-[5vw] lg:px-[4vw] space-y-5"
+          style={{
+            paddingTop: `${headerHeight + 14}px`,
+            paddingBottom: `${composerHeight + 10}px`,
+          }}
         >
           <div
             ref={indicatorRef}
@@ -804,14 +841,14 @@ export default function ChatPage() {
 
           <div
             ref={messagesEndRef}
-            className="h-32"
-            style={{ scrollMarginBottom: '80px' }}
+            className="h-6 lg:h-3"
+            style={{ scrollMarginBottom: `${composerHeight + 12}px` }}
           />
         </div>
       </div>
 
       {/* Input area */}
-      <div className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
+      <div ref={composerRef} className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3">
 
           {/* Attach photo */}
