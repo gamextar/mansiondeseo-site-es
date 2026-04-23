@@ -268,20 +268,37 @@ export default function ChatPage() {
     setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
   }, []);
 
+  const measureChatChrome = useCallback(() => {
+    const nextHeaderHeight = headerRef.current?.getBoundingClientRect?.().height;
+    const nextComposerHeight = composerRef.current?.getBoundingClientRect?.().height;
+    if (nextHeaderHeight) setHeaderHeight(Math.round(nextHeaderHeight));
+    if (nextComposerHeight) setComposerHeight(Math.round(nextComposerHeight));
+  }, []);
+
+  const reconcileChatViewport = useCallback((behavior = 'auto') => {
+    syncViewportMetrics();
+    requestAnimationFrame(() => {
+      measureChatChrome();
+      keepChatPinnedToBottom(behavior);
+    });
+  }, [keepChatPinnedToBottom, measureChatChrome, syncViewportMetrics]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const settleTimers = [];
-    const settleViewport = () => {
-      syncViewportMetrics();
-      settleTimers.push(setTimeout(syncViewportMetrics, 40));
-      settleTimers.push(setTimeout(syncViewportMetrics, 180));
-      settleTimers.push(setTimeout(syncViewportMetrics, 420));
+    const settleViewport = (behavior = 'auto') => {
+      reconcileChatViewport(behavior);
+      [40, 180, 420, 760].forEach((delay) => {
+        settleTimers.push(setTimeout(() => reconcileChatViewport(behavior), delay));
+      });
     };
 
     settleViewport();
 
     const vv = window.visualViewport;
     window.addEventListener('resize', settleViewport);
+    window.addEventListener('orientationchange', settleViewport);
+    window.addEventListener('focus', settleViewport);
     window.addEventListener('pageshow', settleViewport);
     vv?.addEventListener('resize', settleViewport);
     vv?.addEventListener('scroll', settleViewport);
@@ -289,39 +306,33 @@ export default function ChatPage() {
     return () => {
       settleTimers.forEach((timer) => clearTimeout(timer));
       window.removeEventListener('resize', settleViewport);
+      window.removeEventListener('orientationchange', settleViewport);
+      window.removeEventListener('focus', settleViewport);
       window.removeEventListener('pageshow', settleViewport);
       vv?.removeEventListener('resize', settleViewport);
       vv?.removeEventListener('scroll', settleViewport);
     };
-  }, [syncViewportMetrics]);
+  }, [reconcileChatViewport]);
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return undefined;
-
-    const measure = () => {
-      const nextHeaderHeight = headerRef.current?.getBoundingClientRect?.().height;
-      const nextComposerHeight = composerRef.current?.getBoundingClientRect?.().height;
-      if (nextHeaderHeight) setHeaderHeight(Math.round(nextHeaderHeight));
-      if (nextComposerHeight) setComposerHeight(Math.round(nextComposerHeight));
-    };
-
-    measure();
+    measureChatChrome();
 
     const headerNode = headerRef.current;
     const composerNode = composerRef.current;
     const resizeObserver = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(() => measure())
+      ? new ResizeObserver(() => measureChatChrome())
       : null;
 
     if (headerNode) resizeObserver?.observe(headerNode);
     if (composerNode) resizeObserver?.observe(composerNode);
-    window.addEventListener('resize', measure);
+    window.addEventListener('resize', measureChatChrome);
 
     return () => {
       resizeObserver?.disconnect();
-      window.removeEventListener('resize', measure);
+      window.removeEventListener('resize', measureChatChrome);
     };
-  }, [partnerTyping, isVipUser, input, viewportHeight]);
+  }, [measureChatChrome, partnerTyping, isVipUser, input, viewportHeight]);
 
   useEffect(() => {
     const token = getToken();
@@ -890,17 +901,15 @@ export default function ChatPage() {
                 onChange={handleInputChange}
                 onBlur={() => {
                   stopTypingSignal();
-                  syncViewportMetrics();
+                  reconcileChatViewport('auto');
                   setTimeout(() => {
-                    syncViewportMetrics();
-                    keepChatPinnedToBottom('auto');
+                    reconcileChatViewport('auto');
                   }, 120);
                 }}
                 onKeyDown={handleKeyDown}
                 onFocus={() => {
                   setShowEmojis(false);
-                  syncViewportMetrics();
-                  keepChatPinnedToBottom('auto');
+                  reconcileChatViewport('auto');
                 }}
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
                 disabled={!effectiveCanSend}
@@ -912,7 +921,7 @@ export default function ChatPage() {
                 type="button"
                 onClick={() => {
                   setShowEmojis(v => !v);
-                  keepChatPinnedToBottom('auto');
+                  reconcileChatViewport('auto');
                 }}
                 className={`flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center transition-colors lg:w-12 lg:pb-3 ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
               >
