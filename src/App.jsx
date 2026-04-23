@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate } from '
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAgeVerified } from './hooks/useAgeVerified';
 import AgeVerificationModal from './components/AgeVerificationModal';
-import Navbar from './components/Navbar';
+import Navbar, { MobileBrandOverlay } from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import DesktopSidebar from './components/DesktopSidebar';
 import FeedPage from './pages/FeedPage';
@@ -285,6 +285,14 @@ function AppLayout() {
     normalizedRoutePath !== '/explorar' &&
     normalizedRoutePath !== '/videos' &&
     (immersiveMobileApp || isChatDetail);
+  const restoreHiddenMobileOverlayShim =
+    isMobileViewport &&
+    !routeOverlayOpen &&
+    (
+      normalizedRoutePath === '/perfil' ||
+      normalizedRoutePath === '/mensajes' ||
+      normalizedRoutePath.startsWith('/mensajes/')
+    );
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const showTopNavbar = showChrome && !routeOverlayOpen && !immersiveMobileApp;
   const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute || mobileBrowserVideosRoute) && !routeOverlayOpen);
@@ -771,6 +779,7 @@ function AppLayout() {
       {showDesktopSidebar && <DesktopSidebar />}
       {showTopNavbar && <Navbar />}
       {showMobileViewportStabilizer && <MobileViewportStabilizer />}
+      {restoreHiddenMobileOverlayShim && <MobileBrandOverlay hidden />}
 
       <div
         className={showDesktopSidebar ? 'lg:pl-64 xl:pl-72' : ''}
