@@ -133,6 +133,7 @@ export default function SettingsPage() {
   const [resendApiKey, setResendApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [mailFrom, setMailFrom] = useState('');
+  const [registrationEmailBcc, setRegistrationEmailBcc] = useState('');
 
   // Payment display
   const [paymentTitleVip, setPaymentTitleVip] = useState('Servicios Digitales');
@@ -296,6 +297,7 @@ export default function SettingsPage() {
         setEncoderShowProgressHud(s.encoderShowProgressHud === true);
         setResendApiKey(s.resendApiKey || '');
         setMailFrom(s.mailFrom || '');
+        setRegistrationEmailBcc(s.registrationEmailBcc ?? 'registro@gamextar.com');
       })
       .catch(() => navigate('/feed'))
       .finally(() => setLoading(false));
@@ -464,6 +466,7 @@ export default function SettingsPage() {
         encoder_show_progress_hud: encoderShowProgressHud ? '1' : '0',
         resend_api_key: resendApiKey,
         mail_from: mailFrom,
+        registration_email_bcc: registrationEmailBcc,
       });
       const s = data.settings;
       setBlurMobile(s.blurMobile);
@@ -538,6 +541,9 @@ export default function SettingsPage() {
       setEncoderAudioMono(s.encoderAudioMono ?? true);
       setEncoderPreset(s.encoderPreset || 'superfast');
       setEncoderShowProgressHud(s.encoderShowProgressHud === true);
+      setResendApiKey(s.resendApiKey || '');
+      setMailFrom(s.mailFrom || '');
+      setRegistrationEmailBcc(s.registrationEmailBcc ?? 'registro@gamextar.com');
       // Propagate to global context so dependent components update live
       setSiteSettings(s);
       try {
@@ -2452,6 +2458,25 @@ export default function SettingsPage() {
                 value={mailFrom}
                 onChange={e => setMailFrom(e.target.value)}
                 placeholder="noreply@tudominio.com"
+                className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary"
+              />
+            </div>
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Mail className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">BCC registro</h3>
+                  <p className="text-[11px] text-text-dim">Copias ocultas para emails de verificación del registro. Acepta varios emails separados por coma.</p>
+                </div>
+              </div>
+              <input
+                type="text"
+                value={registrationEmailBcc}
+                onChange={e => setRegistrationEmailBcc(e.target.value)}
+                placeholder="registro@gamextar.com, otro@dominio.com"
                 className="w-full text-sm py-2 px-3 rounded-xl bg-mansion-elevated border border-mansion-border/30 text-text-primary"
               />
             </div>

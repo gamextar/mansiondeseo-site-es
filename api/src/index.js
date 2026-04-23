@@ -1617,19 +1617,31 @@ function verificationEmailHTML(code) {
 }
 
 async function getResendCredentials(env) {
-  const row = await env.DB.prepare("SELECT key, value FROM site_settings WHERE key IN ('resend_api_key', 'mail_from')").all();
+  const row = await env.DB.prepare("SELECT key, value FROM site_settings WHERE key IN ('resend_api_key', 'mail_from', 'registration_email_bcc')").all();
   const map = {};
   for (const r of row.results) map[r.key] = r.value;
   return {
     apiKey: map.resend_api_key || env.RESEND_API_KEY,
     mailFrom: map.mail_from || env.MAIL_FROM || 'noreply@mansiondeseo.com',
+    registrationEmailBcc: Object.prototype.hasOwnProperty.call(map, 'registration_email_bcc')
+      ? String(map.registration_email_bcc || '')
+      : 'registro@gamextar.com',
   };
 }
 
+function parseEmailList(value) {
+  return String(value || '')
+    .split(/[\s,;]+/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+    .filter((item, index, arr) => arr.indexOf(item) === index);
+}
+
 async function sendVerificationEmail(env, toEmail, code) {
-  const { apiKey, mailFrom } = await getResendCredentials(env);
+  const { apiKey, mailFrom, registrationEmailBcc } = await getResendCredentials(env);
   const fromEmail = mailFrom;
   const fromName = 'Mansión Deseo';
+  const bccRecipients = parseEmailList(registrationEmailBcc);
 
   if (!apiKey) {
     console.error('Resend send failed: RESEND_API_KEY is not configured');
@@ -1646,7 +1658,7 @@ async function sendVerificationEmail(env, toEmail, code) {
       body: JSON.stringify({
         from: `${fromName} <${fromEmail}>`,
         to: [toEmail],
-        bcc: ['registro@gamextar.com'],
+        ...(bccRecipients.length ? { bcc: bccRecipients } : {}),
         subject: `${code} — Tu código de verificación`,
         text: `Tu código de verificación para Mansión Deseo es: ${code}\n\nExpira en 30 minutos.\n\nSi no solicitaste esto, ignora este email.`,
         html: verificationEmailHTML(code),
@@ -1710,7 +1722,7 @@ function calculateAgeFromBirthdate(birthdate) {
   return age;
 }
 
-async function handleRegister(request, env) {
+async function handleRegister(request, env, ctx) {
   const body = await request.json();
   const { email, password, username, role, seeking, interests, age, birthdate, city, province, locality, bio, marital_status, sexual_orientation, message_block_roles } = body;
   await ensureUsersMessageBlockRolesColumn(env);
@@ -1851,14 +1863,32 @@ async function handleRegister(request, env) {
 
   // Send verification email (MailChannels in production, console in dev)
   if (env.ENVIRONMENT === 'production') {
-    const sent = await sendVerificationEmail(env, email.toLowerCase(), code);
-    if (!sent) return error('No pudimos enviar el email de verificación. Intentá nuevamente en unos minutos.', 502);
+    const sendTask = sendVerificationEmail(env, email.toLowerCase(), code)
+      .then((sent) => {
+        if (!sent) {
+          console.error(`[register] verification email send failed for ${email.toLowerCase()}`);
+          return false;
+        }
+        return true;
+      })
+      .catch((err) => {
+        console.error('[register] verification email background send failed:', err?.message || err);
+        return false;
+      });
+
+    if (ctx?.waitUntil) {
+      ctx.waitUntil(sendTask);
+    } else {
+      const sent = await sendTask;
+      if (!sent) return error('No pudimos enviar el email de verificación. Intentá nuevamente en unos minutos.', 502);
+    }
   } else {
     debugLog(env, `📧 VERIFICATION CODE for ${email}: ${code}`);
   }
 
   return json({
     needsVerification: true,
+    emailDeliveryPending: env.ENVIRONMENT === 'production',
     email: email.toLowerCase(),
     message: 'Código de verificación enviado a tu email.',
     ...(env.ENVIRONMENT !== 'production' && { devCode: code }),
@@ -3816,6 +3846,9 @@ async function loadSettings(env) {
     encoderShowProgressHud: settings.encoder_show_progress_hud === '1',
     resendApiKey: settings.resend_api_key || env.RESEND_API_KEY || '',
     mailFrom: settings.mail_from || env.MAIL_FROM || 'noreply@mansiondeseo.com',
+    registrationEmailBcc: Object.prototype.hasOwnProperty.call(settings, 'registration_email_bcc')
+      ? String(settings.registration_email_bcc || '')
+      : 'registro@gamextar.com',
     onlineThresholdMinutes: parseInt(settings.online_threshold_minutes || '60', 10),
     feedFilterByCountry: parseBooleanSetting(settings.feed_filter_by_country, false),
     feedWeightLastActive: parseNumberSetting(settings.feed_weight_last_active, 45),
@@ -4000,6 +4033,7 @@ async function handleUpdateSettings(request, env) {
     'encoder_show_progress_hud',
     'resend_api_key',
     'mail_from',
+    'registration_email_bcc',
     'online_threshold_minutes',
     'feed_filter_by_country',
     'feed_weight_last_active',
@@ -5665,7 +5699,7 @@ async function handleUploadStory(request, env) {
   return json({ id: storyId, video_url: videoUrl, caption }, 201);
 }
 
-async function handleRequest(request, env) {
+async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
@@ -5696,7 +5730,7 @@ async function handleRequest(request, env) {
   if (path === '/api/stories' && method === 'POST') return handleUploadStory(request, env);
 
   // ── Auth routes
-  if (path === '/api/auth/register' && method === 'POST') return handleRegister(request, env);
+  if (path === '/api/auth/register' && method === 'POST') return handleRegister(request, env, ctx);
   if (path === '/api/auth/login' && method === 'POST') return handleLogin(request, env);
   if (path === '/api/auth/verify-code' && method === 'POST') return handleVerifyCode(request, env);
   if (path === '/api/auth/resend-code' && method === 'POST') return handleResendCode(request, env);
@@ -5809,7 +5843,7 @@ export default {
   async fetch(request, env, ctx) {
     const startedAt = Date.now();
     try {
-      const response = await handleRequest(request, env);
+      const response = await handleRequest(request, env, ctx);
       recordRouteMetric(env, request, response, Date.now() - startedAt);
       if (response.status >= 500) {
         ctx.waitUntil((async () => {

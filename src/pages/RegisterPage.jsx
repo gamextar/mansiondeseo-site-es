@@ -1399,7 +1399,7 @@ function StepPhoto({ photoFile, onPhotoSelect }) {
 // Email Verification Screen
 // ────────────────────────────────────────────
 
-function VerificationScreen({ email, devCode, onVerified, onResend }) {
+function VerificationScreen({ email, devCode, emailDeliveryPending = false, onVerified, onResend }) {
   const [code, setCode] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState('');
@@ -1424,7 +1424,8 @@ function VerificationScreen({ email, devCode, onVerified, onResend }) {
     setResending(true);
     setResent(false);
     try {
-      await apiResendCode(email);
+      if (typeof onResend === 'function') await onResend();
+      else await apiResendCode(email);
       setResent(true);
       setTimeout(() => setResent(false), 5000);
     } catch {
@@ -1471,6 +1472,20 @@ function VerificationScreen({ email, devCode, onVerified, onResend }) {
       >
         Hemos enviado un código de 6 dígitos a <span className="text-mansion-gold font-medium">{email}</span>
       </motion.p>
+
+      {emailDeliveryPending && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="mb-6 max-w-sm rounded-2xl border border-mansion-gold/20 bg-mansion-gold/8 px-4 py-3 text-left"
+        >
+          <p className="flex items-start gap-2 text-xs text-text-muted">
+            <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-mansion-gold" />
+            <span>Te mostramos esta pantalla primero mientras terminamos de enviar el código. Si no llega enseguida, podés reenviarlo acá mismo.</span>
+          </p>
+        </motion.div>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -1632,6 +1647,7 @@ export default function RegisterPage() {
   const [photoFile, setPhotoFile] = useState(null);
   const [completed, setCompleted] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
+  const [emailDeliveryPending, setEmailDeliveryPending] = useState(false);
   const [devCode, setDevCode] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
@@ -1646,6 +1662,12 @@ export default function RegisterPage() {
   const [hidePasswordDefault, setHidePasswordDefault] = useState(true);
   const [roleImages, setRoleImages] = useState({});
   const [optimizeOnboardingMotion, setOptimizeOnboardingMotion] = useState(false);
+
+  useEffect(() => {
+    if (!emailDeliveryPending) return undefined;
+    const timerId = window.setTimeout(() => setEmailDeliveryPending(false), 8000);
+    return () => window.clearTimeout(timerId);
+  }, [emailDeliveryPending]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -1837,8 +1859,10 @@ export default function RegisterPage() {
 
         // Show verification screen
         if (regResult.devCode) setDevCode(regResult.devCode);
+        setEmailDeliveryPending(regResult.emailDeliveryPending === true);
         setPendingVerification(true);
       } catch (err) {
+        setEmailDeliveryPending(false);
         if (err.data?.code === 'EMAIL_EXISTS') {
           setApiError('EMAIL_EXISTS');
         } else {
@@ -1898,10 +1922,12 @@ export default function RegisterPage() {
         <VerificationScreen
           email={email}
           devCode={devCode}
+          emailDeliveryPending={emailDeliveryPending}
           onVerified={handleVerified}
           onResend={async () => {
             const res = await apiResendCode(email);
             if (res.devCode) setDevCode(res.devCode);
+            setEmailDeliveryPending(false);
           }}
         />
       </div>
