@@ -142,6 +142,7 @@ export default function ChatPage() {
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
   const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
+  const [mobileBrowserComposerOffset, setMobileBrowserComposerOffset] = useState(0);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -277,8 +278,21 @@ export default function ChatPage() {
 
     const updateViewport = () => {
       const vv = window.visualViewport;
-      setViewportHeight(Math.round(vv?.height || window.innerHeight));
-      setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
+      const nextHeight = Math.round(vv?.height || window.innerHeight);
+      const nextOffsetTop = Math.round(vv?.offsetTop || 0);
+      setViewportHeight(nextHeight);
+      setViewportOffsetTop(nextOffsetTop);
+
+      if (isMobileBrowserChat) {
+        const layoutHeight = Math.round(window.innerHeight || nextHeight);
+        const keyboardDelta = Math.max(0, layoutHeight - nextHeight);
+        const keyboardLikelyOpen = keyboardDelta > 160;
+
+        if (!keyboardLikelyOpen) {
+          const browserInset = Math.max(0, layoutHeight - nextHeight - nextOffsetTop);
+          setMobileBrowserComposerOffset(Math.min(24, Math.round(browserInset)));
+        }
+      }
     };
 
     updateViewport();
@@ -293,7 +307,7 @@ export default function ChatPage() {
       vv?.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('scroll', updateViewport);
     };
-  }, []);
+  }, [isMobileBrowserChat]);
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -876,7 +890,9 @@ export default function ChatPage() {
       <div
         ref={composerRef}
         className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20"
-        style={isMobileBrowserChat ? { bottom: '10px' } : undefined}
+        style={isMobileBrowserChat && mobileBrowserComposerOffset > 0
+          ? { bottom: `${mobileBrowserComposerOffset}px` }
+          : undefined}
       >
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3">
 
