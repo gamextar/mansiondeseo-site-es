@@ -136,6 +136,7 @@ export default function ChatPage() {
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
   const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
+  const [isComposerFocused, setIsComposerFocused] = useState(false);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -837,35 +838,39 @@ export default function ChatPage() {
 
       {/* Input area */}
       <div className="safe-bottom relative shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
-        <div className="flex items-end gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
+        <div className={`flex items-end gap-2 px-3 ${isComposerFocused ? 'py-2' : 'py-3'} lg:px-6 max-w-4xl lg:mx-auto transition-[padding] duration-200`}>
 
           {/* Attach photo */}
-          <button className="flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-colors border border-mansion-border/30">
+          <button className={`flex-shrink-0 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-[width,height,color,background-color] border border-mansion-border/30 ${isComposerFocused ? 'w-10 h-10' : 'w-11 h-11'}`}>
             <ImageIcon className="w-5 h-5" />
           </button>
 
           {/* Textarea + emoji */}
           <div className="flex-1 relative flex items-end">
-            <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors min-h-[44px]">
+            <div className={`flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-[min-height,border-color] ${isComposerFocused ? 'min-h-[40px]' : 'min-h-[44px]'}`}>
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={handleInputChange}
-                onBlur={stopTypingSignal}
+                onBlur={() => {
+                  stopTypingSignal();
+                  setIsComposerFocused(false);
+                }}
                 onKeyDown={handleKeyDown}
                 onFocus={() => {
                   setShowEmojis(false);
+                  setIsComposerFocused(true);
                 }}
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
                 disabled={!effectiveCanSend}
                 rows={1}
-                className="flex-1 resize-none bg-transparent py-3 px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50"
-                style={{ minHeight: '44px' }}
+                className={`flex-1 resize-none bg-transparent px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50 transition-[padding,min-height] ${isComposerFocused ? 'py-2.5' : 'py-3'}`}
+                style={{ minHeight: isComposerFocused ? '40px' : '44px' }}
               />
               <button
                 type="button"
                 onClick={() => setShowEmojis(v => !v)}
-                className={`flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center transition-colors ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
+                className={`flex-shrink-0 w-10 self-end flex items-center justify-center transition-[color,padding-bottom] ${isComposerFocused ? 'pb-2' : 'pb-2.5'} ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
               >
                 <Smile className="w-5 h-5" />
               </button>
@@ -885,7 +890,7 @@ export default function ChatPage() {
             whileTap={{ scale: 0.9 }}
             onClick={handleSend}
             disabled={!input.trim() || !effectiveCanSend}
-            className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
+            className={`flex-shrink-0 rounded-2xl flex items-center justify-center transition-all ${isComposerFocused ? 'w-10 h-10' : 'w-11 h-11'} ${
               input.trim() && effectiveCanSend
                 ? 'bg-mansion-crimson text-white shadow-glow-crimson'
                 : 'bg-mansion-elevated text-text-dim border border-mansion-border/30'
