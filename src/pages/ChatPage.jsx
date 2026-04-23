@@ -112,6 +112,8 @@ export default function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const currentUser = getStoredUser();
+  const isVipUser = Boolean(currentUser?.premium);
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
@@ -622,7 +624,7 @@ export default function ChatPage() {
         <div className="relative flex items-center gap-3 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3 lg:gap-3 lg:py-4">
           <button
             onClick={() => navigate(backTarget)}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0 lg:absolute lg:left-0 lg:top-1/2 lg:z-10 lg:w-14 lg:h-14 lg:-translate-x-[4.25rem] lg:-translate-y-1/2"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0 lg:absolute lg:left-1 lg:top-1/2 lg:z-10 lg:w-12 lg:h-12 lg:-translate-y-1/2 lg:bg-mansion-elevated/65 lg:border lg:border-mansion-border/30"
             aria-label="Volver a la lista de chats"
           >
             <ChevronLeft className="w-5 h-5 lg:w-7 lg:h-7" />
@@ -680,10 +682,16 @@ export default function ChatPage() {
               } : null,
             },
           })}>
-            <h2 className="font-semibold text-sm text-text-primary truncate lg:text-[20px]">{partner.name}</h2>
-            <p className={`text-[11px] lg:text-[14px] ${partnerTyping ? 'text-mansion-gold' : partner.online ? 'text-green-400' : 'text-text-dim'}`}>
-              {partnerTyping ? 'Escribiendo...' : partner.online ? '● En línea' : 'Desconectado'}
-            </p>
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="font-semibold text-sm text-text-primary truncate lg:text-[20px]">{partner.name}</h2>
+              <span className={`hidden sm:inline-flex flex-shrink-0 items-center gap-1.5 text-[11px] lg:text-[13px] ${partner.online ? 'text-green-400' : 'text-text-dim'}`}>
+                <span className={`w-2 h-2 rounded-full ${partner.online ? 'bg-green-400' : 'bg-text-dim/70'}`} />
+                {partner.online ? 'En línea' : 'Offline'}
+              </span>
+            </div>
+            {partnerTyping && (
+              <p className="text-[11px] text-mansion-gold lg:text-[14px]">Escribiendo...</p>
+            )}
           </div>
 
           {/* Connection status + Limit pill */}
@@ -691,14 +699,16 @@ export default function ChatPage() {
             <span className={`w-2 h-2 rounded-full ${
               wsState === 'connected' ? 'bg-green-400' : wsState === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
             }`} title={wsState === 'connected' ? 'Conectado' : wsState === 'connecting' ? 'Conectando...' : 'Desconectado'} />
-            <div className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border lg:text-[13px] lg:px-3 lg:py-1.5 ${
-              effectiveRemaining <= 2
-                ? 'bg-mansion-crimson/10 border-mansion-crimson/30 text-mansion-crimson'
-                : 'bg-mansion-gold/5 border-mansion-gold/20 text-mansion-gold'
-            }`}>
-              <Lock className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
-              <span>{effectiveRemaining}/{effectiveMax}</span>
-            </div>
+            {!isVipUser && (
+              <div className={`flex items-center gap-2 text-[12px] font-semibold px-3 py-1.5 rounded-full border lg:text-[15px] lg:px-4 lg:py-2 ${
+                effectiveRemaining <= 2
+                  ? 'bg-mansion-crimson/10 border-mansion-crimson/30 text-mansion-crimson'
+                  : 'bg-mansion-gold/8 border-mansion-gold/25 text-mansion-gold'
+              }`}>
+                <Lock className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                <span>{effectiveRemaining} mensajes restantes</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
