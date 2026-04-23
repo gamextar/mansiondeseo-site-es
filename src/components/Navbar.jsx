@@ -2,20 +2,32 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 export function MobileBrandOverlay({ hidden = false }) {
+  if (hidden) {
+    return (
+      <motion.div
+        initial={{ y: -12, opacity: 0 }}
+        animate={{ y: 0, opacity: 0 }}
+        className="fixed top-0 left-0 right-0 z-50 lg:hidden pointer-events-none"
+        style={{ paddingTop: 'var(--safe-top)' }}
+        aria-hidden="true"
+      >
+        <div className="max-w-7xl mx-auto pl-0 pr-3 h-10 flex items-center" />
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ y: -12, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className={`fixed top-0 left-0 right-0 z-50 lg:hidden ${hidden ? 'pointer-events-none opacity-0' : 'pointer-events-none'}`}
+      className="fixed top-0 left-0 right-0 z-50 lg:hidden pointer-events-none"
       style={{ paddingTop: 'var(--safe-top)' }}
-      aria-hidden={hidden ? 'true' : undefined}
+      aria-hidden={undefined}
     >
       <div className="max-w-7xl mx-auto pl-0 pr-3 h-10 flex items-center">
         <Link
           to="/feed"
-          className={`inline-flex items-center gap-2 rounded-full bg-black/28 px-2.5 py-1.5 backdrop-blur-md ${hidden ? 'pointer-events-none' : 'pointer-events-auto'}`}
-          tabIndex={hidden ? -1 : undefined}
-          aria-hidden={hidden ? 'true' : undefined}
+          className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-black/28 px-2.5 py-1.5 backdrop-blur-md"
         >
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
             <span className="font-display text-white text-xs font-bold">M</span>
