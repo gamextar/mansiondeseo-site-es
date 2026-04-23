@@ -469,6 +469,7 @@ export default function ChatPage() {
     if (headerNode) resizeObserver?.observe(headerNode);
     if (composerNode) resizeObserver?.observe(composerNode);
     window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, { passive: true });
     window.addEventListener('orientationchange', measure);
     window.addEventListener('focus', measure);
     window.addEventListener('pageshow', measure);
@@ -479,6 +480,7 @@ export default function ChatPage() {
       settleTimers.forEach((timerId) => window.clearTimeout(timerId));
       resizeObserver?.disconnect();
       window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure);
       window.removeEventListener('orientationchange', measure);
       window.removeEventListener('focus', measure);
       window.removeEventListener('pageshow', measure);
@@ -1065,7 +1067,7 @@ export default function ChatPage() {
       <div
         ref={composerRef}
         className={`${isStandaloneMobileChat ? 'safe-bottom ' : ''}sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20`}
-        style={isMobileBrowserChat && composerBottomCompensation > 0 ? { bottom: `${composerBottomCompensation}px` } : undefined}
+        style={isMobileBrowserChat && composerBottomCompensation > 0 ? { transform: `translateY(-${composerBottomCompensation}px)` } : undefined}
       >
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3">
 
