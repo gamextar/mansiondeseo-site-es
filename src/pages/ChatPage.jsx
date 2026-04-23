@@ -199,6 +199,15 @@ export default function ChatPage() {
     pendingScrollForceRef.current = force;
   }, []);
 
+  const keepChatPinnedToBottom = useCallback((behavior = 'auto') => {
+    if (!wasAtBottomRef.current) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToBottom(behavior);
+      });
+    });
+  }, [scrollToBottom]);
+
   const markMessagePopped = useCallback((messageId) => {
     if (!messageId) return;
     setPoppedMessageIds((prev) => {
@@ -643,15 +652,6 @@ export default function ChatPage() {
     setInput(nextValue);
     handleTypingInput(nextValue);
   };
-
-  const keepChatPinnedToBottom = useCallback((behavior = 'auto') => {
-    if (!wasAtBottomRef.current) return;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        scrollToBottom(behavior);
-      });
-    });
-  }, [scrollToBottom]);
 
   return (
     <>
