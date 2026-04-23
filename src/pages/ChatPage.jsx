@@ -20,6 +20,7 @@ const CHAT_CACHE_MESSAGE_LIMIT = 60;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
 const INITIAL_MOBILE_BROWSER_COMPOSER_OFFSET_PX = 40;
+const INITIAL_MOBILE_BROWSER_COMPOSER_OFFSET_SESSION_KEY = 'mansion_chat_initial_mobile_browser_offset_applied';
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -73,6 +74,24 @@ function writeChatCache(partnerId, payload) {
     }));
   } catch {
     // Silently fail
+  }
+}
+
+function hasAppliedInitialMobileBrowserComposerOffset() {
+  if (typeof window === 'undefined') return true;
+  try {
+    return sessionStorage.getItem(INITIAL_MOBILE_BROWSER_COMPOSER_OFFSET_SESSION_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markInitialMobileBrowserComposerOffsetApplied() {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(INITIAL_MOBILE_BROWSER_COMPOSER_OFFSET_SESSION_KEY, '1');
+  } catch {
+    // ignore storage failures
   }
 }
 
@@ -191,7 +210,9 @@ export default function ChatPage() {
   const [chatDebugEnabled, setChatDebugEnabled] = useState(false);
   const [chatDebugMetrics, setChatDebugMetrics] = useState(null);
   const [chatDebugSnapshots, setChatDebugSnapshots] = useState({});
-  const [applyInitialMobileBrowserComposerOffset, setApplyInitialMobileBrowserComposerOffset] = useState(() => isMobileBrowserChat);
+  const [applyInitialMobileBrowserComposerOffset, setApplyInitialMobileBrowserComposerOffset] = useState(() => (
+    isMobileBrowserChat && !hasAppliedInitialMobileBrowserComposerOffset()
+  ));
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -386,8 +407,9 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    setApplyInitialMobileBrowserComposerOffset(isMobileBrowserChat);
-  }, [isMobileBrowserChat, partnerId]);
+    if (!applyInitialMobileBrowserComposerOffset) return;
+    markInitialMobileBrowserComposerOffsetApplied();
+  }, [applyInitialMobileBrowserComposerOffset]);
 
   useEffect(() => {
     if (!chatDebugEnabled) return undefined;
