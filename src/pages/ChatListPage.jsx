@@ -426,12 +426,15 @@ export default function ChatListPage() {
   }, [navigate, fetchConversations, subscribe, applyConversationUpdate, applyLocalConversationPreview]);
   return (
     <div
-      className="min-h-mobile-browser-screen bg-mansion-base pt-[calc(var(--safe-top)+56px)] lg:pt-0 lg:pb-[84px]"
-      style={{ paddingBottom: isDesktopViewport ? undefined : navBottomOffset }}
+      className="min-h-mobile-browser-screen bg-mansion-base lg:pt-0 lg:pb-[84px]"
+      style={{
+        paddingTop: 'calc(var(--safe-top) + 16px)',
+        paddingBottom: isDesktopViewport ? undefined : navBottomOffset,
+      }}
     >
       {/* Header */}
       <motion.div
-        className="px-3 lg:px-8 pt-2 lg:pt-6 pb-3 lg:max-w-3xl lg:mx-auto"
+        className="px-3 lg:px-8 pt-0 lg:pt-6 pb-3 lg:max-w-3xl lg:mx-auto"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}

@@ -636,9 +636,9 @@ export default function ChatPage() {
       {/* Header */}
       <div
         className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 z-30"
-        style={{ paddingTop: 'calc(var(--safe-top) + 48px)' }}
+        style={{ paddingTop: 'calc(var(--safe-top) + 12px)' }}
       >
-        <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
+        <div className="flex items-center gap-3 px-3 py-2.5 lg:px-6 max-w-4xl lg:mx-auto">
           <button
             onClick={() => navigate(backTarget)}
             className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0"
@@ -691,7 +691,7 @@ export default function ChatPage() {
             const el = scrollRef.current;
             if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
-          className="h-full overflow-y-auto overscroll-y-contain px-4 pt-[calc(var(--safe-top)+127px)] pb-5 space-y-5 lg:px-6 lg:pt-24"
+          className="h-full overflow-y-auto overscroll-y-contain px-4 pt-[calc(var(--safe-top)+82px)] pb-5 space-y-5 lg:px-6 lg:pt-24"
         >
           <div
             ref={indicatorRef}
