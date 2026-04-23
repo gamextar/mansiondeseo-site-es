@@ -144,7 +144,9 @@ const staticHomeHtml = `<!doctype html>
       try {
         var hasToken = !!localStorage.getItem('mansion_token');
         var registered = localStorage.getItem('mansion_registered') === 'true';
-        if (hasToken || registered) location.replace('/feed/');
+        var path = location.pathname || '/';
+        var isHomePath = path === '/' || path === '/index.html';
+        if (isHomePath && (hasToken || registered)) location.replace('/feed/');
       } catch (_) {}
     })();
   </script>
