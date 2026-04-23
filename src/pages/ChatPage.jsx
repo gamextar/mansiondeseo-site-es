@@ -683,13 +683,7 @@ export default function ChatPage() {
     handleTypingInput(nextValue);
   };
 
-  const isStandaloneMode = typeof window !== 'undefined' && (
-    window.matchMedia?.('(display-mode: standalone)')?.matches ||
-    window.navigator.standalone === true
-  );
-  const composerKeyboardOffset = isStandaloneMode && isComposerFocused ? keyboardInset : 0;
-  const composerVisibleHeight = isComposerFocused ? 58 : 84;
-  const composerMessagesPadding = Math.max(20, composerKeyboardOffset + composerVisibleHeight + 12);
+  const composerMessagesPadding = isComposerFocused ? 12 : 20;
 
   return (
     <>
@@ -897,7 +891,7 @@ export default function ChatPage() {
       {/* Input area */}
       <div
         className="safe-bottom shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 transition-[padding-bottom,transform] duration-200"
-        style={isComposerFocused ? { paddingBottom: '2px', transform: composerKeyboardOffset ? `translateY(-${composerKeyboardOffset}px)` : undefined } : undefined}
+        style={isComposerFocused ? { paddingBottom: '2px' } : undefined}
       >
         <div className={`flex items-end gap-2 px-3 lg:px-6 max-w-4xl lg:mx-auto ${isComposerFocused ? 'py-1' : 'py-3'}`}>
 
