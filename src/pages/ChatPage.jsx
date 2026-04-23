@@ -261,28 +261,39 @@ export default function ChatPage() {
     scheduleTypingStop();
   }, [scheduleTypingStop, stopTypingSignal]);
 
+  const syncViewportMetrics = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const vv = window.visualViewport;
+    setViewportHeight(Math.round(vv?.height || window.innerHeight));
+    setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
-
-    const updateViewport = () => {
-      const vv = window.visualViewport;
-      setViewportHeight(Math.round(vv?.height || window.innerHeight));
-      setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
+    const settleTimers = [];
+    const settleViewport = () => {
+      syncViewportMetrics();
+      settleTimers.push(setTimeout(syncViewportMetrics, 40));
+      settleTimers.push(setTimeout(syncViewportMetrics, 180));
+      settleTimers.push(setTimeout(syncViewportMetrics, 420));
     };
 
-    updateViewport();
+    settleViewport();
 
     const vv = window.visualViewport;
-    window.addEventListener('resize', updateViewport);
-    vv?.addEventListener('resize', updateViewport);
-    vv?.addEventListener('scroll', updateViewport);
+    window.addEventListener('resize', settleViewport);
+    window.addEventListener('pageshow', settleViewport);
+    vv?.addEventListener('resize', settleViewport);
+    vv?.addEventListener('scroll', settleViewport);
 
     return () => {
-      window.removeEventListener('resize', updateViewport);
-      vv?.removeEventListener('resize', updateViewport);
-      vv?.removeEventListener('scroll', updateViewport);
+      settleTimers.forEach((timer) => clearTimeout(timer));
+      window.removeEventListener('resize', settleViewport);
+      window.removeEventListener('pageshow', settleViewport);
+      vv?.removeEventListener('resize', settleViewport);
+      vv?.removeEventListener('scroll', settleViewport);
     };
-  }, []);
+  }, [syncViewportMetrics]);
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -877,10 +888,18 @@ export default function ChatPage() {
                 ref={inputRef}
                 value={input}
                 onChange={handleInputChange}
-                onBlur={stopTypingSignal}
+                onBlur={() => {
+                  stopTypingSignal();
+                  syncViewportMetrics();
+                  setTimeout(() => {
+                    syncViewportMetrics();
+                    keepChatPinnedToBottom('auto');
+                  }, 120);
+                }}
                 onKeyDown={handleKeyDown}
                 onFocus={() => {
                   setShowEmojis(false);
+                  syncViewportMetrics();
                   keepChatPinnedToBottom('auto');
                 }}
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
