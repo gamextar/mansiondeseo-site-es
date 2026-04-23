@@ -24,6 +24,22 @@ function getChatCacheKey(partnerId) {
   return `${CHAT_CACHE_PREFIX}${partnerId}`;
 }
 
+function readViewportMetrics() {
+  if (typeof window === 'undefined') {
+    return { height: null, offsetTop: 0 };
+  }
+
+  const vv = window.visualViewport;
+  const visualHeight = Math.round(vv?.height || 0);
+  const innerHeight = Math.round(window.innerHeight || 0);
+  const candidates = [visualHeight, innerHeight].filter((value) => value > 0);
+
+  return {
+    height: candidates.length > 0 ? Math.min(...candidates) : null,
+    offsetTop: Math.max(0, Math.round(vv?.offsetTop || 0)),
+  };
+}
+
 function normalizeMessages(messages = []) {
   return messages.map((message) => ({
     ...message,
@@ -127,8 +143,8 @@ export default function ChatPage() {
   const [showEmojis, setShowEmojis] = useState(false);
   const [wsState, setWsState] = useState('disconnected');
   const [partnerTyping, setPartnerTyping] = useState(false);
-  const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
-  const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(() => readViewportMetrics().height);
+  const [viewportOffsetTop, setViewportOffsetTop] = useState(() => readViewportMetrics().offsetTop);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -246,28 +262,48 @@ export default function ChatPage() {
     scheduleTypingStop();
   }, [scheduleTypingStop, stopTypingSignal]);
 
-  useEffect(() => {
+  const syncViewport = useCallback(() => {
     if (typeof window === 'undefined') return undefined;
 
-    const updateViewport = () => {
-      const vv = window.visualViewport;
-      setViewportHeight(Math.round(vv?.height || window.innerHeight));
-      setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
-    };
+    const nextViewport = readViewportMetrics();
+    setViewportHeight((current) => (current === nextViewport.height ? current : nextViewport.height));
+    setViewportOffsetTop((current) => (current === nextViewport.offsetTop ? current : nextViewport.offsetTop));
+  }, []);
+
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    let rafA = 0;
+    let rafB = 0;
+    const updateViewport = () => syncViewport();
+    const timers = [80, 180, 360].map((delay) => window.setTimeout(updateViewport, delay));
 
     updateViewport();
+    rafA = window.requestAnimationFrame(() => {
+      updateViewport();
+      rafB = window.requestAnimationFrame(updateViewport);
+    });
 
     const vv = window.visualViewport;
     window.addEventListener('resize', updateViewport);
+    window.addEventListener('orientationchange', updateViewport);
+    window.addEventListener('focus', updateViewport);
+    window.addEventListener('pageshow', updateViewport);
     vv?.addEventListener('resize', updateViewport);
     vv?.addEventListener('scroll', updateViewport);
 
     return () => {
+      if (rafA) window.cancelAnimationFrame(rafA);
+      if (rafB) window.cancelAnimationFrame(rafB);
+      timers.forEach((timerId) => window.clearTimeout(timerId));
       window.removeEventListener('resize', updateViewport);
+      window.removeEventListener('orientationchange', updateViewport);
+      window.removeEventListener('focus', updateViewport);
+      window.removeEventListener('pageshow', updateViewport);
       vv?.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('scroll', updateViewport);
     };
-  }, []);
+  }, [partnerId, syncViewport]);
 
   useEffect(() => {
     const token = getToken();
@@ -612,7 +648,11 @@ export default function ChatPage() {
     <DesktopSidebar />
     <div
       className="min-h-screen h-[100dvh] bg-mansion-base flex flex-col overflow-hidden lg:pl-64 xl:pl-72"
-      style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
+      style={viewportHeight ? {
+        height: `${viewportHeight}px`,
+        minHeight: `${viewportHeight}px`,
+        maxHeight: `${viewportHeight}px`,
+      } : undefined}
     >
       {/* Header */}
       <div
@@ -824,7 +864,10 @@ export default function ChatPage() {
                 onChange={handleInputChange}
                 onBlur={stopTypingSignal}
                 onKeyDown={handleKeyDown}
-                onFocus={() => setShowEmojis(false)}
+                onFocus={() => {
+                  setShowEmojis(false);
+                  syncViewport();
+                }}
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
                 disabled={!effectiveCanSend}
                 rows={1}
