@@ -125,7 +125,7 @@ export default function BottomNav({ immersive = false }) {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-none"
+      className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex justify-center pointer-events-auto"
       style={{
         bottom: isStandaloneMobileApp ? `${visualOffsetPx}px` : '0px',
         paddingBottom: isStandaloneMobileApp
@@ -134,6 +134,7 @@ export default function BottomNav({ immersive = false }) {
         paddingLeft: outerSidePadding,
         paddingRight: outerSidePadding,
         isolation: 'isolate',
+        touchAction: 'manipulation',
       }}
     >
       {showNavDebug && (
@@ -195,14 +196,19 @@ export default function BottomNav({ immersive = false }) {
                   }
                   navigateAfterScrollReset(to);
                 }}
-                className="relative flex h-full shrink-0 flex-col items-center justify-center group"
-                style={{ touchAction: 'manipulation', width: isStandaloneMobileApp ? 76 : 70 }}
+                className="relative flex h-full shrink-0 flex-col items-center justify-center group pointer-events-auto select-none"
+                style={{
+                  touchAction: 'manipulation',
+                  WebkitTouchCallout: 'none',
+                  WebkitUserSelect: 'none',
+                  width: isStandaloneMobileApp ? 76 : 70,
+                }}
               >
                 {isActive && (
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <motion.div
                       layoutId="bottomnav-indicator"
-                      className="rounded-[1.55rem] bg-white/[0.08]"
+                      className="rounded-[1.55rem] bg-white/[0.08] pointer-events-none"
                       style={{ width: activeIndicatorSize, height: activeIndicatorSize }}
                       transition={{ type: 'spring', stiffness: 420, damping: 32 }}
                     />
