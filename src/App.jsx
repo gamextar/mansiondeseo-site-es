@@ -285,16 +285,16 @@ function AppLayout() {
     !routeOverlayOpen &&
     normalizedRoutePath !== '/feed' &&
     normalizedRoutePath !== '/explorar' &&
+    normalizedRoutePath !== '/mensajes' &&
+    !normalizedRoutePath.startsWith('/mensajes/') &&
     normalizedRoutePath !== '/videos' &&
-    (immersiveMobileApp || isChatDetail);
+    immersiveMobileApp;
   const restoreHiddenMobileOverlayShim =
     isMobileViewport &&
     !routeOverlayOpen &&
     (
       normalizedRoutePath === '/perfil' ||
-      isPublicProfileRoute ||
-      normalizedRoutePath === '/mensajes' ||
-      normalizedRoutePath.startsWith('/mensajes/')
+      isPublicProfileRoute
     );
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const showTopNavbar = showChrome && !routeOverlayOpen && !immersiveMobileApp;
@@ -453,8 +453,6 @@ function AppLayout() {
       isMobileViewport &&
       (
         normalizedRoutePath === '/perfil' ||
-        normalizedRoutePath === '/mensajes' ||
-        normalizedRoutePath.startsWith('/mensajes/') ||
         isMobileBrowserPublicProfileRoute
       );
 
