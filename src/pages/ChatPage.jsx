@@ -813,6 +813,8 @@ export default function ChatPage() {
                 ref={inputRef}
                 value={input}
                 autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
                 onChange={handleInputChange}
                 onBlur={stopTypingSignal}
                 onKeyDown={handleKeyDown}
