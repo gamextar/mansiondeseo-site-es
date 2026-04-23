@@ -51,7 +51,7 @@ const PagoMonedasExitosoPage = lazy(lazyWithRetry(() => import('./pages/PagoMone
 const StoryUploadPage = lazy(lazyWithRetry(() => import('./pages/StoryUploadPage'), 'mansion-lazy-retry:story-upload'));
 const TopVisitedPage = lazy(lazyWithRetry(() => import('./pages/TopVisitedPage'), 'mansion-lazy-retry:top-visited'));
 const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage'), 'mansion-lazy-retry:video-lab'));
-const VideoFeedPage = lazy(() => preloadVideoFeedChunk());
+const VideoFeedPage = lazy(lazyWithRetry(() => preloadVideoFeedChunk(), 'mansion-lazy-retry:video-feed'));
 const NON_DEFAULT_ROUTE_LOCALES = getRouteEnabledSeoLocales().filter((locale) => locale.pathPrefix);
 const MOBILE_BROWSER_IMMERSIVE_SCROLL_OFFSET = 68;
 const MOBILE_PUBLIC_PROFILE_SCROLL_ELASTIC_MAX_PX = 48;

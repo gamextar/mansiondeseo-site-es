@@ -11,7 +11,10 @@ function markVideoFeedPrefetched() {
 
 export function preloadVideoFeedChunk() {
   if (!videoFeedChunkPromise) {
-    videoFeedChunkPromise = import('../pages/VideoFeedPage');
+    videoFeedChunkPromise = import('../pages/VideoFeedPage').catch((error) => {
+      videoFeedChunkPromise = null;
+      throw error;
+    });
     markVideoFeedPrefetched();
   }
   return videoFeedChunkPromise;
@@ -19,7 +22,10 @@ export function preloadVideoFeedChunk() {
 
 export function preloadVideoFeedData() {
   if (!videoFeedDataPromise) {
-    videoFeedDataPromise = getStories().catch(() => null);
+    videoFeedDataPromise = getStories().catch((error) => {
+      videoFeedDataPromise = null;
+      throw error;
+    }).catch(() => null);
     markVideoFeedPrefetched();
   }
   return videoFeedDataPromise;
