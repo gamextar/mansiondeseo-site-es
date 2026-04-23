@@ -1097,7 +1097,7 @@ export default function FeedPage({ initialData }) {
         <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
       {!isDesktopViewport && (
-        <div className="px-0 pr-3 min-h-[42px] pb-0.5 flex items-center justify-between gap-3 fade-in-up">
+        <div className="px-0 pr-3 min-h-[47px] pb-0.5 flex items-center justify-between gap-3 fade-in-up">
           <button
             type="button"
             onClick={() => navigate('/feed')}
@@ -1113,7 +1113,7 @@ export default function FeedPage({ initialData }) {
               Mansion Deseo
             </span>
           </button>
-          <div className="flex items-center justify-end gap-1.5 pr-2">
+          <div className="relative top-px flex items-center justify-end gap-1.5 pr-2">
             <Radio className="w-4 h-4 text-mansion-crimson" />
             <p className="text-text-muted text-sm font-medium leading-none">Video Cards</p>
           </div>
