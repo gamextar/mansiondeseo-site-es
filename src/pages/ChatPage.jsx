@@ -500,7 +500,7 @@ export default function ChatPage() {
         });
       });
     }
-  }, [messages, scrollToBottom]);
+  }, [messages, partnerTyping, scrollToBottom]);
 
   useLayoutEffect(() => {
     if (!wasAtBottomRef.current) return;
@@ -509,10 +509,12 @@ export default function ChatPage() {
     });
   }, [viewportHeight, headerHeight, composerHeight, scrollToBottom]);
 
-  useEffect(() => {
-    if (!partnerTyping || !wasAtBottomRef.current) return;
-    requestScrollToBottom('smooth');
-  }, [partnerTyping]);
+  useLayoutEffect(() => {
+    if (!wasAtBottomRef.current) return;
+    requestAnimationFrame(() => {
+      scrollToBottom(partnerTyping ? 'smooth' : 'auto');
+    });
+  }, [partnerTyping, scrollToBottom]);
 
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
