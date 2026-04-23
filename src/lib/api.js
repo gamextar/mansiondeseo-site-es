@@ -1174,23 +1174,25 @@ export async function adminResetAllCoins() {
 
 // ── Admin: Users ────────────────────────────────────────
 
-export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', role = '', status = '', duplicate = '' } = {}) {
+export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', role = '', status = '', duplicate = '', created = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (q) params.set('q', q);
   if (fake === '1' || fake === '0') params.set('fake', fake);
   if (['mujer', 'hombre', 'pareja'].includes(role)) params.set('role', role);
   if (['active', 'under_review', 'suspended'].includes(status)) params.set('status', status);
   if (duplicate === '1' || duplicate === '0') params.set('duplicate', duplicate);
+  if (['1d', '7d', '30d'].includes(created)) params.set('created', created);
   return apiFetch(`/admin/users?${params}`);
 }
 
-export async function adminGetUserIds({ q = '', fake = '', role = '', status = '', duplicate = '' } = {}) {
+export async function adminGetUserIds({ q = '', fake = '', role = '', status = '', duplicate = '', created = '' } = {}) {
   const params = new URLSearchParams();
   if (q) params.set('q', q);
   if (fake === '1' || fake === '0') params.set('fake', fake);
   if (['mujer', 'hombre', 'pareja'].includes(role)) params.set('role', role);
   if (['active', 'under_review', 'suspended'].includes(status)) params.set('status', status);
   if (duplicate === '1' || duplicate === '0') params.set('duplicate', duplicate);
+  if (['1d', '7d', '30d'].includes(created)) params.set('created', created);
   return apiFetch(`/admin/users/ids?${params}`);
 }
 

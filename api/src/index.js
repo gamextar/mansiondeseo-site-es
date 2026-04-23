@@ -4432,6 +4432,7 @@ async function handleAdminGetUsers(request, env) {
   const duplicateFilter = url.searchParams.get('duplicate');
   const roleFilter = (url.searchParams.get('role') || '').trim();
   const statusFilter = (url.searchParams.get('status') || '').trim();
+  const createdFilter = (url.searchParams.get('created') || '').trim();
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
@@ -4470,6 +4471,12 @@ async function handleAdminGetUsers(request, env) {
   if (statusFilter === 'active' || statusFilter === 'under_review' || statusFilter === 'suspended') {
     filters.push("COALESCE(account_status, 'active') = ?");
     bindings.push(statusFilter);
+  }
+
+  if (createdFilter === '1d' || createdFilter === '7d' || createdFilter === '30d') {
+    const days = createdFilter === '1d' ? 1 : createdFilter === '7d' ? 7 : 30;
+    filters.push(`created_at >= datetime('now', ?)`);
+    bindings.push(`-${days} days`);
   }
 
   if (filters.length > 0) {
@@ -4527,6 +4534,7 @@ async function handleAdminGetUserIds(request, env) {
   const duplicateFilter = url.searchParams.get('duplicate');
   const roleFilter = (url.searchParams.get('role') || '').trim();
   const statusFilter = (url.searchParams.get('status') || '').trim();
+  const createdFilter = (url.searchParams.get('created') || '').trim();
 
   let query = 'SELECT id, fake FROM users';
   const filters = [];
@@ -4558,6 +4566,12 @@ async function handleAdminGetUserIds(request, env) {
   if (statusFilter === 'active' || statusFilter === 'under_review' || statusFilter === 'suspended') {
     filters.push("COALESCE(account_status, 'active') = ?");
     bindings.push(statusFilter);
+  }
+
+  if (createdFilter === '1d' || createdFilter === '7d' || createdFilter === '30d') {
+    const days = createdFilter === '1d' ? 1 : createdFilter === '7d' ? 7 : 30;
+    filters.push(`created_at >= datetime('now', ?)`);
+    bindings.push(`-${days} days`);
   }
 
   if (filters.length > 0) {
