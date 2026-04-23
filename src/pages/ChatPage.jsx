@@ -688,7 +688,8 @@ export default function ChatPage() {
     window.navigator.standalone === true
   );
   const composerKeyboardOffset = isStandaloneMode && isComposerFocused ? keyboardInset : 0;
-  const composerMessagesPadding = isComposerFocused ? Math.max(8, composerKeyboardOffset + 8) : 20;
+  const composerVisibleHeight = isComposerFocused ? 58 : 84;
+  const composerMessagesPadding = Math.max(20, composerKeyboardOffset + composerVisibleHeight + 12);
 
   return (
     <>
