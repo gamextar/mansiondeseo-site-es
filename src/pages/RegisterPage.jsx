@@ -1399,7 +1399,7 @@ function StepPhoto({ photoFile, onPhotoSelect }) {
 // Email Verification Screen
 // ────────────────────────────────────────────
 
-function VerificationScreen({ email, devCode, emailDeliveryPending = false, onVerified, onResend }) {
+function VerificationScreen({ email, devCode, onVerified, onResend }) {
   const [code, setCode] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState('');
@@ -1472,20 +1472,6 @@ function VerificationScreen({ email, devCode, emailDeliveryPending = false, onVe
       >
         Hemos enviado un código de 6 dígitos a <span className="text-mansion-gold font-medium">{email}</span>
       </motion.p>
-
-      {emailDeliveryPending && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          className="mb-6 max-w-sm rounded-2xl border border-mansion-gold/20 bg-mansion-gold/8 px-4 py-3 text-left"
-        >
-          <p className="flex items-start gap-2 text-xs text-text-muted">
-            <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-mansion-gold" />
-            <span>Te mostramos esta pantalla primero mientras terminamos de enviar el código. Si no llega enseguida, podés reenviarlo acá mismo.</span>
-          </p>
-        </motion.div>
-      )}
 
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -1922,7 +1908,6 @@ export default function RegisterPage() {
         <VerificationScreen
           email={email}
           devCode={devCode}
-          emailDeliveryPending={emailDeliveryPending}
           onVerified={handleVerified}
           onResend={async () => {
             const res = await apiResendCode(email);
