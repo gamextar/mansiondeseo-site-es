@@ -20,6 +20,14 @@ const CHAT_CACHE_MESSAGE_LIMIT = 60;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
 
+function detectStandaloneMobile() {
+  if (typeof window === 'undefined') return false;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const ua = window.navigator.userAgent || '';
+  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+  return Boolean(standalone && isMobile);
+}
+
 function getChatCacheKey(partnerId) {
   return `${CHAT_CACHE_PREFIX}${partnerId}`;
 }
@@ -117,6 +125,9 @@ export default function ChatPage() {
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
+  const isMobileBrowserChat = typeof window !== 'undefined'
+    ? window.matchMedia('(max-width: 1023px)').matches && !detectStandaloneMobile()
+    : false;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
   const [input, setInput] = useState('');
@@ -266,7 +277,13 @@ export default function ChatPage() {
 
     const updateViewport = () => {
       const vv = window.visualViewport;
-      setViewportHeight(Math.round(vv?.height || window.innerHeight));
+      const vvHeight = Math.round(vv?.height || window.innerHeight || 0);
+      const innerHeight = Math.round(window.innerHeight || vvHeight || 0);
+      const docHeight = Math.round(document.documentElement?.clientHeight || innerHeight || 0);
+      const nextHeight = isMobileBrowserChat
+        ? Math.min(vvHeight || innerHeight, innerHeight, docHeight)
+        : (vvHeight || innerHeight);
+      setViewportHeight(nextHeight);
       setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
     };
 
@@ -274,15 +291,21 @@ export default function ChatPage() {
 
     const vv = window.visualViewport;
     window.addEventListener('resize', updateViewport);
+    window.addEventListener('orientationchange', updateViewport);
+    window.addEventListener('focus', updateViewport);
+    window.addEventListener('pageshow', updateViewport);
     vv?.addEventListener('resize', updateViewport);
     vv?.addEventListener('scroll', updateViewport);
 
     return () => {
       window.removeEventListener('resize', updateViewport);
+      window.removeEventListener('orientationchange', updateViewport);
+      window.removeEventListener('focus', updateViewport);
+      window.removeEventListener('pageshow', updateViewport);
       vv?.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('scroll', updateViewport);
     };
-  }, []);
+  }, [isMobileBrowserChat]);
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return undefined;
