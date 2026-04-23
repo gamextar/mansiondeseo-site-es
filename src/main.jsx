@@ -9,6 +9,8 @@ import {
 import { SITE_CONFIG } from './lib/siteConfig'
 
 const ASSET_RECOVERY_KEY = 'mansion-asset-recovery-reload';
+const SW_MIGRATION_KEY = 'mansion-sw-migration';
+const SW_MIGRATION_VERSION = 'v10-app-shell-fallback';
 
 function isRecoverableAssetUrl(url) {
   const value = String(url || '');
@@ -113,7 +115,26 @@ if (typeof window !== 'undefined') {
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    void (async () => {
+      try {
+        const currentMigration = localStorage.getItem(SW_MIGRATION_KEY);
+        if (currentMigration !== SW_MIGRATION_VERSION) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((registration) => registration.unregister()));
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(
+              keys
+                .filter((key) => key.startsWith('mansion-'))
+                .map((key) => caches.delete(key))
+            );
+          }
+          localStorage.setItem(SW_MIGRATION_KEY, SW_MIGRATION_VERSION);
+        }
+      } catch {}
+
+      navigator.serviceWorker.register(`/sw.js?${SW_MIGRATION_VERSION}`).catch(() => {});
+    })();
   });
 }
 
