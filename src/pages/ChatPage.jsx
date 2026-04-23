@@ -145,6 +145,7 @@ export default function ChatPage() {
   const initialHistoryLoadedRef = useRef(false);
   const historyFallbackTimerRef = useRef(null);
   const suppressTypingUntilRef = useRef(0);
+  const viewportSyncRafRef = useRef(0);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
@@ -273,7 +274,7 @@ export default function ChatPage() {
 
     const updateViewport = () => {
       const vv = window.visualViewport;
-      setViewportHeight(Math.round(vv?.height || window.innerHeight));
+      setViewportHeight(Math.round((vv?.height || window.innerHeight) + Math.max(0, vv?.offsetTop || 0)));
 
       const activeElement = document.activeElement;
       const inputFocused = activeElement === inputRef.current;
@@ -281,7 +282,11 @@ export default function ChatPage() {
 
       const root = document.documentElement;
       const body = document.body;
-      window.requestAnimationFrame(() => {
+      const docScrollTop = Math.max(window.scrollY || 0, root.scrollTop || 0, body?.scrollTop || 0);
+      if (docScrollTop <= 1) return;
+
+      window.cancelAnimationFrame(viewportSyncRafRef.current);
+      viewportSyncRafRef.current = window.requestAnimationFrame(() => {
         window.scrollTo(0, 0);
         root.scrollTop = 0;
         if (body) body.scrollTop = 0;
@@ -293,10 +298,13 @@ export default function ChatPage() {
     const vv = window.visualViewport;
     window.addEventListener('resize', updateViewport);
     vv?.addEventListener('resize', updateViewport);
+    vv?.addEventListener('scroll', updateViewport);
 
     return () => {
+      window.cancelAnimationFrame(viewportSyncRafRef.current);
       window.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('scroll', updateViewport);
     };
   }, []);
 
@@ -800,7 +808,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input area */}
-      <div className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
+      <div className="safe-bottom relative shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
         <div className="flex items-end gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
 
           {/* Attach photo */}
@@ -819,13 +827,6 @@ export default function ChatPage() {
                 onKeyDown={handleKeyDown}
                 onFocus={() => {
                   setShowEmojis(false);
-                  window.requestAnimationFrame(() => {
-                    const root = document.documentElement;
-                    const body = document.body;
-                    window.scrollTo(0, 0);
-                    root.scrollTop = 0;
-                    if (body) body.scrollTop = 0;
-                  });
                 }}
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
                 disabled={!effectiveCanSend}
