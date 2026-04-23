@@ -59,6 +59,19 @@ if (typeof window !== 'undefined' && SITE_CONFIG.redirectHosts.includes(window.l
   window.location.replace(canonicalUrl);
 }
 
+if (typeof window !== 'undefined') {
+  const currentPath = window.location.pathname || '/';
+  if (currentPath === '/app' || currentPath === '/app/') {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const redirectTarget = params.get('redirect');
+      if (redirectTarget && redirectTarget.startsWith('/')) {
+        window.history.replaceState({}, '', redirectTarget);
+      }
+    } catch {}
+  }
+}
+
 if (typeof document !== 'undefined') {
   // Keep the shell dark even before CSS assets finish loading.
   document.documentElement.style.backgroundColor = '#08080E';

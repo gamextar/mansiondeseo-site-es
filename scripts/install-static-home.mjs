@@ -146,7 +146,14 @@ const staticHomeHtml = `<!doctype html>
         var registered = localStorage.getItem('mansion_registered') === 'true';
         var path = location.pathname || '/';
         var isHomePath = path === '/' || path === '/index.html';
-        if (isHomePath && (hasToken || registered)) location.replace('/feed/');
+        if (hasToken || registered) {
+          if (isHomePath) {
+            location.replace('/feed/');
+            return;
+          }
+          var deepTarget = path + (location.search || '') + (location.hash || '');
+          location.replace('/app/?redirect=' + encodeURIComponent(deepTarget));
+        }
       } catch (_) {}
     })();
   </script>
