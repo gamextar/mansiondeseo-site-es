@@ -12,11 +12,12 @@ import {
   getBottomNavVisualOffset,
 } from '../lib/bottomNavConfig';
 import { warmVideoFeed } from '../lib/videoFeedWarmup';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
 const HOME_FEED_ROUTES = ['/', '/feed'];
+const HIDDEN_PATHS = ['/bienvenida', '/registro', '/login'];
 
 const NAV_ITEMS = [
   { to: '/feed', icon: Home, label: 'Inicio' },
@@ -50,7 +51,6 @@ export default function BottomNav({ immersive = false }) {
   const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
   const { user } = useAuth();
-  const pendingNavResetRef = useRef(null);
   const lastTouchNavRef = useRef({ to: '', at: 0 });
   const isStandaloneMobileApp = detectStandaloneMobile();
   const effectiveNavHeight = getBottomNavHeight(isStandaloneMobileApp);
@@ -64,13 +64,6 @@ export default function BottomNav({ immersive = false }) {
   const blurAmount = BOTTOM_NAV_OPACITY <= 0 ? '0px' : `${BOTTOM_NAV_BLUR}px`;
   const showNavDebug = new URLSearchParams(location.search).get('nav_debug') === '1';
 
-  useEffect(() => () => {
-    if (!pendingNavResetRef.current || typeof window === 'undefined') return;
-    if (pendingNavResetRef.current.rafId) window.cancelAnimationFrame(pendingNavResetRef.current.rafId);
-    if (pendingNavResetRef.current.timeoutId) window.clearTimeout(pendingNavResetRef.current.timeoutId);
-    pendingNavResetRef.current = null;
-  }, []);
-
   const handleNavIntent = (to, { isActive, isHomeRoute }) => {
     if (to === '/feed' && isHomeRoute) {
       window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT));
@@ -83,19 +76,13 @@ export default function BottomNav({ immersive = false }) {
     if (to === '/feed') {
       try { localStorage.removeItem('mansion_feed'); } catch {}
     }
-    navigateAfterScrollReset(to);
+    navigateWithScrollReset(to);
   };
 
-  const navigateAfterScrollReset = (to) => {
+  const navigateWithScrollReset = (to) => {
     if (typeof window === 'undefined') {
       navigate(to);
       return;
-    }
-
-    if (pendingNavResetRef.current) {
-      if (pendingNavResetRef.current.rafId) window.cancelAnimationFrame(pendingNavResetRef.current.rafId);
-      if (pendingNavResetRef.current.timeoutId) window.clearTimeout(pendingNavResetRef.current.timeoutId);
-      pendingNavResetRef.current = null;
     }
 
     if (isStandaloneMobileApp) {
@@ -106,8 +93,7 @@ export default function BottomNav({ immersive = false }) {
   };
 
   // Hide on landing/onboarding/register/login
-  const hiddenPaths = ['/bienvenida', '/registro', '/login'];
-  if (hiddenPaths.some((p) => location.pathname.startsWith(p))) return null;
+  if (HIDDEN_PATHS.some((p) => location.pathname.startsWith(p))) return null;
 
   return (
     <nav
