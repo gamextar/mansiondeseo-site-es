@@ -108,6 +108,13 @@ function updateConversationPreviewCache(partnerId, partner, message) {
   }
 }
 
+function detectStandaloneMobile() {
+  if (typeof window === 'undefined') return false;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const isMobile = window.matchMedia?.('(max-width: 1023px)')?.matches ?? false;
+  return Boolean(standalone && isMobile);
+}
+
 export default function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -128,6 +135,7 @@ export default function ChatPage() {
   const [wsState, setWsState] = useState('disconnected');
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
+  const [isStandaloneMobileApp, setIsStandaloneMobileApp] = useState(() => detectStandaloneMobile());
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -271,9 +279,29 @@ export default function ChatPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
+    const updateStandalone = () => {
+      setIsStandaloneMobileApp(detectStandaloneMobile());
+    };
+
+    updateStandalone();
+    window.addEventListener('resize', updateStandalone);
+    window.addEventListener('orientationchange', updateStandalone);
+    window.addEventListener('pageshow', updateStandalone);
+
+    return () => {
+      window.removeEventListener('resize', updateStandalone);
+      window.removeEventListener('orientationchange', updateStandalone);
+      window.removeEventListener('pageshow', updateStandalone);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
     const updateViewport = () => {
       const vv = window.visualViewport;
-      setViewportHeight(Math.round(vv?.height || window.innerHeight));
+      const offsetTop = isStandaloneMobileApp ? 0 : Math.max(0, vv?.offsetTop || 0);
+      setViewportHeight(Math.round((vv?.height || window.innerHeight) + offsetTop));
     };
 
     updateViewport();
@@ -284,6 +312,7 @@ export default function ChatPage() {
     window.addEventListener('pageshow', updateViewport);
     window.addEventListener('focus', updateViewport);
     vv?.addEventListener('resize', updateViewport);
+    vv?.addEventListener('scroll', updateViewport);
 
     return () => {
       window.removeEventListener('resize', updateViewport);
@@ -291,8 +320,9 @@ export default function ChatPage() {
       window.removeEventListener('pageshow', updateViewport);
       window.removeEventListener('focus', updateViewport);
       vv?.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('scroll', updateViewport);
     };
-  }, []);
+  }, [isStandaloneMobileApp]);
 
   useEffect(() => {
     const token = getToken();
@@ -643,7 +673,7 @@ export default function ChatPage() {
     <>
     <DesktopSidebar />
     <div
-      className="bg-mansion-base lg:pl-64 xl:pl-72"
+      className="bg-mansion-base overflow-hidden lg:pl-64 xl:pl-72"
       style={viewportHeight ? { minHeight: `${viewportHeight}px`, height: `${viewportHeight}px` } : undefined}
     >
       <div className="mx-auto flex h-full max-w-4xl flex-col overflow-hidden lg:border-x lg:border-mansion-border/20">
@@ -813,6 +843,7 @@ export default function ChatPage() {
                 ref={inputRef}
                 value={input}
                 autoComplete="off"
+                autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
                 onChange={handleInputChange}
