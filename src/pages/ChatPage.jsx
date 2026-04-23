@@ -463,7 +463,7 @@ export default function ChatPage() {
       ? new ResizeObserver(() => measure())
       : null;
     const settleTimers = isMobileBrowserChat && !composerBottomSettledRef.current
-      ? [60, 140, 260, 420, 720, 1100].map((delay) => window.setTimeout(measure, delay))
+      ? [60, 140, 260, 420, 720, 1100, 1600, 2200].map((delay) => window.setTimeout(measure, delay))
       : [];
 
     if (headerNode) resizeObserver?.observe(headerNode);
@@ -962,7 +962,7 @@ export default function ChatPage() {
           className="h-full overflow-y-auto overscroll-y-contain px-[5vw] lg:px-[4vw]"
           style={{
             paddingTop: `${headerHeight + 14}px`,
-            paddingBottom: '12px',
+            paddingBottom: `${12 + (isMobileBrowserChat ? composerBottomCompensation : 0)}px`,
           }}
         >
           <div
