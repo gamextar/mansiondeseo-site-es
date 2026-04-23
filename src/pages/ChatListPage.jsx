@@ -221,9 +221,6 @@ export default function ChatListPage() {
   const cols = useGridColumns();
   const isDesktopViewport = cols >= 4;
   const isStandaloneMobileApp = detectStandaloneMobile();
-  const isMobileBrowserChatList = typeof window !== 'undefined'
-    ? window.matchMedia('(max-width: 1023px)').matches && !isStandaloneMobileApp
-    : false;
   const navBottomOffset = getBottomNavPagePadding(isStandaloneMobileApp);
   const cachedState = getCachedConversations();
   const [conversations, setConversations] = useState(cachedState.conversations);
@@ -234,25 +231,6 @@ export default function ChatListPage() {
   const lastSyncAtRef = useRef(cachedState.timestamp || 0);
   const navigate = useNavigate();
   const { refresh: refreshUnread, subscribe, decrementUnread } = useUnreadMessages();
-
-  useEffect(() => {
-    if (!isMobileBrowserChatList || typeof window === 'undefined' || typeof document === 'undefined') return undefined;
-
-    const resetViewport = () => {
-      const activeElement = document.activeElement;
-      if (activeElement instanceof HTMLElement) activeElement.blur();
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      if (document.body) document.body.scrollTop = 0;
-      window.dispatchEvent(new Event('resize'));
-    };
-
-    resetViewport();
-    const timers = [80, 180, 320].map((delay) => window.setTimeout(resetViewport, delay));
-    return () => {
-      timers.forEach((timerId) => window.clearTimeout(timerId));
-    };
-  }, [isMobileBrowserChatList]);
 
   // Optimistically mark a conversation as read in local state + cache + global badge
   const markConversationRead = useCallback((profileId) => {

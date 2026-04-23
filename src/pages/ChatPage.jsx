@@ -119,7 +119,6 @@ function updateConversationPreviewCache(partnerId, partner, message) {
 function readChatDebugMetrics({
   viewportHeight,
   viewportOffsetTop,
-  composerBottomCompensation,
   headerRef,
   composerRef,
   scrollRef,
@@ -155,7 +154,6 @@ function readChatDebugMetrics({
     composerBottom: Math.round(composerRect?.bottom || 0),
     composerHeight: Math.round(composerRect?.height || 0),
     composerGapBottom: Math.round((window.innerHeight || 0) - (composerRect?.bottom || 0)),
-    composerBottomCompensation: Math.round(composerBottomCompensation || 0),
     scrollTop: Math.round(scrollEl?.scrollTop || 0),
     scrollClientHeight: Math.round(scrollEl?.clientHeight || 0),
     scrollHeight: Math.round(scrollEl?.scrollHeight || 0),
@@ -172,9 +170,6 @@ export default function ChatPage() {
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
-  const isMobileBrowserChat = typeof window !== 'undefined'
-    ? window.matchMedia('(max-width: 1023px)').matches && !isStandaloneMobileChat
-    : false;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
   const [input, setInput] = useState('');
@@ -211,13 +206,9 @@ export default function ChatPage() {
   const initialHistoryLoadedRef = useRef(false);
   const historyFallbackTimerRef = useRef(null);
   const suppressTypingUntilRef = useRef(0);
-  const inputFocusedRef = useRef(false);
-  const composerBottomCompensationRef = useRef(0);
-  const composerBottomSettledRef = useRef(false);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const [headerHeight, setHeaderHeight] = useState(96);
   const [composerHeight, setComposerHeight] = useState(84);
-  const [composerBottomCompensation, setComposerBottomCompensation] = useState(0);
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
   const backTarget = location.state?.from || '/mensajes';
@@ -273,21 +264,10 @@ export default function ChatPage() {
     });
   }, [scrollToBottom]);
 
-  const resetMobileBrowserChatViewport = useCallback(() => {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
-    inputRef.current?.blur?.();
-    const activeElement = document.activeElement;
-    if (activeElement instanceof HTMLElement) activeElement.blur();
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    if (document.body) document.body.scrollTop = 0;
-  }, []);
-
   const captureChatDebug = useCallback((label) => {
     const nextMetrics = readChatDebugMetrics({
       viewportHeight,
       viewportOffsetTop,
-      composerBottomCompensation,
       headerRef,
       composerRef,
       scrollRef,
@@ -301,7 +281,7 @@ export default function ChatPage() {
         [label]: nextMetrics,
       }));
     }
-  }, [composerBottomCompensation, location.pathname, viewportHeight, viewportOffsetTop]);
+  }, [location.pathname, viewportHeight, viewportOffsetTop]);
 
   const markMessagePopped = useCallback((messageId) => {
     if (!messageId) return;
@@ -372,10 +352,7 @@ export default function ChatPage() {
       const vv = window.visualViewport;
       const vvHeight = Math.round(vv?.height || window.innerHeight || 0);
       const innerHeight = Math.round(window.innerHeight || vvHeight || 0);
-      const docHeight = Math.round(document.documentElement?.clientHeight || innerHeight || 0);
-      const nextHeight = isMobileBrowserChat
-        ? Math.min(vvHeight || innerHeight, innerHeight, docHeight)
-        : (vvHeight || innerHeight);
+      const nextHeight = vvHeight || innerHeight;
       setViewportHeight(nextHeight);
       setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
     };
@@ -398,7 +375,7 @@ export default function ChatPage() {
       vv?.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('scroll', updateViewport);
     };
-  }, [isMobileBrowserChat]);
+  }, []);
 
   useEffect(() => {
     if (!chatDebugEnabled) return undefined;
@@ -449,55 +426,25 @@ export default function ChatPage() {
       const nextComposerHeight = composerRect?.height;
       if (nextHeaderHeight) setHeaderHeight(Math.round(nextHeaderHeight));
       if (nextComposerHeight) setComposerHeight(Math.round(nextComposerHeight));
-      if (!isMobileBrowserChat || composerBottomSettledRef.current) return;
-
-      const vv = window.visualViewport;
-      const visibleBottom = Math.round((vv?.height || window.innerHeight || 0) + (vv?.offsetTop || 0));
-      const rawOverflow = Math.max(
-        0,
-        Math.round((composerRect?.bottom || 0) - visibleBottom + composerBottomCompensationRef.current),
-      );
-      const nextCompensation = inputFocusedRef.current ? 0 : rawOverflow;
-      if (nextCompensation !== composerBottomCompensationRef.current) {
-        composerBottomCompensationRef.current = nextCompensation;
-        setComposerBottomCompensation(nextCompensation);
-      }
     };
 
     measure();
 
     const headerNode = headerRef.current;
     const composerNode = composerRef.current;
-    const vv = window.visualViewport;
     const resizeObserver = typeof ResizeObserver !== 'undefined'
       ? new ResizeObserver(() => measure())
       : null;
-    const settleTimers = isMobileBrowserChat && !composerBottomSettledRef.current
-      ? [60, 140, 260, 420, 720, 1100, 1600, 2200].map((delay) => window.setTimeout(measure, delay))
-      : [];
 
     if (headerNode) resizeObserver?.observe(headerNode);
     if (composerNode) resizeObserver?.observe(composerNode);
     window.addEventListener('resize', measure);
-    window.addEventListener('scroll', measure, { passive: true });
-    window.addEventListener('orientationchange', measure);
-    window.addEventListener('focus', measure);
-    window.addEventListener('pageshow', measure);
-    vv?.addEventListener('resize', measure);
-    vv?.addEventListener('scroll', measure);
 
     return () => {
-      settleTimers.forEach((timerId) => window.clearTimeout(timerId));
       resizeObserver?.disconnect();
       window.removeEventListener('resize', measure);
-      window.removeEventListener('scroll', measure);
-      window.removeEventListener('orientationchange', measure);
-      window.removeEventListener('focus', measure);
-      window.removeEventListener('pageshow', measure);
-      vv?.removeEventListener('resize', measure);
-      vv?.removeEventListener('scroll', measure);
     };
-  }, [isMobileBrowserChat, partnerTyping, isVipUser, input, viewportHeight]);
+  }, [partnerTyping, isVipUser, input, viewportHeight]);
 
   useEffect(() => {
     const token = getToken();
@@ -509,10 +456,6 @@ export default function ChatPage() {
     initialHistoryLoadedRef.current = false;
     clearTimeout(historyFallbackTimerRef.current);
     myUserIdRef.current = String(user.id);
-    inputFocusedRef.current = false;
-    composerBottomSettledRef.current = false;
-    composerBottomCompensationRef.current = 0;
-    setComposerBottomCompensation(0);
     setActiveChatId([String(user.id), partnerId].sort().join('-'));
 
     // Optimistically clear the global badge for this conversation immediately.
@@ -654,7 +597,6 @@ export default function ChatPage() {
 
     return () => {
       cancelled = true;
-      if (isMobileBrowserChat) resetMobileBrowserChatViewport();
       clearTimeout(historyFallbackTimerRef.current);
       clearTimeout(typingTimeoutRef.current);
       stopTypingSignal();
@@ -668,7 +610,7 @@ export default function ChatPage() {
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [decrementUnread, id, isMobileBrowserChat, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, resetMobileBrowserChatViewport, setActiveChatId, stopTypingSignal]);
+  }, [decrementUnread, id, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, setActiveChatId, stopTypingSignal]);
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;
@@ -846,12 +788,6 @@ export default function ChatPage() {
   };
 
   const handleInputFocus = () => {
-    inputFocusedRef.current = true;
-    composerBottomSettledRef.current = true;
-    if (composerBottomCompensationRef.current) {
-      composerBottomCompensationRef.current = 0;
-      setComposerBottomCompensation(0);
-    }
     setShowEmojis(false);
     keepChatPinnedToBottom('auto');
     if (chatDebugEnabled) {
@@ -860,16 +796,7 @@ export default function ChatPage() {
   };
 
   const handleInputBlur = () => {
-    inputFocusedRef.current = false;
-    composerBottomSettledRef.current = false;
     stopTypingSignal();
-    if (isMobileBrowserChat) {
-      [0, 80, 180].forEach((delay) => {
-        window.setTimeout(() => {
-          window.dispatchEvent(new Event('resize'));
-        }, delay);
-      });
-    }
     if (chatDebugEnabled) {
       requestAnimationFrame(() => captureChatDebug('blur'));
     }
@@ -988,7 +915,7 @@ export default function ChatPage() {
           className="h-full overflow-y-auto overscroll-y-contain px-[5vw] lg:px-[4vw]"
           style={{
             paddingTop: `${headerHeight + 14}px`,
-            paddingBottom: `${12 + (isMobileBrowserChat ? composerBottomCompensation : 0)}px`,
+            paddingBottom: '12px',
           }}
         >
           <div
@@ -1091,7 +1018,6 @@ export default function ChatPage() {
       <div
         ref={composerRef}
         className={`${isStandaloneMobileChat ? 'safe-bottom ' : ''}sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20`}
-        style={isMobileBrowserChat && composerBottomCompensation > 0 ? { transform: `translateY(-${composerBottomCompensation}px)` } : undefined}
       >
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3">
 
@@ -1177,7 +1103,6 @@ export default function ChatPage() {
             <span>composer bottom</span><span>{chatDebugMetrics.composerBottom}px</span>
             <span>composer h</span><span>{chatDebugMetrics.composerHeight}px</span>
             <span>gap bottom</span><span>{chatDebugMetrics.composerGapBottom}px</span>
-            <span>bottom fix</span><span>{chatDebugMetrics.composerBottomCompensation}px</span>
             <span>chat scroll</span><span>{chatDebugMetrics.scrollTop}/{chatDebugMetrics.scrollClientHeight}/{chatDebugMetrics.scrollHeight}</span>
           </div>
           <div className="mt-3 space-y-1 border-t border-white/10 pt-2 text-[9px] text-white/72">
