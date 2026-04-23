@@ -274,6 +274,18 @@ export default function ChatPage() {
     const updateViewport = () => {
       const vv = window.visualViewport;
       setViewportHeight(Math.round(vv?.height || window.innerHeight));
+
+      const activeElement = document.activeElement;
+      const inputFocused = activeElement === inputRef.current;
+      if (!inputFocused) return;
+
+      const root = document.documentElement;
+      const body = document.body;
+      window.requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        root.scrollTop = 0;
+        if (body) body.scrollTop = 0;
+      });
     };
 
     updateViewport();
@@ -805,7 +817,16 @@ export default function ChatPage() {
                 onChange={handleInputChange}
                 onBlur={stopTypingSignal}
                 onKeyDown={handleKeyDown}
-                onFocus={() => setShowEmojis(false)}
+                onFocus={() => {
+                  setShowEmojis(false);
+                  window.requestAnimationFrame(() => {
+                    const root = document.documentElement;
+                    const body = document.body;
+                    window.scrollTo(0, 0);
+                    root.scrollTop = 0;
+                    if (body) body.scrollTop = 0;
+                  });
+                }}
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
                 disabled={!effectiveCanSend}
                 rows={1}
