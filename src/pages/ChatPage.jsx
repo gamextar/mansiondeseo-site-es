@@ -164,13 +164,14 @@ export default function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const isStandaloneMobileChat = detectStandaloneMobile();
   const currentUser = getStoredUser();
   const isVipUser = Boolean(currentUser?.premium);
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
   const isMobileBrowserChat = typeof window !== 'undefined'
-    ? window.matchMedia('(max-width: 1023px)').matches && !detectStandaloneMobile()
+    ? window.matchMedia('(max-width: 1023px)').matches && !isStandaloneMobileChat
     : false;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
@@ -1015,7 +1016,10 @@ export default function ChatPage() {
       </div>
 
       {/* Input area */}
-      <div ref={composerRef} className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
+      <div
+        ref={composerRef}
+        className={`${isStandaloneMobileChat ? 'safe-bottom ' : ''}sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20`}
+      >
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3">
 
           {/* Attach photo */}
