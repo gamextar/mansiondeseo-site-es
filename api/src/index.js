@@ -113,6 +113,71 @@ function interleaveRoleBuckets(bucketDefs, bucketMap, limit = FEED_PROFILE_LIMIT
   return output;
 }
 
+function compareFeedBucketProfiles(a, b) {
+  const aFake = Number(a.fake ? 1 : 0);
+  const bFake = Number(b.fake ? 1 : 0);
+  if (aFake !== bFake) return aFake - bFake;
+  if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
+  return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
+}
+
+function compareStoryRows(a, b) {
+  const aFake = Number(a?.fake || 0);
+  const bFake = Number(b?.fake || 0);
+  if (aFake !== bFake) return aFake - bFake;
+  const createdCompare = String(b?.created_at || '').localeCompare(String(a?.created_at || ''));
+  if (createdCompare !== 0) return createdCompare;
+  return String(b?.id || '').localeCompare(String(a?.id || ''));
+}
+
+function interleaveStoryRows(rows, roleBuckets, limit = Infinity) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  if (roleBuckets.length <= 1) {
+    return safeRows.sort(compareStoryRows).slice(0, limit);
+  }
+
+  const bucketMap = new Map(roleBuckets.map((bucket) => [bucket.key, []]));
+  for (const row of safeRows) {
+    const bucketKey = getRoleBucketKey(row?.role);
+    if (!bucketMap.has(bucketKey)) continue;
+    bucketMap.get(bucketKey).push(row);
+  }
+  for (const bucket of roleBuckets) {
+    const list = bucketMap.get(bucket.key) || [];
+    list.sort(compareStoryRows);
+  }
+  return interleaveRoleBuckets(roleBuckets, bucketMap, limit);
+}
+
+async function fetchRowsPerRoleBucket(env, baseQuery, baseBindings, roleBuckets, perBucketLimit) {
+  const queryValue = String(baseQuery || '').trim();
+  const orderByMatch = queryValue.match(/\bORDER BY\b[\s\S]*$/i);
+  const orderByClause = orderByMatch ? orderByMatch[0] : '';
+  const queryWithoutOrder = orderByMatch
+    ? queryValue.slice(0, orderByMatch.index).trim()
+    : queryValue;
+
+  if (roleBuckets.length <= 1) {
+    const singleQuery = `${queryValue}\nLIMIT ${perBucketLimit}`;
+    const { results } = await env.DB.prepare(singleQuery).bind(...baseBindings).all();
+    return results || [];
+  }
+
+  const bucketResults = await Promise.all(roleBuckets.map(async (bucket) => {
+    const roleValues = [...new Set(bucket.roles)];
+    const bucketQuery = `
+      ${queryWithoutOrder}
+      AND u.role IN (${roleValues.map(() => '?').join(', ')})
+      ${orderByClause}
+      LIMIT ${perBucketLimit}
+    `;
+    const { results } = await env.DB.prepare(bucketQuery).bind(...baseBindings, ...roleValues).all();
+    return results || [];
+  }));
+
+  return bucketResults.flat();
+}
+
 function computeFeedScore(profile, viewerInterests, settings) {
   const now = Date.now();
   const lastActiveRaw = String(profile?.last_active || '').trim();
@@ -207,13 +272,7 @@ function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets,
   });
 
   if (roleBuckets.length <= 1) {
-    scoredProfiles.sort((a, b) => {
-      const aFake = Number(a.fake ? 1 : 0);
-      const bFake = Number(b.fake ? 1 : 0);
-      if (aFake !== bFake) return aFake - bFake;
-      if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
-      return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
-    });
+    scoredProfiles.sort(compareFeedBucketProfiles);
     return scoredProfiles.slice(0, limit);
   }
 
@@ -225,15 +284,25 @@ function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets,
   }
   for (const bucket of roleBuckets) {
     const list = bucketMap.get(bucket.key) || [];
-    list.sort((a, b) => {
-      const aFake = Number(a.fake ? 1 : 0);
-      const bFake = Number(b.fake ? 1 : 0);
-      if (aFake !== bFake) return aFake - bFake;
-      if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
-      return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
-    });
+    list.sort(compareFeedBucketProfiles);
   }
   return interleaveRoleBuckets(roleBuckets, bucketMap, limit);
+}
+
+function mapStoryRowForResponse(row, env) {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    video_url: normalizeStoryVideoUrl(row.video_url, env),
+    caption: row.caption || '',
+    likes: row.likes || 0,
+    liked: !!row.liked,
+    comments: row.comments || 0,
+    created_at: row.created_at,
+    username: row.username,
+    avatar_url: row.avatar_url || '',
+    avatar_crop: safeParseJSON(row.avatar_crop, null),
+  };
 }
 
 function personalizeFeedProfiles(profiles, authUserId, viewerFavorites, favoritedBySet, viewerIsPremium, settings) {
@@ -2019,11 +2088,12 @@ async function handleAppBootstrap(request, env) {
     const roleFilters = viewerSeeking.length > 0 && viewerSeeking.length < SEEKING_ROLE_IDS.length
       ? viewerSeeking
       : [];
+    const roleBuckets = getRoleBucketsForFilters(roleFilters);
     const roleValues = [...new Set(roleFilters.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])))];
     const storyBindings = [auth.sub];
     let storiesQuery = `
       SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
-             u.username, u.avatar_url, u.avatar_crop,
+             u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
              CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
       FROM stories s
       JOIN users u ON u.id = s.user_id
@@ -2038,11 +2108,10 @@ async function handleAppBootstrap(request, env) {
     }
     storiesQuery += `
         AND s.user_id != ?
-      ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC
-      LIMIT ?
+      ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC, s.id DESC
     `;
-    storyBindings.push(auth.sub, storyLimit);
-    const storiesResult = await env.DB.prepare(storiesQuery).bind(...storyBindings).all();
+    storyBindings.push(auth.sub);
+    const storyRows = await fetchRowsPerRoleBucket(env, storiesQuery, storyBindings, roleBuckets, storyLimit);
     user = sanitizeUser(dbUser, env);
     user.has_active_story = !!activeStory;
     if (activeStory) {
@@ -2050,19 +2119,7 @@ async function handleAppBootstrap(request, env) {
       user.active_story_url = normalizeStoryVideoUrl(activeStory.video_url, env);
     }
     unread = Number(unreadRow?.unread || 0);
-    stories = (storiesResult?.results || []).map((r) => ({
-      id: r.id,
-      user_id: r.user_id,
-      video_url: normalizeStoryVideoUrl(r.video_url, env),
-      caption: r.caption || '',
-      likes: r.likes || 0,
-      liked: !!r.liked,
-      comments: r.comments || 0,
-      created_at: r.created_at,
-      username: r.username,
-      avatar_url: r.avatar_url || '',
-      avatar_crop: safeParseJSON(r.avatar_crop, null),
-    }));
+    stories = interleaveStoryRows(storyRows, roleBuckets, storyLimit).map((r) => mapStoryRowForResponse(r, env));
   }
 
   const settings = await settingsPromise;
@@ -2263,9 +2320,9 @@ async function handleProfiles(request, env) {
               FEED_SNAPSHOT_LIMIT * FEED_QUERY_EXPANSION_FACTOR,
             )
           : snapshotWindowLimit;
-        const snapshotQuery = `${query} ORDER BY last_active DESC LIMIT ${snapshotDbLimit}`;
+        const snapshotQuery = `${query} ORDER BY last_active DESC`;
         const [snapshotRows, storyRows, snapshotCountRow] = await Promise.all([
-          env.DB.prepare(snapshotQuery).bind(...params).all().then(r => r.results),
+          fetchRowsPerRoleBucket(env, snapshotQuery, params, roleBuckets, snapshotDbLimit),
           storyRowsPromise,
           env.DB.prepare(countQuery).bind(...params).first(),
         ]);
@@ -2284,7 +2341,7 @@ async function handleProfiles(request, env) {
         };
       })
     : Promise.all([
-        env.DB.prepare(`${query} ORDER BY last_active DESC LIMIT ${dbLimit}`).bind(...params).all().then(r => r.results),
+        fetchRowsPerRoleBucket(env, `${query} ORDER BY last_active DESC`, params, roleBuckets, dbLimit),
         storyRowsPromise,
       ]).then(([results, storyRows]) => {
         const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
@@ -4957,6 +5014,7 @@ async function handleGetStories(request, env) {
   const roleFilters = viewerSeeking.length > 0 && viewerSeeking.length < SEEKING_ROLE_IDS.length
     ? viewerSeeking
     : [];
+  const roleBuckets = getRoleBucketsForFilters(roleFilters);
   const roleValues = [...new Set(roleFilters.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])))];
 
   const bindings = [];
@@ -4978,45 +5036,9 @@ async function handleGetStories(request, env) {
     values.push(viewerId || '', viewerId || '', focusUserId);
   };
 
-  if (focusUserId && page === 1) {
-    const targetParts = ['SELECT s.id, s.created_at, COALESCE(u.fake, 0) AS fake_rank'];
-    const targetBindings = [];
-    appendStoryVisibilityFilters(targetParts, targetBindings);
-    targetParts.push(' AND s.user_id = ?');
-    targetBindings.push(focusUserId);
-    targetParts.push(' ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC, s.id DESC LIMIT 1');
-
-    const target = await env.DB.prepare(targetParts.join('\n')).bind(...targetBindings).first();
-    if (target?.id) {
-      const rankParts = ['SELECT COUNT(*) AS before_count'];
-      const rankBindings = [];
-      appendStoryVisibilityFilters(rankParts, rankBindings);
-      rankParts.push(`
-        AND (
-          COALESCE(u.fake, 0) < ?
-          OR (
-            COALESCE(u.fake, 0) = ?
-            AND (s.created_at > ? OR (s.created_at = ? AND s.id > ?))
-          )
-        )
-      `);
-      rankBindings.push(
-        Number(target.fake_rank || 0),
-        Number(target.fake_rank || 0),
-        target.created_at,
-        target.created_at,
-        target.id
-      );
-
-      const rank = await env.DB.prepare(rankParts.join('\n')).bind(...rankBindings).first();
-      const beforeCount = Math.max(0, Number(rank?.before_count || 0));
-      offset = Math.max(0, beforeCount - Math.floor(limit / 2));
-    }
-  }
-
   let query = `
     SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
-           u.username, u.avatar_url, u.avatar_crop,
+           u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
            CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
   `;
   const queryParts = [query];
@@ -5024,25 +5046,25 @@ async function handleGetStories(request, env) {
   query = queryParts.join('\n');
   query += `
     ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC, s.id DESC
-    LIMIT ? OFFSET ?
   `;
-  bindings.push(limit, offset);
 
-  const { results } = await env.DB.prepare(query).bind(...bindings).all();
+  const storyWindowLimit = Math.max(
+    offset + limit + 1,
+    focusUserId && page === 1 ? 400 : limit
+  );
+  const storyRows = await fetchRowsPerRoleBucket(env, query, bindings, roleBuckets, storyWindowLimit);
+  const orderedRows = interleaveStoryRows(storyRows, roleBuckets, storyWindowLimit);
 
-  const stories = (results || []).map(r => ({
-    id: r.id,
-    user_id: r.user_id,
-    video_url: normalizeStoryVideoUrl(r.video_url, env),
-    caption: r.caption || '',
-    likes: r.likes || 0,
-    liked: !!r.liked,
-    comments: r.comments || 0,
-    created_at: r.created_at,
-    username: r.username,
-    avatar_url: r.avatar_url || '',
-    avatar_crop: safeParseJSON(r.avatar_crop, null),
-  }));
+  if (focusUserId && page === 1) {
+    const targetIndex = orderedRows.findIndex((row) => String(row.user_id) === focusUserId);
+    if (targetIndex >= 0) {
+      offset = Math.max(0, targetIndex - Math.floor(limit / 2));
+    }
+  }
+
+  const stories = orderedRows
+    .slice(offset, offset + limit)
+    .map((row) => mapStoryRowForResponse(row, env));
 
   return json({ stories });
 }
