@@ -619,12 +619,12 @@ export default function ChatPage() {
         className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
         style={viewportOffsetTop ? { transform: `translateY(${viewportOffsetTop}px)` } : undefined}
       >
-        <div className="flex items-center gap-3 w-full max-w-[88rem] mx-auto px-[5vw] py-3">
+        <div className="flex items-center gap-3 w-full max-w-[88rem] mx-auto px-[5vw] py-3 lg:gap-4 lg:py-4">
           <button
             onClick={() => navigate(backTarget)}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0 lg:w-12 lg:h-12 lg:bg-mansion-elevated/65 lg:border lg:border-mansion-border/30"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-5 h-5 lg:w-6 lg:h-6" />
           </button>
 
           <div className="relative flex-shrink-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`, {
@@ -649,11 +649,11 @@ export default function ChatPage() {
               } : null,
             },
           })}>
-            <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-mansion-border/40">
+            <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-mansion-border/40 lg:w-[54px] lg:h-[54px]">
               <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt={partner.name} className="w-full h-full" />
             </div>
             {partner.online && (
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-mansion-card" />
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-mansion-card lg:w-3.5 lg:h-3.5" />
             )}
           </div>
 
@@ -679,8 +679,8 @@ export default function ChatPage() {
               } : null,
             },
           })}>
-            <h2 className="font-semibold text-sm text-text-primary truncate">{partner.name}</h2>
-            <p className={`text-[11px] ${partnerTyping ? 'text-mansion-gold' : partner.online ? 'text-green-400' : 'text-text-dim'}`}>
+            <h2 className="font-semibold text-sm text-text-primary truncate lg:text-[20px]">{partner.name}</h2>
+            <p className={`text-[11px] lg:text-[14px] ${partnerTyping ? 'text-mansion-gold' : partner.online ? 'text-green-400' : 'text-text-dim'}`}>
               {partnerTyping ? 'Escribiendo...' : partner.online ? '● En línea' : 'Desconectado'}
             </p>
           </div>
@@ -690,12 +690,12 @@ export default function ChatPage() {
             <span className={`w-2 h-2 rounded-full ${
               wsState === 'connected' ? 'bg-green-400' : wsState === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
             }`} title={wsState === 'connected' ? 'Conectado' : wsState === 'connecting' ? 'Conectando...' : 'Desconectado'} />
-            <div className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border ${
+            <div className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border lg:text-[13px] lg:px-3 lg:py-1.5 ${
               effectiveRemaining <= 2
                 ? 'bg-mansion-crimson/10 border-mansion-crimson/30 text-mansion-crimson'
                 : 'bg-mansion-gold/5 border-mansion-gold/20 text-mansion-gold'
             }`}>
-              <Lock className="w-3 h-3" />
+              <Lock className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
               <span>{effectiveRemaining}/{effectiveMax}</span>
             </div>
           </div>
@@ -726,7 +726,7 @@ export default function ChatPage() {
               type="button"
               onClick={handleLoadOlderMessages}
               disabled={loadingOlder}
-              className="text-xs px-3 py-1.5 rounded-full border border-mansion-border/40 text-text-muted hover:text-text-primary hover:border-mansion-gold/30 transition-colors disabled:opacity-60"
+              className="text-xs px-3 py-1.5 rounded-full border border-mansion-border/40 text-text-muted hover:text-text-primary hover:border-mansion-gold/30 transition-colors disabled:opacity-60 lg:text-sm lg:px-4 lg:py-2"
             >
               {loadingOlder ? 'Cargando...' : 'Cargar mensajes anteriores'}
             </button>
@@ -734,7 +734,7 @@ export default function ChatPage() {
         )}
 
         <div className="flex items-center justify-center">
-          <span className="text-[10px] text-text-dim bg-mansion-elevated px-3 py-1 rounded-full">
+          <span className="text-[10px] text-text-dim bg-mansion-elevated px-3 py-1 rounded-full lg:text-xs lg:px-4 lg:py-1.5">
             Hoy
           </span>
         </div>
@@ -754,7 +754,7 @@ export default function ChatPage() {
               className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
             >
               {!isMe && (
-                <div className={`flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5 ${isPopped ? 'chat-avatar-highlight' : ''}`}>
+                <div className={`flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5 lg:w-[58px] lg:h-[58px] ${isPopped ? 'chat-avatar-highlight' : ''}`}>
                   <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
                 </div>
               )}
@@ -765,8 +765,8 @@ export default function ChatPage() {
                     : `text-text-primary border rounded-bl-sm ${isPopped ? 'chat-bubble-highlight bg-mansion-gold/10 border-mansion-gold/30 shadow-[0_0_0_1px_rgba(212,175,55,0.08)]' : 'bg-mansion-elevated border-mansion-border/30'}`
                 }`}
               >
-                <p className="text-[15px] leading-relaxed">{msg.text}</p>
-                <p className={`text-[11px] mt-1.5 flex items-center ${isMe ? 'justify-end text-white/50 gap-1' : 'justify-end text-text-dim'}`}>
+                <p className="text-[15px] leading-relaxed lg:text-[16px]">{msg.text}</p>
+                <p className={`text-[11px] mt-1.5 flex items-center lg:text-[12px] ${isMe ? 'justify-end text-white/50 gap-1' : 'justify-end text-text-dim'}`}>
                   {msg.timestamp}
                   {isMe && (
                     <span className={`chat-read-check inline-flex ${msg.is_read ? 'is-read text-blue-400' : 'text-white/40'}`}>
@@ -785,7 +785,7 @@ export default function ChatPage() {
 
         {partnerTyping && (
           <div className="flex items-end gap-2 justify-start">
-            <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5">
+            <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5 lg:w-[58px] lg:h-[58px]">
               <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
             </div>
             <div className="chat-bubble max-w-[80%] rounded-2xl rounded-bl-sm px-4 py-3 bg-mansion-elevated border border-mansion-border/30 text-text-primary shadow-[0_6px_18px_rgba(8,8,14,0.18)]">
@@ -811,13 +811,13 @@ export default function ChatPage() {
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[5vw] py-3">
 
           {/* Attach photo */}
-          <button className="flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-colors border border-mansion-border/30">
-            <ImageIcon className="w-5 h-5" />
+          <button className="flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-colors border border-mansion-border/30 lg:w-12 lg:h-12">
+            <ImageIcon className="w-5 h-5 lg:w-5.5 lg:h-5.5" />
           </button>
 
           {/* Textarea + emoji */}
           <div className="flex-1 relative flex items-end">
-            <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors min-h-[44px]">
+            <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors min-h-[44px] lg:min-h-[52px]">
               <textarea
                 ref={inputRef}
                 value={input}
@@ -828,15 +828,15 @@ export default function ChatPage() {
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
                 disabled={!effectiveCanSend}
                 rows={1}
-                className="flex-1 resize-none bg-transparent py-3 px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50"
+                className="flex-1 resize-none bg-transparent py-3 px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50 lg:px-5 lg:py-3.5 lg:text-base"
                 style={{ minHeight: '44px' }}
               />
               <button
                 type="button"
                 onClick={() => setShowEmojis(v => !v)}
-                className={`flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center transition-colors ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
+                className={`flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center transition-colors lg:w-12 lg:pb-3 ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
               >
-                <Smile className="w-5 h-5" />
+                <Smile className="w-5 h-5 lg:w-5.5 lg:h-5.5" />
               </button>
             </div>
             <AnimatePresence>
@@ -854,13 +854,13 @@ export default function ChatPage() {
             whileTap={{ scale: 0.9 }}
             onClick={handleSend}
             disabled={!input.trim() || !effectiveCanSend}
-            className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
+            className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all lg:w-12 lg:h-12 ${
               input.trim() && effectiveCanSend
                 ? 'bg-mansion-crimson text-white shadow-glow-crimson'
                 : 'bg-mansion-elevated text-text-dim border border-mansion-border/30'
             }`}
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-5 h-5 lg:w-5.5 lg:h-5.5" />
           </motion.button>
         </div>
       </div>

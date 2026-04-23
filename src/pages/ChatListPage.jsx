@@ -165,10 +165,10 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
         <button
           type="button"
           onClick={handleNavigate}
-          className="w-full text-left flex items-center gap-3.5 px-3 py-4 rounded-xl bg-mansion-base hover:bg-mansion-card/50 transition-all group"
+          className="w-full text-left flex items-center gap-3.5 px-3 py-4 rounded-xl bg-mansion-base hover:bg-mansion-card/50 transition-all group lg:gap-4 lg:px-4 lg:py-5"
         >
           <div className="relative flex-shrink-0">
-            <div className={`w-[60px] h-[60px] rounded-full overflow-hidden ${
+            <div className={`w-[60px] h-[60px] rounded-full overflow-hidden lg:w-[72px] lg:h-[72px] ${
               conv.unread > 0 ? 'ring-2 ring-mansion-gold/50' : ''
             }`}>
               <AvatarImg
@@ -185,19 +185,19 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <h3 className={`font-medium text-[15px] truncate ${
+              <h3 className={`font-medium text-[15px] truncate lg:text-[18px] ${
                 conv.unread > 0 ? 'text-text-primary' : 'text-text-muted'
               }`}>
                 {conv.name}
               </h3>
-              <span className={`text-xs flex-shrink-0 ml-2 ${
+              <span className={`text-xs flex-shrink-0 ml-2 lg:text-sm ${
                 conv.unread > 0 ? 'text-mansion-gold' : 'text-text-dim'
               }`}>
                 {timeAgo(conv.timestamp)}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <p className={`text-[13px] truncate pr-2 ${
+              <p className={`text-[13px] truncate pr-2 lg:text-[15px] ${
                 typing
                   ? 'text-mansion-gold italic'
                   : conv.unread > 0 ? 'text-text-primary font-medium' : 'text-text-dim'
@@ -205,7 +205,7 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
                 {typing ? 'escribiendo...' : conv.lastMessage}
               </p>
               {conv.unread > 0 && (
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-mansion-crimson text-white text-[10px] font-bold flex items-center justify-center">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-mansion-crimson text-white text-[10px] font-bold flex items-center justify-center lg:w-6 lg:h-6 lg:text-xs">
                   {conv.unread}
                 </span>
               )}
@@ -439,15 +439,15 @@ export default function ChatListPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
       >
-        <h1 className="font-display text-2xl font-bold text-text-primary mb-4">Mensajes</h1>
+        <h1 className="font-display text-2xl font-bold text-text-primary mb-4 lg:text-3xl lg:mb-5">Mensajes</h1>
 
         {/* Search bar */}
         <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim lg:left-4 lg:w-5 lg:h-5" />
           <input
             type="text"
             placeholder="Buscar conversación..."
-            className="w-full pl-10 py-2.5 text-sm"
+            className="w-full pl-10 py-2.5 text-sm lg:pl-12 lg:py-3.5 lg:text-base"
           />
         </div>
       </motion.div>
