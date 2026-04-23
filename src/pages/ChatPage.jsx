@@ -619,7 +619,7 @@ export default function ChatPage() {
         className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
         style={viewportOffsetTop ? { transform: `translateY(${viewportOffsetTop}px)` } : undefined}
       >
-        <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
+        <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-[88rem] lg:mx-auto">
           <button
             onClick={() => navigate(backTarget)}
             className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0"
@@ -703,7 +703,7 @@ export default function ChatPage() {
       </div>
 
       {/* Messages area */}
-      <div className="relative flex-1 min-h-0 max-w-4xl lg:mx-auto w-full">
+      <div className="relative flex-1 min-h-0 max-w-[88rem] lg:mx-auto w-full">
         <div
           ref={scrollRef}
           onScroll={() => {
@@ -808,7 +808,7 @@ export default function ChatPage() {
 
       {/* Input area */}
       <div className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
-        <div className="flex items-end gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
+        <div className="flex items-end gap-2 px-3 py-3 lg:px-6 max-w-[88rem] lg:mx-auto">
 
           {/* Attach photo */}
           <button className="flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-colors border border-mansion-border/30">
