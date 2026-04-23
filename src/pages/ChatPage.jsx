@@ -127,6 +127,7 @@ export default function ChatPage() {
   const [showEmojis, setShowEmojis] = useState(false);
   const [wsState, setWsState] = useState('disconnected');
   const [partnerTyping, setPartnerTyping] = useState(false);
+  const [isComposerFocused, setIsComposerFocused] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
   const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
   const inputRef = useRef(null);
@@ -807,17 +808,20 @@ export default function ChatPage() {
       </div>
 
       {/* Input area */}
-      <div className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
-        <div className="flex items-end gap-2 px-3 py-2 lg:px-6 max-w-4xl lg:mx-auto">
+      <div
+        className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 transition-[padding-bottom] duration-200"
+        style={isComposerFocused ? { paddingBottom: 'max(4px, calc(env(safe-area-inset-bottom, 0px) * 0.3))' } : undefined}
+      >
+        <div className="flex items-end gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
 
           {/* Attach photo */}
-          <button className="flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-colors border border-mansion-border/30">
+          <button className="flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-colors border border-mansion-border/30">
             <ImageIcon className="w-5 h-5" />
           </button>
 
           {/* Textarea + emoji */}
           <div className="flex-1 relative flex items-end">
-            <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors min-h-[40px]">
+            <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors min-h-[44px]">
               <textarea
                 ref={inputRef}
                 value={input}
@@ -826,19 +830,25 @@ export default function ChatPage() {
                 autoCorrect="off"
                 spellCheck={false}
                 onChange={handleInputChange}
-                onBlur={stopTypingSignal}
+                onBlur={() => {
+                  setIsComposerFocused(false);
+                  stopTypingSignal();
+                }}
                 onKeyDown={handleKeyDown}
-                onFocus={() => setShowEmojis(false)}
+                onFocus={() => {
+                  setIsComposerFocused(true);
+                  setShowEmojis(false);
+                }}
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
                 disabled={!effectiveCanSend}
                 rows={1}
-                className="flex-1 resize-none bg-transparent py-2 px-4 text-sm outline-none max-h-28 text-text-primary placeholder:text-text-dim disabled:opacity-50"
-                style={{ minHeight: '40px' }}
+                className="flex-1 resize-none bg-transparent py-3 px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50"
+                style={{ minHeight: '44px' }}
               />
               <button
                 type="button"
                 onClick={() => setShowEmojis(v => !v)}
-                className={`flex-shrink-0 w-9 self-end pb-2 flex items-center justify-center transition-colors ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
+                className={`flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center transition-colors ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
               >
                 <Smile className="w-5 h-5" />
               </button>
@@ -858,7 +868,7 @@ export default function ChatPage() {
             whileTap={{ scale: 0.9 }}
             onClick={handleSend}
             disabled={!input.trim() || !effectiveCanSend}
-            className={`flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
+            className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
               input.trim() && effectiveCanSend
                 ? 'bg-mansion-crimson text-white shadow-glow-crimson'
                 : 'bg-mansion-elevated text-text-dim border border-mansion-border/30'
