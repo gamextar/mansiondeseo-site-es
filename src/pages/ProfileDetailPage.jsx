@@ -140,6 +140,7 @@ export default function ProfileDetailPage({ initialData }) {
   const [giftCatalog, setGiftCatalog] = useState([]);
   const [sendingGift, setSendingGift] = useState(null);
   const [giftSent, setGiftSent] = useState(null);
+  const [messageBlockedNotice, setMessageBlockedNotice] = useState('');
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
@@ -572,12 +573,27 @@ export default function ProfileDetailPage({ initialData }) {
   const followersTotal = Number(profile?.followers_total || 0);
   const seeking = Array.isArray(profile?.seeking) ? profile.seeking : (profile?.seeking ? [profile.seeking] : []);
   const messageBlockRoles = Array.isArray(profile?.message_block_roles) ? profile.message_block_roles : [];
+  const viewerRole = String(user?.role || '').trim();
+  const messagingBlockedByRole = !isOwnProfile && !!viewerRole && messageBlockRoles.includes(viewerRole);
+  const viewerRoleLabel = viewerRole ? (SEEKING_META[viewerRole]?.label || viewerRole) : 'tu perfil';
   const locationText = formatLocation(profile);
   const galleryPhotos = getGalleryPhotos(profile);
   const displayPhotos = getDisplayPhotos(profile);
   const avatarDisplayOffset = profile.avatar_url ? 1 : 0;
   const canAdminEditViewedProfile = effectiveViewerIsAdmin && !isOwnProfile;
   const disableMountMotion = isOverlayEntry;
+
+  useEffect(() => {
+    if (!messageBlockedNotice) return undefined;
+    const timerId = window.setTimeout(() => setMessageBlockedNotice(''), 3200);
+    return () => window.clearTimeout(timerId);
+  }, [messageBlockedNotice]);
+
+  const handleMessageIntent = useCallback((event) => {
+    if (!messagingBlockedByRole) return;
+    event.preventDefault();
+    setMessageBlockedNotice(`Este usuario no acepta mensajes de ${viewerRoleLabel}.`);
+  }, [messagingBlockedByRole, viewerRoleLabel]);
 
   // Incognito mode blur (whole profile)
   const isGhostBlurred = blurred;
@@ -1176,8 +1192,21 @@ export default function ProfileDetailPage({ initialData }) {
         >
           <Gift className="w-6 h-6" />
         </motion.button>
+        <AnimatePresence>
+          {messageBlockedNotice && (
+            <motion.div
+              initial={{ opacity: 0, y: 8, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.96 }}
+              className="max-w-[12rem] rounded-2xl border border-amber-500/25 bg-black/78 px-3 py-2 text-center text-[11px] font-medium leading-4 text-amber-100 shadow-[0_14px_28px_rgba(0,0,0,0.28)] backdrop-blur-md"
+            >
+              {messageBlockedNotice}
+            </motion.div>
+          )}
+        </AnimatePresence>
         <Link
           to={`/mensajes/${id}`}
+          onClick={handleMessageIntent}
           state={{
             partnerPreview: {
               id,
@@ -1188,7 +1217,12 @@ export default function ProfileDetailPage({ initialData }) {
               online: profile.online,
             },
           }}
-          className="w-16 h-16 rounded-full bg-mansion-crimson text-white shadow-glow-crimson hover:bg-mansion-crimson-dark transition-all active:scale-95 flex items-center justify-center"
+          aria-disabled={messagingBlockedByRole ? 'true' : undefined}
+          className={`w-16 h-16 rounded-full text-white transition-all active:scale-95 flex items-center justify-center ${
+            messagingBlockedByRole
+              ? 'bg-white/12 border border-white/10 text-white/55 shadow-none'
+              : 'bg-mansion-crimson shadow-glow-crimson hover:bg-mansion-crimson-dark'
+          }`}
         >
           <MessageCircle className="w-6 h-6" />
         </Link>
