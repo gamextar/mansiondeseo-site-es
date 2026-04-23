@@ -286,8 +286,6 @@ function AppLayout() {
     !routeOverlayOpen &&
     normalizedRoutePath !== '/feed' &&
     normalizedRoutePath !== '/explorar' &&
-    normalizedRoutePath !== '/mensajes' &&
-    !normalizedRoutePath.startsWith('/mensajes/') &&
     normalizedRoutePath !== '/videos' &&
     immersiveMobileApp;
   const restoreHiddenMobileOverlayShim =
@@ -454,7 +452,9 @@ function AppLayout() {
       isMobileViewport &&
       (
         normalizedRoutePath === '/perfil' ||
-        isMobileBrowserPublicProfileRoute
+        isMobileBrowserPublicProfileRoute ||
+        normalizedRoutePath === '/mensajes' ||
+        normalizedRoutePath.startsWith('/mensajes/')
       );
 
     const nextScrollTop =
