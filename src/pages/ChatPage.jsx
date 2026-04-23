@@ -128,6 +128,7 @@ export default function ChatPage() {
   const [wsState, setWsState] = useState('disconnected');
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
+  const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -149,29 +150,6 @@ export default function ChatPage() {
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
   const backTarget = location.state?.from || '/mensajes';
-  const desktopProfileOverlayState = partner ? {
-    backgroundLocation: location,
-    backgroundScrollY: window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0,
-    modal: 'profile',
-    from: `${location.pathname}${location.search}${location.hash}`,
-    returnState: location.state || null,
-    preview: {
-      id: partnerId,
-      name: partner.name,
-      age: partner.age,
-      city: partner.city,
-      province: partner.province,
-      locality: partner.locality,
-      role: partner.role,
-      photos: partner.photos || [],
-      avatar_url: partner.avatar_url,
-      avatar_crop: partner.avatar_crop || null,
-      online: partner.online,
-      premium: partner.premium,
-      blurred: partner.blurred,
-      visiblePhotos: partner.visiblePhotos,
-    },
-  } : null;
 
   // Format DO message to UI format
   function formatMsg(msg) {
@@ -274,6 +252,7 @@ export default function ChatPage() {
     const updateViewport = () => {
       const vv = window.visualViewport;
       setViewportHeight(Math.round(vv?.height || window.innerHeight));
+      setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
     };
 
     updateViewport();
@@ -281,10 +260,12 @@ export default function ChatPage() {
     const vv = window.visualViewport;
     window.addEventListener('resize', updateViewport);
     vv?.addEventListener('resize', updateViewport);
+    vv?.addEventListener('scroll', updateViewport);
 
     return () => {
       window.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('scroll', updateViewport);
     };
   }, []);
 
@@ -636,6 +617,7 @@ export default function ChatPage() {
       {/* Header */}
       <div
         className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
+        style={viewportOffsetTop ? { transform: `translateY(${viewportOffsetTop}px)` } : undefined}
       >
         <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
           <button
@@ -646,7 +628,26 @@ export default function ChatPage() {
           </button>
 
           <div className="relative flex-shrink-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`, {
-            state: desktopProfileOverlayState,
+            state: {
+              from: location.pathname,
+              returnState: location.state || null,
+              preview: partner ? {
+                id: partnerId,
+                name: partner.name,
+                age: partner.age,
+                city: partner.city,
+                province: partner.province,
+                locality: partner.locality,
+                role: partner.role,
+                photos: partner.photos || [],
+                avatar_url: partner.avatar_url,
+                avatar_crop: partner.avatar_crop || null,
+                online: partner.online,
+                premium: partner.premium,
+                blurred: partner.blurred,
+                visiblePhotos: partner.visiblePhotos,
+              } : null,
+            },
           })}>
             <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-mansion-border/40">
               <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt={partner.name} className="w-full h-full" />
@@ -657,7 +658,26 @@ export default function ChatPage() {
           </div>
 
           <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/perfiles/${partnerId}`, {
-            state: desktopProfileOverlayState,
+            state: {
+              from: location.pathname,
+              returnState: location.state || null,
+              preview: partner ? {
+                id: partnerId,
+                name: partner.name,
+                age: partner.age,
+                city: partner.city,
+                province: partner.province,
+                locality: partner.locality,
+                role: partner.role,
+                photos: partner.photos || [],
+                avatar_url: partner.avatar_url,
+                avatar_crop: partner.avatar_crop || null,
+                online: partner.online,
+                premium: partner.premium,
+                blurred: partner.blurred,
+                visiblePhotos: partner.visiblePhotos,
+              } : null,
+            },
           })}>
             <h2 className="font-semibold text-sm text-text-primary truncate">{partner.name}</h2>
             <p className={`text-[11px] ${partnerTyping ? 'text-mansion-gold' : partner.online ? 'text-green-400' : 'text-text-dim'}`}>
@@ -801,10 +821,6 @@ export default function ChatPage() {
               <textarea
                 ref={inputRef}
                 value={input}
-                autoComplete="off"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
                 onChange={handleInputChange}
                 onBlur={stopTypingSignal}
                 onKeyDown={handleKeyDown}
