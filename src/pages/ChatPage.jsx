@@ -129,7 +129,6 @@ export default function ChatPage() {
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [isComposerFocused, setIsComposerFocused] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
-  const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -253,7 +252,6 @@ export default function ChatPage() {
     const updateViewport = () => {
       const vv = window.visualViewport;
       setViewportHeight(Math.round(vv?.height || window.innerHeight));
-      setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
     };
 
     updateViewport();
@@ -261,12 +259,10 @@ export default function ChatPage() {
     const vv = window.visualViewport;
     window.addEventListener('resize', updateViewport);
     vv?.addEventListener('resize', updateViewport);
-    vv?.addEventListener('scroll', updateViewport);
 
     return () => {
       window.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('resize', updateViewport);
-      vv?.removeEventListener('scroll', updateViewport);
     };
   }, []);
 
@@ -474,6 +470,12 @@ export default function ChatPage() {
     requestScrollToBottom('smooth');
   }, [partnerTyping]);
 
+  useEffect(() => {
+    if (!isComposerFocused) return;
+    wasAtBottomRef.current = true;
+    requestScrollToBottom('auto', { force: true });
+  }, [isComposerFocused, viewportHeight, requestScrollToBottom]);
+
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
     const oldestMessage = messages.find((message) => message.createdAt);
@@ -618,7 +620,6 @@ export default function ChatPage() {
       {/* Header */}
       <div
         className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
-        style={isComposerFocused && viewportOffsetTop ? { transform: `translateY(${viewportOffsetTop}px)` } : undefined}
       >
         <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
           <button
@@ -711,7 +712,7 @@ export default function ChatPage() {
             const el = scrollRef.current;
             if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
-          className="h-full overflow-y-auto overscroll-y-contain px-4 pt-24 pb-5 space-y-5 lg:px-6 lg:pt-24"
+          className={`h-full overflow-y-auto overscroll-y-contain px-4 pt-24 space-y-5 lg:px-6 lg:pt-24 ${isComposerFocused ? 'pb-2' : 'pb-5'}`}
         >
           <div
             ref={indicatorRef}
@@ -801,8 +802,8 @@ export default function ChatPage() {
 
           <div
             ref={messagesEndRef}
-            className="h-32"
-            style={{ scrollMarginBottom: '80px' }}
+            className={isComposerFocused ? 'h-8' : 'h-32'}
+            style={{ scrollMarginBottom: isComposerFocused ? '20px' : '80px' }}
           />
         </div>
       </div>
@@ -810,9 +811,9 @@ export default function ChatPage() {
       {/* Input area */}
       <div
         className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 transition-[padding-bottom] duration-200"
-        style={isComposerFocused ? { paddingBottom: 'max(2px, calc(env(safe-area-inset-bottom, 0px) * 0.12))' } : undefined}
+        style={isComposerFocused ? { paddingBottom: '2px' } : undefined}
       >
-        <div className="flex items-end gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
+        <div className={`flex items-end gap-2 px-3 lg:px-6 max-w-4xl lg:mx-auto ${isComposerFocused ? 'py-1' : 'py-3'}`}>
 
           {/* Attach photo */}
           <button className="flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-colors border border-mansion-border/30">
