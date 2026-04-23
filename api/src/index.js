@@ -92,22 +92,91 @@ function getRoleBucketKey(role) {
   return PAIR_ROLE_IDS.includes(role) ? 'pareja' : role;
 }
 
+function hashStringToUint32(value = '') {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function createSeededRandom(seedValue) {
+  let state = (Number(seedValue) >>> 0) || 0x9e3779b9;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
+    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed);
+    return (((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296);
+  };
+}
+
+function buildBucketInterleaveSeed(bucketDefs, bucketMap) {
+  const seedParts = [];
+  for (const bucket of bucketDefs) {
+    const list = bucketMap.get(bucket.key) || [];
+    const preview = list
+      .slice(0, 10)
+      .map((item) => String(
+        item?.id ||
+        item?.user_id ||
+        item?.story_id ||
+        item?.lastActive ||
+        item?.created_at ||
+        ''
+      ))
+      .join('|');
+    seedParts.push(`${bucket.key}:${list.length}:${preview}`);
+  }
+  return hashStringToUint32(seedParts.join('||'));
+}
+
 function interleaveRoleBuckets(bucketDefs, bucketMap, limit = FEED_PROFILE_LIMIT) {
   const output = [];
   const cursors = new Map(bucketDefs.map((bucket) => [bucket.key, 0]));
+  const random = createSeededRandom(buildBucketInterleaveSeed(bucketDefs, bucketMap));
+  let lastBucketKey = '';
+  let lastBucketStreak = 0;
 
   while (output.length < limit) {
-    let addedInRound = false;
+    const candidates = [];
+    let totalWeight = 0;
+
     for (const bucket of bucketDefs) {
-      if (output.length >= limit) break;
       const list = bucketMap.get(bucket.key) || [];
       const cursor = cursors.get(bucket.key) || 0;
       if (cursor >= list.length) continue;
-      output.push(list[cursor]);
-      cursors.set(bucket.key, cursor + 1);
-      addedInRound = true;
+
+      const remaining = list.length - cursor;
+      let weight = remaining;
+
+      if (bucket.key === lastBucketKey) {
+        weight *= lastBucketStreak >= 2 ? 0.18 : 0.42;
+      }
+
+      if (weight <= 0) continue;
+      totalWeight += weight;
+      candidates.push({ bucket, cursor, weight, totalWeight });
     }
-    if (!addedInRound) break;
+
+    if (candidates.length === 0) break;
+
+    let selected = candidates[0];
+    if (totalWeight > 0) {
+      const roll = random() * totalWeight;
+      selected = candidates.find((candidate) => roll <= candidate.totalWeight) || candidates[candidates.length - 1];
+    }
+
+    const list = bucketMap.get(selected.bucket.key) || [];
+    output.push(list[selected.cursor]);
+    cursors.set(selected.bucket.key, selected.cursor + 1);
+
+    if (selected.bucket.key === lastBucketKey) {
+      lastBucketStreak += 1;
+    } else {
+      lastBucketKey = selected.bucket.key;
+      lastBucketStreak = 1;
+    }
   }
 
   return output;
