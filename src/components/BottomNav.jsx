@@ -51,6 +51,7 @@ export default function BottomNav({ immersive = false }) {
   const { unreadCount } = useUnreadMessages();
   const { user } = useAuth();
   const pendingNavResetRef = useRef(null);
+  const lastTouchNavRef = useRef({ to: '', at: 0 });
   const isStandaloneMobileApp = detectStandaloneMobile();
   const effectiveNavHeight = getBottomNavHeight(isStandaloneMobileApp);
   const visualOffsetPx = getBottomNavVisualOffset(isStandaloneMobileApp);
@@ -70,14 +71,23 @@ export default function BottomNav({ immersive = false }) {
     pendingNavResetRef.current = null;
   }, []);
 
-  const navigateAfterScrollReset = (to) => {
-    if (typeof window === 'undefined') {
-      navigate(to);
+  const handleNavIntent = (to, { isActive, isHomeRoute }) => {
+    if (to === '/feed' && isHomeRoute) {
+      window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT));
       return;
     }
+    if (isActive) return;
+    if (to === '/videos') {
+      warmVideoFeed();
+    }
+    if (to === '/feed') {
+      try { localStorage.removeItem('mansion_feed'); } catch {}
+    }
+    navigateAfterScrollReset(to);
+  };
 
-    if (isStandaloneMobileApp) {
-      resetDocumentScrollToTop();
+  const navigateAfterScrollReset = (to) => {
+    if (typeof window === 'undefined') {
       navigate(to);
       return;
     }
@@ -88,35 +98,11 @@ export default function BottomNav({ immersive = false }) {
       pendingNavResetRef.current = null;
     }
 
-    let attempts = 0;
-    const maxAttempts = 8;
-
-    const finish = () => {
-      if (pendingNavResetRef.current?.timeoutId) {
-        window.clearTimeout(pendingNavResetRef.current.timeoutId);
-      }
-      pendingNavResetRef.current = null;
-      navigate(to);
-    };
-
-    const tick = () => {
+    if (isStandaloneMobileApp) {
       resetDocumentScrollToTop();
-      attempts += 1;
-      const currentScrollY = Number(window.scrollY ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) || 0;
-      if (currentScrollY <= 1 || attempts >= maxAttempts) {
-        finish();
-        return;
-      }
-      pendingNavResetRef.current = {
-        ...pendingNavResetRef.current,
-        rafId: window.requestAnimationFrame(tick),
-      };
-    };
+    }
 
-    pendingNavResetRef.current = {
-      rafId: window.requestAnimationFrame(tick),
-      timeoutId: window.setTimeout(finish, 180),
-    };
+    navigate(to);
   };
 
   // Hide on landing/onboarding/register/login
@@ -181,20 +167,21 @@ export default function BottomNav({ immersive = false }) {
                 onFocus={() => {
                   if (to === '/videos') warmVideoFeed();
                 }}
+                onPointerUp={(e) => {
+                  if (e.pointerType === 'mouse') return;
+                  e.preventDefault();
+                  lastTouchNavRef.current = { to, at: Date.now() };
+                  handleNavIntent(to, { isActive, isHomeRoute });
+                }}
                 onClick={(e) => {
-                  if (to === '/feed' && isHomeRoute) {
-                    window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT));
+                  const lastTouchNav = lastTouchNavRef.current;
+                  if (lastTouchNav.to === to && Date.now() - lastTouchNav.at < 900) {
+                    e.preventDefault();
                     return;
                   }
-                  if (isActive) return;
+                  if (isActive && to !== '/feed') return;
                   e.preventDefault();
-                  if (to === '/videos') {
-                    warmVideoFeed();
-                  }
-                  if (to === '/feed') {
-                    try { localStorage.removeItem('mansion_feed'); } catch {}
-                  }
-                  navigateAfterScrollReset(to);
+                  handleNavIntent(to, { isActive, isHomeRoute });
                 }}
                 className="relative flex h-full shrink-0 flex-col items-center justify-center group pointer-events-auto select-none"
                 style={{
