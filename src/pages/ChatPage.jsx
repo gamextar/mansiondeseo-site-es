@@ -119,6 +119,7 @@ function updateConversationPreviewCache(partnerId, partner, message) {
 function readChatDebugMetrics({
   viewportHeight,
   viewportOffsetTop,
+  composerBottomCompensation,
   headerRef,
   composerRef,
   scrollRef,
@@ -154,6 +155,7 @@ function readChatDebugMetrics({
     composerBottom: Math.round(composerRect?.bottom || 0),
     composerHeight: Math.round(composerRect?.height || 0),
     composerGapBottom: Math.round((window.innerHeight || 0) - (composerRect?.bottom || 0)),
+    composerBottomCompensation: Math.round(composerBottomCompensation || 0),
     scrollTop: Math.round(scrollEl?.scrollTop || 0),
     scrollClientHeight: Math.round(scrollEl?.clientHeight || 0),
     scrollHeight: Math.round(scrollEl?.scrollHeight || 0),
@@ -209,9 +211,13 @@ export default function ChatPage() {
   const initialHistoryLoadedRef = useRef(false);
   const historyFallbackTimerRef = useRef(null);
   const suppressTypingUntilRef = useRef(0);
+  const inputFocusedRef = useRef(false);
+  const composerBottomCompensationRef = useRef(0);
+  const composerBottomSettledRef = useRef(false);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const [headerHeight, setHeaderHeight] = useState(96);
   const [composerHeight, setComposerHeight] = useState(84);
+  const [composerBottomCompensation, setComposerBottomCompensation] = useState(0);
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
   const backTarget = location.state?.from || '/mensajes';
@@ -271,6 +277,7 @@ export default function ChatPage() {
     const nextMetrics = readChatDebugMetrics({
       viewportHeight,
       viewportOffsetTop,
+      composerBottomCompensation,
       headerRef,
       composerRef,
       scrollRef,
@@ -284,7 +291,7 @@ export default function ChatPage() {
         [label]: nextMetrics,
       }));
     }
-  }, [location.pathname, viewportHeight, viewportOffsetTop]);
+  }, [composerBottomCompensation, location.pathname, viewportHeight, viewportOffsetTop]);
 
   const markMessagePopped = useCallback((messageId) => {
     if (!messageId) return;
@@ -428,9 +435,23 @@ export default function ChatPage() {
 
     const measure = () => {
       const nextHeaderHeight = headerRef.current?.getBoundingClientRect?.().height;
-      const nextComposerHeight = composerRef.current?.getBoundingClientRect?.().height;
+      const composerRect = composerRef.current?.getBoundingClientRect?.();
+      const nextComposerHeight = composerRect?.height;
       if (nextHeaderHeight) setHeaderHeight(Math.round(nextHeaderHeight));
       if (nextComposerHeight) setComposerHeight(Math.round(nextComposerHeight));
+      if (!isMobileBrowserChat || composerBottomSettledRef.current) return;
+
+      const vv = window.visualViewport;
+      const visibleBottom = Math.round((vv?.height || window.innerHeight || 0) + (vv?.offsetTop || 0));
+      const rawOverflow = Math.max(
+        0,
+        Math.round((composerRect?.bottom || 0) - visibleBottom + composerBottomCompensationRef.current),
+      );
+      const nextCompensation = inputFocusedRef.current ? 0 : rawOverflow;
+      if (nextCompensation !== composerBottomCompensationRef.current) {
+        composerBottomCompensationRef.current = nextCompensation;
+        setComposerBottomCompensation(nextCompensation);
+      }
     };
 
     measure();
@@ -449,7 +470,7 @@ export default function ChatPage() {
       resizeObserver?.disconnect();
       window.removeEventListener('resize', measure);
     };
-  }, [partnerTyping, isVipUser, input, viewportHeight]);
+  }, [isMobileBrowserChat, partnerTyping, isVipUser, input, viewportHeight]);
 
   useEffect(() => {
     const token = getToken();
@@ -461,6 +482,10 @@ export default function ChatPage() {
     initialHistoryLoadedRef.current = false;
     clearTimeout(historyFallbackTimerRef.current);
     myUserIdRef.current = String(user.id);
+    inputFocusedRef.current = false;
+    composerBottomSettledRef.current = false;
+    composerBottomCompensationRef.current = 0;
+    setComposerBottomCompensation(0);
     setActiveChatId([String(user.id), partnerId].sort().join('-'));
 
     // Optimistically clear the global badge for this conversation immediately.
@@ -793,6 +818,12 @@ export default function ChatPage() {
   };
 
   const handleInputFocus = () => {
+    inputFocusedRef.current = true;
+    composerBottomSettledRef.current = true;
+    if (composerBottomCompensationRef.current) {
+      composerBottomCompensationRef.current = 0;
+      setComposerBottomCompensation(0);
+    }
     setShowEmojis(false);
     keepChatPinnedToBottom('auto');
     if (chatDebugEnabled) {
@@ -1019,6 +1050,7 @@ export default function ChatPage() {
       <div
         ref={composerRef}
         className={`${isStandaloneMobileChat ? 'safe-bottom ' : ''}sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20`}
+        style={isMobileBrowserChat && composerBottomCompensation > 0 ? { bottom: `${composerBottomCompensation}px` } : undefined}
       >
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3">
 
@@ -1104,6 +1136,7 @@ export default function ChatPage() {
             <span>composer bottom</span><span>{chatDebugMetrics.composerBottom}px</span>
             <span>composer h</span><span>{chatDebugMetrics.composerHeight}px</span>
             <span>gap bottom</span><span>{chatDebugMetrics.composerGapBottom}px</span>
+            <span>bottom fix</span><span>{chatDebugMetrics.composerBottomCompensation}px</span>
             <span>chat scroll</span><span>{chatDebugMetrics.scrollTop}/{chatDebugMetrics.scrollClientHeight}/{chatDebugMetrics.scrollHeight}</span>
           </div>
           <div className="mt-3 space-y-1 border-t border-white/10 pt-2 text-[9px] text-white/72">
