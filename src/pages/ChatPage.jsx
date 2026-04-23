@@ -129,6 +129,7 @@ export default function ChatPage() {
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [isComposerFocused, setIsComposerFocused] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
+  const [keyboardInset, setKeyboardInset] = useState(0);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -281,7 +282,10 @@ export default function ChatPage() {
 
     const updateViewport = () => {
       const vv = window.visualViewport;
-      setViewportHeight(Math.round(vv?.height || window.innerHeight));
+      const nextHeight = Math.round(vv?.height || window.innerHeight);
+      const nextInset = Math.max(0, Math.round(window.innerHeight - ((vv?.height || window.innerHeight) + (vv?.offsetTop || 0))));
+      setViewportHeight(nextHeight);
+      setKeyboardInset(nextInset);
     };
 
     updateViewport();
@@ -289,10 +293,12 @@ export default function ChatPage() {
     const vv = window.visualViewport;
     window.addEventListener('resize', updateViewport);
     vv?.addEventListener('resize', updateViewport);
+    vv?.addEventListener('scroll', updateViewport);
 
     return () => {
       window.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('scroll', updateViewport);
     };
   }, []);
 
@@ -667,6 +673,13 @@ export default function ChatPage() {
     handleTypingInput(nextValue);
   };
 
+  const isStandaloneMode = typeof window !== 'undefined' && (
+    window.matchMedia?.('(display-mode: standalone)')?.matches ||
+    window.navigator.standalone === true
+  );
+  const composerKeyboardOffset = isStandaloneMode && isComposerFocused ? keyboardInset : 0;
+  const composerMessagesPadding = isComposerFocused ? Math.max(8, composerKeyboardOffset + 8) : 20;
+
   return (
     <>
     <DesktopSidebar />
@@ -794,7 +807,7 @@ export default function ChatPage() {
           </div>
         )}
 
-        <div className={`mt-auto flex flex-col gap-5 ${isComposerFocused ? 'pb-2' : 'pb-5'}`}>
+        <div className="mt-auto flex flex-col gap-5" style={{ paddingBottom: `${composerMessagesPadding}px` }}>
         <div className="flex items-center justify-center">
           <span className="text-[10px] text-text-dim bg-mansion-elevated px-3 py-1 rounded-full">
             Hoy
@@ -863,7 +876,7 @@ export default function ChatPage() {
           <div
             ref={messagesEndRef}
             className={isComposerFocused ? 'h-2' : 'h-12'}
-            style={{ scrollMarginBottom: isComposerFocused ? '8px' : '48px' }}
+            style={{ scrollMarginBottom: `${composerMessagesPadding}px` }}
           />
         </div>
         </div>
@@ -872,8 +885,8 @@ export default function ChatPage() {
 
       {/* Input area */}
       <div
-        className="safe-bottom shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 transition-[padding-bottom] duration-200"
-        style={isComposerFocused ? { paddingBottom: '2px' } : undefined}
+        className="safe-bottom shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 transition-[padding-bottom,transform] duration-200"
+        style={isComposerFocused ? { paddingBottom: '2px', transform: composerKeyboardOffset ? `translateY(-${composerKeyboardOffset}px)` : undefined } : undefined}
       >
         <div className={`flex items-end gap-2 px-3 lg:px-6 max-w-4xl lg:mx-auto ${isComposerFocused ? 'py-1' : 'py-3'}`}>
 
