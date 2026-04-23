@@ -147,10 +147,12 @@ function readUrlNumberParam(params, name, fallback, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function syncViewportTopInsetVar() {
+function syncViewportTopInsetVar({ forceZero = false } = {}) {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   const root = document.documentElement;
-  const offsetTop = Math.max(0, Math.round(window.visualViewport?.offsetTop || 0));
+  const offsetTop = forceZero
+    ? 0
+    : Math.max(0, Math.round(window.visualViewport?.offsetTop || 0));
   root.style.setProperty('--visual-viewport-offset-top', `${offsetTop}px`);
 }
 
@@ -392,15 +394,17 @@ function AppLayout() {
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
-    syncViewportTopInsetVar();
+    const sync = () => syncViewportTopInsetVar({ forceZero: isStandaloneMobileApp });
+
+    sync();
 
     let rafA = 0;
     let rafB = 0;
-    const timers = [80, 180, 360].map((delay) => window.setTimeout(syncViewportTopInsetVar, delay));
+    const timers = [80, 180, 360].map((delay) => window.setTimeout(sync, delay));
 
     rafA = window.requestAnimationFrame(() => {
-      syncViewportTopInsetVar();
-      rafB = window.requestAnimationFrame(syncViewportTopInsetVar);
+      sync();
+      rafB = window.requestAnimationFrame(sync);
     });
 
     return () => {
@@ -408,12 +412,12 @@ function AppLayout() {
       if (rafB) window.cancelAnimationFrame(rafB);
       timers.forEach((timerId) => window.clearTimeout(timerId));
     };
-  }, [location.pathname]);
+  }, [isStandaloneMobileApp, location.pathname]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
-    const updateViewportInset = () => syncViewportTopInsetVar();
+    const updateViewportInset = () => syncViewportTopInsetVar({ forceZero: isStandaloneMobileApp });
     const vv = window.visualViewport;
 
     updateViewportInset();
@@ -430,7 +434,7 @@ function AppLayout() {
       window.removeEventListener('pageshow', updateViewportInset);
       vv?.removeEventListener('resize', updateViewportInset);
     };
-  }, []);
+  }, [isStandaloneMobileApp]);
 
   // Reset scroll to top on every route change, EXCEPT when opening/closing
   // a profile overlay (which manages scroll lock/restore itself).
