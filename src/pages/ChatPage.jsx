@@ -503,18 +503,12 @@ export default function ChatPage() {
   }, [messages, partnerTyping, scrollToBottom]);
 
   useLayoutEffect(() => {
-    if (!wasAtBottomRef.current) return;
-    requestAnimationFrame(() => {
-      scrollToBottom('auto');
-    });
-  }, [viewportHeight, headerHeight, composerHeight, scrollToBottom]);
+    keepChatPinnedToBottom('auto');
+  }, [viewportHeight, viewportOffsetTop, headerHeight, composerHeight, showEmojis, keepChatPinnedToBottom]);
 
   useLayoutEffect(() => {
-    if (!wasAtBottomRef.current) return;
-    requestAnimationFrame(() => {
-      scrollToBottom(partnerTyping ? 'smooth' : 'auto');
-    });
-  }, [partnerTyping, scrollToBottom]);
+    keepChatPinnedToBottom(partnerTyping ? 'smooth' : 'auto');
+  }, [partnerTyping, keepChatPinnedToBottom]);
 
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
@@ -649,6 +643,15 @@ export default function ChatPage() {
     setInput(nextValue);
     handleTypingInput(nextValue);
   };
+
+  const keepChatPinnedToBottom = useCallback((behavior = 'auto') => {
+    if (!wasAtBottomRef.current) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToBottom(behavior);
+      });
+    });
+  }, [scrollToBottom]);
 
   return (
     <>
@@ -876,7 +879,10 @@ export default function ChatPage() {
                 onChange={handleInputChange}
                 onBlur={stopTypingSignal}
                 onKeyDown={handleKeyDown}
-                onFocus={() => setShowEmojis(false)}
+                onFocus={() => {
+                  setShowEmojis(false);
+                  keepChatPinnedToBottom('auto');
+                }}
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
                 disabled={!effectiveCanSend}
                 rows={1}
@@ -885,7 +891,10 @@ export default function ChatPage() {
               />
               <button
                 type="button"
-                onClick={() => setShowEmojis(v => !v)}
+                onClick={() => {
+                  setShowEmojis(v => !v);
+                  keepChatPinnedToBottom('auto');
+                }}
                 className={`flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center transition-colors lg:w-12 lg:pb-3 ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
               >
                 <Smile className="w-5 h-5 lg:w-5.5 lg:h-5.5" />
