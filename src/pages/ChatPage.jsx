@@ -458,17 +458,32 @@ export default function ChatPage() {
 
     const headerNode = headerRef.current;
     const composerNode = composerRef.current;
+    const vv = window.visualViewport;
     const resizeObserver = typeof ResizeObserver !== 'undefined'
       ? new ResizeObserver(() => measure())
       : null;
+    const settleTimers = isMobileBrowserChat && !composerBottomSettledRef.current
+      ? [60, 140, 260, 420, 720, 1100].map((delay) => window.setTimeout(measure, delay))
+      : [];
 
     if (headerNode) resizeObserver?.observe(headerNode);
     if (composerNode) resizeObserver?.observe(composerNode);
     window.addEventListener('resize', measure);
+    window.addEventListener('orientationchange', measure);
+    window.addEventListener('focus', measure);
+    window.addEventListener('pageshow', measure);
+    vv?.addEventListener('resize', measure);
+    vv?.addEventListener('scroll', measure);
 
     return () => {
+      settleTimers.forEach((timerId) => window.clearTimeout(timerId));
       resizeObserver?.disconnect();
       window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
+      window.removeEventListener('focus', measure);
+      window.removeEventListener('pageshow', measure);
+      vv?.removeEventListener('resize', measure);
+      vv?.removeEventListener('scroll', measure);
     };
   }, [isMobileBrowserChat, partnerTyping, isVipUser, input, viewportHeight]);
 
