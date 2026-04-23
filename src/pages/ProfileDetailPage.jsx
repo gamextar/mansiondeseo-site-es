@@ -551,6 +551,23 @@ export default function ProfileDetailPage({ initialData }) {
     return () => window.removeEventListener('keydown', handleKey);
   }, [lightboxOpen, closeLightbox, profile]);
 
+  const messageBlockRoles = Array.isArray(profile?.message_block_roles) ? profile.message_block_roles : [];
+  const viewerRole = String(user?.role || '').trim();
+  const messagingBlockedByRole = !profile?.isOwnProfile && !!viewerRole && messageBlockRoles.includes(viewerRole);
+  const viewerRoleLabel = viewerRole ? (SEEKING_META[viewerRole]?.label || viewerRole) : 'tu perfil';
+
+  useEffect(() => {
+    if (!messageBlockedNotice) return undefined;
+    const timerId = window.setTimeout(() => setMessageBlockedNotice(''), 3200);
+    return () => window.clearTimeout(timerId);
+  }, [messageBlockedNotice]);
+
+  const handleMessageIntent = useCallback((event) => {
+    if (!messagingBlockedByRole) return;
+    event.preventDefault();
+    setMessageBlockedNotice(`Este usuario no acepta mensajes de ${viewerRoleLabel}.`);
+  }, [messagingBlockedByRole, viewerRoleLabel]);
+
   if (loading) {
     return (
       <div className="min-h-mobile-browser-screen lg:min-h-screen bg-mansion-base flex items-center justify-center">
@@ -572,28 +589,12 @@ export default function ProfileDetailPage({ initialData }) {
   const visitsTotal = Number(profile?.visits_total || 0);
   const followersTotal = Number(profile?.followers_total || 0);
   const seeking = Array.isArray(profile?.seeking) ? profile.seeking : (profile?.seeking ? [profile.seeking] : []);
-  const messageBlockRoles = Array.isArray(profile?.message_block_roles) ? profile.message_block_roles : [];
-  const viewerRole = String(user?.role || '').trim();
-  const messagingBlockedByRole = !isOwnProfile && !!viewerRole && messageBlockRoles.includes(viewerRole);
-  const viewerRoleLabel = viewerRole ? (SEEKING_META[viewerRole]?.label || viewerRole) : 'tu perfil';
   const locationText = formatLocation(profile);
   const galleryPhotos = getGalleryPhotos(profile);
   const displayPhotos = getDisplayPhotos(profile);
   const avatarDisplayOffset = profile.avatar_url ? 1 : 0;
   const canAdminEditViewedProfile = effectiveViewerIsAdmin && !isOwnProfile;
   const disableMountMotion = isOverlayEntry;
-
-  useEffect(() => {
-    if (!messageBlockedNotice) return undefined;
-    const timerId = window.setTimeout(() => setMessageBlockedNotice(''), 3200);
-    return () => window.clearTimeout(timerId);
-  }, [messageBlockedNotice]);
-
-  const handleMessageIntent = useCallback((event) => {
-    if (!messagingBlockedByRole) return;
-    event.preventDefault();
-    setMessageBlockedNotice(`Este usuario no acepta mensajes de ${viewerRoleLabel}.`);
-  }, [messagingBlockedByRole, viewerRoleLabel]);
 
   // Incognito mode blur (whole profile)
   const isGhostBlurred = blurred;
@@ -702,6 +703,22 @@ export default function ProfileDetailPage({ initialData }) {
           <ChevronLeft className="w-6 h-6 text-white" />
         </MotionButton>
 
+        {!isOwnProfile && (
+          <MotionButton
+            disabled={disableMountMotion}
+            motionProps={{
+              initial: { opacity: 0, x: 10 },
+              animate: { opacity: 1, x: 0 },
+            }}
+            onClick={handleBack}
+            aria-label="Cerrar perfil"
+            className="hidden lg:flex fixed w-14 h-14 rounded-full bg-black/40 backdrop-blur-md border border-white/10 items-center justify-center z-[70]"
+            style={{ top: 'max(env(safe-area-inset-top, 16px), 16px)', right: 16 }}
+          >
+            <X className="w-5 h-5 text-white" />
+          </MotionButton>
+        )}
+
         {/* Desktop arrow buttons */}
         {displayPhotos.length > 1 && (
           <>
@@ -769,15 +786,6 @@ export default function ProfileDetailPage({ initialData }) {
                 <span className="text-text-muted text-xl font-light shrink-0">{age}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {!isOwnProfile && (
-                  <button
-                    onClick={handleBack}
-                    aria-label="Cerrar perfil"
-                    className="hidden lg:inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-text-muted hover:text-white transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
                 {online && (
                   <span className="flex items-center gap-1.5 text-xs text-green-400 bg-green-400/10 rounded-full px-2.5 py-1">
                     <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse-slow" />
