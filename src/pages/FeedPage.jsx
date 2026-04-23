@@ -1486,7 +1486,6 @@ export default function FeedPage({ initialData }) {
                         <ProfileCard
                           profile={profile}
                           index={index}
-                          rank={pageCursor + index + 1}
                           viewerPremium={viewerPremium}
                           settings={safeSettings}
                           immersiveMobile={!isDesktopViewport}
