@@ -426,10 +426,8 @@ export default function ProfilePage() {
   } : null;
 
   return (
-    <div
-      className="min-h-mobile-browser-screen bg-mansion-base pb-mobile-legacy-nav lg:pb-8 lg:pt-0"
-      style={{ paddingTop: 'calc(var(--safe-top) + 14px)' }}
-    >
+    <div className="min-h-mobile-browser-screen bg-mansion-base pb-mobile-legacy-nav lg:pb-8 pt-navbar lg:pt-0">
+      <div className="h-6 lg:hidden" />
       {cropFile && (
         <ImageCropper
           file={cropFile}
