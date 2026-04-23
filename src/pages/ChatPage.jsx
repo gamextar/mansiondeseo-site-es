@@ -519,7 +519,7 @@ export default function ChatPage() {
 
   if (!partner && !loading) {
     return (
-      <div className="min-h-screen bg-[#1439d6] flex items-center justify-center">
+      <div className="min-h-screen bg-[#c1121f] flex items-center justify-center">
         <p className="text-text-muted">Conversación no encontrada</p>
       </div>
     );
@@ -527,7 +527,7 @@ export default function ChatPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#1439d6] flex items-center justify-center">
+      <div className="min-h-screen bg-[#c1121f] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
       </div>
     );
@@ -611,7 +611,7 @@ export default function ChatPage() {
     <>
     <DesktopSidebar />
     <div
-      className="min-h-screen h-[100dvh] bg-[#1439d6] flex flex-col overflow-hidden lg:pl-64 xl:pl-72"
+      className="min-h-screen h-[100dvh] bg-[#c1121f] flex flex-col overflow-hidden lg:pl-64 xl:pl-72"
       style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
     >
       {/* Header */}
@@ -808,19 +808,23 @@ export default function ChatPage() {
 
       {/* Input area */}
       <div className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20">
-        <div className="flex items-end gap-2 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
+        <div className="flex items-end gap-2 px-3 py-2 lg:px-6 max-w-4xl lg:mx-auto">
 
           {/* Attach photo */}
-          <button className="flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-colors border border-mansion-border/30">
+          <button className="flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-colors border border-mansion-border/30">
             <ImageIcon className="w-5 h-5" />
           </button>
 
           {/* Textarea + emoji */}
           <div className="flex-1 relative flex items-end">
-            <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors min-h-[44px]">
+            <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors min-h-[40px]">
               <textarea
                 ref={inputRef}
                 value={input}
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 onChange={handleInputChange}
                 onBlur={stopTypingSignal}
                 onKeyDown={handleKeyDown}
@@ -828,13 +832,13 @@ export default function ChatPage() {
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
                 disabled={!effectiveCanSend}
                 rows={1}
-                className="flex-1 resize-none bg-transparent py-3 px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50"
-                style={{ minHeight: '44px' }}
+                className="flex-1 resize-none bg-transparent py-2 px-4 text-sm outline-none max-h-28 text-text-primary placeholder:text-text-dim disabled:opacity-50"
+                style={{ minHeight: '40px' }}
               />
               <button
                 type="button"
                 onClick={() => setShowEmojis(v => !v)}
-                className={`flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center transition-colors ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
+                className={`flex-shrink-0 w-9 self-end pb-2 flex items-center justify-center transition-colors ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
               >
                 <Smile className="w-5 h-5" />
               </button>
@@ -854,7 +858,7 @@ export default function ChatPage() {
             whileTap={{ scale: 0.9 }}
             onClick={handleSend}
             disabled={!input.trim() || !effectiveCanSend}
-            className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
+            className={`flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
               input.trim() && effectiveCanSend
                 ? 'bg-mansion-crimson text-white shadow-glow-crimson'
                 : 'bg-mansion-elevated text-text-dim border border-mansion-border/30'
