@@ -116,6 +116,50 @@ function updateConversationPreviewCache(partnerId, partner, message) {
   }
 }
 
+function readChatDebugMetrics({
+  viewportHeight,
+  viewportOffsetTop,
+  headerRef,
+  composerRef,
+  scrollRef,
+  route,
+}) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return null;
+
+  const root = document.documentElement;
+  const body = document.body;
+  const vv = window.visualViewport;
+  const rootStyles = window.getComputedStyle(root);
+  const headerRect = headerRef.current?.getBoundingClientRect?.();
+  const composerRect = composerRef.current?.getBoundingClientRect?.();
+  const scrollEl = scrollRef.current;
+
+  return {
+    route,
+    innerHeight: Math.round(window.innerHeight || 0),
+    viewportHeightState: Math.round(viewportHeight || 0),
+    viewportOffsetTopState: Math.round(viewportOffsetTop || 0),
+    vvHeight: Math.round(vv?.height || 0),
+    vvOffsetTop: Math.round(vv?.offsetTop || 0),
+    vvPageTop: Math.round(vv?.pageTop || 0),
+    docClientHeight: Math.round(root.clientHeight || 0),
+    scrollY: Math.round(window.scrollY || 0),
+    rootScrollTop: Math.round(root.scrollTop || 0),
+    bodyScrollTop: Math.round(body?.scrollTop || 0),
+    safeTopVar: rootStyles.getPropertyValue('--safe-top').trim() || 'n/a',
+    vvTopVar: rootStyles.getPropertyValue('--visual-viewport-offset-top').trim() || 'n/a',
+    headerTop: Math.round(headerRect?.top || 0),
+    headerHeight: Math.round(headerRect?.height || 0),
+    composerTop: Math.round(composerRect?.top || 0),
+    composerBottom: Math.round(composerRect?.bottom || 0),
+    composerHeight: Math.round(composerRect?.height || 0),
+    composerGapBottom: Math.round((window.innerHeight || 0) - (composerRect?.bottom || 0)),
+    scrollTop: Math.round(scrollEl?.scrollTop || 0),
+    scrollClientHeight: Math.round(scrollEl?.clientHeight || 0),
+    scrollHeight: Math.round(scrollEl?.scrollHeight || 0),
+  };
+}
+
 export default function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -142,6 +186,9 @@ export default function ChatPage() {
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
   const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
+  const [chatDebugEnabled, setChatDebugEnabled] = useState(false);
+  const [chatDebugMetrics, setChatDebugMetrics] = useState(null);
+  const [chatDebugSnapshots, setChatDebugSnapshots] = useState({});
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -219,6 +266,25 @@ export default function ChatPage() {
     });
   }, [scrollToBottom]);
 
+  const captureChatDebug = useCallback((label) => {
+    const nextMetrics = readChatDebugMetrics({
+      viewportHeight,
+      viewportOffsetTop,
+      headerRef,
+      composerRef,
+      scrollRef,
+      route: location.pathname,
+    });
+    if (!nextMetrics) return;
+    setChatDebugMetrics(nextMetrics);
+    if (label) {
+      setChatDebugSnapshots((prev) => ({
+        ...prev,
+        [label]: nextMetrics,
+      }));
+    }
+  }, [location.pathname, viewportHeight, viewportOffsetTop]);
+
   const markMessagePopped = useCallback((messageId) => {
     if (!messageId) return;
     setPoppedMessageIds((prev) => {
@@ -275,6 +341,15 @@ export default function ChatPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
+    const params = new URLSearchParams(window.location.search);
+    const enabled = params.get('chat_debug') === '1';
+    setChatDebugEnabled(enabled);
+    if (!enabled) {
+      setChatDebugMetrics(null);
+      setChatDebugSnapshots({});
+      return undefined;
+    }
+
     const updateViewport = () => {
       const vv = window.visualViewport;
       const vvHeight = Math.round(vv?.height || window.innerHeight || 0);
@@ -306,6 +381,46 @@ export default function ChatPage() {
       vv?.removeEventListener('scroll', updateViewport);
     };
   }, [isMobileBrowserChat]);
+
+  useEffect(() => {
+    if (!chatDebugEnabled) return undefined;
+
+    let rafId = 0;
+    const update = () => {
+      window.cancelAnimationFrame(rafId);
+      rafId = window.requestAnimationFrame(() => {
+        captureChatDebug();
+      });
+    };
+
+    update();
+    const timers = [80, 180, 360, 700].map((delay) => window.setTimeout(update, delay));
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    window.addEventListener('focus', update);
+    window.addEventListener('pageshow', update);
+    window.addEventListener('scroll', update, { passive: true });
+    window.visualViewport?.addEventListener('resize', update);
+    window.visualViewport?.addEventListener('scroll', update);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+      window.removeEventListener('focus', update);
+      window.removeEventListener('pageshow', update);
+      window.removeEventListener('scroll', update);
+      window.visualViewport?.removeEventListener('resize', update);
+      window.visualViewport?.removeEventListener('scroll', update);
+    };
+  }, [captureChatDebug, chatDebugEnabled]);
+
+  useEffect(() => {
+    if (!chatDebugEnabled) return;
+    captureChatDebug('initial');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatDebugEnabled]);
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -676,6 +791,21 @@ export default function ChatPage() {
     handleTypingInput(nextValue);
   };
 
+  const handleInputFocus = () => {
+    setShowEmojis(false);
+    keepChatPinnedToBottom('auto');
+    if (chatDebugEnabled) {
+      requestAnimationFrame(() => captureChatDebug('focus'));
+    }
+  };
+
+  const handleInputBlur = () => {
+    stopTypingSignal();
+    if (chatDebugEnabled) {
+      requestAnimationFrame(() => captureChatDebug('blur'));
+    }
+  };
+
   return (
     <>
     <DesktopSidebar />
@@ -900,12 +1030,9 @@ export default function ChatPage() {
                 ref={inputRef}
                 value={input}
                 onChange={handleInputChange}
-                onBlur={stopTypingSignal}
+                onBlur={handleInputBlur}
                 onKeyDown={handleKeyDown}
-                onFocus={() => {
-                  setShowEmojis(false);
-                  keepChatPinnedToBottom('auto');
-                }}
+                onFocus={handleInputFocus}
                 placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
                 disabled={!effectiveCanSend}
                 rows={1}
@@ -949,6 +1076,40 @@ export default function ChatPage() {
         </div>
       </div>
     </div>
+    {chatDebugEnabled && chatDebugMetrics && (
+      <div className="fixed left-2 right-2 top-2 z-[10001] pointer-events-none lg:left-auto lg:right-3 lg:w-[360px]">
+        <div className="rounded-2xl border border-amber-300/60 bg-black/88 p-3 font-mono text-[10px] leading-4 text-amber-50 shadow-2xl backdrop-blur-md pointer-events-auto">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <strong className="text-amber-200">chat_debug=1</strong>
+            <span>{chatDebugMetrics.route}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+            <span>innerHeight</span><span>{chatDebugMetrics.innerHeight}px</span>
+            <span>vh state</span><span>{chatDebugMetrics.viewportHeightState}px</span>
+            <span>vv.height</span><span>{chatDebugMetrics.vvHeight}px</span>
+            <span>vv.offsetTop</span><span>{chatDebugMetrics.vvOffsetTop}px</span>
+            <span>vv.pageTop</span><span>{chatDebugMetrics.vvPageTop}px</span>
+            <span>offsetTop state</span><span>{chatDebugMetrics.viewportOffsetTopState}px</span>
+            <span>doc.clientHeight</span><span>{chatDebugMetrics.docClientHeight}px</span>
+            <span>scrollY</span><span>{chatDebugMetrics.scrollY}px</span>
+            <span>root/body scroll</span><span>{chatDebugMetrics.rootScrollTop}/{chatDebugMetrics.bodyScrollTop}px</span>
+            <span>--safe-top</span><span>{chatDebugMetrics.safeTopVar}</span>
+            <span>--vv-top</span><span>{chatDebugMetrics.vvTopVar}</span>
+            <span>header top/h</span><span>{chatDebugMetrics.headerTop}/{chatDebugMetrics.headerHeight}</span>
+            <span>composer top</span><span>{chatDebugMetrics.composerTop}px</span>
+            <span>composer bottom</span><span>{chatDebugMetrics.composerBottom}px</span>
+            <span>composer h</span><span>{chatDebugMetrics.composerHeight}px</span>
+            <span>gap bottom</span><span>{chatDebugMetrics.composerGapBottom}px</span>
+            <span>chat scroll</span><span>{chatDebugMetrics.scrollTop}/{chatDebugMetrics.scrollClientHeight}/{chatDebugMetrics.scrollHeight}</span>
+          </div>
+          <div className="mt-3 space-y-1 border-t border-white/10 pt-2 text-[9px] text-white/72">
+            <div>initial gap: {chatDebugSnapshots.initial?.composerGapBottom ?? 'n/a'}px</div>
+            <div>focus gap: {chatDebugSnapshots.focus?.composerGapBottom ?? 'n/a'}px</div>
+            <div>blur gap: {chatDebugSnapshots.blur?.composerGapBottom ?? 'n/a'}px</div>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }
