@@ -502,6 +502,13 @@ export default function ChatPage() {
     }
   }, [messages, scrollToBottom]);
 
+  useLayoutEffect(() => {
+    if (!wasAtBottomRef.current) return;
+    requestAnimationFrame(() => {
+      scrollToBottom('auto');
+    });
+  }, [viewportHeight, headerHeight, composerHeight, scrollToBottom]);
+
   useEffect(() => {
     if (!partnerTyping || !wasAtBottomRef.current) return;
     requestScrollToBottom('smooth');
@@ -747,10 +754,10 @@ export default function ChatPage() {
             const el = scrollRef.current;
             if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
-          className="h-full overflow-y-auto overscroll-y-contain px-[5vw] lg:px-[4vw] space-y-5"
+          className="h-full overflow-y-auto overscroll-y-contain px-[5vw] lg:px-[4vw]"
           style={{
             paddingTop: `${headerHeight + 14}px`,
-            paddingBottom: `${composerHeight + 10}px`,
+            paddingBottom: '12px',
           }}
         >
           <div
@@ -761,89 +768,91 @@ export default function ChatPage() {
             <div className="w-7 h-7 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
           </div>
 
-        {hasOlderMessages && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={handleLoadOlderMessages}
-              disabled={loadingOlder}
-              className="text-xs px-3 py-1.5 rounded-full border border-mansion-border/40 text-text-muted hover:text-text-primary hover:border-mansion-gold/30 transition-colors disabled:opacity-60 lg:text-sm lg:px-4 lg:py-2"
-            >
-              {loadingOlder ? 'Cargando...' : 'Cargar mensajes anteriores'}
-            </button>
-          </div>
-        )}
+          <div className="flex min-h-full flex-col justify-end gap-5">
+            {hasOlderMessages && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={handleLoadOlderMessages}
+                  disabled={loadingOlder}
+                  className="text-xs px-3 py-1.5 rounded-full border border-mansion-border/40 text-text-muted hover:text-text-primary hover:border-mansion-gold/30 transition-colors disabled:opacity-60 lg:text-sm lg:px-4 lg:py-2"
+                >
+                  {loadingOlder ? 'Cargando...' : 'Cargar mensajes anteriores'}
+                </button>
+              </div>
+            )}
 
-        <div className="flex items-center justify-center">
-          <span className="text-[10px] text-text-dim bg-mansion-elevated px-3 py-1 rounded-full lg:text-xs lg:px-4 lg:py-1.5">
-            Hoy
-          </span>
-        </div>
+            <div className="flex items-center justify-center">
+              <span className="text-[10px] text-text-dim bg-mansion-elevated px-3 py-1 rounded-full lg:text-xs lg:px-4 lg:py-1.5">
+                Hoy
+              </span>
+            </div>
 
-        {loading && messages.length === 0 && (
-          <div className="flex items-center justify-center py-10">
-            <div className="w-6 h-6 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
-          </div>
-        )}
+            {loading && messages.length === 0 && (
+              <div className="flex items-center justify-center py-10">
+                <div className="w-6 h-6 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+              </div>
+            )}
 
-        {messages.map((msg) => {
-          const isMe = msg.senderId === 'me';
-          const isPopped = poppedMessageIds.has(msg.id);
-          return (
-            <div
-              key={msg.id}
-              className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
-            >
-              {!isMe && (
-                <div className={`flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5 lg:w-[58px] lg:h-[58px] ${isPopped ? 'chat-avatar-highlight' : ''}`}>
+            {messages.map((msg) => {
+              const isMe = msg.senderId === 'me';
+              const isPopped = poppedMessageIds.has(msg.id);
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
+                >
+                  {!isMe && (
+                    <div className={`flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5 lg:w-[58px] lg:h-[58px] ${isPopped ? 'chat-avatar-highlight' : ''}`}>
+                      <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
+                    </div>
+                  )}
+                  <div
+                    className={`chat-bubble max-w-[80%] rounded-2xl px-4 py-3 transition-[color,background-color,border-color,box-shadow] duration-300 ${
+                      isMe
+                        ? 'chat-bubble-outgoing bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white rounded-br-sm shadow-[0_10px_28px_rgba(96,14,30,0.22)]'
+                        : `text-text-primary border rounded-bl-sm ${isPopped ? 'chat-bubble-highlight bg-mansion-gold/10 border-mansion-gold/30 shadow-[0_0_0_1px_rgba(212,175,55,0.08)]' : 'bg-mansion-elevated border-mansion-border/30'}`
+                    }`}
+                  >
+                    <p className="text-[15px] leading-relaxed lg:text-[16px]">{msg.text}</p>
+                    <p className={`text-[11px] mt-1.5 flex items-center lg:text-[12px] ${isMe ? 'justify-end text-white/50 gap-1' : 'justify-end text-text-dim'}`}>
+                      {msg.timestamp}
+                      {isMe && (
+                        <span className={`chat-read-check inline-flex ${msg.is_read ? 'is-read text-blue-400' : 'text-white/40'}`}>
+                          {msg.is_read ? (
+                            <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M0.5 5.5L4 9L4.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3.5 5.5L7 9L15 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M8.5 5.5L12 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          ) : (
+                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 5.5L4.5 9L10 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          )}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+
+            {partnerTyping && (
+              <div className="flex items-end gap-2 justify-start">
+                <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5 lg:w-[58px] lg:h-[58px]">
                   <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
                 </div>
-              )}
-              <div
-                className={`chat-bubble max-w-[80%] rounded-2xl px-4 py-3 transition-[color,background-color,border-color,box-shadow] duration-300 ${
-                  isMe
-                    ? 'chat-bubble-outgoing bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white rounded-br-sm shadow-[0_10px_28px_rgba(96,14,30,0.22)]'
-                    : `text-text-primary border rounded-bl-sm ${isPopped ? 'chat-bubble-highlight bg-mansion-gold/10 border-mansion-gold/30 shadow-[0_0_0_1px_rgba(212,175,55,0.08)]' : 'bg-mansion-elevated border-mansion-border/30'}`
-                }`}
-              >
-                <p className="text-[15px] leading-relaxed lg:text-[16px]">{msg.text}</p>
-                <p className={`text-[11px] mt-1.5 flex items-center lg:text-[12px] ${isMe ? 'justify-end text-white/50 gap-1' : 'justify-end text-text-dim'}`}>
-                  {msg.timestamp}
-                  {isMe && (
-                    <span className={`chat-read-check inline-flex ${msg.is_read ? 'is-read text-blue-400' : 'text-white/40'}`}>
-                      {msg.is_read ? (
-                        <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M0.5 5.5L4 9L4.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3.5 5.5L7 9L15 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M8.5 5.5L12 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      ) : (
-                        <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 5.5L4.5 9L10 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      )}
-                    </span>
-                  )}
-                </p>
+                <div className="chat-bubble max-w-[80%] rounded-2xl rounded-bl-sm px-4 py-3 bg-mansion-elevated border border-mansion-border/30 text-text-primary shadow-[0_6px_18px_rgba(8,8,14,0.18)]">
+                  <div className="flex items-center gap-1.5 h-6">
+                    <span className="chat-typing-dot" style={{ animationDelay: '0ms' }} />
+                    <span className="chat-typing-dot" style={{ animationDelay: '150ms' }} />
+                    <span className="chat-typing-dot" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            )}
 
-        {partnerTyping && (
-          <div className="flex items-end gap-2 justify-start">
-            <div className="flex-shrink-0 w-[50px] h-[50px] rounded-full overflow-hidden mb-0.5 lg:w-[58px] lg:h-[58px]">
-              <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="w-full h-full" />
-            </div>
-            <div className="chat-bubble max-w-[80%] rounded-2xl rounded-bl-sm px-4 py-3 bg-mansion-elevated border border-mansion-border/30 text-text-primary shadow-[0_6px_18px_rgba(8,8,14,0.18)]">
-              <div className="flex items-center gap-1.5 h-6">
-                <span className="chat-typing-dot" style={{ animationDelay: '0ms' }} />
-                <span className="chat-typing-dot" style={{ animationDelay: '150ms' }} />
-                <span className="chat-typing-dot" style={{ animationDelay: '300ms' }} />
-              </div>
-            </div>
+            <div
+              ref={messagesEndRef}
+              className="h-1"
+              style={{ scrollMarginBottom: '16px' }}
+            />
           </div>
-        )}
-
-          <div
-            ref={messagesEndRef}
-            className="h-6 lg:h-3"
-            style={{ scrollMarginBottom: `${composerHeight + 12}px` }}
-          />
         </div>
       </div>
 
