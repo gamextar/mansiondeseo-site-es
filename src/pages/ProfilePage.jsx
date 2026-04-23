@@ -184,24 +184,6 @@ export default function ProfilePage() {
   }, [lightboxOpen, user]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    if (!window.matchMedia?.('(max-width: 1023px)').matches) return undefined;
-
-    const root = document.documentElement;
-    const body = document.body;
-    const previousRootOverscroll = root.style.overscrollBehaviorY;
-    const previousBodyOverscroll = body?.style.overscrollBehaviorY || '';
-
-    root.style.overscrollBehaviorY = 'contain';
-    if (body) body.style.overscrollBehaviorY = 'contain';
-
-    return () => {
-      root.style.overscrollBehaviorY = previousRootOverscroll;
-      if (body) body.style.overscrollBehaviorY = previousBodyOverscroll;
-    };
-  }, []);
-
-  useEffect(() => {
     if (!user?.id) return;
     getOwnProfileDashboard().then(data => {
       setVisitors(data.visitors || []);

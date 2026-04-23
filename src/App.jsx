@@ -21,7 +21,7 @@ import FeedShellProbePage from './pages/FeedShellProbePage';
 import ProfileShellProbePage from './pages/ProfileShellProbePage';
 import SafeAreaDebugPage from './pages/SafeAreaDebugPage';
 import ProfilePage from './pages/ProfilePage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute } from './lib/api';
+import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, reportClientError } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -41,6 +41,7 @@ const FavoritesPage = lazy(lazyWithRetry(() => import('./pages/FavoritesPage'), 
 const SettingsPage = lazy(lazyWithRetry(() => import('./pages/SettingsPage'), 'mansion-lazy-retry:settings'));
 const AdminLayout = lazy(lazyWithRetry(() => import('./components/AdminLayout'), 'mansion-lazy-retry:admin-layout'));
 const AdminUsersPage = lazy(lazyWithRetry(() => import('./pages/admin/AdminUsersPage'), 'mansion-lazy-retry:admin-users'));
+const AdminErrorLogsPage = lazy(lazyWithRetry(() => import('./pages/admin/AdminErrorLogsPage'), 'mansion-lazy-retry:admin-error-logs'));
 const VipPage = lazy(lazyWithRetry(() => import('./pages/VipPage'), 'mansion-lazy-retry:vip'));
 const PagoExitosoPage = lazy(lazyWithRetry(() => import('./pages/PagoExitosoPage'), 'mansion-lazy-retry:pago-exitoso'));
 const PagoFallidoPage = lazy(lazyWithRetry(() => import('./pages/PagoFallidoPage'), 'mansion-lazy-retry:pago-fallido'));
@@ -971,6 +972,7 @@ function AppLayout() {
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/usuarios" replace />} />
             <Route path="usuarios" element={<AdminUsersPage />} />
+            <Route path="errores" element={<AdminErrorLogsPage />} />
             <Route path="configuracion" element={<SettingsPage />} />
             <Route path="video-lab" element={<VideoLabPage />} />
           </Route>
@@ -1062,6 +1064,7 @@ export default function App() {
   const [bootShieldVisible, setBootShieldVisible] = useState(() => debugFlags.bootShield);
   const [snapshotShieldVisible, setSnapshotShieldVisible] = useState(false);
   const bootstrapStartedRef = useRef(false);
+  const reportedClientErrorsRef = useRef(new Set());
 
   const handleDisableBootDiagnostics = useCallback(() => {
     clearBootDebugFlags();
@@ -1105,6 +1108,74 @@ export default function App() {
     };
     window.addEventListener('mansion-auth-expired', handleAuthExpired);
     return () => window.removeEventListener('mansion-auth-expired', handleAuthExpired);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const ignoredMessages = [
+      'ResizeObserver loop limit exceeded',
+      'ResizeObserver loop completed with undelivered notifications',
+    ];
+
+    const sendClientError = (kind, payload = {}) => {
+      const message = String(payload.message || payload.reason || '').trim();
+      if (!message) return;
+      if (ignoredMessages.some((entry) => message.includes(entry))) return;
+
+      const route = `${window.location.pathname}${window.location.search}`;
+      const fingerprint = [
+        kind,
+        route,
+        message,
+        String(payload.filename || ''),
+        String(payload.line || ''),
+        String(payload.column || ''),
+      ].join('|');
+
+      if (reportedClientErrorsRef.current.has(fingerprint)) return;
+      if (reportedClientErrorsRef.current.size > 100) return;
+      reportedClientErrorsRef.current.add(fingerprint);
+
+      reportClientError({
+        kind,
+        message,
+        stack: payload.stack || '',
+        route,
+        href: window.location.href,
+        filename: payload.filename || '',
+        line: payload.line || null,
+        column: payload.column || null,
+        online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+        extra: payload.extra || {},
+      });
+    };
+
+    const handleWindowError = (event) => {
+      sendClientError('window.error', {
+        message: event.message || event.error?.message || 'window_error',
+        stack: event.error?.stack || '',
+        filename: event.filename || '',
+        line: event.lineno || null,
+        column: event.colno || null,
+      });
+    };
+
+    const handleUnhandledRejection = (event) => {
+      const reason = event.reason;
+      sendClientError('unhandledrejection', {
+        message: typeof reason === 'string' ? reason : reason?.message || 'unhandled_rejection',
+        stack: reason?.stack || '',
+        extra: typeof reason === 'string' ? { value: reason } : { name: reason?.name || '' },
+      });
+    };
+
+    window.addEventListener('error', handleWindowError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    return () => {
+      window.removeEventListener('error', handleWindowError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
   }, []);
 
   useEffect(() => {
@@ -1248,14 +1319,23 @@ export default function App() {
           setSiteSettings(data.settings);
           try { sessionStorage.setItem('mansion_site_settings', JSON.stringify(data.settings)); } catch {}
         }
-      }).catch(() => {
+      }).catch((err) => {
+        const bootstrapErrorSnapshot = {
+          at: new Date().toISOString(),
+          status: Number(err?.status) || 0,
+          message: String(err?.message || 'bootstrap_failed'),
+          hasToken: Boolean(getToken()),
+          online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+          path: typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : '',
+        };
+        try {
+          sessionStorage.setItem('mansion_bootstrap_last_error', JSON.stringify(bootstrapErrorSnapshot));
+        } catch {}
+        console.warn('[bootstrap] getAppBootstrap failed', bootstrapErrorSnapshot, err);
         setBootstrapUnread(null);
         setBootstrapStories([]);
         setBootstrapResolved(true);
         if (cancelled || !getToken()) return;
-        clearAuth();
-        setUserState(null);
-        setRegisteredState(false);
       });
     };
 

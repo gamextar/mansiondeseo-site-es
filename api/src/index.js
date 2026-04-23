@@ -50,6 +50,7 @@ let _userMessageBlockRolesColumnReady = null;
 let _userLastIpColumnReady = null;
 let _profileVisitStructuresReady = null;
 let _profileStatsBackfillReady = null;
+let _errorLogsReady = null;
 
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
@@ -413,6 +414,22 @@ function json(data, status = 200, headers = {}) {
 
 function error(message, status = 400) {
   return json({ error: message }, status);
+}
+
+function truncateLogValue(value, maxLength = 1200) {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  return text.length > maxLength ? `${text.slice(0, Math.max(0, maxLength - 1))}…` : text;
+}
+
+function safeSerializeLogMeta(value, maxLength = 8000) {
+  if (value === undefined) return '{}';
+  try {
+    const serialized = JSON.stringify(value);
+    return truncateLogValue(serialized || '{}', maxLength) || '{}';
+  } catch {
+    return '{}';
+  }
 }
 
 function getLegacyMediaBases() {
@@ -1187,7 +1204,95 @@ function normalizeMetricRoute(path) {
   if (/^\/api\/gifts\/received\/[a-f0-9-]+$/.test(path)) return '/api/gifts/received/:userId';
   if (/^\/api\/admin\/gifts\/[a-zA-Z0-9-]+$/.test(path)) return '/api/admin/gifts/:id';
   if (/^\/api\/admin\/users\/[a-f0-9-]+$/.test(path)) return '/api/admin/users/:id';
+  if (/^\/api\/admin\/error-logs\/[a-f0-9-]+$/.test(path)) return '/api/admin/error-logs/:id';
   return path;
+}
+
+function getRequestLogContext(request) {
+  const url = new URL(request.url);
+  return {
+    route: normalizeMetricRoute(url.pathname),
+    method: String(request.method || 'GET').toUpperCase(),
+    userAgent: truncateLogValue(request.headers.get('User-Agent') || '', 500),
+    ip: truncateLogValue(request.headers.get('CF-Connecting-IP') || '', 80),
+    requestId: truncateLogValue(request.headers.get('CF-Ray') || request.headers.get('X-Request-Id') || '', 120),
+  };
+}
+
+async function getAuthUserIdIfAny(request, env) {
+  try {
+    const authHeader = request.headers.get('Authorization');
+    const fallbackToken = request.headers.get('X-Session-Token') || '';
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : fallbackToken.trim();
+    if (!token) return null;
+    const payload = await verifyJWT(token, env.JWT_SECRET);
+    return payload?.sub ? String(payload.sub) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function ensureErrorLogsTable(env) {
+  if (!_errorLogsReady) {
+    _errorLogsReady = Promise.all([
+      env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS error_logs (
+          id          TEXT PRIMARY KEY,
+          source      TEXT NOT NULL,
+          level       TEXT NOT NULL DEFAULT 'error',
+          message     TEXT NOT NULL,
+          stack       TEXT DEFAULT '',
+          route       TEXT DEFAULT '',
+          method      TEXT DEFAULT '',
+          status_code INTEGER,
+          user_id     TEXT,
+          request_id  TEXT DEFAULT '',
+          ip          TEXT DEFAULT '',
+          user_agent  TEXT DEFAULT '',
+          meta        TEXT DEFAULT '{}',
+          created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `).run(),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_error_logs_created_at ON error_logs(created_at DESC)').run(),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_error_logs_source_created_at ON error_logs(source, created_at DESC)').run(),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_error_logs_status_created_at ON error_logs(status_code, created_at DESC)').run(),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_error_logs_user_created_at ON error_logs(user_id, created_at DESC)').run(),
+    ]).catch((err) => {
+      _errorLogsReady = null;
+      throw err;
+    });
+  }
+
+  await _errorLogsReady;
+}
+
+async function persistErrorLog(env, entry = {}) {
+  await ensureErrorLogsTable(env);
+  const message = truncateLogValue(entry.message || 'unknown_error', 1200);
+  if (!message) return;
+
+  await env.DB.prepare(`
+    INSERT INTO error_logs (
+      id, source, level, message, stack, route, method, status_code,
+      user_id, request_id, ip, user_agent, meta
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    generateId(),
+    truncateLogValue(entry.source || 'worker', 32) || 'worker',
+    truncateLogValue(entry.level || 'error', 32) || 'error',
+    message,
+    truncateLogValue(entry.stack || '', 12000),
+    truncateLogValue(entry.route || '', 300),
+    truncateLogValue(entry.method || '', 16),
+    Number.isFinite(Number(entry.statusCode)) ? Number(entry.statusCode) : null,
+    entry.userId ? String(entry.userId) : null,
+    truncateLogValue(entry.requestId || '', 120),
+    truncateLogValue(entry.ip || '', 80),
+    truncateLogValue(entry.userAgent || '', 500),
+    safeSerializeLogMeta(entry.meta),
+  ).run();
 }
 
 function recordRouteMetric(env, request, response, durationMs) {
@@ -4436,6 +4541,86 @@ async function handleAdminGetUserIds(request, env) {
   });
 }
 
+async function handleAdminGetErrorLogs(request, env) {
+  await ensureErrorLogsTable(env);
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const url = new URL(request.url);
+  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
+  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '25', 10)));
+  const source = (url.searchParams.get('source') || '').trim().toLowerCase();
+  const level = (url.searchParams.get('level') || '').trim().toLowerCase();
+  const q = (url.searchParams.get('q') || '').trim();
+  const offset = (page - 1) * limit;
+
+  let countQuery = 'SELECT COUNT(*) as total FROM error_logs';
+  let dataQuery = `
+    SELECT id, source, level, message, stack, route, method, status_code,
+           user_id, request_id, ip, user_agent, meta, created_at
+    FROM error_logs
+  `;
+  const filters = [];
+  const bindings = [];
+
+  if (source === 'worker' || source === 'client') {
+    filters.push('source = ?');
+    bindings.push(source);
+  }
+
+  if (level === 'error' || level === 'warn') {
+    filters.push('level = ?');
+    bindings.push(level);
+  }
+
+  if (q) {
+    filters.push('(message LIKE ? OR route LIKE ? OR user_id LIKE ? OR request_id LIKE ?)');
+    bindings.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+  }
+
+  if (filters.length > 0) {
+    const whereClause = ` WHERE ${filters.join(' AND ')}`;
+    countQuery += whereClause;
+    dataQuery += whereClause;
+  }
+
+  dataQuery += ' ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?';
+
+  const countStmt = bindings.length
+    ? env.DB.prepare(countQuery).bind(...bindings)
+    : env.DB.prepare(countQuery);
+  const dataStmt = bindings.length
+    ? env.DB.prepare(dataQuery).bind(...bindings, limit, offset)
+    : env.DB.prepare(dataQuery).bind(limit, offset);
+
+  const [countRes, dataRes] = await Promise.all([countStmt.first(), dataStmt.all()]);
+  const rows = (dataRes.results || []).map((row) => ({
+    ...row,
+    status_code: row.status_code == null ? null : Number(row.status_code),
+    meta: safeParseJSON(row.meta, {}),
+  }));
+
+  return json({
+    logs: rows,
+    total: Number(countRes?.total || 0),
+    page,
+    pages: Math.max(1, Math.ceil(Number(countRes?.total || 0) / limit)),
+  });
+}
+
+async function handleAdminDeleteErrorLog(request, env, logId) {
+  await ensureErrorLogsTable(env);
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  await env.DB.prepare('DELETE FROM error_logs WHERE id = ?').bind(logId).run();
+  return json({ deleted: true, id: logId });
+}
+
 // ── Admin: GET /api/admin/users/:id ─────────────────────
 async function handleAdminGetUser(request, env, userId) {
   await ensureUsersMessageBlockRolesColumn(env);
@@ -5243,6 +5428,47 @@ async function handleSyncStoryLikes(request, env) {
   return json({ updates });
 }
 
+async function handleClientErrorReport(request, env) {
+  await ensureErrorLogsTable(env);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return error('JSON inválido', 400);
+  }
+
+  const context = getRequestLogContext(request);
+  const userId = await getAuthUserIdIfAny(request, env);
+  const message = truncateLogValue(body?.message || body?.reason || 'client_error', 1200);
+  if (!message) return error('message requerido', 400);
+
+  await persistErrorLog(env, {
+    source: 'client',
+    level: String(body?.level || 'error').toLowerCase() === 'warn' ? 'warn' : 'error',
+    message,
+    stack: truncateLogValue(body?.stack || '', 12000),
+    route: truncateLogValue(body?.route || context.route, 300),
+    method: context.method,
+    statusCode: null,
+    userId,
+    requestId: context.requestId,
+    ip: context.ip,
+    userAgent: context.userAgent,
+    meta: {
+      kind: truncateLogValue(body?.kind || 'window.error', 120),
+      href: truncateLogValue(body?.href || '', 500),
+      filename: truncateLogValue(body?.filename || '', 500),
+      line: Number(body?.line) || null,
+      column: Number(body?.column) || null,
+      online: typeof body?.online === 'boolean' ? body.online : null,
+      extra: body?.extra && typeof body.extra === 'object' ? body.extra : {},
+    },
+  });
+
+  return json({ ok: true }, 201);
+}
+
 async function handleDebugMediaCache(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
@@ -5512,6 +5738,7 @@ async function handleRequest(request, env) {
   if (path === '/api/settings/public' && method === 'GET') return handleGetPublicSettings(request, env);
   if (path === '/api/settings' && method === 'GET') return handleGetSettings(request, env);
   if (path === '/api/settings' && method === 'PUT') return handleUpdateSettings(request, env);
+  if (path === '/api/client-errors' && method === 'POST') return handleClientErrorReport(request, env);
 
   // ── Favorites
   if (path === '/api/favorites' && method === 'GET') return handleGetFavorites(request, env);
@@ -5546,10 +5773,13 @@ async function handleRequest(request, env) {
   if (path === '/api/admin/users' && method === 'GET') return handleAdminGetUsers(request, env);
   if (path === '/api/admin/users/ids' && method === 'GET') return handleAdminGetUserIds(request, env);
   if (path === '/api/admin/users/bulk-delete' && method === 'POST') return handleAdminBulkDeleteUsers(request, env);
+  if (path === '/api/admin/error-logs' && method === 'GET') return handleAdminGetErrorLogs(request, env);
   const adminUserMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)$/);
   if (adminUserMatch && method === 'GET') return handleAdminGetUser(request, env, adminUserMatch[1]);
   if (adminUserMatch && method === 'PUT') return handleAdminUpdateUser(request, env, adminUserMatch[1]);
   if (adminUserMatch && method === 'DELETE') return handleAdminDeleteUser(request, env, adminUserMatch[1]);
+  const adminErrorLogMatch = path.match(/^\/api\/admin\/error-logs\/([a-f0-9-]+)$/);
+  if (adminErrorLogMatch && method === 'DELETE') return handleAdminDeleteErrorLog(request, env, adminErrorLogMatch[1]);
 
   // ── Pagos
   if (path === '/api/payment/create' && method === 'POST') return handlePaymentCreate(request, env);
@@ -5580,6 +5810,32 @@ export default {
     try {
       const response = await handleRequest(request, env);
       recordRouteMetric(env, request, response, Date.now() - startedAt);
+      if (response.status >= 500) {
+        ctx.waitUntil((async () => {
+          const context = getRequestLogContext(request);
+          let message = `HTTP ${response.status}`;
+          try {
+            const data = await response.clone().json();
+            message = truncateLogValue(data?.error || message, 1200) || message;
+          } catch {}
+          await persistErrorLog(env, {
+            source: 'worker',
+            level: 'error',
+            message,
+            stack: '',
+            route: context.route,
+            method: context.method,
+            statusCode: response.status,
+            userId: await getAuthUserIdIfAny(request, env),
+            requestId: context.requestId,
+            ip: context.ip,
+            userAgent: context.userAgent,
+            meta: { kind: 'handled_response_5xx' },
+          });
+        })().catch((logErr) => {
+          console.error('[error_logs] failed to persist handled 5xx', logErr?.message || logErr);
+        }));
+      }
       // WebSocket upgrade responses (101) have immutable headers — skip CORS
       if (response.status === 101) {
         return response;
@@ -5593,6 +5849,25 @@ export default {
     } catch (err) {
       recordRouteMetric(env, request, new Response(null, { status: 500 }), Date.now() - startedAt);
       console.error('Worker error:', err.message, err.stack);
+      ctx.waitUntil((async () => {
+        const context = getRequestLogContext(request);
+        await persistErrorLog(env, {
+          source: 'worker',
+          level: 'error',
+          message: truncateLogValue(err?.message || 'Worker error', 1200) || 'Worker error',
+          stack: truncateLogValue(err?.stack || '', 12000),
+          route: context.route,
+          method: context.method,
+          statusCode: 500,
+          userId: await getAuthUserIdIfAny(request, env),
+          requestId: context.requestId,
+          ip: context.ip,
+          userAgent: context.userAgent,
+          meta: { kind: 'unhandled_exception' },
+        });
+      })().catch((logErr) => {
+        console.error('[error_logs] failed to persist unhandled exception', logErr?.message || logErr);
+      }));
       const errRes = json({ error: 'Error interno del servidor' }, 500);
       const cors = corsHeaders(env, request);
       for (const [key, value] of Object.entries(cors)) {

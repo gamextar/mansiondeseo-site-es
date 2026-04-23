@@ -172,6 +172,29 @@ CREATE TABLE IF NOT EXISTS profile_stats (
 CREATE INDEX IF NOT EXISTS idx_profile_stats_visits_total ON profile_stats(visits_total DESC, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_profile_stats_followers_total ON profile_stats(followers_total DESC, updated_at DESC);
 
+-- Error logs
+CREATE TABLE IF NOT EXISTS error_logs (
+  id          TEXT PRIMARY KEY,
+  source      TEXT NOT NULL,
+  level       TEXT NOT NULL DEFAULT 'error',
+  message     TEXT NOT NULL,
+  stack       TEXT DEFAULT '',
+  route       TEXT DEFAULT '',
+  method      TEXT DEFAULT '',
+  status_code INTEGER,
+  user_id     TEXT,
+  request_id  TEXT DEFAULT '',
+  ip          TEXT DEFAULT '',
+  user_agent  TEXT DEFAULT '',
+  meta        TEXT DEFAULT '{}',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_error_logs_created_at ON error_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_error_logs_source_created_at ON error_logs(source, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_error_logs_status_created_at ON error_logs(status_code, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_error_logs_user_created_at ON error_logs(user_id, created_at DESC);
+
 -- Site settings
 CREATE TABLE IF NOT EXISTS site_settings (
   key   TEXT PRIMARY KEY,

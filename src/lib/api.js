@@ -1216,6 +1216,34 @@ export async function adminBulkDeleteUsers(userIds) {
   });
 }
 
+export async function adminGetErrorLogs({ page = 1, limit = 25, q = '', source = '', level = '' } = {}) {
+  const params = new URLSearchParams({ page, limit });
+  if (q) params.set('q', q);
+  if (['worker', 'client'].includes(source)) params.set('source', source);
+  if (['error', 'warn'].includes(level)) params.set('level', level);
+  return apiFetch(`/admin/error-logs?${params}`);
+}
+
+export async function adminDeleteErrorLog(logId) {
+  return apiFetch(`/admin/error-logs/${logId}`, { method: 'DELETE' });
+}
+
+export async function reportClientError(payload = {}) {
+  try {
+    const token = getToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    await fetch(`${API_BASE}/client-errors`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      keepalive: true,
+    });
+  } catch {
+    // Best-effort only
+  }
+}
+
 // ── Stories ─────────────────────────────────────────────
 
 export async function getStories({ page = 1, limit = 25, focusUserId = '' } = {}) {
