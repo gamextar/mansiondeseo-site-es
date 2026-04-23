@@ -130,9 +130,11 @@ export default function ChatPage() {
   const [isComposerFocused, setIsComposerFocused] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
   const [keyboardInset, setKeyboardInset] = useState(0);
+  const [composerHeight, setComposerHeight] = useState(72);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const composerRef = useRef(null);
   const chatRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const incomingMessageTimersRef = useRef(new Map());
@@ -311,6 +313,29 @@ export default function ChatPage() {
       vv?.removeEventListener('scroll', updateViewport);
     };
   }, [isComposerFocused]);
+
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const measureComposer = () => {
+      const nextHeight = Math.round(composerRef.current?.offsetHeight || 0);
+      if (nextHeight > 0) setComposerHeight(nextHeight);
+    };
+
+    measureComposer();
+
+    const observer = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => measureComposer())
+      : null;
+
+    if (composerRef.current && observer) observer.observe(composerRef.current);
+    window.addEventListener('resize', measureComposer);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measureComposer);
+    };
+  }, [isComposerFocused, showEmojis, input]);
 
   useEffect(() => {
     const token = getToken();
@@ -688,7 +713,9 @@ export default function ChatPage() {
     window.navigator.standalone === true
   );
   const composerKeyboardOffset = isStandaloneMode && isComposerFocused ? keyboardInset : 0;
-  const composerMessagesPadding = isComposerFocused ? Math.max(8, composerKeyboardOffset + 8) : 20;
+  const composerMessagesPadding = isComposerFocused
+    ? Math.max(20, composerKeyboardOffset + composerHeight + 12)
+    : Math.max(20, composerHeight * 0.6);
 
   return (
     <>
@@ -895,6 +922,7 @@ export default function ChatPage() {
 
       {/* Input area */}
       <div
+        ref={composerRef}
         className="safe-bottom shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 transition-[padding-bottom,transform] duration-200"
         style={isComposerFocused ? { paddingBottom: '2px', transform: composerKeyboardOffset ? `translateY(-${composerKeyboardOffset}px)` : undefined } : undefined}
       >
