@@ -1101,7 +1101,7 @@ export default function FeedPage({ initialData }) {
           <button
             type="button"
             onClick={() => navigate('/feed')}
-            className="relative -top-1 inline-flex items-center gap-2 rounded-full bg-black/28 px-2.5 py-1.5 backdrop-blur-md"
+            className="relative -top-[5px] inline-flex items-center gap-2 rounded-full bg-black/28 px-2.5 py-1.5 backdrop-blur-md"
           >
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
               <span className="font-display text-white text-xs font-bold">M</span>
