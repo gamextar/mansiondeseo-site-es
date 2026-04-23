@@ -619,7 +619,8 @@ export default function ChatPage() {
     >
       {/* Header */}
       <div
-        className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
+        className="glass shrink-0 border-b border-mansion-border/30 z-30"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="flex items-center gap-3 px-3 py-3 lg:px-6 max-w-4xl lg:mx-auto">
           <button
@@ -712,8 +713,9 @@ export default function ChatPage() {
             const el = scrollRef.current;
             if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
-          className={`h-full overflow-y-auto overscroll-y-contain px-4 pt-24 space-y-5 lg:px-6 lg:pt-24 ${isComposerFocused ? 'pb-2' : 'pb-5'}`}
+          className="h-full overflow-y-auto overscroll-y-contain px-4 pt-4 lg:px-6"
         >
+          <div className="flex min-h-full flex-col">
           <div
             ref={indicatorRef}
             className="sticky top-0 z-10 flex justify-center py-2 pointer-events-none"
@@ -735,6 +737,7 @@ export default function ChatPage() {
           </div>
         )}
 
+        <div className={`mt-auto flex flex-col gap-5 ${isComposerFocused ? 'pb-2' : 'pb-5'}`}>
         <div className="flex items-center justify-center">
           <span className="text-[10px] text-text-dim bg-mansion-elevated px-3 py-1 rounded-full">
             Hoy
@@ -802,15 +805,17 @@ export default function ChatPage() {
 
           <div
             ref={messagesEndRef}
-            className={isComposerFocused ? 'h-8' : 'h-32'}
-            style={{ scrollMarginBottom: isComposerFocused ? '20px' : '80px' }}
+            className={isComposerFocused ? 'h-2' : 'h-12'}
+            style={{ scrollMarginBottom: isComposerFocused ? '8px' : '48px' }}
           />
         </div>
+        </div>
+      </div>
       </div>
 
       {/* Input area */}
       <div
-        className="safe-bottom sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 transition-[padding-bottom] duration-200"
+        className="safe-bottom shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 transition-[padding-bottom] duration-200"
         style={isComposerFocused ? { paddingBottom: '2px' } : undefined}
       >
         <div className={`flex items-end gap-2 px-3 lg:px-6 max-w-4xl lg:mx-auto ${isComposerFocused ? 'py-1' : 'py-3'}`}>
