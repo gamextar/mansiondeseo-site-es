@@ -188,6 +188,7 @@ export default function ChatPage() {
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
   const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
   const [keyboardActive, setKeyboardActive] = useState(false);
+  const [messagesAreaHeight, setMessagesAreaHeight] = useState(null);
   const [chatDebugEnabled, setChatDebugEnabled] = useState(false);
   const [chatDebugMetrics, setChatDebugMetrics] = useState(null);
   const [chatDebugSnapshots, setChatDebugSnapshots] = useState({});
@@ -512,6 +513,11 @@ export default function ChatPage() {
       const nextComposerHeight = composerRect?.height;
       if (nextHeaderHeight) setHeaderHeight(Math.round(nextHeaderHeight));
       if (nextComposerHeight) setComposerHeight(Math.round(nextComposerHeight));
+      setMessagesAreaHeight((prev) => {
+        if (!isMobileBrowserChat || !composerRect) return prev === null ? prev : null;
+        const nextHeight = Math.max(180, Math.round(composerRect.top));
+        return prev === nextHeight ? prev : nextHeight;
+      });
     };
 
     measure();
@@ -524,13 +530,19 @@ export default function ChatPage() {
 
     if (headerNode) resizeObserver?.observe(headerNode);
     if (composerNode) resizeObserver?.observe(composerNode);
+    const settleTimers = [0, 80, 180, 360].map((delay) => window.setTimeout(measure, delay));
     window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('scroll', measure);
 
     return () => {
+      settleTimers.forEach((timerId) => window.clearTimeout(timerId));
       resizeObserver?.disconnect();
       window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('scroll', measure);
     };
-  }, [partnerTyping, isVipUser, input, viewportHeight]);
+  }, [partnerTyping, isVipUser, input, viewportHeight, keyboardActive, isMobileBrowserChat]);
 
   useEffect(() => {
     const token = getToken();
@@ -915,12 +927,24 @@ export default function ChatPage() {
     navigate(backTarget);
   };
 
-  const messagesBottomPadding = isMobileBrowserChat && keyboardActive
-    ? 0
-    : 12;
-  const messagesBottomSpacer = isMobileBrowserChat && keyboardActive
-    ? composerHeight + 16
-    : 1;
+  const messagesAreaStyle = isMobileBrowserChat && messagesAreaHeight
+    ? {
+        flex: '0 0 auto',
+        height: `${messagesAreaHeight}px`,
+      }
+    : undefined;
+  const scrollAreaStyle = {
+    ...(isMobileBrowserChat && messagesAreaHeight ? {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: `${messagesAreaHeight}px`,
+      zIndex: 10,
+    } : null),
+    paddingTop: `${headerHeight + 14}px`,
+    paddingBottom: '12px',
+  };
 
   return (
     <>
@@ -1021,7 +1045,10 @@ export default function ChatPage() {
       </div>
 
       {/* Messages area */}
-      <div className="relative flex-1 min-h-0 w-full max-w-[88rem] mx-auto">
+      <div
+        className="relative flex-1 min-h-0 w-full max-w-[88rem] mx-auto"
+        style={messagesAreaStyle}
+      >
         <div
           ref={scrollRef}
           onScroll={() => {
@@ -1035,10 +1062,7 @@ export default function ChatPage() {
             }
           }}
           className="h-full overflow-y-auto overscroll-y-contain px-[5vw] lg:px-[4vw]"
-          style={{
-            paddingTop: `${headerHeight + 14}px`,
-            paddingBottom: `${messagesBottomPadding}px`,
-          }}
+          style={scrollAreaStyle}
         >
           <div
             ref={indicatorRef}
@@ -1129,10 +1153,7 @@ export default function ChatPage() {
 
             <div
               ref={messagesEndRef}
-              style={{
-                height: `${messagesBottomSpacer}px`,
-                flexShrink: 0,
-              }}
+              className="h-1 flex-shrink-0"
             />
           </div>
         </div>
