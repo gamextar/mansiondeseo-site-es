@@ -28,27 +28,20 @@ function formatCardLocation(profile) {
   return formatLocation(profile);
 }
 
-const CARD_ROLE_LABELS = {
-  hombre: 'Hombre',
-  mujer: 'Mujer',
-  pareja: 'Pareja',
-  pareja_hombres: 'Pareja de hombres',
-  pareja_mujeres: 'Pareja de mujeres',
-  trans: 'Trans',
-  'Hombre Solo': 'Hombre',
-  'Mujer Sola': 'Mujer',
-  'Pareja de Hombres': 'Pareja de hombres',
-  'Pareja de Mujeres': 'Pareja de mujeres',
+const ROLE_PILLS = {
+  hombre: { label: 'Hombre', className: 'bg-blue-500/15 text-blue-300 border-blue-500/40' },
+  mujer: { label: 'Mujer', className: 'bg-pink-500/15 text-pink-300 border-pink-500/40' },
+  pareja: { label: 'Pareja', className: 'bg-purple-500/15 text-purple-300 border-purple-500/40' },
+  pareja_hombres: { label: 'Pareja de hombres', className: 'bg-sky-500/15 text-sky-300 border-sky-500/40' },
+  pareja_mujeres: { label: 'Pareja de mujeres', className: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/40' },
+  trans: { label: 'Trans', className: 'bg-teal-500/15 text-teal-300 border-teal-500/40' },
+  'Hombre Solo': { label: 'Hombre', className: 'bg-blue-500/15 text-blue-300 border-blue-500/40' },
+  'Mujer Sola': { label: 'Mujer', className: 'bg-pink-500/15 text-pink-300 border-pink-500/40' },
+  Pareja: { label: 'Pareja', className: 'bg-purple-500/15 text-purple-300 border-purple-500/40' },
+  'Pareja de Hombres': { label: 'Pareja de hombres', className: 'bg-sky-500/15 text-sky-300 border-sky-500/40' },
+  'Pareja de Mujeres': { label: 'Pareja de mujeres', className: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/40' },
+  Trans: { label: 'Trans', className: 'bg-teal-500/15 text-teal-300 border-teal-500/40' },
 };
-
-function formatRoleAge(role, age) {
-  const cleanRole = String(role || '').trim();
-  const roleLabel = CARD_ROLE_LABELS[cleanRole] || cleanRole;
-  const ageNumber = Number(age || 0);
-  const ageText = ageNumber > 0 ? `${ageNumber} años` : '';
-  if (roleLabel && ageText) return `${roleLabel} de ${ageText}`;
-  return roleLabel || ageText;
-}
 
 export default function ProfileCard({
   profile,
@@ -66,7 +59,7 @@ export default function ProfileCard({
   const { id, name, age, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const safariDesktop = typeof safariDesktopOverride === 'boolean' ? safariDesktopOverride : isSafariDesktopBrowser();
   const locationText = formatCardLocation(profile);
-  const roleAgeText = formatRoleAge(role, age);
+  const rolePill = ROLE_PILLS[role] || (role ? { label: role, className: 'bg-white/10 text-white/80 border-white/20' } : null);
   const isMobile = typeof isMobileOverride === 'boolean'
     ? isMobileOverride
     : (typeof window !== 'undefined' && window.innerWidth < 1024);
@@ -192,7 +185,12 @@ export default function ProfileCard({
 
           {/* Top badges */}
           <div className="absolute top-3 left-3 right-3 flex items-start justify-between z-20">
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5 pr-6">
+              {rolePill && (
+                <span className={`flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm ${rolePill.className}`}>
+                  {rolePill.label}
+                </span>
+              )}
               {premium && (
                 <span className={`flex items-center gap-1 border border-mansion-gold/30 rounded-full px-2 py-0.5 text-[10px] font-semibold text-mansion-gold ${safariDesktop ? 'bg-black/55' : 'bg-mansion-gold/20 backdrop-blur-sm'}`}>
                   <Crown className="w-3 h-3" />
@@ -214,16 +212,11 @@ export default function ProfileCard({
           {/* Bottom info */}
           <div className="absolute bottom-0 left-0 right-0 p-3 z-20">
             {/* Name & details */}
-            <div>
-              <div className="min-w-0">
+            <div className="flex items-end justify-between">
+              <div>
                 <h3 className="font-display text-lg font-semibold text-white leading-tight">
-                  {name}
+                  {name}<span className="text-text-muted font-body text-sm ml-1">{age}</span>
                 </h3>
-                {roleAgeText && (
-                  <p className="mt-0.5 text-xs font-semibold text-white/80 leading-tight">
-                    {roleAgeText}
-                  </p>
-                )}
                 {locationText && (
                   <div className="flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3 h-3 text-text-muted" />
