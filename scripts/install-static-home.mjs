@@ -59,10 +59,11 @@ async function writeAppRoute(route, html) {
 }
 
 function buildHeaders() {
-  const htmlCache = '  Cache-Control: public, max-age=0, s-maxage=600, stale-while-revalidate=86400';
   const blocks = [
-    `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n${htmlCache}`,
+    `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Cache-Control: no-store, max-age=0, must-revalidate`,
     `/assets/*\n  ! Cache-Control\n  Cache-Control: public, max-age=31536000, immutable`,
+    `/sw.js\n  ! Cache-Control\n  Cache-Control: no-store, max-age=0, must-revalidate`,
+    `/manifest.json\n  ! Cache-Control\n  Cache-Control: no-cache, max-age=0, must-revalidate`,
   ];
   return `${blocks.join('\n\n')}\n`;
 }

@@ -4,6 +4,9 @@ export default {
   plugins: [react()],
   build: {
     outDir: 'dist',
+    // Keep previous hashed assets in dist so users with an older HTML shell
+    // during a deploy can still load the JS/CSS it references.
+    emptyOutDir: false,
     rollupOptions: {
       output: {
         manualChunks(id) {

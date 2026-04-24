@@ -1,10 +1,7 @@
-const CACHE_NAME = 'mansion-v11';
-const PRECACHE = ['/', '/index.html', '/app/index.html'];
+const CACHE_NAME = 'mansion-v12';
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE))
-  );
+  e.waitUntil(Promise.resolve());
   self.skipWaiting();
 });
 
@@ -48,7 +45,7 @@ self.addEventListener('fetch', (e) => {
   if (isNavigation) {
     e.respondWith(
       caches.open(CACHE_NAME).then((cache) =>
-        fetch(request)
+        fetch(request, { cache: 'no-store' })
           .then((res) => {
             if (res.ok) cache.put(request, res.clone());
             return res;

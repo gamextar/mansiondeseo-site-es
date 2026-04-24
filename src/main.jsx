@@ -10,7 +10,7 @@ import { SITE_CONFIG } from './lib/siteConfig'
 
 const ASSET_RECOVERY_KEY = 'mansion-asset-recovery-reload';
 const SW_MIGRATION_KEY = 'mansion-sw-migration';
-const SW_MIGRATION_VERSION = 'v11-chat-reset';
+const SW_MIGRATION_VERSION = 'v12-no-html-cache';
 
 function isRecoverableAssetUrl(url) {
   const value = String(url || '');
