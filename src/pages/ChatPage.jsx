@@ -187,6 +187,7 @@ export default function ChatPage() {
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
   const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
+  const [keyboardActive, setKeyboardActive] = useState(false);
   const [chatDebugEnabled, setChatDebugEnabled] = useState(false);
   const [chatDebugMetrics, setChatDebugMetrics] = useState(null);
   const [chatDebugSnapshots, setChatDebugSnapshots] = useState({});
@@ -738,6 +739,12 @@ export default function ChatPage() {
     keepChatPinnedToBottom(partnerTyping ? 'smooth' : 'auto');
   }, [partnerTyping, keepChatPinnedToBottom]);
 
+  useLayoutEffect(() => {
+    if (keyboardActive && pinOnKeyboardResizeRef.current) {
+      keepChatPinnedToBottom('auto');
+    }
+  }, [keyboardActive, keepChatPinnedToBottom]);
+
   const handleLoadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
     const oldestMessage = messages.find((message) => message.createdAt);
@@ -875,6 +882,7 @@ export default function ChatPage() {
 
   const handleInputFocus = () => {
     setShowEmojis(false);
+    setKeyboardActive(true);
     keyboardFocusedRef.current = true;
     pinOnKeyboardResizeRef.current = isAtBottom(160);
     if (pinOnKeyboardResizeRef.current) {
@@ -892,6 +900,7 @@ export default function ChatPage() {
 
   const handleInputBlur = () => {
     stopTypingSignal();
+    setKeyboardActive(false);
     keyboardFocusedRef.current = false;
     pinOnKeyboardResizeRef.current = false;
     const fastSettle = fastKeyboardSettleRef.current || input.trim().length === 0;
@@ -905,6 +914,10 @@ export default function ChatPage() {
   const handleBackClick = () => {
     navigate(backTarget);
   };
+
+  const messagesBottomPadding = isMobileBrowserChat && keyboardActive
+    ? composerHeight + 12
+    : 12;
 
   return (
     <>
@@ -1021,7 +1034,7 @@ export default function ChatPage() {
           className="h-full overflow-y-auto overscroll-y-contain px-[5vw] lg:px-[4vw]"
           style={{
             paddingTop: `${headerHeight + 14}px`,
-            paddingBottom: '12px',
+            paddingBottom: `${messagesBottomPadding}px`,
           }}
         >
           <div
