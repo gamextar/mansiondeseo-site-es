@@ -844,7 +844,7 @@ function AppLayout() {
           {/* Chat detail (full-screen but with custom header) */}
           <Route
             path="/mensajes/:id"
-            element={<ChatPage />}
+            element={<ChatPage key={`chat:${location.key || location.pathname}`} />}
           />
 
           {/* Standard layout pages (require registration) */}
@@ -928,7 +928,7 @@ function AppLayout() {
             path="/mensajes"
             element={
               <RequireRegistration>
-                <ChatListPage />
+                <ChatListPage key={`chat-list:${location.key || location.pathname}`} />
               </RequireRegistration>
             }
           />
