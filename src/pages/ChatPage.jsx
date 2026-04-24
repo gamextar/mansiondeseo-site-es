@@ -348,7 +348,6 @@ export default function ChatPage() {
     if (!enabled) {
       setChatDebugMetrics(null);
       setChatDebugSnapshots({});
-      return undefined;
     }
 
     const updateViewport = () => {
@@ -807,6 +806,13 @@ export default function ChatPage() {
 
   const handleInputBlur = () => {
     stopTypingSignal();
+    if (isMobileBrowserChat && typeof window !== 'undefined') {
+      [0, 80, 180, 360].forEach((delay) => {
+        window.setTimeout(() => {
+          window.dispatchEvent(new Event('resize'));
+        }, delay);
+      });
+    }
     if (chatDebugEnabled) {
       requestAnimationFrame(() => captureChatDebug('blur'));
     }
