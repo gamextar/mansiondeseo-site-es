@@ -121,6 +121,8 @@ function normalizeStorySeed(seed) {
     likes: Number(seed.likes || 0),
     liked: !!seed.liked,
     comments: Number(seed.comments || 0),
+    vip_only: !!seed.vip_only,
+    restricted: !!seed.restricted,
     created_at: String(seed.created_at || ''),
     username: String(seed.username || seed.name || ''),
     avatar_url: String(seed.avatar_url || ''),

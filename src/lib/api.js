@@ -1296,9 +1296,10 @@ const storyLikesQueue = createMutationQueue({
   },
 });
 
-export async function uploadStory(file, { caption = '', onProgress, tokenOverride } = {}) {
+export async function uploadStory(file, { caption = '', vipOnly = false, onProgress, tokenOverride } = {}) {
   const params = new URLSearchParams();
   if (caption) params.set('caption', caption);
+  if (vipOnly) params.set('vip_only', '1');
   const qs = params.toString();
   const body = await file.arrayBuffer();
   const data = await apiUpload(`/stories${qs ? `?${qs}` : ''}`, {
@@ -1353,10 +1354,11 @@ export async function deleteOwnStory(storyId) {
   return data;
 }
 
-export async function adminUploadStoryForUser(userId, file, { caption = '' } = {}) {
+export async function adminUploadStoryForUser(userId, file, { caption = '', vipOnly = false } = {}) {
   const params = new URLSearchParams();
   params.set('user_id', userId);
   if (caption) params.set('caption', caption);
+  if (vipOnly) params.set('vip_only', '1');
   const data = await apiFetch(`/admin/upload-story?${params}`, {
     method: 'POST',
     headers: { 'Content-Type': file.type },

@@ -70,15 +70,17 @@ function mapStoriesToRailProfiles(stories = []) {
       avatar_crop: story.avatar_crop || null,
       photos: [],
       has_active_story: true,
-      active_story_url: story.video_url || '',
+      active_story_url: story.video_url || (story.vip_only ? `vip-only:${story.id || story.user_id || ''}` : ''),
       video_url: story.video_url || '',
+      vip_only: !!story.vip_only,
+      restricted: !!story.restricted,
       caption: story.caption || '',
       likes: Number(story.likes || 0),
       comments: Number(story.comments || 0),
       liked: !!story.liked,
       created_at: story.created_at || '',
     }))
-    .filter((story) => story.id && story.active_story_url);
+    .filter((story) => story.id && (story.active_story_url || story.vip_only));
 }
 
 function getGridColumns() {
@@ -1380,7 +1382,9 @@ export default function FeedPage({ initialData }) {
             const itemStyle = getStoryRailItemStyle(
               storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined
             );
-            const isLockedStory = !canWatchAllVideoStories && index >= freeVideoStoryLimit;
+            const isFreeLimitLockedStory = !canWatchAllVideoStories && index >= freeVideoStoryLimit;
+            const isVipOnlyLockedStory = !canWatchAllVideoStories && Boolean(p.vip_only);
+            const isLockedStory = isFreeLimitLockedStory || isVipOnlyLockedStory;
             return safariDesktop ? (
               <div
                 key={`story-${p.id}`}

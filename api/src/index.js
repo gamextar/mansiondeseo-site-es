@@ -360,11 +360,15 @@ function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets,
 }
 
 function mapStoryRowForResponse(row, env) {
+  const vipOnly = Number(row?.vip_only || 0) === 1;
+  const restricted = Number(row?.restricted || 0) === 1;
   return {
     id: row.id,
     user_id: row.user_id,
-    video_url: normalizeStoryVideoUrl(row.video_url, env),
+    video_url: restricted ? '' : normalizeStoryVideoUrl(row.video_url, env),
     caption: row.caption || '',
+    vip_only: vipOnly,
+    restricted,
     likes: row.likes || 0,
     liked: !!row.liked,
     comments: row.comments || 0,
@@ -2264,6 +2268,7 @@ async function handleAppBootstrap(request, env) {
   if (authHeader?.startsWith('Bearer ')) {
     const auth = await authenticate(request, env);
     if (!auth) return error('No autorizado', 401);
+    await ensureStoriesTable(env);
 
     const settings = await settingsPromise;
     const storyLimit = Math.max(
@@ -2295,9 +2300,15 @@ async function handleAppBootstrap(request, env) {
       : [];
     const roleBuckets = getRoleBucketsForFilters(roleFilters);
     const roleValues = [...new Set(roleFilters.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])))];
-    const storyBindings = [auth.sub];
+    const viewerCanWatchAllStories = Boolean(dbUser && isPremiumActive(dbUser));
+    const storyBindings = [auth.sub, viewerCanWatchAllStories ? 1 : 0, auth.sub];
     let storiesQuery = `
-      SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
+      SELECT s.id, s.user_id, s.video_url, s.caption, COALESCE(s.vip_only, 0) AS vip_only,
+             CASE
+               WHEN COALESCE(s.vip_only, 0) = 1 AND s.user_id != ? AND ? = 0 THEN 1
+               ELSE 0
+             END AS restricted,
+             s.likes, s.comments, s.created_at,
              u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
              CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
       FROM stories s
@@ -2415,6 +2426,7 @@ async function handleProfiles(request, env) {
   if (!auth) return error('No autorizado', 401);
   await ensureUserBrowseIndexes(env);
   await ensureProfileVisitStructures(env);
+  await ensureStoriesTable(env);
 
   const url = new URL(request.url);
   const includeTimingDetails = url.searchParams.get('timings') === '1';
@@ -2435,6 +2447,7 @@ async function handleProfiles(request, env) {
   }
   markTiming('viewerMs', viewerStartedAt);
   const country = viewer?.country || '';
+  const viewerCanWatchAllStories = Boolean(viewer && isPremiumActive(viewer));
 
   // Determine role filter: use viewer's seeking from DB, with frontend filter as fallback
   const viewerSeeking = safeParseJSON(viewer?.seeking, []);
@@ -2499,7 +2512,7 @@ async function handleProfiles(request, env) {
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
   const countryKey = settings.feedFilterByCountry ? country : 'all-countries';
   const profilesCacheKey = `profiles:${seekingKey}:${countryKey}:${search}`;
-  const feedSnapshotCacheKey = `feed-snapshot:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}`;
+  const feedSnapshotCacheKey = `feed-snapshot:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}:${viewerCanWatchAllStories ? 'vip' : 'free'}`;
   const windowLimit = cursor + reqPageSize;
   const pageWindowLimit = windowLimit + 1;
   const dbLimit = roleBuckets.length > 1
@@ -2512,7 +2525,7 @@ async function handleProfiles(request, env) {
   const storyRowsPromise = cached(
     'active_story_users',
     30_000,
-    () => env.DB.prepare('SELECT user_id, video_url FROM stories WHERE active = 1 ORDER BY created_at DESC').all().then(r => r.results).catch(() => [])
+    () => env.DB.prepare('SELECT user_id, video_url, COALESCE(vip_only, 0) AS vip_only FROM stories WHERE active = 1 ORDER BY created_at DESC').all().then(r => r.results).catch(() => [])
   );
   const countQuery = query.replace(/SELECT[\s\S]+?FROM users u/, 'SELECT COUNT(*) AS total FROM users u');
   const snapshotStartedAt = Date.now();
@@ -2535,6 +2548,7 @@ async function handleProfiles(request, env) {
         const activeStoryUrlMap = new Map();
         for (const row of (storyRows || [])) {
           const userId = String(row.user_id);
+          if (!viewerCanWatchAllStories && Number(row.vip_only || 0) === 1) continue;
           if (!activeStoryUrlMap.has(userId) && row.video_url) {
             activeStoryUrlMap.set(userId, normalizeStoryVideoUrl(row.video_url, env));
           }
@@ -2553,6 +2567,7 @@ async function handleProfiles(request, env) {
         const activeStoryUrlMap = new Map();
         for (const row of (storyRows || [])) {
           const userId = String(row.user_id);
+          if (!viewerCanWatchAllStories && Number(row.vip_only || 0) === 1) continue;
           if (!activeStoryUrlMap.has(userId) && row.video_url) {
             activeStoryUrlMap.set(userId, normalizeStoryVideoUrl(row.video_url, env));
           }
@@ -5263,29 +5278,43 @@ async function handlePaymentConfirm(request, env) {
 let _storiesTableReady = null;
 async function ensureStoriesTable(env) {
   if (!_storiesTableReady) {
-    _storiesTableReady = env.DB.prepare(`
-      CREATE TABLE IF NOT EXISTS stories (
-        id          TEXT PRIMARY KEY,
-        user_id     TEXT NOT NULL REFERENCES users(id),
-        video_url   TEXT NOT NULL,
-        caption     TEXT DEFAULT '',
-        likes       INTEGER NOT NULL DEFAULT 0,
-        comments    INTEGER NOT NULL DEFAULT 0,
-        active      INTEGER NOT NULL DEFAULT 1,
-        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `).run().then(() =>
-      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_active ON stories(active, created_at)').run()
-    ).then(() =>
-      env.DB.prepare(`
-        CREATE TABLE IF NOT EXISTS story_likes (
-          user_id   TEXT NOT NULL,
-          story_id  TEXT NOT NULL,
-          created_at TEXT NOT NULL DEFAULT (datetime('now')),
-          PRIMARY KEY (user_id, story_id)
+    _storiesTableReady = (async () => {
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS stories (
+          id          TEXT PRIMARY KEY,
+          user_id     TEXT NOT NULL REFERENCES users(id),
+          video_url   TEXT NOT NULL,
+          caption     TEXT DEFAULT '',
+          vip_only    INTEGER NOT NULL DEFAULT 0,
+          likes       INTEGER NOT NULL DEFAULT 0,
+          comments    INTEGER NOT NULL DEFAULT 0,
+          active      INTEGER NOT NULL DEFAULT 1,
+          created_at  TEXT NOT NULL DEFAULT (datetime('now'))
         )
-      `).run()
-    ).catch((err) => {
+      `).run();
+
+      try {
+        await env.DB.prepare('ALTER TABLE stories ADD COLUMN vip_only INTEGER NOT NULL DEFAULT 0').run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+
+      await Promise.all([
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_active ON stories(active, created_at)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_vip_only ON stories(vip_only, active, created_at)').run(),
+        env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS story_likes (
+            user_id   TEXT NOT NULL,
+            story_id  TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (user_id, story_id)
+          )
+        `).run(),
+      ]);
+    })().catch((err) => {
       _storiesTableReady = null;
       throw err;
     });
@@ -5297,6 +5326,8 @@ const FREE_VIDEO_STORY_LIMIT = 5;
 
 // GET /api/stories
 async function handleGetStories(request, env) {
+  await ensureStoriesTable(env);
+
   const url = new URL(request.url);
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
   const requestedLimit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
@@ -5316,7 +5347,7 @@ async function handleGetStories(request, env) {
     if (viewer) setCachedViewer(viewerId, viewer);
   }
 
-  const viewerCanWatchAllStories = viewer && isPremiumActive(viewer);
+  const viewerCanWatchAllStories = Boolean(viewer && isPremiumActive(viewer));
   const enforceFreeStoryLimit = !isRailSurface && !viewerCanWatchAllStories;
   const effectiveLimit = enforceFreeStoryLimit
     ? Math.min(requestedLimit, FREE_VIDEO_STORY_LIMIT)
@@ -5346,16 +5377,26 @@ async function handleGetStories(request, env) {
       parts.push(` AND u.role IN (${roleValues.map(() => '?').join(', ')})`);
       values.push(...roleValues);
     }
+    if (!isRailSurface && !viewerCanWatchAllStories) {
+      parts.push(' AND (COALESCE(s.vip_only, 0) = 0 OR s.user_id = ?)');
+      values.push(viewerId || '');
+    }
     parts.push(' AND (s.user_id != ? OR ? = \'\' OR s.user_id = ?)');
     values.push(viewerId || '', viewerId || '', focusUserId);
   };
 
   let query = `
-    SELECT s.id, s.user_id, s.video_url, s.caption, s.likes, s.comments, s.created_at,
+    SELECT s.id, s.user_id, s.video_url, s.caption, COALESCE(s.vip_only, 0) AS vip_only,
+           CASE
+             WHEN COALESCE(s.vip_only, 0) = 1 AND s.user_id != ? AND ? = 0 THEN 1
+             ELSE 0
+           END AS restricted,
+           s.likes, s.comments, s.created_at,
            u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
            CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
   `;
   const queryParts = [query];
+  bindings.push(viewerId || '', viewerCanWatchAllStories ? 1 : 0);
   appendStoryVisibilityFilters(queryParts, bindings, { includeLiked: true });
   query = queryParts.join('\n');
   query += `
@@ -5392,11 +5433,17 @@ async function handleGetStories(request, env) {
 
 // POST /api/stories/:id/like — toggle like on a story
 async function handleToggleStoryLike(request, env, storyId) {
+  await ensureStoriesTable(env);
+
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
-  const story = await env.DB.prepare('SELECT id, user_id, likes FROM stories WHERE id = ?').bind(storyId).first();
+  const story = await env.DB.prepare('SELECT id, user_id, likes, COALESCE(vip_only, 0) AS vip_only FROM stories WHERE id = ?').bind(storyId).first();
   if (!story) return error('Historia no encontrada', 404);
+  if (Number(story.vip_only || 0) === 1 && story.user_id !== auth.sub) {
+    const viewer = getCachedViewer(auth.sub) || getCachedFullUser(auth.sub) || await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
+    if (!isPremiumActive(viewer)) return error('Historia disponible solo para usuarios VIP', 403);
+  }
 
   const existing = await env.DB.prepare(
     'SELECT user_id FROM story_likes WHERE user_id = ? AND story_id = ?'
@@ -5436,6 +5483,8 @@ async function handleToggleStoryLike(request, env, storyId) {
 }
 
 async function handleSyncStoryLikes(request, env) {
+  await ensureStoriesTable(env);
+
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
@@ -5451,9 +5500,16 @@ async function handleSyncStoryLikes(request, env) {
   }
 
   const updates = [];
+  let viewerForVipStory = null;
   for (const [storyId, desiredLiked] of deduped.entries()) {
-    const story = await env.DB.prepare('SELECT id, user_id, likes FROM stories WHERE id = ?').bind(storyId).first();
+    const story = await env.DB.prepare('SELECT id, user_id, likes, COALESCE(vip_only, 0) AS vip_only FROM stories WHERE id = ?').bind(storyId).first();
     if (!story) continue;
+    if (Number(story.vip_only || 0) === 1 && story.user_id !== auth.sub) {
+      if (!viewerForVipStory) {
+        viewerForVipStory = getCachedViewer(auth.sub) || getCachedFullUser(auth.sub) || await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
+      }
+      if (!isPremiumActive(viewerForVipStory)) continue;
+    }
 
     const existing = await env.DB.prepare(
       'SELECT user_id FROM story_likes WHERE user_id = ? AND story_id = ?'
@@ -5572,6 +5628,8 @@ async function handleDebugMediaCache(request, env) {
 
 // POST /api/admin/upload-story — admin uploads a video story for any user
 async function handleAdminUploadStory(request, env) {
+  await ensureStoriesTable(env);
+
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
@@ -5582,12 +5640,16 @@ async function handleAdminUploadStory(request, env) {
   const url = new URL(request.url);
   const userId = url.searchParams.get('user_id');
   const caption = url.searchParams.get('caption') || '';
+  const vipOnly = parseBooleanSetting(url.searchParams.get('vip_only'), false);
 
   if (!userId) return error('user_id requerido', 400);
 
   // Verify target user exists
-  const targetUser = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+  const targetUser = await env.DB.prepare('SELECT id, premium, premium_until FROM users WHERE id = ?').bind(userId).first();
   if (!targetUser) return error('Usuario no encontrado', 404);
+  if (vipOnly && !isPremiumActive(targetUser)) {
+    return error('Solo usuarios VIP pueden publicar historias solo VIP', 403);
+  }
 
   const contentType = request.headers.get('Content-Type') || '';
   if (!contentType.startsWith('video/')) {
@@ -5624,10 +5686,10 @@ async function handleAdminUploadStory(request, env) {
 
   const storyId = generateId();
   await env.DB.prepare(`
-    INSERT INTO stories (id, user_id, video_url, caption) VALUES (?, ?, ?, ?)
-  `).bind(storyId, userId, videoUrl, caption).run();
+    INSERT INTO stories (id, user_id, video_url, caption, vip_only) VALUES (?, ?, ?, ?, ?)
+  `).bind(storyId, userId, videoUrl, caption, vipOnly ? 1 : 0).run();
 
-  return json({ id: storyId, video_url: videoUrl, user_id: userId, caption }, 201);
+  return json({ id: storyId, video_url: videoUrl, user_id: userId, caption, vip_only: vipOnly }, 201);
 }
 
 // ── Admin: DELETE /api/admin/stories/:id ───────────────
@@ -5683,12 +5745,19 @@ async function handleAdminDeleteStory(request, env, storyId) {
 
 // POST /api/stories — authenticated user uploads their own story
 async function handleUploadStory(request, env) {
+  await ensureStoriesTable(env);
+
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
 
   const url = new URL(request.url);
   const caption = url.searchParams.get('caption') || '';
+  const vipOnly = parseBooleanSetting(url.searchParams.get('vip_only'), false);
+  if (vipOnly) {
+    const user = getCachedViewer(auth.sub) || getCachedFullUser(auth.sub) || await env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first();
+    if (!isPremiumActive(user)) return error('Solo usuarios VIP pueden publicar historias solo VIP', 403);
+  }
 
   const contentType = request.headers.get('Content-Type') || '';
   if (!contentType.startsWith('video/')) {
@@ -5725,10 +5794,10 @@ async function handleUploadStory(request, env) {
 
   const storyId = generateId();
   await env.DB.prepare(`
-    INSERT INTO stories (id, user_id, video_url, caption) VALUES (?, ?, ?, ?)
-  `).bind(storyId, auth.sub, videoUrl, caption).run();
+    INSERT INTO stories (id, user_id, video_url, caption, vip_only) VALUES (?, ?, ?, ?, ?)
+  `).bind(storyId, auth.sub, videoUrl, caption, vipOnly ? 1 : 0).run();
 
-  return json({ id: storyId, video_url: videoUrl, caption }, 201);
+  return json({ id: storyId, video_url: videoUrl, caption, vip_only: vipOnly }, 201);
 }
 
 async function handleRequest(request, env, ctx) {

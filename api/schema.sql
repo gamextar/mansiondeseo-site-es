@@ -235,6 +235,7 @@ CREATE TABLE IF NOT EXISTS stories (
   user_id    TEXT NOT NULL REFERENCES users(id),
   video_url  TEXT NOT NULL,
   caption    TEXT DEFAULT '',
+  vip_only   INTEGER NOT NULL DEFAULT 0,
   likes      INTEGER NOT NULL DEFAULT 0,
   comments   INTEGER NOT NULL DEFAULT 0,
   active     INTEGER NOT NULL DEFAULT 1,

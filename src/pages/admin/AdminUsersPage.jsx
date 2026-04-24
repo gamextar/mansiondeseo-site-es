@@ -61,6 +61,7 @@ export default function AdminUsersPage() {
   const [selectionLoading, setSelectionLoading] = useState(false);
   const [storyUploading, setStoryUploading] = useState(false);
   const [storyCaption, setStoryCaption] = useState('');
+  const [storyVipOnly, setStoryVipOnly] = useState(false);
   const [galleryEditing, setGalleryEditing] = useState(false);
   const [gallerySaving, setGallerySaving] = useState(false);
   const storyInputRef = useRef(null);
@@ -141,6 +142,7 @@ export default function AdminUsersPage() {
     setSelectedLoading(true);
     setGalleryEditing(false);
     setStoryCaption('');
+    setStoryVipOnly(false);
     try {
       const data = await adminGetUser(user.id);
       setSelected(data.user);
@@ -157,6 +159,7 @@ export default function AdminUsersPage() {
     setGalleryEditing(false);
     setGallerySaving(false);
     setStoryCaption('');
+    setStoryVipOnly(false);
     galleryDragItem.current = null;
     galleryDragOverItem.current = null;
   }, []);
@@ -287,6 +290,11 @@ export default function AdminUsersPage() {
   };
 
   const allCurrentPageSelected = users.length > 0 && users.every((u) => selectedIds.includes(u.id));
+  const selectedCanPublishVipOnlyStory = Boolean(selected?.premium);
+
+  useEffect(() => {
+    if (!selectedCanPublishVipOnlyStory) setStoryVipOnly(false);
+  }, [selectedCanPublishVipOnlyStory]);
 
   const handleStoryUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -294,10 +302,11 @@ export default function AdminUsersPage() {
     if (!file || !selected) return;
     setStoryUploading(true);
     try {
-      const result = await adminUploadStoryForUser(selected.id, file, { caption: storyCaption });
+      const result = await adminUploadStoryForUser(selected.id, file, { caption: storyCaption, vipOnly: storyVipOnly });
       setSelected(s => ({ ...s, story_id: result.id }));
       setUsers(prev => prev.map(u => u.id === selected.id ? { ...u, story_id: result.id } : u));
       setStoryCaption('');
+      setStoryVipOnly(false);
     } catch (err) {
       alert(err.message || 'Error al subir historia');
     } finally {
@@ -982,6 +991,20 @@ export default function AdminUsersPage() {
                         placeholder="Texto de la historia (opcional)..."
                         className="w-full px-4 py-2 rounded-xl bg-mansion-elevated border border-mansion-border/20 text-sm text-text-primary placeholder:text-text-dim focus:outline-none focus:border-mansion-gold/40"
                       />
+                      {selectedCanPublishVipOnlyStory && (
+                        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-mansion-gold/20 bg-mansion-gold/8 px-4 py-2.5">
+                          <span className="flex items-center gap-2 text-xs font-semibold text-text-primary">
+                            <Crown className="h-4 w-4 text-mansion-gold" />
+                            Solo usuarios VIP
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={storyVipOnly}
+                            onChange={e => setStoryVipOnly(e.target.checked)}
+                            className="h-4 w-4 accent-mansion-gold"
+                          />
+                        </label>
+                      )}
                       <button
                         disabled={storyUploading}
                         onClick={() => storyInputRef.current?.click()}

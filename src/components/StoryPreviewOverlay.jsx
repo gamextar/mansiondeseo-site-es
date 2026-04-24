@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Heart, Send, Gift, Volume2, VolumeX, X } from 'lucide-react';
+import { Heart, Send, Gift, Lock, Volume2, VolumeX, X } from 'lucide-react';
 import AvatarImg from './AvatarImg';
 
 const CLOSE_BTN_CLASS = 'absolute z-30 flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60';
@@ -17,6 +17,9 @@ export default function StoryPreviewOverlay({
   onConfirm,
   uploading = false,
   uploadProgress = 0,
+  canRestrictVipOnly = false,
+  vipOnly = false,
+  onVipOnlyChange,
   avatarSize = 52,
   navBottomOffset = 0,
 }) {
@@ -30,6 +33,7 @@ export default function StoryPreviewOverlay({
   const infoBottom = typeof navBottomOffset === 'number'
     ? navBottomOffset + 8
     : `calc(${navBottomOffset} + 8px)`;
+  const showVipOnlyToggle = Boolean(!uploading && onConfirm && canRestrictVipOnly && onVipOnlyChange);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -176,6 +180,30 @@ export default function StoryPreviewOverlay({
               <span className="rounded-full border border-white/10 bg-black/28 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm">Publicar</span>
             </motion.div>
           </div>
+        )}
+
+        {showVipOnlyToggle && (
+          <motion.label
+            initial={{ opacity: 0, x: '-50%', y: 10 }}
+            animate={{ opacity: 1, x: '-50%', y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="absolute left-1/2 z-30 flex cursor-pointer items-center gap-3 rounded-2xl border border-white/14 bg-black/46 px-4 py-3 text-white shadow-2xl backdrop-blur-md"
+            style={{ top: 'calc(50% + 7.25rem)' }}
+          >
+            <input
+              type="checkbox"
+              checked={!!vipOnly}
+              onChange={(event) => onVipOnlyChange(event.target.checked)}
+              className="sr-only"
+            />
+            <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
+              <Lock className="h-4 w-4 text-mansion-gold" />
+              Solo VIP
+            </span>
+            <span className={`relative h-6 w-11 rounded-full border transition-colors ${vipOnly ? 'border-mansion-gold/70 bg-mansion-gold/35' : 'border-white/20 bg-white/10'}`}>
+              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${vipOnly ? 'translate-x-5' : 'translate-x-1'}`} />
+            </span>
+          </motion.label>
         )}
 
         {/* Upload progress overlay */}
