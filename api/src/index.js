@@ -41,6 +41,7 @@ let _conversationStateReady = null;
 let _messageConversationIdReady = null;
 let _userBrowseIndexesReady = null;
 let _userFakeColumnReady = null;
+let _userFeedPriorityColumnReady = null;
 let _userDuplicateFlagColumnReady = null;
 let _userLocalityColumnReady = null;
 let _userBirthdateColumnReady = null;
@@ -194,6 +195,9 @@ function compareFeedBucketProfiles(a, b) {
   const aFake = Number(a.fake ? 1 : 0);
   const bFake = Number(b.fake ? 1 : 0);
   if (aFake !== bFake) return aFake - bFake;
+  const aPriority = Math.max(0, Number(a.feed_priority || 0));
+  const bPriority = Math.max(0, Number(b.feed_priority || 0));
+  if (bPriority !== aPriority) return bPriority - aPriority;
   if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
   return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
 }
@@ -318,6 +322,7 @@ function buildFeedBaseProfiles(rows, env, activeStoryUserIds, activeStoryUrlMap)
       premium_until: u.premium_until || null,
       ghost_mode: hasGhostMode,
       fake: !!u.fake,
+      feed_priority: Math.max(0, Number(u.feed_priority || 0)),
       marital_status: u.marital_status || '',
       sexual_orientation: u.sexual_orientation || '',
       lastActive: u.last_active,
@@ -753,6 +758,32 @@ async function ensureUsersFakeColumn(env) {
   }
 
   return _userFakeColumnReady;
+}
+
+async function ensureUsersFeedPriorityColumn(env) {
+  if (!_userFeedPriorityColumnReady) {
+    _userFeedPriorityColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          'ALTER TABLE users ADD COLUMN feed_priority INTEGER NOT NULL DEFAULT 0'
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+
+      await env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_users_feed_priority ON users(feed_priority)'
+      ).run();
+    })().catch((err) => {
+      _userFeedPriorityColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userFeedPriorityColumnReady;
 }
 
 async function ensureUsersDuplicateFlagColumn(env) {
@@ -2481,6 +2512,7 @@ async function handleProfiles(request, env) {
       u.premium_until,
       u.ghost_mode,
       u.fake,
+      COALESCE(u.feed_priority, 0) AS feed_priority,
       u.marital_status,
       u.sexual_orientation,
       u.last_active,
@@ -2809,6 +2841,7 @@ async function handleProfileDetail(request, env, userId) {
       premium: isPremiumActive(user),
       premium_until: user.premium_until || null,
       account_status: user.account_status || 'active',
+      feed_priority: Math.max(0, Number(user.feed_priority || 0)),
       ghost_mode: hasGhostMode,
       blurred,
       isFavorited,
@@ -3653,6 +3686,7 @@ function sanitizeUser(user, env) {
     ghost_mode: ghostMode,
     is_admin: !!safe.is_admin,
     fake: !!safe.fake,
+    feed_priority: Math.max(0, Number(safe.feed_priority || 0)),
     coins: safe.coins || 0,
   };
 }
@@ -4465,8 +4499,9 @@ async function handleAdminGetUsers(request, env) {
   let countQuery = 'SELECT COUNT(*) as total FROM users';
   await ensureUsersMessageBlockRolesColumn(env);
   await ensureUsersDuplicateFlagColumn(env);
+  await ensureUsersFeedPriorityColumn(env);
   let dataQuery = `SELECT id, email, username, role, seeking, message_block_roles, age, birthdate, city, locality, marital_status, sexual_orientation, country, avatar_url, status,
-    premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, duplicate_flag, account_status, last_active, last_ip, created_at,
+    premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, feed_priority, duplicate_flag, account_status, last_active, last_ip, created_at,
     (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id,
     (SELECT COALESCE(s.vip_only, 0) FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_vip_only
     FROM users`;
@@ -4538,6 +4573,7 @@ async function handleAdminGetUsers(request, env) {
       online: isOnline(u.last_active),
       is_admin: !!u.is_admin,
       fake: !!u.fake,
+      feed_priority: Math.max(0, Number(u.feed_priority || 0)),
       duplicate_flag: !!u.duplicate_flag,
       story_id: u.story_id || null,
       story_vip_only: Number(u.story_vip_only || 0) === 1,
@@ -4703,6 +4739,7 @@ async function handleAdminDeleteErrorLog(request, env, logId) {
 async function handleAdminGetUser(request, env, userId) {
   await ensureUsersMessageBlockRolesColumn(env);
   await ensureUsersDuplicateFlagColumn(env);
+  await ensureUsersFeedPriorityColumn(env);
   await ensureStoriesTable(env);
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
@@ -4733,6 +4770,7 @@ async function handleAdminGetUser(request, env, userId) {
       online: isOnline(safe.last_active),
       is_admin: !!safe.is_admin,
       fake: !!safe.fake,
+      feed_priority: Math.max(0, Number(safe.feed_priority || 0)),
       duplicate_flag: !!safe.duplicate_flag,
       story_id: story?.id || null,
       story_vip_only: Number(story?.vip_only || 0) === 1,
@@ -4744,6 +4782,7 @@ async function handleAdminGetUser(request, env, userId) {
 async function handleAdminUpdateUser(request, env, userId) {
   await ensureUsersMessageBlockRolesColumn(env);
   await ensureUsersDuplicateFlagColumn(env);
+  await ensureUsersFeedPriorityColumn(env);
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -4767,6 +4806,10 @@ async function handleAdminUpdateUser(request, env, userId) {
   if (body.verified !== undefined) { updates.push('verified = ?'); vals.push(body.verified ? 1 : 0); }
   if (body.ghost_mode !== undefined) { updates.push('ghost_mode = ?'); vals.push(body.ghost_mode ? 1 : 0); }
   if (body.fake !== undefined) { updates.push('fake = ?'); vals.push(body.fake ? 1 : 0); }
+  if (body.feed_priority !== undefined) {
+    updates.push('feed_priority = ?');
+    vals.push(Math.max(0, Math.min(1000, Number.parseInt(String(body.feed_priority || 0), 10) || 0)));
+  }
   if (body.duplicate_flag !== undefined) { updates.push('duplicate_flag = ?'); vals.push(body.duplicate_flag ? 1 : 0); }
   if (body.marital_status !== undefined) { updates.push('marital_status = ?'); vals.push(body.marital_status || ''); }
   if (body.sexual_orientation !== undefined) { updates.push('sexual_orientation = ?'); vals.push(body.sexual_orientation || ''); }
@@ -4808,6 +4851,7 @@ async function handleAdminUpdateUser(request, env, userId) {
       online: isOnline(safe.last_active),
       is_admin: !!safe.is_admin,
       fake: !!safe.fake,
+      feed_priority: Math.max(0, Number(safe.feed_priority || 0)),
       duplicate_flag: !!safe.duplicate_flag,
     }
   });
@@ -5974,6 +6018,7 @@ async function handleRequest(request, env, ctx) {
   const method = request.method;
 
   await ensureUsersFakeColumn(env);
+  await ensureUsersFeedPriorityColumn(env);
   await ensureUsersDuplicateFlagColumn(env);
   await ensureUsersLocalityColumn(env);
   await ensureUsersBirthdateColumn(env);

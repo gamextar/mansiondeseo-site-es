@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS users (
   account_status     TEXT NOT NULL DEFAULT 'active' CHECK(account_status IN ('active','under_review','suspended')),
   avatar_crop        TEXT DEFAULT NULL,
   fake               INTEGER NOT NULL DEFAULT 0,
+  feed_priority      INTEGER NOT NULL DEFAULT 0,
   locality           TEXT,
   birthdate          TEXT,
   marital_status     TEXT,
@@ -48,6 +49,7 @@ CREATE INDEX IF NOT EXISTS idx_users_status_active ON users(status, last_active 
 CREATE INDEX IF NOT EXISTS idx_users_status_country_active ON users(status, country, last_active DESC);
 CREATE INDEX IF NOT EXISTS idx_users_status_country_role_active ON users(status, country, role, last_active DESC);
 CREATE INDEX IF NOT EXISTS idx_users_fake ON users(fake);
+CREATE INDEX IF NOT EXISTS idx_users_feed_priority ON users(feed_priority);
 CREATE INDEX IF NOT EXISTS idx_users_duplicate_flag ON users(duplicate_flag);
 
 -- Processed payments

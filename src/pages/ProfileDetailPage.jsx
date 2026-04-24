@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Heart, MessageCircle, Shield, Crown,
-  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift, Eye, AlertTriangle,
+  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift, Eye, AlertTriangle, Star,
 } from 'lucide-react';
 import { getProfile, getToken, toggleFavorite, updateProfile, adminUpdateUser, invalidateProfilesCache, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
@@ -133,6 +133,7 @@ export default function ProfileDetailPage({ initialData }) {
   const [orderedPhotos, setOrderedPhotos] = useState(initialProfile?.photos || []);
   const [savingOrder, setSavingOrder] = useState(false);
   const [togglingReview, setTogglingReview] = useState(false);
+  const [togglingPriority, setTogglingPriority] = useState(false);
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
   // Gift state
@@ -330,6 +331,41 @@ export default function ProfileDetailPage({ initialData }) {
       setTogglingReview(false);
     }
   }, [id, profile, togglingReview, settings, user?.is_admin, viewerIsAdmin, viewerPremium]);
+
+  const handleToggleFeedPriority = useCallback(async () => {
+    const canAdminPrioritize = viewerIsAdmin || !!user?.is_admin;
+    if (!canAdminPrioritize || profile?.isOwnProfile || !profile?.id || togglingPriority) return;
+    const currentPriority = Math.max(0, Number(profile.feed_priority || 0));
+    const nextPriority = currentPriority > 0 ? 0 : 100;
+
+    setTogglingPriority(true);
+    try {
+      const data = await adminUpdateUser(profile.id, { feed_priority: nextPriority });
+      setProfile((prev) => {
+        if (!prev) return prev;
+        const nextProfile = {
+          ...prev,
+          feed_priority: Math.max(0, Number(data.user.feed_priority || 0)),
+        };
+        writeProfileDetailCache(id, {
+          profile: nextProfile,
+          viewerPremium,
+          viewerIsAdmin: canAdminPrioritize,
+          settings,
+        });
+        return nextProfile;
+      });
+      invalidateProfilesCache();
+      try {
+        sessionStorage.setItem('mansion_feed_dirty', '1');
+        sessionStorage.setItem('mansion_feed_force_refresh', '1');
+      } catch {}
+    } catch (err) {
+      alert(err.message || 'Error al actualizar prioridad');
+    } finally {
+      setTogglingPriority(false);
+    }
+  }, [id, profile, togglingPriority, settings, user?.is_admin, viewerIsAdmin, viewerPremium]);
 
   const handleToggleFavorite = async () => {
     if (togglingFav) return;
@@ -793,18 +829,32 @@ export default function ProfileDetailPage({ initialData }) {
                   </span>
                 )}
                 {canAdminEditViewedProfile && (
-                  <button
-                    onClick={handleToggleReview}
-                    disabled={togglingReview}
-                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold shadow transition-colors ${
-                      ((profile?.account_status) || 'active') === 'under_review'
-                        ? 'bg-yellow-500 text-black hover:bg-yellow-400'
-                        : 'bg-mansion-crimson text-white hover:bg-red-600'
-                    } disabled:opacity-60`}
-                  >
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    {((profile?.account_status) || 'active') === 'under_review' ? 'EN REVISIÓN' : 'SUSPENDER'}
-                  </button>
+                  <>
+                    <button
+                      onClick={handleToggleFeedPriority}
+                      disabled={togglingPriority}
+                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold shadow transition-colors ${
+                        Number(profile?.feed_priority || 0) > 0
+                          ? 'bg-mansion-gold text-mansion-base hover:bg-mansion-gold-light'
+                          : 'bg-white/10 text-mansion-gold hover:bg-white/15'
+                      } disabled:opacity-60`}
+                    >
+                      <Star className="w-3.5 h-3.5" />
+                      {Number(profile?.feed_priority || 0) > 0 ? 'QUITAR PRIORIDAD' : 'DAR PRIORIDAD'}
+                    </button>
+                    <button
+                      onClick={handleToggleReview}
+                      disabled={togglingReview}
+                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold shadow transition-colors ${
+                        ((profile?.account_status) || 'active') === 'under_review'
+                          ? 'bg-yellow-500 text-black hover:bg-yellow-400'
+                          : 'bg-mansion-crimson text-white hover:bg-red-600'
+                      } disabled:opacity-60`}
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      {((profile?.account_status) || 'active') === 'under_review' ? 'EN REVISIÓN' : 'SUSPENDER'}
+                    </button>
+                  </>
                 )}
               </div>
             </div>
