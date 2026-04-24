@@ -203,6 +203,7 @@ export default function ChatPage() {
   const typingIdleTimerRef = useRef(null);
   const wasAtBottomRef = useRef(true);
   const myUserIdRef = useRef(null);
+  const fastKeyboardSettleRef = useRef(false);
   const pendingScrollBehaviorRef = useRef(null);
   const pendingScrollForceRef = useRef(false);
   const restoreScrollAfterPrependRef = useRef(null);
@@ -338,6 +339,17 @@ export default function ChatPage() {
 
     scheduleTypingStop();
   }, [scheduleTypingStop, stopTypingSignal]);
+
+  const settleMobileKeyboardViewport = useCallback((fast = false) => {
+    if (!isMobileBrowserChat || typeof window === 'undefined') return;
+    const delays = fast ? [0] : [0, 120];
+    delays.forEach((delay) => {
+      window.setTimeout(() => {
+        window.scrollTo(0, 0);
+        window.dispatchEvent(new Event('resize'));
+      }, delay);
+    });
+  }, [isMobileBrowserChat]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -784,6 +796,7 @@ export default function ChatPage() {
 
   const handleSend = async () => {
     if (!input.trim() || !effectiveCanSend) return;
+    fastKeyboardSettleRef.current = true;
 
     const text = input.trim();
     const tempId = `temp-${Date.now()}`;
@@ -870,14 +883,9 @@ export default function ChatPage() {
 
   const handleInputBlur = () => {
     stopTypingSignal();
-    if (isMobileBrowserChat && typeof window !== 'undefined') {
-      [0, 120].forEach((delay) => {
-        window.setTimeout(() => {
-          window.scrollTo(0, 0);
-          window.dispatchEvent(new Event('resize'));
-        }, delay);
-      });
-    }
+    const fastSettle = fastKeyboardSettleRef.current || input.trim().length === 0;
+    fastKeyboardSettleRef.current = false;
+    settleMobileKeyboardViewport(fastSettle);
     if (chatDebugEnabled) {
       requestAnimationFrame(() => captureChatDebug('blur'));
     }
@@ -1147,6 +1155,9 @@ export default function ChatPage() {
           {/* Send */}
           <motion.button
             whileTap={{ scale: 0.9 }}
+            onPointerDown={() => {
+              if (input.trim() && effectiveCanSend) fastKeyboardSettleRef.current = true;
+            }}
             onClick={handleSend}
             disabled={!input.trim() || !effectiveCanSend}
             className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all lg:w-12 lg:h-12 ${
