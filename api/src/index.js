@@ -32,6 +32,18 @@ function invalidateFeedBrowseCache() {
   }
 }
 
+async function bumpFeedCacheVersion(env) {
+  const nextVersion = String(Date.now());
+  await env.DB.prepare(`
+    INSERT INTO site_settings (key, value)
+    VALUES ('feed_cache_version', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).bind(nextVersion).run();
+  _cache.delete('settings');
+  invalidateFeedBrowseCache();
+  return nextVersion;
+}
+
 const _routeMetrics = new Map();
 let _metricsWindowStartedAt = Date.now();
 let _metricsRequestCount = 0;
@@ -2729,6 +2741,7 @@ async function handleProfiles(request, env) {
     profiles: pagedProfiles,
     viewerPremium: viewerIsPremium,
     settings,
+    feedCacheVersion: settings.feedCacheVersion,
     totalProfiles,
     nextCursor: nextCursor !== null ? String(nextCursor) : null,
     hasMore,
@@ -2750,6 +2763,17 @@ async function handleProfiles(request, env) {
   }
 
   return json(responseBody, 200, timingHeaders);
+}
+
+async function handleProfilesVersion(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const row = await env.DB.prepare(
+    "SELECT value FROM site_settings WHERE key = 'feed_cache_version'"
+  ).first();
+  return json({ feedCacheVersion: String(row?.value || '0') }, 200, {
+    'Cache-Control': 'no-store',
+  });
 }
 
 // ── GET /api/profiles/:id ───────────────────────────────
@@ -3950,6 +3974,7 @@ async function loadSettings(env) {
     feedCardsPerPageMobile: parseNumberSetting(settings.feed_cards_per_page_mobile, settings.feed_cards_per_page || 12),
     feedMaxPages: parseNumberSetting(settings.feed_max_pages, 10),
     feedPrefetchPages: parseNumberSetting(settings.feed_prefetch_pages, 6),
+    feedCacheVersion: String(settings.feed_cache_version || '0'),
     homeStoryCountMobile: parseNumberSetting(settings.home_story_count_mobile, 15),
     homeStoryCountDesktop: parseNumberSetting(settings.home_story_count_desktop, 30),
     storyRailGapMobile: parseNumberSetting(settings.story_rail_gap_mobile, STORY_RAIL_FALLBACK_GAP_MOBILE),
@@ -4021,6 +4046,7 @@ function getPublicSettingsPayload(settings) {
     feedCardsPerPageMobile: settings.feedCardsPerPageMobile,
     feedMaxPages: settings.feedMaxPages,
     feedPrefetchPages: settings.feedPrefetchPages,
+    feedCacheVersion: settings.feedCacheVersion,
     freeVideoStoryLimit: settings.freeVideoStoryLimit,
     homeStoryCountMobile: settings.homeStoryCountMobile,
     homeStoryCountDesktop: settings.homeStoryCountDesktop,
@@ -5135,6 +5161,7 @@ async function handleAdminDeleteUser(request, env, userId) {
   if (!user) return error('Usuario no encontrado', 404);
 
   await deleteUserCompletely(env, user);
+  await bumpFeedCacheVersion(env);
 
   console.log(`🗑️ Admin eliminó usuario ${userId} (${user.email})`);
   return json({ success: true });
@@ -5170,6 +5197,9 @@ async function handleAdminBulkDeleteUsers(request, env) {
     } catch (err) {
       results.push({ user_id: userId, email: user.email, username: user.username, deleted: false, reason: 'delete_failed', error: String(err?.message || err) });
     }
+  }
+  if (results.some((item) => item.deleted)) {
+    await bumpFeedCacheVersion(env);
   }
 
   return json({
@@ -6326,6 +6356,7 @@ async function handleRequest(request, env, ctx) {
 
   // ── Profile routes
   if (path === '/api/profiles' && method === 'GET') return handleProfiles(request, env);
+  if (path === '/api/profiles/version' && method === 'GET') return handleProfilesVersion(request, env);
   if (path === '/api/profile' && method === 'PUT') return handleUpdateProfile(request, env);
   const chatBootstrapMatch = path.match(/^\/api\/chat\/bootstrap\/([a-f0-9-]+)$/);
   if (chatBootstrapMatch && method === 'GET') return handleChatBootstrap(request, env, chatBootstrapMatch[1]);

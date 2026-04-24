@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MapPin, Shield, Crown, Lock } from 'lucide-react';
 import { getDisplayPhotos, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { formatLocation } from '../lib/location';
@@ -90,6 +90,7 @@ export default function ProfileCard({
   const location = useLocation();
   const navigate = useNavigate();
   const touchStartRef = useRef(null);
+  const [imageFailed, setImageFailed] = useState(false);
   const { id, name, age, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const safariDesktop = typeof safariDesktopOverride === 'boolean' ? safariDesktopOverride : isSafariDesktopBrowser();
   const roleImg = settings[ROLE_IMG_KEYS[role]] || null;
@@ -107,6 +108,11 @@ export default function ProfileCard({
   const cardBlocked = blurred || visiblePhotos === 0;
   const mainPhoto = getPrimaryProfilePhoto(profile);
   const resolvedMainPhoto = resolveMediaUrl(mainPhoto);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [resolvedMainPhoto]);
+
   const returnToPath = `${location.pathname}${location.search}${location.hash}`;
   const useOverlayNavigation = location.pathname === '/' || location.pathname === '/feed' || location.pathname === '/explorar';
   const profilePath = `/perfiles/${id}`;
@@ -182,10 +188,11 @@ export default function ProfileCard({
           }`}
         >
           {/* Photo — use actual photo with blur for blocked cards */}
-          {mainPhoto ? (
+          {mainPhoto && !imageFailed ? (
             <img
               src={resolvedMainPhoto}
               alt={cardBlocked ? '' : name}
+              onError={() => setImageFailed(true)}
               referrerPolicy="no-referrer"
               draggable={false}
               loading={index < (safariDesktop ? 2 : 6) ? 'eager' : 'lazy'}

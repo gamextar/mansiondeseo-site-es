@@ -7,7 +7,7 @@ import { useAuth } from '../lib/authContext';
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } };
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
-import { getProfiles, getStories, getToken } from '../lib/api';
+import { getProfiles, getProfilesVersion, getStories, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
@@ -16,6 +16,7 @@ import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStor
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const FEED_CACHE_VERSION = 2;
+const FEED_GLOBAL_VERSION_KEY = 'mansion_feed_cache_version';
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
 const DEFAULT_CARDS_PER_PAGE = 12;
@@ -121,6 +122,10 @@ function getCachedFeed() {
     const parsed = JSON.parse(raw);
     const cacheVersion = Number(parsed?.version || 0);
     if (cacheVersion !== FEED_CACHE_VERSION) return null;
+    const knownFeedVersion = localStorage.getItem(FEED_GLOBAL_VERSION_KEY) || '';
+    const cachedFeedVersion = String(parsed?.feedCacheVersion || '');
+    if (knownFeedVersion && cachedFeedVersion && knownFeedVersion !== cachedFeedVersion) return null;
+    if (knownFeedVersion && !cachedFeedVersion) return null;
     const currentCursor = Number(parsed?.currentCursor) || 0;
     const blockCursor = Number(parsed?.blockCursor ?? parsed?.currentCursor) || 0;
     const pageCursor = Number(parsed?.pageCursor ?? parsed?.currentCursor) || 0;
@@ -142,8 +147,11 @@ function getCachedFeed() {
 
 function setCachedFeed(data) {
   try {
+    const feedCacheVersion = String(data.feedCacheVersion || data.settings?.feedCacheVersion || localStorage.getItem(FEED_GLOBAL_VERSION_KEY) || '0');
+    if (feedCacheVersion) localStorage.setItem(FEED_GLOBAL_VERSION_KEY, feedCacheVersion);
     localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({
       version: FEED_CACHE_VERSION,
+      feedCacheVersion,
       profiles: data.profiles || [],
       viewerPremium: data.viewerPremium || false,
       settings: {},
@@ -250,6 +258,7 @@ export default function FeedPage({ initialData }) {
       viewerPremium: data.viewerPremium || false,
       settings: data.settings || {},
       totalProfiles: Number(data.totalProfiles) || 0,
+      feedCacheVersion: data.feedCacheVersion || data.settings?.feedCacheVersion || '',
       currentCursor: Number(data.cursor) || cursor || 0,
       blockCursor: Number(data.cursor) || cursor || 0,
       pageCursor: Number(targetPageCursor ?? data.cursor ?? cursor) || 0,
@@ -345,6 +354,35 @@ export default function FeedPage({ initialData }) {
     }
   }, [isDesktopViewport, setBootstrapStories]);
 
+  const refreshIfFeedVersionChanged = useCallback(async ({ cachedFeed, cursor = 0, pageSize, targetPageCursor } = {}) => {
+    try {
+      const data = await getProfilesVersion();
+      const remoteVersion = String(data?.feedCacheVersion || '0');
+      const localVersion = String(cachedFeed?.feedCacheVersion || localStorage.getItem(FEED_GLOBAL_VERSION_KEY) || '0');
+      if (!remoteVersion || remoteVersion === localVersion) {
+        if (remoteVersion) localStorage.setItem(FEED_GLOBAL_VERSION_KEY, remoteVersion);
+        return false;
+      }
+
+      localStorage.setItem(FEED_GLOBAL_VERSION_KEY, remoteVersion);
+      localStorage.removeItem(FEED_CACHE_KEY);
+      prefetchedBlocksRef.current.clear();
+      prefetchInFlightRef.current.clear();
+      setHomeStories([]);
+      setBootstrapStories([]);
+      void loadHomeStories({ syncBootstrap: true });
+      await loadProfiles({
+        forceFresh: true,
+        cursor,
+        pageSize,
+        targetPageCursor,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }, [loadHomeStories, loadProfiles, setBootstrapStories]);
+
   // Initial/config load — reruns when the viewport crosses the mobile/desktop page-size boundary.
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
@@ -377,10 +415,15 @@ export default function FeedPage({ initialData }) {
       return;
     }
 
-    // Cache is valid — show it instantly, no background fetch.
-    // Data stays fresh until: pull-to-refresh, cache invalidation (profile edit),
-    // or cache is > 30 minutes old (stale safety net).
+    // Cache is valid — show it instantly, then run a cheap version check so
+    // admin deletes can invalidate stale local feeds across clients.
     setLoading(false);
+    void refreshIfFeedVersionChanged({
+      cachedFeed,
+      cursor: Math.floor(cachedPageCursor / expectedPageSize) * expectedPageSize,
+      pageSize: expectedPageSize,
+      targetPageCursor: cachedPageCursor,
+    });
     try {
       sessionStorage.removeItem('mansion_feed_dirty');
       sessionStorage.removeItem('mansion_feed_force_refresh');
@@ -477,7 +520,19 @@ export default function FeedPage({ initialData }) {
   // Reload feed ONLY when explicitly marked dirty (preference/settings changes)
   useEffect(() => {
     const onFocus = () => {
-      if (!sessionStorage.getItem('mansion_feed_dirty')) return;
+      if (!sessionStorage.getItem('mansion_feed_dirty')) {
+        const cachedFeed = getCachedFeed();
+        const s = settingsRef.current;
+        const nextCardsPerPage = getFeedCardsPerPage(s, isDesktopViewport);
+        const nextBlockSize = nextCardsPerPage * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES);
+        void refreshIfFeedVersionChanged({
+          cachedFeed,
+          cursor: Math.floor(pageCursor / nextBlockSize) * nextBlockSize,
+          pageSize: nextBlockSize,
+          targetPageCursor: pageCursor,
+        });
+        return;
+      }
       sessionStorage.removeItem('mansion_feed_dirty');
       const shouldForceFresh = sessionStorage.getItem('mansion_feed_force_refresh') === '1';
       sessionStorage.removeItem('mansion_feed_force_refresh');
@@ -497,7 +552,7 @@ export default function FeedPage({ initialData }) {
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [isDesktopViewport, loadHomeStories, loadProfiles, pageCursor]);
+  }, [isDesktopViewport, loadHomeStories, loadProfiles, pageCursor, refreshIfFeedVersionChanged]);
 
   const { indicatorRef } = usePullToRefresh(
     useCallback(() => Promise.all([

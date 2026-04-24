@@ -782,6 +782,10 @@ export async function getProfiles({ filter, q, fresh = false, cursor, pageSize }
   return sharedGet(cacheKey, () => apiFetch(path), { ttlMs: 5 * 60_000 });
 }
 
+export async function getProfilesVersion() {
+  return apiFetch('/profiles/version');
+}
+
 export function invalidateProfilesCache() {
   for (const key of sharedGetCache.keys()) {
     if (String(key).startsWith('profiles:')) {
@@ -1208,14 +1212,18 @@ export async function adminUpdateUser(userId, fields) {
 }
 
 export async function adminDeleteUser(userId) {
-  return apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
+  const result = await apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
+  markFeedDirty();
+  return result;
 }
 
 export async function adminBulkDeleteUsers(userIds) {
-  return apiFetch('/admin/users/bulk-delete', {
+  const result = await apiFetch('/admin/users/bulk-delete', {
     method: 'POST',
     body: JSON.stringify({ user_ids: userIds }),
   });
+  if (Number(result?.deleted || 0) > 0) markFeedDirty();
+  return result;
 }
 
 export async function adminGetErrorLogs({ page = 1, limit = 25, q = '', source = '', level = '' } = {}) {
