@@ -65,6 +65,7 @@ const STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT = 3;
 const STORY_RAIL_FALLBACK_GAP_MOBILE = 6;
 const STORY_RAIL_FALLBACK_GAP_DESKTOP = 7;
 const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
+const FREE_VIDEO_STORY_DAILY_LIMIT = 10;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -73,6 +74,12 @@ function clamp01(value) {
 function parseNumberSetting(value, fallback) {
   const parsed = Number.parseFloat(String(value ?? ''));
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseIntegerSetting(value, fallback, min = 0, max = Number.MAX_SAFE_INTEGER) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
 }
 
 function parseBooleanSetting(value, fallback = false) {
@@ -3798,6 +3805,7 @@ async function loadSettings(env) {
     freeVisiblePhotos: parseInt(settings.free_visible_photos || '1', 10),
     showVipButton: settings.show_vip_button !== '0',
     dailyMessageLimit: parseInt(settings.daily_message_limit || '5', 10),
+    freeVideoStoryLimit: parseIntegerSetting(settings.free_video_story_daily_limit, FREE_VIDEO_STORY_DAILY_LIMIT, 0, 500),
     siteCountry,
     siteLocale: settings.site_locale || (siteCountry === 'ES' ? 'es-ES' : 'es-AR'),
     siteTimezone: settings.site_timezone || (siteCountry === 'ES' ? 'Europe/Madrid' : 'America/Argentina/Buenos_Aires'),
@@ -3947,6 +3955,7 @@ function getPublicSettingsPayload(settings) {
     feedCardsPerPageMobile: settings.feedCardsPerPageMobile,
     feedMaxPages: settings.feedMaxPages,
     feedPrefetchPages: settings.feedPrefetchPages,
+    freeVideoStoryLimit: settings.freeVideoStoryLimit,
     homeStoryCountMobile: settings.homeStoryCountMobile,
     homeStoryCountDesktop: settings.homeStoryCountDesktop,
     storyRailGapMobile: settings.storyRailGapMobile,
@@ -4061,6 +4070,7 @@ async function handleUpdateSettings(request, env) {
     'feed_cards_per_page_mobile',
     'feed_max_pages',
     'feed_prefetch_pages',
+    'free_video_story_daily_limit',
     'home_story_count_mobile',
     'home_story_count_desktop',
     'story_rail_gap_mobile',
@@ -5323,6 +5333,16 @@ async function ensureStoriesTable(env) {
             PRIMARY KEY (user_id, story_id)
           )
         `).run(),
+        env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS story_daily_views (
+            user_id   TEXT NOT NULL,
+            story_id  TEXT NOT NULL,
+            date_utc  TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (user_id, story_id, date_utc)
+          )
+        `).run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_story_daily_views_user_date ON story_daily_views(user_id, date_utc)').run(),
       ]);
     })().catch((err) => {
       _storiesTableReady = null;
@@ -5332,11 +5352,52 @@ async function ensureStoriesTable(env) {
   return _storiesTableReady;
 }
 
-const FREE_VIDEO_STORY_LIMIT = 5;
+function getStoryDailyLimit(settings) {
+  return parseIntegerSetting(settings?.freeVideoStoryLimit, FREE_VIDEO_STORY_DAILY_LIMIT, 0, 500);
+}
+
+async function getStoryViewLimitStatus(env, viewerId, viewerCanWatchAllStories, settings) {
+  const dailyLimit = getStoryDailyLimit(settings);
+  if (viewerCanWatchAllStories) {
+    return {
+      limited: false,
+      dailyLimit,
+      viewedToday: 0,
+      remaining: null,
+      canWatch: true,
+    };
+  }
+
+  if (!viewerId) {
+    return {
+      limited: true,
+      dailyLimit,
+      viewedToday: 0,
+      remaining: dailyLimit,
+      canWatch: dailyLimit > 0,
+    };
+  }
+
+  const today = todayUTC();
+  const row = await env.DB.prepare(
+    'SELECT COUNT(*) AS count FROM story_daily_views WHERE user_id = ? AND date_utc = ?'
+  ).bind(viewerId, today).first();
+  const viewedToday = Number(row?.count || 0);
+  const remaining = Math.max(0, dailyLimit - viewedToday);
+
+  return {
+    limited: true,
+    dailyLimit,
+    viewedToday,
+    remaining,
+    canWatch: remaining > 0,
+  };
+}
 
 // GET /api/stories
 async function handleGetStories(request, env) {
   await ensureStoriesTable(env);
+  const settings = await cached('settings', 300_000, () => loadSettings(env));
 
   const url = new URL(request.url);
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
@@ -5358,11 +5419,9 @@ async function handleGetStories(request, env) {
   }
 
   const viewerCanWatchAllStories = Boolean(viewer && isPremiumActive(viewer));
-  const enforceFreeStoryLimit = !isRailSurface && !viewerCanWatchAllStories;
-  const effectiveLimit = enforceFreeStoryLimit
-    ? Math.min(requestedLimit, FREE_VIDEO_STORY_LIMIT)
-    : requestedLimit;
-  const effectivePage = enforceFreeStoryLimit ? 1 : page;
+  const storyViewLimit = await getStoryViewLimitStatus(env, viewerId, viewerCanWatchAllStories, settings);
+  const effectiveLimit = requestedLimit;
+  const effectivePage = page;
   let offset = (effectivePage - 1) * effectiveLimit;
 
   const viewerSeeking = normalizeRoleArray(safeParseJSON(viewer?.seeking, []), SEEKING_ROLE_IDS, []);
@@ -5413,7 +5472,7 @@ async function handleGetStories(request, env) {
     ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC, s.id DESC
   `;
 
-  const allowFocusWindow = focusUserId && effectivePage === 1 && !enforceFreeStoryLimit;
+  const allowFocusWindow = focusUserId && effectivePage === 1;
   const storyWindowLimit = Math.max(
     offset + effectiveLimit + 1,
     allowFocusWindow ? 400 : effectiveLimit
@@ -5434,10 +5493,84 @@ async function handleGetStories(request, env) {
 
   return json({
     stories,
-    videoLimit: {
-      limited: enforceFreeStoryLimit,
-      freeLimit: FREE_VIDEO_STORY_LIMIT,
-    },
+    videoLimit: storyViewLimit,
+  });
+}
+
+// POST /api/stories/:id/view — count a non-VIP viewer's daily story access
+async function handleRecordStoryView(request, env, storyId) {
+  await ensureStoriesTable(env);
+
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const [story, viewer, settings] = await Promise.all([
+    env.DB.prepare('SELECT id, user_id, COALESCE(vip_only, 0) AS vip_only FROM stories WHERE id = ? AND active = 1').bind(storyId).first(),
+    env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
+    cached('settings', 300_000, () => loadSettings(env)),
+  ]);
+
+  if (!story) return error('Historia no encontrada', 404);
+
+  const viewerCanWatchAllStories = isPremiumActive(viewer);
+  const isOwnStory = String(story.user_id) === String(auth.sub);
+  if (Number(story.vip_only || 0) === 1 && !viewerCanWatchAllStories && !isOwnStory) {
+    return json({
+      error: 'Esta historia es solo para usuarios VIP.',
+      code: 'VIP_STORY_REQUIRED',
+      videoLimit: await getStoryViewLimitStatus(env, auth.sub, viewerCanWatchAllStories, settings),
+    }, 403);
+  }
+
+  if (viewerCanWatchAllStories) {
+    return json({
+      allowed: true,
+      counted: false,
+      videoLimit: await getStoryViewLimitStatus(env, auth.sub, true, settings),
+    });
+  }
+
+  const today = todayUTC();
+  const dailyLimit = getStoryDailyLimit(settings);
+  const existing = await env.DB.prepare(
+    'SELECT 1 FROM story_daily_views WHERE user_id = ? AND story_id = ? AND date_utc = ?'
+  ).bind(auth.sub, storyId, today).first();
+
+  if (existing) {
+    return json({
+      allowed: true,
+      counted: false,
+      videoLimit: await getStoryViewLimitStatus(env, auth.sub, false, settings),
+    });
+  }
+
+  const countRow = await env.DB.prepare(
+    'SELECT COUNT(*) AS count FROM story_daily_views WHERE user_id = ? AND date_utc = ?'
+  ).bind(auth.sub, today).first();
+  const currentCount = Number(countRow?.count || 0);
+
+  if (currentCount >= dailyLimit) {
+    return json({
+      error: `Alcanzaste el límite diario de ${dailyLimit} historias. Hazte VIP para ver historias sin límite.`,
+      code: 'DAILY_STORY_LIMIT',
+      videoLimit: {
+        limited: true,
+        dailyLimit,
+        viewedToday: currentCount,
+        remaining: 0,
+        canWatch: false,
+      },
+    }, 403);
+  }
+
+  await env.DB.prepare(
+    'INSERT OR IGNORE INTO story_daily_views (user_id, story_id, date_utc) VALUES (?, ?, ?)'
+  ).bind(auth.sub, storyId, today).run();
+
+  return json({
+    allowed: true,
+    counted: true,
+    videoLimit: await getStoryViewLimitStatus(env, auth.sub, false, settings),
   });
 }
 
@@ -5962,6 +6095,8 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/stories/likes/sync' && method === 'POST') return handleSyncStoryLikes(request, env);
   const storyLikeMatch = path.match(/^\/api\/stories\/([a-f0-9-]+)\/like$/);
   if (storyLikeMatch && method === 'POST') return handleToggleStoryLike(request, env, storyLikeMatch[1]);
+  const storyViewMatch = path.match(/^\/api\/stories\/([a-f0-9-]+)\/view$/);
+  if (storyViewMatch && method === 'POST') return handleRecordStoryView(request, env, storyViewMatch[1]);
   const userStoryMatch = path.match(/^\/api\/stories\/([a-f0-9-]+)$/);
   if (userStoryMatch && method === 'DELETE') return handleDeleteOwnStory(request, env, userStoryMatch[1]);
   if (path === '/api/admin/upload-story' && method === 'POST') return handleAdminUploadStory(request, env);

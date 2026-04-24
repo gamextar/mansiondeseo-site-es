@@ -251,6 +251,16 @@ CREATE TABLE IF NOT EXISTS story_likes (
   PRIMARY KEY (user_id, story_id)
 );
 
+CREATE TABLE IF NOT EXISTS story_daily_views (
+  user_id    TEXT NOT NULL,
+  story_id   TEXT NOT NULL,
+  date_utc   TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, story_id, date_utc)
+);
+
+CREATE INDEX IF NOT EXISTS idx_story_daily_views_user_date ON story_daily_views(user_id, date_utc);
+
 -- SEO city stats
 CREATE TABLE IF NOT EXISTS seo_city_stats (
   city_slug           TEXT NOT NULL,

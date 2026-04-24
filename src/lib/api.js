@@ -1261,6 +1261,18 @@ export async function getStories({ page = 1, limit = 25, focusUserId = '', surfa
   return sharedGet(`stories:${surface || 'video'}:${page}:${limit}:`, () => apiFetch(path), { ttlMs: 2 * 60_000 });
 }
 
+export async function recordStoryView(storyId, { keepalive = false } = {}) {
+  const id = String(storyId || '').trim();
+  if (!id) throw new Error('storyId requerido');
+  const data = await apiFetch(`/stories/${id}/view`, {
+    method: 'POST',
+    body: '{}',
+    keepalive,
+  });
+  invalidateStoriesCache();
+  return data;
+}
+
 export function invalidateStoriesCache() {
   for (const key of sharedGetCache.keys()) {
     if (key.startsWith('stories:')) sharedGetCache.delete(key);

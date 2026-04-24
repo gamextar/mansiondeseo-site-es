@@ -109,6 +109,7 @@ export default function SettingsPage() {
   const [storyRailGapMobile, setStoryRailGapMobile] = useState(STORY_RAIL_FALLBACK_GAP_MOBILE);
   const [storyRailGapDesktop, setStoryRailGapDesktop] = useState(STORY_RAIL_FALLBACK_GAP_DESKTOP);
   const [storyRailOwnStoryExtraGap, setStoryRailOwnStoryExtraGap] = useState(STORY_RAIL_FALLBACK_OWN_EXTRA_GAP);
+  const [freeVideoStoryLimit, setFreeVideoStoryLimit] = useState(10);
   const [sidebarStoryRingWidth, setSidebarStoryRingWidth] = useState(4);
   const [storyPresetEditor, setStoryPresetEditor] = useState('medium');
   const [avatarSizeDraft, setAvatarSizeDraft] = useState('88');
@@ -282,6 +283,7 @@ export default function SettingsPage() {
         setStoryRailGapMobile(s.storyRailGapMobile ?? STORY_RAIL_FALLBACK_GAP_MOBILE);
         setStoryRailGapDesktop(s.storyRailGapDesktop ?? STORY_RAIL_FALLBACK_GAP_DESKTOP);
         setStoryRailOwnStoryExtraGap(s.storyRailOwnStoryExtraGap ?? STORY_RAIL_FALLBACK_OWN_EXTRA_GAP);
+        setFreeVideoStoryLimit(s.freeVideoStoryLimit ?? 10);
         setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? STORY_CIRCLE_FALLBACK_BORDER_PERCENT);
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
@@ -451,6 +453,7 @@ export default function SettingsPage() {
         story_rail_gap_mobile: storyRailGapMobile,
         story_rail_gap_desktop: storyRailGapDesktop,
         story_rail_own_story_extra_gap: storyRailOwnStoryExtraGap,
+        free_video_story_daily_limit: freeVideoStoryLimit,
         sidebar_story_ring_width: sidebarStoryRingWidth,
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
@@ -528,6 +531,7 @@ export default function SettingsPage() {
       setStoryRailGapMobile(s.storyRailGapMobile ?? STORY_RAIL_FALLBACK_GAP_MOBILE);
       setStoryRailGapDesktop(s.storyRailGapDesktop ?? STORY_RAIL_FALLBACK_GAP_DESKTOP);
       setStoryRailOwnStoryExtraGap(s.storyRailOwnStoryExtraGap ?? STORY_RAIL_FALLBACK_OWN_EXTRA_GAP);
+      setFreeVideoStoryLimit(s.freeVideoStoryLimit ?? 10);
       setSidebarStoryRingWidth(s.sidebarStoryRingWidth ?? s.storyCircleBorder ?? STORY_CIRCLE_FALLBACK_BORDER_PERCENT);
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
@@ -2085,6 +2089,17 @@ export default function SettingsPage() {
                   </div>
                   <Counter value={homeStoryCountDesktop} onChange={setHomeStoryCountDesktop} min={1} max={60} />
                 </div>
+              </div>
+
+              <div className="mb-3 rounded-2xl border border-mansion-gold/15 bg-mansion-gold/5 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">Límite diario no VIP</h3>
+                    <p className="text-[11px] text-text-dim">Cantidad de stories que un usuario no VIP puede mirar por día. El rail no muestra candado por este límite.</p>
+                  </div>
+                  <Counter value={freeVideoStoryLimit} onChange={setFreeVideoStoryLimit} min={0} max={200} />
+                </div>
+                <p className="mt-2 text-[10px] text-text-dim">Las stories marcadas como solo VIP siguen mostrando candado y no cuentan como acceso gratis.</p>
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">

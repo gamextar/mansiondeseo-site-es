@@ -30,7 +30,6 @@ const STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT = 3;
 const STORY_RAIL_FALLBACK_GAP_MOBILE = 6;
 const STORY_RAIL_FALLBACK_GAP_DESKTOP = 7;
 const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
-const FREE_VIDEO_STORY_LIMIT = 5;
 const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
 
@@ -538,10 +537,6 @@ export default function FeedPage({ initialData }) {
     return Array.from({ length: end - adjustedStart + 1 }, (_, idx) => adjustedStart + idx);
   }, [currentPage, totalPages]);
   const storyLimit = getInitialStoryLimit(safeSettings, isDesktopViewport);
-  const freeVideoStoryLimit = Math.max(
-    1,
-    Math.round(coerceSettingNumber(safeSettings.freeVideoStoryLimit, FREE_VIDEO_STORY_LIMIT))
-  );
   const canWatchAllVideoStories = Boolean(user?.premium);
   const bootstrapStoryProfiles = useMemo(
     () => mapStoriesToRailProfiles(bootstrapStories).slice(0, storyLimit),
@@ -1382,9 +1377,8 @@ export default function FeedPage({ initialData }) {
             const itemStyle = getStoryRailItemStyle(
               storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined
             );
-            const isFreeLimitLockedStory = !canWatchAllVideoStories && index >= freeVideoStoryLimit;
             const isVipOnlyLockedStory = !canWatchAllVideoStories && Boolean(p.vip_only);
-            const isLockedStory = isFreeLimitLockedStory || isVipOnlyLockedStory;
+            const isLockedStory = isVipOnlyLockedStory;
             return safariDesktop ? (
               <div
                 key={`story-${p.id}`}

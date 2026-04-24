@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X } from 'lucide-react';
-import { getStories, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X, Crown } from 'lucide-react';
+import { getStories, recordStoryView, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
@@ -820,6 +820,55 @@ function DesktopActionButtons({ story, onLike, navigate, onGift, isOwnStory = fa
   );
 }
 
+function StoryDailyLimitOverlay({ limit, onVip, onBack }) {
+  const dailyLimit = Number(limit?.dailyLimit ?? 10);
+  const viewedToday = Number(limit?.viewedToday ?? dailyLimit);
+  const label = dailyLimit > 0 ? `${Math.min(viewedToday, dailyLimit)}/${dailyLimit}` : '0';
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/78 px-5 backdrop-blur-md"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+    >
+      <motion.div
+        className="w-full max-w-sm rounded-[2rem] border border-mansion-gold/25 bg-mansion-base/95 p-6 text-center shadow-[0_24px_80px_rgba(0,0,0,0.42)]"
+        initial={{ y: 18, scale: 0.96, opacity: 0 }}
+        animate={{ y: 0, scale: 1, opacity: 1 }}
+        exit={{ y: 12, scale: 0.98, opacity: 0 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-mansion-gold/12 text-mansion-gold">
+          <Crown className="h-8 w-8" />
+        </div>
+        <p className="text-xs font-bold uppercase tracking-[0.28em] text-mansion-gold">Límite diario</p>
+        <h2 className="mt-2 font-display text-2xl font-bold text-text-primary">Stories gratis usadas</h2>
+        <p className="mt-3 text-sm leading-relaxed text-text-muted">
+          Ya viste {label} stories hoy. Con VIP puedes seguir mirando stories sin límite diario.
+        </p>
+        <div className="mt-5 grid gap-2">
+          <button
+            type="button"
+            onClick={onVip}
+            className="rounded-2xl bg-mansion-gold px-5 py-3 text-sm font-bold text-mansion-base transition-colors hover:bg-mansion-gold-light"
+          >
+            Ver planes VIP
+          </button>
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-text-secondary transition-colors hover:bg-white/10"
+          >
+            Volver al feed
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export default function VideoFeedPage() {
   const safariDesktop = isSafariDesktopBrowser();
   const location = useLocation();
@@ -909,6 +958,8 @@ export default function VideoFeedPage() {
   const [activeDispIdx, setActiveDispIdx] = useState(() => (requestedStoryUserId ? 1 : savedIdx()));
   const [boundaryOverlayIdx, setBoundaryOverlayIdx] = useState(null);
   const [isMuted, setIsMuted] = useState(savedMuted);
+  const [storyViewLimit, setStoryViewLimit] = useState(null);
+  const [storyLimitBlock, setStoryLimitBlock] = useState(null);
   const [isDesktopViewport, setIsDesktopViewport] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(min-width: 1024px)').matches;
@@ -917,6 +968,8 @@ export default function VideoFeedPage() {
   const savedStoryRestoreRef = useRef(requestedStoryUserId ? null : readSavedVideoFeedStory());
   const savedStoryRestoredRef = useRef(false);
   const apiRespondedRef = useRef(false);
+  const allowedStoryViewsRef = useRef(new Set());
+  const recordingStoryViewsRef = useRef(new Set());
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
@@ -1000,6 +1053,9 @@ export default function VideoFeedPage() {
   const activeStory = isDesktopViewport
     ? stories[desktopActiveIdx - 1] || stories[0] || null
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
+  const activeStoryId = String(activeStory?.story_id || activeStory?.id || '').trim();
+  const blockedStoryId = String(storyLimitBlock?.storyId || '').trim();
+  const activeStoryLimitBlocked = Boolean(activeStoryId && blockedStoryId && activeStoryId === blockedStoryId);
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const isStandaloneMobileApp = detectStandaloneMobile();
   const mobileBrowserRoute = standaloneMobileRoute && !isStandaloneMobileApp;
@@ -1124,6 +1180,7 @@ export default function VideoFeedPage() {
       : baseStories;
     const fresh = applyPendingStoryLikeState(orderedStories, getPendingStoryLikes());
     apiRespondedRef.current = true;
+    if (data.videoLimit) setStoryViewLimit(data.videoLimit);
     setStories(fresh);
     return fresh;
   }, [requestedStorySeed, requestedStoryUserId]);
@@ -1192,13 +1249,78 @@ export default function VideoFeedPage() {
   }, [forceMobileViewportToIndex, requestedStoryUserId, stories, syncMobileViewportToIndex]);
 
   useEffect(() => {
-    if (!activeStory?.user_id) return;
-    if (isOverlayPreview) {
-      queueStoryViewed(activeStory.user_id);
-      return;
+    if (!activeStory?.user_id) return undefined;
+
+    const storyId = String(activeStory.story_id || activeStory.id || '').trim();
+    const storyUserId = activeStory.user_id;
+    const markAllowedStoryViewed = () => {
+      if (isOverlayPreview) {
+        queueStoryViewed(storyUserId);
+        return;
+      }
+      markStoryViewed(storyUserId);
+    };
+
+    setStoryLimitBlock((current) => (
+      current?.storyId && current.storyId !== storyId ? null : current
+    ));
+
+    if (user?.premium || !storyId) {
+      markAllowedStoryViewed();
+      return undefined;
     }
-    markStoryViewed(activeStory.user_id);
-  }, [activeStory?.user_id, isOverlayPreview, markStoryViewed, queueStoryViewed]);
+
+    if (allowedStoryViewsRef.current.has(storyId)) {
+      markAllowedStoryViewed();
+      return undefined;
+    }
+
+    if (recordingStoryViewsRef.current.has(storyId)) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    recordingStoryViewsRef.current.add(storyId);
+
+    recordStoryView(storyId)
+      .then((data) => {
+        allowedStoryViewsRef.current.add(storyId);
+        if (data?.videoLimit && !cancelled) setStoryViewLimit(data.videoLimit);
+        if (!cancelled) {
+          setStoryLimitBlock((current) => (current?.storyId === storyId ? null : current));
+          markAllowedStoryViewed();
+        }
+      })
+      .catch((err) => {
+        const code = String(err?.data?.code || '').toUpperCase();
+        if (code === 'DAILY_STORY_LIMIT') {
+          const nextLimit = err?.data?.videoLimit || storyViewLimit || { dailyLimit: 10, viewedToday: 10, remaining: 0 };
+          if (!cancelled) {
+            setStoryViewLimit(nextLimit);
+            setStoryLimitBlock({
+              storyId,
+              limit: nextLimit,
+              message: err?.message || 'Alcanzaste el límite diario de stories.',
+            });
+          }
+          return;
+        }
+
+        if (code === 'VIP_STORY_REQUIRED') {
+          if (!cancelled) navigate('/vip', { state: { from: '/videos' } });
+          return;
+        }
+
+        if (!cancelled) markAllowedStoryViewed();
+      })
+      .finally(() => {
+        recordingStoryViewsRef.current.delete(storyId);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeStory?.id, activeStory?.story_id, activeStory?.user_id, isOverlayPreview, markStoryViewed, navigate, queueStoryViewed, storyViewLimit, user?.premium]);
 
   useEffect(() => {
     return subscribe((event) => {
@@ -1649,6 +1771,8 @@ export default function VideoFeedPage() {
               const rawDistance = Math.abs(index - activeIndex);
               const circularDistance = Math.min(rawDistance, stories.length - rawDistance);
               const isActive = index === activeIndex;
+              const storyId = String(story.story_id || story.id || '').trim();
+              const isStoryBlocked = Boolean(blockedStoryId && storyId === blockedStoryId);
               const shouldLoad = stories.length <= 3 || circularDistance <= 1;
               const enableCinematicReveal = isActive && !entryRevealReady;
 
@@ -1668,9 +1792,9 @@ export default function VideoFeedPage() {
                 >
                   <StoryCard
                     story={story}
-                    videoSrc={story.video_url}
-                    isActive={isActive}
-                    shouldLoad={shouldLoad}
+                    videoSrc={isStoryBlocked ? '' : story.video_url}
+                    isActive={isActive && !isStoryBlocked}
+                    shouldLoad={shouldLoad && !isStoryBlocked}
                     isMuted={isMuted}
                     avatarSize={avatarSize}
                     onLike={handleLike}
@@ -1706,6 +1830,8 @@ export default function VideoFeedPage() {
             const shouldLoad = dist <= 3 || isBoundary;
             const enableCinematicReveal = displayIndex === activeDispIdx && !entryRevealReady;
             const mobileStoryKey = story.story_id || story.id || story.user_id || story.video_url || displayIndex;
+            const storyId = String(story.story_id || story.id || '').trim();
+            const isStoryBlocked = Boolean(blockedStoryId && storyId === blockedStoryId);
             return (
               <div
                 key={`${displayIndex}-${mobileStoryKey}`}
@@ -1713,9 +1839,9 @@ export default function VideoFeedPage() {
               >
                 <StoryCard
                   story={story}
-                  videoSrc={story.video_url}
-                  isActive={displayIndex === activeDispIdx}
-                  shouldLoad={shouldLoad}
+                  videoSrc={isStoryBlocked ? '' : story.video_url}
+                  isActive={displayIndex === activeDispIdx && !isStoryBlocked}
+                  shouldLoad={shouldLoad && !isStoryBlocked}
                   isMuted={isMuted}
                   avatarSize={avatarSize}
                   onLike={handleLike}
@@ -1805,6 +1931,16 @@ export default function VideoFeedPage() {
           </button>
         </>
         )}
+
+        <AnimatePresence>
+          {activeStoryLimitBlocked && (
+            <StoryDailyLimitOverlay
+              limit={storyLimitBlock?.limit || storyViewLimit}
+              onVip={() => navigate('/vip', { state: { from: '/videos' } })}
+              onBack={closeToHomeFeed}
+            />
+          )}
+        </AnimatePresence>
 
         {/* Gift Modal */}
         <AnimatePresence>
