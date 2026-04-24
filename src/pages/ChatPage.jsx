@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Send, Smile } from 'lucide-react';
+import { Ban, ChevronLeft, Send, Smile } from 'lucide-react';
 import { useMessageLimit } from '../hooks/useMessageLimit';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import EmojiPicker from '../components/EmojiPicker';
 import AvatarImg from '../components/AvatarImg';
-import { getMessageLimit, getChatBootstrap, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, invalidateConversationsCache } from '../lib/api';
+import { getMessageLimit, getChatBootstrap, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, invalidateConversationsCache, setUserBlocked } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
@@ -176,8 +176,10 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState(cachedChat?.messages || []);
   const [apiLimit, setApiLimit] = useState(cachedChat?.apiLimit || null);
+  const [blockState, setBlockState] = useState(cachedChat?.blockState || { blockedByMe: false, blockedMe: false });
   const [partner, setPartner] = useState(cachedChat?.partner || partnerPreview || null);
   const [loading, setLoading] = useState(!cachedChat && !partnerPreview);
+  const [blockUpdating, setBlockUpdating] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlderMessages, setHasOlderMessages] = useState(cachedChat?.hasOlderMessages || false);
   const [showEmojis, setShowEmojis] = useState(false);
@@ -590,6 +592,7 @@ export default function ChatPage() {
     setPartner(nextCachedChat?.partner || nextPartnerPreview || null);
     setMessages(nextCachedChat?.messages || []);
     setApiLimit(nextCachedChat?.apiLimit || null);
+    setBlockState(nextCachedChat?.blockState || { blockedByMe: false, blockedMe: false });
     setHasOlderMessages(nextCachedChat?.hasOlderMessages || false);
     setLoading(!nextCachedChat && !nextPartnerPreview);
     if ((nextCachedChat?.messages || []).length > 0) {
@@ -602,6 +605,7 @@ export default function ChatPage() {
       if (cancelled) return;
       if (data?.partner) setPartner((prev) => ({ ...(prev || {}), ...data.partner }));
       if (data?.messageLimit) setApiLimit(data.messageLimit);
+      if (data?.blockState) setBlockState(data.blockState);
     }).catch(() => {}).finally(() => {
       if (!cancelled && nextCachedChat) setLoading(false);
     });
@@ -671,6 +675,12 @@ export default function ChatPage() {
       onError(data) {
         if (data.code === 'LIMIT_REACHED') {
           setApiLimit({ remaining: 0, canSend: false, max: data.max || 5 });
+        } else if (data.code === 'USER_BLOCKED_BY_ME' || data.code === 'USER_BLOCKED_ME') {
+          setBlockState((prev) => ({
+            blockedByMe: data.code === 'USER_BLOCKED_BY_ME' ? true : prev.blockedByMe,
+            blockedMe: data.code === 'USER_BLOCKED_ME' ? true : prev.blockedMe,
+          }));
+          setMessages((prev) => prev.filter((message) => !String(message.id || '').startsWith('temp-')));
         }
       },
       onStateChange(state) {
@@ -727,9 +737,10 @@ export default function ChatPage() {
       partner,
       messages,
       apiLimit,
+      blockState,
       hasOlderMessages,
     });
-  }, [partnerId, partner, messages, apiLimit, hasOlderMessages]);
+  }, [partnerId, partner, messages, apiLimit, blockState, hasOlderMessages]);
 
   useLayoutEffect(() => {
     if (restoreScrollAfterPrependRef.current && scrollRef.current) {
@@ -828,8 +839,42 @@ export default function ChatPage() {
     );
   }
 
-  const effectiveCanSend = apiLimit ? apiLimit.canSend : canSend;
+  const isBlockedByMe = !!blockState?.blockedByMe;
+  const isBlockedByPartner = !!blockState?.blockedMe;
+  const isChatBlocked = isBlockedByMe || isBlockedByPartner;
+  const effectiveCanSend = !isChatBlocked && (apiLimit ? apiLimit.canSend : canSend);
   const effectiveMax = apiLimit ? apiLimit.max : max;
+  const composerPlaceholder = isBlockedByMe
+    ? 'Desbloquea al usuario para enviar mensajes'
+    : isBlockedByPartner
+      ? 'Este usuario no acepta mensajes tuyos'
+      : effectiveCanSend
+        ? 'Escribe un mensaje...'
+        : 'Sin mensajes disponibles';
+
+  const handleToggleBlock = async () => {
+    if (blockUpdating) return;
+    const nextBlocked = !isBlockedByMe;
+    setBlockUpdating(true);
+    const previous = blockState;
+    setBlockState((prev) => ({ ...prev, blockedByMe: nextBlocked }));
+    if (nextBlocked) {
+      setInput('');
+      stopTypingSignal();
+    }
+    try {
+      const data = await setUserBlocked(partnerId, nextBlocked);
+      setBlockState({
+        blockedByMe: !!data.blockedByMe,
+        blockedMe: !!data.blockedMe,
+      });
+    } catch (err) {
+      setBlockState(previous);
+      alert(err.message || 'No se pudo actualizar el bloqueo');
+    } finally {
+      setBlockUpdating(false);
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim() || !effectiveCanSend) return;
@@ -869,7 +914,16 @@ export default function ChatPage() {
         getMessageLimit().then(data => setApiLimit(data)).catch(() => {});
       } catch (err) {
         if (err.status === 403) {
-          setApiLimit({ remaining: 0, canSend: false, max: 5 });
+          const code = err.data?.code || '';
+          if (code === 'USER_BLOCKED_BY_ME' || code === 'USER_BLOCKED_ME') {
+            setBlockState((prev) => ({
+              blockedByMe: code === 'USER_BLOCKED_BY_ME' ? true : prev.blockedByMe,
+              blockedMe: code === 'USER_BLOCKED_ME' ? true : prev.blockedMe,
+            }));
+            setMessages((prev) => prev.filter((message) => message.id !== tempId));
+          } else {
+            setApiLimit({ remaining: 0, canSend: false, max: 5 });
+          }
         }
       }
     }
@@ -1048,6 +1102,22 @@ export default function ChatPage() {
             )}
           </div>
 
+          <button
+            type="button"
+            onClick={handleToggleBlock}
+            disabled={blockUpdating}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors disabled:opacity-60 lg:px-4 lg:py-2 lg:text-[11px] ${
+              isBlockedByMe
+                ? 'border-mansion-gold/35 bg-mansion-gold/15 text-mansion-gold hover:bg-mansion-gold/20'
+                : 'border-red-500/25 bg-red-500/10 text-red-300 hover:bg-red-500/15'
+            }`}
+            aria-label={isBlockedByMe ? `Desbloquear a ${partner.name}` : `Bloquear a ${partner.name}`}
+          >
+            <Ban className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+            <span className="hidden sm:inline">{isBlockedByMe ? 'Desbloquear' : 'Bloquear'}</span>
+            <span className="sm:hidden">{isBlockedByMe ? 'Desbloq.' : 'Bloq.'}</span>
+          </button>
+
         </div>
       </div>
 
@@ -1182,7 +1252,7 @@ export default function ChatPage() {
                 onBlur={handleInputBlur}
                 onKeyDown={handleKeyDown}
                 onFocus={handleInputFocus}
-                placeholder={effectiveCanSend ? 'Escribe un mensaje...' : 'Sin mensajes disponibles'}
+                placeholder={composerPlaceholder}
                 disabled={!effectiveCanSend}
                 rows={1}
                 className="flex-1 resize-none bg-transparent py-3 px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50 lg:px-5 lg:py-3.5 lg:text-base"

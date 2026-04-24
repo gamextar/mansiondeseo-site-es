@@ -17,6 +17,7 @@ export class ChatRoom {
     this.messageConversationIdReady = null;
     this.senderConversationStateWriteAt = new Map();
     this.userMessageBlockRolesColumnReady = null;
+    this.userBlocksReady = null;
   }
 
   normalizeRoleArray(rawValue, validValues, fallback = []) {
@@ -146,16 +147,59 @@ export class ChatRoom {
     return this.userMessageBlockRolesColumnReady;
   }
 
+  async ensureUserBlocksTable() {
+    if (!this.userBlocksReady) {
+      this.userBlocksReady = Promise.all([
+        this.env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS user_blocks (
+            blocker_id TEXT NOT NULL REFERENCES users(id),
+            blocked_id TEXT NOT NULL REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (blocker_id, blocked_id)
+          )
+        `).run(),
+        this.env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_id, blocker_id)'
+        ).run(),
+      ]).catch((err) => {
+        this.userBlocksReady = null;
+        throw err;
+      });
+    }
+
+    return this.userBlocksReady;
+  }
+
   async assertMessagingAllowed(senderId, receiverId) {
     await this.ensureUsersMessageBlockRolesColumn();
-    const [sender, receiver] = await Promise.all([
+    await this.ensureUserBlocksTable();
+    const [sender, receiver, blockRow] = await Promise.all([
       this.env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(senderId).first(),
       this.env.DB.prepare('SELECT id, message_block_roles FROM users WHERE id = ?').bind(receiverId).first(),
+      this.env.DB.prepare(`
+        SELECT blocker_id
+        FROM user_blocks
+        WHERE (blocker_id = ? AND blocked_id = ?)
+           OR (blocker_id = ? AND blocked_id = ?)
+        LIMIT 1
+      `).bind(senderId, receiverId, receiverId, senderId).first(),
     ]);
 
     if (!receiver) {
       return { ok: false, code: 'RECEIVER_NOT_FOUND', message: 'Destinatario no encontrado.' };
     }
+
+    if (blockRow) {
+      const blockedByMe = String(blockRow.blocker_id) === String(senderId);
+      return {
+        ok: false,
+        code: blockedByMe ? 'USER_BLOCKED_BY_ME' : 'USER_BLOCKED_ME',
+        message: blockedByMe
+          ? 'Desbloquea a este usuario para poder enviarle mensajes.'
+          : 'Este usuario no acepta mensajes tuyos.',
+      };
+    }
+
     if (!sender?.role) {
       return { ok: true };
     }

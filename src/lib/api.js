@@ -904,6 +904,22 @@ export async function deleteConversation(otherUserId) {
   });
 }
 
+export async function getUserBlockState(otherUserId) {
+  return apiFetch(`/users/${otherUserId}/block`);
+}
+
+export async function setUserBlocked(otherUserId, blocked) {
+  return apiFetch(`/users/${otherUserId}/block`, {
+    method: 'PUT',
+    body: JSON.stringify({ blocked: !!blocked }),
+  }).then((data) => {
+    sharedGetCache.delete(`chatBootstrap:${otherUserId}`);
+    invalidateMessageHistoryCache(otherUserId);
+    invalidateConversationsCache();
+    return data;
+  });
+}
+
 export async function sendMessage(receiverId, content) {
   return apiFetch('/messages/send', {
     method: 'POST',

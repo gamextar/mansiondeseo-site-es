@@ -60,6 +60,7 @@ let _userBirthdateColumnReady = null;
 let _userMaritalStatusColumnReady = null;
 let _userSexualOrientationColumnReady = null;
 let _userMessageBlockRolesColumnReady = null;
+let _userBlocksReady = null;
 let _userLastIpColumnReady = null;
 let _profileVisitStructuresReady = null;
 let _profileStatsBackfillReady = null;
@@ -623,6 +624,7 @@ async function deleteUserMediaFromR2(env, user, storyRows = []) {
 async function deleteUserCompletely(env, user) {
   const userId = user.id;
   await ensureProfileVisitStructures(env);
+  await ensureUserBlocksTable(env);
   const storyRowsResult = await env.DB.prepare(
     'SELECT id, video_url FROM stories WHERE user_id = ?'
   ).bind(userId).all();
@@ -635,6 +637,7 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM story_likes WHERE story_id IN (SELECT id FROM stories WHERE user_id = ?)').bind(userId),
     env.DB.prepare('DELETE FROM stories WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM hidden_conversations WHERE user_id = ? OR partner_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM user_blocks WHERE blocker_id = ? OR blocked_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM conversation_state WHERE user_id = ? OR partner_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM favorites WHERE user_id = ? OR target_id = ?').bind(userId, userId),
@@ -647,6 +650,29 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
+}
+
+async function ensureUserBlocksTable(env) {
+  if (!_userBlocksReady) {
+    _userBlocksReady = Promise.all([
+      env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS user_blocks (
+          blocker_id TEXT NOT NULL REFERENCES users(id),
+          blocked_id TEXT NOT NULL REFERENCES users(id),
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (blocker_id, blocked_id)
+        )
+      `).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_id, blocker_id)'
+      ).run(),
+    ]).catch((err) => {
+      _userBlocksReady = null;
+      throw err;
+    });
+  }
+
+  return _userBlocksReady;
 }
 
 async function ensureHiddenConversationsTable(env) {
@@ -1006,13 +1032,33 @@ async function getReceiverMessageBlockInfo(env, receiverId) {
 }
 
 async function assertMessagingAllowed(env, senderId, receiverId) {
-  const [sender, receiver] = await Promise.all([
+  await ensureUserBlocksTable(env);
+  const [sender, receiver, blockRow] = await Promise.all([
     env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(senderId).first(),
     getReceiverMessageBlockInfo(env, receiverId),
+    env.DB.prepare(`
+      SELECT blocker_id
+      FROM user_blocks
+      WHERE (blocker_id = ? AND blocked_id = ?)
+         OR (blocker_id = ? AND blocked_id = ?)
+      LIMIT 1
+    `).bind(senderId, receiverId, receiverId, senderId).first(),
   ]);
 
   if (!receiver) return { ok: false, status: 404, message: 'Destinatario no encontrado' };
   if (!sender) return { ok: false, status: 404, message: 'Remitente no encontrado' };
+
+  if (blockRow) {
+    const blockedByMe = String(blockRow.blocker_id) === String(senderId);
+    return {
+      ok: false,
+      status: 403,
+      code: blockedByMe ? 'USER_BLOCKED_BY_ME' : 'USER_BLOCKED_ME',
+      message: blockedByMe
+        ? 'Desbloquea a este usuario para poder enviarle mensajes.'
+        : 'Este usuario no acepta mensajes tuyos.',
+    };
+  }
 
   const senderRole = String(sender.role || '').trim();
   if (!senderRole) return { ok: true };
@@ -1281,6 +1327,7 @@ function normalizeMetricRoute(path) {
   if (/^\/api\/chat\/ws\/[a-f0-9-]+$/.test(path)) return '/api/chat/ws/:chatId';
   if (/^\/api\/profiles\/[a-f0-9-]+$/.test(path)) return '/api/profiles/:id';
   if (/^\/api\/messages\/[a-f0-9-]+$/.test(path)) return '/api/messages/:userId';
+  if (/^\/api\/users\/[a-f0-9-]+\/block$/.test(path)) return '/api/users/:id/block';
   if (/^\/api\/favorites\/check\/[a-f0-9-]+$/.test(path)) return '/api/favorites/check/:id';
   if (/^\/api\/favorites\/[a-f0-9-]+$/.test(path)) return '/api/favorites/:id';
   if (/^\/api\/gifts\/received\/[a-f0-9-]+$/.test(path)) return '/api/gifts/received/:userId';
@@ -2922,13 +2969,22 @@ async function handleProfileDetail(request, env, userId) {
 async function handleChatBootstrap(request, env, userId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
+  await ensureUserBlocksTable(env);
 
-  const [user, sender, settings] = await Promise.all([
+  const [user, sender, settings, blockState] = await Promise.all([
     env.DB.prepare(
       'SELECT id, username, age, birthdate, city, locality, role, avatar_url, avatar_crop, last_active, premium, premium_until FROM users WHERE id = ?'
     ).bind(userId).first(),
     env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
     cached('settings', 300_000, () => loadSettings(env)),
+    env.DB.prepare(`
+      SELECT
+        MAX(CASE WHEN blocker_id = ? AND blocked_id = ? THEN 1 ELSE 0 END) AS blocked_by_me,
+        MAX(CASE WHEN blocker_id = ? AND blocked_id = ? THEN 1 ELSE 0 END) AS blocked_me
+      FROM user_blocks
+      WHERE (blocker_id = ? AND blocked_id = ?)
+         OR (blocker_id = ? AND blocked_id = ?)
+    `).bind(auth.sub, userId, userId, auth.sub, auth.sub, userId, userId, auth.sub).first(),
   ]);
 
   if (!user) return error('Perfil no encontrado', 404);
@@ -2964,6 +3020,10 @@ async function handleChatBootstrap(request, env, userId) {
       remaining: senderPremium ? 999 : Math.max(0, dailyLimit - count),
       canSend: senderPremium ? true : count < dailyLimit,
       max: senderPremium ? 999 : dailyLimit,
+    },
+    blockState: {
+      blockedByMe: Number(blockState?.blocked_by_me || 0) === 1,
+      blockedMe: Number(blockState?.blocked_me || 0) === 1,
     },
   });
 }
@@ -3210,6 +3270,53 @@ async function handleDeleteConversation(request, env, otherUserId) {
   }).catch(() => {});
 
   return json({ deleted: true, partnerId: otherUserId, unreadCount: Number(unreadRow?.unread || 0) });
+}
+
+async function handleGetUserBlockState(request, env, otherUserId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  await ensureUserBlocksTable(env);
+
+  const row = await env.DB.prepare(`
+    SELECT
+      MAX(CASE WHEN blocker_id = ? AND blocked_id = ? THEN 1 ELSE 0 END) AS blocked_by_me,
+      MAX(CASE WHEN blocker_id = ? AND blocked_id = ? THEN 1 ELSE 0 END) AS blocked_me
+    FROM user_blocks
+    WHERE (blocker_id = ? AND blocked_id = ?)
+       OR (blocker_id = ? AND blocked_id = ?)
+  `).bind(auth.sub, otherUserId, otherUserId, auth.sub, auth.sub, otherUserId, otherUserId, auth.sub).first();
+
+  return json({
+    userId: otherUserId,
+    blockedByMe: Number(row?.blocked_by_me || 0) === 1,
+    blockedMe: Number(row?.blocked_me || 0) === 1,
+  });
+}
+
+async function handleSetUserBlockState(request, env, otherUserId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  if (String(auth.sub) === String(otherUserId)) return error('No puedes bloquearte a ti mismo', 400);
+  await ensureUserBlocksTable(env);
+
+  const body = await request.json().catch(() => ({}));
+  const blocked = parseBooleanSetting(body?.blocked, true);
+  const partner = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(otherUserId).first();
+  if (!partner) return error('Usuario no encontrado', 404);
+
+  if (blocked) {
+    await env.DB.prepare(`
+      INSERT INTO user_blocks (blocker_id, blocked_id, created_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(blocker_id, blocked_id) DO NOTHING
+    `).bind(auth.sub, otherUserId).run();
+  } else {
+    await env.DB.prepare(
+      'DELETE FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?'
+    ).bind(auth.sub, otherUserId).run();
+  }
+
+  return handleGetUserBlockState(request, env, otherUserId);
 }
 
 // ── GET /api/messages/limit ─────────────────────────────
@@ -6361,6 +6468,9 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/messages/send' && method === 'POST') return handleSendMessage(request, env);
   if (path === '/api/messages/limit' && method === 'GET') return handleMessageLimit(request, env);
   if (path === '/api/unread-count' && method === 'GET') return handleUnreadCount(request, env);
+  const blockMatch = path.match(/^\/api\/users\/([a-f0-9-]+)\/block$/);
+  if (blockMatch && method === 'GET') return handleGetUserBlockState(request, env, blockMatch[1]);
+  if (blockMatch && method === 'PUT') return handleSetUserBlockState(request, env, blockMatch[1]);
   const msgMatch = path.match(/^\/api\/messages\/([a-f0-9-]+)$/);
   if (msgMatch && method === 'GET') return handleGetMessages(request, env, msgMatch[1]);
   if (msgMatch && method === 'DELETE') return handleDeleteConversation(request, env, msgMatch[1]);
