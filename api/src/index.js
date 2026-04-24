@@ -4434,6 +4434,8 @@ async function handleAdminResetAllCoins(request, env) {
 
 // ── Admin: GET /api/admin/users ─────────────────────────
 async function handleAdminGetUsers(request, env) {
+  await ensureStoriesTable(env);
+
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -4455,7 +4457,8 @@ async function handleAdminGetUsers(request, env) {
   await ensureUsersDuplicateFlagColumn(env);
   let dataQuery = `SELECT id, email, username, role, seeking, message_block_roles, age, birthdate, city, locality, marital_status, sexual_orientation, country, avatar_url, status,
     premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, duplicate_flag, account_status, last_active, last_ip, created_at,
-    (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id
+    (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id,
+    (SELECT COALESCE(s.vip_only, 0) FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_vip_only
     FROM users`;
   const filters = [];
   const bindings = [];
@@ -4527,6 +4530,7 @@ async function handleAdminGetUsers(request, env) {
       fake: !!u.fake,
       duplicate_flag: !!u.duplicate_flag,
       story_id: u.story_id || null,
+      story_vip_only: Number(u.story_vip_only || 0) === 1,
       interests: undefined,
       photos: undefined,
     })),
@@ -4689,6 +4693,7 @@ async function handleAdminDeleteErrorLog(request, env, logId) {
 async function handleAdminGetUser(request, env, userId) {
   await ensureUsersMessageBlockRolesColumn(env);
   await ensureUsersDuplicateFlagColumn(env);
+  await ensureStoriesTable(env);
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -4696,6 +4701,9 @@ async function handleAdminGetUser(request, env, userId) {
 
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
+  const story = await env.DB.prepare(
+    'SELECT id, COALESCE(vip_only, 0) AS vip_only FROM stories WHERE user_id = ? ORDER BY created_at DESC LIMIT 1'
+  ).bind(userId).first();
 
   const { password_hash, ...safe } = user;
   return json({
@@ -4716,6 +4724,8 @@ async function handleAdminGetUser(request, env, userId) {
       is_admin: !!safe.is_admin,
       fake: !!safe.fake,
       duplicate_flag: !!safe.duplicate_flag,
+      story_id: story?.id || null,
+      story_vip_only: Number(story?.vip_only || 0) === 1,
     }
   });
 }
@@ -5743,6 +5753,31 @@ async function handleAdminDeleteStory(request, env, storyId) {
   return json({ deleted: true, story_id: storyId });
 }
 
+async function handleAdminUpdateStory(request, env, storyId) {
+  await ensureStoriesTable(env);
+
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const body = await request.json().catch(() => ({}));
+  const vipOnly = parseBooleanSetting(body?.vip_only, false);
+  const story = await env.DB.prepare(`
+    SELECT s.id, s.user_id, u.premium, u.premium_until
+    FROM stories s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.id = ?
+  `).bind(storyId).first();
+  if (!story) return error('Historia no encontrada', 404);
+  if (vipOnly && !isPremiumActive(story)) {
+    return error('Solo usuarios VIP pueden tener historias solo VIP', 403);
+  }
+
+  await env.DB.prepare('UPDATE stories SET vip_only = ? WHERE id = ?').bind(vipOnly ? 1 : 0, storyId).run();
+  return json({ id: storyId, user_id: story.user_id, vip_only: vipOnly });
+}
+
 // POST /api/stories — authenticated user uploads their own story
 async function handleUploadStory(request, env) {
   await ensureStoriesTable(env);
@@ -5931,6 +5966,7 @@ async function handleRequest(request, env, ctx) {
   if (userStoryMatch && method === 'DELETE') return handleDeleteOwnStory(request, env, userStoryMatch[1]);
   if (path === '/api/admin/upload-story' && method === 'POST') return handleAdminUploadStory(request, env);
   const adminStoryMatch = path.match(/^\/api\/admin\/stories\/([a-f0-9-]+)$/);
+  if (adminStoryMatch && method === 'PATCH') return handleAdminUpdateStory(request, env, adminStoryMatch[1]);
   if (adminStoryMatch && method === 'DELETE') return handleAdminDeleteStory(request, env, adminStoryMatch[1]);
 
   return error('Ruta no encontrada', 404);

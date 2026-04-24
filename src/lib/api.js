@@ -1347,6 +1347,15 @@ export async function adminDeleteStory(storyId) {
   return data;
 }
 
+export async function adminUpdateStory(storyId, { vipOnly = false } = {}) {
+  const data = await apiFetch(`/admin/stories/${storyId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ vip_only: !!vipOnly }),
+  });
+  invalidateStoryFeedCache();
+  return data;
+}
+
 export async function deleteOwnStory(storyId) {
   const data = await apiFetch(`/stories/${storyId}`, { method: 'DELETE' });
   invalidateStoryFeedCache();

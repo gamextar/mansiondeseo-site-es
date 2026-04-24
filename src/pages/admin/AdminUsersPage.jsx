@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Pause, Play, Film, Pencil, Copy } from 'lucide-react';
-import { adminGetUsers, adminGetUserIds, adminGetUser, adminUpdateUser, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory } from '../../lib/api';
+import { adminGetUsers, adminGetUserIds, adminGetUser, adminUpdateUser, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 import { resolveMediaUrl } from '../../lib/media';
 
@@ -291,6 +291,7 @@ export default function AdminUsersPage() {
 
   const allCurrentPageSelected = users.length > 0 && users.every((u) => selectedIds.includes(u.id));
   const selectedCanPublishVipOnlyStory = Boolean(selected?.premium);
+  const canShowExistingStoryVipToggle = Boolean(selected?.story_id && (selectedCanPublishVipOnlyStory || selected?.story_vip_only));
 
   useEffect(() => {
     if (!selectedCanPublishVipOnlyStory) setStoryVipOnly(false);
@@ -303,8 +304,8 @@ export default function AdminUsersPage() {
     setStoryUploading(true);
     try {
       const result = await adminUploadStoryForUser(selected.id, file, { caption: storyCaption, vipOnly: storyVipOnly });
-      setSelected(s => ({ ...s, story_id: result.id }));
-      setUsers(prev => prev.map(u => u.id === selected.id ? { ...u, story_id: result.id } : u));
+      setSelected(s => ({ ...s, story_id: result.id, story_vip_only: !!result.vip_only }));
+      setUsers(prev => prev.map(u => u.id === selected.id ? { ...u, story_id: result.id, story_vip_only: !!result.vip_only } : u));
       setStoryCaption('');
       setStoryVipOnly(false);
     } catch (err) {
@@ -320,10 +321,36 @@ export default function AdminUsersPage() {
     setActionLoading(true);
     try {
       await adminDeleteStory(selected.story_id);
-      setSelected(s => ({ ...s, story_id: null }));
-      setUsers(prev => prev.map(u => u.id === selected.id ? { ...u, story_id: null } : u));
+      setSelected(s => ({ ...s, story_id: null, story_vip_only: false }));
+      setUsers(prev => prev.map(u => u.id === selected.id ? { ...u, story_id: null, story_vip_only: false } : u));
     } catch (err) {
       alert(err.message || 'Error al eliminar historia');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleStoryVipOnlyToggle = async (checked) => {
+    if (!selected?.story_id) return;
+    if (checked && !selectedCanPublishVipOnlyStory) {
+      alert('Solo los usuarios VIP pueden tener historias solo VIP.');
+      return;
+    }
+
+    const previousValue = !!selected.story_vip_only;
+    const userId = selected.id;
+    const storyId = selected.story_id;
+    setActionLoading(true);
+    setSelected(s => ({ ...s, story_vip_only: checked }));
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, story_vip_only: checked } : u));
+    try {
+      const data = await adminUpdateStory(storyId, { vipOnly: checked });
+      setSelected(s => ({ ...s, story_vip_only: !!data.vip_only }));
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, story_vip_only: !!data.vip_only } : u));
+    } catch (err) {
+      setSelected(s => ({ ...s, story_vip_only: previousValue }));
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, story_vip_only: previousValue } : u));
+      alert(err.message || 'Error al actualizar la historia');
     } finally {
       setActionLoading(false);
     }
@@ -974,14 +1001,47 @@ export default function AdminUsersPage() {
                 <div className="space-y-2 pt-2 border-t border-mansion-border/20">
                   <p className="text-[10px] text-text-dim uppercase tracking-wider">Historias</p>
                   {selected.story_id ? (
-                    <button
-                      disabled={actionLoading}
-                      onClick={handleStoryDelete}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-red-900/20 border border-red-500/20 hover:bg-red-900/40 transition-colors text-left"
-                    >
-                      <Film className="w-4 h-4 text-red-400" />
-                      <span className="text-xs text-red-400 font-semibold">{actionLoading ? 'Eliminando...' : 'Eliminar historia'}</span>
-                    </button>
+                    <>
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-mansion-border/20 bg-mansion-elevated/60 px-4 py-2.5">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Film className="h-4 w-4 text-mansion-gold" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-text-primary">Historia activa</p>
+                            <p className="text-[11px] text-text-dim">
+                              {selected.story_vip_only ? 'Visible solo para usuarios VIP' : 'Visible para usuarios permitidos'}
+                            </p>
+                          </div>
+                        </div>
+                        {selected.story_vip_only && (
+                          <span className="rounded-full border border-mansion-gold/25 bg-mansion-gold/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-mansion-gold">
+                            VIP
+                          </span>
+                        )}
+                      </div>
+                      {canShowExistingStoryVipToggle && (
+                        <label className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 ${actionLoading ? 'opacity-70' : 'cursor-pointer'} ${selected.story_vip_only ? 'border-mansion-gold/30 bg-mansion-gold/10' : 'border-mansion-border/20 bg-mansion-elevated/40'}`}>
+                          <span className="flex items-center gap-2 text-xs font-semibold text-text-primary">
+                            <Crown className="h-4 w-4 text-mansion-gold" />
+                            Marcar como solo VIP
+                          </span>
+                          <input
+                            type="checkbox"
+                            disabled={actionLoading}
+                            checked={!!selected.story_vip_only}
+                            onChange={e => handleStoryVipOnlyToggle(e.target.checked)}
+                            className="h-4 w-4 accent-mansion-gold"
+                          />
+                        </label>
+                      )}
+                      <button
+                        disabled={actionLoading}
+                        onClick={handleStoryDelete}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-red-900/20 border border-red-500/20 hover:bg-red-900/40 transition-colors text-left"
+                      >
+                        <Film className="w-4 h-4 text-red-400" />
+                        <span className="text-xs text-red-400 font-semibold">{actionLoading ? 'Actualizando...' : 'Eliminar historia'}</span>
+                      </button>
+                    </>
                   ) : (
                     <>
                       <input
