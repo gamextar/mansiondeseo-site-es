@@ -245,7 +245,7 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, enableCinematicReveal = false, pauseOnAppBackground = false, videoScale = 1 }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, enableCinematicReveal = false, pauseOnAppBackground = false, videoScale = 1, forcePaused = false }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
@@ -274,13 +274,13 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   }, [activeSrc]);
 
   const notifyRevealReady = useCallback(() => {
-    if (!isActive || !onRevealReady || revealSentRef.current) return;
+    if (forcePaused || !isActive || !onRevealReady || revealSentRef.current) return;
     revealSentRef.current = true;
     onRevealReady();
-  }, [isActive, onRevealReady]);
+  }, [forcePaused, isActive, onRevealReady]);
 
   const resetSuspendedVideo = useCallback(() => {
-    if (!isActive || !activeSrc || userPausedRef.current) return;
+    if (forcePaused || !isActive || !activeSrc || userPausedRef.current) return;
 
     const now = Date.now();
     if (now - lastRecoveryAtRef.current < 900) return;
@@ -297,11 +297,11 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     setIsPlaying(false);
     setIsVideoReady(false);
     setVideoResetToken((token) => token + 1);
-  }, [activeSrc, isActive]);
+  }, [activeSrc, forcePaused, isActive]);
 
   const attemptPlay = useCallback((options = {}) => {
     const video = videoRef.current;
-    if (!video || !isActive || !activeSrc || userPausedRef.current) return;
+    if (!video || forcePaused || !isActive || !activeSrc || userPausedRef.current) return;
 
     const { verify = false } = options;
     const attemptId = playAttemptIdRef.current + 1;
@@ -319,7 +319,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
 
     recoveryTimerRef.current = window.setTimeout(() => {
       recoveryTimerRef.current = null;
-      if (playAttemptIdRef.current !== attemptId || !isActive || userPausedRef.current) return;
+      if (playAttemptIdRef.current !== attemptId || forcePaused || !isActive || userPausedRef.current) return;
 
       const currentVideo = videoRef.current;
       if (!currentVideo) return;
@@ -329,7 +329,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       const looksSuspended = currentVideo.paused || !readyEnough || (!advanced && !currentVideo.ended);
       if (looksSuspended) resetSuspendedVideo();
     }, 900);
-  }, [activeSrc, isActive, resetSuspendedVideo]);
+  }, [activeSrc, forcePaused, isActive, resetSuspendedVideo]);
 
   useEffect(() => {
     if (isActive) {
@@ -353,7 +353,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       rafRef.current = requestAnimationFrame(tick);
     };
 
-    if (isActive) {
+    if (isActive && !forcePaused) {
       attemptPlay();
       rafRef.current = requestAnimationFrame(tick);
     } else {
@@ -367,10 +367,10 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     }
 
     return () => cancelAnimationFrame(rafRef.current);
-  }, [attemptPlay, isActive]);
+  }, [attemptPlay, forcePaused, isActive]);
 
   useEffect(() => {
-    if (!isActive || !activeSrc) return;
+    if (forcePaused || !isActive || !activeSrc) return;
 
     const video = videoRef.current;
     if (!video) return;
@@ -393,10 +393,10 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       video.removeEventListener('loadeddata', handleReady);
       video.removeEventListener('canplay', handleReady);
     };
-  }, [activeSrc, attemptPlay, isActive, notifyRevealReady]);
+  }, [activeSrc, attemptPlay, forcePaused, isActive, notifyRevealReady]);
 
   useEffect(() => {
-    if (!isActive || !activeSrc || typeof window === 'undefined') return undefined;
+    if (forcePaused || !isActive || !activeSrc || typeof window === 'undefined') return undefined;
 
     const resumeActiveVideo = () => {
       if (document.visibilityState === 'hidden' || userPausedRef.current) return;
@@ -418,10 +418,10 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       window.removeEventListener('focus', resumeActiveVideo);
       document.removeEventListener('visibilitychange', resumeActiveVideo);
     };
-  }, [activeSrc, attemptPlay, isActive]);
+  }, [activeSrc, attemptPlay, forcePaused, isActive]);
 
   useEffect(() => {
-    if (!pauseOnAppBackground || !isActive || !activeSrc || typeof window === 'undefined') return undefined;
+    if (forcePaused || !pauseOnAppBackground || !isActive || !activeSrc || typeof window === 'undefined') return undefined;
 
     const pauseForBackground = () => {
       const video = videoRef.current;
@@ -468,7 +468,26 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       window.removeEventListener('pageshow', resumeFromBackground);
       window.removeEventListener('focus', resumeFromBackground);
     };
-  }, [activeSrc, attemptPlay, isActive, isPlaying, pauseOnAppBackground]);
+  }, [activeSrc, attemptPlay, forcePaused, isActive, isPlaying, pauseOnAppBackground]);
+
+  useEffect(() => {
+    if (!forcePaused) return;
+    const video = videoRef.current;
+    resumeAfterAppFocusRef.current = false;
+    userPausedRef.current = true;
+    if (recoveryTimerRef.current) {
+      window.clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = null;
+    }
+    if (video) {
+      try {
+        video.pause();
+      } catch {}
+    }
+    if (progressBarRef.current) progressBarRef.current.style.width = '0%';
+    setIsPlaying(false);
+    cancelAnimationFrame(rafRef.current);
+  }, [forcePaused]);
 
   useEffect(() => () => {
     if (recoveryTimerRef.current) {
@@ -483,6 +502,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   }, [isMuted]);
 
   const togglePlay = () => {
+    if (forcePaused) return;
     const video = videoRef.current;
     if (!video) return;
     if (video.paused || !isPlaying) {
@@ -498,6 +518,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   };
 
   const handleVideoEnd = () => {
+    if (forcePaused) return;
     const video = videoRef.current;
     if (video) {
       video.currentTime = 0;
@@ -526,8 +547,8 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           playsInline
           webkit-playsinline="true"
           muted={isMuted}
-          autoPlay
-          preload={isActive ? 'auto' : 'metadata'}
+          autoPlay={isActive && !forcePaused}
+          preload={isActive && !forcePaused ? 'auto' : 'metadata'}
           onEnded={handleVideoEnd}
           onClick={togglePlay}
         />
@@ -827,7 +848,7 @@ function StoryDailyLimitOverlay({ limit, onVip, onBack }) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/78 px-5 backdrop-blur-md"
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/88 px-5 backdrop-blur-2xl"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -1806,6 +1827,7 @@ export default function VideoFeedPage() {
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={isActive ? handleEntryRevealReady : undefined}
                   enableCinematicReveal={enableCinematicReveal}
+                  forcePaused={isStoryBlocked}
                 />
               </div>
             );
@@ -1854,6 +1876,7 @@ export default function VideoFeedPage() {
                   onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
                   enableCinematicReveal={enableCinematicReveal}
                   pauseOnAppBackground
+                  forcePaused={isStoryBlocked}
                 />
               </div>
             );
