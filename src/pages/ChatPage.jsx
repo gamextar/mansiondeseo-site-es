@@ -891,7 +891,7 @@ export default function ChatPage() {
     <>
     <DesktopSidebar />
     <div
-      className="min-h-0 h-[100dvh] bg-mansion-base flex flex-col overflow-hidden lg:min-h-screen lg:pl-64 xl:pl-72"
+      className="min-h-0 h-[100dvh] bg-mansion-base flex flex-col overflow-hidden transition-[height] duration-200 ease-out lg:min-h-screen lg:pl-64 xl:pl-72"
       style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
     >
       {/* Header */}
@@ -1098,7 +1098,7 @@ export default function ChatPage() {
       {/* Input area */}
       <div
         ref={composerRef}
-        className={`${isStandaloneMobileChat ? 'safe-bottom ' : ''}sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20`}
+        className={`${isStandaloneMobileChat ? 'safe-bottom ' : ''}sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 transition-transform duration-200 ease-out`}
       >
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3">
 
