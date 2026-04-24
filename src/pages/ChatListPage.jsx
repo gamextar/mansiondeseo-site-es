@@ -426,7 +426,7 @@ export default function ChatListPage() {
   }, [navigate, fetchConversations, subscribe, applyConversationUpdate, applyLocalConversationPreview]);
   return (
     <div
-      className="min-h-mobile-browser-screen bg-mansion-base lg:pt-0 lg:pb-[84px]"
+      className="min-h-0 min-h-[100dvh] bg-mansion-base lg:min-h-screen lg:pt-0 lg:pb-[84px]"
       style={{
         paddingTop: 'calc(var(--safe-top) + 20px)',
         paddingBottom: isDesktopViewport ? undefined : navBottomOffset,
