@@ -111,7 +111,12 @@ export default function AdminFakeInboxPage() {
       if (message) {
         setThread((prev) => ({
           ...(prev || {}),
-          messages: [...(prev?.messages || []), message],
+          messages: [
+            ...(prev?.messages || []).map((item) => (
+              item.direction === 'real_to_fake' ? { ...item, is_read: true } : item
+            )),
+            message,
+          ],
         }));
       }
       setReplyText('');
@@ -120,9 +125,11 @@ export default function AdminFakeInboxPage() {
           ? {
               ...conversation,
               messages_count: Number(conversation.messages_count || 0) + 1,
+              unread_count: 0,
             }
           : conversation
       )));
+      setSelected((prev) => prev ? { ...prev, unread_count: 0 } : prev);
     } catch (err) {
       alert(err.message || 'No se pudo enviar la respuesta');
     } finally {

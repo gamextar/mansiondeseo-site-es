@@ -4950,6 +4950,13 @@ async function handleAdminReplyFakeInbox(request, env) {
     INSERT INTO messages (id, sender_id, receiver_id, content, created_at, conversation_id)
     VALUES (?, ?, ?, ?, ?, ?)
   `).bind(msgId, fakeId, realId, content, now, conversationId).run();
+  await env.DB.prepare(`
+    UPDATE messages
+    SET is_read = 1
+    WHERE sender_id = ?
+      AND receiver_id = ?
+      AND is_read = 0
+  `).bind(realId, fakeId).run();
 
   const msg = {
     id: msgId,
