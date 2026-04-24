@@ -89,12 +89,19 @@ function parseBooleanSetting(value, fallback = false) {
 }
 
 function getRoleBucketsForFilters(filterParts = []) {
-  return [...new Set(filterParts)]
-    .filter((role) => SEEKING_ROLE_IDS.includes(role))
-    .map((role) => ({
-      key: role,
-      roles: role === 'pareja' ? PAIR_ROLE_IDS : [role],
-    }));
+  const bucketMap = new Map();
+  for (const role of [...new Set(filterParts)].filter((value) => SEEKING_ROLE_IDS.includes(value))) {
+    const key = getRoleBucketKey(role);
+    const roleValues = role === 'pareja' ? PAIR_ROLE_IDS : [role];
+    const current = bucketMap.get(key) || new Set();
+    for (const value of roleValues) current.add(value);
+    bucketMap.set(key, current);
+  }
+
+  return Array.from(bucketMap.entries()).map(([key, roles]) => ({
+    key,
+    roles: Array.from(roles),
+  }));
 }
 
 function getRoleBucketKey(role) {
@@ -199,7 +206,9 @@ function compareFeedBucketProfiles(a, b) {
   const bPriority = Math.max(0, Number(b.feed_priority || 0));
   if (bPriority !== aPriority) return bPriority - aPriority;
   if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
-  return String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
+  const activeCompare = String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
+  if (activeCompare !== 0) return activeCompare;
+  return String(b.id || '').localeCompare(String(a.id || ''));
 }
 
 function compareStoryRows(a, b) {
@@ -256,7 +265,14 @@ async function fetchRowsPerRoleBucket(env, baseQuery, baseBindings, roleBuckets,
     return results || [];
   }));
 
-  return bucketResults.flat();
+  const seenIds = new Set();
+  return bucketResults.flat().filter((row) => {
+    const id = String(row?.id || '');
+    if (!id) return false;
+    if (seenIds.has(id)) return false;
+    seenIds.add(id);
+    return true;
+  });
 }
 
 function computeFeedScore(profile, viewerInterests, settings) {
@@ -338,7 +354,16 @@ function buildFeedBaseProfiles(rows, env, activeStoryUserIds, activeStoryUrlMap)
 }
 
 function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets, limit = FEED_PROFILE_LIMIT) {
-  const scoredProfiles = (profiles || []).map((profile) => {
+  const seenIds = new Set();
+  const uniqueProfiles = (profiles || []).filter((profile) => {
+    const id = String(profile?.id || '');
+    if (!id) return false;
+    if (seenIds.has(id)) return false;
+    seenIds.add(id);
+    return true;
+  });
+
+  const scoredProfiles = uniqueProfiles.map((profile) => {
     const matchingInterests = Array.isArray(viewerInterests) && viewerInterests.length > 0
       ? profile._profileInterests.filter((interest) => viewerInterests.includes(interest)).length
       : 0;
@@ -2577,7 +2602,7 @@ async function handleProfiles(request, env) {
               FEED_SNAPSHOT_LIMIT * FEED_QUERY_EXPANSION_FACTOR,
             )
           : snapshotWindowLimit;
-        const snapshotQuery = `${query} ORDER BY last_active DESC`;
+        const snapshotQuery = `${query} ORDER BY last_active DESC, u.id DESC`;
         const [snapshotRows, storyRows, snapshotCountRow] = await Promise.all([
           fetchRowsPerRoleBucket(env, snapshotQuery, params, roleBuckets, snapshotDbLimit),
           storyRowsPromise,
@@ -2599,7 +2624,7 @@ async function handleProfiles(request, env) {
         };
       })
     : Promise.all([
-        fetchRowsPerRoleBucket(env, `${query} ORDER BY last_active DESC`, params, roleBuckets, dbLimit),
+        fetchRowsPerRoleBucket(env, `${query} ORDER BY last_active DESC, u.id DESC`, params, roleBuckets, dbLimit),
         storyRowsPromise,
       ]).then(([results, storyRows]) => {
         const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
