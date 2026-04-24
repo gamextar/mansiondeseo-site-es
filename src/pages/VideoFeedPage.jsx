@@ -27,7 +27,7 @@ function timeAgo(dateStr) {
 const AVATAR_SIZE_DEFAULT = 52;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORY_SYNC_DELAY_MS = 320;
-const STORY_VIEW_COUNT_DELAY_MS = 1800;
+const STORY_VIEW_COUNT_DELAY_MS = 1000;
 const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
