@@ -5293,13 +5293,16 @@ async function ensureStoriesTable(env) {
   return _storiesTableReady;
 }
 
+const FREE_VIDEO_STORY_LIMIT = 5;
+
 // GET /api/stories
 async function handleGetStories(request, env) {
   const url = new URL(request.url);
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
-  const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
+  const requestedLimit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
   const focusUserId = String(url.searchParams.get('focus_user_id') || '').trim();
-  let offset = (page - 1) * limit;
+  const surface = String(url.searchParams.get('surface') || 'video').trim().toLowerCase();
+  const isRailSurface = surface === 'rail' || surface === 'home' || surface === 'feed';
 
   // Try to get current user for per-user liked status and server-side seeking filter
   const auth = await authenticate(request, env).catch(() => null);
@@ -5312,6 +5315,14 @@ async function handleGetStories(request, env) {
     ).bind(viewerId).first();
     if (viewer) setCachedViewer(viewerId, viewer);
   }
+
+  const viewerCanWatchAllStories = viewer && isPremiumActive(viewer);
+  const enforceFreeStoryLimit = !isRailSurface && !viewerCanWatchAllStories;
+  const effectiveLimit = enforceFreeStoryLimit
+    ? Math.min(requestedLimit, FREE_VIDEO_STORY_LIMIT)
+    : requestedLimit;
+  const effectivePage = enforceFreeStoryLimit ? 1 : page;
+  let offset = (effectivePage - 1) * effectiveLimit;
 
   const viewerSeeking = normalizeRoleArray(safeParseJSON(viewer?.seeking, []), SEEKING_ROLE_IDS, []);
   const roleFilters = viewerSeeking.length > 0 && viewerSeeking.length < SEEKING_ROLE_IDS.length
@@ -5351,25 +5362,32 @@ async function handleGetStories(request, env) {
     ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC, s.id DESC
   `;
 
+  const allowFocusWindow = focusUserId && effectivePage === 1 && !enforceFreeStoryLimit;
   const storyWindowLimit = Math.max(
-    offset + limit + 1,
-    focusUserId && page === 1 ? 400 : limit
+    offset + effectiveLimit + 1,
+    allowFocusWindow ? 400 : effectiveLimit
   );
   const storyRows = await fetchRowsPerRoleBucket(env, query, bindings, roleBuckets, storyWindowLimit);
   const orderedRows = interleaveStoryRows(storyRows, roleBuckets, storyWindowLimit);
 
-  if (focusUserId && page === 1) {
+  if (allowFocusWindow) {
     const targetIndex = orderedRows.findIndex((row) => String(row.user_id) === focusUserId);
     if (targetIndex >= 0) {
-      offset = Math.max(0, targetIndex - Math.floor(limit / 2));
+      offset = Math.max(0, targetIndex - Math.floor(effectiveLimit / 2));
     }
   }
 
   const stories = orderedRows
-    .slice(offset, offset + limit)
+    .slice(offset, offset + effectiveLimit)
     .map((row) => mapStoryRowForResponse(row, env));
 
-  return json({ stories });
+  return json({
+    stories,
+    videoLimit: {
+      limited: enforceFreeStoryLimit,
+      freeLimit: FREE_VIDEO_STORY_LIMIT,
+    },
+  });
 }
 
 // POST /api/stories/:id/like — toggle like on a story

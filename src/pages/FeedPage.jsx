@@ -1,7 +1,7 @@
 import { forwardRef, useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Home, Plus, Radio } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, Lock, Plus, Radio } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } };
@@ -30,6 +30,7 @@ const STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT = 3;
 const STORY_RAIL_FALLBACK_GAP_MOBILE = 6;
 const STORY_RAIL_FALLBACK_GAP_DESKTOP = 7;
 const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
+const FREE_VIDEO_STORY_LIMIT = 5;
 const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
 
@@ -329,7 +330,7 @@ export default function FeedPage({ initialData }) {
     const resolvedLimit = getInitialStoryLimit(settingsRef.current, isDesktopViewport);
 
     try {
-      const data = await getStories({ limit: resolvedLimit });
+      const data = await getStories({ limit: resolvedLimit, surface: 'rail' });
       if (myId !== homeStoriesLoadIdRef.current) return null;
 
       const nextStories = Array.isArray(data?.stories) ? data.stories : [];
@@ -535,6 +536,11 @@ export default function FeedPage({ initialData }) {
     return Array.from({ length: end - adjustedStart + 1 }, (_, idx) => adjustedStart + idx);
   }, [currentPage, totalPages]);
   const storyLimit = getInitialStoryLimit(safeSettings, isDesktopViewport);
+  const freeVideoStoryLimit = Math.max(
+    1,
+    Math.round(coerceSettingNumber(safeSettings.freeVideoStoryLimit, FREE_VIDEO_STORY_LIMIT))
+  );
+  const canWatchAllVideoStories = Boolean(user?.premium);
   const bootstrapStoryProfiles = useMemo(
     () => mapStoriesToRailProfiles(bootstrapStories).slice(0, storyLimit),
     [bootstrapStories, storyLimit]
@@ -1374,6 +1380,7 @@ export default function FeedPage({ initialData }) {
             const itemStyle = getStoryRailItemStyle(
               storiesIntroEnabled ? `${60 + Math.min(index, 10) * 35}ms` : undefined
             );
+            const isLockedStory = !canWatchAllVideoStories && index >= freeVideoStoryLimit;
             return safariDesktop ? (
               <div
                 key={`story-${p.id}`}
@@ -1385,11 +1392,12 @@ export default function FeedPage({ initialData }) {
                 <button
                   type="button"
                   draggable={false}
-                  onClick={() => openStoryFromHome(p)}
-                  className="flex flex-col items-center gap-1"
+                  onClick={() => (isLockedStory ? navigate('/vip') : openStoryFromHome(p))}
+                  className={`flex flex-col items-center gap-1 ${isLockedStory ? 'opacity-75' : ''}`}
                   onDragStart={handleStoriesNativeDragStart}
+                  aria-label={isLockedStory ? 'Historia disponible para usuarios VIP' : undefined}
                 >
-                  <div className={`rounded-full transition-all duration-300 ease-out ${
+                  <div className={`relative rounded-full transition-all duration-300 ease-out ${
                     isViewed
                       ? 'bg-white/20'
                       : 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson'
@@ -1405,6 +1413,11 @@ export default function FeedPage({ initialData }) {
                         )}
                       </div>
                     </div>
+                    {isLockedStory && (
+                      <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-mansion-base bg-mansion-gold text-mansion-base shadow-md">
+                        <Lock className="h-3 w-3" strokeWidth={3} />
+                      </span>
+                    )}
                   </div>
                   <span className="text-[10px] text-text-muted truncate w-full text-center leading-tight">{p.name?.split(' ')[0]}</span>
                 </button>
@@ -1420,11 +1433,12 @@ export default function FeedPage({ initialData }) {
                 <button
                   type="button"
                   draggable={false}
-                  onClick={() => openStoryFromHome(p)}
-                  className="flex flex-col items-center gap-1"
+                  onClick={() => (isLockedStory ? navigate('/vip') : openStoryFromHome(p))}
+                  className={`flex flex-col items-center gap-1 ${isLockedStory ? 'opacity-75' : ''}`}
                   onDragStart={handleStoriesNativeDragStart}
+                  aria-label={isLockedStory ? 'Historia disponible para usuarios VIP' : undefined}
                 >
-                  <div className={`rounded-full transition-all duration-300 ease-out ${
+                  <div className={`relative rounded-full transition-all duration-300 ease-out ${
                     isViewed
                       ? 'bg-white/20'
                       : 'bg-gradient-to-tr from-mansion-crimson via-mansion-gold to-mansion-crimson'
@@ -1440,6 +1454,11 @@ export default function FeedPage({ initialData }) {
                         )}
                       </div>
                     </div>
+                    {isLockedStory && (
+                      <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-mansion-base bg-mansion-gold text-mansion-base shadow-md">
+                        <Lock className="h-3 w-3" strokeWidth={3} />
+                      </span>
+                    )}
                   </div>
                   <span className="text-[10px] text-text-muted truncate w-full text-center leading-tight">{p.name?.split(' ')[0]}</span>
                 </button>

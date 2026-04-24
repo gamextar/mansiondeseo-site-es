@@ -1248,16 +1248,17 @@ export async function reportClientError(payload = {}) {
 
 // ── Stories ─────────────────────────────────────────────
 
-export async function getStories({ page = 1, limit = 25, focusUserId = '' } = {}) {
+export async function getStories({ page = 1, limit = 25, focusUserId = '', surface = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (focusUserId) params.set('focus_user_id', focusUserId);
+  if (surface) params.set('surface', surface);
   const path = `/stories?${params}`;
   if (focusUserId) {
     // Reopening the same story reuses the same focus_user_id.
     // Bypass shared cache/promise reuse on this path to avoid stale modal state.
     return apiFetch(path);
   }
-  return sharedGet(`stories:${page}:${limit}:`, () => apiFetch(path), { ttlMs: 2 * 60_000 });
+  return sharedGet(`stories:${surface || 'video'}:${page}:${limit}:`, () => apiFetch(path), { ttlMs: 2 * 60_000 });
 }
 
 export function invalidateStoriesCache() {
