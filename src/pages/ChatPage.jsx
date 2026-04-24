@@ -363,6 +363,7 @@ export default function ChatPage() {
     if (!enabled) {
       setChatDebugMetrics(null);
       setChatDebugSnapshots({});
+      if (!isMobileBrowserChat) return undefined;
     }
 
     const updateViewport = () => {
@@ -374,7 +375,7 @@ export default function ChatPage() {
         ? innerHeight
         : (vvHeight || innerHeight);
       setViewportHeight(nextHeight);
-      setViewportOffsetTop(vvOffsetTop);
+      setViewportOffsetTop(isMobileBrowserChat ? vvOffsetTop : 0);
 
       if (isMobileBrowserChat && keyboardFocusedRef.current && pinOnKeyboardResizeRef.current) {
         window.requestAnimationFrame(() => {
@@ -387,7 +388,9 @@ export default function ChatPage() {
     updateViewport();
 
     const vv = window.visualViewport;
-    const settleTimers = [80, 180, 360, 700].map((delay) => window.setTimeout(updateViewport, delay));
+    const settleTimers = isMobileBrowserChat
+      ? [80, 180, 360, 700].map((delay) => window.setTimeout(updateViewport, delay))
+      : [];
     window.addEventListener('resize', updateViewport);
     window.addEventListener('orientationchange', updateViewport);
     window.addEventListener('focus', updateViewport);
@@ -534,17 +537,23 @@ export default function ChatPage() {
 
     if (headerNode) resizeObserver?.observe(headerNode);
     if (composerNode) resizeObserver?.observe(composerNode);
-    const settleTimers = [0, 80, 180, 360].map((delay) => window.setTimeout(measure, delay));
+    const settleTimers = isMobileBrowserChat
+      ? [0, 80, 180, 360].map((delay) => window.setTimeout(measure, delay))
+      : [];
     window.addEventListener('resize', measure);
-    window.visualViewport?.addEventListener('resize', measure);
-    window.visualViewport?.addEventListener('scroll', measure);
+    if (isMobileBrowserChat) {
+      window.visualViewport?.addEventListener('resize', measure);
+      window.visualViewport?.addEventListener('scroll', measure);
+    }
 
     return () => {
       settleTimers.forEach((timerId) => window.clearTimeout(timerId));
       resizeObserver?.disconnect();
       window.removeEventListener('resize', measure);
-      window.visualViewport?.removeEventListener('resize', measure);
-      window.visualViewport?.removeEventListener('scroll', measure);
+      if (isMobileBrowserChat) {
+        window.visualViewport?.removeEventListener('resize', measure);
+        window.visualViewport?.removeEventListener('scroll', measure);
+      }
     };
   }, [partnerTyping, isVipUser, input, viewportHeight, keyboardActive, isMobileBrowserChat]);
 
@@ -898,14 +907,12 @@ export default function ChatPage() {
 
   const handleInputFocus = () => {
     setShowEmojis(false);
-    setKeyboardActive(true);
-    keyboardFocusedRef.current = true;
-    pinOnKeyboardResizeRef.current = isMobileBrowserChat || isAtBottom(160);
-    if (pinOnKeyboardResizeRef.current) {
+    if (isMobileBrowserChat) {
+      setKeyboardActive(true);
+      keyboardFocusedRef.current = true;
+      pinOnKeyboardResizeRef.current = true;
       wasAtBottomRef.current = true;
       scrollToBottom('auto');
-    }
-    if (isMobileBrowserChat && typeof window !== 'undefined') {
       settleMobileKeyboardViewport(true);
     }
     keepChatPinnedToBottom('auto');
@@ -916,13 +923,13 @@ export default function ChatPage() {
 
   const handleInputBlur = () => {
     stopTypingSignal();
-    setKeyboardActive(false);
-    setMessagesAreaHeight(null);
-    if (isMobileBrowserChat && typeof window !== 'undefined') {
+    if (isMobileBrowserChat) {
+      setKeyboardActive(false);
+      setMessagesAreaHeight(null);
+      keyboardFocusedRef.current = false;
+      pinOnKeyboardResizeRef.current = false;
       setViewportHeight(window.innerHeight);
     }
-    keyboardFocusedRef.current = false;
-    pinOnKeyboardResizeRef.current = false;
     const fastSettle = fastKeyboardSettleRef.current || input.trim().length === 0;
     fastKeyboardSettleRef.current = false;
     settleMobileKeyboardViewport(fastSettle);
@@ -953,19 +960,26 @@ export default function ChatPage() {
     paddingTop: `${headerHeight + 14}px`,
     paddingBottom: '12px',
   };
+  const shellStyle = viewportHeight ? { height: `${viewportHeight}px` } : undefined;
+  const headerStyle = isMobileBrowserChat && viewportOffsetTop
+    ? { transform: `translateY(${viewportOffsetTop}px)` }
+    : undefined;
+  const shellMinHeightClass = isStandaloneMobileChat ? 'min-h-screen' : 'min-h-0';
+  const shellTransitionClass = isMobileBrowserChat ? 'transition-[height] duration-150 ease-out' : '';
+  const composerTransitionClass = isMobileBrowserChat ? 'transition-transform duration-150 ease-out' : '';
 
   return (
     <>
     <DesktopSidebar />
     <div
-      className="min-h-0 h-[100dvh] bg-mansion-base flex flex-col overflow-hidden transition-[height] duration-150 ease-out lg:min-h-screen lg:pl-64 xl:pl-72"
-      style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
+      className={`${shellMinHeightClass} h-[100dvh] bg-mansion-base flex flex-col overflow-hidden lg:min-h-screen lg:pl-64 xl:pl-72 ${shellTransitionClass}`}
+      style={shellStyle}
     >
       {/* Header */}
       <div
         ref={headerRef}
         className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
-        style={viewportOffsetTop ? { transform: `translateY(${viewportOffsetTop}px)` } : undefined}
+        style={headerStyle}
       >
         <div className="relative flex items-center gap-3 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3 lg:gap-3 lg:py-4">
           <button
@@ -1170,7 +1184,7 @@ export default function ChatPage() {
       {/* Input area */}
       <div
         ref={composerRef}
-        className={`${isStandaloneMobileChat ? 'safe-bottom ' : ''}sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 transition-transform duration-150 ease-out`}
+        className={`${isStandaloneMobileChat ? 'safe-bottom ' : ''}sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 ${composerTransitionClass}`}
       >
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3">
 
