@@ -56,7 +56,7 @@ export default function BottomNav({ immersive = false }) {
   const effectiveNavHeight = getBottomNavHeight(isStandaloneMobileApp);
   const visualOffsetPx = getBottomNavVisualOffset(isStandaloneMobileApp);
   const pageExtraPaddingPx = getBottomNavPageExtraPadding(isStandaloneMobileApp);
-  const activeIndicatorSize = isStandaloneMobileApp ? 66 : 62;
+  const activeIndicatorSize = isStandaloneMobileApp ? 70 : 62;
   const outerSidePadding = BOTTOM_NAV_SIDE_PADDING;
   const bgColor = `rgba(0,0,0,${(BOTTOM_NAV_OPACITY / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * BOTTOM_NAV_OPACITY / 100).toFixed(3)})`;
@@ -122,7 +122,7 @@ export default function BottomNav({ immersive = false }) {
       )}
       <div
         className={`pointer-events-auto w-full border ${
-          isStandaloneMobileApp ? 'rounded-[1.9rem]' : 'rounded-[2.35rem]'
+          isStandaloneMobileApp ? 'rounded-[2.55rem]' : 'rounded-[2.35rem]'
         }`}
         style={{
           backgroundColor: bgColor,
