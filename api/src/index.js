@@ -423,6 +423,9 @@ function mapStoryRowForResponse(row, env) {
     comments: row.comments || 0,
     created_at: row.created_at,
     username: row.username,
+    role: row.role || '',
+    role_label: mapRoleToDisplay(row.role || ''),
+    age: getPublicAge(row),
     avatar_url: row.avatar_url || '',
     avatar_crop: safeParseJSON(row.avatar_crop, null),
   };
@@ -2394,7 +2397,7 @@ async function handleAppBootstrap(request, env) {
                ELSE 0
              END AS restricted,
              s.likes, s.comments, s.created_at,
-             u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
+             u.username, u.avatar_url, u.avatar_crop, u.role, u.age, u.birthdate, COALESCE(u.fake, 0) AS fake,
              CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
       FROM stories s
       JOIN users u ON u.id = s.user_id
@@ -3918,12 +3921,6 @@ async function loadSettings(env) {
     roleParejaHombresImg: settings.role_pareja_hombres_img || '',
     roleParejaMujeresImg: settings.role_pareja_mujeres_img || '',
     roleTransImg: settings.role_trans_img || '',
-    galleryHombreImg: settings.gallery_hombre_img || '',
-    galleryMujerImg: settings.gallery_mujer_img || '',
-    galleryParejaImg: settings.gallery_pareja_img || '',
-    galleryParejaHombresImg: settings.gallery_pareja_hombres_img || '',
-    galleryParejaMujeresImg: settings.gallery_pareja_mujeres_img || '',
-    galleryTransImg: settings.gallery_trans_img || '',
     allowedCountries: settings.allowed_countries || 'AR',
     coinPack1Coins: settings.coin_pack_1_coins || '1000',
     coinPack1Price: settings.coin_pack_1_price || '',
@@ -4034,12 +4031,6 @@ function getPublicSettingsPayload(settings) {
     roleParejaHombresImg: settings.roleParejaHombresImg,
     roleParejaMujeresImg: settings.roleParejaMujeresImg,
     roleTransImg: settings.roleTransImg,
-    galleryHombreImg: settings.galleryHombreImg,
-    galleryMujerImg: settings.galleryMujerImg,
-    galleryParejaImg: settings.galleryParejaImg,
-    galleryParejaHombresImg: settings.galleryParejaHombresImg,
-    galleryParejaMujeresImg: settings.galleryParejaMujeresImg,
-    galleryTransImg: settings.galleryTransImg,
     coinIconUrl: settings.coinIconUrl,
     coinIconSize: settings.coinIconSize,
     feedFilterByCountry: settings.feedFilterByCountry,
@@ -4117,8 +4108,6 @@ async function handleUpdateSettings(request, env) {
     'incognito_icon_svg',
     'role_hombre_img', 'role_mujer_img', 'role_pareja_img',
     'role_pareja_hombres_img', 'role_pareja_mujeres_img', 'role_trans_img',
-    'gallery_hombre_img', 'gallery_mujer_img', 'gallery_pareja_img',
-    'gallery_pareja_hombres_img', 'gallery_pareja_mujeres_img', 'gallery_trans_img',
     'allowed_countries',
     'coin_pack_1_coins', 'coin_pack_1_price',
     'coin_pack_2_coins', 'coin_pack_2_price',
@@ -5807,7 +5796,7 @@ async function handleGetStories(request, env) {
              ELSE 0
            END AS restricted,
            s.likes, s.comments, s.created_at,
-           u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
+           u.username, u.avatar_url, u.avatar_crop, u.role, u.age, u.birthdate, COALESCE(u.fake, 0) AS fake,
            CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
   `;
   const queryParts = [query];

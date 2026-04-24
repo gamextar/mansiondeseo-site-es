@@ -85,12 +85,6 @@ export default function SettingsPage() {
   const [roleParejaHombresImg, setRoleParejaHombresImg] = useState('');
   const [roleParejaMujeresImg, setRoleParejaMujeresImg] = useState('');
   const [roleTransImg, setRoleTransImg] = useState('');
-  const [galleryHombreImg, setGalleryHombreImg] = useState('');
-  const [galleryMujerImg, setGalleryMujerImg] = useState('');
-  const [galleryParejaImg, setGalleryParejaImg] = useState('');
-  const [galleryParejaHombresImg, setGalleryParejaHombresImg] = useState('');
-  const [galleryParejaMujeresImg, setGalleryParejaMujeresImg] = useState('');
-  const [galleryTransImg, setGalleryTransImg] = useState('');
 
   // Navegacion inferior
   const [navBottomPadding, setNavBottomPadding] = useState(24);
@@ -250,12 +244,6 @@ export default function SettingsPage() {
         setRoleParejaHombresImg(s.roleParejaHombresImg || '');
         setRoleParejaMujeresImg(s.roleParejaMujeresImg || '');
         setRoleTransImg(s.roleTransImg || '');
-        setGalleryHombreImg(s.galleryHombreImg || '');
-        setGalleryMujerImg(s.galleryMujerImg || '');
-        setGalleryParejaImg(s.galleryParejaImg || '');
-        setGalleryParejaHombresImg(s.galleryParejaHombresImg || '');
-        setGalleryParejaMujeresImg(s.galleryParejaMujeresImg || '');
-        setGalleryTransImg(s.galleryTransImg || '');
         setCoinPack1Coins(s.coinPack1Coins || '1000');
         setCoinPack1Price(s.coinPack1Price || '');
         setCoinPack2Coins(s.coinPack2Coins || '2000');
@@ -423,12 +411,6 @@ export default function SettingsPage() {
         role_pareja_hombres_img: roleParejaHombresImg,
         role_pareja_mujeres_img: roleParejaMujeresImg,
         role_trans_img: roleTransImg,
-        gallery_hombre_img: galleryHombreImg,
-        gallery_mujer_img: galleryMujerImg,
-        gallery_pareja_img: galleryParejaImg,
-        gallery_pareja_hombres_img: galleryParejaHombresImg,
-        gallery_pareja_mujeres_img: galleryParejaMujeresImg,
-        gallery_trans_img: galleryTransImg,
         coin_pack_1_coins: coinPack1Coins,
         coin_pack_1_price: coinPack1Price,
         coin_pack_2_coins: coinPack2Coins,
@@ -498,12 +480,6 @@ export default function SettingsPage() {
       setVipPrice3Months(s.vipPrice3Months);
       setVipPrice6Months(s.vipPrice6Months);
       setIncognitoIconSvg(s.incognitoIconSvg || '');
-      setGalleryHombreImg(s.galleryHombreImg || '');
-      setGalleryMujerImg(s.galleryMujerImg || '');
-      setGalleryParejaImg(s.galleryParejaImg || '');
-      setGalleryParejaHombresImg(s.galleryParejaHombresImg || '');
-      setGalleryParejaMujeresImg(s.galleryParejaMujeresImg || '');
-      setGalleryTransImg(s.galleryTransImg || '');
       setCoinPack1Coins(s.coinPack1Coins || '1000');
       setCoinPack1Price(s.coinPack1Price || '');
       setCoinPack2Coins(s.coinPack2Coins || '2000');
@@ -998,60 +974,6 @@ export default function SettingsPage() {
                 {incognitoIconSvg.trim() && (
                   <button onClick={() => setIncognitoIconSvg('')} className="text-[11px] text-mansion-crimson hover:underline">Restaurar default</button>
                 )}
-              </div>
-            </div>
-
-            {/* Gallery Role Images */}
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                  <Image className="w-4 h-4 text-mansion-gold" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Íconos de Galería</h3>
-                  <p className="text-[11px] text-text-dim">Íconos pequeños para las tarjetas de galería. PNG/WebP recomendado.</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {[
-                  { label: 'Hombre', value: galleryHombreImg, setter: setGalleryHombreImg, color: '#3B82F6' },
-                  { label: 'Mujer', value: galleryMujerImg, setter: setGalleryMujerImg, color: '#EC4899' },
-                  { label: 'Pareja', value: galleryParejaImg, setter: setGalleryParejaImg, color: '#8B5CF6' },
-                  { label: 'Pareja Hombres', value: galleryParejaHombresImg, setter: setGalleryParejaHombresImg, color: '#60A5FA' },
-                  { label: 'Pareja Mujeres', value: galleryParejaMujeresImg, setter: setGalleryParejaMujeresImg, color: '#F472B6' },
-                  { label: 'Trans', value: galleryTransImg, setter: setGalleryTransImg, color: '#2DD4BF' },
-                ].map(({ label, value, setter, color }) => (
-                  <div key={label} className="flex flex-col items-center gap-2">
-                    <span className="text-[11px] font-medium" style={{ color }}>{label}</span>
-                    <label className="relative w-full aspect-square rounded-xl border-2 border-dashed border-mansion-border/40 hover:border-mansion-gold/40 cursor-pointer transition-colors bg-mansion-elevated/50 overflow-hidden flex items-center justify-center">
-                      {value ? (
-                        <img src={value} alt={label} className="w-full h-full object-cover" />
-                      ) : (
-                        <Upload className="w-5 h-5 text-text-dim" />
-                      )}
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="hidden"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          try {
-                            const result = await uploadImage(file);
-                            if (result.url) setter(result.url);
-                          } catch (err) {
-                            console.error('Error uploading gallery icon:', err);
-                          }
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
-                    {value && (
-                      <button onClick={() => setter('')} className="text-[10px] text-mansion-crimson hover:underline">Quitar</button>
-                    )}
-                  </div>
-                ))}
               </div>
             </div>
 

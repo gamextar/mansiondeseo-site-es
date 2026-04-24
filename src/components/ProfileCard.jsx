@@ -19,34 +19,7 @@ const MaskIcon = ({ className = 'w-6 h-6', customSvg = '' }) => {
   );
 };
 
-const ROLE_COLORS = {
-  Pareja: 'from-purple-500/80 to-purple-700/80',
-  'Pareja de Hombres': 'from-sky-500/80 to-blue-700/80',
-  'Pareja de Mujeres': 'from-fuchsia-500/80 to-pink-700/80',
-  Trans: 'from-teal-500/80 to-cyan-700/80',
-  'Hombre Solo': 'from-blue-500/80 to-blue-700/80',
-  'Mujer Sola': 'from-pink-500/80 to-pink-700/80',
-};
-
-const ROLE_BG = {
-  Pareja: 'bg-purple-500/20 text-purple-300',
-  'Pareja de Hombres': 'bg-sky-500/20 text-sky-300',
-  'Pareja de Mujeres': 'bg-fuchsia-500/20 text-fuchsia-300',
-  Trans: 'bg-teal-500/20 text-teal-300',
-  'Hombre Solo': 'bg-blue-500/20 text-blue-300',
-  'Mujer Sola': 'bg-pink-500/20 text-pink-300',
-};
-
 const FEED_SCROLL_KEY = 'mansion_feed_scroll_y';
-
-const ROLE_IMG_KEYS = {
-  'Hombre Solo': 'galleryHombreImg',
-  'Mujer Sola': 'galleryMujerImg',
-  'Pareja': 'galleryParejaImg',
-  'Pareja de Hombres': 'galleryParejaHombresImg',
-  'Pareja de Mujeres': 'galleryParejaMujeresImg',
-  Trans: 'galleryTransImg',
-};
 
 function formatCardLocation(profile) {
   const province = String(profile?.province ?? profile?.city ?? '').trim();
@@ -54,29 +27,6 @@ function formatCardLocation(profile) {
   if (locality && province) return province;
   return formatLocation(profile);
 }
-
-const RoleFallbackIcon = ({ role }) => {
-  if (role === 'Hombre Solo') return (
-    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-500/80 text-white shrink-0">
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4Z"/></svg>
-    </span>
-  );
-  if (role === 'Mujer Sola') return (
-    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-pink-500/80 text-white shrink-0">
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4Z"/></svg>
-    </span>
-  );
-  if (role === 'Trans') return (
-    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-teal-500/80 text-white shrink-0">
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm-4 12c0-1.8 1.8-3 4-3s4 1.2 4 3v1H8v-1Zm4 3a3 3 0 0 0-3 3h6a3 3 0 0 0-3-3Z"/></svg>
-    </span>
-  );
-  return (
-    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-purple-500/80 text-white shrink-0">
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3Zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3Zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5Zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5Z"/></svg>
-    </span>
-  );
-};
 
 export default function ProfileCard({
   profile,
@@ -93,7 +43,6 @@ export default function ProfileCard({
   const [imageFailed, setImageFailed] = useState(false);
   const { id, name, age, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const safariDesktop = typeof safariDesktopOverride === 'boolean' ? safariDesktopOverride : isSafariDesktopBrowser();
-  const roleImg = settings[ROLE_IMG_KEYS[role]] || null;
   const locationText = formatCardLocation(profile);
   const isMobile = typeof isMobileOverride === 'boolean'
     ? isMobileOverride
@@ -255,10 +204,6 @@ export default function ProfileCard({
                 )}
               </div>
 
-              {roleImg
-                ? <img src={roleImg} alt={role} title={role} className="w-7 h-7 rounded-full object-contain" />
-                : <RoleFallbackIcon role={role} />
-              }
             </div>
           </div>
         </div>
