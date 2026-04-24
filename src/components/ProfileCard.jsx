@@ -29,18 +29,18 @@ function formatCardLocation(profile) {
 }
 
 const ROLE_PILLS = {
-  hombre: { label: 'Hombre', className: 'bg-blue-600/35 text-blue-100 border-blue-300/55 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
-  mujer: { label: 'Mujer', className: 'bg-pink-600/35 text-pink-100 border-pink-300/55 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
-  pareja: { label: 'Pareja', className: 'bg-purple-600/35 text-purple-100 border-purple-300/55 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
-  pareja_hombres: { label: 'Pareja de hombres', className: 'bg-sky-600/35 text-sky-100 border-sky-300/55 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
-  pareja_mujeres: { label: 'Pareja de mujeres', className: 'bg-fuchsia-600/35 text-fuchsia-100 border-fuchsia-300/55 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
-  trans: { label: 'Trans', className: 'bg-teal-600/35 text-teal-100 border-teal-300/55 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
-  'Hombre Solo': { label: 'Hombre', className: 'bg-blue-600/35 text-blue-100 border-blue-300/55 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
-  'Mujer Sola': { label: 'Mujer', className: 'bg-pink-600/35 text-pink-100 border-pink-300/55 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
-  Pareja: { label: 'Pareja', className: 'bg-purple-600/35 text-purple-100 border-purple-300/55 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
-  'Pareja de Hombres': { label: 'Pareja de hombres', className: 'bg-sky-600/35 text-sky-100 border-sky-300/55 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
-  'Pareja de Mujeres': { label: 'Pareja de mujeres', className: 'bg-fuchsia-600/35 text-fuchsia-100 border-fuchsia-300/55 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
-  Trans: { label: 'Trans', className: 'bg-teal-600/35 text-teal-100 border-teal-300/55 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
+  hombre: { label: 'Hombre', className: 'bg-blue-600/35 text-blue-100 border-blue-500/40 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
+  mujer: { label: 'Mujer', className: 'bg-pink-600/35 text-pink-100 border-pink-500/40 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
+  pareja: { label: 'Pareja', className: 'bg-purple-600/35 text-purple-100 border-purple-500/40 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
+  pareja_hombres: { label: 'Pareja de hombres', className: 'bg-sky-600/35 text-sky-100 border-sky-500/40 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
+  pareja_mujeres: { label: 'Pareja de mujeres', className: 'bg-fuchsia-600/35 text-fuchsia-100 border-fuchsia-500/40 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
+  trans: { label: 'Trans', className: 'bg-teal-600/35 text-teal-100 border-teal-500/40 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
+  'Hombre Solo': { label: 'Hombre', className: 'bg-blue-600/35 text-blue-100 border-blue-500/40 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
+  'Mujer Sola': { label: 'Mujer', className: 'bg-pink-600/35 text-pink-100 border-pink-500/40 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
+  Pareja: { label: 'Pareja', className: 'bg-purple-600/35 text-purple-100 border-purple-500/40 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
+  'Pareja de Hombres': { label: 'Pareja de hombres', className: 'bg-sky-600/35 text-sky-100 border-sky-500/40 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
+  'Pareja de Mujeres': { label: 'Pareja de mujeres', className: 'bg-fuchsia-600/35 text-fuchsia-100 border-fuchsia-500/40 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
+  Trans: { label: 'Trans', className: 'bg-teal-600/35 text-teal-100 border-teal-500/40 shadow-[0_6px_18px_rgba(0,0,0,0.22)]' },
 };
 
 export default function ProfileCard({
