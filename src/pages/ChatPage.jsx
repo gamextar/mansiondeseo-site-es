@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Send, Lock, ImageIcon, Smile } from 'lucide-react';
+import { ChevronLeft, Send, Smile } from 'lucide-react';
 import { useMessageLimit } from '../hooks/useMessageLimit';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
@@ -168,9 +168,7 @@ export default function ChatPage() {
   const isMobileBrowserChat = typeof window !== 'undefined'
     ? window.matchMedia('(max-width: 1023px)').matches && !isStandaloneMobileChat
     : false;
-  const currentUser = getStoredUser();
-  const isVipUser = Boolean(currentUser?.premium);
-  const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
+  const { canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
   const cachedChat = readChatCache(partnerId);
@@ -555,7 +553,7 @@ export default function ChatPage() {
         window.visualViewport?.removeEventListener('scroll', measure);
       }
     };
-  }, [partnerTyping, isVipUser, input, viewportHeight, keyboardActive, isMobileBrowserChat]);
+  }, [partnerTyping, input, viewportHeight, keyboardActive, isMobileBrowserChat]);
 
   useEffect(() => {
     const token = getToken();
@@ -830,7 +828,6 @@ export default function ChatPage() {
     );
   }
 
-  const effectiveRemaining = apiLimit ? apiLimit.remaining : remaining;
   const effectiveCanSend = apiLimit ? apiLimit.canSend : canSend;
   const effectiveMax = apiLimit ? apiLimit.max : max;
 
@@ -1051,18 +1048,6 @@ export default function ChatPage() {
             )}
           </div>
 
-          {!isVipUser && (
-            <div className="flex-shrink-0 flex items-center gap-2">
-              <div className={`flex items-center gap-2 text-[12px] font-semibold px-3 py-1.5 rounded-full border lg:text-[15px] lg:px-4 lg:py-2 ${
-                effectiveRemaining <= 2
-                  ? 'bg-mansion-crimson/10 border-mansion-crimson/30 text-mansion-crimson'
-                  : 'bg-mansion-gold/8 border-mansion-gold/25 text-mansion-gold'
-              }`}>
-                <Lock className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                <span>{effectiveRemaining} mensajes restantes</span>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -1187,12 +1172,6 @@ export default function ChatPage() {
         className={`${isStandaloneMobileChat ? 'safe-bottom ' : ''}sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 ${composerTransitionClass}`}
       >
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3">
-
-          {/* Attach photo */}
-          <button className="flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center text-text-dim hover:text-mansion-gold hover:bg-mansion-elevated/60 transition-colors border border-mansion-border/30 lg:w-12 lg:h-12">
-            <ImageIcon className="w-5 h-5 lg:w-5.5 lg:h-5.5" />
-          </button>
-
           {/* Textarea + emoji */}
           <div className="flex-1 relative flex items-end">
             <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors min-h-[44px] lg:min-h-[52px]">
