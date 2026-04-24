@@ -23,32 +23,6 @@ function timeAgo(dateStr) {
   return `${days}d`;
 }
 
-function normalizeStoryRoleLabel(story) {
-  const raw = String(story?.role || story?.role_label || '').trim();
-  const labels = {
-    hombre: 'Hombre',
-    mujer: 'Mujer',
-    pareja: 'Pareja',
-    pareja_hombres: 'Pareja de hombres',
-    pareja_mujeres: 'Pareja de mujeres',
-    trans: 'Trans',
-    'Hombre Solo': 'Hombre',
-    'Mujer Sola': 'Mujer',
-    'Pareja de Hombres': 'Pareja de hombres',
-    'Pareja de Mujeres': 'Pareja de mujeres',
-  };
-  return labels[raw] || raw;
-}
-
-function getStoryMetaLine(story) {
-  const role = normalizeStoryRoleLabel(story);
-  const age = Number(story?.age || 0);
-  if (role && age > 0) return `${role} de ${age} años`;
-  if (role) return role;
-  if (age > 0) return `${age} años`;
-  return '';
-}
-
 // ── Avatar size fallback; real value comes from siteSettings.videoAvatarSize ─
 const AVATAR_SIZE_DEFAULT = 52;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
@@ -151,9 +125,6 @@ function normalizeStorySeed(seed) {
     restricted: !!seed.restricted,
     created_at: String(seed.created_at || ''),
     username: String(seed.username || seed.name || ''),
-    role: String(seed.role || ''),
-    role_label: String(seed.role_label || ''),
-    age: Number(seed.age || 0) || null,
     avatar_url: String(seed.avatar_url || ''),
     avatar_crop: seed.avatar_crop || null,
   };
@@ -288,7 +259,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [videoResetToken, setVideoResetToken] = useState(0);
-  const metaLine = getStoryMetaLine(story);
 
   // Once src is set, never clear it — clearing causes browser to reload the video
   // which produces the black flash/glitch at boundaries. Matches original behavior.
@@ -622,12 +592,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
                 <div className="w-full h-full flex items-center justify-center text-white/60 text-xl font-bold">{(story.username || '?')[0]}</div>
               )}
             </div>
-            <div>
-              <p className="text-white font-bold text-xl leading-tight" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.5)' }}>{story.username}</p>
-              {metaLine && (
-                <p className="mt-0.5 text-white/75 text-sm font-medium leading-tight" style={{ textShadow: '0 1px 5px rgba(0,0,0,0.65)' }}>{metaLine}</p>
-              )}
-            </div>
+            <p className="text-white font-bold text-xl leading-tight" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.5)' }}>@{story.username}</p>
           </button>
           {story.caption && (
             <p className="text-white/90 text-lg leading-relaxed line-clamp-3" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.6), 0 0 2px rgba(0,0,0,0.4)' }}>{story.caption}</p>
@@ -796,7 +761,6 @@ function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, s
 
 function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, navBottomOffset, avatarSize, scrollContainerRef, onGift, isOwnStory = false }) {
   if (!story) return null;
-  const metaLine = getStoryMetaLine(story);
   const actionBottom = typeof navBottomOffset === 'number'
     ? `${navBottomOffset + 16}px`
     : `calc(${navBottomOffset} + 16px)`;
@@ -825,12 +789,7 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
               <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">{(story.username || '?')[0]}</div>
             )}
           </div>
-          <div>
-            <p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg">{story.username}</p>
-            {metaLine && (
-              <p className="mt-0.5 text-white/75 text-[12px] font-medium leading-tight drop-shadow">{metaLine}</p>
-            )}
-          </div>
+          <p className="text-white font-bold text-[16px] leading-tight drop-shadow-lg">@{story.username}</p>
         </MobileOverlayButton>
         {story.caption && (
           <p className="pointer-events-none text-white/90 text-sm leading-relaxed line-clamp-3 drop-shadow">{story.caption}</p>

@@ -28,6 +28,28 @@ function formatCardLocation(profile) {
   return formatLocation(profile);
 }
 
+const CARD_ROLE_LABELS = {
+  hombre: 'Hombre',
+  mujer: 'Mujer',
+  pareja: 'Pareja',
+  pareja_hombres: 'Pareja de hombres',
+  pareja_mujeres: 'Pareja de mujeres',
+  trans: 'Trans',
+  'Hombre Solo': 'Hombre',
+  'Mujer Sola': 'Mujer',
+  'Pareja de Hombres': 'Pareja de hombres',
+  'Pareja de Mujeres': 'Pareja de mujeres',
+};
+
+function formatRoleAge(role, age) {
+  const cleanRole = String(role || '').trim();
+  const roleLabel = CARD_ROLE_LABELS[cleanRole] || cleanRole;
+  const ageNumber = Number(age || 0);
+  const ageText = ageNumber > 0 ? `${ageNumber} años` : '';
+  if (roleLabel && ageText) return `${roleLabel} de ${ageText}`;
+  return roleLabel || ageText;
+}
+
 export default function ProfileCard({
   profile,
   index = 0,
@@ -44,6 +66,7 @@ export default function ProfileCard({
   const { id, name, age, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const safariDesktop = typeof safariDesktopOverride === 'boolean' ? safariDesktopOverride : isSafariDesktopBrowser();
   const locationText = formatCardLocation(profile);
+  const roleAgeText = formatRoleAge(role, age);
   const isMobile = typeof isMobileOverride === 'boolean'
     ? isMobileOverride
     : (typeof window !== 'undefined' && window.innerWidth < 1024);
@@ -191,11 +214,16 @@ export default function ProfileCard({
           {/* Bottom info */}
           <div className="absolute bottom-0 left-0 right-0 p-3 z-20">
             {/* Name & details */}
-            <div className="flex items-end justify-between">
-              <div>
+            <div>
+              <div className="min-w-0">
                 <h3 className="font-display text-lg font-semibold text-white leading-tight">
-                  {name}<span className="text-text-muted font-body text-sm ml-1">{age}</span>
+                  {name}
                 </h3>
+                {roleAgeText && (
+                  <p className="mt-0.5 text-xs font-semibold text-white/80 leading-tight">
+                    {roleAgeText}
+                  </p>
+                )}
                 {locationText && (
                   <div className="flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3 h-3 text-text-muted" />
@@ -203,7 +231,6 @@ export default function ProfileCard({
                   </div>
                 )}
               </div>
-
             </div>
           </div>
         </div>

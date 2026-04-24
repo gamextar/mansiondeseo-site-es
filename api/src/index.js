@@ -423,9 +423,6 @@ function mapStoryRowForResponse(row, env) {
     comments: row.comments || 0,
     created_at: row.created_at,
     username: row.username,
-    role: row.role || '',
-    role_label: mapRoleToDisplay(row.role || ''),
-    age: getPublicAge(row),
     avatar_url: row.avatar_url || '',
     avatar_crop: safeParseJSON(row.avatar_crop, null),
   };
@@ -2397,7 +2394,7 @@ async function handleAppBootstrap(request, env) {
                ELSE 0
              END AS restricted,
              s.likes, s.comments, s.created_at,
-             u.username, u.avatar_url, u.avatar_crop, u.role, u.age, u.birthdate, COALESCE(u.fake, 0) AS fake,
+             u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
              CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
       FROM stories s
       JOIN users u ON u.id = s.user_id
@@ -5796,7 +5793,7 @@ async function handleGetStories(request, env) {
              ELSE 0
            END AS restricted,
            s.likes, s.comments, s.created_at,
-           u.username, u.avatar_url, u.avatar_crop, u.role, u.age, u.birthdate, COALESCE(u.fake, 0) AS fake,
+           u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
            CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
   `;
   const queryParts = [query];
