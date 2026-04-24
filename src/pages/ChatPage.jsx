@@ -204,6 +204,8 @@ export default function ChatPage() {
   const wasAtBottomRef = useRef(true);
   const myUserIdRef = useRef(null);
   const fastKeyboardSettleRef = useRef(false);
+  const keyboardFocusedRef = useRef(false);
+  const pinOnKeyboardResizeRef = useRef(false);
   const pendingScrollBehaviorRef = useRef(null);
   const pendingScrollForceRef = useRef(false);
   const restoreScrollAfterPrependRef = useRef(null);
@@ -235,11 +237,10 @@ export default function ChatPage() {
 
 
   // Helper: is user at bottom?
-  const isAtBottom = useCallback(() => {
+  const isAtBottom = useCallback((tolerance = 40) => {
     if (!scrollRef.current) return true;
     const el = scrollRef.current;
-    // Allow 40px tolerance
-    return el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < tolerance;
   }, []);
 
   const scrollToBottom = useCallback((behavior = 'auto') => {
@@ -370,6 +371,13 @@ export default function ChatPage() {
       const nextHeight = vvHeight || innerHeight;
       setViewportHeight(nextHeight);
       setViewportOffsetTop(vvOffsetTop);
+
+      if (isMobileBrowserChat && keyboardFocusedRef.current && pinOnKeyboardResizeRef.current) {
+        window.requestAnimationFrame(() => {
+          scrollToBottom('auto');
+          window.requestAnimationFrame(() => scrollToBottom('auto'));
+        });
+      }
     };
 
     updateViewport();
@@ -392,7 +400,7 @@ export default function ChatPage() {
       vv?.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('scroll', updateViewport);
     };
-  }, [isMobileBrowserChat]);
+  }, [isMobileBrowserChat, scrollToBottom]);
 
   useLayoutEffect(() => {
     if (!isMobileBrowserChat || typeof window === 'undefined' || typeof document === 'undefined') return undefined;
@@ -867,6 +875,12 @@ export default function ChatPage() {
 
   const handleInputFocus = () => {
     setShowEmojis(false);
+    keyboardFocusedRef.current = true;
+    pinOnKeyboardResizeRef.current = isAtBottom(160);
+    if (pinOnKeyboardResizeRef.current) {
+      wasAtBottomRef.current = true;
+      scrollToBottom('auto');
+    }
     if (isMobileBrowserChat && typeof window !== 'undefined') {
       settleMobileKeyboardViewport(true);
     }
@@ -878,6 +892,8 @@ export default function ChatPage() {
 
   const handleInputBlur = () => {
     stopTypingSignal();
+    keyboardFocusedRef.current = false;
+    pinOnKeyboardResizeRef.current = false;
     const fastSettle = fastKeyboardSettleRef.current || input.trim().length === 0;
     fastKeyboardSettleRef.current = false;
     settleMobileKeyboardViewport(fastSettle);
@@ -994,7 +1010,13 @@ export default function ChatPage() {
           ref={scrollRef}
           onScroll={() => {
             const el = scrollRef.current;
-            if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+            if (el) {
+              if (keyboardFocusedRef.current && pinOnKeyboardResizeRef.current) {
+                wasAtBottomRef.current = true;
+                return;
+              }
+              wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+            }
           }}
           className="h-full overflow-y-auto overscroll-y-contain px-[5vw] lg:px-[4vw]"
           style={{
