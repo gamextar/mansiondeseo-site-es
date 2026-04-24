@@ -48,6 +48,13 @@ const ROLE_IMG_KEYS = {
   Trans: 'galleryTransImg',
 };
 
+function formatCardLocation(profile) {
+  const province = String(profile?.province ?? profile?.city ?? '').trim();
+  const locality = String(profile?.locality ?? '').trim();
+  if (locality && province) return province;
+  return formatLocation(profile);
+}
+
 const RoleFallbackIcon = ({ role }) => {
   if (role === 'Hombre Solo') return (
     <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-500/80 text-white shrink-0">
@@ -86,7 +93,7 @@ export default function ProfileCard({
   const { id, name, age, role, interests, photos = [], verified, online, premium, blurred } = profile;
   const safariDesktop = typeof safariDesktopOverride === 'boolean' ? safariDesktopOverride : isSafariDesktopBrowser();
   const roleImg = settings[ROLE_IMG_KEYS[role]] || null;
-  const locationText = formatLocation(profile);
+  const locationText = formatCardLocation(profile);
   const isMobile = typeof isMobileOverride === 'boolean'
     ? isMobileOverride
     : (typeof window !== 'undefined' && window.innerWidth < 1024);
