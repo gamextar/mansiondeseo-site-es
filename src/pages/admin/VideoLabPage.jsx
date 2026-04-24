@@ -26,6 +26,24 @@ const VIDEO_PRESETS = [
     audioMono: true,
     preset: 'superfast',
     estimatedVideoBitrate: '1.6M',
+    outputSuffix: '720p-15s',
+  },
+  {
+    id: 'videoblur',
+    label: 'videoblur',
+    description: 'Blur preview liviano: scale=256:-1, boxblur=25:10, scale=854:-1, CRF 35, preset faster, sin audio.',
+    statusLabel: 'videoblur',
+    codecLabel: 'H.264 CRF 35 + blur + sin audio',
+    crf: '35',
+    maxrate: 'none',
+    bufsize: 'none',
+    audioBitrate: 'none',
+    audioMono: false,
+    preset: 'faster',
+    estimatedVideoBitrate: '350k',
+    videoFilter: 'scale=256:-1,boxblur=25:10,scale=854:-1',
+    outputLabel: '854px blur preview',
+    outputSuffix: 'videoblur-15s',
   },
 ];
 
@@ -198,8 +216,22 @@ export default function VideoLabPage() {
     audioBitrate: customOverrides.audioBitrate ?? selectedPreset.audioBitrate,
     audioMono: customOverrides.audioMono ?? selectedPreset.audioMono ?? false,
     estimatedVideoBitrate: selectedPreset.estimatedVideoBitrate,
+    videoFilter: selectedPreset.videoFilter || '',
+    outputLabel: selectedPreset.outputLabel || '',
+    outputSuffix: selectedPreset.outputSuffix || '720p-15s',
   };
   const outputEstimateLabel = getEstimatedOutputSizeLabel(MAX_CLIP_SECONDS, activeParams);
+  const activeOutputLabel = activeParams.outputLabel || outputProfile.label;
+  const activeVideoFilter = activeParams.videoFilter || `${outputProfile.scaleFilter},setsar=1`;
+  const rateControlLabel = activeParams.maxrate && activeParams.maxrate !== 'none'
+    ? `${activeParams.maxrate} cap`
+    : 'sin cap';
+  const bufsizeLabel = activeParams.bufsize && activeParams.bufsize !== 'none'
+    ? `buf ${activeParams.bufsize}`
+    : 'sin buf';
+  const audioLabel = activeParams.audioBitrate === 'none'
+    ? 'sin audio'
+    : `AAC ${activeParams.audioBitrate}${activeParams.audioMono ? ' mono' : ''}`;
 
   const profilePanel = hasProfileTimings ? (
     <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-4">
@@ -527,8 +559,8 @@ export default function VideoLabPage() {
       clipEnd,
       segmentDuration: Math.max(0.1, clipEnd - clipStart),
       sourceResolution: sourceResolution ? `${sourceResolution.width}x${sourceResolution.height}` : '—',
-      outputResolution: outputProfile.label,
-      params: `CRF ${activeParams.crf} · ${activeParams.maxrate} · ${activeParams.bufsize} · ${activeParams.preset} · ${activeParams.audioBitrate === 'none' ? 'sin audio' : `AAC ${activeParams.audioBitrate}${activeParams.audioMono ? ' mono' : ''}`}`,
+      outputResolution: activeOutputLabel,
+      params: `CRF ${activeParams.crf} · ${rateControlLabel} · ${bufsizeLabel} · ${activeParams.preset} · ${audioLabel} · ${activeVideoFilter}`,
     });
 
     try {
@@ -547,7 +579,7 @@ export default function VideoLabPage() {
 
       const inputExtension = sourceFile.name.split('.').pop()?.toLowerCase() || 'mp4';
       const inputFileName = `input.${inputExtension}`;
-      const outputFileName = `${getFileStem(sourceFile.name)}-720p-15s.mp4`;
+      const outputFileName = `${getFileStem(sourceFile.name)}-${activeParams.outputSuffix}.mp4`;
       const segmentDuration = Math.max(0.1, clipEnd - clipStart);
       activeSegmentDurationRef.current = segmentDuration;
 
@@ -566,20 +598,23 @@ export default function VideoLabPage() {
         '-ss', clipStart.toFixed(2),
         '-t', segmentDuration.toFixed(2),
         '-i', inputFileName,
-        '-vf', `${outputProfile.scaleFilter},setsar=1`,
+        '-vf', activeVideoFilter,
         '-movflags', '+faststart',
       ];
 
-      setStatusText(`Convirtiendo en ${selectedPreset.statusLabel} (${outputProfile.label})...`);
+      setStatusText(`Convirtiendo en ${selectedPreset.statusLabel} (${activeOutputLabel})...`);
       const execStartedAt = performance.now();
+      const rateControlArgs = [
+        ...(activeParams.maxrate && activeParams.maxrate !== 'none' ? ['-maxrate', activeParams.maxrate] : []),
+        ...(activeParams.bufsize && activeParams.bufsize !== 'none' ? ['-bufsize', activeParams.bufsize] : []),
+      ];
       let exitCode = await ffmpeg.exec([
         ...sharedArgs,
         '-c:v', 'libx264',
         '-threads', '4',
         '-x264-params', 'sliced-threads=1:threads=4',
         '-crf', activeParams.crf,
-        '-maxrate', activeParams.maxrate,
-        '-bufsize', activeParams.bufsize,
+        ...rateControlArgs,
         '-preset', activeParams.preset,
         '-pix_fmt', 'yuv420p',
         ...(activeParams.audioBitrate === 'none' ? ['-an'] : ['-c:a', 'aac', '-b:a', activeParams.audioBitrate, ...(activeParams.audioMono ? ['-ac', '1'] : [])]),
@@ -788,13 +823,13 @@ export default function VideoLabPage() {
                         <input
                           type="range"
                           min="18"
-                          max="32"
+                          max="40"
                           step="1"
                           value={activeParams.crf}
                           onChange={(e) => setCustomOverrides((prev) => ({ ...prev, crf: e.target.value }))}
                           className="w-full accent-mansion-gold"
                         />
-                        <p className="text-[10px] text-text-dim mt-1">Calidad constante. Menor = más calidad y peso. 18–22 alta, 23–25 buena, 26+ liviana.</p>
+                        <p className="text-[10px] text-text-dim mt-1">Calidad constante. Menor = más calidad y peso. 18–22 alta, 23–25 buena, 26+ liviana, 35+ preview muy liviano.</p>
                       </div>
 
                       {/* Maxrate */}
@@ -804,17 +839,17 @@ export default function VideoLabPage() {
                           <span className="text-sm font-semibold text-mansion-gold tabular-nums">{activeParams.maxrate}</span>
                         </div>
                         <select
-                          value={activeParams.maxrate}
+                          value={activeParams.maxrate || 'none'}
                           onChange={(e) => {
                             setCustomOverrides((prev) => ({ ...prev, maxrate: e.target.value }));
                           }}
                           className="w-full rounded-xl bg-mansion-elevated/85 border border-mansion-border/30 px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-mansion-gold/40"
                         >
-                          {['1500k', '2000k', '2500k', '2600k', '2700k', '2800k', '2900k', '3000k', '3100k', '3200k', '3300k', '3400k', '3500k', '4000k', '4500k', '5000k', '5500k', '6000k'].map((v) => (
-                            <option key={v} value={v}>{v}</option>
+                          {['none', '1500k', '2000k', '2500k', '2600k', '2700k', '2800k', '2900k', '3000k', '3100k', '3200k', '3300k', '3400k', '3500k', '4000k', '4500k', '5000k', '5500k', '6000k'].map((v) => (
+                            <option key={v} value={v}>{v === 'none' ? 'Sin cap' : v}</option>
                           ))}
                         </select>
-                        <p className="text-[10px] text-text-dim mt-1">Techo de bitrate. Limita picos para controlar tamaño. Bufsize se ajusta auto a 2×.</p>
+                        <p className="text-[10px] text-text-dim mt-1">Techo de bitrate. Limita picos para controlar tamaño. En videoblur queda sin cap para respetar el comando base.</p>
                       </div>
 
                       {/* Preset (speed) */}
@@ -873,15 +908,15 @@ export default function VideoLabPage() {
                           <span className="text-sm font-semibold text-mansion-gold tabular-nums">{activeParams.bufsize}</span>
                         </div>
                         <select
-                          value={activeParams.bufsize}
+                          value={activeParams.bufsize || 'none'}
                           onChange={(e) => setCustomOverrides((prev) => ({ ...prev, bufsize: e.target.value }))}
                           className="w-full rounded-xl bg-mansion-elevated/85 border border-mansion-border/30 px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-mansion-gold/40"
                         >
-                          {['3000k', '4000k', '5000k', '6000k', '7000k', '8000k', '9000k', '10000k', '12000k'].map((v) => (
-                            <option key={v} value={v}>{v}</option>
+                          {['none', '3000k', '4000k', '5000k', '6000k', '7000k', '8000k', '9000k', '10000k', '12000k'].map((v) => (
+                            <option key={v} value={v}>{v === 'none' ? 'Sin buf' : v}</option>
                           ))}
                         </select>
-                        <p className="text-[10px] text-text-dim mt-1">Ventana del rate control. Mayor = picos más altos pero promedio estable. Menor = bitrate más parejo frame a frame. Típico: 1.5× a 2× del maxrate.</p>
+                        <p className="text-[10px] text-text-dim mt-1">Ventana del rate control. Si el cap está desactivado, este valor no se envía a FFmpeg.</p>
                       </div>
                       <div className="flex items-end">
                         {Object.keys(customOverrides).length > 0 && (
@@ -1066,7 +1101,7 @@ export default function VideoLabPage() {
               <div className="grid gap-3 mt-5 sm:grid-cols-2 xl:grid-cols-1">
                 <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Salida objetivo</p>
-                  <p className="text-sm text-text-primary mt-1">{`MP4 · ${outputProfile.label} · CRF ${activeParams.crf} · ${activeParams.maxrate} cap · ${activeParams.preset} · ${outputEstimateLabel}`}</p>
+                  <p className="text-sm text-text-primary mt-1">{`MP4 · ${activeOutputLabel} · CRF ${activeParams.crf} · ${rateControlLabel} · ${activeParams.preset} · ${outputEstimateLabel}`}</p>
                 </div>
                 <div className="rounded-2xl bg-mansion-card/60 border border-mansion-border/20 px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Motor</p>
