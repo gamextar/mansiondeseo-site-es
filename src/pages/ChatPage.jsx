@@ -868,12 +868,7 @@ export default function ChatPage() {
   const handleInputFocus = () => {
     setShowEmojis(false);
     if (isMobileBrowserChat && typeof window !== 'undefined') {
-      [0, 80, 180].forEach((delay) => {
-        window.setTimeout(() => {
-          window.scrollTo(0, 0);
-          window.dispatchEvent(new Event('resize'));
-        }, delay);
-      });
+      settleMobileKeyboardViewport(true);
     }
     keepChatPinnedToBottom('auto');
     if (chatDebugEnabled) {
