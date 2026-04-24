@@ -4749,6 +4749,165 @@ async function handleAdminGetErrorLogs(request, env) {
   });
 }
 
+async function handleAdminGetFakeInbox(request, env) {
+  await ensureMessageConversationIdColumn(env);
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const url = new URL(request.url);
+  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
+  const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
+  const q = String(url.searchParams.get('q') || '').trim();
+  const offset = (page - 1) * limit;
+  const filters = [];
+  const bindings = [];
+
+  if (q) {
+    filters.push(`(
+      real_user.username LIKE ?
+      OR fake_user.username LIKE ?
+      OR m.content LIKE ?
+      OR m.sender_id LIKE ?
+      OR m.receiver_id LIKE ?
+    )`);
+    const term = `%${q}%`;
+    bindings.push(term, term, term, term, term);
+  }
+
+  const whereExtra = filters.length ? `AND ${filters.join(' AND ')}` : '';
+  const targetMessages = `
+    FROM messages m
+    JOIN users real_user ON real_user.id = m.sender_id
+    JOIN users fake_user ON fake_user.id = m.receiver_id
+    WHERE COALESCE(real_user.fake, 0) = 0
+      AND COALESCE(fake_user.fake, 0) = 1
+      ${whereExtra}
+  `;
+
+  const countRow = await env.DB.prepare(`
+    SELECT COUNT(*) AS total
+    FROM (
+      SELECT m.sender_id, m.receiver_id
+      ${targetMessages}
+      GROUP BY m.sender_id, m.receiver_id
+    )
+  `).bind(...bindings).first();
+
+  const { results } = await env.DB.prepare(`
+    WITH ranked AS (
+      SELECT
+        m.id,
+        m.sender_id,
+        m.receiver_id,
+        m.content,
+        m.created_at,
+        m.is_read,
+        real_user.username AS sender_username,
+        real_user.avatar_url AS sender_avatar_url,
+        real_user.avatar_crop AS sender_avatar_crop,
+        fake_user.username AS receiver_username,
+        fake_user.avatar_url AS receiver_avatar_url,
+        fake_user.avatar_crop AS receiver_avatar_crop,
+        COUNT(*) OVER (PARTITION BY m.sender_id, m.receiver_id) AS messages_count,
+        SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END) OVER (PARTITION BY m.sender_id, m.receiver_id) AS unread_count,
+        ROW_NUMBER() OVER (PARTITION BY m.sender_id, m.receiver_id ORDER BY m.created_at DESC, m.id DESC) AS rn
+      ${targetMessages}
+    )
+    SELECT *
+    FROM ranked
+    WHERE rn = 1
+    ORDER BY created_at DESC, id DESC
+    LIMIT ? OFFSET ?
+  `).bind(...bindings, limit, offset).all();
+
+  return json({
+    conversations: (results || []).map((row) => ({
+      id: `${row.sender_id}:${row.receiver_id}`,
+      sender: {
+        id: row.sender_id,
+        username: row.sender_username || '',
+        avatar_url: row.sender_avatar_url || '',
+        avatar_crop: safeParseJSON(row.sender_avatar_crop, null),
+      },
+      receiver: {
+        id: row.receiver_id,
+        username: row.receiver_username || '',
+        avatar_url: row.receiver_avatar_url || '',
+        avatar_crop: safeParseJSON(row.receiver_avatar_crop, null),
+      },
+      last_message: row.content || '',
+      last_message_at: row.created_at || '',
+      messages_count: Number(row.messages_count || 0),
+      unread_count: Number(row.unread_count || 0),
+    })),
+    page,
+    pages: Math.max(1, Math.ceil(Number(countRow?.total || 0) / limit)),
+    total: Number(countRow?.total || 0),
+  });
+}
+
+async function handleAdminGetFakeInboxConversation(request, env) {
+  await ensureMessageConversationIdColumn(env);
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const url = new URL(request.url);
+  const realId = String(url.searchParams.get('real_id') || '').trim();
+  const fakeId = String(url.searchParams.get('fake_id') || '').trim();
+  const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '80', 10)));
+  if (!realId || !fakeId) return error('real_id y fake_id requeridos', 400);
+
+  const [realUser, fakeUser] = await Promise.all([
+    env.DB.prepare('SELECT id, username, avatar_url, avatar_crop, COALESCE(fake, 0) AS fake FROM users WHERE id = ?').bind(realId).first(),
+    env.DB.prepare('SELECT id, username, avatar_url, avatar_crop, COALESCE(fake, 0) AS fake FROM users WHERE id = ?').bind(fakeId).first(),
+  ]);
+  if (!realUser || Number(realUser.fake || 0) !== 0) return error('Usuario real no encontrado', 404);
+  if (!fakeUser || Number(fakeUser.fake || 0) !== 1) return error('Usuario fake no encontrado', 404);
+
+  const conversationId = buildConversationId(realId, fakeId);
+  const { results } = await env.DB.prepare(`
+    SELECT id, sender_id, receiver_id, content, is_read, created_at
+    FROM (
+      SELECT id, sender_id, receiver_id, content, is_read, created_at
+      FROM messages
+      WHERE conversation_id = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?
+    )
+    ORDER BY created_at ASC, id ASC
+  `).bind(conversationId, limit).all();
+
+  return json({
+    participants: {
+      real: {
+        id: realUser.id,
+        username: realUser.username || '',
+        avatar_url: realUser.avatar_url || '',
+        avatar_crop: safeParseJSON(realUser.avatar_crop, null),
+      },
+      fake: {
+        id: fakeUser.id,
+        username: fakeUser.username || '',
+        avatar_url: fakeUser.avatar_url || '',
+        avatar_crop: safeParseJSON(fakeUser.avatar_crop, null),
+      },
+    },
+    messages: (results || []).map((row) => ({
+      id: row.id,
+      sender_id: row.sender_id,
+      receiver_id: row.receiver_id,
+      direction: row.sender_id === realId && row.receiver_id === fakeId ? 'real_to_fake' : 'fake_to_real',
+      content: row.content || '',
+      is_read: !!row.is_read,
+      created_at: row.created_at || '',
+    })),
+  });
+}
+
 async function handleAdminDeleteErrorLog(request, env, logId) {
   await ensureErrorLogsTable(env);
   const auth = await authenticate(request, env);
@@ -6148,6 +6307,8 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/admin/users/ids' && method === 'GET') return handleAdminGetUserIds(request, env);
   if (path === '/api/admin/users/bulk-delete' && method === 'POST') return handleAdminBulkDeleteUsers(request, env);
   if (path === '/api/admin/error-logs' && method === 'GET') return handleAdminGetErrorLogs(request, env);
+  if (path === '/api/admin/fake-inbox' && method === 'GET') return handleAdminGetFakeInbox(request, env);
+  if (path === '/api/admin/fake-inbox/conversation' && method === 'GET') return handleAdminGetFakeInboxConversation(request, env);
   const adminUserMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)$/);
   if (adminUserMatch && method === 'GET') return handleAdminGetUser(request, env, adminUserMatch[1]);
   if (adminUserMatch && method === 'PUT') return handleAdminUpdateUser(request, env, adminUserMatch[1]);

@@ -42,6 +42,7 @@ const SettingsPage = lazy(lazyWithRetry(() => import('./pages/SettingsPage'), 'm
 const AdminLayout = lazy(lazyWithRetry(() => import('./components/AdminLayout'), 'mansion-lazy-retry:admin-layout'));
 const AdminUsersPage = lazy(lazyWithRetry(() => import('./pages/admin/AdminUsersPage'), 'mansion-lazy-retry:admin-users'));
 const AdminErrorLogsPage = lazy(lazyWithRetry(() => import('./pages/admin/AdminErrorLogsPage'), 'mansion-lazy-retry:admin-error-logs'));
+const AdminFakeInboxPage = lazy(lazyWithRetry(() => import('./pages/admin/AdminFakeInboxPage'), 'mansion-lazy-retry:admin-fake-inbox'));
 const VipPage = lazy(lazyWithRetry(() => import('./pages/VipPage'), 'mansion-lazy-retry:vip'));
 const PagoExitosoPage = lazy(lazyWithRetry(() => import('./pages/PagoExitosoPage'), 'mansion-lazy-retry:pago-exitoso'));
 const PagoFallidoPage = lazy(lazyWithRetry(() => import('./pages/PagoFallidoPage'), 'mansion-lazy-retry:pago-fallido'));
@@ -972,6 +973,7 @@ function AppLayout() {
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/usuarios" replace />} />
             <Route path="usuarios" element={<AdminUsersPage />} />
+            <Route path="bandeja-fake" element={<AdminFakeInboxPage />} />
             <Route path="errores" element={<AdminErrorLogsPage />} />
             <Route path="configuracion" element={<SettingsPage />} />
             <Route path="video-lab" element={<VideoLabPage />} />

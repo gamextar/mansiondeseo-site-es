@@ -1230,6 +1230,17 @@ export async function adminDeleteErrorLog(logId) {
   return apiFetch(`/admin/error-logs/${logId}`, { method: 'DELETE' });
 }
 
+export async function adminGetFakeInbox({ page = 1, limit = 20, q = '' } = {}) {
+  const params = new URLSearchParams({ page, limit });
+  if (q) params.set('q', q);
+  return apiFetch(`/admin/fake-inbox?${params}`);
+}
+
+export async function adminGetFakeInboxConversation({ realId, fakeId, limit = 80 } = {}) {
+  const params = new URLSearchParams({ real_id: realId || '', fake_id: fakeId || '', limit });
+  return apiFetch(`/admin/fake-inbox/conversation?${params}`);
+}
+
 export async function reportClientError(payload = {}) {
   try {
     const token = getToken();
