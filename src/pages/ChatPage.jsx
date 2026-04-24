@@ -355,11 +355,7 @@ export default function ChatPage() {
       const vvHeight = Math.round(vv?.height || 0);
       const vvOffsetTop = Math.round(vv?.offsetTop || 0);
       const innerHeight = Math.round(window.innerHeight || vvHeight || 0);
-      const docHeight = Math.round(document.documentElement?.clientHeight || innerHeight || 0);
-      const visibleViewportHeight = Math.round((vvHeight || innerHeight || 0) + vvOffsetTop);
-      const nextHeight = isMobileBrowserChat
-        ? Math.max(visibleViewportHeight, innerHeight, docHeight)
-        : (vvHeight || innerHeight);
+      const nextHeight = vvHeight || innerHeight;
       setViewportHeight(nextHeight);
       setViewportOffsetTop(vvOffsetTop);
     };
@@ -383,6 +379,66 @@ export default function ChatPage() {
       window.removeEventListener('pageshow', updateViewport);
       vv?.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('scroll', updateViewport);
+    };
+  }, [isMobileBrowserChat]);
+
+  useLayoutEffect(() => {
+    if (!isMobileBrowserChat || typeof window === 'undefined' || typeof document === 'undefined') return undefined;
+
+    const root = document.documentElement;
+    const body = document.body;
+    const previousRoot = {
+      overflow: root.style.overflow,
+      overscrollBehavior: root.style.overscrollBehavior,
+      height: root.style.height,
+    };
+    const previousBody = {
+      overflow: body?.style.overflow || '',
+      overscrollBehavior: body?.style.overscrollBehavior || '',
+      position: body?.style.position || '',
+      inset: body?.style.inset || '',
+      width: body?.style.width || '',
+      height: body?.style.height || '',
+    };
+
+    const lockDocumentScroll = () => {
+      root.style.overflow = 'hidden';
+      root.style.overscrollBehavior = 'none';
+      root.style.height = '100%';
+      if (body) {
+        body.style.overflow = 'hidden';
+        body.style.overscrollBehavior = 'none';
+        body.style.position = 'fixed';
+        body.style.inset = '0';
+        body.style.width = '100%';
+        body.style.height = '100%';
+      }
+      window.scrollTo(0, 0);
+      root.scrollTop = 0;
+      if (body) body.scrollTop = 0;
+    };
+
+    lockDocumentScroll();
+    const timers = [80, 180, 360].map((delay) => window.setTimeout(lockDocumentScroll, delay));
+    window.addEventListener('resize', lockDocumentScroll);
+    window.visualViewport?.addEventListener('resize', lockDocumentScroll);
+
+    return () => {
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+      window.removeEventListener('resize', lockDocumentScroll);
+      window.visualViewport?.removeEventListener('resize', lockDocumentScroll);
+      root.style.overflow = previousRoot.overflow;
+      root.style.overscrollBehavior = previousRoot.overscrollBehavior;
+      root.style.height = previousRoot.height;
+      if (body) {
+        body.style.overflow = previousBody.overflow;
+        body.style.overscrollBehavior = previousBody.overscrollBehavior;
+        body.style.position = previousBody.position;
+        body.style.inset = previousBody.inset;
+        body.style.width = previousBody.width;
+        body.style.height = previousBody.height;
+      }
+      window.scrollTo(0, 0);
     };
   }, [isMobileBrowserChat]);
 
@@ -798,6 +854,14 @@ export default function ChatPage() {
 
   const handleInputFocus = () => {
     setShowEmojis(false);
+    if (isMobileBrowserChat && typeof window !== 'undefined') {
+      [0, 80, 180].forEach((delay) => {
+        window.setTimeout(() => {
+          window.scrollTo(0, 0);
+          window.dispatchEvent(new Event('resize'));
+        }, delay);
+      });
+    }
     keepChatPinnedToBottom('auto');
     if (chatDebugEnabled) {
       requestAnimationFrame(() => captureChatDebug('focus'));
@@ -809,6 +873,7 @@ export default function ChatPage() {
     if (isMobileBrowserChat && typeof window !== 'undefined') {
       [0, 80, 180, 360].forEach((delay) => {
         window.setTimeout(() => {
+          window.scrollTo(0, 0);
           window.dispatchEvent(new Event('resize'));
         }, delay);
       });
