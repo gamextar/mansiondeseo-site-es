@@ -27,6 +27,7 @@ function timeAgo(dateStr) {
 const AVATAR_SIZE_DEFAULT = 52;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORY_SYNC_DELAY_MS = 320;
+const STORY_VIEW_COUNT_DELAY_MS = 1800;
 const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
@@ -1301,47 +1302,51 @@ export default function VideoFeedPage() {
     }
 
     let cancelled = false;
-    recordingStoryViewsRef.current.add(storyId);
+    const timerId = window.setTimeout(() => {
+      if (cancelled || recordingStoryViewsRef.current.has(storyId)) return;
+      recordingStoryViewsRef.current.add(storyId);
 
-    recordStoryView(storyId)
-      .then((data) => {
-        allowedStoryViewsRef.current.add(storyId);
-        if (data?.videoLimit && !cancelled) setStoryViewLimit(data.videoLimit);
-        if (!cancelled) {
-          setStoryLimitBlock((current) => (current?.storyId === storyId ? null : current));
-          markAllowedStoryViewed();
-        }
-      })
-      .catch((err) => {
-        const code = String(err?.data?.code || '').toUpperCase();
-        if (code === 'DAILY_STORY_LIMIT') {
-          const nextLimit = err?.data?.videoLimit || storyViewLimit || { dailyLimit: 10, viewedToday: 10, remaining: 0 };
+      recordStoryView(storyId)
+        .then((data) => {
+          allowedStoryViewsRef.current.add(storyId);
+          if (data?.videoLimit && !cancelled) setStoryViewLimit(data.videoLimit);
           if (!cancelled) {
-            setStoryViewLimit(nextLimit);
-            setStoryLimitBlock({
-              storyId,
-              limit: nextLimit,
-              message: err?.message || 'Alcanzaste el límite diario de stories.',
-            });
+            setStoryLimitBlock((current) => (current?.storyId === storyId ? null : current));
+            markAllowedStoryViewed();
           }
-          return;
-        }
+        })
+        .catch((err) => {
+          const code = String(err?.data?.code || '').toUpperCase();
+          if (code === 'DAILY_STORY_LIMIT') {
+            const nextLimit = err?.data?.videoLimit || { dailyLimit: 10, viewedToday: 10, remaining: 0 };
+            if (!cancelled) {
+              setStoryViewLimit(nextLimit);
+              setStoryLimitBlock({
+                storyId,
+                limit: nextLimit,
+                message: err?.message || 'Alcanzaste el límite diario de stories.',
+              });
+            }
+            return;
+          }
 
-        if (code === 'VIP_STORY_REQUIRED') {
-          if (!cancelled) navigate('/vip', { state: { from: '/videos' } });
-          return;
-        }
+          if (code === 'VIP_STORY_REQUIRED') {
+            if (!cancelled) navigate('/vip', { state: { from: '/videos' } });
+            return;
+          }
 
-        if (!cancelled) markAllowedStoryViewed();
-      })
-      .finally(() => {
-        recordingStoryViewsRef.current.delete(storyId);
-      });
+          if (!cancelled) markAllowedStoryViewed();
+        })
+        .finally(() => {
+          recordingStoryViewsRef.current.delete(storyId);
+        });
+    }, STORY_VIEW_COUNT_DELAY_MS);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timerId);
     };
-  }, [activeStory?.id, activeStory?.story_id, activeStory?.user_id, isOverlayPreview, markStoryViewed, navigate, queueStoryViewed, storyViewLimit, user?.premium]);
+  }, [activeStory?.id, activeStory?.story_id, activeStory?.user_id, isOverlayPreview, markStoryViewed, navigate, queueStoryViewed, user?.premium]);
 
   useEffect(() => {
     return subscribe((event) => {
