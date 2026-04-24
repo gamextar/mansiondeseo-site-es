@@ -1872,12 +1872,18 @@ async function handleRegister(request, env, ctx) {
   }
 
   const conflictingFakeUsernames = await env.DB.prepare(
-    "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 1"
+    "SELECT id, COALESCE(feed_priority, 0) AS feed_priority FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 1"
   ).bind(username).all();
 
   const conflictingFakeIds = (conflictingFakeUsernames?.results || [])
     .map((row) => row?.id)
     .filter(Boolean);
+  const inheritedFeedPriority = Math.max(
+    0,
+    ...(conflictingFakeUsernames?.results || []).map((row) => (
+      Math.max(0, Math.min(1000, Number(row?.feed_priority || 0)))
+    ))
+  );
 
   if (conflictingFakeIds.length > 0) {
     await Promise.all(conflictingFakeIds.map((id) => (
@@ -1913,8 +1919,8 @@ async function handleRegister(request, env, ctx) {
   const country = body.country || detectedCountry;
 
   await env.DB.prepare(`
-    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, birthdate, city, locality, marital_status, sexual_orientation, message_block_roles, country, bio, status, coins)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0)
+    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, birthdate, city, locality, marital_status, sexual_orientation, message_block_roles, country, bio, status, coins, feed_priority)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?)
   `).bind(
     userId,
     email.toLowerCase(),
@@ -1931,7 +1937,8 @@ async function handleRegister(request, env, ctx) {
     sexualOrientationValue,
     JSON.stringify(messageBlockRolesValue),
     country,
-    bio || ''
+    bio || '',
+    inheritedFeedPriority
   ).run();
 
   // Generate 6-digit verification code
