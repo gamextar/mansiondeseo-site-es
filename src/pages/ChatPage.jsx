@@ -370,7 +370,9 @@ export default function ChatPage() {
       const vvHeight = Math.round(vv?.height || 0);
       const vvOffsetTop = Math.round(vv?.offsetTop || 0);
       const innerHeight = Math.round(window.innerHeight || vvHeight || 0);
-      const nextHeight = vvHeight || innerHeight;
+      const nextHeight = isMobileBrowserChat && !keyboardFocusedRef.current
+        ? innerHeight
+        : (vvHeight || innerHeight);
       setViewportHeight(nextHeight);
       setViewportOffsetTop(vvOffsetTop);
 
@@ -514,7 +516,9 @@ export default function ChatPage() {
       if (nextHeaderHeight) setHeaderHeight(Math.round(nextHeaderHeight));
       if (nextComposerHeight) setComposerHeight(Math.round(nextComposerHeight));
       setMessagesAreaHeight((prev) => {
-        if (!isMobileBrowserChat || !composerRect) return prev === null ? prev : null;
+        if (!isMobileBrowserChat || !keyboardFocusedRef.current || !composerRect) {
+          return prev === null ? prev : null;
+        }
         const nextHeight = Math.max(180, Math.round(composerRect.top));
         return prev === nextHeight ? prev : nextHeight;
       });
@@ -913,6 +917,10 @@ export default function ChatPage() {
   const handleInputBlur = () => {
     stopTypingSignal();
     setKeyboardActive(false);
+    setMessagesAreaHeight(null);
+    if (isMobileBrowserChat && typeof window !== 'undefined') {
+      setViewportHeight(window.innerHeight);
+    }
     keyboardFocusedRef.current = false;
     pinOnKeyboardResizeRef.current = false;
     const fastSettle = fastKeyboardSettleRef.current || input.trim().length === 0;
@@ -927,14 +935,14 @@ export default function ChatPage() {
     navigate(backTarget);
   };
 
-  const messagesAreaStyle = isMobileBrowserChat && messagesAreaHeight
+  const messagesAreaStyle = isMobileBrowserChat && keyboardActive && messagesAreaHeight
     ? {
         flex: '0 0 auto',
         height: `${messagesAreaHeight}px`,
       }
     : undefined;
   const scrollAreaStyle = {
-    ...(isMobileBrowserChat && messagesAreaHeight ? {
+    ...(isMobileBrowserChat && keyboardActive && messagesAreaHeight ? {
       position: 'fixed',
       top: 0,
       left: 0,
