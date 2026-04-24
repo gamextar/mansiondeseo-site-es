@@ -165,6 +165,9 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isStandaloneMobileChat = detectStandaloneMobile();
+  const isMobileBrowserChat = typeof window !== 'undefined'
+    ? window.matchMedia('(max-width: 1023px)').matches && !isStandaloneMobileChat
+    : false;
   const currentUser = getStoredUser();
   const isVipUser = Boolean(currentUser?.premium);
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
@@ -350,16 +353,22 @@ export default function ChatPage() {
 
     const updateViewport = () => {
       const vv = window.visualViewport;
-      const vvHeight = Math.round(vv?.height || window.innerHeight || 0);
+      const vvHeight = Math.round(vv?.height || 0);
+      const vvOffsetTop = Math.round(vv?.offsetTop || 0);
       const innerHeight = Math.round(window.innerHeight || vvHeight || 0);
-      const nextHeight = vvHeight || innerHeight;
+      const docHeight = Math.round(document.documentElement?.clientHeight || innerHeight || 0);
+      const visibleViewportHeight = Math.round((vvHeight || innerHeight || 0) + vvOffsetTop);
+      const nextHeight = isMobileBrowserChat
+        ? Math.max(visibleViewportHeight, innerHeight, docHeight)
+        : (vvHeight || innerHeight);
       setViewportHeight(nextHeight);
-      setViewportOffsetTop(Math.round(vv?.offsetTop || 0));
+      setViewportOffsetTop(vvOffsetTop);
     };
 
     updateViewport();
 
     const vv = window.visualViewport;
+    const settleTimers = [80, 180, 360, 700].map((delay) => window.setTimeout(updateViewport, delay));
     window.addEventListener('resize', updateViewport);
     window.addEventListener('orientationchange', updateViewport);
     window.addEventListener('focus', updateViewport);
@@ -368,6 +377,7 @@ export default function ChatPage() {
     vv?.addEventListener('scroll', updateViewport);
 
     return () => {
+      settleTimers.forEach((timerId) => window.clearTimeout(timerId));
       window.removeEventListener('resize', updateViewport);
       window.removeEventListener('orientationchange', updateViewport);
       window.removeEventListener('focus', updateViewport);
@@ -375,7 +385,7 @@ export default function ChatPage() {
       vv?.removeEventListener('resize', updateViewport);
       vv?.removeEventListener('scroll', updateViewport);
     };
-  }, []);
+  }, [isMobileBrowserChat]);
 
   useEffect(() => {
     if (!chatDebugEnabled) return undefined;
