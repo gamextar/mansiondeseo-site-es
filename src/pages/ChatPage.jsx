@@ -19,8 +19,6 @@ const CHAT_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_MESSAGE_LIMIT = 60;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
-const INITIAL_MOBILE_BROWSER_COMPOSER_OFFSET_PX = 40;
-const INITIAL_MOBILE_BROWSER_COMPOSER_OFFSET_SESSION_KEY = 'mansion_chat_initial_mobile_browser_offset_applied';
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -74,24 +72,6 @@ function writeChatCache(partnerId, payload) {
     }));
   } catch {
     // Silently fail
-  }
-}
-
-function hasAppliedInitialMobileBrowserComposerOffset() {
-  if (typeof window === 'undefined') return true;
-  try {
-    return sessionStorage.getItem(INITIAL_MOBILE_BROWSER_COMPOSER_OFFSET_SESSION_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function markInitialMobileBrowserComposerOffsetApplied() {
-  if (typeof window === 'undefined') return;
-  try {
-    sessionStorage.setItem(INITIAL_MOBILE_BROWSER_COMPOSER_OFFSET_SESSION_KEY, '1');
-  } catch {
-    // ignore storage failures
   }
 }
 
@@ -190,9 +170,6 @@ export default function ChatPage() {
   const { remaining, canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
-  const isMobileBrowserChat = typeof window !== 'undefined'
-    ? window.matchMedia('(max-width: 1023px)').matches && !isStandaloneMobileChat
-    : false;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
   const [input, setInput] = useState('');
@@ -210,9 +187,6 @@ export default function ChatPage() {
   const [chatDebugEnabled, setChatDebugEnabled] = useState(false);
   const [chatDebugMetrics, setChatDebugMetrics] = useState(null);
   const [chatDebugSnapshots, setChatDebugSnapshots] = useState({});
-  const [applyInitialMobileBrowserComposerOffset, setApplyInitialMobileBrowserComposerOffset] = useState(() => (
-    isMobileBrowserChat && !hasAppliedInitialMobileBrowserComposerOffset()
-  ));
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -238,9 +212,6 @@ export default function ChatPage() {
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
   const backTarget = location.state?.from || '/mensajes';
-  const initialComposerOffset = applyInitialMobileBrowserComposerOffset
-    ? INITIAL_MOBILE_BROWSER_COMPOSER_OFFSET_PX
-    : 0;
 
   // Format DO message to UI format
   function formatMsg(msg) {
@@ -405,11 +376,6 @@ export default function ChatPage() {
       vv?.removeEventListener('scroll', updateViewport);
     };
   }, []);
-
-  useEffect(() => {
-    if (!applyInitialMobileBrowserComposerOffset) return;
-    markInitialMobileBrowserComposerOffsetApplied();
-  }, [applyInitialMobileBrowserComposerOffset]);
 
   useEffect(() => {
     if (!chatDebugEnabled) return undefined;
@@ -822,9 +788,6 @@ export default function ChatPage() {
   };
 
   const handleInputFocus = () => {
-    if (applyInitialMobileBrowserComposerOffset) {
-      setApplyInitialMobileBrowserComposerOffset(false);
-    }
     setShowEmojis(false);
     keepChatPinnedToBottom('auto');
     if (chatDebugEnabled) {
@@ -949,12 +912,12 @@ export default function ChatPage() {
             const el = scrollRef.current;
             if (el) wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
-        className="h-full overflow-y-auto overscroll-y-contain px-[5vw] lg:px-[4vw]"
-        style={{
-          paddingTop: `${headerHeight + 14}px`,
-          paddingBottom: `${12 + initialComposerOffset}px`,
-        }}
-      >
+          className="h-full overflow-y-auto overscroll-y-contain px-[5vw] lg:px-[4vw]"
+          style={{
+            paddingTop: `${headerHeight + 14}px`,
+            paddingBottom: '12px',
+          }}
+        >
           <div
             ref={indicatorRef}
             className="sticky top-0 z-10 flex justify-center py-2 pointer-events-none"
@@ -1055,7 +1018,6 @@ export default function ChatPage() {
       <div
         ref={composerRef}
         className={`${isStandaloneMobileChat ? 'safe-bottom ' : ''}sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20`}
-        style={initialComposerOffset ? { transform: `translateY(-${initialComposerOffset}px)` } : undefined}
       >
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3">
 
