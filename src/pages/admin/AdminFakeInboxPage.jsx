@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowRight, Bot, Inbox, MessageCircle, RefreshCw, Search, UserRound } from 'lucide-react';
+import { ArrowRight, Bot, Inbox, MessageCircle, RefreshCw, Search, Send, UserRound } from 'lucide-react';
 import AvatarImg from '../../components/AvatarImg';
-import { adminGetFakeInbox, adminGetFakeInboxConversation } from '../../lib/api';
+import { adminGetFakeInbox, adminGetFakeInboxConversation, adminReplyFakeInbox } from '../../lib/api';
 
 function formatDateTime(value) {
   if (!value) return 'Sin fecha';
@@ -50,6 +50,8 @@ export default function AdminFakeInboxPage() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
 
   const fetchInbox = useCallback(async (nextPage = page, nextQuery = query) => {
     setLoading(true);
@@ -74,6 +76,7 @@ export default function AdminFakeInboxPage() {
     setSelected(conversation);
     setThreadLoading(true);
     setThread(null);
+    setReplyText('');
     try {
       const data = await adminGetFakeInboxConversation({
         realId: conversation.sender.id,
@@ -91,6 +94,40 @@ export default function AdminFakeInboxPage() {
   const handleSearch = (event) => {
     event.preventDefault();
     setQuery(searchInput.trim());
+  };
+
+  const handleReply = async (event) => {
+    event.preventDefault();
+    const content = replyText.trim();
+    if (!selected || !content || sendingReply) return;
+    setSendingReply(true);
+    try {
+      const data = await adminReplyFakeInbox({
+        realId: selected.sender.id,
+        fakeId: selected.receiver.id,
+        content,
+      });
+      const message = data?.message;
+      if (message) {
+        setThread((prev) => ({
+          ...(prev || {}),
+          messages: [...(prev?.messages || []), message],
+        }));
+      }
+      setReplyText('');
+      setConversations((prev) => prev.map((conversation) => (
+        conversation.id === selected.id
+          ? {
+              ...conversation,
+              messages_count: Number(conversation.messages_count || 0) + 1,
+            }
+          : conversation
+      )));
+    } catch (err) {
+      alert(err.message || 'No se pudo enviar la respuesta');
+    } finally {
+      setSendingReply(false);
+    }
   };
 
   return (
@@ -248,6 +285,33 @@ export default function AdminFakeInboxPage() {
                     </div>
                   ) : null}
                 </div>
+
+                <form onSubmit={handleReply} className="mt-4 border-t border-mansion-border/20 pt-4">
+                  <label className="block text-[11px] font-bold uppercase tracking-wide text-text-dim">
+                    Responder como {selected.receiver.username || 'fake'}
+                  </label>
+                  <textarea
+                    value={replyText}
+                    onChange={(event) => setReplyText(event.target.value)}
+                    rows={3}
+                    maxLength={2000}
+                    placeholder="Escribir respuesta para el usuario real..."
+                    className="mt-2 w-full resize-none rounded-2xl border border-mansion-border/30 bg-black/25 px-4 py-3 text-sm text-text-primary placeholder:text-text-dim focus:border-mansion-gold/50 focus:ring-mansion-gold/20"
+                  />
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-[11px] text-text-dim">
+                      Sin realtime: se verá al actualizar o entrar al chat.
+                    </span>
+                    <button
+                      type="submit"
+                      disabled={!replyText.trim() || sendingReply}
+                      className="btn-gold flex shrink-0 items-center justify-center gap-2 px-4 py-2.5 text-xs disabled:opacity-50"
+                    >
+                      <Send className="h-4 w-4" />
+                      {sendingReply ? 'Enviando...' : 'Responder'}
+                    </button>
+                  </div>
+                </form>
               </div>
             )}
           </aside>

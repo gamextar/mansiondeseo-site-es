@@ -674,6 +674,9 @@ async function ensureMessagingIndexes(env) {
         'CREATE INDEX IF NOT EXISTS idx_messages_receiver_sender_created ON messages(receiver_id, sender_id, created_at)'
       ).run(),
       env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_messages_sender_receiver_created ON messages(sender_id, receiver_id, created_at)'
+      ).run(),
+      env.DB.prepare(
         'CREATE INDEX IF NOT EXISTS idx_messages_conversation_created ON messages(conversation_id, created_at)'
       ).run(),
       env.DB.prepare(
@@ -2954,13 +2957,15 @@ async function handleSendMessage(request, env) {
 
   // Check daily message limit
   const today = todayUTC();
-  const [limit, sender, siteSettings] = await Promise.all([
+  const [limit, sender, receiver, siteSettings] = await Promise.all([
     env.DB.prepare(
       'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
     ).bind(auth.sub, today).first(),
     env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
+    env.DB.prepare('SELECT COALESCE(fake, 0) AS fake FROM users WHERE id = ?').bind(receiver_id).first(),
     cached('settings', 300_000, () => loadSettings(env)),
   ]);
+  const receiverIsFake = Number(receiver?.fake || 0) === 1;
 
   const currentCount = limit?.msg_count || 0;
 
@@ -3009,13 +3014,15 @@ async function handleSendMessage(request, env) {
     });
   }
 
-  // Notify ChatRoom DO so it broadcasts to connected receivers via WebSocket
-  notifyChatRoom(env, auth.sub, receiver_id, msg).catch(() => {});
+  if (!receiverIsFake) {
+    // Fake/placeholders do not need realtime delivery; keep their path D1-only.
+    notifyChatRoom(env, auth.sub, receiver_id, msg).catch(() => {});
 
-  const events = await buildNewMessageEvents(env, auth.sub, receiver_id, msg);
+    const events = await buildNewMessageEvents(env, auth.sub, receiver_id, msg);
 
-  // Notify receiver's notification channel (updates ChatListPage in real-time)
-  notifyUser(env, receiver_id, events.receiver).catch(() => {});
+    // Notify receiver's notification channel (updates ChatListPage in real-time)
+    notifyUser(env, receiver_id, events.receiver).catch(() => {});
+  }
 
   return json({ message: msg }, 201);
 }
@@ -4810,7 +4817,14 @@ async function handleAdminGetFakeInbox(request, env) {
         fake_user.username AS receiver_username,
         fake_user.avatar_url AS receiver_avatar_url,
         fake_user.avatar_crop AS receiver_avatar_crop,
-        COUNT(*) OVER (PARTITION BY m.sender_id, m.receiver_id) AS messages_count,
+        (
+          SELECT COUNT(*)
+          FROM messages mt
+          WHERE (
+            (mt.sender_id = m.sender_id AND mt.receiver_id = m.receiver_id)
+            OR (mt.sender_id = m.receiver_id AND mt.receiver_id = m.sender_id)
+          )
+        ) AS messages_count,
         SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END) OVER (PARTITION BY m.sender_id, m.receiver_id) AS unread_count,
         ROW_NUMBER() OVER (PARTITION BY m.sender_id, m.receiver_id ORDER BY m.created_at DESC, m.id DESC) AS rn
       ${targetMessages}
@@ -4906,6 +4920,66 @@ async function handleAdminGetFakeInboxConversation(request, env) {
       created_at: row.created_at || '',
     })),
   });
+}
+
+async function handleAdminReplyFakeInbox(request, env) {
+  await ensureMessageConversationIdColumn(env);
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const body = await request.json().catch(() => ({}));
+  const realId = String(body.real_id || '').trim();
+  const fakeId = String(body.fake_id || '').trim();
+  const content = String(body.content || '').trim();
+  if (!realId || !fakeId || !content) return error('real_id, fake_id y content requeridos', 400);
+  if (content.length > 2000) return error('El mensaje es demasiado largo', 400);
+
+  const [realUser, fakeUser] = await Promise.all([
+    env.DB.prepare('SELECT id, COALESCE(fake, 0) AS fake FROM users WHERE id = ?').bind(realId).first(),
+    env.DB.prepare('SELECT id, COALESCE(fake, 0) AS fake FROM users WHERE id = ?').bind(fakeId).first(),
+  ]);
+  if (!realUser || Number(realUser.fake || 0) !== 0) return error('Usuario real no encontrado', 404);
+  if (!fakeUser || Number(fakeUser.fake || 0) !== 1) return error('Usuario fake no encontrado', 404);
+
+  const msgId = generateId();
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const conversationId = buildConversationId(fakeId, realId);
+  await env.DB.prepare(`
+    INSERT INTO messages (id, sender_id, receiver_id, content, created_at, conversation_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).bind(msgId, fakeId, realId, content, now, conversationId).run();
+
+  const msg = {
+    id: msgId,
+    sender_id: fakeId,
+    receiver_id: realId,
+    content,
+    is_read: 0,
+    created_at: now,
+  };
+
+  try {
+    await syncConversationStateForMessage(env, fakeId, realId, msg);
+  } catch (err) {
+    console.error('[handleAdminReplyFakeInbox] conversation_state sync error:', err.message);
+    await rebuildConversationStateForPair(env, fakeId, realId).catch((repairErr) => {
+      console.error('[handleAdminReplyFakeInbox] conversation_state repair error:', repairErr.message);
+    });
+  }
+
+  return json({
+    message: {
+      id: msg.id,
+      sender_id: msg.sender_id,
+      receiver_id: msg.receiver_id,
+      direction: 'fake_to_real',
+      content: msg.content,
+      is_read: false,
+      created_at: msg.created_at,
+    },
+  }, 201);
 }
 
 async function handleAdminDeleteErrorLog(request, env, logId) {
@@ -6309,6 +6383,7 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/admin/error-logs' && method === 'GET') return handleAdminGetErrorLogs(request, env);
   if (path === '/api/admin/fake-inbox' && method === 'GET') return handleAdminGetFakeInbox(request, env);
   if (path === '/api/admin/fake-inbox/conversation' && method === 'GET') return handleAdminGetFakeInboxConversation(request, env);
+  if (path === '/api/admin/fake-inbox/reply' && method === 'POST') return handleAdminReplyFakeInbox(request, env);
   const adminUserMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)$/);
   if (adminUserMatch && method === 'GET') return handleAdminGetUser(request, env, adminUserMatch[1]);
   if (adminUserMatch && method === 'PUT') return handleAdminUpdateUser(request, env, adminUserMatch[1]);

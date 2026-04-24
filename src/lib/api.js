@@ -1241,6 +1241,17 @@ export async function adminGetFakeInboxConversation({ realId, fakeId, limit = 80
   return apiFetch(`/admin/fake-inbox/conversation?${params}`);
 }
 
+export async function adminReplyFakeInbox({ realId, fakeId, content } = {}) {
+  return apiFetch('/admin/fake-inbox/reply', {
+    method: 'POST',
+    body: JSON.stringify({
+      real_id: realId || '',
+      fake_id: fakeId || '',
+      content: content || '',
+    }),
+  });
+}
+
 export async function reportClientError(payload = {}) {
   try {
     const token = getToken();
