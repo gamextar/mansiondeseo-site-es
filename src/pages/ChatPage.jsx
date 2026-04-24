@@ -884,7 +884,7 @@ export default function ChatPage() {
     setShowEmojis(false);
     setKeyboardActive(true);
     keyboardFocusedRef.current = true;
-    pinOnKeyboardResizeRef.current = isAtBottom(160);
+    pinOnKeyboardResizeRef.current = isMobileBrowserChat || isAtBottom(160);
     if (pinOnKeyboardResizeRef.current) {
       wasAtBottomRef.current = true;
       scrollToBottom('auto');
@@ -916,8 +916,11 @@ export default function ChatPage() {
   };
 
   const messagesBottomPadding = isMobileBrowserChat && keyboardActive
-    ? composerHeight + 12
+    ? 0
     : 12;
+  const messagesBottomSpacer = isMobileBrowserChat && keyboardActive
+    ? composerHeight + 16
+    : 1;
 
   return (
     <>
@@ -1126,8 +1129,10 @@ export default function ChatPage() {
 
             <div
               ref={messagesEndRef}
-              className="h-1"
-              style={{ scrollMarginBottom: '16px' }}
+              style={{
+                height: `${messagesBottomSpacer}px`,
+                flexShrink: 0,
+              }}
             />
           </div>
         </div>
