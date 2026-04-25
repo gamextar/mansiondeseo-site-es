@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, ShieldCheck, Sparkles, Users, MapPin, HeartHandshake } from 'lucide-react';
 import { useSeoMeta, useStructuredData } from '../lib/seo';
 import { useAuth } from '../lib/authContext';
+import { login as apiLogin } from '../lib/api';
 import { SITE_CONFIG, SITE_ORIGIN } from '../lib/siteConfig';
 
 const featureCards = [
@@ -40,7 +42,11 @@ const intentLinks = SITE_CONFIG.country === 'AR'
   : BASE_INTENT_LINKS;
 
 export default function PublicHomePage() {
-  const { user } = useAuth();
+  const { user, setRegistered, setUser } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
 
   useSeoMeta({
     title: 'Mansion Deseo | Club privado para adultos registrados',
@@ -64,6 +70,23 @@ export default function PublicHomePage() {
     return <Navigate to="/feed" replace />;
   }
 
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    if (loggingIn) return;
+    setLoggingIn(true);
+    setLoginError('');
+
+    try {
+      const data = await apiLogin({ email, password });
+      setUser(data.user);
+      setRegistered(true);
+      window.location.href = '/feed';
+    } catch (err) {
+      setLoginError(err?.message || 'Credenciales inválidas');
+      setLoggingIn(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-mansion-base text-white overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
@@ -73,30 +96,52 @@ export default function PublicHomePage() {
       </div>
 
       <main className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-6 pb-16 pt-10 sm:px-8 lg:px-10">
-        <header className="flex items-center justify-between">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark">
-              <span className="font-display text-sm font-bold text-white">M</span>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
+              <span className="font-display text-white text-sm font-bold">M</span>
             </div>
-            <span className="font-display text-xl font-semibold text-gradient-gold">Mansion Deseo</span>
+            <span className="font-display text-[17px] font-semibold text-gradient-gold" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
+              Mansión Deseo
+            </span>
           </Link>
 
-          <div className="flex items-center gap-3">
-            {user ? (
-              <Link to="/feed" className="rounded-full border border-mansion-gold/30 bg-mansion-gold/10 px-4 py-2 text-sm font-medium text-mansion-gold transition-colors hover:bg-mansion-gold/15">
-                Ir al feed
-              </Link>
-            ) : (
-              <>
-                <Link to="/login" className="text-sm text-text-muted transition-colors hover:text-white">
-                  Acceder
-                </Link>
-                <Link to="/registro" className="rounded-full bg-mansion-gold px-4 py-2 text-sm font-semibold text-black transition-all hover:brightness-110">
-                  Registro gratis
-                </Link>
-              </>
+          <form onSubmit={handleLogin} className="grid w-full gap-2 sm:w-auto sm:grid-cols-[minmax(11rem,13rem)_minmax(9rem,11rem)_auto] sm:items-start">
+            <label className="sr-only" htmlFor="public-login-email">Email</label>
+            <input
+              id="public-login-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="Email"
+              autoComplete="email"
+              className="h-10 rounded-full border-white/10 bg-white/5 px-4 py-2 text-sm"
+              required
+            />
+            <label className="sr-only" htmlFor="public-login-password">Contraseña</label>
+            <input
+              id="public-login-password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Contraseña"
+              autoComplete="current-password"
+              className="h-10 rounded-full border-white/10 bg-white/5 px-4 py-2 text-sm"
+              required
+            />
+            <button
+              type="submit"
+              disabled={loggingIn}
+              className="h-10 rounded-full bg-mansion-gold px-5 text-sm font-semibold text-black transition-all hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
+            >
+              {loggingIn ? 'Entrando...' : 'Entrar'}
+            </button>
+            {loginError && (
+              <p className="sm:col-span-3 text-xs text-mansion-crimson">
+                {loginError}
+              </p>
             )}
-          </div>
+          </form>
         </header>
 
         <section className="grid flex-1 items-center gap-12 py-14 lg:grid-cols-[1.15fr_0.85fr] lg:py-20">
