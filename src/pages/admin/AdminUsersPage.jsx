@@ -464,13 +464,16 @@ export default function AdminUsersPage() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {[
             { id: 'all', label: 'Todos' },
-            { id: '1', label: 'Solo fake' },
-            { id: '0', label: 'Solo reales' },
+            { id: '1', label: 'Fake' },
+            { id: '0', label: 'Reales' },
           ].map((option) => (
             <button
               key={option.id}
               type="button"
-              onClick={() => setFakeFilter(option.id)}
+              onClick={() => {
+                setFakeFilter(option.id);
+                if (option.id !== 'all') setDuplicateFilter('all');
+              }}
               className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
                 fakeFilter === option.id
                   ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
@@ -482,12 +485,15 @@ export default function AdminUsersPage() {
           ))}
 
           {[
-            { id: '1', label: 'Solo duplicados' },
+            { id: '1', label: 'Duplicados' },
           ].map((option) => (
             <button
               key={option.id}
               type="button"
-              onClick={() => setDuplicateFilter((current) => (current === option.id ? 'all' : option.id))}
+              onClick={() => {
+                setDuplicateFilter((current) => (current === option.id ? 'all' : option.id));
+                setFakeFilter('all');
+              }}
               className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
                 duplicateFilter === option.id
                   ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
@@ -518,14 +524,13 @@ export default function AdminUsersPage() {
           ))}
 
           {[
-            { id: 'all', label: 'Todos los estados' },
             { id: 'under_review', label: '⚠️ En revisión' },
             { id: 'suspended', label: '🚫 Suspendidos' },
           ].map((option) => (
             <button
               key={option.id}
               type="button"
-              onClick={() => setStatusFilter(option.id)}
+              onClick={() => setStatusFilter((current) => (current === option.id ? 'all' : option.id))}
               className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
                 statusFilter === option.id
                   ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
