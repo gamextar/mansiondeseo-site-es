@@ -159,54 +159,80 @@ const staticHomeHtml = `<!doctype html>
     })();
   </script>
   <style>
-    :root{--bg:#08080e;--panel:#11111a;--panel2:#17151f;--text:#f6efe6;--muted:rgba(246,239,230,.70);--dim:rgba(246,239,230,.50);--gold:#c9a84c;--gold2:#f0d98b;--crimson:#9b2b40;--wine:#4a1324;--line:rgba(255,255,255,.10)}
-    *{box-sizing:border-box}html{background:var(--bg)}body{margin:0;min-height:100vh;background:radial-gradient(circle at 78% 4%,rgba(201,168,76,.18),transparent 25rem),radial-gradient(circle at 9% 18%,rgba(155,43,64,.27),transparent 24rem),linear-gradient(180deg,#0d0b12 0%,#08080e 68%,#050508 100%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit;text-decoration:none}button,input{font:inherit}.wrap{width:min(1180px,calc(100% - 32px));margin:0 auto;padding:22px 0 54px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0 22px}.brand{display:flex;align-items:center;gap:12px}.mark{width:44px;height:44px;border-radius:17px;background:linear-gradient(135deg,var(--crimson),#54172a);display:grid;place-items:center;font-family:Georgia,serif;font-weight:800;box-shadow:0 18px 44px rgba(155,43,64,.24)}.brand-text{font-family:Georgia,"Times New Roman",serif;font-size:23px;color:var(--gold2)}.top-actions{display:flex;align-items:center;gap:10px}.link{font-size:14px;color:var(--muted);background:none;border:0;cursor:pointer;padding:0}.pill-btn{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:12px 18px;font-weight:800;font-size:14px;border:0;cursor:pointer}.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#14100a;box-shadow:0 18px 36px rgba(201,168,76,.18)}.ghost{border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text)}.hero{display:block}.panel{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.026));border-radius:34px;box-shadow:0 30px 90px rgba(0,0,0,.36);overflow:hidden}.copy{padding:52px;max-width:980px}.badge{display:inline-flex;border:1px solid rgba(201,168,76,.28);background:rgba(201,168,76,.10);color:rgba(240,217,139,.95);border-radius:999px;padding:9px 13px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}.title{font-family:Georgia,"Times New Roman",serif;font-weight:500;letter-spacing:-.05em;font-size:clamp(48px,8vw,96px);line-height:.94;margin:24px 0 0}.lead{max-width:780px;margin:22px 0 0;color:var(--muted);font-size:18px;line-height:1.75}.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}.hero-notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:28px;max-width:820px}.note{border:1px solid var(--line);background:rgba(0,0,0,.16);border-radius:18px;padding:14px}.note strong{display:block;color:var(--gold2);font-size:18px}.note span{display:block;margin-top:4px;color:var(--dim);font-size:12px;line-height:1.35}.home-login{max-width:520px;margin:18px 0 0;padding:24px}.home-login[hidden]{display:none}.home-login h2{font-family:Georgia,"Times New Roman",serif;font-size:30px;line-height:1.05;margin:0}.home-login p{color:var(--muted);line-height:1.6}.fields{display:grid;gap:10px;margin:18px 0}.home-input{width:100%;border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:16px;padding:13px 14px;color:var(--text);font-size:14px;outline:none}.home-input::placeholder{color:var(--dim)}.home-input:focus{border-color:rgba(201,168,76,.42);box-shadow:0 0 0 4px rgba(201,168,76,.08)}.login-error{min-height:18px;margin:10px 0 0;color:#ff8ea0;font-size:12px;text-align:center}.login-tools{display:flex;justify-content:space-between;gap:10px;margin-top:10px}.login-tools a{font-size:12px;color:var(--muted)}.strip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:18px}.mini{padding:24px}.eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgba(201,168,76,.86)}.stat{font-family:Georgia,"Times New Roman",serif;font-size:48px;line-height:1;margin-top:12px}.muted{color:var(--muted);line-height:1.65}.tags{display:flex;flex-wrap:wrap;gap:9px;margin-top:15px}.tag{border:1px solid var(--line);background:rgba(0,0,0,.18);border-radius:999px;padding:8px 12px;font-size:12px;color:rgba(255,255,255,.78)}.trust{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}.trust .mini{padding:20px}.trust h3{font-size:14px;margin:0 0 8px}.trust p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}.footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-top:24px;color:var(--dim);font-size:12px}.footer a{color:var(--muted)}@media(max-width:900px){.wrap{width:min(100% - 24px,700px);padding-top:14px}.strip,.trust{grid-template-columns:1fr}.copy{padding:28px}.hero-notes{grid-template-columns:1fr}.top{align-items:flex-start}.brand-text{font-size:20px}.top-actions{gap:8px}.top-actions .link{display:none}.pill-btn{padding:11px 15px}.title{font-size:clamp(42px,13vw,68px)}}
+    :root{--bg:#08080e;--text:#f6efe6;--muted:rgba(246,239,230,.72);--dim:rgba(246,239,230,.48);--gold:#c9a84c;--gold2:#f0d98b;--crimson:#9b2b40;--wine:#4a1324;--line:rgba(255,255,255,.10)}
+    *{box-sizing:border-box}
+    html{background:var(--bg)}
+    body{margin:0;min-height:100vh;background:radial-gradient(circle at 82% 8%,rgba(201,168,76,.20),transparent 28rem),radial-gradient(circle at 8% 18%,rgba(155,43,64,.28),transparent 26rem),linear-gradient(180deg,#0d0b12 0%,#08080e 62%,#050508 100%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:56px 56px;mask-image:linear-gradient(to bottom,black,transparent 82%)}
+    a{color:inherit;text-decoration:none}button,input{font:inherit}.wrap{width:min(1180px,calc(100% - 32px));margin:0 auto;padding:18px 0 54px}
+    .top-shell{position:sticky;top:0;z-index:20;padding-top:8px;background:linear-gradient(180deg,rgba(8,8,14,.96),rgba(8,8,14,.70) 72%,transparent);backdrop-filter:blur(14px)}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid rgba(255,255,255,.08);background:rgba(9,8,14,.62);border-radius:24px;padding:12px 14px}
+    .brand{display:flex;align-items:center;gap:12px}.mark{width:44px;height:44px;border-radius:17px;background:linear-gradient(135deg,var(--crimson),#54172a);display:grid;place-items:center;font-family:Georgia,serif;font-weight:800;box-shadow:0 18px 44px rgba(155,43,64,.24)}.brand-text{font-family:Georgia,"Times New Roman",serif;font-size:23px;color:var(--gold2)}
+    .top-actions{display:flex;align-items:center;gap:10px}.link{font-size:14px;color:var(--muted);background:none;border:0;cursor:pointer;padding:0}.pill-btn{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:12px 18px;font-weight:800;font-size:14px;border:0;cursor:pointer}.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#14100a;box-shadow:0 18px 36px rgba(201,168,76,.18)}.ghost{border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text)}
+    .login-dock{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end;margin:10px 0 16px;padding:16px;border:1px solid rgba(201,168,76,.18);background:rgba(9,8,14,.86);border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.28)}.login-dock[hidden]{display:none}.login-copy h2{font-family:Georgia,"Times New Roman",serif;font-size:24px;line-height:1;margin:0}.login-copy p{margin:7px 0 0;color:var(--muted);font-size:13px}.login-fields{display:grid;grid-template-columns:220px 190px auto;gap:10px;align-items:center}.home-input{width:100%;border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:15px;padding:12px 13px;color:var(--text);font-size:14px;outline:none}.home-input::placeholder{color:var(--dim)}.home-input:focus{border-color:rgba(201,168,76,.42);box-shadow:0 0 0 4px rgba(201,168,76,.08)}.login-error{grid-column:1/-1;min-height:16px;margin:0;color:#ff8ea0;font-size:12px;text-align:right}.forgot{color:var(--muted);font-size:12px}
+    .hero{margin-top:22px}.panel{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.072),rgba(255,255,255,.026));border-radius:36px;box-shadow:0 32px 96px rgba(0,0,0,.36);overflow:hidden}.hero-panel{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 360px;min-height:610px}.hero-panel:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 82% 24%,rgba(240,217,139,.15),transparent 20rem),radial-gradient(circle at 14% 10%,rgba(155,43,64,.16),transparent 20rem);pointer-events:none}.copy{position:relative;padding:64px 56px;align-self:center}.badge{display:inline-flex;border:1px solid rgba(201,168,76,.28);background:rgba(201,168,76,.10);color:rgba(240,217,139,.95);border-radius:999px;padding:9px 13px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}.title{font-family:Georgia,"Times New Roman",serif;font-weight:500;letter-spacing:-.055em;font-size:clamp(52px,8vw,104px);line-height:.92;margin:24px 0 0;max-width:850px}.lead{max-width:760px;margin:24px 0 0;color:var(--muted);font-size:19px;line-height:1.75}.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}.hero-notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:34px;max-width:860px}.note{border:1px solid var(--line);background:rgba(0,0,0,.18);border-radius:20px;padding:16px}.note strong{display:block;color:var(--gold2);font-size:18px}.note span{display:block;margin-top:5px;color:var(--dim);font-size:12px;line-height:1.4}
+    .signal{position:relative;padding:32px;display:flex;align-items:center;justify-content:center;border-left:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,rgba(74,19,36,.26),rgba(0,0,0,.10))}.signal-orb{position:absolute;width:270px;height:270px;border-radius:999px;background:radial-gradient(circle,rgba(201,168,76,.25),rgba(155,43,64,.12) 46%,transparent 70%);filter:blur(.2px)}.signal-card{position:relative;width:100%;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.24);backdrop-filter:blur(12px);border-radius:28px;padding:24px}.signal-card h2{font-family:Georgia,"Times New Roman",serif;font-size:34px;line-height:1.05;margin:0}.signal-card p{color:var(--muted);line-height:1.7}.signal-list{display:grid;gap:10px;margin-top:22px}.signal-item{display:flex;justify-content:space-between;gap:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px;color:var(--dim);font-size:12px}.signal-item strong{color:var(--gold2)}
+    .strip{display:grid;grid-template-columns:1.15fr .85fr .85fr;gap:18px;margin-top:18px}.mini{padding:26px}.eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgba(201,168,76,.86)}.stat{font-family:Georgia,"Times New Roman",serif;font-size:52px;line-height:1;margin-top:12px}.muted{color:var(--muted);line-height:1.65}.tags{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px}.tag{border:1px solid var(--line);background:rgba(0,0,0,.18);border-radius:999px;padding:8px 12px;font-size:12px;color:rgba(255,255,255,.78)}.trust{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}.trust .mini{padding:20px}.trust h3{font-size:14px;margin:0 0 8px}.trust p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}.footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-top:24px;color:var(--dim);font-size:12px}.footer a{color:var(--muted)}
+    @media(max-width:960px){.wrap{width:min(100% - 24px,720px);padding-top:10px}.top{border-radius:20px}.top-actions{gap:8px}.top-actions .link{display:none}.pill-btn{padding:11px 15px}.hero-panel{grid-template-columns:1fr;min-height:auto}.copy{padding:34px 28px}.signal{border-left:0;border-top:1px solid rgba(255,255,255,.08);padding:22px}.title{font-size:clamp(42px,13vw,72px)}.lead{font-size:17px}.hero-notes,.strip,.trust{grid-template-columns:1fr}.login-dock{grid-template-columns:1fr}.login-fields{grid-template-columns:1fr}.login-error{text-align:left}.brand-text{font-size:20px}}
   </style>
 </head>
 <body>
   <main class="wrap">
-    <nav class="top" aria-label="Principal">
-      <a class="brand" href="/" aria-label="Mansión Deseo">
-        <span class="mark">M</span>
-        <span class="brand-text">Mansión Deseo</span>
-      </a>
-      <div class="top-actions">
-        <button class="link" type="button" data-show-login>Iniciar sesión</button>
-        <a class="pill-btn gold" href="/registro/">Crear cuenta</a>
-      </div>
-    </nav>
-
-    <section class="hero">
-      <div class="panel copy">
-        <span class="badge">Swingers Argentina · +18 · Acceso privado</span>
-        <h1 class="title">Conocé adultos con la misma curiosidad.</h1>
-        <p class="lead">Mansión Deseo es una comunidad privada para adultos en Argentina: parejas liberales, swingers, tríos y contactos discretos dentro de una experiencia más cuidada, moderna y reservada.</p>
-        <div class="cta">
+    <div class="top-shell">
+      <nav class="top" aria-label="Principal">
+        <a class="brand" href="/" aria-label="Mansión Deseo">
+          <span class="mark">M</span>
+          <span class="brand-text">Mansión Deseo</span>
+        </a>
+        <div class="top-actions">
+          <button class="link" type="button" data-show-login>Iniciar sesión</button>
           <a class="pill-btn gold" href="/registro/">Crear cuenta</a>
-          <button class="pill-btn ghost" type="button" data-show-login>Iniciar sesión</button>
         </div>
-        <div class="hero-notes" aria-label="Datos de la comunidad">
-          <div class="note"><strong>Privado</strong><span>Tu actividad no se vincula con redes sociales.</span></div>
-          <div class="note"><strong>Argentina</strong><span>Perfiles y búsquedas enfocadas en tu zona.</span></div>
-          <div class="note"><strong>+18</strong><span>Acceso reservado para adultos registrados.</span></div>
-        </div>
-      </div>
-      <form class="panel home-login" id="homeLogin" hidden>
-        <div>
+      </nav>
+      <form class="login-dock" id="homeLogin" hidden>
+        <div class="login-copy">
           <h2>Accedé a tu espacio privado.</h2>
-          <p>Ingresá con tu email y contraseña para volver directo al feed.</p>
-          <div class="fields">
-            <input class="home-input" id="homeLoginEmail" type="email" name="email" placeholder="tu@email.com" autocomplete="email" required />
-            <input class="home-input" id="homeLoginPassword" type="password" name="password" placeholder="Contraseña" autocomplete="current-password" required />
-          </div>
-          <p class="login-error" id="homeLoginError" role="alert" aria-live="polite"></p>
+          <p>Ingresá y volvé directo al feed.</p>
         </div>
-        <button class="pill-btn gold" id="homeLoginSubmit" style="width:100%" type="submit">Entrar</button>
-        <div class="login-tools">
-          <a href="/registro/">Crear cuenta</a>
-          <a href="/recuperar-contrasena/">Olvidé mi contraseña</a>
+        <div class="login-fields">
+          <input class="home-input" id="homeLoginEmail" type="email" name="email" placeholder="tu@email.com" autocomplete="email" required />
+          <input class="home-input" id="homeLoginPassword" type="password" name="password" placeholder="Contraseña" autocomplete="current-password" required />
+          <button class="pill-btn gold" id="homeLoginSubmit" type="submit">Entrar</button>
+          <p class="login-error" id="homeLoginError" role="alert" aria-live="polite"></p>
+          <a class="forgot" href="/recuperar-contrasena/">Olvidé mi contraseña</a>
         </div>
       </form>
+    </div>
+
+    <section class="hero">
+      <div class="panel hero-panel">
+        <div class="copy">
+          <span class="badge">Swingers Argentina · +18 · Acceso privado</span>
+          <h1 class="title">Conocé adultos con la misma curiosidad.</h1>
+          <p class="lead">Mansión Deseo es una comunidad privada para adultos en Argentina: parejas liberales, swingers, tríos y contactos discretos dentro de una experiencia cuidada, moderna y reservada.</p>
+          <div class="cta">
+            <a class="pill-btn gold" href="/registro/">Crear cuenta</a>
+            <button class="pill-btn ghost" type="button" data-show-login>Iniciar sesión</button>
+          </div>
+          <div class="hero-notes" aria-label="Datos de la comunidad">
+            <div class="note"><strong>Privado</strong><span>Tu actividad no se vincula con redes sociales.</span></div>
+            <div class="note"><strong>Argentina</strong><span>Perfiles y búsquedas enfocadas en tu zona.</span></div>
+            <div class="note"><strong>+18</strong><span>Acceso reservado para adultos registrados.</span></div>
+          </div>
+        </div>
+        <div class="signal" aria-label="Ambiente privado de Mansión Deseo">
+          <span class="signal-orb"></span>
+          <div class="signal-card">
+            <h2>Privado por diseño.</h2>
+            <p>La experiencia completa vive dentro: feed, historias, mensajes y herramientas de control.</p>
+            <div class="signal-list">
+              <div class="signal-item"><span>Perfiles</span><strong>cuidados</strong></div>
+              <div class="signal-item"><span>Mensajes</span><strong>privados</strong></div>
+              <div class="signal-item"><span>Moderación</span><strong>activa</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="strip">
@@ -251,7 +277,6 @@ const staticHomeHtml = `<!doctype html>
         if (!loginForm) return;
         loginForm.hidden = false;
         loginError.textContent = '';
-        loginForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         setTimeout(function(){ loginEmail && loginEmail.focus(); }, 40);
       }
       var showLoginButtons = document.querySelectorAll('[data-show-login]');
