@@ -203,8 +203,7 @@ const staticHomeHtml = `<!doctype html>
         <h1 class="title">Una comunidad privada para perfiles reales, afinidad y discrecion total.</h1>
         <p class="lead">Mansion Deseo funciona como puerta de entrada publica y experiencia privada: landings indexables para captar busquedas locales y una app cerrada para explorar perfiles verificados, historias, mensajes y conexiones con afinidad real.</p>
         <div class="cta">
-          <a class="pill-btn gold" href="/registro/">Empezar ahora →</a>
-          <a class="pill-btn ghost" href="/login/">Ya tengo cuenta</a>
+          <a class="pill-btn gold" href="/registro/">Registrarme →</a>
         </div>
         <div class="tags">
           ${staticIntentTags}

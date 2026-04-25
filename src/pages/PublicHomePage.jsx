@@ -186,17 +186,9 @@ export default function PublicHomePage() {
                 to={user ? '/feed' : '/registro'}
                 className="inline-flex items-center gap-2 rounded-full bg-mansion-gold px-6 py-3 text-sm font-semibold text-black transition-all hover:brightness-110"
               >
-                {user ? 'Entrar al feed' : 'Empezar ahora'}
+                {user ? 'Entrar al feed' : 'Registrarme'}
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              {!user && (
-                <Link
-                  to="/login"
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-white/10"
-                >
-                  Ya tengo cuenta
-                </Link>
-              )}
             </motion.div>
 
             <motion.div
