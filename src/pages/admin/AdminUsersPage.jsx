@@ -459,26 +459,6 @@ export default function AdminUsersPage() {
           ))}
 
           {[
-            { id: '1', label: 'Duplicados' },
-          ].map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => {
-                setDuplicateFilter((current) => (current === option.id ? 'all' : option.id));
-                setFakeFilter('all');
-              }}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
-                duplicateFilter === option.id
-                  ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
-                  : 'bg-mansion-card border-mansion-border/20 text-text-dim hover:text-text-primary'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-
-          {[
             { id: 'mujer', label: 'Mujeres' },
             { id: 'hombre', label: 'Hombres' },
             { id: 'pareja', label: 'Parejas' },
@@ -498,6 +478,28 @@ export default function AdminUsersPage() {
           ))}
 
           {[
+            { id: '1', label: '👥 Duplicados' },
+          ].map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => {
+                setDuplicateFilter((current) => (current === option.id ? 'all' : option.id));
+                setFakeFilter('all');
+                setReportedFilter('all');
+                setStatusFilter('all');
+              }}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
+                duplicateFilter === option.id
+                  ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
+                  : 'bg-mansion-card border-mansion-border/20 text-text-dim hover:text-text-primary'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+
+          {[
             { id: 'under_review', label: '⚠️ En revisión' },
             { id: 'reported', label: '❗ Denunciados' },
             { id: 'suspended', label: '🚫 Suspendidos' },
@@ -508,9 +510,13 @@ export default function AdminUsersPage() {
               onClick={() => {
                 if (option.id === 'reported') {
                   setReportedFilter((current) => (current === '1' ? 'all' : '1'));
+                  setDuplicateFilter('all');
+                  setStatusFilter('all');
                   return;
                 }
                 setStatusFilter((current) => (current === option.id ? 'all' : option.id));
+                setDuplicateFilter('all');
+                setReportedFilter('all');
               }}
               className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
                 (option.id === 'reported' ? reportedFilter === '1' : statusFilter === option.id)
