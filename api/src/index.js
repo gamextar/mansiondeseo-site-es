@@ -1367,6 +1367,7 @@ function normalizeMetricRoute(path) {
   if (/^\/api\/favorites\/[a-f0-9-]+$/.test(path)) return '/api/favorites/:id';
   if (/^\/api\/gifts\/received\/[a-f0-9-]+$/.test(path)) return '/api/gifts/received/:userId';
   if (/^\/api\/admin\/gifts\/[a-zA-Z0-9-]+$/.test(path)) return '/api/admin/gifts/:id';
+  if (/^\/api\/admin\/profile-reports\/[a-f0-9-]+$/.test(path)) return '/api/admin/profile-reports/:id';
   if (/^\/api\/admin\/users\/[a-f0-9-]+$/.test(path)) return '/api/admin/users/:id';
   if (/^\/api\/admin\/error-logs\/[a-f0-9-]+$/.test(path)) return '/api/admin/error-logs/:id';
   return path;
@@ -5283,6 +5284,47 @@ async function handleAdminGetUser(request, env, userId) {
   });
 }
 
+// ── Admin: PATCH /api/admin/profile-reports/:id ─────────
+async function handleAdminUpdateProfileReport(request, env, reportId) {
+  await ensureProfileReportsTable(env);
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const body = await request.json().catch(() => ({}));
+  const status = String(body?.status || '').trim();
+  if (status !== 'closed') return error('Estado de denuncia inválido', 400);
+
+  const existing = await env.DB.prepare('SELECT id, reported_id FROM profile_reports WHERE id = ?').bind(reportId).first();
+  if (!existing) return error('Denuncia no encontrada', 404);
+
+  await env.DB.prepare(
+    "UPDATE profile_reports SET status = ?, updated_at = datetime('now') WHERE id = ?"
+  ).bind(status, reportId).run();
+
+  const updated = await env.DB.prepare(
+    'SELECT id, reporter_id, reported_id, reason, details, status, created_at, updated_at FROM profile_reports WHERE id = ?'
+  ).bind(reportId).first();
+  const openCount = await env.DB.prepare(
+    "SELECT COUNT(*) AS total FROM profile_reports WHERE reported_id = ? AND status = 'open'"
+  ).bind(existing.reported_id).first();
+
+  return json({
+    report: {
+      id: updated.id,
+      reporter_id: updated.reporter_id,
+      reported_id: updated.reported_id,
+      reason: updated.reason || '',
+      details: updated.details || '',
+      status: updated.status || 'closed',
+      created_at: updated.created_at || '',
+      updated_at: updated.updated_at || '',
+    },
+    reports_count: Number(openCount?.total || 0),
+  });
+}
+
 // ── Admin: PUT /api/admin/users/:id ─────────────────────
 async function handleAdminUpdateUser(request, env, userId) {
   await ensureUsersMessageBlockRolesColumn(env);
@@ -6642,6 +6684,8 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/admin/fake-inbox/conversation' && method === 'GET') return handleAdminGetFakeInboxConversation(request, env);
   if (path === '/api/admin/fake-inbox/reply' && method === 'POST') return handleAdminReplyFakeInbox(request, env);
   const adminUserMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)$/);
+  const adminProfileReportMatch = path.match(/^\/api\/admin\/profile-reports\/([a-f0-9-]+)$/);
+  if (adminProfileReportMatch && method === 'PATCH') return handleAdminUpdateProfileReport(request, env, adminProfileReportMatch[1]);
   if (adminUserMatch && method === 'GET') return handleAdminGetUser(request, env, adminUserMatch[1]);
   if (adminUserMatch && method === 'PUT') return handleAdminUpdateUser(request, env, adminUserMatch[1]);
   if (adminUserMatch && method === 'DELETE') return handleAdminDeleteUser(request, env, adminUserMatch[1]);

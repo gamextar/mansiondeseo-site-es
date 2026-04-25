@@ -1236,6 +1236,13 @@ export async function adminUpdateUser(userId, fields) {
   });
 }
 
+export async function adminCloseProfileReport(reportId) {
+  return apiFetch(`/admin/profile-reports/${reportId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'closed' }),
+  });
+}
+
 export async function adminDeleteUser(userId) {
   const result = await apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
   markFeedDirty();

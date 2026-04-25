@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Pause, Play, Film, Pencil, Copy, Flag } from 'lucide-react';
-import { adminGetUsers, adminGetUserIds, adminGetUser, adminUpdateUser, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory } from '../../lib/api';
+import { adminGetUsers, adminGetUserIds, adminGetUser, adminUpdateUser, adminCloseProfileReport, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 import { resolveMediaUrl } from '../../lib/media';
 
@@ -144,6 +144,41 @@ export default function AdminUsersPage() {
       if (selected?.id === userId) setSelected(s => ({ ...s, ...data.user }));
     } catch (err) {
       alert(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCloseReport = async (reportId) => {
+    if (!selected?.id) return;
+    setActionLoading(true);
+    try {
+      const data = await adminCloseProfileReport(reportId);
+      const nextOpenCount = Number(data.reports_count || 0);
+      setSelected((prev) => {
+        if (!prev) return prev;
+        const reports = (prev.reports || []).map((report) => (
+          report.id === reportId
+            ? { ...report, ...data.report, reporter_username: report.reporter_username }
+            : report
+        ));
+        return { ...prev, reports, reports_count: nextOpenCount };
+      });
+      setUsers((prev) => prev
+        .map((user) => (
+          user.id === data.report.reported_id
+            ? {
+                ...user,
+                reports_count: nextOpenCount,
+                latest_report_reason: nextOpenCount > 0 ? user.latest_report_reason : '',
+                latest_report_at: nextOpenCount > 0 ? user.latest_report_at : '',
+              }
+            : user
+        ))
+        .filter((user) => !(reportedFilter === '1' && user.id === data.report.reported_id && nextOpenCount === 0)));
+      if (reportedFilter === '1' && nextOpenCount === 0) setTotal((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      alert(err.message || 'No se pudo cerrar la denuncia');
     } finally {
       setActionLoading(false);
     }
@@ -826,13 +861,25 @@ export default function AdminUsersPage() {
                       <div key={report.id} className="rounded-xl border border-red-500/10 bg-black/15 px-3 py-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-xs font-semibold text-text-primary">{reportReasonLabel(report.reason)}</p>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            report.status === 'open'
-                              ? 'bg-red-500/10 text-red-300'
-                              : 'bg-mansion-elevated text-text-dim'
-                          }`}>
-                            {report.status === 'open' ? 'Abierta' : report.status}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              report.status === 'open'
+                                ? 'bg-red-500/10 text-red-300'
+                                : 'bg-mansion-elevated text-text-dim'
+                            }`}>
+                              {report.status === 'open' ? 'Abierta' : 'Cerrada'}
+                            </span>
+                            {report.status === 'open' && (
+                              <button
+                                type="button"
+                                disabled={actionLoading}
+                                onClick={() => handleCloseReport(report.id)}
+                                className="rounded-full border border-mansion-border/20 bg-mansion-elevated px-2 py-0.5 text-[10px] font-semibold text-text-dim transition-colors hover:border-red-500/25 hover:text-red-200 disabled:opacity-60"
+                              >
+                                Cerrar denuncia
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <p className="mt-1 text-[11px] text-text-dim">
                           Denunció: {report.reporter_username || report.reporter_id || 'Usuario eliminado'} · {report.updated_at ? timeAgo(report.updated_at) : 'sin fecha'}
