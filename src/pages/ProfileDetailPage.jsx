@@ -1294,7 +1294,7 @@ export default function ProfileDetailPage({ initialData }) {
               initial={{ opacity: 0, y: 8, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.96 }}
-              className="max-w-[12rem] rounded-2xl border border-amber-500/25 bg-black/78 px-3 py-2 text-center text-[11px] font-medium leading-4 text-amber-100 shadow-[0_14px_28px_rgba(0,0,0,0.28)] backdrop-blur-md"
+              className="absolute bottom-0 right-[calc(100%+0.75rem)] w-max max-w-[12rem] rounded-2xl border border-amber-500/25 bg-black/78 px-3 py-2 text-left text-[11px] font-medium leading-4 text-amber-100 shadow-[0_14px_28px_rgba(0,0,0,0.28)] backdrop-blur-md"
             >
               {messageBlockedNotice}
             </motion.div>
@@ -1322,9 +1322,11 @@ export default function ProfileDetailPage({ initialData }) {
               : 'bg-mansion-crimson shadow-glow-crimson hover:bg-mansion-crimson-dark'
           }`}
         >
-          <span className="pointer-events-none absolute right-[calc(100%+0.75rem)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-full border border-white/10 bg-black/80 px-3 py-1.5 text-[11px] font-semibold text-white/90 shadow-lg backdrop-blur-md group-hover:block group-focus-visible:block">
-            {messagingBlockedByRole ? 'Mensajes bloqueados' : 'Enviar mensaje'}
-          </span>
+          {!messagingBlockedByRole && (
+            <span className="pointer-events-none absolute right-[calc(100%+0.75rem)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-full border border-white/10 bg-black/80 px-3 py-1.5 text-[11px] font-semibold text-white/90 shadow-lg backdrop-blur-md group-hover:block group-focus-visible:block">
+              Enviar mensaje
+            </span>
+          )}
           <MessageCircle className="w-6 h-6" />
         </Link>
       </MotionDiv>
