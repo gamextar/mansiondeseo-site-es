@@ -74,6 +74,8 @@ const FEED_PROFILE_LIMIT = 42;
 const FEED_SNAPSHOT_LIMIT = 180;
 const FEED_SNAPSHOT_TTL_MS = 300_000;
 const FEED_QUERY_EXPANSION_FACTOR = 4;
+const FEED_PROXIMITY_CITY_BOOST = 22;
+const FEED_PROXIMITY_REGION_BOOST = 10;
 const STORY_CIRCLE_FALLBACK_SIZE = 88;
 const STORY_CIRCLE_FALLBACK_BORDER_PERCENT = 4;
 const STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT = 3;
@@ -308,6 +310,7 @@ function computeFeedScore(profile, viewerInterests, settings) {
     : 0;
   const storyScore = profile?.has_active_story ? 1 : 0;
   const premiumScore = isPremiumActive(profile) ? 1 : 0;
+  const proximityBoost = Math.max(0, Number(profile?._proximityBoost || 0));
 
   return (
     recencyScore * settings.feedWeightLastActive +
@@ -315,8 +318,49 @@ function computeFeedScore(profile, viewerInterests, settings) {
     photosScore * settings.feedWeightPhotos +
     followersScore * settings.feedWeightFollowers +
     sharedInterestsScore * settings.feedWeightSharedInterests +
-    premiumScore * settings.feedWeightPremium
+    premiumScore * settings.feedWeightPremium +
+    proximityBoost
   );
+}
+
+function normalizeGeoToken(value = '') {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function getRequestFeedGeo(request) {
+  const cf = request?.cf || {};
+  const city = String(cf.city || '').trim();
+  const region = String(cf.region || '').trim();
+  const normalizedCity = normalizeGeoToken(city);
+  const normalizedRegion = normalizeGeoToken(region);
+  return {
+    city,
+    region,
+    normalizedCity,
+    normalizedRegion,
+    cacheKey: `${normalizedCity || 'no-city'}:${normalizedRegion || 'no-region'}`,
+  };
+}
+
+function computeProximityBoost(profile, viewerGeo) {
+  const cityToken = viewerGeo?.normalizedCity || '';
+  const regionToken = viewerGeo?.normalizedRegion || '';
+  if (!cityToken && !regionToken) return 0;
+
+  const profileLocality = normalizeGeoToken(profile?.locality || '');
+  const profileProvince = normalizeGeoToken(profile?.province || profile?.city || '');
+  const profileCity = normalizeGeoToken(profile?.city || '');
+  const profileTokens = new Set([profileLocality, profileProvince, profileCity].filter(Boolean));
+
+  if (cityToken && profileTokens.has(cityToken)) return FEED_PROXIMITY_CITY_BOOST;
+  if (regionToken && profileTokens.has(regionToken)) return FEED_PROXIMITY_REGION_BOOST;
+  return 0;
 }
 
 function normalizeViewerInterestsKey(viewerInterests = []) {
@@ -367,7 +411,7 @@ function buildFeedBaseProfiles(rows, env, activeStoryUserIds, activeStoryUrlMap)
   });
 }
 
-function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets, limit = FEED_PROFILE_LIMIT) {
+function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets, limit = FEED_PROFILE_LIMIT, viewerGeo = null) {
   const seenIds = new Set();
   const uniqueProfiles = (profiles || []).filter((profile) => {
     const id = String(profile?.id || '');
@@ -381,13 +425,16 @@ function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets,
     const matchingInterests = Array.isArray(viewerInterests) && viewerInterests.length > 0
       ? profile._profileInterests.filter((interest) => viewerInterests.includes(interest)).length
       : 0;
+    const proximityBoost = computeProximityBoost(profile, viewerGeo);
 
     return {
       ...profile,
       _matchingInterests: matchingInterests,
+      _proximityBoost: proximityBoost,
       _feedScore: computeFeedScore({
         ...profile,
         _matchingInterests: matchingInterests,
+        _proximityBoost: proximityBoost,
       }, viewerInterests, settings),
     };
   });
@@ -433,7 +480,7 @@ function mapStoryRowForResponse(row, env) {
 function personalizeFeedProfiles(profiles, authUserId, viewerFavorites, favoritedBySet, viewerIsPremium, settings) {
   return (profiles || [])
     .filter((profile) => profile.id !== authUserId)
-    .map(({ _profileInterests, _matchingInterests, _feedScore, _roleId, ...profile }) => {
+    .map(({ _profileInterests, _matchingInterests, _proximityBoost, _feedScore, _roleId, ...profile }) => {
       const blurred = profile.ghost_mode && !viewerIsPremium && !favoritedBySet.has(profile.id);
       const visiblePhotos = viewerIsPremium
         ? profile.totalPhotos
@@ -2601,6 +2648,7 @@ async function handleProfiles(request, env) {
   const filter = url.searchParams.get('filter') || 'all';
   const search = url.searchParams.get('q') || '';
   const fresh = url.searchParams.get('fresh') === '1';
+  const viewerGeo = getRequestFeedGeo(request);
   const cursor = Math.max(0, Number.parseInt(url.searchParams.get('cursor') || '0', 10) || 0);
   const reqPageSize = Math.min(200, Math.max(12, Number.parseInt(url.searchParams.get('pageSize') || '0', 10) || FEED_PROFILE_LIMIT));
   const settings = await cached('settings', 300_000, () => loadSettings(env));
@@ -2680,8 +2728,9 @@ async function handleProfiles(request, env) {
   // Cache key for profiles query (shared across all users)
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
   const countryKey = settings.feedFilterByCountry ? country : 'all-countries';
+  const geoKey = viewerGeo.cacheKey || 'no-geo';
   const profilesCacheKey = `profiles:${seekingKey}:${countryKey}:${search}`;
-  const feedSnapshotCacheKey = `feed-snapshot:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}:${viewerCanWatchAllStories ? 'vip' : 'free'}`;
+  const feedSnapshotCacheKey = `feed-snapshot:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}:${viewerCanWatchAllStories ? 'vip' : 'free'}:${geoKey}`;
   const windowLimit = cursor + reqPageSize;
   const pageWindowLimit = windowLimit + 1;
   const dbLimit = roleBuckets.length > 1
@@ -2724,7 +2773,7 @@ async function handleProfiles(request, env) {
         }
         const baseProfiles = buildFeedBaseProfiles(snapshotRows, env, activeStoryUserIds, activeStoryUrlMap);
         return {
-          orderedProfiles: orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, snapshotWindowLimit),
+          orderedProfiles: orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, snapshotWindowLimit, viewerGeo),
           totalProfiles: Number(snapshotCountRow?.total ?? 0),
         };
       })
@@ -2748,7 +2797,7 @@ async function handleProfiles(request, env) {
           activeStoryUrlMap,
         );
         return {
-          orderedProfiles: orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, pageWindowLimit),
+          orderedProfiles: orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, pageWindowLimit, viewerGeo),
           totalProfiles: null,
         };
       }))
@@ -2849,6 +2898,11 @@ async function handleProfiles(request, env) {
       },
       feedSnapshotLimit: FEED_SNAPSHOT_LIMIT,
       feedSnapshotTtlMs: FEED_SNAPSHOT_TTL_MS,
+      proximity: {
+        city: viewerGeo.city,
+        region: viewerGeo.region,
+        cacheKey: geoKey,
+      },
     };
   }
 
