@@ -26,6 +26,7 @@ import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBoot
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
+import CloudflareLocationDebugOverlay from './components/CloudflareLocationDebugOverlay';
 import SafeAreaRuntimeDebugOverlay from './components/SafeAreaRuntimeDebugOverlay';
 import MobileViewportStabilizer from './components/MobileViewportStabilizer';
 import { AuthContext, useAuth } from './lib/authContext';
@@ -1407,6 +1408,7 @@ export default function App() {
         {!debugFlags.shellOnly && <AppLayout />}
         {!debugFlags.shellOnly && <InstallAppBanner />}
         {!debugFlags.shellOnly && <ApiDebugOverlay />}
+        {!debugFlags.shellOnly && <CloudflareLocationDebugOverlay />}
         {!debugFlags.shellOnly && <SafeAreaRuntimeDebugOverlay />}
       </div>
       </UnreadProvider>

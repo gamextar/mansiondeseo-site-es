@@ -305,6 +305,30 @@ const staticHomeHtml = `<!doctype html>
             });
         });
       }
+      if (new URLSearchParams(location.search).get('geo_debug') === '1') {
+        var geoBox = document.createElement('aside');
+        geoBox.setAttribute('aria-label', 'Cloudflare location debug');
+        geoBox.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:10000;width:min(352px,calc(100vw - 32px));max-height:70vh;overflow:auto;border:1px solid rgba(103,232,249,.22);border-radius:18px;background:rgba(0,0,0,.86);color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.45);backdrop-filter:blur(18px);font:12px Inter,system-ui,sans-serif';
+        geoBox.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(255,255,255,.10);padding:12px 14px"><div><strong style="display:block;font-size:13px">Cloudflare location</strong><span id="geoDebugTime" style="color:#888899;font-size:10px">Cargando...</span></div><button id="geoDebugClose" type="button" style="width:32px;height:32px;border-radius:10px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.06);color:#fff;cursor:pointer">x</button></div><div id="geoDebugBody" style="padding:12px 14px;color:#888899">Leyendo /api/debug/cf-location...</div>';
+        document.body.appendChild(geoBox);
+        document.getElementById('geoDebugClose').addEventListener('click', function(){ geoBox.remove(); });
+        fetch('/api/debug/cf-location', { cache: 'no-store' })
+          .then(function(response){ return response.json(); })
+          .then(function(data){
+            var cf = data.cf || {};
+            var fields = ['country','region','regionCode','city','postalCode','latitude','longitude','timezone','continent','colo','asn','asOrganization','tlsVersion'];
+            var html = '<dl style="margin:0">';
+            fields.forEach(function(key){
+              html += '<div style="display:grid;grid-template-columns:104px 1fr;gap:8px;border-bottom:1px solid rgba(255,255,255,.06);padding:6px 0"><dt style="color:#555566;text-transform:uppercase;letter-spacing:.12em;font-size:10px">' + key + '</dt><dd style="margin:0;color:#f0ede8;font-weight:600;word-break:break-word">' + (cf[key] || '-') + '</dd></div>';
+            });
+            html += '</dl><p style="margin:12px 0 0;color:#555566;font-size:10px;line-height:1.45">' + (data.note || '') + '</p>';
+            document.getElementById('geoDebugBody').innerHTML = html;
+            document.getElementById('geoDebugTime').textContent = data.generatedAt || 'OK';
+          })
+          .catch(function(error){
+            document.getElementById('geoDebugBody').textContent = error.message || 'No se pudo leer la geolocalizacion.';
+          });
+      }
       var assets = ${JSON.stringify(prewarmAssetHrefs)};
       var warmed = false;
       function addLink(rel, href, as) {

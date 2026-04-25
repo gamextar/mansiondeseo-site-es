@@ -1047,6 +1047,10 @@ export async function detectCountry() {
   });
 }
 
+export async function getCloudflareLocationDebug() {
+  return apiFetch('/debug/cf-location');
+}
+
 export async function updateSettings(fields) {
   return apiFetch('/settings', {
     method: 'PUT',

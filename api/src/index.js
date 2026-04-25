@@ -4171,6 +4171,52 @@ async function handleDetectCountry(request) {
   });
 }
 
+// ── GET /api/debug/cf-location ───────────────────────────
+async function handleDebugCfLocation(request) {
+  const cf = request.cf || {};
+  const headerNames = [
+    'cf-ipcountry',
+    'cf-ipcity',
+    'cf-region',
+    'cf-region-code',
+    'cf-ipcontinent',
+    'cf-iplatitude',
+    'cf-iplongitude',
+    'cf-postal-code',
+    'cf-metro-code',
+    'cf-timezone',
+  ];
+  const headers = {};
+  for (const name of headerNames) {
+    const value = request.headers.get(name);
+    if (value) headers[name] = value;
+  }
+
+  return json({
+    generatedAt: new Date().toISOString(),
+    cf: {
+      country: cf.country || '',
+      city: cf.city || '',
+      region: cf.region || '',
+      regionCode: cf.regionCode || '',
+      continent: cf.continent || '',
+      latitude: cf.latitude || '',
+      longitude: cf.longitude || '',
+      postalCode: cf.postalCode || '',
+      metroCode: cf.metroCode || '',
+      timezone: cf.timezone || '',
+      colo: cf.colo || '',
+      asn: cf.asn || '',
+      asOrganization: cf.asOrganization || '',
+      tlsVersion: cf.tlsVersion || '',
+    },
+    headers,
+    note: 'Datos aproximados inferidos por Cloudflare desde la IP. No se expone la IP cruda en este endpoint.',
+  }, 200, {
+    'Cache-Control': 'no-store, max-age=0',
+  });
+}
+
 // ── GET /api/settings/public ─────────────────────────────
 // Returns non-sensitive settings (VIP prices, blur, etc.)
 async function handleGetPublicSettings(request, env) {
@@ -6641,6 +6687,7 @@ async function handleRequest(request, env, ctx) {
 
   // ── Settings
   if (path === '/api/detect-country' && method === 'GET') return handleDetectCountry(request);
+  if (path === '/api/debug/cf-location' && method === 'GET') return handleDebugCfLocation(request);
   if (path === '/api/settings/public' && method === 'GET') return handleGetPublicSettings(request, env);
   if (path === '/api/settings' && method === 'GET') return handleGetSettings(request, env);
   if (path === '/api/settings' && method === 'PUT') return handleUpdateSettings(request, env);
