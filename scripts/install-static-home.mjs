@@ -84,6 +84,26 @@ function collectAppAssetHrefs(html) {
   return hrefs.sort((a, b) => Number(a.endsWith('.js')) - Number(b.endsWith('.js')));
 }
 
+function buildRedirects() {
+  const appFallbackPrefixes = new Set(
+    [...appRoutes]
+      .map((route) => String(route || '').split('/')[0])
+      .filter(Boolean)
+      .map((prefix) => `/${prefix}/*`)
+  );
+  appFallbackPrefixes.add('/mensajes/*');
+  appFallbackPrefixes.add('/perfiles/*');
+  appFallbackPrefixes.add('/perfil/*');
+  appFallbackPrefixes.add('/historia/*');
+
+  return `${[
+    '/ /index.html 200',
+    ...[...appFallbackPrefixes]
+      .sort((a, b) => a.localeCompare(b))
+      .map((prefix) => `${prefix} /app/index.html 200`),
+  ].join('\n')}\n`;
+}
+
 const appHtml = await readFile(indexPath, 'utf8');
 await mkdir(appDir, { recursive: true });
 await rename(indexPath, appPath);
@@ -373,13 +393,5 @@ const staticHomeHtml = `<!doctype html>
 
 await writeFile(indexPath, staticHomeHtml, 'utf8');
 await writeFile(headersPath, buildHeaders(), 'utf8');
-await writeFile(
-  redirectsPath,
-  `/ /index.html 200
-/mensajes/* /app/index.html 200
-/perfiles/* /app/index.html 200
-/* /app/index.html 200
-`,
-  'utf8',
-);
+await writeFile(redirectsPath, buildRedirects(), 'utf8');
 console.log(`Installed static home and ${appRoutes.size} static SPA route entries`);
