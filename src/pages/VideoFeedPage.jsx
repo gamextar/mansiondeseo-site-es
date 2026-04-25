@@ -30,8 +30,36 @@ const VIEWED_STORY_SYNC_DELAY_MS = 320;
 const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
+const VIDEO_FEED_VIEW_COUNT_KEY_PREFIX = 'mansion_video_story_views:';
 const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 68;
 const VIDEO_FEED_RAIL_SOURCE = 'rail';
+
+function getVideoStoryViewsKey(userId) {
+  const normalizedUserId = String(userId || 'anon').trim() || 'anon';
+  return `${VIDEO_FEED_VIEW_COUNT_KEY_PREFIX}${normalizedUserId}`;
+}
+
+function readVideoStoryViewIds(userId) {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(getVideoStoryViewsKey(userId)) || '[]');
+    return Array.isArray(parsed)
+      ? parsed.map((value) => String(value || '').trim()).filter(Boolean)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeVideoStoryViewIds(userId, values) {
+  if (typeof localStorage === 'undefined') return;
+  const normalized = Array.from(new Set(
+    (Array.isArray(values) ? values : [])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+  ));
+  localStorage.setItem(getVideoStoryViewsKey(userId), JSON.stringify(normalized));
+}
 
 function getStoryIdentity(story) {
   if (!story) return null;
@@ -981,6 +1009,7 @@ export default function VideoFeedPage() {
   const [isMuted, setIsMuted] = useState(savedMuted);
   const [storyViewLimit, setStoryViewLimit] = useState(null);
   const [storyLimitBlock, setStoryLimitBlock] = useState(null);
+  const [watchedStoryCount, setWatchedStoryCount] = useState(() => readVideoStoryViewIds(user?.id).length);
   const [isDesktopViewport, setIsDesktopViewport] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(min-width: 1024px)').matches;
@@ -995,6 +1024,29 @@ export default function VideoFeedPage() {
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
+  useEffect(() => {
+    setWatchedStoryCount(readVideoStoryViewIds(user?.id).length);
+  }, [user?.id]);
+  const markVideoStoryWatched = useCallback((storyKey) => {
+    const key = String(storyKey || '').trim();
+    if (!key) return;
+    try {
+      const current = readVideoStoryViewIds(user?.id);
+      if (current.includes(key)) {
+        setWatchedStoryCount(current.length);
+        return;
+      }
+      const next = [...current, key];
+      writeVideoStoryViewIds(user?.id, next);
+      setWatchedStoryCount(next.length);
+    } catch {}
+  }, [user?.id]);
+  const resetWatchedStoryCount = useCallback(() => {
+    try {
+      writeVideoStoryViewIds(user?.id, []);
+      setWatchedStoryCount(0);
+    } catch {}
+  }, [user?.id]);
   const flushPendingViewedStories = useCallback(() => {
     try {
       if (!user?.id) return;
@@ -1274,7 +1326,9 @@ export default function VideoFeedPage() {
 
     const storyId = String(activeStory.story_id || activeStory.id || '').trim();
     const storyUserId = activeStory.user_id;
+    const storyCountKey = storyId || `${storyUserId}:${String(activeStory.video_url || '').trim()}`;
     const markAllowedStoryViewed = () => {
+      markVideoStoryWatched(storyCountKey);
       if (isOverlayPreview) {
         queueStoryViewed(storyUserId);
         return;
@@ -1341,7 +1395,7 @@ export default function VideoFeedPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeStory?.id, activeStory?.story_id, activeStory?.user_id, isOverlayPreview, markStoryViewed, navigate, queueStoryViewed, user?.premium]);
+  }, [activeStory?.id, activeStory?.story_id, activeStory?.user_id, activeStory?.video_url, isOverlayPreview, markStoryViewed, markVideoStoryWatched, navigate, queueStoryViewed, user?.premium]);
 
   useEffect(() => {
     return subscribe((event) => {
@@ -1784,6 +1838,22 @@ export default function VideoFeedPage() {
             </button>
           </div>
         )}
+
+        <div
+          className="fixed left-1/2 top-4 z-[85] w-[min(92vw,360px)] -translate-x-1/2 rounded-2xl border border-mansion-gold/35 bg-black/70 px-5 py-4 text-center text-white shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-md lg:top-6"
+          style={{ top: 'max(env(safe-area-inset-top, 16px), 16px)' }}
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mansion-gold/90">Stories vistas</p>
+          <div className="mt-1 font-display text-5xl font-bold leading-none text-white">{watchedStoryCount}</div>
+          <button
+            type="button"
+            onClick={resetWatchedStoryCount}
+            className="mt-3 inline-flex h-9 items-center justify-center rounded-full border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white transition-colors hover:bg-white/18 active:bg-white/25"
+          >
+            Reset
+          </button>
+        </div>
+
         {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">
