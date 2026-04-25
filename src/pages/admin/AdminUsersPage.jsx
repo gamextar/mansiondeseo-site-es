@@ -525,14 +525,21 @@ export default function AdminUsersPage() {
 
           {[
             { id: 'under_review', label: '⚠️ En revisión' },
+            { id: 'reported', label: '❗ Denunciados' },
             { id: 'suspended', label: '🚫 Suspendidos' },
           ].map((option) => (
             <button
               key={option.id}
               type="button"
-              onClick={() => setStatusFilter((current) => (current === option.id ? 'all' : option.id))}
+              onClick={() => {
+                if (option.id === 'reported') {
+                  setReportedFilter((current) => (current === '1' ? 'all' : '1'));
+                  return;
+                }
+                setStatusFilter((current) => (current === option.id ? 'all' : option.id));
+              }}
               className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
-                statusFilter === option.id
+                (option.id === 'reported' ? reportedFilter === '1' : statusFilter === option.id)
                   ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
                   : 'bg-mansion-card border-mansion-border/20 text-text-dim hover:text-text-primary'
               }`}
@@ -554,24 +561,6 @@ export default function AdminUsersPage() {
               className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
                 createdFilter === option.id
                   ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
-                  : 'bg-mansion-card border-mansion-border/20 text-text-dim hover:text-text-primary'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-
-          {[
-            { id: '1', label: 'Solo denunciados' },
-            { id: '0', label: 'Sin denuncias' },
-          ].map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => setReportedFilter((current) => (current === option.id ? 'all' : option.id))}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
-                reportedFilter === option.id
-                  ? 'bg-red-500/10 border-red-500/30 text-red-300'
                   : 'bg-mansion-card border-mansion-border/20 text-text-dim hover:text-text-primary'
               }`}
             >
