@@ -160,7 +160,7 @@ const staticHomeHtml = `<!doctype html>
   </script>
   <style>
     :root{--bg:#08080e;--panel:#11111a;--panel2:#17151f;--text:#f6efe6;--muted:rgba(246,239,230,.70);--dim:rgba(246,239,230,.50);--gold:#c9a84c;--gold2:#f0d98b;--crimson:#9b2b40;--wine:#4a1324;--line:rgba(255,255,255,.10)}
-    *{box-sizing:border-box}html{background:var(--bg)}body{margin:0;min-height:100vh;background:radial-gradient(circle at 78% 4%,rgba(201,168,76,.18),transparent 25rem),radial-gradient(circle at 9% 18%,rgba(155,43,64,.27),transparent 24rem),linear-gradient(180deg,#0d0b12 0%,#08080e 68%,#050508 100%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit;text-decoration:none}button,input{font:inherit}.wrap{width:min(1180px,calc(100% - 32px));margin:0 auto;padding:22px 0 54px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0 22px}.brand{display:flex;align-items:center;gap:12px}.mark{width:44px;height:44px;border-radius:17px;background:linear-gradient(135deg,var(--crimson),#54172a);display:grid;place-items:center;font-family:Georgia,serif;font-weight:800;box-shadow:0 18px 44px rgba(155,43,64,.24)}.brand-text{font-family:Georgia,"Times New Roman",serif;font-size:23px;color:var(--gold2)}.top-actions{display:flex;align-items:center;gap:10px}.link{font-size:14px;color:var(--muted);background:none;border:0;cursor:pointer;padding:0}.pill-btn{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:12px 18px;font-weight:800;font-size:14px;border:0;cursor:pointer}.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#14100a;box-shadow:0 18px 36px rgba(201,168,76,.18)}.ghost{border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text)}.hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(330px,.85fr);gap:22px;align-items:stretch}.panel{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.026));border-radius:34px;box-shadow:0 30px 90px rgba(0,0,0,.36);overflow:hidden}.copy{padding:44px}.badge{display:inline-flex;border:1px solid rgba(201,168,76,.28);background:rgba(201,168,76,.10);color:rgba(240,217,139,.95);border-radius:999px;padding:9px 13px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}.title{font-family:Georgia,"Times New Roman",serif;font-weight:500;letter-spacing:-.05em;font-size:clamp(46px,7vw,88px);line-height:.94;margin:24px 0 0}.lead{max-width:720px;margin:22px 0 0;color:var(--muted);font-size:18px;line-height:1.75}.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}.hero-notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:28px}.note{border:1px solid var(--line);background:rgba(0,0,0,.16);border-radius:18px;padding:14px}.note strong{display:block;color:var(--gold2);font-size:18px}.note span{display:block;margin-top:4px;color:var(--dim);font-size:12px;line-height:1.35}.access{padding:24px;background:linear-gradient(145deg,rgba(74,19,36,.48),rgba(8,8,14,.86) 62%)}.access-card{height:100%;border:1px solid var(--line);border-radius:26px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,.24));padding:22px;display:flex;flex-direction:column;justify-content:space-between;min-height:520px;position:relative;overflow:hidden}.access-card:before{content:"";position:absolute;inset:-35% -20% auto auto;width:280px;height:280px;border-radius:999px;background:radial-gradient(circle,rgba(201,168,76,.20),transparent 62%)}.access-card:after{content:"";position:absolute;left:22px;right:22px;bottom:98px;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.32),transparent)}.access h2{position:relative;font-family:Georgia,"Times New Roman",serif;font-size:34px;line-height:1.05;margin:0}.access p{position:relative;color:var(--muted);line-height:1.7}.access-view{position:relative;height:100%;display:flex;flex-direction:column;justify-content:space-between}.access-view[hidden]{display:none}.fields{display:grid;gap:10px;margin:18px 0}.home-input{width:100%;border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:16px;padding:13px 14px;color:var(--text);font-size:14px;outline:none}.home-input::placeholder{color:var(--dim)}.home-input:focus{border-color:rgba(201,168,76,.42);box-shadow:0 0 0 4px rgba(201,168,76,.08)}.portal-stack{display:grid;gap:10px;margin:24px 0}.portal-row{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;border:1px solid rgba(255,255,255,.09);background:rgba(0,0,0,.20);border-radius:18px;padding:14px}.portal-row span{display:grid;place-items:center;width:32px;height:32px;border-radius:12px;background:rgba(201,168,76,.12);color:var(--gold2);font-size:12px;font-weight:900}.portal-row strong{display:block;color:var(--text);font-size:14px}.portal-row small{display:block;margin-top:3px;color:var(--dim);font-size:12px;line-height:1.4}.seal{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(201,168,76,.22);background:rgba(201,168,76,.08);border-radius:999px;padding:9px 12px;color:rgba(240,217,139,.92);font-size:12px}.fine{font-size:12px;color:var(--dim);line-height:1.55}.login-error{min-height:18px;margin:10px 0 0;color:#ff8ea0;font-size:12px;text-align:center}.login-tools{display:flex;justify-content:space-between;gap:10px;margin-top:10px}.login-tools a,.login-tools button{font-size:12px;color:var(--muted);background:none;border:0;padding:0;cursor:pointer}.strip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:18px}.mini{padding:24px}.eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgba(201,168,76,.86)}.stat{font-family:Georgia,"Times New Roman",serif;font-size:48px;line-height:1;margin-top:12px}.muted{color:var(--muted);line-height:1.65}.tags{display:flex;flex-wrap:wrap;gap:9px;margin-top:15px}.tag{border:1px solid var(--line);background:rgba(0,0,0,.18);border-radius:999px;padding:8px 12px;font-size:12px;color:rgba(255,255,255,.78)}.trust{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}.trust .mini{padding:20px}.trust h3{font-size:14px;margin:0 0 8px}.trust p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}.footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-top:24px;color:var(--dim);font-size:12px}.footer a{color:var(--muted)}@media(max-width:900px){.wrap{width:min(100% - 24px,700px);padding-top:14px}.hero,.strip,.trust{grid-template-columns:1fr}.copy{padding:28px}.access-card{min-height:auto}.hero-notes{grid-template-columns:1fr}.top{align-items:flex-start}.brand-text{font-size:20px}.top-actions{gap:8px}.top-actions .link{display:none}.pill-btn{padding:11px 15px}.title{font-size:clamp(42px,13vw,68px)}}
+    *{box-sizing:border-box}html{background:var(--bg)}body{margin:0;min-height:100vh;background:radial-gradient(circle at 78% 4%,rgba(201,168,76,.18),transparent 25rem),radial-gradient(circle at 9% 18%,rgba(155,43,64,.27),transparent 24rem),linear-gradient(180deg,#0d0b12 0%,#08080e 68%,#050508 100%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit;text-decoration:none}button,input{font:inherit}.wrap{width:min(1180px,calc(100% - 32px));margin:0 auto;padding:22px 0 54px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0 22px}.brand{display:flex;align-items:center;gap:12px}.mark{width:44px;height:44px;border-radius:17px;background:linear-gradient(135deg,var(--crimson),#54172a);display:grid;place-items:center;font-family:Georgia,serif;font-weight:800;box-shadow:0 18px 44px rgba(155,43,64,.24)}.brand-text{font-family:Georgia,"Times New Roman",serif;font-size:23px;color:var(--gold2)}.top-actions{display:flex;align-items:center;gap:10px}.link{font-size:14px;color:var(--muted);background:none;border:0;cursor:pointer;padding:0}.pill-btn{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:12px 18px;font-weight:800;font-size:14px;border:0;cursor:pointer}.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#14100a;box-shadow:0 18px 36px rgba(201,168,76,.18)}.ghost{border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text)}.hero{display:block}.panel{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.026));border-radius:34px;box-shadow:0 30px 90px rgba(0,0,0,.36);overflow:hidden}.copy{padding:52px;max-width:980px}.badge{display:inline-flex;border:1px solid rgba(201,168,76,.28);background:rgba(201,168,76,.10);color:rgba(240,217,139,.95);border-radius:999px;padding:9px 13px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}.title{font-family:Georgia,"Times New Roman",serif;font-weight:500;letter-spacing:-.05em;font-size:clamp(48px,8vw,96px);line-height:.94;margin:24px 0 0}.lead{max-width:780px;margin:22px 0 0;color:var(--muted);font-size:18px;line-height:1.75}.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}.hero-notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:28px;max-width:820px}.note{border:1px solid var(--line);background:rgba(0,0,0,.16);border-radius:18px;padding:14px}.note strong{display:block;color:var(--gold2);font-size:18px}.note span{display:block;margin-top:4px;color:var(--dim);font-size:12px;line-height:1.35}.home-login{max-width:520px;margin:18px 0 0;padding:24px}.home-login[hidden]{display:none}.home-login h2{font-family:Georgia,"Times New Roman",serif;font-size:30px;line-height:1.05;margin:0}.home-login p{color:var(--muted);line-height:1.6}.fields{display:grid;gap:10px;margin:18px 0}.home-input{width:100%;border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:16px;padding:13px 14px;color:var(--text);font-size:14px;outline:none}.home-input::placeholder{color:var(--dim)}.home-input:focus{border-color:rgba(201,168,76,.42);box-shadow:0 0 0 4px rgba(201,168,76,.08)}.login-error{min-height:18px;margin:10px 0 0;color:#ff8ea0;font-size:12px;text-align:center}.login-tools{display:flex;justify-content:space-between;gap:10px;margin-top:10px}.login-tools a{font-size:12px;color:var(--muted)}.strip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:18px}.mini{padding:24px}.eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgba(201,168,76,.86)}.stat{font-family:Georgia,"Times New Roman",serif;font-size:48px;line-height:1;margin-top:12px}.muted{color:var(--muted);line-height:1.65}.tags{display:flex;flex-wrap:wrap;gap:9px;margin-top:15px}.tag{border:1px solid var(--line);background:rgba(0,0,0,.18);border-radius:999px;padding:8px 12px;font-size:12px;color:rgba(255,255,255,.78)}.trust{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}.trust .mini{padding:20px}.trust h3{font-size:14px;margin:0 0 8px}.trust p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}.footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-top:24px;color:var(--dim);font-size:12px}.footer a{color:var(--muted)}@media(max-width:900px){.wrap{width:min(100% - 24px,700px);padding-top:14px}.strip,.trust{grid-template-columns:1fr}.copy{padding:28px}.hero-notes{grid-template-columns:1fr}.top{align-items:flex-start}.brand-text{font-size:20px}.top-actions{gap:8px}.top-actions .link{display:none}.pill-btn{padding:11px 15px}.title{font-size:clamp(42px,13vw,68px)}}
   </style>
 </head>
 <body>
@@ -171,8 +171,8 @@ const staticHomeHtml = `<!doctype html>
         <span class="brand-text">Mansión Deseo</span>
       </a>
       <div class="top-actions">
-        <button class="link" type="button" data-show-login>Ya tengo cuenta</button>
-        <a class="pill-btn gold" href="/registro/">Empezar ahora</a>
+        <button class="link" type="button" data-show-login>Iniciar sesión</button>
+        <a class="pill-btn gold" href="/registro/">Crear cuenta</a>
       </div>
     </nav>
 
@@ -182,8 +182,8 @@ const staticHomeHtml = `<!doctype html>
         <h1 class="title">Conocé adultos con la misma curiosidad.</h1>
         <p class="lead">Mansión Deseo es una comunidad privada para adultos en Argentina: parejas liberales, swingers, tríos y contactos discretos dentro de una experiencia más cuidada, moderna y reservada.</p>
         <div class="cta">
-          <a class="pill-btn gold" href="/registro/">Empezar ahora</a>
-          <button class="pill-btn ghost" type="button" data-show-login>Ya tengo cuenta</button>
+          <a class="pill-btn gold" href="/registro/">Crear cuenta</a>
+          <button class="pill-btn ghost" type="button" data-show-login>Iniciar sesión</button>
         </div>
         <div class="hero-notes" aria-label="Datos de la comunidad">
           <div class="note"><strong>Privado</strong><span>Tu actividad no se vincula con redes sociales.</span></div>
@@ -191,44 +191,22 @@ const staticHomeHtml = `<!doctype html>
           <div class="note"><strong>+18</strong><span>Acceso reservado para adultos registrados.</span></div>
         </div>
       </div>
-      <div class="panel access" aria-label="Acceso a Mansión Deseo">
-        <div class="access-card">
-          <div class="access-view" id="signupPreview">
-            <div>
-              <h2>Tu entrada privada, sin ruido público.</h2>
-              <p>Creá un perfil reservado, elegí cómo aparecer y descubrí personas con intereses afines dentro de un entorno cuidado.</p>
-              <div class="portal-stack" aria-label="Ventajas de Mansión Deseo">
-                <div class="portal-row"><span>01</span><div><strong>Perfil reservado</strong><small>Tu presencia vive dentro de la comunidad, no en redes abiertas.</small></div></div>
-                <div class="portal-row"><span>02</span><div><strong>Preferencias claras</strong><small>Buscá por roles, zona e intereses sin perder discreción.</small></div></div>
-                <div class="portal-row"><span>03</span><div><strong>Control y moderación</strong><small>Bloqueos, denuncias y revisión para mantener la experiencia limpia.</small></div></div>
-              </div>
-              <div class="seal">+18 · Privacidad · Argentina</div>
-            </div>
-            <div>
-              <a class="pill-btn gold" style="width:100%" href="/registro/">Crear mi cuenta</a>
-              <p class="fine">Entorno discreto con herramientas para bloquear o denunciar perfiles cuando haga falta.</p>
-            </div>
+      <form class="panel home-login" id="homeLogin" hidden>
+        <div>
+          <h2>Accedé a tu espacio privado.</h2>
+          <p>Ingresá con tu email y contraseña para volver directo al feed.</p>
+          <div class="fields">
+            <input class="home-input" id="homeLoginEmail" type="email" name="email" placeholder="tu@email.com" autocomplete="email" required />
+            <input class="home-input" id="homeLoginPassword" type="password" name="password" placeholder="Contraseña" autocomplete="current-password" required />
           </div>
-          <form class="access-view" id="homeLogin" hidden>
-            <div>
-              <h2>Accedé a tu espacio privado.</h2>
-              <p>Ingresá con tu email y contraseña para volver directo al feed.</p>
-              <div class="fields">
-                <input class="home-input" id="homeLoginEmail" type="email" name="email" placeholder="tu@email.com" autocomplete="email" required />
-                <input class="home-input" id="homeLoginPassword" type="password" name="password" placeholder="Contraseña" autocomplete="current-password" required />
-              </div>
-              <p class="login-error" id="homeLoginError" role="alert" aria-live="polite"></p>
-            </div>
-            <div>
-              <button class="pill-btn gold" id="homeLoginSubmit" style="width:100%" type="submit">Entrar</button>
-              <div class="login-tools">
-                <button type="button" data-show-signup>Crear cuenta</button>
-                <a href="/recuperar-contrasena/">Olvidé mi contraseña</a>
-              </div>
-            </div>
-          </form>
+          <p class="login-error" id="homeLoginError" role="alert" aria-live="polite"></p>
         </div>
-      </div>
+        <button class="pill-btn gold" id="homeLoginSubmit" style="width:100%" type="submit">Entrar</button>
+        <div class="login-tools">
+          <a href="/registro/">Crear cuenta</a>
+          <a href="/recuperar-contrasena/">Olvidé mi contraseña</a>
+        </div>
+      </form>
     </section>
 
     <section class="strip">
@@ -259,36 +237,26 @@ const staticHomeHtml = `<!doctype html>
 
     <footer class="footer">
       <span>© 2026 Mansión Deseo · Sitio para mayores de 18 años.</span>
-      <span><button class="link" type="button" data-show-login>Ingresar</button> · <a href="/registro/">Registrarme</a></span>
+      <span><button class="link" type="button" data-show-login>Iniciar sesión</button> · <a href="/registro/">Crear cuenta</a></span>
     </footer>
   </main>
   <script>
     (function(){
       var loginForm = document.getElementById('homeLogin');
-      var signupPreview = document.getElementById('signupPreview');
       var loginEmail = document.getElementById('homeLoginEmail');
       var loginPassword = document.getElementById('homeLoginPassword');
       var loginError = document.getElementById('homeLoginError');
       var loginSubmit = document.getElementById('homeLoginSubmit');
       function showLogin() {
-        if (!loginForm || !signupPreview) return;
-        signupPreview.hidden = true;
+        if (!loginForm) return;
         loginForm.hidden = false;
         loginError.textContent = '';
+        loginForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         setTimeout(function(){ loginEmail && loginEmail.focus(); }, 40);
-      }
-      function showSignup() {
-        if (!loginForm || !signupPreview) return;
-        loginForm.hidden = true;
-        signupPreview.hidden = false;
       }
       var showLoginButtons = document.querySelectorAll('[data-show-login]');
       for (var b = 0; b < showLoginButtons.length; b += 1) {
         showLoginButtons[b].addEventListener('click', showLogin);
-      }
-      var showSignupButtons = document.querySelectorAll('[data-show-signup]');
-      for (var s = 0; s < showSignupButtons.length; s += 1) {
-        showSignupButtons[s].addEventListener('click', showSignup);
       }
       if (loginForm) {
         loginForm.addEventListener('submit', function(event) {
