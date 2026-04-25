@@ -549,15 +549,13 @@ export default function AdminUsersPage() {
           ))}
 
           {[
-            { id: 'all', label: 'Cualquier fecha' },
             { id: '1d', label: 'Nuevos 24h' },
             { id: '7d', label: 'Nuevos 7d' },
-            { id: '30d', label: 'Nuevos 30d' },
           ].map((option) => (
             <button
               key={option.id}
               type="button"
-              onClick={() => setCreatedFilter(option.id)}
+              onClick={() => setCreatedFilter((current) => (current === option.id ? 'all' : option.id))}
               className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
                 createdFilter === option.id
                   ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
