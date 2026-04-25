@@ -489,7 +489,7 @@ async function apiFetch(path, options = {}) {
   // Handle 401 — token expired
   if (res.status === 401 && token) {
     clearAuth();
-    window.location.href = '/login';
+    window.location.href = '/';
     throw new Error('Sesión expirada');
   }
 
@@ -595,7 +595,7 @@ async function apiUpload(path, options = {}) {
 
       if (xhr.status === 401 && token) {
         clearAuth();
-        window.location.href = '/login';
+        window.location.href = '/';
         reject(new Error('Sesión expirada'));
         return;
       }

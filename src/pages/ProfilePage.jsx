@@ -292,7 +292,7 @@ export default function ProfilePage() {
     await apiLogout();
     setUser(null);
     setRegistered(false);
-    navigate('/login', { replace: true });
+    window.location.href = '/';
   };
 
   const handleAvatarSelect = (e) => {
