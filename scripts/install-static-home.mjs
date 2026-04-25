@@ -7,6 +7,7 @@ const DIST_DIR = path.resolve('dist');
 const indexPath = path.join(DIST_DIR, 'index.html');
 const appDir = path.join(DIST_DIR, 'app');
 const appPath = path.join(appDir, 'index.html');
+const notFoundPath = path.join(DIST_DIR, '404.html');
 const headersPath = path.join(DIST_DIR, '_headers');
 const redirectsPath = path.join(DIST_DIR, '_redirects');
 const sitemapPath = path.join(DIST_DIR, 'sitemap.xml');
@@ -102,6 +103,32 @@ function buildRedirects() {
       .sort((a, b) => a.localeCompare(b))
       .map((prefix) => `${prefix} /app/index.html 200`),
   ].join('\n')}\n`;
+}
+
+function buildNotFoundHtml() {
+  return `<!doctype html>
+<html lang="es" style="background:#08080e;color-scheme:dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>404 | Mansión Deseo</title>
+  <style>
+    html,body{margin:0;min-height:100%;background:#08080e;color:#f0ede8;font-family:Inter,system-ui,sans-serif}
+    main{min-height:100vh;display:grid;place-items:center;padding:24px;text-align:center}
+    h1{font-size:28px;margin:0 0 8px}
+    p{margin:0;color:#888899}
+  </style>
+</head>
+<body>
+  <main>
+    <div>
+      <h1>Contenido no encontrado</h1>
+      <p>El recurso solicitado ya no está disponible.</p>
+    </div>
+  </main>
+</body>
+</html>`;
 }
 
 const appHtml = await readFile(indexPath, 'utf8');
@@ -392,6 +419,7 @@ const staticHomeHtml = `<!doctype html>
 </html>`;
 
 await writeFile(indexPath, staticHomeHtml, 'utf8');
+await writeFile(notFoundPath, buildNotFoundHtml(), 'utf8');
 await writeFile(headersPath, buildHeaders(), 'utf8');
 await writeFile(redirectsPath, buildRedirects(), 'utf8');
 console.log(`Installed static home and ${appRoutes.size} static SPA route entries`);
