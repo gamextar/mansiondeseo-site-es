@@ -204,6 +204,7 @@ export default function FeedPage({ initialData }) {
   const mobileNavVisibilityTimerRef = useRef(null);
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
   const homeStoriesLoadIdRef = useRef(0);
+  const homeStoriesInitialLoadRef = useRef(false);
   const prefetchedBlocksRef = useRef(new Map());
   const prefetchInFlightRef = useRef(new Map());
   const storiesScrollRef = useRef(null);
@@ -398,6 +399,7 @@ export default function FeedPage({ initialData }) {
     const canReuseCached = !!cachedFeed && cachedPageSize === expectedPageSize;
     const shouldReloadDirtyFeed = sessionStorage.getItem('mansion_feed_dirty') === '1';
     const shouldForceFresh = sessionStorage.getItem('mansion_feed_force_refresh') === '1';
+    const shouldLoadStories = shouldReloadDirtyFeed || (!homeStoriesInitialLoadRef.current && homeStories.length === 0);
 
     if (shouldReloadDirtyFeed) {
       try {
@@ -407,6 +409,10 @@ export default function FeedPage({ initialData }) {
       } catch {}
       setHomeStories([]);
       setBootstrapStories([]);
+    }
+
+    if (shouldLoadStories) {
+      homeStoriesInitialLoadRef.current = true;
       void loadHomeStories({ syncBootstrap: true });
     }
 
@@ -418,24 +424,27 @@ export default function FeedPage({ initialData }) {
     // Cache is valid — show it instantly, then run a cheap version check so
     // admin deletes can invalidate stale local feeds across clients.
     setLoading(false);
+    const cacheCursor = Math.floor(cachedPageCursor / expectedPageSize) * expectedPageSize;
+    const cacheAgeMs = Date.now() - (Number(cachedFeed.timestamp) || 0);
     void refreshIfFeedVersionChanged({
       cachedFeed,
-      cursor: Math.floor(cachedPageCursor / expectedPageSize) * expectedPageSize,
+      cursor: cacheCursor,
       pageSize: expectedPageSize,
       targetPageCursor: cachedPageCursor,
+    }).then((didRefresh) => {
+      if (didRefresh) return;
+      if (cacheAgeMs > 30 * 60 * 1000) {
+        loadProfiles({
+          cursor: cacheCursor,
+          pageSize: expectedPageSize,
+          targetPageCursor: cachedPageCursor,
+        });
+      }
     });
     try {
       sessionStorage.removeItem('mansion_feed_dirty');
       sessionStorage.removeItem('mansion_feed_force_refresh');
     } catch {}
-    const cacheAgeMs = Date.now() - (Number(cachedFeed.timestamp) || 0);
-    if (cacheAgeMs > 30 * 60 * 1000) {
-      loadProfiles({
-        cursor: Math.floor(cachedPageCursor / expectedPageSize) * expectedPageSize,
-        pageSize: expectedPageSize,
-        targetPageCursor: cachedPageCursor,
-      });
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDesktopViewport, loadHomeStories, loadProfiles, navigate]);
 
@@ -942,10 +951,7 @@ export default function FeedPage({ initialData }) {
 
   useEffect(() => {
     if (!getToken()) return;
-    if (bootstrapStoryProfiles.length === 0) {
-      setHomeStories([]);
-      return;
-    }
+    if (bootstrapStoryProfiles.length === 0) return;
     setHomeStories((current) => {
       const currentIds = current.map((story) => String(story.story_id || story.id || '')).join(',');
       const nextIds = bootstrapStoryProfiles.map((story) => String(story.story_id || story.id || '')).join(',');
