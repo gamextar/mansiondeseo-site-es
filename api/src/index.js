@@ -1938,8 +1938,10 @@ async function handleRegister(request, env, ctx) {
   const body = await request.json();
   const { email, password, username, role, seeking, interests, age, birthdate, city, province, locality, bio, marital_status, sexual_orientation, message_block_roles } = body;
   await ensureUsersMessageBlockRolesColumn(env);
-  const provinceValue = String(province ?? city ?? '').trim();
-  const localityValue = String(locality || '').trim();
+  const cfCity = String(request.cf?.city || '').trim();
+  const cfRegion = String(request.cf?.region || '').trim();
+  const provinceValue = String(province || city || cfRegion || '').trim();
+  const localityValue = String(locality || cfCity || '').trim();
   const maritalStatusValue = String(marital_status || '').trim();
   const sexualOrientationValue = String(sexual_orientation || '').trim();
   const messageBlockRolesValue = normalizeRoleArray(message_block_roles, SEEKING_ROLE_IDS, []);
@@ -4266,6 +4268,17 @@ async function handleDebugCfLocation(request) {
     },
     headers,
     note: 'Datos aproximados inferidos por Cloudflare desde la IP. No se expone la IP cruda en este endpoint.',
+  }, 200, {
+    'Cache-Control': 'no-store, max-age=0',
+  });
+}
+
+// ── GET /api/geo/defaults ────────────────────────────────
+async function handleGeoDefaults(request) {
+  const cf = request.cf || {};
+  return json({
+    city: String(cf.city || '').trim(),
+    region: String(cf.region || '').trim(),
   }, 200, {
     'Cache-Control': 'no-store, max-age=0',
   });
@@ -6741,6 +6754,7 @@ async function handleRequest(request, env, ctx) {
 
   // ── Settings
   if (path === '/api/detect-country' && method === 'GET') return handleDetectCountry(request);
+  if (path === '/api/geo/defaults' && method === 'GET') return handleGeoDefaults(request);
   if (path === '/api/debug/cf-location' && method === 'GET') return handleDebugCfLocation(request);
   if (path === '/api/settings/public' && method === 'GET') return handleGetPublicSettings(request, env);
   if (path === '/api/settings' && method === 'GET') return handleGetSettings(request, env);

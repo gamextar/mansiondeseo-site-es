@@ -1051,6 +1051,10 @@ export async function getCloudflareLocationDebug() {
   return apiFetch('/debug/cf-location');
 }
 
+export async function getGeoDefaults() {
+  return apiFetch('/geo/defaults');
+}
+
 export async function updateSettings(fields) {
   return apiFetch('/settings', {
     method: 'PUT',

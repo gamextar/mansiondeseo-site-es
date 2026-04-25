@@ -20,7 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername } from '../lib/api';
+import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getGeoDefaults, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername } from '../lib/api';
 import { calculateAgeFromBirthdate, getLatestAdultBirthdate, isAdultBirthdate } from '../lib/birthdate';
 import { formatLocation } from '../lib/location';
 import ImageCropper from '../components/ImageCropper';
@@ -1275,20 +1275,7 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
             )}
           </div>
         </div>
-        <div>
-          <label className="text-text-muted text-xs font-medium mb-1.5 block">Localidad / Zona</label>
-          <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" />
-            <input
-              type="text"
-              value={data.locality}
-              onChange={(e) => onChange({ ...data, locality: e.target.value.slice(0, 40) })}
-              placeholder="Palermo, San Isidro, Zona Norte..."
-              maxLength={40}
-              className="w-full pl-10"
-            />
-          </div>
-        </div>
+        <input type="hidden" value={data.locality} readOnly />
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">Bio corta</label>
           <textarea
@@ -1690,13 +1677,23 @@ export default function RegisterPage() {
   useEffect(() => {
     Promise.all([
       apiDetectCountry().catch(() => ({ country: '' })),
+      getGeoDefaults().catch(() => ({})),
       getPublicSettings().catch(() => ({ settings: {} })),
-    ]).then(([detectData, settingsData]) => {
+    ]).then(([detectData, geoData, settingsData]) => {
       const detected = String(detectData.country || '').trim().toUpperCase();
+      const cfCity = String(geoData?.city || '').trim().slice(0, 40);
+      const cfRegion = String(geoData?.region || '').trim().slice(0, 40);
       const allowed = (settingsData.settings?.allowedCountries || 'AR')
         .split(',')
         .map(c => c.trim().toUpperCase())
         .filter(Boolean);
+      if (cfRegion || cfCity) {
+        setInfo((current) => ({
+          ...current,
+          province: current.province || cfRegion,
+          locality: current.locality || cfCity,
+        }));
+      }
       setDetectedCountry(detected);
       setAllowedCountries(allowed);
       setHidePasswordDefault(settingsData.settings?.hidePasswordRegister !== false);
