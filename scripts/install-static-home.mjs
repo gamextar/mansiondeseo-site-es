@@ -189,9 +189,9 @@ const staticHomeHtml = `<!doctype html>
         <span class="mark">M</span>
         <span class="brand-text">Mansión Deseo</span>
       </a>
-      <form class="login-inline" id="homeLogin">
-        <input class="home-input" id="homeLoginEmail" type="email" name="email" placeholder="Email" autocomplete="email" inputmode="email" readonly data-defer-focus required />
-        <input class="home-input" id="homeLoginPassword" type="password" name="password" placeholder="Contraseña" autocomplete="current-password" readonly data-defer-focus required />
+      <form class="login-inline" id="homeLogin" autocomplete="off">
+        <input class="home-input" id="homeLoginEmail" type="email" name="email" placeholder="Email" autocomplete="off" inputmode="email" tabindex="-1" readonly data-defer-focus required />
+        <input class="home-input" id="homeLoginPassword" type="password" name="password" placeholder="Contraseña" autocomplete="off" tabindex="-1" readonly data-defer-focus required />
         <button class="login-btn" id="homeLoginSubmit" type="submit">Entrar</button>
         <p class="login-error" id="homeLoginError" role="alert" aria-live="polite"></p>
       </form>
@@ -244,19 +244,35 @@ const staticHomeHtml = `<!doctype html>
       var loginPassword = document.getElementById('homeLoginPassword');
       var loginError = document.getElementById('homeLoginError');
       var loginSubmit = document.getElementById('homeLoginSubmit');
+      function blurDeferredLogin() {
+        window.setTimeout(function() {
+          var active = document.activeElement;
+          if (active && active.matches && active.matches('[data-defer-focus]')) active.blur();
+        }, 0);
+        window.setTimeout(function() {
+          var active = document.activeElement;
+          if (active && active.matches && active.matches('[data-defer-focus]')) active.blur();
+        }, 120);
+      }
+      blurDeferredLogin();
       Array.prototype.forEach.call(document.querySelectorAll('[data-defer-focus]'), function(input) {
         input.addEventListener('pointerdown', function() {
           input.removeAttribute('readonly');
+          input.removeAttribute('tabindex');
         }, { once: true });
+        input.addEventListener('focus', function(event) {
+          if (input.hasAttribute('readonly')) {
+            event.preventDefault();
+            input.blur();
+          }
+        });
         input.addEventListener('keydown', function() {
           input.removeAttribute('readonly');
+          input.removeAttribute('tabindex');
         }, { once: true });
       });
-      window.addEventListener('pageshow', function() {
-        if (document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-defer-focus]')) {
-          document.activeElement.blur();
-        }
-      });
+      window.addEventListener('pageshow', blurDeferredLogin);
+      window.addEventListener('load', blurDeferredLogin);
       if (loginForm) {
         loginForm.addEventListener('submit', function(event) {
           event.preventDefault();
