@@ -597,11 +597,7 @@ export default function FeedPage({ initialData }) {
     () => mapStoriesToRailProfiles(bootstrapStories).slice(0, storyLimit),
     [bootstrapStories, storyLimit]
   );
-  const fallbackStoryProfiles = useMemo(
-    () => safeProfiles.filter((p) => p.has_active_story).slice(0, storyLimit),
-    [safeProfiles, storyLimit]
-  );
-  const storyProfiles = homeStories.length > 0 ? homeStories : fallbackStoryProfiles;
+  const storyProfiles = homeStories.length > 0 ? homeStories : bootstrapStoryProfiles;
   const storyCircleSize = Math.max(
     1,
     Math.round(coerceSettingNumber(

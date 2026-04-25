@@ -2485,7 +2485,6 @@ async function handleAppBootstrap(request, env) {
   if (authHeader?.startsWith('Bearer ')) {
     const auth = await authenticate(request, env);
     if (!auth) return error('No autorizado', 401);
-    await ensureStoriesTable(env);
 
     const settings = await settingsPromise;
     const storyLimit = Math.max(
@@ -2511,40 +2510,15 @@ async function handleAppBootstrap(request, env) {
       ).bind(auth.sub).first(),
     ]);
     if (!dbUser) return error('Usuario no encontrado', 404);
-    const viewerSeeking = normalizeRoleArray(safeParseJSON(dbUser?.seeking, []), SEEKING_ROLE_IDS, []);
-    const roleFilters = viewerSeeking.length > 0 && viewerSeeking.length < SEEKING_ROLE_IDS.length
-      ? viewerSeeking
-      : [];
-    const roleBuckets = getRoleBucketsForFilters(roleFilters);
-    const roleValues = [...new Set(roleFilters.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])))];
-    const viewerCanWatchAllStories = Boolean(dbUser && isPremiumActive(dbUser));
-    const storyBindings = [auth.sub, viewerCanWatchAllStories ? 1 : 0, auth.sub];
-    let storiesQuery = `
-      SELECT s.id, s.user_id, s.video_url, s.caption, COALESCE(s.vip_only, 0) AS vip_only,
-             CASE
-               WHEN COALESCE(s.vip_only, 0) = 1 AND s.user_id != ? AND ? = 0 THEN 1
-               ELSE 0
-             END AS restricted,
-             s.likes, s.comments, s.created_at,
-             u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
-             CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
-      FROM stories s
-      JOIN users u ON u.id = s.user_id
-      LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?
-      WHERE s.active = 1
-        AND u.status = 'verified'
-        AND COALESCE(u.account_status, 'active') = 'active'
-    `;
-    if (roleValues.length > 0) {
-      storiesQuery += ` AND u.role IN (${roleValues.map(() => '?').join(', ')})`;
-      storyBindings.push(...roleValues);
-    }
-    storiesQuery += `
-        AND s.user_id != ?
-      ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC, s.id DESC
-    `;
-    storyBindings.push(auth.sub);
-    const storyRows = await fetchRowsPerRoleBucket(env, storiesQuery, storyBindings, roleBuckets, storyLimit);
+    const storyPayload = await loadStoriesPayload(request, env, {
+      settings,
+      page: 1,
+      limit: storyLimit,
+      surface: 'rail',
+      viewerId: auth.sub,
+      viewer: dbUser,
+      includeVideoLimit: false,
+    });
     user = sanitizeUser(dbUser, env);
     user.has_active_story = !!activeStory;
     if (activeStory) {
@@ -2552,7 +2526,7 @@ async function handleAppBootstrap(request, env) {
       user.active_story_url = normalizeStoryVideoUrl(activeStory.video_url, env);
     }
     unread = Number(unreadRow?.unread || 0);
-    stories = interleaveStoryRows(storyRows, roleBuckets, storyLimit).map((r) => mapStoryRowForResponse(r, env));
+    stories = storyPayload.stories;
   }
 
   const settings = await settingsPromise;
@@ -6102,23 +6076,26 @@ async function getStoryViewLimitStatus(env, viewerId, viewerCanWatchAllStories, 
   };
 }
 
-// GET /api/stories
-async function handleGetStories(request, env) {
+async function loadStoriesPayload(request, env, options = {}) {
   await ensureStoriesTable(env);
-  const settings = await cached('settings', 300_000, () => loadSettings(env));
+  const settings = options.settings || await cached('settings', 300_000, () => loadSettings(env));
 
   const url = new URL(request.url);
-  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
-  const requestedLimit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
-  const focusUserId = String(url.searchParams.get('focus_user_id') || '').trim();
-  const surface = String(url.searchParams.get('surface') || 'video').trim().toLowerCase();
+  const page = Math.max(1, parseInt(String(options.page ?? url.searchParams.get('page') ?? '1'), 10));
+  const requestedLimit = Math.min(200, Math.max(1, parseInt(String(options.limit ?? url.searchParams.get('limit') ?? '20'), 10)));
+  const focusUserId = String(options.focusUserId ?? url.searchParams.get('focus_user_id') ?? '').trim();
+  const surface = String(options.surface ?? url.searchParams.get('surface') ?? 'video').trim().toLowerCase();
   const isRailSurface = surface === 'rail' || surface === 'home' || surface === 'feed';
 
   // Try to get current user for per-user liked status and server-side seeking filter
-  const auth = await authenticate(request, env).catch(() => null);
-  const viewerId = auth?.sub || null;
+  const auth = Object.prototype.hasOwnProperty.call(options, 'viewerId')
+    ? (options.viewerId ? { sub: options.viewerId } : null)
+    : await authenticate(request, env).catch(() => null);
+  const viewerId = options.viewerId || auth?.sub || null;
 
-  let viewer = viewerId ? getCachedViewer(viewerId) : null;
+  let viewer = Object.prototype.hasOwnProperty.call(options, 'viewer')
+    ? options.viewer
+    : viewerId ? getCachedViewer(viewerId) : null;
   if (viewerId && !viewer) {
     viewer = await env.DB.prepare(
       'SELECT premium, premium_until, country, seeking, interests FROM users WHERE id = ?'
@@ -6127,7 +6104,10 @@ async function handleGetStories(request, env) {
   }
 
   const viewerCanWatchAllStories = Boolean(viewer && isPremiumActive(viewer));
-  const storyViewLimit = await getStoryViewLimitStatus(env, viewerId, viewerCanWatchAllStories, settings);
+  const includeVideoLimit = options.includeVideoLimit !== false;
+  const storyViewLimit = includeVideoLimit
+    ? await getStoryViewLimitStatus(env, viewerId, viewerCanWatchAllStories, settings)
+    : null;
   const effectiveLimit = requestedLimit;
   const effectivePage = page;
   let offset = (effectivePage - 1) * effectiveLimit;
@@ -6199,9 +6179,18 @@ async function handleGetStories(request, env) {
     .slice(offset, offset + effectiveLimit)
     .map((row) => mapStoryRowForResponse(row, env));
 
-  return json({
+  return {
     stories,
     videoLimit: storyViewLimit,
+  };
+}
+
+// GET /api/stories
+async function handleGetStories(request, env) {
+  const payload = await loadStoriesPayload(request, env);
+  return json({
+    stories: payload.stories,
+    videoLimit: payload.videoLimit,
   });
 }
 
