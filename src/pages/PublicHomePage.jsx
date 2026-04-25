@@ -96,8 +96,8 @@ export default function PublicHomePage() {
       </div>
 
       <main className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-6 pb-16 pt-10 sm:px-8 lg:px-10">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Link to="/" className="flex items-center gap-3">
+        <header className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <Link to="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
               <span className="font-display text-white text-sm font-bold">M</span>
             </div>
@@ -254,6 +254,15 @@ export default function PublicHomePage() {
             </div>
           </motion.div>
         </section>
+
+        <footer className="flex flex-col gap-3 border-t border-white/10 py-6 text-xs text-text-dim sm:flex-row sm:items-center sm:justify-between">
+          <span>© 2026 Mansión Deseo · Sitio para mayores de 18 años.</span>
+          <nav className="flex flex-wrap gap-4" aria-label="Legal y ayuda">
+            <Link to="/terminos" className="transition-colors hover:text-text-muted">Términos</Link>
+            <Link to="/privacidad" className="transition-colors hover:text-text-muted">Privacidad</Link>
+            <Link to="/ayuda" className="transition-colors hover:text-text-muted">Ayuda</Link>
+          </nav>
+        </footer>
       </main>
     </div>
   );

@@ -22,6 +22,7 @@ const appRoutes = new Set([
   'feed-shell-test',
   'full-mobile-test',
   'historia/nueva',
+  'ayuda',
   'login',
   'mensajes',
   'monedas',
@@ -36,6 +37,8 @@ const appRoutes = new Set([
   'registro',
   'safe-area-debug',
   'seguidores',
+  'privacidad',
+  'terminos',
   'videos',
   'vip',
 ]);
@@ -139,6 +142,10 @@ const staticHomeHtml = `<!doctype html>
   <meta name="twitter:title" content="Mansión Deseo | Swingers Argentina y contactos adultos privados" />
   <meta name="twitter:description" content="Comunidad privada para adultos en Argentina: swingers, parejas liberales, tríos y conexiones discretas." />
   <meta name="twitter:image" content="${SITE_ORIGIN}/icon-512.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" /></noscript>
   <script type="application/ld+json">${staticHomeStructuredData}</script>
   <script>
     (function(){
@@ -162,7 +169,7 @@ const staticHomeHtml = `<!doctype html>
     :root{--bg:#08080e;--text:#f6efe6;--muted:rgba(246,239,230,.72);--dim:rgba(246,239,230,.48);--gold:#c9a84c;--gold2:#f0d98b;--crimson:#9b2b40;--wine:#4a1324;--line:rgba(255,255,255,.10)}
     *{box-sizing:border-box}
     html{background:var(--bg)}
-    body{margin:0;min-height:100vh;background:radial-gradient(circle at 82% 8%,rgba(201,168,76,.20),transparent 28rem),radial-gradient(circle at 8% 18%,rgba(155,43,64,.28),transparent 26rem),linear-gradient(180deg,#0d0b12 0%,#08080e 62%,#050508 100%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{margin:0;min-height:100vh;background:radial-gradient(circle at 82% 8%,rgba(201,168,76,.20),transparent 28rem),radial-gradient(circle at 8% 18%,rgba(155,43,64,.28),transparent 26rem),linear-gradient(180deg,#0d0b12 0%,#08080e 62%,#050508 100%);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:56px 56px;mask-image:linear-gradient(to bottom,black,transparent 82%)}
     a{color:inherit;text-decoration:none}button,input{font:inherit}.wrap{width:min(1180px,calc(100% - 32px));margin:0 auto;padding:18px 0 54px}
     @keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
@@ -170,7 +177,7 @@ const staticHomeHtml = `<!doctype html>
     @keyframes lineSweep{from{transform:translateX(-110%)}to{transform:translateX(110%)}}
     .top-shell{position:sticky;top:0;z-index:20;padding-top:8px;background:linear-gradient(180deg,rgba(8,8,14,.96),rgba(8,8,14,.70) 72%,transparent);backdrop-filter:blur(14px);animation:rise .7s ease both}
     .top{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid rgba(255,255,255,.08);background:rgba(9,8,14,.62);border-radius:24px;padding:12px 14px}
-    .brand{display:flex;align-items:center;gap:8px}.mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#D4183D,#9B1C3A);display:grid;place-items:center;font-family:Georgia,serif;font-size:14px;font-weight:800;color:#fff}.brand-text{font-family:Georgia,"Times New Roman",serif;font-size:17px;font-weight:600;background:linear-gradient(90deg,#C9A84C,#E0C97A,#C9A84C);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 2px 8px rgba(0,0,0,.35)}
+    .brand{display:flex;align-items:center;gap:8px}.mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#D4183D,#9B1C3A);display:grid;place-items:center;font-family:"Playfair Display",Georgia,serif;font-size:14px;font-weight:700;color:#fff}.brand-text{font-family:"Playfair Display",Georgia,"Times New Roman",serif;font-size:17px;font-weight:600;background:linear-gradient(90deg,#C9A84C,#E0C97A,#C9A84C);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 2px 8px rgba(0,0,0,.35)}
     .top-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}.top.login-open .top-actions .link{display:none}.link{font-size:14px;color:var(--muted);background:none;border:0;cursor:pointer;padding:0}.pill-btn{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:12px 18px;font-weight:800;font-size:14px;border:0;cursor:pointer}.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#14100a;box-shadow:0 18px 36px rgba(201,168,76,.18)}.ghost{border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text)}
     .login-inline{position:relative;display:grid;grid-template-columns:180px 160px auto;gap:8px;align-items:center;max-width:560px;opacity:1;overflow:visible;pointer-events:auto;transform:none}.home-input{width:100%;border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:15px;padding:11px 12px;color:var(--text);font-size:14px;outline:none}.home-input::placeholder{color:var(--dim)}.home-input:focus{border-color:rgba(201,168,76,.42);box-shadow:0 0 0 4px rgba(201,168,76,.08)}.login-error{position:absolute;right:0;top:calc(100% + 8px);min-height:16px;margin:0;color:#ff8ea0;font-size:12px;text-align:right;white-space:nowrap}
     .hero{margin-top:22px}.panel{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.072),rgba(255,255,255,.026));border-radius:36px;box-shadow:0 32px 96px rgba(0,0,0,.36);overflow:hidden}.hero-panel{position:relative;min-height:610px;animation:rise .85s .08s ease both}.hero-panel:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 78% 18%,rgba(240,217,139,.18),transparent 21rem),radial-gradient(circle at 14% 10%,rgba(155,43,64,.18),transparent 22rem);pointer-events:none;animation:glowDrift 9s ease-in-out infinite}.hero-panel:after{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(240,217,139,.65),transparent);animation:lineSweep 3.8s ease-in-out infinite}.copy{position:relative;padding:72px 64px;max-width:1030px}.badge{display:inline-flex;border:1px solid rgba(201,168,76,.28);background:rgba(201,168,76,.10);color:rgba(240,217,139,.95);border-radius:999px;padding:9px 13px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;animation:rise .7s .16s ease both}.title{font-family:Georgia,"Times New Roman",serif;font-weight:500;letter-spacing:-.055em;font-size:clamp(56px,8.5vw,112px);line-height:.92;margin:24px 0 0;max-width:980px;animation:rise .8s .22s ease both}.lead{max-width:780px;margin:24px 0 0;color:var(--muted);font-size:19px;line-height:1.75;animation:rise .8s .30s ease both}.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px;animation:rise .8s .38s ease both}.hero-notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:34px;max-width:900px}.note{border:1px solid var(--line);background:rgba(0,0,0,.18);border-radius:20px;padding:16px;animation:rise .8s calc(.44s + var(--i,0s)) ease both}.note strong{display:block;color:var(--gold2);font-size:18px}.note span{display:block;margin-top:5px;color:var(--dim);font-size:12px;line-height:1.4}
@@ -243,7 +250,7 @@ const staticHomeHtml = `<!doctype html>
 
     <footer class="footer">
       <span>© 2026 Mansión Deseo · Sitio para mayores de 18 años.</span>
-      <span><button class="link" type="button" data-show-login>Iniciar sesión</button> · <a href="/registro/">Crear cuenta</a></span>
+      <span><a href="/terminos/">Términos</a> · <a href="/privacidad/">Privacidad</a> · <a href="/ayuda/">Ayuda</a></span>
     </footer>
   </main>
   <script>

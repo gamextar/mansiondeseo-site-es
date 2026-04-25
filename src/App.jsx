@@ -14,6 +14,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import WelcomePage from './pages/WelcomePage';
 import PublicHomePage from './pages/PublicHomePage';
+import PublicInfoPage from './pages/PublicInfoPage';
 import SEOLandingPage from './pages/SEOLandingPage';
 import BlackScreenPage from './pages/BlackScreenPage';
 import MobileFullScreenProbePage from './pages/MobileFullScreenProbePage';
@@ -238,6 +239,7 @@ function AppLayout() {
   const standaloneVideosRoute = isStandaloneMobileApp && location.pathname.startsWith('/videos');
   const mobileBrowserVideosRoute = isMobileViewport && normalizedRoutePath === '/videos';
   const isPublicHome = location.pathname === '/';
+  const isPublicInfoRoute = ['/terminos', '/privacidad', '/ayuda'].includes(normalizedRoutePath);
   const isPublicProfileRoute = normalizedRoutePath.startsWith('/perfiles/');
   const isMobileBrowserPublicProfileRoute = isMobileViewport && !isStandaloneMobileApp && isPublicProfileRoute;
   const isFullscreen =
@@ -246,7 +248,7 @@ function AppLayout() {
     FULLSCREEN_PATHS.some((p) => location.pathname.startsWith(p)) ||
     FULLSCREEN_PATHS.includes(location.pathname);
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
-  const showChrome = !isFullscreen && !isChatDetail && !isPublicHome;
+  const showChrome = !isFullscreen && !isChatDetail && !isPublicHome && !isPublicInfoRoute;
   const scrollLockRef = useRef(null);
   const publicProfileScrollTuning = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -853,6 +855,9 @@ function AppLayout() {
             path="/"
             element={<PublicHomePage />}
           />
+          <Route path="/terminos" element={<PublicInfoPage type="terms" />} />
+          <Route path="/privacidad" element={<PublicInfoPage type="privacy" />} />
+          <Route path="/ayuda" element={<PublicInfoPage type="help" />} />
           <Route
             path="/feed"
             element={
