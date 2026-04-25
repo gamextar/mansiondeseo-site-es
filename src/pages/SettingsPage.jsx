@@ -1126,21 +1126,28 @@ export default function SettingsPage() {
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5 space-y-4">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Activity className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Scoring del feed</h3>
+                  <p className="text-[11px] text-text-dim">Ajusta cuánto pesa cada señal en el orden del feed principal. El scoring se aplica siempre; pon los pesos en 0 para neutralizar una señal.</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-mansion-elevated/30 px-3 py-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                    <Activity className="w-4 h-4 text-mansion-gold" />
-                  </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-text-primary">Scoring del feed</h3>
-                    <p className="text-[11px] text-text-dim">Ajusta cuánto pesa cada señal en el orden del feed principal.</p>
+                    <h4 className="text-sm font-semibold text-text-primary">Filtrar feed por país</h4>
+                    <p className="text-[11px] text-text-dim">Cuando está activo, el feed sólo muestra perfiles del país del usuario.</p>
                   </div>
                 </div>
                 <ToggleSwitch value={feedFilterByCountry} onChange={setFeedFilterByCountry} />
               </div>
 
               <div className="rounded-xl border border-white/5 bg-mansion-elevated/30 px-3 py-2 text-[11px] text-text-dim">
-                Filtro por país en el feed:
+                Filtro por país:
                 <span className="ml-2 font-semibold text-mansion-gold">{feedFilterByCountry ? 'Activo' : 'Desactivado'}</span>
               </div>
 
