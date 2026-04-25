@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Heart, MessageCircle, Shield, Crown,
-  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift, Eye, AlertTriangle, Star, Flag,
+  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift, Eye, AlertTriangle, Star, CircleAlert,
 } from 'lucide-react';
 import { getProfile, getToken, toggleFavorite, updateProfile, adminUpdateUser, invalidateProfilesCache, getGiftCatalog, sendGift as apiSendGift, reportProfile } from '../lib/api';
 import { useAuth } from '../lib/authContext';
@@ -1244,12 +1244,17 @@ export default function ProfileDetailPage({ initialData }) {
           whileTap={{ scale: 0.85 }}
           onClick={handleToggleFavorite}
           disabled={togglingFav}
-          className={`w-16 h-16 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-lg ${
+          title={isFavorited ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+          aria-label={isFavorited ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+          className={`group relative w-16 h-16 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-lg ${
             isFavorited
               ? 'bg-mansion-crimson/20 border-mansion-crimson/40 text-mansion-crimson'
               : 'bg-black/40 border-white/10 text-text-muted hover:text-mansion-crimson hover:border-mansion-crimson/30'
           }`}
         >
+          <span className="pointer-events-none absolute right-[calc(100%+0.75rem)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-full border border-white/10 bg-black/80 px-3 py-1.5 text-[11px] font-semibold text-white/90 shadow-lg backdrop-blur-md group-hover:block group-focus-visible:block">
+            {isFavorited ? 'Quitar favorito' : 'Favorito'}
+          </span>
           <Heart
             className={`w-6 h-6 transition-transform ${isFavorited ? 'scale-110' : ''}`}
             fill={isFavorited ? 'currentColor' : 'none'}
@@ -1258,21 +1263,30 @@ export default function ProfileDetailPage({ initialData }) {
         <motion.button
           whileTap={{ scale: 0.85 }}
           onClick={openGiftModal}
-          className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-md border border-mansion-gold/30 text-mansion-gold flex items-center justify-center transition-all shadow-lg hover:bg-mansion-gold/10"
+          title="Enviar regalo"
+          aria-label="Enviar regalo"
+          className="group relative w-16 h-16 rounded-full bg-black/40 backdrop-blur-md border border-mansion-gold/30 text-mansion-gold flex items-center justify-center transition-all shadow-lg hover:bg-mansion-gold/10"
         >
+          <span className="pointer-events-none absolute right-[calc(100%+0.75rem)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-full border border-mansion-gold/20 bg-black/80 px-3 py-1.5 text-[11px] font-semibold text-mansion-gold shadow-lg backdrop-blur-md group-hover:block group-focus-visible:block">
+            Enviar regalo
+          </span>
           <Gift className="w-6 h-6" />
         </motion.button>
         <motion.button
           whileTap={{ scale: 0.85 }}
           onClick={() => setReportModalOpen(true)}
-          className={`w-16 h-16 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-lg ${
+          title="Denunciar perfil"
+          className={`group relative w-16 h-16 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-lg ${
             reportSent
-              ? 'bg-red-500/20 border-red-500/35 text-red-200'
-              : 'bg-black/40 border-red-500/25 text-red-300 hover:bg-red-500/10'
+              ? 'bg-red-500/25 border-red-500/40 text-red-100'
+              : 'bg-black/40 border-red-500/30 text-red-400 hover:bg-red-500/12'
           }`}
           aria-label="Denunciar perfil"
         >
-          <Flag className="w-6 h-6" />
+          <span className="pointer-events-none absolute right-[calc(100%+0.75rem)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-full border border-red-500/25 bg-black/80 px-3 py-1.5 text-[11px] font-semibold text-red-200 shadow-lg backdrop-blur-md group-hover:block group-focus-visible:block">
+            Denunciar perfil
+          </span>
+          <CircleAlert className="w-7 h-7" />
         </motion.button>
         <AnimatePresence>
           {messageBlockedNotice && (
@@ -1300,12 +1314,17 @@ export default function ProfileDetailPage({ initialData }) {
             },
           }}
           aria-disabled={messagingBlockedByRole ? 'true' : undefined}
-          className={`w-16 h-16 rounded-full text-white transition-all active:scale-95 flex items-center justify-center ${
+          title={messagingBlockedByRole ? 'Mensajes bloqueados' : 'Enviar mensaje'}
+          aria-label={messagingBlockedByRole ? 'Mensajes bloqueados' : 'Enviar mensaje'}
+          className={`group relative w-16 h-16 rounded-full text-white transition-all active:scale-95 flex items-center justify-center ${
             messagingBlockedByRole
               ? 'bg-white/12 border border-white/10 text-white/55 shadow-none'
               : 'bg-mansion-crimson shadow-glow-crimson hover:bg-mansion-crimson-dark'
           }`}
         >
+          <span className="pointer-events-none absolute right-[calc(100%+0.75rem)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-full border border-white/10 bg-black/80 px-3 py-1.5 text-[11px] font-semibold text-white/90 shadow-lg backdrop-blur-md group-hover:block group-focus-visible:block">
+            {messagingBlockedByRole ? 'Mensajes bloqueados' : 'Enviar mensaje'}
+          </span>
           <MessageCircle className="w-6 h-6" />
         </Link>
       </MotionDiv>
