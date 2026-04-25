@@ -482,14 +482,12 @@ export default function AdminUsersPage() {
           ))}
 
           {[
-            { id: 'all', label: 'Todos los duplicados' },
             { id: '1', label: 'Solo duplicados' },
-            { id: '0', label: 'Solo no duplicados' },
           ].map((option) => (
             <button
               key={option.id}
               type="button"
-              onClick={() => setDuplicateFilter(option.id)}
+              onClick={() => setDuplicateFilter((current) => (current === option.id ? 'all' : option.id))}
               className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
                 duplicateFilter === option.id
                   ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
@@ -501,7 +499,6 @@ export default function AdminUsersPage() {
           ))}
 
           {[
-            { id: 'all', label: 'Todos los roles' },
             { id: 'mujer', label: 'Mujeres' },
             { id: 'hombre', label: 'Hombres' },
             { id: 'pareja', label: 'Parejas' },
@@ -509,7 +506,7 @@ export default function AdminUsersPage() {
             <button
               key={option.id}
               type="button"
-              onClick={() => setRoleFilter(option.id)}
+              onClick={() => setRoleFilter((current) => (current === option.id ? 'all' : option.id))}
               className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
                 roleFilter === option.id
                   ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
@@ -560,14 +557,13 @@ export default function AdminUsersPage() {
           ))}
 
           {[
-            { id: 'all', label: 'Todas las denuncias' },
             { id: '1', label: 'Solo denunciados' },
             { id: '0', label: 'Sin denuncias' },
           ].map((option) => (
             <button
               key={option.id}
               type="button"
-              onClick={() => setReportedFilter(option.id)}
+              onClick={() => setReportedFilter((current) => (current === option.id ? 'all' : option.id))}
               className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
                 reportedFilter === option.id
                   ? 'bg-red-500/10 border-red-500/30 text-red-300'
