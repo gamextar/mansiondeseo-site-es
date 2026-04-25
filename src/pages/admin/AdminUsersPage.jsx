@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Pause, Play, Film, Pencil, Copy, Flag } from 'lucide-react';
-import { adminGetUsers, adminGetUserIds, adminGetUser, adminUpdateUser, adminCloseProfileReport, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory } from '../../lib/api';
+import { adminGetUsers, adminGetUser, adminUpdateUser, adminCloseProfileReport, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 import { resolveMediaUrl } from '../../lib/media';
 
@@ -68,7 +68,6 @@ export default function AdminUsersPage() {
   const [selectedLoading, setSelectedLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
-  const [selectionLoading, setSelectionLoading] = useState(false);
   const [storyUploading, setStoryUploading] = useState(false);
   const [storyCaption, setStoryCaption] = useState('');
   const [storyVipOnly, setStoryVipOnly] = useState(false);
@@ -109,31 +108,6 @@ export default function AdminUsersPage() {
   const handleSearch = (e) => {
     e.preventDefault();
     setQuery(searchInput);
-  };
-
-  const handleSelectVisibleFakes = () => {
-    const visibleFakeIds = users.filter((u) => u.fake).map((u) => u.id);
-    setSelectedIds((prev) => [...new Set([...prev, ...visibleFakeIds])]);
-  };
-
-  const handleSelectMatchingFakes = async () => {
-    setSelectionLoading(true);
-    try {
-      const data = await adminGetUserIds({
-        q: query,
-        fake: '1',
-        duplicate: duplicateFilter === 'all' ? '' : duplicateFilter,
-        role: roleFilter === 'all' ? '' : roleFilter,
-        status: statusFilter === 'all' ? '' : statusFilter,
-        created: createdFilter === 'all' ? '' : createdFilter,
-        reported: reportedFilter === 'all' ? '' : reportedFilter,
-      });
-      setSelectedIds(data.ids || []);
-    } catch (err) {
-      alert(err.message || 'Error al seleccionar usuarios fake');
-    } finally {
-      setSelectionLoading(false);
-    }
   };
 
   const handleAction = async (userId, fields) => {
@@ -550,7 +524,7 @@ export default function AdminUsersPage() {
 
           {[
             { id: '1d', label: 'Nuevos 24h' },
-            { id: '7d', label: 'Nuevos 7d' },
+            { id: '72h', label: 'Nuevos 72hs' },
           ].map((option) => (
             <button
               key={option.id}
@@ -565,23 +539,6 @@ export default function AdminUsersPage() {
               {option.label}
             </button>
           ))}
-
-          <button
-            type="button"
-            onClick={handleSelectVisibleFakes}
-            className="px-3 py-2 rounded-xl bg-mansion-card border border-mansion-border/20 text-text-dim hover:text-mansion-gold text-xs font-semibold transition-colors"
-          >
-            Seleccionar fake visibles
-          </button>
-
-              <button
-                type="button"
-                disabled={selectionLoading}
-                onClick={handleSelectMatchingFakes}
-                className="px-3 py-2 rounded-xl bg-mansion-card border border-mansion-border/20 text-text-dim hover:text-mansion-gold text-xs font-semibold transition-colors disabled:opacity-60"
-          >
-            {selectionLoading ? 'Seleccionando...' : 'Seleccionar fake del resultado'}
-          </button>
         </div>
 
         {/* Table */}

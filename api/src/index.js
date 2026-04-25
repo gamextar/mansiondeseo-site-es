@@ -4768,10 +4768,10 @@ async function handleAdminGetUsers(request, env) {
     bindings.push(statusFilter);
   }
 
-  if (createdFilter === '1d' || createdFilter === '7d' || createdFilter === '30d') {
-    const days = createdFilter === '1d' ? 1 : createdFilter === '7d' ? 7 : 30;
+  if (createdFilter === '1d' || createdFilter === '72h') {
+    const hours = createdFilter === '1d' ? 24 : 72;
     filters.push(`created_at >= datetime('now', ?)`);
-    bindings.push(`-${days} days`);
+    bindings.push(`-${hours} hours`);
   }
 
   if (reportedFilter === '1') {
@@ -4876,10 +4876,10 @@ async function handleAdminGetUserIds(request, env) {
     bindings.push(statusFilter);
   }
 
-  if (createdFilter === '1d' || createdFilter === '7d' || createdFilter === '30d') {
-    const days = createdFilter === '1d' ? 1 : createdFilter === '7d' ? 7 : 30;
+  if (createdFilter === '1d' || createdFilter === '72h') {
+    const hours = createdFilter === '1d' ? 24 : 72;
     filters.push(`created_at >= datetime('now', ?)`);
-    bindings.push(`-${days} days`);
+    bindings.push(`-${hours} hours`);
   }
 
   if (reportedFilter === '1') {

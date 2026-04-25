@@ -1208,7 +1208,7 @@ export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', r
   if (['mujer', 'hombre', 'pareja'].includes(role)) params.set('role', role);
   if (['active', 'under_review', 'suspended'].includes(status)) params.set('status', status);
   if (duplicate === '1' || duplicate === '0') params.set('duplicate', duplicate);
-  if (['1d', '7d', '30d'].includes(created)) params.set('created', created);
+  if (['1d', '72h'].includes(created)) params.set('created', created);
   if (reported === '1' || reported === '0') params.set('reported', reported);
   return apiFetch(`/admin/users?${params}`);
 }
@@ -1220,7 +1220,7 @@ export async function adminGetUserIds({ q = '', fake = '', role = '', status = '
   if (['mujer', 'hombre', 'pareja'].includes(role)) params.set('role', role);
   if (['active', 'under_review', 'suspended'].includes(status)) params.set('status', status);
   if (duplicate === '1' || duplicate === '0') params.set('duplicate', duplicate);
-  if (['1d', '7d', '30d'].includes(created)) params.set('created', created);
+  if (['1d', '72h'].includes(created)) params.set('created', created);
   if (reported === '1' || reported === '0') params.set('reported', reported);
   return apiFetch(`/admin/users/ids?${params}`);
 }
