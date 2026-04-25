@@ -3,9 +3,9 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Heart, MessageCircle, Shield, Crown,
-  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift, Eye, AlertTriangle, Star,
+  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift, Eye, AlertTriangle, Star, Flag,
 } from 'lucide-react';
-import { getProfile, getToken, toggleFavorite, updateProfile, adminUpdateUser, invalidateProfilesCache, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { getProfile, getToken, toggleFavorite, updateProfile, adminUpdateUser, invalidateProfilesCache, getGiftCatalog, sendGift as apiSendGift, reportProfile } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { formatLocation } from '../lib/location';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
@@ -28,6 +28,11 @@ const SEEKING_META = {
 };
 
 const MESSAGE_BLOCK_META = SEEKING_META;
+const REPORT_REASONS = [
+  { id: 'fake_profile', label: 'Perfil falso', description: 'La información o fotos parecen falsas.' },
+  { id: 'offensive', label: 'Ofensivo', description: 'Contenido agresivo, discriminatorio o inapropiado.' },
+  { id: 'other', label: 'Otro motivo', description: 'Contanos brevemente qué ocurre.' },
+];
 
 const PROFILE_DETAIL_CACHE_PREFIX = 'mansion_profile_detail_';
 const PROFILE_DETAIL_CACHE_TTL_MS = 5 * 60_000;
@@ -142,6 +147,11 @@ export default function ProfileDetailPage({ initialData }) {
   const [sendingGift, setSendingGift] = useState(null);
   const [giftSent, setGiftSent] = useState(null);
   const [messageBlockedNotice, setMessageBlockedNotice] = useState('');
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('fake_profile');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportSending, setReportSending] = useState(false);
+  const [reportSent, setReportSent] = useState(false);
 
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
@@ -603,6 +613,24 @@ export default function ProfileDetailPage({ initialData }) {
     event.preventDefault();
     setMessageBlockedNotice(`Este usuario no acepta mensajes de ${viewerRoleLabel}.`);
   }, [messagingBlockedByRole, viewerRoleLabel]);
+
+  const handleSubmitReport = useCallback(async () => {
+    if (!profile?.id || reportSending) return;
+    setReportSending(true);
+    try {
+      await reportProfile(profile.id, {
+        reason: reportReason,
+        details: reportDetails,
+      });
+      setReportSent(true);
+      setReportModalOpen(false);
+      setReportDetails('');
+    } catch (err) {
+      alert(err.message || 'No se pudo enviar la denuncia');
+    } finally {
+      setReportSending(false);
+    }
+  }, [profile?.id, reportDetails, reportReason, reportSending]);
 
   if (loading) {
     return (
@@ -1234,6 +1262,18 @@ export default function ProfileDetailPage({ initialData }) {
         >
           <Gift className="w-6 h-6" />
         </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.85 }}
+          onClick={() => setReportModalOpen(true)}
+          className={`w-16 h-16 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-lg ${
+            reportSent
+              ? 'bg-red-500/20 border-red-500/35 text-red-200'
+              : 'bg-black/40 border-red-500/25 text-red-300 hover:bg-red-500/10'
+          }`}
+          aria-label="Denunciar perfil"
+        >
+          <Flag className="w-6 h-6" />
+        </motion.button>
         <AnimatePresence>
           {messageBlockedNotice && (
             <motion.div
@@ -1270,6 +1310,79 @@ export default function ProfileDetailPage({ initialData }) {
         </Link>
       </MotionDiv>
       )}
+
+      {/* ── Report Profile Modal ── */}
+      <AnimatePresence>
+        {reportModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center"
+            onClick={() => setReportModalOpen(false)}
+          >
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-mansion-base border border-mansion-border/30 rounded-t-3xl sm:rounded-3xl w-full max-w-md overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-5 border-b border-mansion-border/20 flex items-center justify-between">
+                <div>
+                  <h3 className="font-display text-xl text-text-primary">Denunciar perfil</h3>
+                  <p className="text-xs text-text-dim mt-1">La denuncia queda visible para moderación.</p>
+                </div>
+                <button
+                  onClick={() => setReportModalOpen(false)}
+                  className="w-9 h-9 rounded-full bg-mansion-elevated flex items-center justify-center text-text-dim hover:text-text-primary"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-3">
+                {REPORT_REASONS.map((reason) => (
+                  <button
+                    key={reason.id}
+                    type="button"
+                    onClick={() => setReportReason(reason.id)}
+                    className={`w-full rounded-2xl border p-4 text-left transition-colors ${
+                      reportReason === reason.id
+                        ? 'border-red-500/35 bg-red-500/12'
+                        : 'border-mansion-border/25 bg-mansion-card/70 hover:border-red-500/20'
+                    }`}
+                  >
+                    <p className="text-sm font-semibold text-text-primary">{reason.label}</p>
+                    <p className="mt-1 text-xs text-text-dim">{reason.description}</p>
+                  </button>
+                ))}
+
+                {reportReason === 'other' && (
+                  <textarea
+                    value={reportDetails}
+                    onChange={(event) => setReportDetails(event.target.value)}
+                    rows={3}
+                    maxLength={1000}
+                    placeholder="Contanos brevemente qué ocurre..."
+                    className="w-full resize-none rounded-2xl border border-mansion-border/30 bg-mansion-card px-4 py-3 text-sm text-text-primary placeholder:text-text-dim outline-none focus:border-red-500/35"
+                  />
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleSubmitReport}
+                  disabled={reportSending || (reportReason === 'other' && reportDetails.trim().length < 3)}
+                  className="w-full rounded-2xl bg-red-500 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+                >
+                  {reportSending ? 'Enviando...' : 'Enviar denuncia'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Gift Picker Modal ── */}
       <AnimatePresence>

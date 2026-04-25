@@ -816,6 +816,13 @@ export async function getProfileWithMessageLimit(id) {
   return apiFetch(`/profiles/${id}?include=messageLimit`);
 }
 
+export async function reportProfile(profileId, { reason, details = '' } = {}) {
+  return apiFetch(`/profiles/${profileId}/report`, {
+    method: 'POST',
+    body: JSON.stringify({ reason, details }),
+  });
+}
+
 export async function getChatBootstrap(id) {
   return sharedGet(`chatBootstrap:${id}`, () => apiFetch(`/chat/bootstrap/${id}`), { ttlMs: 60_000 });
 }
@@ -1194,7 +1201,7 @@ export async function adminResetAllCoins() {
 
 // ── Admin: Users ────────────────────────────────────────
 
-export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', role = '', status = '', duplicate = '', created = '' } = {}) {
+export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', role = '', status = '', duplicate = '', created = '', reported = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (q) params.set('q', q);
   if (fake === '1' || fake === '0') params.set('fake', fake);
@@ -1202,10 +1209,11 @@ export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', r
   if (['active', 'under_review', 'suspended'].includes(status)) params.set('status', status);
   if (duplicate === '1' || duplicate === '0') params.set('duplicate', duplicate);
   if (['1d', '7d', '30d'].includes(created)) params.set('created', created);
+  if (reported === '1' || reported === '0') params.set('reported', reported);
   return apiFetch(`/admin/users?${params}`);
 }
 
-export async function adminGetUserIds({ q = '', fake = '', role = '', status = '', duplicate = '', created = '' } = {}) {
+export async function adminGetUserIds({ q = '', fake = '', role = '', status = '', duplicate = '', created = '', reported = '' } = {}) {
   const params = new URLSearchParams();
   if (q) params.set('q', q);
   if (fake === '1' || fake === '0') params.set('fake', fake);
@@ -1213,6 +1221,7 @@ export async function adminGetUserIds({ q = '', fake = '', role = '', status = '
   if (['active', 'under_review', 'suspended'].includes(status)) params.set('status', status);
   if (duplicate === '1' || duplicate === '0') params.set('duplicate', duplicate);
   if (['1d', '7d', '30d'].includes(created)) params.set('created', created);
+  if (reported === '1' || reported === '0') params.set('reported', reported);
   return apiFetch(`/admin/users/ids?${params}`);
 }
 

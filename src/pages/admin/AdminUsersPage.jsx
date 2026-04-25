@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Pause, Play, Film, Pencil, Copy } from 'lucide-react';
+import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Pause, Play, Film, Pencil, Copy, Flag } from 'lucide-react';
 import { adminGetUsers, adminGetUserIds, adminGetUser, adminUpdateUser, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 import { resolveMediaUrl } from '../../lib/media';
@@ -41,6 +41,15 @@ function roleLabel(role) {
   return map[role] || role;
 }
 
+function reportReasonLabel(reason) {
+  const map = {
+    fake_profile: 'Perfil falso',
+    offensive: 'Ofensivo',
+    other: 'Otro motivo',
+  };
+  return map[reason] || reason || 'Denuncia';
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
@@ -52,6 +61,7 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [createdFilter, setCreatedFilter] = useState('all');
+  const [reportedFilter, setReportedFilter] = useState('all');
   const [searchInput, setSearchInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -68,7 +78,7 @@ export default function AdminUsersPage() {
   const galleryDragItem = useRef(null);
   const galleryDragOverItem = useRef(null);
 
-  const fetchUsers = useCallback(async (p = page, q = query, fake = fakeFilter, duplicate = duplicateFilter, role = roleFilter, status = statusFilter, created = createdFilter) => {
+  const fetchUsers = useCallback(async (p = page, q = query, fake = fakeFilter, duplicate = duplicateFilter, role = roleFilter, status = statusFilter, created = createdFilter, reported = reportedFilter) => {
     setLoading(true);
     try {
       const data = await adminGetUsers({
@@ -80,6 +90,7 @@ export default function AdminUsersPage() {
         role: role === 'all' ? '' : role,
         status: status === 'all' ? '' : status,
         created: created === 'all' ? '' : created,
+        reported: reported === 'all' ? '' : reported,
       });
       setUsers(data.users);
       setTotal(data.total);
@@ -91,9 +102,9 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter]);
+  }, [page, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter]);
 
-  useEffect(() => { fetchUsers(1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter); }, [query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter]); // eslint-disable-line
+  useEffect(() => { fetchUsers(1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter); }, [query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter]); // eslint-disable-line
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -115,6 +126,7 @@ export default function AdminUsersPage() {
         role: roleFilter === 'all' ? '' : roleFilter,
         status: statusFilter === 'all' ? '' : statusFilter,
         created: createdFilter === 'all' ? '' : createdFilter,
+        reported: reportedFilter === 'all' ? '' : reportedFilter,
       });
       setSelectedIds(data.ids || []);
     } catch (err) {
@@ -512,6 +524,25 @@ export default function AdminUsersPage() {
             </button>
           ))}
 
+          {[
+            { id: 'all', label: 'Todas las denuncias' },
+            { id: '1', label: 'Solo denunciados' },
+            { id: '0', label: 'Sin denuncias' },
+          ].map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setReportedFilter(option.id)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
+                reportedFilter === option.id
+                  ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                  : 'bg-mansion-card border-mansion-border/20 text-text-dim hover:text-text-primary'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+
           <button
             type="button"
             onClick={handleSelectVisibleFakes}
@@ -588,7 +619,18 @@ export default function AdminUsersPage() {
                               {u.online && <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
                               {u.is_admin && <Shield className="w-3 h-3 text-red-400 flex-shrink-0" />}
                               {u.duplicate_flag && <Copy className="w-3 h-3 text-amber-300 flex-shrink-0" />}
+                              {Number(u.reports_count || 0) > 0 && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-red-500/25 bg-red-500/10 px-1.5 py-0.5 text-[9px] font-bold text-red-300">
+                                  <Flag className="w-2.5 h-2.5" />
+                                  {Number(u.reports_count || 0)}
+                                </span>
+                              )}
                             </div>
+                            {Number(u.reports_count || 0) > 0 && (
+                              <p className="text-[10px] text-red-300 truncate">
+                                {reportReasonLabel(u.latest_report_reason)}{u.latest_report_at ? ` · ${timeAgo(u.latest_report_at)}` : ''}
+                              </p>
+                            )}
                             <p className="text-[10px] text-text-dim md:hidden truncate">{u.email}</p>
                           </div>
                         </div>
@@ -630,7 +672,7 @@ export default function AdminUsersPage() {
         {pages > 1 && (
           <div className="flex items-center justify-center gap-2 mt-4">
             <button
-              onClick={() => fetchUsers(page - 1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter)}
+              onClick={() => fetchUsers(page - 1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter)}
               disabled={page <= 1}
               className="p-2 rounded-lg bg-mansion-card border border-mansion-border/20 text-text-muted disabled:opacity-30 hover:text-mansion-gold transition-colors"
             >
@@ -638,7 +680,7 @@ export default function AdminUsersPage() {
             </button>
             <span className="text-sm text-text-dim px-3">{page} / {pages}</span>
             <button
-              onClick={() => fetchUsers(page + 1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter)}
+              onClick={() => fetchUsers(page + 1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter)}
               disabled={page >= pages}
               className="p-2 rounded-lg bg-mansion-card border border-mansion-border/20 text-text-muted disabled:opacity-30 hover:text-mansion-gold transition-colors"
             >
@@ -754,6 +796,12 @@ export default function AdminUsersPage() {
                 {selected.duplicate_flag && (
                   <span className="px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-semibold">Duplicado</span>
                 )}
+                {Number(selected.reports_count || 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-[10px] font-semibold">
+                    <Flag className="w-3 h-3" />
+                    {Number(selected.reports_count || 0)} denuncia{Number(selected.reports_count || 0) === 1 ? '' : 's'} abierta{Number(selected.reports_count || 0) === 1 ? '' : 's'}
+                  </span>
+                )}
                 {selected.account_status === 'suspended' && (
                   <span className="px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-semibold">Suspendida</span>
                 )}
@@ -761,6 +809,44 @@ export default function AdminUsersPage() {
                   <span className="px-2 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[10px] font-semibold">En revisión</span>
                 )}
               </div>
+
+              {Array.isArray(selected.reports) && selected.reports.length > 0 && (
+                <div className="space-y-2 rounded-2xl border border-red-500/20 bg-red-950/10 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Flag className="h-4 w-4 text-red-300" />
+                      <p className="text-xs font-bold text-red-200">Denuncias de perfil</p>
+                    </div>
+                    <span className="rounded-full bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-300">
+                      {Number(selected.reports_count || 0)} abierta{Number(selected.reports_count || 0) === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {selected.reports.map((report) => (
+                      <div key={report.id} className="rounded-xl border border-red-500/10 bg-black/15 px-3 py-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs font-semibold text-text-primary">{reportReasonLabel(report.reason)}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            report.status === 'open'
+                              ? 'bg-red-500/10 text-red-300'
+                              : 'bg-mansion-elevated text-text-dim'
+                          }`}>
+                            {report.status === 'open' ? 'Abierta' : report.status}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-text-dim">
+                          Denunció: {report.reporter_username || report.reporter_id || 'Usuario eliminado'} · {report.updated_at ? timeAgo(report.updated_at) : 'sin fecha'}
+                        </p>
+                        {report.details && (
+                          <p className="mt-2 rounded-lg bg-mansion-elevated/60 px-2 py-1.5 text-[11px] text-text-muted">
+                            {report.details}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="space-y-2 pt-2 border-t border-mansion-border/20">

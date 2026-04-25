@@ -61,6 +61,7 @@ let _userMaritalStatusColumnReady = null;
 let _userSexualOrientationColumnReady = null;
 let _userMessageBlockRolesColumnReady = null;
 let _userBlocksReady = null;
+let _profileReportsReady = null;
 let _userLastIpColumnReady = null;
 let _profileVisitStructuresReady = null;
 let _profileStatsBackfillReady = null;
@@ -625,6 +626,7 @@ async function deleteUserCompletely(env, user) {
   const userId = user.id;
   await ensureProfileVisitStructures(env);
   await ensureUserBlocksTable(env);
+  await ensureProfileReportsTable(env);
   const storyRowsResult = await env.DB.prepare(
     'SELECT id, video_url FROM stories WHERE user_id = ?'
   ).bind(userId).all();
@@ -638,6 +640,7 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM stories WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM hidden_conversations WHERE user_id = ? OR partner_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM user_blocks WHERE blocker_id = ? OR blocked_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM profile_reports WHERE reporter_id = ? OR reported_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM conversation_state WHERE user_id = ? OR partner_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM favorites WHERE user_id = ? OR target_id = ?').bind(userId, userId),
@@ -650,6 +653,37 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
+}
+
+async function ensureProfileReportsTable(env) {
+  if (!_profileReportsReady) {
+    _profileReportsReady = Promise.all([
+      env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS profile_reports (
+          id TEXT PRIMARY KEY,
+          reporter_id TEXT NOT NULL REFERENCES users(id),
+          reported_id TEXT NOT NULL REFERENCES users(id),
+          reason TEXT NOT NULL,
+          details TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'open',
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE(reporter_id, reported_id)
+        )
+      `).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_profile_reports_reported ON profile_reports(reported_id, status, created_at)'
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_profile_reports_status ON profile_reports(status, created_at)'
+      ).run(),
+    ]).catch((err) => {
+      _profileReportsReady = null;
+      throw err;
+    });
+  }
+
+  return _profileReportsReady;
 }
 
 async function ensureUserBlocksTable(env) {
@@ -1325,6 +1359,7 @@ function isMetricsLoggingEnabled(env) {
 
 function normalizeMetricRoute(path) {
   if (/^\/api\/chat\/ws\/[a-f0-9-]+$/.test(path)) return '/api/chat/ws/:chatId';
+  if (/^\/api\/profiles\/[a-f0-9-]+\/report$/.test(path)) return '/api/profiles/:id/report';
   if (/^\/api\/profiles\/[a-f0-9-]+$/.test(path)) return '/api/profiles/:id';
   if (/^\/api\/messages\/[a-f0-9-]+$/.test(path)) return '/api/messages/:userId';
   if (/^\/api\/users\/[a-f0-9-]+\/block$/.test(path)) return '/api/users/:id/block';
@@ -3028,6 +3063,39 @@ async function handleChatBootstrap(request, env, userId) {
   });
 }
 
+const PROFILE_REPORT_REASONS = new Set(['fake_profile', 'offensive', 'other']);
+
+async function handleReportProfile(request, env, userId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  if (String(auth.sub) === String(userId)) return error('No puedes denunciar tu propio perfil', 400);
+  await ensureProfileReportsTable(env);
+
+  const body = await request.json().catch(() => ({}));
+  const reason = String(body?.reason || '').trim();
+  const details = String(body?.details || '').trim().slice(0, 1000);
+  if (!PROFILE_REPORT_REASONS.has(reason)) return error('Motivo de denuncia inválido', 400);
+  if (reason === 'other' && details.length < 3) return error('Contanos brevemente el motivo de la denuncia', 400);
+
+  const reported = await env.DB.prepare(
+    "SELECT id FROM users WHERE id = ? AND status = 'verified'"
+  ).bind(userId).first();
+  if (!reported) return error('Perfil no encontrado', 404);
+
+  const reportId = generateId();
+  await env.DB.prepare(`
+    INSERT INTO profile_reports (id, reporter_id, reported_id, reason, details, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 'open', datetime('now'), datetime('now'))
+    ON CONFLICT(reporter_id, reported_id) DO UPDATE SET
+      reason = excluded.reason,
+      details = excluded.details,
+      status = 'open',
+      updated_at = datetime('now')
+  `).bind(reportId, auth.sub, userId, reason, details).run();
+
+  return json({ reported: true, profile_id: userId });
+}
+
 // ── POST /api/messages/send ─────────────────────────────
 
 async function handleSendMessage(request, env) {
@@ -4637,6 +4705,7 @@ async function handleAdminResetAllCoins(request, env) {
 // ── Admin: GET /api/admin/users ─────────────────────────
 async function handleAdminGetUsers(request, env) {
   await ensureStoriesTable(env);
+  await ensureProfileReportsTable(env);
 
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
@@ -4652,6 +4721,7 @@ async function handleAdminGetUsers(request, env) {
   const roleFilter = (url.searchParams.get('role') || '').trim();
   const statusFilter = (url.searchParams.get('status') || '').trim();
   const createdFilter = (url.searchParams.get('created') || '').trim();
+  const reportedFilter = url.searchParams.get('reported');
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
@@ -4660,6 +4730,9 @@ async function handleAdminGetUsers(request, env) {
   await ensureUsersFeedPriorityColumn(env);
   let dataQuery = `SELECT id, email, username, role, seeking, message_block_roles, age, birthdate, city, locality, marital_status, sexual_orientation, country, avatar_url, status,
     premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, feed_priority, duplicate_flag, account_status, last_active, last_ip, created_at,
+    (SELECT COUNT(*) FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open') as reports_count,
+    (SELECT pr.reason FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open' ORDER BY pr.updated_at DESC LIMIT 1) as latest_report_reason,
+    (SELECT pr.updated_at FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open' ORDER BY pr.updated_at DESC LIMIT 1) as latest_report_at,
     (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id,
     (SELECT COALESCE(s.vip_only, 0) FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_vip_only
     FROM users`;
@@ -4700,6 +4773,12 @@ async function handleAdminGetUsers(request, env) {
     bindings.push(`-${days} days`);
   }
 
+  if (reportedFilter === '1') {
+    filters.push("EXISTS (SELECT 1 FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open')");
+  } else if (reportedFilter === '0') {
+    filters.push("NOT EXISTS (SELECT 1 FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open')");
+  }
+
   if (filters.length > 0) {
     const whereClause = ` WHERE ${filters.join(' AND ')}`;
     countQuery += whereClause;
@@ -4733,6 +4812,9 @@ async function handleAdminGetUsers(request, env) {
       fake: !!u.fake,
       feed_priority: Math.max(0, Number(u.feed_priority || 0)),
       duplicate_flag: !!u.duplicate_flag,
+      reports_count: Number(u.reports_count || 0),
+      latest_report_reason: u.latest_report_reason || '',
+      latest_report_at: u.latest_report_at || '',
       story_id: u.story_id || null,
       story_vip_only: Number(u.story_vip_only || 0) === 1,
       interests: undefined,
@@ -4746,6 +4828,7 @@ async function handleAdminGetUsers(request, env) {
 
 async function handleAdminGetUserIds(request, env) {
   await ensureUsersDuplicateFlagColumn(env);
+  await ensureProfileReportsTable(env);
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -4758,6 +4841,7 @@ async function handleAdminGetUserIds(request, env) {
   const roleFilter = (url.searchParams.get('role') || '').trim();
   const statusFilter = (url.searchParams.get('status') || '').trim();
   const createdFilter = (url.searchParams.get('created') || '').trim();
+  const reportedFilter = url.searchParams.get('reported');
 
   let query = 'SELECT id, fake FROM users';
   const filters = [];
@@ -4795,6 +4879,12 @@ async function handleAdminGetUserIds(request, env) {
     const days = createdFilter === '1d' ? 1 : createdFilter === '7d' ? 7 : 30;
     filters.push(`created_at >= datetime('now', ?)`);
     bindings.push(`-${days} days`);
+  }
+
+  if (reportedFilter === '1') {
+    filters.push("EXISTS (SELECT 1 FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open')");
+  } else if (reportedFilter === '0') {
+    filters.push("NOT EXISTS (SELECT 1 FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open')");
   }
 
   if (filters.length > 0) {
@@ -5131,6 +5221,7 @@ async function handleAdminGetUser(request, env, userId) {
   await ensureUsersMessageBlockRolesColumn(env);
   await ensureUsersDuplicateFlagColumn(env);
   await ensureUsersFeedPriorityColumn(env);
+  await ensureProfileReportsTable(env);
   await ensureStoriesTable(env);
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
@@ -5142,6 +5233,27 @@ async function handleAdminGetUser(request, env, userId) {
   const story = await env.DB.prepare(
     'SELECT id, COALESCE(vip_only, 0) AS vip_only FROM stories WHERE user_id = ? ORDER BY created_at DESC LIMIT 1'
   ).bind(userId).first();
+  const reportRows = await env.DB.prepare(`
+    SELECT pr.id, pr.reporter_id, pr.reason, pr.details, pr.status, pr.created_at, pr.updated_at, u.username AS reporter_username
+    FROM profile_reports pr
+    LEFT JOIN users u ON u.id = pr.reporter_id
+    WHERE pr.reported_id = ?
+    ORDER BY pr.status = 'open' DESC, pr.updated_at DESC
+    LIMIT 20
+  `).bind(userId).all();
+  const reportCount = await env.DB.prepare(
+    "SELECT COUNT(*) AS total FROM profile_reports WHERE reported_id = ? AND status = 'open'"
+  ).bind(userId).first();
+  const reports = (reportRows.results || []).map((row) => ({
+    id: row.id,
+    reporter_id: row.reporter_id,
+    reporter_username: row.reporter_username || '',
+    reason: row.reason || '',
+    details: row.details || '',
+    status: row.status || 'open',
+    created_at: row.created_at || '',
+    updated_at: row.updated_at || '',
+  }));
 
   const { password_hash, ...safe } = user;
   return json({
@@ -5163,6 +5275,8 @@ async function handleAdminGetUser(request, env, userId) {
       fake: !!safe.fake,
       feed_priority: Math.max(0, Number(safe.feed_priority || 0)),
       duplicate_flag: !!safe.duplicate_flag,
+      reports_count: Number(reportCount?.total || 0),
+      reports,
       story_id: story?.id || null,
       story_vip_only: Number(story?.vip_only || 0) === 1,
     }
@@ -6460,6 +6574,8 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/profile' && method === 'PUT') return handleUpdateProfile(request, env);
   const chatBootstrapMatch = path.match(/^\/api\/chat\/bootstrap\/([a-f0-9-]+)$/);
   if (chatBootstrapMatch && method === 'GET') return handleChatBootstrap(request, env, chatBootstrapMatch[1]);
+  const profileReportMatch = path.match(/^\/api\/profiles\/([a-f0-9-]+)\/report$/);
+  if (profileReportMatch && method === 'POST') return handleReportProfile(request, env, profileReportMatch[1]);
   const profileMatch = path.match(/^\/api\/profiles\/([a-f0-9-]+)$/);
   if (profileMatch && method === 'GET') return handleProfileDetail(request, env, profileMatch[1]);
 
