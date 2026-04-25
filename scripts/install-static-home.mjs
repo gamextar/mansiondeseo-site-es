@@ -117,9 +117,9 @@ const staticHomeHtml = `<!doctype html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Mansión Deseo | Club privado para adultos registrados</title>
-  <meta name="description" content="Comunidad privada para adultos registrados, pensada para parejas liberales, swingers, tríos y conexiones discretas con perfiles verificados." />
-  <meta name="keywords" content="parejas liberales, swingers, cuckold, tríos, contactossex, intercambio de parejas, comunidad liberal, club privado adultos" />
+  <title>Mansión Deseo | Swingers Argentina y contactos adultos privados</title>
+  <meta name="description" content="Mansión Deseo es una comunidad privada para adultos en Argentina: swingers, parejas liberales, tríos y contactos discretos con perfiles cuidados." />
+  <meta name="keywords" content="swingers argentina, parejas liberales argentina, contactos adultos, intercambio de parejas, tríos argentina, comunidad liberal, club privado adultos" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="${SITE_ORIGIN}/" />
   <meta name="theme-color" content="#08080E" />
@@ -130,14 +130,14 @@ const staticHomeHtml = `<!doctype html>
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Mansión Deseo" />
-  <meta property="og:title" content="Mansión Deseo | Club privado para adultos registrados" />
-  <meta property="og:description" content="Comunidad privada para adultos registrados, pensada para parejas liberales, swingers, tríos y conexiones discretas con perfiles verificados." />
+  <meta property="og:title" content="Mansión Deseo | Swingers Argentina y contactos adultos privados" />
+  <meta property="og:description" content="Comunidad privada para adultos en Argentina: swingers, parejas liberales, tríos y conexiones discretas." />
   <meta property="og:image" content="${SITE_ORIGIN}/icon-512.png" />
   <meta property="og:url" content="${SITE_ORIGIN}/" />
   <meta property="og:locale" content="${ogLocale}" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Mansión Deseo | Club privado para adultos registrados" />
-  <meta name="twitter:description" content="Comunidad privada para adultos registrados, pensada para parejas liberales, swingers, tríos y conexiones discretas." />
+  <meta name="twitter:title" content="Mansión Deseo | Swingers Argentina y contactos adultos privados" />
+  <meta name="twitter:description" content="Comunidad privada para adultos en Argentina: swingers, parejas liberales, tríos y conexiones discretas." />
   <meta name="twitter:image" content="${SITE_ORIGIN}/icon-512.png" />
   <script type="application/ld+json">${staticHomeStructuredData}</script>
   <script>
@@ -159,8 +159,8 @@ const staticHomeHtml = `<!doctype html>
     })();
   </script>
   <style>
-    :root{--bg:#08080e;--panel:#11111a;--panel2:#17151f;--text:#f6efe6;--muted:rgba(246,239,230,.68);--dim:rgba(246,239,230,.48);--gold:#c9a84c;--gold2:#f0d98b;--crimson:#9b2b40;--line:rgba(255,255,255,.09)}
-    *{box-sizing:border-box}html{background:var(--bg)}body{margin:0;background:radial-gradient(circle at 72% 8%,rgba(201,168,76,.14),transparent 26rem),radial-gradient(circle at 12% 10%,rgba(155,43,64,.22),transparent 24rem),linear-gradient(180deg,#0b0a11 0%,#08080e 70%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}a{color:inherit;text-decoration:none}.wrap{width:min(1160px,calc(100% - 32px));margin:0 auto;padding:22px 0 48px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0 24px}.brand{display:flex;align-items:center;gap:12px}.mark{width:42px;height:42px;border-radius:16px;background:linear-gradient(135deg,var(--crimson),#54172a);display:grid;place-items:center;font-family:Georgia,serif;font-weight:800;box-shadow:0 18px 42px rgba(155,43,64,.22)}.brand-text{font-family:Georgia,"Times New Roman",serif;font-size:22px;color:var(--gold2)}.top-actions{display:flex;align-items:center;gap:10px}.link{font-size:14px;color:var(--muted)}.pill-btn{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:12px 18px;font-weight:700;font-size:14px}.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#14100a}.ghost{border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text)}.hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:22px;align-items:stretch}.panel{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.025));border-radius:34px;box-shadow:0 30px 90px rgba(0,0,0,.34);overflow:hidden}.copy{padding:42px}.badge{display:inline-flex;border:1px solid rgba(201,168,76,.26);background:rgba(201,168,76,.09);color:rgba(240,217,139,.92);border-radius:999px;padding:9px 13px;font-size:12px;letter-spacing:.06em}.title{font-family:Georgia,"Times New Roman",serif;font-weight:500;letter-spacing:-.045em;font-size:clamp(46px,7vw,86px);line-height:.94;margin:24px 0 0}.lead{max-width:680px;margin:22px 0 0;color:var(--muted);font-size:18px;line-height:1.75}.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}.visual{min-height:520px;position:relative;background:radial-gradient(circle at 50% 20%,rgba(240,217,139,.16),transparent 18rem),linear-gradient(145deg,#1b141d,#09080d 62%);display:flex;align-items:flex-end;padding:26px}.orb{position:absolute;border-radius:999px;filter:blur(.2px);opacity:.78}.orb.one{width:185px;height:185px;left:16%;bottom:21%;background:linear-gradient(145deg,rgba(201,168,76,.28),rgba(155,43,64,.14))}.orb.two{width:230px;height:230px;right:12%;bottom:15%;background:linear-gradient(145deg,rgba(155,43,64,.32),rgba(201,168,76,.1))}.orb.three{width:150px;height:150px;left:40%;bottom:31%;background:linear-gradient(145deg,rgba(255,255,255,.16),rgba(201,168,76,.1))}.visual-card{position:relative;z-index:2;border:1px solid var(--line);background:rgba(0,0,0,.24);backdrop-filter:blur(14px);border-radius:24px;padding:18px;color:var(--muted);font-size:14px;line-height:1.65}.strip{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;margin-top:18px}.mini{padding:24px}.eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgba(201,168,76,.86)}.stat{font-family:Georgia,"Times New Roman",serif;font-size:50px;line-height:1;margin-top:12px}.muted{color:var(--muted);line-height:1.65}.tags{display:flex;flex-wrap:wrap;gap:9px;margin-top:15px}.tag{border:1px solid var(--line);background:rgba(0,0,0,.18);border-radius:999px;padding:8px 12px;font-size:12px;color:rgba(255,255,255,.78)}@media(max-width:900px){.wrap{width:min(100% - 24px,680px);padding-top:14px}.hero,.strip{grid-template-columns:1fr}.copy{padding:26px}.visual{min-height:360px}.top{align-items:flex-start}.brand-text{font-size:20px}.top-actions{gap:8px}.top-actions .link{display:none}.pill-btn{padding:11px 15px}.title{font-size:clamp(42px,13vw,68px)}}
+    :root{--bg:#08080e;--panel:#11111a;--panel2:#17151f;--text:#f6efe6;--muted:rgba(246,239,230,.70);--dim:rgba(246,239,230,.50);--gold:#c9a84c;--gold2:#f0d98b;--crimson:#9b2b40;--wine:#4a1324;--line:rgba(255,255,255,.10)}
+    *{box-sizing:border-box}html{background:var(--bg)}body{margin:0;min-height:100vh;background:radial-gradient(circle at 78% 4%,rgba(201,168,76,.18),transparent 25rem),radial-gradient(circle at 9% 18%,rgba(155,43,64,.27),transparent 24rem),linear-gradient(180deg,#0d0b12 0%,#08080e 68%,#050508 100%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit;text-decoration:none}.wrap{width:min(1180px,calc(100% - 32px));margin:0 auto;padding:22px 0 54px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0 22px}.brand{display:flex;align-items:center;gap:12px}.mark{width:44px;height:44px;border-radius:17px;background:linear-gradient(135deg,var(--crimson),#54172a);display:grid;place-items:center;font-family:Georgia,serif;font-weight:800;box-shadow:0 18px 44px rgba(155,43,64,.24)}.brand-text{font-family:Georgia,"Times New Roman",serif;font-size:23px;color:var(--gold2)}.top-actions{display:flex;align-items:center;gap:10px}.link{font-size:14px;color:var(--muted)}.pill-btn{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:12px 18px;font-weight:800;font-size:14px}.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#14100a;box-shadow:0 18px 36px rgba(201,168,76,.18)}.ghost{border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text)}.hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(330px,.85fr);gap:22px;align-items:stretch}.panel{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.026));border-radius:34px;box-shadow:0 30px 90px rgba(0,0,0,.36);overflow:hidden}.copy{padding:44px}.badge{display:inline-flex;border:1px solid rgba(201,168,76,.28);background:rgba(201,168,76,.10);color:rgba(240,217,139,.95);border-radius:999px;padding:9px 13px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}.title{font-family:Georgia,"Times New Roman",serif;font-weight:500;letter-spacing:-.05em;font-size:clamp(46px,7vw,88px);line-height:.94;margin:24px 0 0}.lead{max-width:720px;margin:22px 0 0;color:var(--muted);font-size:18px;line-height:1.75}.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}.hero-notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:28px}.note{border:1px solid var(--line);background:rgba(0,0,0,.16);border-radius:18px;padding:14px}.note strong{display:block;color:var(--gold2);font-size:18px}.note span{display:block;margin-top:4px;color:var(--dim);font-size:12px;line-height:1.35}.access{padding:24px;background:linear-gradient(145deg,rgba(74,19,36,.48),rgba(8,8,14,.86) 62%)}.access-card{height:100%;border:1px solid var(--line);border-radius:26px;background:rgba(0,0,0,.26);padding:22px;display:flex;flex-direction:column;justify-content:space-between;min-height:520px;position:relative;overflow:hidden}.access-card:before{content:"";position:absolute;inset:-35% -20% auto auto;width:280px;height:280px;border-radius:999px;background:radial-gradient(circle,rgba(201,168,76,.20),transparent 62%)}.access h2{position:relative;font-family:Georgia,"Times New Roman",serif;font-size:34px;line-height:1.05;margin:0}.access p{position:relative;color:var(--muted);line-height:1.7}.fields{position:relative;display:grid;gap:10px;margin:18px 0}.fake-field{border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:16px;padding:13px 14px;color:var(--dim);font-size:14px}.role-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.role{border:1px solid rgba(201,168,76,.16);background:rgba(201,168,76,.07);border-radius:14px;padding:10px;text-align:center;font-size:12px;color:rgba(240,217,139,.92)}.fine{font-size:12px;color:var(--dim);line-height:1.55}.strip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:18px}.mini{padding:24px}.eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgba(201,168,76,.86)}.stat{font-family:Georgia,"Times New Roman",serif;font-size:48px;line-height:1;margin-top:12px}.muted{color:var(--muted);line-height:1.65}.tags{display:flex;flex-wrap:wrap;gap:9px;margin-top:15px}.tag{border:1px solid var(--line);background:rgba(0,0,0,.18);border-radius:999px;padding:8px 12px;font-size:12px;color:rgba(255,255,255,.78)}.trust{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}.trust .mini{padding:20px}.trust h3{font-size:14px;margin:0 0 8px}.trust p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}.footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-top:24px;color:var(--dim);font-size:12px}.footer a{color:var(--muted)}@media(max-width:900px){.wrap{width:min(100% - 24px,700px);padding-top:14px}.hero,.strip,.trust{grid-template-columns:1fr}.copy{padding:28px}.access-card{min-height:auto}.hero-notes{grid-template-columns:1fr}.top{align-items:flex-start}.brand-text{font-size:20px}.top-actions{gap:8px}.top-actions .link{display:none}.pill-btn{padding:11px 15px}.title{font-size:clamp(42px,13vw,68px)}}
   </style>
 </head>
 <body>
@@ -178,33 +178,73 @@ const staticHomeHtml = `<!doctype html>
 
     <section class="hero">
       <div class="panel copy">
-        <span class="badge">+18 · Acceso privado para adultos</span>
-        <h1 class="title">Una comunidad privada con química real.</h1>
-        <p class="lead">Mansión Deseo es una entrada discreta para adultos registrados que buscan parejas liberales, swingers, tríos y conexiones de nicho dentro de un entorno más cuidado.</p>
+        <span class="badge">Swingers Argentina · +18 · Acceso privado</span>
+        <h1 class="title">Conocé adultos con la misma curiosidad.</h1>
+        <p class="lead">Mansión Deseo es una comunidad privada para adultos en Argentina: parejas liberales, swingers, tríos y contactos discretos dentro de una experiencia más cuidada, moderna y reservada.</p>
         <div class="cta">
           <a class="pill-btn gold" href="/registro/">Empezar ahora</a>
           <a class="pill-btn ghost" href="/login/">Ya tengo cuenta</a>
         </div>
+        <div class="hero-notes" aria-label="Datos de la comunidad">
+          <div class="note"><strong>Privado</strong><span>Tu actividad no se vincula con redes sociales.</span></div>
+          <div class="note"><strong>Argentina</strong><span>Perfiles y búsquedas enfocadas en tu zona.</span></div>
+          <div class="note"><strong>+18</strong><span>Acceso reservado para adultos registrados.</span></div>
+        </div>
       </div>
-      <div class="panel visual" aria-label="Ambiente premium de Mansión Deseo">
-        <span class="orb one"></span><span class="orb two"></span><span class="orb three"></span>
-        <div class="visual-card">No es una red abierta. La experiencia completa vive adentro: perfiles, historias y mensajes para adultos registrados.</div>
+      <div class="panel access" aria-label="Acceso a Mansión Deseo">
+        <div class="access-card">
+          <div>
+            <h2>Entrá a la mansión con un perfil reservado.</h2>
+            <p>Creá tu cuenta gratis y completá tu perfil para descubrir personas, parejas e historias privadas.</p>
+            <div class="fields" aria-hidden="true">
+              <div class="fake-field">Correo electrónico</div>
+              <div class="fake-field">Nombre de usuario</div>
+              <div class="role-grid">
+                <div class="role">Mujer</div>
+                <div class="role">Hombre</div>
+                <div class="role">Pareja</div>
+                <div class="role">Trans</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <a class="pill-btn gold" style="width:100%" href="/registro/">Crear mi cuenta</a>
+            <p class="fine">Registro rápido, entorno discreto y herramientas para bloquear o denunciar perfiles cuando haga falta.</p>
+          </div>
+        </div>
       </div>
     </section>
 
     <section class="strip">
       <div class="panel mini">
-        <div class="eyebrow">Últimas búsquedas</div>
+        <div class="eyebrow">Búsquedas destacadas</div>
         <div class="tags">
 	          ${staticIntentTags}
         </div>
       </div>
       <div class="panel mini">
-        <div class="eyebrow">Acceso privado</div>
-        <div class="stat">+18</div>
-        <p class="muted">El contenido completo, la interacción y los perfiles detallados quedan reservados para usuarios registrados.</p>
+        <div class="eyebrow">Comunidad</div>
+        <div class="stat">3k+</div>
+        <p class="muted">Perfiles de lanzamiento y usuarios reales conviven mientras crece la comunidad.</p>
+      </div>
+      <div class="panel mini">
+        <div class="eyebrow">Experiencia</div>
+        <div class="stat">24/7</div>
+        <p class="muted">Feed, stories, mensajes y moderación pensados para una navegación privada.</p>
       </div>
     </section>
+
+    <section class="trust" aria-label="Confianza y privacidad">
+      <div class="panel mini"><h3>Discreción</h3><p>Sin conexión pública con redes sociales y con acceso completo dentro del área privada.</p></div>
+      <div class="panel mini"><h3>Moderación</h3><p>Herramientas para reportar, bloquear y revisar perfiles desde administración.</p></div>
+      <div class="panel mini"><h3>Historias privadas</h3><p>Contenido efímero y perfiles con fotos visibles según configuración.</p></div>
+      <div class="panel mini"><h3>Argentina primero</h3><p>Landings, búsquedas y contenido orientados a ciudades y términos locales.</p></div>
+    </section>
+
+    <footer class="footer">
+      <span>© 2026 Mansión Deseo · Sitio para mayores de 18 años.</span>
+      <span><a href="/login/">Ingresar</a> · <a href="/registro/">Registrarme</a></span>
+    </footer>
   </main>
   <script>
     (function(){
