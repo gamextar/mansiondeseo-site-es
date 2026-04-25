@@ -96,6 +96,54 @@
     <style>
       html,body{background:#08080E;color-scheme:dark}
     </style>
+    <script>
+      (function(){
+        var key = 'mansion-html-asset-recovery';
+        function isAssetUrl(value) {
+          return /\/assets\/.+\.(js|css)(\?|$)/i.test(String(value || ''));
+        }
+        function recover() {
+          try {
+            if (sessionStorage.getItem(key) === '1') return;
+            sessionStorage.setItem(key, '1');
+          } catch (_) {}
+          Promise.resolve()
+            .then(function(){
+              if (!('caches' in window)) return;
+              return caches.keys().then(function(keys){
+                return Promise.all(keys.map(function(cacheKey){ return caches.delete(cacheKey); }));
+              });
+            })
+            .then(function(){
+              if (!('serviceWorker' in navigator)) return;
+              return navigator.serviceWorker.getRegistrations().then(function(registrations){
+                return Promise.all(registrations.map(function(registration){ return registration.unregister(); }));
+              });
+            })
+            .catch(function(){})
+            .then(function(){ window.location.reload(); });
+        }
+        window.addEventListener('error', function(event) {
+          var target = event && event.target;
+          var url = target && (target.src || target.href);
+          if (isAssetUrl(url)) recover();
+          var message = String((event && (event.message || event.error)) || '');
+          if (
+            message.indexOf('valid JavaScript MIME type') >= 0 ||
+            message.indexOf('Failed to fetch dynamically imported module') >= 0 ||
+            message.indexOf('Importing a module script failed') >= 0
+          ) recover();
+        }, true);
+        window.addEventListener('unhandledrejection', function(event) {
+          var message = String((event && event.reason && (event.reason.message || event.reason)) || '');
+          if (
+            message.indexOf('valid JavaScript MIME type') >= 0 ||
+            message.indexOf('Failed to fetch dynamically imported module') >= 0 ||
+            message.indexOf('Importing a module script failed') >= 0
+          ) recover();
+        });
+      })();
+    </script>
   </head>
   <body style="margin:0;background-color:#08080E;color-scheme:dark">
     <div id="root" style="background-color:#08080E"></div>
