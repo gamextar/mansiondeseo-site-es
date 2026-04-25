@@ -1,9 +1,9 @@
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Film, MessageCircle, User, Crown, Settings, Camera, Trophy, Heart } from 'lucide-react';
+import { Home, Film, MessageCircle, User, Settings, Camera, Trophy, Heart, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useState } from 'react';
-import { peekOwnProfileDashboard, warmTopVisitedProfiles } from '../lib/api';
+import { logout as apiLogout, peekOwnProfileDashboard, warmTopVisitedProfiles } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import AvatarImg from './AvatarImg';
 import { warmVideoFeed } from '../lib/videoFeedWarmup';
@@ -38,7 +38,8 @@ export default function DesktopSidebar() {
   const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
   const [visitors] = useState(() => peekOwnProfileDashboard()?.visitors || []);
-  const { user, siteSettings } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const { user, setRegistered, setUser } = useAuth();
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];
@@ -51,6 +52,15 @@ export default function DesktopSidebar() {
     from: `${location.pathname}${location.search}${location.hash}`,
     preview,
   });
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    await apiLogout();
+    setUser(null);
+    setRegistered(false);
+    window.location.href = '/';
+  };
 
   return (
     <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 xl:w-72 z-40 flex-col bg-mansion-card/50 border-r border-mansion-border/30 backdrop-blur-xl">
@@ -210,9 +220,8 @@ export default function DesktopSidebar() {
       )}
 
       {/* Bottom section */}
-      {user?.is_admin && (
-        <div className="px-3 pb-4 space-y-2">
-          {/* Settings (admin only) */}
+      <div className="px-3 pb-4 space-y-2">
+        {user?.is_admin && (
           <NavLink
             to="/admin"
             className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-text-dim hover:text-text-muted transition-colors"
@@ -220,8 +229,18 @@ export default function DesktopSidebar() {
             <Settings className="w-4 h-4" />
             <span className="text-xs">Admin Panel</span>
           </NavLink>
-        </div>
-      )}
+        )}
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-mansion-crimson/70 hover:text-mansion-crimson hover:bg-mansion-crimson/5 transition-colors disabled:opacity-60 disabled:cursor-wait"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="text-xs">{loggingOut ? 'Cerrando...' : 'Cerrar sesión'}</span>
+        </button>
+      </div>
     </aside>
   );
 }
