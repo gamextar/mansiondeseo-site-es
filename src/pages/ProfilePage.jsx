@@ -1,13 +1,11 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Filter, Move, MapPin, ExternalLink, Film, Pencil } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
-import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache, getFavorites } from '../lib/api';
+import { logout as apiLogout, uploadImage, deletePhoto, updateProfile, invalidateProfilesCache, getFavorites } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
-import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
 import { formatLocation } from '../lib/location';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
 import { resolveMediaUrl } from '../lib/media';
@@ -60,9 +58,9 @@ const INTEREST_OPTIONS = [
 ];
 
 const PROFILE_TABS = [
-  { id: 'gallery', label: 'Galería', icon: Image },
-  { id: 'preferences', label: 'Preferencias', icon: Filter },
-  { id: 'followers', label: 'Seguidores', icon: Heart },
+  { id: 'gallery', label: 'Galería', icon: Camera },
+  { id: 'preferences', label: 'Preferencias', icon: Heart },
+  { id: 'followers', label: 'Seguidores', icon: Users },
   { id: 'account', label: 'Cuenta', icon: Settings },
 ];
 
@@ -77,26 +75,6 @@ const tabPanelMotion = {
   animate: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.28, ease: [.25,.46,.45,.94] } },
   exit: { opacity: 0, y: -10, filter: 'blur(4px)', transition: { duration: 0.16, ease: 'easeOut' } },
 };
-
-function detectStandaloneMobile() {
-  if (typeof window === 'undefined') return false;
-  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
-  const ua = window.navigator.userAgent || '';
-  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
-  return Boolean(standalone && isMobile);
-}
-
-function timeAgo(dateStr) {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr + 'Z').getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Justo ahora';
-  if (mins < 60) return `Hace ${mins} min`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `Hace ${hrs}h`;
-  const days = Math.floor(hrs / 24);
-  return `Hace ${days}d`;
-}
 
 function RoleSelectorTile({ option, active, roleImage, tone = 'gold', onClick }) {
   const selectedClass = tone === 'danger'
@@ -175,10 +153,6 @@ function FollowMiniCard({ profile, relation, onOpen }) {
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { setRegistered, setUser, user, siteSettings } = useAuth();
-  const isStandaloneMobileApp = detectStandaloneMobile();
-  const navBottomOffset = isStandaloneMobileApp
-    ? getStandaloneBottomNavOffset()
-    : getBrowserBottomNavOffset();
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -187,8 +161,6 @@ export default function ProfilePage() {
   const [adjustUrl, setAdjustUrl] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [togglingGhost, setTogglingGhost] = useState(false);
-  const [visitors, setVisitors] = useState([]);
-  const [receivedGifts, setReceivedGifts] = useState([]);
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
   const avatarUploadSeqRef = useRef(0);
@@ -203,7 +175,6 @@ export default function ProfilePage() {
   const lbPanRef = useRef({ x: 0, y: 0 });
   const lbPinchRef = useRef({ startDist: 0, startZoom: 1, active: false });
   const lbDragRef = useRef({ startX: 0, startY: 0, startPanX: 0, startPanY: 0, active: false });
-  const [showStoryPreview, setShowStoryPreview] = useState(false);
   const [activeTab, setActiveTab] = useState('gallery');
   const [followTab, setFollowTab] = useState('followers');
   const [followProfiles, setFollowProfiles] = useState([]);
@@ -296,14 +267,6 @@ export default function ProfilePage() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [lightboxOpen, user]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    getOwnProfileDashboard().then(data => {
-      setVisitors(data.visitors || []);
-      setReceivedGifts(data.gifts || []);
-    }).catch(() => {});
-  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id || activeTab !== 'followers') return;
@@ -781,54 +744,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Action pills row */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => navigate('/historia/nueva', { state: { from: '/perfil' } })}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-mansion-crimson/10 border border-mansion-crimson/25 text-[11px] font-medium text-mansion-crimson hover:bg-mansion-crimson/20 transition-all"
-            >
-              <Film className="w-3 h-3" />
-              {user?.has_active_story ? 'Ver / nueva historia' : 'Subir historia'}
-            </button>
-
-            {user?.has_active_story && (
-              <button
-                onClick={async () => {
-                  if (!confirm('¿Eliminar tu historia actual?')) return;
-                  try {
-                    const storiesData = await getStories({ limit: 50 });
-                    const currentStory = (storiesData.stories || []).find((story) => story.user_id === user?.id);
-                    if (currentStory?.id) await deleteOwnStory(currentStory.id);
-                    const me = await getMe().catch(() => null);
-                    if (me?.user) {
-                      setUser({ ...me.user, has_active_story: false });
-                    } else {
-                      setUser(prev => prev ? { ...prev, has_active_story: false } : prev);
-                    }
-                  } catch { /* best-effort */ }
-                }}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-[11px] text-red-400 hover:bg-red-500/15 transition-all"
-              >
-                <X className="w-3 h-3" />
-                Eliminar historia
-              </button>
-            )}
-          </div>
-        </motion.div>
-
-        {/* ── Stats Row ── */}
-        <motion.div variants={fadeUp} className="grid grid-cols-3 gap-px mb-5 rounded-2xl overflow-hidden bg-mansion-border/10">
-          {[
-            { value: photos.length, label: 'Fotos', icon: Image },
-            { value: receivedGifts.length, label: 'Regalos', icon: Gift },
-            { value: visitors.length, label: 'Visitas', icon: Users },
-          ].map(({ value, label, icon: Icon }) => (
-            <div key={label} className="flex flex-col items-center py-3.5 bg-mansion-card/40">
-              <Icon className="w-3.5 h-3.5 text-mansion-gold/50 mb-1" />
-              <span className="text-lg font-bold text-text-primary font-display">{value}</span>
-              <span className="text-[10px] uppercase tracking-wider text-text-dim mt-0.5">{label}</span>
-            </div>
-          ))}
         </motion.div>
 
         <motion.div variants={fadeUp} className="sticky top-[calc(var(--safe-top)+72px)] z-20 mb-6 -mx-1 overflow-x-auto rounded-2xl border border-mansion-border/20 bg-mansion-base/80 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:top-4 lg:mx-0">
@@ -840,7 +755,7 @@ export default function ProfilePage() {
                   key={id}
                   type="button"
                   onClick={() => setActiveTab(id)}
-                  className={`relative flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold transition-all lg:text-sm ${
+                  className={`relative flex min-w-[112px] flex-col items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-xs font-semibold transition-all lg:min-w-0 lg:flex-row lg:gap-2 lg:text-sm ${
                     active ? 'text-mansion-base' : 'text-text-muted hover:bg-white/[0.04] hover:text-text-primary'
                   }`}
                 >
@@ -851,7 +766,11 @@ export default function ProfilePage() {
                       transition={{ type: 'spring', stiffness: 420, damping: 34 }}
                     />
                   )}
-                  <Icon className="relative h-4 w-4" />
+                  <span className={`relative flex h-8 w-8 items-center justify-center rounded-full transition-colors lg:h-7 lg:w-7 ${
+                    active ? 'bg-mansion-base/12' : 'bg-white/[0.04] text-mansion-gold/85'
+                  }`}>
+                    <Icon className="h-4 w-4" />
+                  </span>
                   <span className="relative whitespace-nowrap">{label}</span>
                 </button>
               );
@@ -861,7 +780,7 @@ export default function ProfilePage() {
 
         <AnimatePresence mode="wait">
           {activeTab === 'gallery' && (
-            <motion.section key="gallery" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+            <motion.section key="gallery" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit">
               <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.18)] lg:p-6">
                 <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -961,103 +880,41 @@ export default function ProfilePage() {
                 </div>
                 <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleGalleryUpload} />
               </div>
-
-              <aside className="space-y-4">
-                {receivedGifts.length > 0 && (
-                  <div className="rounded-[1.75rem] border border-mansion-border/20 bg-mansion-card/35 p-4">
-                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-text-dim">Regalos recibidos</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {receivedGifts.map((g, i) => (
-                        <motion.div key={g.id} initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.035 }} className="flex items-center gap-2 rounded-2xl border border-mansion-border/15 bg-mansion-card/55 px-3 py-2" title={`De ${g.sender_name}`}>
-                          <span className="text-xl">{g.gift_emoji}</span>
-                          <div className="text-xs">
-                            <p className="font-medium text-text-primary">{g.gift_name}</p>
-                            <p className="text-text-dim">de {g.sender_name}</p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {visitors.length > 0 && (
-                  <div className="rounded-[1.75rem] border border-mansion-border/20 bg-mansion-card/35 p-4">
-                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-text-dim">Visitas recientes</h3>
-                    <div className="space-y-2">
-                      {visitors.slice(0, 6).map((v, i) => (
-                        <motion.button key={v.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} onClick={() => openFollowProfile(v)} className="group flex w-full items-center gap-3 rounded-2xl bg-mansion-card/40 p-3 text-left transition-all hover:bg-mansion-card/70">
-                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-mansion-elevated">
-                            {v.avatar_url ? <AvatarImg src={v.avatar_url} crop={v.avatar_crop} alt={v.name} className="h-full w-full" /> : <div className="flex h-full w-full items-center justify-center text-text-dim"><Camera className="h-4 w-4" /></div>}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-text-primary">{v.name}</p>
-                            <p className="truncate text-xs text-text-dim">Te visitó {timeAgo(v.visited_at).toLowerCase()}</p>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-text-dim group-hover:text-mansion-gold" />
-                        </motion.button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </aside>
             </motion.section>
           )}
 
           {activeTab === 'preferences' && (
-            <motion.section key="preferences" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
-                <div className="mb-5">
-                  <h3 className="font-display text-2xl font-bold text-text-primary">Preferencias</h3>
-                  <p className="mt-1 text-sm text-text-dim">Elegí varios roles para ordenar tu feed por afinidad.</p>
-                </div>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                  {SEEKING_OPTIONS.map((option) => (
-                    <RoleSelectorTile
-                      key={option.id}
-                      option={option}
-                      active={seekingArr.includes(option.id)}
-                      roleImage={roleImages[option.id]}
-                      onClick={() => toggleSeekingRole(option.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
-                  <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
-                    <Filter className="h-3.5 w-3.5 text-mansion-gold" />
-                    Intereses
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {INTEREST_OPTIONS.map((interest) => {
-                      const active = userInterests.includes(interest.id);
-                      return (
-                        <motion.button
-                          key={interest.id}
-                          type="button"
-                          whileTap={{ scale: 0.96 }}
-                          onClick={() => toggleInterest(interest.id)}
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition-all ${
-                            active
-                              ? 'border-mansion-gold/45 bg-mansion-gold/14 text-mansion-gold'
-                              : 'border-mansion-border/25 bg-mansion-card/55 text-text-muted hover:border-mansion-gold/25 hover:text-text-primary'
-                          }`}
-                        >
-                          <span>{interest.emoji}</span>
-                          <span>{interest.label}</span>
-                        </motion.button>
-                      );
-                    })}
+            <motion.section key="preferences" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="space-y-6">
+              <div className="grid items-start gap-6 xl:grid-cols-2">
+                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
+                  <div className="mb-5 min-h-[70px]">
+                    <h3 className="flex items-center gap-2 font-display text-2xl font-bold text-text-primary">
+                      <Heart className="h-5 w-5 text-mansion-gold" />
+                      Busco
+                    </h3>
+                    <p className="mt-1 text-sm text-text-dim">Elegí varios roles para ordenar tu feed por afinidad.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                    {SEEKING_OPTIONS.map((option) => (
+                      <RoleSelectorTile
+                        key={option.id}
+                        option={option}
+                        active={seekingArr.includes(option.id)}
+                        roleImage={roleImages[option.id]}
+                        onClick={() => toggleSeekingRole(option.id)}
+                      />
+                    ))}
                   </div>
                 </div>
 
-                <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
-                  <h3 className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
-                    <Shield className="h-3.5 w-3.5 text-mansion-crimson" />
-                    Bloquear mensajes de
-                  </h3>
-                  <p className="mb-4 text-xs text-text-dim">Los roles seleccionados no podrán iniciarte chat.</p>
+                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
+                  <div className="mb-5 min-h-[70px]">
+                    <h3 className="flex items-center gap-2 font-display text-2xl font-bold text-text-primary">
+                      <Shield className="h-5 w-5 text-mansion-crimson" />
+                      Bloquear
+                    </h3>
+                    <p className="mt-1 text-sm text-text-dim">Los roles seleccionados no podrán iniciarte chat.</p>
+                  </div>
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                     {SEEKING_OPTIONS.map((option) => (
                       <RoleSelectorTile
@@ -1070,6 +927,35 @@ export default function ProfilePage() {
                       />
                     ))}
                   </div>
+                </div>
+              </div>
+
+              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
+                <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
+                  <Filter className="h-3.5 w-3.5 text-mansion-gold" />
+                  Intereses
+                </h3>
+                <p className="mb-4 text-xs text-text-dim">Estos intereses afinan el orden del feed después de tus preferencias principales.</p>
+                <div className="flex flex-wrap gap-2">
+                  {INTEREST_OPTIONS.map((interest) => {
+                    const active = userInterests.includes(interest.id);
+                    return (
+                      <motion.button
+                        key={interest.id}
+                        type="button"
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => toggleInterest(interest.id)}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition-all ${
+                          active
+                            ? 'border-mansion-gold/45 bg-mansion-gold/14 text-mansion-gold'
+                            : 'border-mansion-border/25 bg-mansion-card/55 text-text-muted hover:border-mansion-gold/25 hover:text-text-primary'
+                        }`}
+                      >
+                        <span>{interest.emoji}</span>
+                        <span>{interest.label}</span>
+                      </motion.button>
+                    );
+                  })}
                 </div>
               </div>
             </motion.section>
@@ -1270,19 +1156,6 @@ export default function ProfilePage() {
               )}
             </>
           )}
-        </div>
-      )}
-
-      {showStoryPreview && user?.active_story_url && (
-        <div className="fixed inset-0 z-50 bg-black lg:left-64 xl:left-72 lg:bg-mansion-base">
-          <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
-            <StoryPreviewOverlay
-              videoUrl={user.active_story_url}
-              user={user}
-              navBottomOffset={navBottomOffset}
-              onDismiss={() => setShowStoryPreview(false)}
-            />
-          </div>
         </div>
       )}
     </div>
