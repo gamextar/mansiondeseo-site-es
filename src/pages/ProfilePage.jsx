@@ -666,10 +666,10 @@ export default function ProfilePage() {
         variants={stagger}
         className="w-full px-3 pt-6 lg:px-10 lg:pt-8"
       >
-        {/* ── Hero Section ── */}
-        <motion.div variants={fadeUp} className="mb-4">
+        {/* ── Profile Header ── */}
+        <motion.div variants={fadeUp} className="sticky top-[calc(var(--safe-top)+72px)] z-30 -mx-3 mb-3 border-b border-mansion-border/15 bg-mansion-base/90 px-3 pb-3 pt-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:top-4 lg:-mx-10 lg:px-10 lg:pt-4">
           {/* Avatar + info row */}
-          <div className="flex items-center gap-4 mb-3">
+          <div className="mb-3 flex items-center gap-4">
             {/* Avatar */}
             <div className="relative flex-shrink-0">
               <div className={`rounded-full p-[3px] ${user?.has_active_story ? 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400' : 'bg-gradient-to-br from-mansion-gold/50 to-mansion-gold-light/30'}`}>
@@ -744,45 +744,44 @@ export default function ProfilePage() {
             </div>
           </div>
 
-        </motion.div>
-
-        <motion.div variants={fadeUp} className="sticky top-[calc(var(--safe-top)+72px)] z-20 mb-6 -mx-1 overflow-x-auto rounded-2xl border border-mansion-border/20 bg-mansion-base/80 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:top-4 lg:mx-0">
-          <div className="grid min-w-max grid-cols-4 gap-1 lg:min-w-0">
-            {PROFILE_TABS.map(({ id, label, icon: Icon }) => {
-              const active = activeTab === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setActiveTab(id)}
-                  className={`relative flex min-w-[112px] flex-col items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-xs font-semibold transition-all lg:min-w-0 lg:flex-row lg:gap-2 lg:text-sm ${
-                    active ? 'text-mansion-base' : 'text-text-muted hover:bg-white/[0.04] hover:text-text-primary'
-                  }`}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="profileTabActive"
-                      className="absolute inset-0 rounded-xl bg-mansion-gold shadow-[0_14px_32px_rgba(201,168,76,0.18)]"
-                      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-                    />
-                  )}
-                  <span className={`relative flex h-8 w-8 items-center justify-center rounded-full transition-colors lg:h-7 lg:w-7 ${
-                    active ? 'bg-mansion-base/12' : 'bg-white/[0.04] text-mansion-gold/85'
-                  }`}>
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="relative whitespace-nowrap">{label}</span>
-                </button>
-              );
-            })}
+          <div className="-mx-1 overflow-x-auto rounded-2xl border border-mansion-border/20 bg-mansion-card/45 p-1.5">
+            <div className="grid min-w-max grid-cols-4 gap-1 lg:min-w-0">
+              {PROFILE_TABS.map(({ id, label, icon: Icon }) => {
+                const active = activeTab === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActiveTab(id)}
+                    className={`relative flex min-w-[112px] flex-col items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-xs font-semibold transition-all lg:min-w-0 lg:flex-row lg:gap-2 lg:text-sm ${
+                      active ? 'text-mansion-base' : 'text-text-muted hover:bg-white/[0.04] hover:text-text-primary'
+                    }`}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="profileTabActive"
+                        className="absolute inset-0 rounded-xl bg-mansion-gold shadow-[0_14px_32px_rgba(201,168,76,0.18)]"
+                        transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                      />
+                    )}
+                    <span className={`relative flex h-8 w-8 items-center justify-center rounded-full transition-colors lg:h-7 lg:w-7 ${
+                      active ? 'bg-mansion-base/12' : 'bg-white/[0.04] text-mansion-gold/85'
+                    }`}>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="relative whitespace-nowrap">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </motion.div>
 
         <AnimatePresence mode="wait">
           {activeTab === 'gallery' && (
             <motion.section key="gallery" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit">
-              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.18)] lg:p-6">
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.18)] lg:p-5">
+                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="font-display text-2xl font-bold text-text-primary">Galería</h3>
                     <p className="mt-1 text-sm text-text-dim">Ordená tus fotos y suma contenido nuevo desde el mismo panel.</p>
@@ -884,10 +883,10 @@ export default function ProfilePage() {
           )}
 
           {activeTab === 'preferences' && (
-            <motion.section key="preferences" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="space-y-6">
-              <div className="grid items-start gap-6 xl:grid-cols-2">
-                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
-                  <div className="mb-5 min-h-[70px]">
+            <motion.section key="preferences" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="space-y-4">
+              <div className="grid items-start gap-4 xl:grid-cols-2">
+                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-5">
+                  <div className="mb-3 min-h-[58px] lg:mb-4">
                     <h3 className="flex items-center gap-2 font-display text-2xl font-bold text-text-primary">
                       <Heart className="h-5 w-5 text-mansion-gold" />
                       Busco
@@ -907,8 +906,8 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
-                  <div className="mb-5 min-h-[70px]">
+                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-5">
+                  <div className="mb-3 min-h-[58px] lg:mb-4">
                     <h3 className="flex items-center gap-2 font-display text-2xl font-bold text-text-primary">
                       <Shield className="h-5 w-5 text-mansion-crimson" />
                       Bloquear
@@ -930,7 +929,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
+              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-5">
                 <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
                   <Filter className="h-3.5 w-3.5 text-mansion-gold" />
                   Intereses
@@ -962,7 +961,7 @@ export default function ProfilePage() {
           )}
 
           {activeTab === 'followers' && (
-            <motion.section key="followers" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
+            <motion.section key="followers" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <h3 className="font-display text-2xl font-bold text-text-primary">Seguidores</h3>
@@ -988,14 +987,14 @@ export default function ProfilePage() {
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-mansion-gold/25 border-t-mansion-gold" />
                 </div>
               ) : followersError ? (
-                <div className="mt-6 rounded-2xl border border-mansion-crimson/20 bg-mansion-crimson/8 p-4 text-sm text-red-300">{followersError}</div>
+                <div className="mt-4 rounded-2xl border border-mansion-crimson/20 bg-mansion-crimson/8 p-4 text-sm text-red-300">{followersError}</div>
               ) : followProfiles.length === 0 ? (
-                <div className="mt-6 rounded-[1.5rem] bg-mansion-card/45 p-10 text-center">
+                <div className="mt-4 rounded-[1.5rem] bg-mansion-card/45 p-10 text-center">
                   <Heart className="mx-auto mb-3 h-10 w-10 text-text-dim" />
                   <p className="text-sm text-text-dim">{followTab === 'followers' ? 'Todavía no tienes seguidores.' : 'Todavía no sigues a ningún perfil.'}</p>
                 </div>
               ) : (
-                <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {followProfiles.map((profile) => (
                     <FollowMiniCard key={`${followTab}-${profile.id}`} profile={profile} relation={followTab === 'followers' ? (profile.mutual_follow ? 'Mutuo' : 'Te sigue') : (profile.mutual_follow ? 'Mutuo' : 'Siguiendo')} onOpen={() => openFollowProfile(profile)} />
                   ))}
