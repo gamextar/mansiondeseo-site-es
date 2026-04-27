@@ -990,7 +990,7 @@ export async function sendMessage(receiverId, content) {
 }
 
 export async function getMessageLimit() {
-  return sharedGet('messageLimit', () => apiFetch('/messages/limit'), { ttlMs: 2 * 60_000 });
+  return apiFetch('/messages/limit');
 }
 
 export async function getUnreadCount({ force = false } = {}) {

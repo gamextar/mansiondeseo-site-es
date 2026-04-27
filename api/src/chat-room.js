@@ -268,6 +268,12 @@ export class ChatRoom {
     return dailyLimit;
   }
 
+  getMessageLimitWindowUTC(date = new Date()) {
+    const isoDate = date.toISOString().slice(0, 10);
+    const hourBucket = date.getUTCHours() < 12 ? '00' : '12';
+    return `${isoDate}-${hourBucket}`;
+  }
+
   async getSenderStatus(userId) {
     const now = Date.now();
     const cached = this.userStatusCache.get(userId);
@@ -612,9 +618,9 @@ export class ChatRoom {
       }
     }
 
-    // Check daily message limit via D1
+    // Check free-user message limit via D1 in 12-hour windows.
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const limitWindow = this.getMessageLimitWindowUTC();
       const senderStatus = await this.getSenderStatus(senderId);
       const isPremium = senderStatus.isPremium;
 
@@ -623,16 +629,17 @@ export class ChatRoom {
 
         const limitRow = await this.env.DB.prepare(
           'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
-        ).bind(senderId, today).first();
+        ).bind(senderId, limitWindow).first();
 
         const currentCount = limitRow?.msg_count || 0;
         if (currentCount >= dailyLimit) {
           ws.send(JSON.stringify({
             type: 'error',
             code: 'LIMIT_REACHED',
-            message: `Has alcanzado el límite de ${dailyLimit} mensajes diarios. Desbloquea VIP para mensajes ilimitados.`,
+            message: `Has alcanzado el límite de ${dailyLimit} mensajes cada 12 horas. Desbloquea VIP para mensajes ilimitados.`,
             remaining: 0,
             max: dailyLimit,
+            windowHours: 12,
           }));
           return;
         }
@@ -641,11 +648,11 @@ export class ChatRoom {
         if (limitRow) {
           await this.env.DB.prepare(
             'UPDATE message_limits SET msg_count = msg_count + 1 WHERE user_id = ? AND date_utc = ?'
-          ).bind(senderId, today).run();
+          ).bind(senderId, limitWindow).run();
         } else {
           await this.env.DB.prepare(
             'INSERT INTO message_limits (user_id, date_utc, msg_count) VALUES (?, ?, 1)'
-          ).bind(senderId, today).run();
+          ).bind(senderId, limitWindow).run();
         }
 
         // Send remaining count
@@ -655,6 +662,7 @@ export class ChatRoom {
           remaining: dailyLimit - newCount,
           max: dailyLimit,
           canSend: newCount < dailyLimit,
+          windowHours: 12,
         }));
       }
     } catch (err) {

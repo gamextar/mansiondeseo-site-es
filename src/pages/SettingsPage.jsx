@@ -797,8 +797,8 @@ export default function SettingsPage() {
                     <MessageCircle className="w-4 h-4 text-mansion-gold" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-text-primary">Mensajes diarios (free)</h3>
-                    <p className="text-[11px] text-text-dim">Límite para usuarios no VIP</p>
+                    <h3 className="text-sm font-semibold text-text-primary">Mensajes cada 12 h (free)</h3>
+                    <p className="text-[11px] text-text-dim">Límite para usuarios no VIP por ventana de 12 horas</p>
                   </div>
                 </div>
                 <Counter value={dailyMessageLimit} onChange={setDailyMessageLimit} min={1} max={50} />
