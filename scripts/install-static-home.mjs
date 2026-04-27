@@ -266,9 +266,9 @@ const staticHomeHtml = `<!doctype html>
         <span class="mark">MD</span>
         <span class="brand-text">Mansión Deseo</span>
       </a>
-      <form class="login-inline" id="homeLogin" autocomplete="off">
-        <input class="home-input" id="homeLoginEmail" type="email" name="email" placeholder="Email" autocomplete="off" inputmode="email" tabindex="-1" readonly data-defer-focus required />
-        <input class="home-input" id="homeLoginPassword" type="password" name="password" placeholder="Contraseña" autocomplete="off" tabindex="-1" readonly data-defer-focus required />
+      <form class="login-inline" id="homeLogin" autocomplete="on">
+        <input class="home-input" id="homeLoginEmail" type="email" name="username" placeholder="Email" autocomplete="username" inputmode="email" required />
+        <input class="home-input" id="homeLoginPassword" type="password" name="password" placeholder="Contraseña" autocomplete="current-password" required />
         <button class="login-btn" id="homeLoginSubmit" type="submit">Entrar</button>
         <p class="login-error" id="homeLoginError" role="alert" aria-live="polite"></p>
       </form>
@@ -295,7 +295,7 @@ const staticHomeHtml = `<!doctype html>
       </article>
       <article class="benefit">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 19v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1"></path><circle cx="10" cy="7" r="4"></circle><path d="M20 19v-1a4 4 0 0 0-3-3.86"></path><path d="M17 3.13a4 4 0 0 1 0 7.75"></path></svg>
-        <h2>Parejas verificadas</h2>
+        <h2>Perfiles Verificados</h2>
         <p>Menos ruido, más intención: perfiles cuidados antes de entrar a la comunidad.</p>
       </article>
       <article class="benefit">
@@ -322,35 +322,6 @@ const staticHomeHtml = `<!doctype html>
       var loginPassword = document.getElementById('homeLoginPassword');
       var loginError = document.getElementById('homeLoginError');
       var loginSubmit = document.getElementById('homeLoginSubmit');
-      function blurDeferredLogin() {
-        window.setTimeout(function() {
-          var active = document.activeElement;
-          if (active && active.matches && active.matches('[data-defer-focus]')) active.blur();
-        }, 0);
-        window.setTimeout(function() {
-          var active = document.activeElement;
-          if (active && active.matches && active.matches('[data-defer-focus]')) active.blur();
-        }, 120);
-      }
-      blurDeferredLogin();
-      Array.prototype.forEach.call(document.querySelectorAll('[data-defer-focus]'), function(input) {
-        input.addEventListener('pointerdown', function() {
-          input.removeAttribute('readonly');
-          input.removeAttribute('tabindex');
-        }, { once: true });
-        input.addEventListener('focus', function(event) {
-          if (input.hasAttribute('readonly')) {
-            event.preventDefault();
-            input.blur();
-          }
-        });
-        input.addEventListener('keydown', function() {
-          input.removeAttribute('readonly');
-          input.removeAttribute('tabindex');
-        }, { once: true });
-      });
-      window.addEventListener('pageshow', blurDeferredLogin);
-      window.addEventListener('load', blurDeferredLogin);
       if (loginForm) {
         loginForm.addEventListener('submit', function(event) {
           event.preventDefault();

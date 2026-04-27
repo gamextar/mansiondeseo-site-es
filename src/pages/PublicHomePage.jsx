@@ -16,7 +16,7 @@ const benefits = [
   },
   {
     icon: Users,
-    title: 'Parejas verificadas',
+    title: 'Perfiles Verificados',
     text: 'Menos ruido, más intención: perfiles cuidados antes de entrar a la comunidad.',
   },
   {
@@ -54,11 +54,14 @@ export default function PublicHomePage() {
   const handleLogin = async (event) => {
     event.preventDefault();
     if (loggingIn) return;
+    const formData = new FormData(event.currentTarget);
+    const loginEmail = String(formData.get('username') || email).trim();
+    const loginPassword = String(formData.get('password') || password);
     setLoggingIn(true);
     setLoginError('');
 
     try {
-      const data = await apiLogin({ email, password });
+      const data = await apiLogin({ email: loginEmail, password: loginPassword });
       setUser(data.user);
       setRegistered(true);
       window.location.href = '/feed';
@@ -82,22 +85,26 @@ export default function PublicHomePage() {
 
         <form
           onSubmit={handleLogin}
+          autoComplete="on"
           className="relative hidden items-center gap-4 md:grid md:grid-cols-[12rem_10rem_auto]"
         >
           <label className="sr-only" htmlFor="public-login-email">Email</label>
           <input
             id="public-login-email"
+            name="username"
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="Email"
-            autoComplete="email"
+            autoComplete="username"
+            inputMode="email"
             className="h-9 rounded-none border-0 border-b border-white/20 bg-transparent px-0 py-1 text-sm text-[#f4f4f4] placeholder:text-white/35 focus:border-[#c5a059] focus:outline-none focus:ring-0"
             required
           />
           <label className="sr-only" htmlFor="public-login-password">Contraseña</label>
           <input
             id="public-login-password"
+            name="password"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}

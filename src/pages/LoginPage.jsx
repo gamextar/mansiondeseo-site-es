@@ -16,10 +16,13 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const loginEmail = String(formData.get('username') || email).trim();
+    const loginPassword = String(formData.get('password') || password);
     setLoading(true);
     setError('');
     try {
-      const data = await apiLogin({ email, password });
+      const data = await apiLogin({ email: loginEmail, password: loginPassword });
       setUser(data.user);
       setRegistered(true);
       navigate('/feed');
@@ -55,16 +58,18 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} autoComplete="on" className="space-y-4">
           <div>
             <label className="text-text-muted text-xs font-medium mb-1.5 block">Email</label>
             <input
+              name="username"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="tu@email.com"
               className="w-full"
-              autoComplete="email"
+              autoComplete="username"
+              inputMode="email"
             />
           </div>
 
@@ -72,6 +77,7 @@ export default function LoginPage() {
             <label className="text-text-muted text-xs font-medium mb-1.5 block">Contraseña</label>
             <div className="relative">
               <input
+                name="password"
                 type={showPass ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
