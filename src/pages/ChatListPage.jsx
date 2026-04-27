@@ -426,7 +426,7 @@ export default function ChatListPage() {
   }, [navigate, fetchConversations, subscribe, applyConversationUpdate, applyLocalConversationPreview]);
   return (
     <div
-      className="min-h-0 min-h-[100dvh] bg-mansion-base lg:min-h-screen lg:pt-0 lg:pb-[84px]"
+      className="min-h-0 min-h-[100dvh] bg-mansion-base px-3 lg:min-h-screen lg:px-8 lg:pt-0 lg:pb-[84px]"
       style={{
         paddingTop: 'calc(var(--safe-top) + 20px)',
         paddingBottom: isDesktopViewport ? undefined : navBottomOffset,
@@ -434,7 +434,7 @@ export default function ChatListPage() {
     >
       {/* Header */}
       <motion.div
-        className="w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] pt-0 lg:pt-6 pb-3"
+        className="w-full max-w-6xl mx-auto pt-0 lg:pt-6 pb-3"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
@@ -454,7 +454,7 @@ export default function ChatListPage() {
 
       {/* Conversation list */}
       <motion.div
-        className="w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw]"
+        className="w-full max-w-6xl mx-auto"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, delay: 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}

@@ -1,9 +1,9 @@
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Film, MessageCircle, User, Settings, Camera, Trophy, Heart, LogOut } from 'lucide-react';
+import { Home, Film, MessageCircle, User, Settings, Camera, Heart, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useState } from 'react';
-import { logout as apiLogout, peekOwnProfileDashboard, warmTopVisitedProfiles } from '../lib/api';
+import { logout as apiLogout, peekOwnProfileDashboard } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import AvatarImg from './AvatarImg';
 import { warmVideoFeed } from '../lib/videoFeedWarmup';
@@ -28,7 +28,6 @@ const NAV_ITEMS = [
   { to: '/feed', icon: Home, label: 'Inicio' },
   { to: '/videos', icon: Film, label: 'Videos' },
   { to: '/seguidores', icon: Heart, label: 'Seguidores' },
-  { to: '/ranking', icon: Trophy, label: 'Ranking' },
   { to: '/mensajes', icon: MessageCircle, label: 'Mensajes' },
   { to: '/perfil', icon: User, label: 'Mi Perfil' },
 ];
@@ -128,11 +127,9 @@ export default function DesktopSidebar() {
               to={to}
               onMouseEnter={() => {
                 if (to === '/videos') warmVideoFeed();
-                if (to === '/ranking') warmTopVisitedProfiles(100, 'all');
               }}
               onFocus={() => {
                 if (to === '/videos') warmVideoFeed();
-                if (to === '/ranking') warmTopVisitedProfiles(100, 'all');
               }}
               onClick={() => {
                 if (to === '/feed' && isHomeRoute) {
@@ -143,9 +140,6 @@ export default function DesktopSidebar() {
                 }
                 if (to === '/videos') {
                   warmVideoFeed();
-                }
-                if (to === '/ranking') {
-                  warmTopVisitedProfiles(100, 'all');
                 }
               }}
               className="relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all group"

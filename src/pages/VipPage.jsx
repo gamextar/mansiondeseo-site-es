@@ -28,8 +28,6 @@ export default function VipPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // If already VIP, redirect to home
-    if (user?.premium) { navigate('/feed', { replace: true }); return; }
     getPublicSettings().then(data => {
       const s = data.settings;
       const updated = [...DEFAULT_PLANES];
@@ -39,7 +37,7 @@ export default function VipPage() {
       setPlanes(updated);
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.premium, navigate]);
+  }, [user?.premium]);
 
   const plan = planes.find(p => p.id === planSeleccionado);
 

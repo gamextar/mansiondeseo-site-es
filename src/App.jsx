@@ -52,7 +52,6 @@ const PagoPendientePage = lazy(lazyWithRetry(() => import('./pages/PagoPendiente
 const CoinsPage = lazy(lazyWithRetry(() => import('./pages/CoinsPage'), 'mansion-lazy-retry:coins'));
 const PagoMonedasExitosoPage = lazy(lazyWithRetry(() => import('./pages/PagoMonedasExitosoPage'), 'mansion-lazy-retry:pago-monedas-exitoso'));
 const StoryUploadPage = lazy(lazyWithRetry(() => import('./pages/StoryUploadPage'), 'mansion-lazy-retry:story-upload'));
-const TopVisitedPage = lazy(lazyWithRetry(() => import('./pages/TopVisitedPage'), 'mansion-lazy-retry:top-visited'));
 const VideoLabPage = lazy(lazyWithRetry(() => import('./pages/admin/VideoLabPage'), 'mansion-lazy-retry:video-lab'));
 const VideoFeedPage = lazy(lazyWithRetry(() => preloadVideoFeedChunk(), 'mansion-lazy-retry:video-feed'));
 const NON_DEFAULT_ROUTE_LOCALES = getRouteEnabledSeoLocales().filter((locale) => locale.pathPrefix);
@@ -270,7 +269,6 @@ function AppLayout() {
       normalizedRoutePath === '/feed' ||
       normalizedRoutePath === '/explorar' ||
       normalizedRoutePath === '/videos' ||
-      normalizedRoutePath === '/ranking' ||
       normalizedRoutePath === '/perfil' ||
       isPublicProfileRoute ||
       normalizedRoutePath === '/favoritos' ||
@@ -310,7 +308,6 @@ function AppLayout() {
     routePath === '/feed-shell-test' ||
     routePath === '/profile-shell-test' ||
     routePath === '/safe-area-debug' ||
-    routePath === '/ranking' ||
     routePath === '/perfil' ||
     routePath === '/favoritos' ||
     routePath === '/seguidores' ||
@@ -919,7 +916,7 @@ function AppLayout() {
             path="/ranking"
             element={
               <RequireRegistration>
-                <TopVisitedPage />
+                <Navigate to="/feed" replace />
               </RequireRegistration>
             }
           />
