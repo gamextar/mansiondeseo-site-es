@@ -1,45 +1,30 @@
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ArrowRight, ShieldCheck, Sparkles, Users, HeartHandshake } from 'lucide-react';
+import { ArrowRight, HeartHandshake, ShieldCheck, Users } from 'lucide-react';
 import { useSeoMeta, useStructuredData } from '../lib/seo';
 import { useAuth } from '../lib/authContext';
 import { login as apiLogin } from '../lib/api';
-import { SITE_CONFIG, SITE_ORIGIN } from '../lib/siteConfig';
+import { SITE_ORIGIN } from '../lib/siteConfig';
 
-const featureCards = [
-  {
-    icon: Users,
-    title: 'Comunidad Reservada',
-    text: 'Aquí no somos miles, somos los indicados. Filtramos el ruido para que solo interactúes con personas que comparten tu mismo estilo de vida y nivel de respeto.',
-  },
+const ACTIVE_COUPLES_NOW = '1.248';
+
+const benefits = [
   {
     icon: ShieldCheck,
-    title: 'Entorno 100% Seguro',
-    text: 'Tu privacidad es nuestro cimiento. Con nuestra infraestructura de última generación, tus datos y conversaciones permanecen en el anonimato más absoluto.',
+    title: 'Privacidad por defecto',
+    text: 'Un entorno reservado, discreto y pensado para adultos que cuidan su exposición.',
+  },
+  {
+    icon: Users,
+    title: 'Parejas verificadas',
+    text: 'Menos ruido, más intención: perfiles cuidados antes de entrar a la comunidad.',
   },
   {
     icon: HeartHandshake,
-    title: 'Perfiles Verificados',
-    text: 'Adiós a los engaños. Contamos con un riguroso sistema de verificación para asegurar que cada pareja o persona sea real, activa y esté lista para conectar.',
+    title: 'Acceso curado',
+    text: 'Una experiencia selectiva para conectar con personas que buscan lo mismo.',
   },
 ];
-
-const BASE_INTENT_LINKS = [
-  { to: '/parejas', label: 'Parejas' },
-  { to: '/trios', label: 'Trios' },
-  { to: '/swingers', label: 'Swingers' },
-  { to: '/contactossex', label: 'Contactossex' },
-];
-
-const AR_INTENT_LINKS = [
-  { to: '/contactossex-argentina', label: 'Contactossex AR' },
-  { to: '/cornudos-argentina', label: 'Cornudos AR' },
-];
-
-const intentLinks = SITE_CONFIG.country === 'AR'
-  ? [...BASE_INTENT_LINKS, ...AR_INTENT_LINKS]
-  : BASE_INTENT_LINKS;
 
 export default function PublicHomePage() {
   const { user, setRegistered, setUser } = useAuth();
@@ -49,8 +34,8 @@ export default function PublicHomePage() {
   const [loggingIn, setLoggingIn] = useState(false);
 
   useSeoMeta({
-    title: 'Mansión Deseo | Comunidad Liberal y Parejas Swinger Exclusiva',
-    description: 'Únete a Mansión Deseo, la plataforma reservada para parejas liberales y solteros. Perfiles verificados, privacidad total y el entorno más seguro para explorar el lifestyle swinger.',
+    title: 'Mansión Deseo | Acceso privado para parejas liberales',
+    description: 'Mansión Deseo es una comunidad privada para parejas liberales y adultos que valoran la discreción, la verificación y el acceso curado.',
     canonical: `${SITE_ORIGIN}/`,
   });
 
@@ -59,11 +44,7 @@ export default function PublicHomePage() {
     '@type': 'WebSite',
     name: 'Mansión Deseo',
     url: `${SITE_ORIGIN}/`,
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: `${SITE_ORIGIN}/contactossex/{search_term_string}`,
-      'query-input': 'required name=search_term_string',
-    },
+    description: 'Comunidad privada para parejas liberales con acceso curado, privacidad y perfiles verificados.',
   }, 'website-home');
 
   if (user) {
@@ -88,173 +69,114 @@ export default function PublicHomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-mansion-base text-white overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-[-140px] left-1/2 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-mansion-crimson/10 blur-3xl" />
-        <div className="absolute bottom-0 left-[-120px] h-[280px] w-[280px] rounded-full bg-mansion-gold/10 blur-3xl" />
-        <div className="absolute right-[-120px] top-1/3 h-[300px] w-[300px] rounded-full bg-mansion-crimson/10 blur-3xl" />
-      </div>
+    <div className="min-h-screen bg-[#000000] font-body text-[#f4f4f4]">
+      <header className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between border-b border-white/[0.08] px-6 sm:px-8 lg:px-10">
+        <Link to="/" className="flex items-center gap-3" aria-label="Mansión Deseo">
+          <span className="flex h-9 w-9 items-center justify-center border border-[#c5a059]/50 font-display text-sm font-semibold text-[#c5a059]">
+            MD
+          </span>
+          <span className="font-display text-xl font-medium text-[#f4f4f4]">
+            Mansión Deseo
+          </span>
+        </Link>
 
-      <main className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-6 pb-16 pt-10 sm:px-8 lg:px-10">
-        <header className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
-              <span className="font-display text-white text-sm font-bold">M</span>
-            </div>
-            <span className="font-display text-[17px] font-semibold text-gradient-gold" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
-              Mansión Deseo
-            </span>
-          </Link>
-
-          <form onSubmit={handleLogin} className="grid w-full gap-2 sm:w-auto sm:grid-cols-[minmax(11rem,13rem)_minmax(9rem,11rem)_auto] sm:items-start">
-            <label className="sr-only" htmlFor="public-login-email">Email</label>
-            <input
-              id="public-login-email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="Email"
-              autoComplete="email"
-              className="h-10 rounded-full border-white/10 bg-white/5 px-4 py-2 text-sm"
-              required
-            />
-            <label className="sr-only" htmlFor="public-login-password">Contraseña</label>
-            <input
-              id="public-login-password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Contraseña"
-              autoComplete="current-password"
-              className="h-10 rounded-full border-white/10 bg-white/5 px-4 py-2 text-sm"
-              required
-            />
-            <button
-              type="submit"
-              disabled={loggingIn}
-              className="h-10 rounded-full bg-mansion-gold px-5 text-sm font-semibold text-black transition-all hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
-            >
-              {loggingIn ? 'Entrando...' : 'Entrar'}
-            </button>
-            {loginError && (
-              <p className="sm:col-span-3 text-xs text-mansion-crimson">
-                {loginError}
-              </p>
-            )}
-          </form>
-        </header>
-
-        <section className="grid flex-1 items-center gap-12 py-14 lg:grid-cols-[1.15fr_0.85fr] lg:py-20">
-          <div>
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45 }}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-text-muted backdrop-blur-sm"
-            >
-              <Sparkles className="h-4 w-4 text-mansion-gold" />
-              Acceso privado para adultos registrados
-            </motion.div>
-
-            <motion.h1
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.08 }}
-              className="mt-6 max-w-3xl font-display text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl"
-            >
-              Donde la exclusividad encuentra su refugio más íntimo.
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.16 }}
-              className="mt-5 max-w-2xl text-base leading-7 text-text-muted sm:text-lg"
-            >
-              Un espacio reservado para parejas liberales y solteros exigentes que valoran la discreción
-              tanto como el deseo. Únete a la comunidad líder en encuentros auténticos, seguros y de alto nivel.
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.24 }}
-              className="mt-8 flex flex-wrap items-center gap-3"
-            >
-              <Link
-                to={user ? '/feed' : '/registro'}
-                className="inline-flex items-center gap-2 rounded-full bg-mansion-gold px-6 py-3 text-sm font-semibold text-black transition-all hover:brightness-110"
-              >
-                {user ? 'Entrar al feed' : 'Registrarme'}
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.32 }}
-              className="mt-8 flex flex-wrap gap-2"
-            >
-              {intentLinks.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:text-white"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </motion.div>
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.55, delay: 0.12 }}
-            className="relative"
+        <form
+          onSubmit={handleLogin}
+          className="relative hidden items-center gap-4 md:grid md:grid-cols-[12rem_10rem_auto]"
+        >
+          <label className="sr-only" htmlFor="public-login-email">Email</label>
+          <input
+            id="public-login-email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="Email"
+            autoComplete="email"
+            className="h-9 rounded-none border-0 border-b border-white/20 bg-transparent px-0 py-1 text-sm text-[#f4f4f4] placeholder:text-white/35 focus:border-[#c5a059] focus:outline-none focus:ring-0"
+            required
+          />
+          <label className="sr-only" htmlFor="public-login-password">Contraseña</label>
+          <input
+            id="public-login-password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Contraseña"
+            autoComplete="current-password"
+            className="h-9 rounded-none border-0 border-b border-white/20 bg-transparent px-0 py-1 text-sm text-[#f4f4f4] placeholder:text-white/35 focus:border-[#c5a059] focus:outline-none focus:ring-0"
+            required
+          />
+          <button
+            type="submit"
+            disabled={loggingIn}
+            className="h-9 border border-[#c5a059]/70 px-5 text-sm font-medium text-[#c5a059] transition-colors hover:border-[#c5a059] hover:bg-[#c5a059] hover:text-black disabled:cursor-wait disabled:opacity-60"
           >
-            <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/30 p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.22em] text-text-dim">Los tres pilares</p>
-                    <h2 className="mt-2 text-2xl font-semibold text-white">Exclusividad, seguridad y verificación</h2>
-                  </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-mansion-gold/15">
-                    <Users className="h-6 w-6 text-mansion-gold" />
-                  </div>
-                </div>
+            {loggingIn ? 'Entrando...' : 'Entrar'}
+          </button>
+          {loginError && (
+            <p className="absolute right-0 top-12 max-w-sm text-right text-xs text-[#c5a059]">
+              {loginError}
+            </p>
+          )}
+        </form>
 
-                <div className="mt-6 space-y-3">
-                  {featureCards.map(({ icon: Icon, title, text }) => (
-                    <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-mansion-gold/10">
-                          <Icon className="h-5 w-5 text-mansion-gold" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-white">{title}</p>
-                          <p className="mt-1 text-sm leading-6 text-text-muted">{text}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </motion.div>
+        <Link
+          to="/login"
+          className="border border-[#c5a059]/70 px-4 py-2 text-sm font-medium text-[#c5a059] md:hidden"
+        >
+          Login
+        </Link>
+      </header>
+
+      <main className="mx-auto w-full max-w-7xl px-6 sm:px-8 lg:px-10">
+        <section className="flex max-w-5xl flex-col justify-center py-24 sm:py-28 lg:min-h-[calc(100svh-11rem)] lg:py-32">
+          <h1 className="max-w-4xl font-display text-5xl font-medium leading-[1.05] text-[#f4f4f4] sm:text-6xl lg:text-7xl">
+            Mansión Deseo, el club privado donde el deseo entra sin ruido.
+          </h1>
+          <p className="mt-8 max-w-2xl text-lg font-light leading-8 text-white/64 sm:text-xl">
+            Acceso reservado, perfiles cuidados y privacidad diseñada para explorar con elegancia.
+          </p>
+          <div className="mt-10">
+            <Link
+              to="/registro"
+              className="inline-flex min-h-12 items-center gap-3 bg-[#c5a059] px-7 py-3 text-sm font-semibold text-black transition-colors hover:bg-[#d4b36c] focus:outline-none focus:ring-2 focus:ring-[#c5a059]/50 focus:ring-offset-2 focus:ring-offset-black"
+            >
+              Solicitar Acceso
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
         </section>
 
-        <footer className="flex flex-col gap-3 border-t border-white/10 py-6 text-xs text-text-dim sm:flex-row sm:items-center sm:justify-between">
-          <span>© 2026 Mansión Deseo · Sitio para mayores de 18 años.</span>
-          <nav className="flex flex-wrap gap-4" aria-label="Legal y ayuda">
-            <Link to="/terminos" className="transition-colors hover:text-text-muted">Términos</Link>
-            <Link to="/privacidad" className="transition-colors hover:text-text-muted">Privacidad</Link>
-            <Link to="/ayuda" className="transition-colors hover:text-text-muted">Ayuda</Link>
-          </nav>
-        </footer>
+        <section className="border-y border-white/[0.08] py-8 text-center" aria-label="Actividad actual">
+          <p className="text-sm font-light text-white/70">
+            <span className="font-medium text-[#c5a059]">{ACTIVE_COUPLES_NOW}</span> Parejas activas ahora
+          </p>
+        </section>
+
+        <section className="grid gap-12 py-24 md:grid-cols-3 lg:py-32" aria-label="Beneficios">
+          {benefits.map(({ icon: Icon, title, text }) => (
+            <article key={title} className="border-t border-white/[0.08] pt-8">
+              <Icon className="h-6 w-6 text-[#c5a059]" strokeWidth={1.5} aria-hidden="true" />
+              <h2 className="mt-8 font-display text-2xl font-medium text-[#f4f4f4]">
+                {title}
+              </h2>
+              <p className="mt-4 max-w-sm text-sm font-light leading-7 text-white/58">
+                {text}
+              </p>
+            </article>
+          ))}
+        </section>
       </main>
+
+      <footer className="mx-auto flex w-full max-w-7xl flex-col gap-5 border-t border-white/[0.08] px-6 py-10 text-xs text-white/38 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
+        <span>© 2026 Mansión Deseo · Mayores de 18 años.</span>
+        <nav className="flex flex-wrap gap-x-6 gap-y-3" aria-label="Privacidad y redes">
+          <Link to="/privacidad" className="transition-colors hover:text-[#c5a059]">Privacidad</Link>
+          <Link to="/terminos" className="transition-colors hover:text-[#c5a059]">Términos</Link>
+          <a href="https://instagram.com/mansiondeseo" className="transition-colors hover:text-[#c5a059]" rel="noreferrer" target="_blank">Instagram</a>
+          <a href="https://x.com/mansiondeseo" className="transition-colors hover:text-[#c5a059]" rel="noreferrer" target="_blank">X</a>
+        </nav>
+      </footer>
     </div>
   );
 }
