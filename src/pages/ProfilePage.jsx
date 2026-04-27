@@ -667,7 +667,7 @@ export default function ProfilePage() {
         className="w-full px-3 pt-6 lg:px-10 lg:pt-8"
       >
         {/* ── Profile Header ── */}
-        <motion.div variants={fadeUp} className="-mx-3 mb-0.5 border-b border-mansion-border/15 bg-mansion-base/90 px-3 pb-3 pt-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:-mx-10 lg:px-10 lg:pt-4">
+        <motion.div variants={fadeUp} className="-mx-3 mb-0.5 border-b border-mansion-border/15 bg-mansion-base/90 px-3 pb-0.5 pt-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:-mx-10 lg:px-10 lg:pt-4">
           {/* Avatar + info row */}
           <div className="mb-[17px] flex items-center gap-4">
             {/* Avatar */}
@@ -780,7 +780,7 @@ export default function ProfilePage() {
         <AnimatePresence mode="wait">
           {activeTab === 'gallery' && (
             <motion.section key="gallery" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1">
-              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-3 shadow-[0_24px_80px_rgba(0,0,0,0.18)] lg:p-4">
+              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-2 shadow-[0_24px_80px_rgba(0,0,0,0.18)] lg:p-3">
                 <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="font-display text-2xl font-bold text-text-primary">Galería</h3>
@@ -833,8 +833,8 @@ export default function ProfilePage() {
                       onTouchEnd={galleryEditing ? handleTouchEnd : undefined}
                       onClick={galleryEditing ? undefined : () => { setLightboxIndex(i); setLightboxOpen(true); }}
                       layout
-                      initial={{ opacity: 0, scale: 0.92 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.025 }}
                       className={`group relative aspect-[4/5] overflow-hidden rounded-[1.4rem] border border-mansion-border/20 bg-mansion-card ${
                         galleryEditing ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
@@ -847,7 +847,7 @@ export default function ProfilePage() {
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleDeletePhoto(url); }}
                           disabled={deleting === url}
-                          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/62 text-white backdrop-blur transition-opacity disabled:opacity-50 lg:opacity-0 lg:group-hover:opacity-100"
+                          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/85 text-white shadow-lg ring-1 ring-white/25 backdrop-blur transition-opacity disabled:opacity-50 lg:opacity-0 lg:group-hover:opacity-100"
                         >
                           {deleting === url ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <X className="h-4 w-4" />}
                         </button>
@@ -885,7 +885,7 @@ export default function ProfilePage() {
           {activeTab === 'preferences' && (
             <motion.section key="preferences" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1 space-y-4">
               <div className="grid items-start gap-4 xl:grid-cols-2">
-                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-3 lg:p-4">
+                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-2 lg:p-3">
                   <div className="mb-3 min-h-[58px] lg:mb-4">
                     <h3 className="flex items-center gap-2 font-display text-2xl font-bold text-text-primary">
                       <Heart className="h-5 w-5 text-mansion-gold" />
@@ -906,7 +906,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-3 lg:p-4">
+                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-2 lg:p-3">
                   <div className="mb-3 min-h-[58px] lg:mb-4">
                     <h3 className="flex items-center gap-2 font-display text-2xl font-bold text-text-primary">
                       <Shield className="h-5 w-5 text-mansion-crimson" />
@@ -929,7 +929,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-3 lg:p-4">
+              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-2 lg:p-3">
                 <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
                   <Filter className="h-3.5 w-3.5 text-mansion-gold" />
                   Intereses
@@ -961,7 +961,7 @@ export default function ProfilePage() {
           )}
 
           {activeTab === 'followers' && (
-            <motion.section key="followers" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1 rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-3 lg:p-4">
+            <motion.section key="followers" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1 rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-2 lg:p-3">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <h3 className="font-display text-2xl font-bold text-text-primary">Seguidores</h3>
