@@ -250,6 +250,7 @@ export default function SettingsPage() {
         setFeedCardsPerPageMobile(s.feedCardsPerPageMobile ?? s.feedCardsPerPage ?? 12);
         setFeedMaxPages(s.feedMaxPages ?? 10);
         setFeedPrefetchPages(s.feedPrefetchPages ?? 6);
+        setVipPriceMonthly(s.vipPriceMonthly);
         setVipPrice3Months(s.vipPrice3Months);
         setVipPrice6Months(s.vipPrice6Months);
         setIncognitoIconSvg(s.incognitoIconSvg || '');
@@ -498,6 +499,7 @@ export default function SettingsPage() {
       setFeedCardsPerPageMobile(s.feedCardsPerPageMobile ?? s.feedCardsPerPage ?? 12);
       setFeedMaxPages(s.feedMaxPages ?? 10);
       setFeedPrefetchPages(s.feedPrefetchPages ?? 6);
+      setVipPriceMonthly(s.vipPriceMonthly);
       setVipPrice3Months(s.vipPrice3Months);
       setVipPrice6Months(s.vipPrice6Months);
       setIncognitoIconSvg(s.incognitoIconSvg || '');
