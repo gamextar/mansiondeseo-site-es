@@ -6,10 +6,16 @@ import { useAuth } from '../lib/authContext';
 import { formatCurrencyAmount, formatDate } from '../lib/siteConfig';
 
 const DEFAULT_PLANES = [
-  { id: 'premium_mensual', label: '1 mes', amount: 2999, popular: false, desc: 'Ideal para probar' },
-  { id: 'premium_3meses', label: '3 meses', amount: 7499, popular: true, desc: 'Ahorrás $1.500' },
-  { id: 'premium_6meses', label: '6 meses', amount: 12999, popular: false, desc: 'El mejor precio' },
+  { id: 'premium_mensual', label: '1 mes', amount: null, popular: false, desc: 'Ideal para probar' },
+  { id: 'premium_3meses', label: '3 meses', amount: null, popular: true, desc: 'Ahorrás $1.500' },
+  { id: 'premium_6meses', label: '6 meses', amount: null, popular: false, desc: 'El mejor precio' },
 ];
+
+const FALLBACK_AMOUNTS = {
+  premium_mensual: 2999,
+  premium_3meses: 7499,
+  premium_6meses: 12999,
+};
 
 const BENEFICIOS = [
   { icon: <MessageCircle className="w-5 h-5" />, text: 'Mensajes ilimitados (sin límite diario)' },
@@ -39,18 +45,23 @@ export default function VipPage() {
     getPublicSettings().then(data => {
       const s = data.settings;
       const updated = [...DEFAULT_PLANES];
-      updated[0] = { ...updated[0], amount: parseAdminPrice(s.vipPriceMonthly, updated[0].amount) };
-      updated[1] = { ...updated[1], amount: parseAdminPrice(s.vipPrice3Months, updated[1].amount) };
-      updated[2] = { ...updated[2], amount: parseAdminPrice(s.vipPrice6Months, updated[2].amount) };
+      updated[0] = { ...updated[0], amount: parseAdminPrice(s.vipPriceMonthly, FALLBACK_AMOUNTS.premium_mensual) };
+      updated[1] = { ...updated[1], amount: parseAdminPrice(s.vipPrice3Months, FALLBACK_AMOUNTS.premium_3meses) };
+      updated[2] = { ...updated[2], amount: parseAdminPrice(s.vipPrice6Months, FALLBACK_AMOUNTS.premium_6meses) };
       setPlanes(updated);
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.premium]);
 
   const plan = planes.find(p => p.id === planSeleccionado);
+  const pricesReady = planes.every(p => Number.isFinite(Number(p.amount)) && Number(p.amount) > 0);
 
   async function handlePagar() {
     if (!user) { navigate('/login'); return; }
+    if (!pricesReady || !plan?.amount) {
+      setError('Estamos cargando los precios. Intentá nuevamente en unos segundos.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -128,7 +139,7 @@ export default function VipPage() {
                 )}
                 <span className="font-bold text-white">{p.label}</span>
                 <span className="text-mansion-gold font-semibold text-sm mt-1">
-                  {formatCurrencyAmount(p.amount)}
+                  {p.amount ? formatCurrencyAmount(p.amount) : 'Cargando...'}
                 </span>
                 <span className="text-gray-500 text-xs mt-0.5">{p.desc}</span>
               </button>
@@ -150,7 +161,7 @@ export default function VipPage() {
         {/* Botón pagar */}
         <button
           onClick={handlePagar}
-          disabled={loading}
+          disabled={loading || !pricesReady}
           className="w-full py-4 bg-mansion-gold text-black font-bold text-lg rounded-xl hover:brightness-110 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {loading ? (
@@ -161,7 +172,7 @@ export default function VipPage() {
           ) : (
             <>
               <Crown className="w-5 h-5" />
-              {user?.premium ? 'Extender' : 'Pagar'} {formatCurrencyAmount(plan.amount)}
+              {pricesReady ? `${user?.premium ? 'Extender' : 'Pagar'} ${formatCurrencyAmount(plan.amount)}` : 'Cargando precios...'}
             </>
           )}
         </button>
