@@ -769,6 +769,7 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
       <p className="text-text-muted text-sm mb-8">Creá tu cuenta para empezar a explorar el sitio</p>
 
       <div className="space-y-4 max-w-xs mx-auto text-left">
+        <BirthdateFields data={info} onChange={onInfoChange} />
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">Email</label>
           <div className="relative">
@@ -845,7 +846,6 @@ function StepEmail({ email, password, onEmailChange, onPasswordChange, hidePassw
             <p className="text-green-500 text-[11px] mt-1">Contraseña válida ({password.length}/10)</p>
           )}
         </div>
-        <BirthdateFields data={info} onChange={onInfoChange} />
       </div>
     </div>
   );
