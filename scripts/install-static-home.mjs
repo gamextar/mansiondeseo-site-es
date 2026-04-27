@@ -98,10 +98,10 @@ function buildRedirects() {
   appFallbackPrefixes.add('/historia/*');
 
   return `${[
-    '/ /index.html 200',
+    '/ / 200',
     ...[...appFallbackPrefixes]
       .sort((a, b) => a.localeCompare(b))
-      .map((prefix) => `${prefix} /app/index.html 200`),
+      .map((prefix) => `${prefix} /app/ 200`),
   ].join('\n')}\n`;
 }
 

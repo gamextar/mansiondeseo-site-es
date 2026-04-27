@@ -214,10 +214,8 @@ async function updateRedirects() {
 
   const seoRules = STATIC_SEO_VARIANTS.flatMap((variant) => {
     const route = routePath(variant);
-    const target = `${ensureTrailingSlash(route)}index.html`;
     return [
-      `${route} ${target} 200`,
-      `${ensureTrailingSlash(route)} ${target} 200`,
+      `${route} ${ensureTrailingSlash(route)} 200`,
     ];
   });
   const redirectRules = CANONICAL_REDIRECTS.map(([from, to]) => `${from} ${to} 301`);
