@@ -20,7 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { clearAccountLocalData, register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getGeoDefaults, getMe, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername } from '../lib/api';
+import { clearAccountLocalData, register as apiRegister, uploadAvatar, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getGeoDefaults, getMe, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername } from '../lib/api';
 import { calculateAgeFromBirthdate, isAdultBirthdate } from '../lib/birthdate';
 import { formatLocation } from '../lib/location';
 import ImageCropper from '../components/ImageCropper';
@@ -1374,8 +1374,8 @@ function StepPhoto({ photoFile, onPhotoSelect }) {
       {rawFile && (
         <ImageCropper
           file={rawFile}
-          onCrop={(cropped) => {
-            onPhotoSelect(cropped);
+          onCrop={(cropped, meta) => {
+            onPhotoSelect(cropped, meta);
             setRawFile(null);
           }}
           onCancel={() => setRawFile(null)}
@@ -1622,6 +1622,7 @@ export default function RegisterPage() {
   const [interests, setInterests] = useState([]);
   const [info, setInfo] = useState({ name: '', birthdate: '', province: '', locality: '', bio: '' });
   const [photoFile, setPhotoFile] = useState(null);
+  const [photoThumbFile, setPhotoThumbFile] = useState(null);
   const [completed, setCompleted] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
   const [emailDeliveryPending, setEmailDeliveryPending] = useState(false);
@@ -1883,10 +1884,16 @@ export default function RegisterPage() {
     // Upload photo if selected (now that we have a token)
     if (photoFile) {
       try {
-        const uploadResult = await uploadImage(photoFile, { purpose: 'avatar' });
+        const uploadResult = await uploadAvatar(photoFile, photoThumbFile);
         const nextAvatarUrl = uploadResult?.avatar_url || uploadResult?.url || '';
+        const nextAvatarThumbUrl = uploadResult?.avatar_thumb_url || '';
         if (nextAvatarUrl) {
-          setUser(prev => prev ? { ...prev, avatar_url: nextAvatarUrl, avatar_crop: null } : prev);
+          setUser(prev => prev ? {
+            ...prev,
+            avatar_url: nextAvatarUrl,
+            avatar_thumb_url: nextAvatarThumbUrl,
+            avatar_crop: null,
+          } : prev);
           getMe({ force: true })
             .then((fresh) => {
               if (fresh?.user) setUser(fresh.user);
@@ -1999,7 +2006,15 @@ export default function RegisterPage() {
       case 3:
         return <StepBasicInfo data={info} onChange={setInfo} showCountryPicker={showCountryPicker} allowedCountries={allowedCountries} selectedCountry={selectedCountry} onCountryChange={setSelectedCountry} usernameStatus={usernameStatus} onUsernameBlur={handleUsernameBlur} />;
       case 4:
-        return <StepPhoto photoFile={photoFile} onPhotoSelect={setPhotoFile} />;
+        return (
+          <StepPhoto
+            photoFile={photoFile}
+            onPhotoSelect={(file, meta) => {
+              setPhotoFile(file);
+              setPhotoThumbFile(meta?.thumbnailFile || null);
+            }}
+          />
+        );
       default:
         return null;
     }

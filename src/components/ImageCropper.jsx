@@ -4,6 +4,10 @@ import { Check, X } from 'lucide-react';
 
 const CIRCLE_SIZE = 280;
 const OUTPUT_SIZE = 1080;
+const THUMB_SIZE = 480;
+const EXPORT_MIME = 'image/webp';
+const EXPORT_QUALITY = 0.88;
+const THUMB_QUALITY = 0.78;
 
 function loadImage(src) {
 	return new Promise((resolve, reject) => {
@@ -11,6 +15,24 @@ function loadImage(src) {
 		img.onload = () => resolve(img);
 		img.onerror = () => reject(new Error('No se pudo cargar la imagen.'));
 		img.src = src;
+	});
+}
+
+function buildExportName(fileName, suffix, mimeType) {
+	const base = String(fileName || 'avatar')
+		.replace(/\.[^.]+$/, '')
+		.trim() || 'avatar';
+	const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+	return `${base}${suffix}.${ext}`;
+}
+
+function canvasToBlob(canvas, mimeType, quality) {
+	return new Promise((resolve, reject) => {
+		canvas.toBlob(
+			(blob) => (blob ? resolve(blob) : reject(new Error('No se pudo exportar la imagen.'))),
+			mimeType,
+			quality,
+		);
 	});
 }
 
@@ -37,17 +59,24 @@ async function cropCircle(file, image, zoom, offsetX, offsetY, containerW, conta
 
 	ctx.drawImage(image, srcX, srcY, srcSize, srcSize, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
 
-	// Only use canvas-safe MIME types (jpeg/png/webp); anything else (heic, avif, etc.) → jpeg
-	const SAFE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-	const mimeType = SAFE_TYPES.includes(file.type) ? file.type : 'image/jpeg';
-	const blob = await new Promise((resolve, reject) => {
-		canvas.toBlob(
-			(b) => (b ? resolve(b) : reject(new Error('No se pudo exportar la imagen.'))),
-			mimeType,
-			0.92,
-		);
-	});
-	return new File([blob], file.name || 'avatar.jpg', { type: blob.type || mimeType, lastModified: Date.now() });
+	const thumbCanvas = document.createElement('canvas');
+	thumbCanvas.width = THUMB_SIZE;
+	thumbCanvas.height = THUMB_SIZE;
+	const thumbCtx = thumbCanvas.getContext('2d');
+	if (!thumbCtx) throw new Error('No se pudo inicializar la miniatura.');
+	thumbCtx.drawImage(canvas, 0, 0, THUMB_SIZE, THUMB_SIZE);
+
+	const [blob, thumbBlob] = await Promise.all([
+		canvasToBlob(canvas, EXPORT_MIME, EXPORT_QUALITY),
+		canvasToBlob(thumbCanvas, EXPORT_MIME, THUMB_QUALITY),
+	]);
+	const mimeType = blob.type || EXPORT_MIME;
+	const thumbMimeType = thumbBlob.type || EXPORT_MIME;
+
+	return {
+		file: new File([blob], buildExportName(file.name, '', mimeType), { type: mimeType, lastModified: Date.now() }),
+		thumbnailFile: new File([thumbBlob], buildExportName(file.name, '-thumb', thumbMimeType), { type: thumbMimeType, lastModified: Date.now() }),
+	};
 }
 
 function clampOffset(ox, oy, zoom, imgW, imgH, containerW, containerH) {
@@ -181,8 +210,8 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 			const objectUrl = URL.createObjectURL(file);
 			const image = await loadImage(objectUrl);
 			URL.revokeObjectURL(objectUrl);
-			const cropped = await cropCircle(file, image, zoom, offset.x, offset.y, containerW, containerH);
-			onCrop(cropped);
+			const { file: cropped, thumbnailFile } = await cropCircle(file, image, zoom, offset.x, offset.y, containerW, containerH);
+			onCrop(cropped, { thumbnailFile });
 		} catch (err) {
 			setError(err.message || 'No se pudo recortar la imagen.');
 		} finally {

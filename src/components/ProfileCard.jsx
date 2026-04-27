@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { MapPin, Shield, Crown, Lock } from 'lucide-react';
-import { getDisplayPhotos, getPrimaryProfilePhoto } from '../lib/profileMedia';
+import { getDisplayPhotos, getPrimaryProfileThumbnail } from '../lib/profileMedia';
 import { formatLocation } from '../lib/location';
 import { resolveMediaUrl } from '../lib/media';
 import { isSafariDesktopBrowser } from '../lib/browser';
@@ -71,7 +71,7 @@ export default function ProfileCard({
   const displayPhotos = getDisplayPhotos(profile);
   const visiblePhotos = profile.visiblePhotos ?? displayPhotos.length;
   const cardBlocked = blurred || visiblePhotos === 0;
-  const mainPhoto = getPrimaryProfilePhoto(profile);
+  const mainPhoto = getPrimaryProfileThumbnail(profile);
   const resolvedMainPhoto = resolveMediaUrl(mainPhoto);
 
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function ProfileCard({
       modal: 'profile',
     } : {}),
     from: returnToPath,
-    preview: { id, name, age, city: profile.city, province: profile.province, locality: profile.locality, role, photos, avatar_url: profile.avatar_url, avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode },
+    preview: { id, name, age, city: profile.city, province: profile.province, locality: profile.locality, role, photos, avatar_url: profile.avatar_url, avatar_thumb_url: profile.avatar_thumb_url || '', avatar_crop: profile.avatar_crop || null, online, premium, verified, blurred, visiblePhotos, ghost_mode: profile.ghost_mode },
   };
 
   const handleOpenProfile = () => {

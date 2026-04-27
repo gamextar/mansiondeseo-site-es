@@ -20,6 +20,7 @@ function buildPreview(profile) {
     locality: profile.locality,
     role: profile.role,
     avatar_url: profile.avatar_url,
+    avatar_thumb_url: profile.avatar_thumb_url || '',
     avatar_crop: profile.avatar_crop || null,
     online: profile.online,
     premium: profile.premium,
@@ -54,7 +55,7 @@ function FollowCard({ profile, tab }) {
         <div className="relative shrink-0">
           <div className="h-40 w-40 overflow-hidden rounded-[2rem] bg-mansion-elevated shadow-[0_16px_32px_rgba(0,0,0,0.2)] ring-1 ring-[#2b241d] lg:h-44 lg:w-44 lg:rounded-[2.35rem]">
             {profile.avatar_url ? (
-              <AvatarImg src={profile.avatar_url} crop={profile.avatar_crop} alt={profile.name} className="h-full w-full" />
+              <AvatarImg src={profile.avatar_thumb_url || profile.avatar_url} crop={profile.avatar_crop} alt={profile.name} className="h-full w-full" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-text-dim">
                 <Users className="h-8 w-8" />

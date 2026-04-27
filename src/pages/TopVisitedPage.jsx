@@ -30,6 +30,7 @@ function buildPreview(profile) {
     locality: profile.locality,
     role: profile.role,
     avatar_url: profile.avatar_url,
+    avatar_thumb_url: profile.avatar_thumb_url || '',
     avatar_crop: profile.avatar_crop || null,
     online: profile.online,
     premium: profile.premium,
@@ -62,7 +63,7 @@ function RankCard({ profile, compact = false, safariDesktop = false, imageLoadin
           <div className={`${compact ? 'h-20 w-20 rounded-[1.4rem]' : 'h-28 w-28 rounded-[2rem]'} overflow-hidden bg-mansion-elevated shadow-[0_12px_24px_rgba(0,0,0,0.18)] ring-1 ring-[#2b241d]`}>
             {profile.avatar_url ? (
               <AvatarImg
-                src={profile.avatar_url}
+                src={profile.avatar_thumb_url || profile.avatar_url}
                 crop={profile.avatar_crop}
                 alt={profile.name}
                 className="h-full w-full"

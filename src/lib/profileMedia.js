@@ -23,6 +23,10 @@ export function getPrimaryProfilePhoto(profile) {
   return profile?.avatar_url || getGalleryPhotos(profile)[0] || '';
 }
 
+export function getPrimaryProfileThumbnail(profile) {
+  return profile?.avatar_thumb_url || getPrimaryProfilePhoto(profile);
+}
+
 export function getPrimaryProfileCrop(profile) {
   return profile?.avatar_url ? profile?.avatar_crop || null : null;
 }

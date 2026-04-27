@@ -60,6 +60,7 @@ let _userBirthdateColumnReady = null;
 let _userMaritalStatusColumnReady = null;
 let _userSexualOrientationColumnReady = null;
 let _userMessageBlockRolesColumnReady = null;
+let _userAvatarThumbColumnReady = null;
 let _userBlocksReady = null;
 let _profileReportsReady = null;
 let _userLastIpColumnReady = null;
@@ -402,6 +403,7 @@ function buildFeedBaseProfiles(rows, env, activeStoryUserIds, activeStoryUrlMap)
       sexual_orientation: u.sexual_orientation || '',
       lastActive: u.last_active,
       avatar_url: u.avatar_url,
+      avatar_thumb_url: u.avatar_thumb_url || '',
       avatar_crop: safeParseJSON(u.avatar_crop, null),
       has_active_story: activeStoryUserIds.has(String(u.id)),
       active_story_url: activeStoryUrlMap.get(String(u.id)) || null,
@@ -629,6 +631,7 @@ function sanitizeStorageSegment(input, fallback = 'user') {
 function buildProfileMediaKey(username, kind, ext) {
   const slug = sanitizeStorageSegment(username, 'user');
   if (kind === 'avatar') return `profiles/${slug}/avatar-${generateId()}.${ext}`;
+  if (kind === 'avatar_thumb') return `profiles/${slug}/avatar-thumb-${generateId()}.${ext}`;
   return `profiles/${slug}/photo-${generateId()}.${ext}`;
 }
 
@@ -646,7 +649,7 @@ async function deleteUserMediaFromR2(env, user, storyRows = []) {
   const keys = new Set();
   const photos = safeParseJSON(user?.photos, []);
 
-  for (const url of [user?.avatar_url, ...photos, ...storyRows.map((row) => row.video_url)]) {
+  for (const url of [user?.avatar_url, user?.avatar_thumb_url, ...photos, ...storyRows.map((row) => row.video_url)]) {
     const key = extractMediaKey(url, env);
     if (key) keys.add(key);
   }
@@ -1100,6 +1103,28 @@ async function ensureUsersMessageBlockRolesColumn(env) {
   }
 
   return _userMessageBlockRolesColumnReady;
+}
+
+async function ensureUsersAvatarThumbColumn(env) {
+  if (!_userAvatarThumbColumnReady) {
+    _userAvatarThumbColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          "ALTER TABLE users ADD COLUMN avatar_thumb_url TEXT DEFAULT ''"
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+    })().catch((err) => {
+      _userAvatarThumbColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userAvatarThumbColumnReady;
 }
 
 async function ensureUsersLastIpColumn(env) {
@@ -2768,7 +2793,7 @@ async function handleOwnProfileDashboard(request, env) {
     cachedUser ? Promise.resolve(cachedUser) : env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
     env.DB.prepare('SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first(),
     env.DB.prepare(
-      `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, u.role, u.premium, u.last_active,
+      `SELECT u.id, u.username, u.avatar_url, u.avatar_thumb_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, u.role, u.premium, u.last_active,
               MAX(pv.created_at) as visited_at
        FROM profile_visits pv
        JOIN users u ON u.id = pv.visitor_id
@@ -2806,6 +2831,7 @@ async function handleOwnProfileDashboard(request, env) {
     id: v.id,
     name: v.username,
     avatar_url: v.avatar_url,
+    avatar_thumb_url: v.avatar_thumb_url || '',
     avatar_crop: safeParseJSON(v.avatar_crop, null),
     age: getPublicAge(v),
     ...getLocationFields(v),
@@ -2877,6 +2903,7 @@ async function handleProfiles(request, env) {
       u.interests,
       u.bio,
       u.avatar_url,
+      u.avatar_thumb_url,
       u.avatar_crop,
       u.photos,
       u.verified,
@@ -3240,6 +3267,7 @@ async function handleProfileDetail(request, env, userId) {
       isOwnProfile,
       lastActive: user.last_active,
       avatar_url: user.avatar_url,
+      avatar_thumb_url: user.avatar_thumb_url || '',
       avatar_crop: safeParseJSON(user.avatar_crop, null),
       visits_total: visitsTotal,
       followers_total: followersTotal,
@@ -3856,7 +3884,7 @@ async function handleUpload(request, env) {
   const uploadUrl = new URL(request.url);
   const purpose = uploadUrl.searchParams.get('purpose') || 'asset';
 
-  if (!['asset', 'avatar', 'gallery'].includes(purpose)) {
+  if (!['asset', 'avatar', 'avatar_thumb', 'gallery'].includes(purpose)) {
     return error('purpose inválido', 400);
   }
 
@@ -3879,10 +3907,10 @@ async function handleUpload(request, env) {
   }
 
   const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
-  const user = await env.DB.prepare('SELECT username, photos, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
+  const user = await env.DB.prepare('SELECT username, photos, avatar_url, avatar_thumb_url FROM users WHERE id = ?').bind(auth.sub).first();
   if (!user) return error('Usuario no encontrado', 404);
 
-  const key = purpose === 'avatar' || purpose === 'gallery'
+  const key = purpose === 'avatar' || purpose === 'avatar_thumb' || purpose === 'gallery'
     ? buildProfileMediaKey(user.username, purpose, ext)
     : `assets/${generateId()}.${ext}`;
 
@@ -3900,15 +3928,27 @@ async function handleUpload(request, env) {
 
   if (purpose === 'avatar') {
     const previousAvatarKey = extractMediaKey(user.avatar_url, env);
+    const previousAvatarThumbKey = extractMediaKey(user.avatar_thumb_url, env);
     await env.DB.prepare(`
-      UPDATE users SET avatar_url = ?, avatar_crop = NULL WHERE id = ?
+      UPDATE users SET avatar_url = ?, avatar_thumb_url = '', avatar_crop = NULL WHERE id = ?
     `).bind(publicUrl, auth.sub).run();
 
-    if (previousAvatarKey && previousAvatarKey !== key) {
-      await deleteR2KeysBestEffort(env, [previousAvatarKey]);
+    await deleteR2KeysBestEffort(env, [previousAvatarKey, previousAvatarThumbKey].filter((oldKey) => oldKey && oldKey !== key));
+
+    return json({ url: publicUrl, key, avatar_url: publicUrl, avatar_thumb_url: '', photos: galleryPhotos }, 201);
+  }
+
+  if (purpose === 'avatar_thumb') {
+    const previousAvatarThumbKey = extractMediaKey(user.avatar_thumb_url, env);
+    await env.DB.prepare(`
+      UPDATE users SET avatar_thumb_url = ? WHERE id = ?
+    `).bind(publicUrl, auth.sub).run();
+
+    if (previousAvatarThumbKey && previousAvatarThumbKey !== key) {
+      await deleteR2KeysBestEffort(env, [previousAvatarThumbKey]);
     }
 
-    return json({ url: publicUrl, key, avatar_url: publicUrl, photos: galleryPhotos }, 201);
+    return json({ url: publicUrl, key, avatar_url: user.avatar_url || '', avatar_thumb_url: publicUrl, photos: galleryPhotos }, 201);
   }
 
   if (purpose === 'gallery') {
@@ -4196,6 +4236,7 @@ function sanitizeUser(user, env) {
     message_block_roles: normalizeRoleArray(safeParseJSON(safe.message_block_roles, []), SEEKING_ROLE_IDS, []),
     interests: safeParseJSON(safe.interests, []),
     photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
+    avatar_thumb_url: safe.avatar_thumb_url || '',
     avatar_crop: safeParseJSON(safe.avatar_crop, null),
     verified: !!safe.verified,
     online: !!safe.online,
@@ -4236,7 +4277,7 @@ async function handleGetVisits(request, env) {
   await ensureProfileVisitStructures(env);
 
   const { results } = await env.DB.prepare(
-    `SELECT u.id, u.username, u.avatar_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, u.role, u.premium, u.last_active,
+    `SELECT u.id, u.username, u.avatar_url, u.avatar_thumb_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, u.role, u.premium, u.last_active,
             MAX(pv.created_at) as visited_at
      FROM profile_visits pv
      JOIN users u ON u.id = pv.visitor_id
@@ -4252,6 +4293,7 @@ async function handleGetVisits(request, env) {
     id: v.id,
     name: v.username,
     avatar_url: v.avatar_url,
+    avatar_thumb_url: v.avatar_thumb_url || '',
     avatar_crop: safeParseJSON(v.avatar_crop, null),
     age: getPublicAge(v),
     ...getLocationFields(v),
@@ -4289,6 +4331,7 @@ async function handleGetTopVisitedProfiles(request, env) {
         u.locality,
         u.role,
         u.avatar_url,
+        u.avatar_thumb_url,
         u.avatar_crop,
         u.verified,
         u.premium,
@@ -4332,6 +4375,7 @@ async function handleGetTopVisitedProfiles(request, env) {
       premium: isPremiumActive(u),
       fake: !!u.fake,
       avatar_url: u.avatar_url,
+      avatar_thumb_url: u.avatar_thumb_url || '',
       avatar_crop: safeParseJSON(u.avatar_crop, null),
       visits_total: Number(u.visits_total || 0),
     })),
@@ -4746,6 +4790,7 @@ function mapFavoriteNetworkProfile(record) {
     premium: isPremiumActive(record),
     fake: !!record.fake,
     avatar_url: record.avatar_url,
+    avatar_thumb_url: record.avatar_thumb_url || '',
     avatar_crop: safeParseJSON(record.avatar_crop, null),
     visits_total: Number(record.visits_total || 0),
     followers_total: Number(record.followers_total || 0),
@@ -4799,6 +4844,7 @@ async function handleGetFavorites(request, env) {
         u.locality,
         u.role,
         u.avatar_url,
+        u.avatar_thumb_url,
         u.avatar_crop,
         u.verified,
         u.premium,
@@ -4829,6 +4875,7 @@ async function handleGetFavorites(request, env) {
         u.locality,
         u.role,
         u.avatar_url,
+        u.avatar_thumb_url,
         u.avatar_crop,
         u.verified,
         u.premium,
@@ -5770,7 +5817,7 @@ async function handleAdminDeleteUser(request, env, userId) {
 
   if (userId === auth.sub) return error('No puedes eliminarte a ti mismo', 400);
 
-  const user = await env.DB.prepare('SELECT id, email, username, avatar_url, photos FROM users WHERE id = ?').bind(userId).first();
+  const user = await env.DB.prepare('SELECT id, email, username, avatar_url, avatar_thumb_url, photos FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
 
   await deleteUserCompletely(env, user);
@@ -5798,7 +5845,7 @@ async function handleAdminBulkDeleteUsers(request, env) {
       continue;
     }
 
-    const user = await env.DB.prepare('SELECT id, email, username, avatar_url, photos FROM users WHERE id = ?').bind(userId).first();
+    const user = await env.DB.prepare('SELECT id, email, username, avatar_url, avatar_thumb_url, photos FROM users WHERE id = ?').bind(userId).first();
     if (!user) {
       results.push({ user_id: userId, deleted: false, reason: 'not_found' });
       continue;
@@ -6947,6 +6994,7 @@ async function handleRequest(request, env, ctx) {
   await ensureUsersBirthdateColumn(env);
   await ensureUsersMaritalStatusColumn(env);
   await ensureUsersSexualOrientationColumn(env);
+  await ensureUsersAvatarThumbColumn(env);
 
   // CORS preflight
   if (method === 'OPTIONS') return handleOptions(env, request);

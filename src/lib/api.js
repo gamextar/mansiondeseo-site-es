@@ -1100,8 +1100,17 @@ export async function uploadImage(file, { purpose = 'asset' } = {}) {
     invalidateBootstrapCache();
     invalidateOwnProfileDashboardCache();
     if (currentAvatarUploadSeq === avatarUploadCacheSeq) {
-      mergeMeCache({ avatar_url: data?.avatar_url || data?.url || '', avatar_crop: null });
+      mergeMeCache({
+        avatar_url: data?.avatar_url || data?.url || '',
+        avatar_thumb_url: data?.avatar_thumb_url || '',
+        avatar_crop: null,
+      });
     }
+  } else if (purpose === 'avatar_thumb') {
+    invalidateMeCache();
+    invalidateBootstrapCache();
+    invalidateOwnProfileDashboardCache();
+    mergeMeCache({ avatar_thumb_url: data?.avatar_thumb_url || data?.url || '' });
   } else if (purpose === 'gallery' && Array.isArray(data?.photos)) {
     invalidateMeCache();
     invalidateBootstrapCache();
@@ -1109,6 +1118,22 @@ export async function uploadImage(file, { purpose = 'asset' } = {}) {
     mergeMeCache({ photos: data.photos, avatar_url: data?.avatar_url });
   }
   return data;
+}
+
+export async function uploadAvatar(file, thumbnailFile) {
+  const avatarData = await uploadImage(file, { purpose: 'avatar' });
+  if (!thumbnailFile) return avatarData;
+
+  try {
+    const thumbData = await uploadImage(thumbnailFile, { purpose: 'avatar_thumb' });
+    return {
+      ...avatarData,
+      avatar_thumb_url: thumbData?.avatar_thumb_url || thumbData?.url || avatarData?.avatar_thumb_url || '',
+    };
+  } catch (err) {
+    console.warn('Avatar thumbnail upload failed:', err);
+    return avatarData;
+  }
 }
 
 export async function deletePhoto(url) {

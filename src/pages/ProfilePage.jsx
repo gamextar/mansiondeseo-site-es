@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil, Trash2, AlertTriangle, Mail, Loader2 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
-import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache, requestAccountDeletion, confirmAccountDeletion } from '../lib/api';
+import { logout as apiLogout, uploadImage, uploadAvatar, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache, requestAccountDeletion, confirmAccountDeletion } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
 import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
@@ -372,25 +372,37 @@ export default function ProfilePage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleCroppedAvatar = async (croppedFile) => {
+  const handleCroppedAvatar = async (croppedFile, meta = {}) => {
     setCropFile(null);
     const uploadSeq = avatarUploadSeqRef.current + 1;
     avatarUploadSeqRef.current = uploadSeq;
     const previewUrl = URL.createObjectURL(croppedFile);
     const previousAvatarUrl = user?.avatar_url || '';
+    const previousAvatarThumbUrl = user?.avatar_thumb_url || '';
     if (avatarPreviewUrlRef.current) URL.revokeObjectURL(avatarPreviewUrlRef.current);
     avatarPreviewUrlRef.current = previewUrl;
-    setUser(prev => prev ? { ...prev, avatar_url: previewUrl, avatar_crop: null } : prev);
+    setUser(prev => prev ? { ...prev, avatar_url: previewUrl, avatar_thumb_url: previewUrl, avatar_crop: null } : prev);
 
     try {
-      const data = await uploadImage(croppedFile, { purpose: 'avatar' });
+      const data = await uploadAvatar(croppedFile, meta?.thumbnailFile);
       const nextAvatarUrl = data?.avatar_url || data?.url || '';
+      const nextAvatarThumbUrl = data?.avatar_thumb_url || '';
       if (nextAvatarUrl && avatarUploadSeqRef.current === uploadSeq) {
-        setUser(prev => prev ? { ...prev, avatar_url: nextAvatarUrl, avatar_crop: null } : prev);
+        setUser(prev => prev ? {
+          ...prev,
+          avatar_url: nextAvatarUrl,
+          avatar_thumb_url: nextAvatarThumbUrl,
+          avatar_crop: null,
+        } : prev);
       }
     } catch (err) {
       if (avatarUploadSeqRef.current === uploadSeq) {
-        setUser(prev => prev ? { ...prev, avatar_url: previousAvatarUrl, avatar_crop: null } : prev);
+        setUser(prev => prev ? {
+          ...prev,
+          avatar_url: previousAvatarUrl,
+          avatar_thumb_url: previousAvatarThumbUrl,
+          avatar_crop: null,
+        } : prev);
       }
       console.error('Avatar upload error:', err);
     } finally {
@@ -486,6 +498,7 @@ export default function ProfilePage() {
     role: displayRole,
     photos,
     avatar_url: user.avatar_url || '',
+    avatar_thumb_url: user.avatar_thumb_url || '',
     avatar_crop: user.avatar_crop || null,
     online: user.online,
     premium: user.premium,

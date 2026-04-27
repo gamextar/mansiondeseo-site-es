@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   country            TEXT DEFAULT '',
   bio                TEXT DEFAULT '',
   avatar_url         TEXT DEFAULT '',
+  avatar_thumb_url   TEXT DEFAULT '',
   photos             TEXT DEFAULT '[]',
   status             TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','verified')),
   premium            INTEGER NOT NULL DEFAULT 0,
