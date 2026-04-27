@@ -1,11 +1,13 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Filter, Move, MapPin, ExternalLink, Film, Pencil } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { logout as apiLogout, uploadImage, deletePhoto, updateProfile, invalidateProfilesCache, getFavorites } from '../lib/api';
+import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
+import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache, getFavorites } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
+import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
 import { formatLocation } from '../lib/location';
 import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
 import { resolveMediaUrl } from '../lib/media';
@@ -58,9 +60,9 @@ const INTEREST_OPTIONS = [
 ];
 
 const PROFILE_TABS = [
-  { id: 'gallery', label: 'Galería', icon: Camera },
-  { id: 'preferences', label: 'Preferencias', icon: Heart },
-  { id: 'followers', label: 'Seguidores', icon: Users },
+  { id: 'gallery', label: 'Galería', icon: Image },
+  { id: 'preferences', label: 'Preferencias', icon: Filter },
+  { id: 'followers', label: 'Seguidores', icon: Heart },
   { id: 'account', label: 'Cuenta', icon: Settings },
 ];
 
@@ -75,6 +77,26 @@ const tabPanelMotion = {
   animate: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.28, ease: [.25,.46,.45,.94] } },
   exit: { opacity: 0, y: -10, filter: 'blur(4px)', transition: { duration: 0.16, ease: 'easeOut' } },
 };
+
+function detectStandaloneMobile() {
+  if (typeof window === 'undefined') return false;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const ua = window.navigator.userAgent || '';
+  const isMobile = /iphone|ipad|ipod|android/i.test(ua);
+  return Boolean(standalone && isMobile);
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr + 'Z').getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Justo ahora';
+  if (mins < 60) return `Hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `Hace ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `Hace ${days}d`;
+}
 
 function RoleSelectorTile({ option, active, roleImage, tone = 'gold', onClick }) {
   const selectedClass = tone === 'danger'
@@ -153,6 +175,10 @@ function FollowMiniCard({ profile, relation, onOpen }) {
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { setRegistered, setUser, user, siteSettings } = useAuth();
+  const isStandaloneMobileApp = detectStandaloneMobile();
+  const navBottomOffset = isStandaloneMobileApp
+    ? getStandaloneBottomNavOffset()
+    : getBrowserBottomNavOffset();
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -161,6 +187,8 @@ export default function ProfilePage() {
   const [adjustUrl, setAdjustUrl] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [togglingGhost, setTogglingGhost] = useState(false);
+  const [visitors, setVisitors] = useState([]);
+  const [receivedGifts, setReceivedGifts] = useState([]);
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
   const avatarUploadSeqRef = useRef(0);
@@ -175,6 +203,7 @@ export default function ProfilePage() {
   const lbPanRef = useRef({ x: 0, y: 0 });
   const lbPinchRef = useRef({ startDist: 0, startZoom: 1, active: false });
   const lbDragRef = useRef({ startX: 0, startY: 0, startPanX: 0, startPanY: 0, active: false });
+  const [showStoryPreview, setShowStoryPreview] = useState(false);
   const [activeTab, setActiveTab] = useState('gallery');
   const [followTab, setFollowTab] = useState('followers');
   const [followProfiles, setFollowProfiles] = useState([]);
@@ -269,6 +298,14 @@ export default function ProfilePage() {
   }, [lightboxOpen, user]);
 
   useEffect(() => {
+    if (!user?.id) return;
+    getOwnProfileDashboard().then(data => {
+      setVisitors(data.visitors || []);
+      setReceivedGifts(data.gifts || []);
+    }).catch(() => {});
+  }, [user?.id]);
+
+  useEffect(() => {
     if (!user?.id || activeTab !== 'followers') return;
     let cancelled = false;
     setFollowersLoading(true);
@@ -300,13 +337,8 @@ export default function ProfilePage() {
   // Auto-save reordered photos
   const persistOrder = useCallback(async (newPhotos) => {
     setUser(prev => prev ? { ...prev, photos: newPhotos } : prev);
-    invalidateProfilesCache();
-    try { sessionStorage.setItem('mansion_feed_dirty', '1'); localStorage.removeItem('mansion_feed'); } catch {}
     try {
-      const data = await updateProfile({ photos: newPhotos });
-      if (Array.isArray(data?.user?.photos)) {
-        setUser(prev => prev ? { ...prev, photos: data.user.photos } : prev);
-      }
+      await updateProfile({ photos: newPhotos });
     } catch {
       // Silently fail — local state already updated
     }
@@ -463,20 +495,8 @@ export default function ProfilePage() {
     try {
       for (const file of files) {
         const data = await uploadImage(file, { purpose: 'gallery' });
-        setUser(prev => {
-          if (!prev) return prev;
-          const nextPhotos = Array.isArray(data?.photos)
-            ? data.photos
-            : [...getGalleryPhotos(prev), data?.url].filter(Boolean);
-          return {
-            ...prev,
-            photos: nextPhotos,
-            avatar_url: data?.avatar_url ?? prev.avatar_url,
-          };
-        });
+        setUser(prev => prev ? { ...prev, photos: [...getGalleryPhotos(prev), data.url] } : prev);
       }
-      invalidateProfilesCache();
-      try { sessionStorage.setItem('mansion_feed_dirty', '1'); localStorage.removeItem('mansion_feed'); } catch {}
     } catch {
       // Partial upload ok
     } finally {
@@ -491,8 +511,6 @@ export default function ProfilePage() {
     try {
       const data = await deletePhoto(url);
       setUser(prev => prev ? { ...prev, photos: data.photos, avatar_url: data.avatar_url } : prev);
-      invalidateProfilesCache();
-      try { sessionStorage.setItem('mansion_feed_dirty', '1'); localStorage.removeItem('mansion_feed'); } catch {}
     } catch {
       // Silently fail
     } finally {
@@ -685,10 +703,10 @@ export default function ProfilePage() {
         variants={stagger}
         className="w-full px-3 pt-6 lg:px-10 lg:pt-8"
       >
-        {/* ── Profile Header ── */}
-        <motion.div variants={fadeUp} className="-mx-3 mb-0.5 border-b border-mansion-border/15 bg-mansion-base/90 px-3 pb-0.5 pt-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:-mx-10 lg:px-10 lg:pt-4">
+        {/* ── Hero Section ── */}
+        <motion.div variants={fadeUp} className="mb-4">
           {/* Avatar + info row */}
-          <div className="mb-[17px] flex items-center gap-4">
+          <div className="flex items-center gap-4 mb-3">
             {/* Avatar */}
             <div className="relative flex-shrink-0">
               <div className={`rounded-full p-[3px] ${user?.has_active_story ? 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400' : 'bg-gradient-to-br from-mansion-gold/50 to-mansion-gold-light/30'}`}>
@@ -763,49 +781,111 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="-mx-1 overflow-x-auto scrollbar-hide rounded-2xl border border-mansion-border/20 bg-mansion-card/45 p-1.5">
-            <div className="grid min-w-max grid-cols-4 gap-1 lg:min-w-0">
-              {PROFILE_TABS.map(({ id, label, icon: Icon }) => {
-                const active = activeTab === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setActiveTab(id)}
-                    className={`relative flex min-w-[112px] flex-col items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-xs font-semibold transition-all lg:min-w-0 lg:flex-row lg:gap-2 lg:text-sm ${
-                      active ? 'text-mansion-base' : 'text-text-muted hover:bg-white/[0.04] hover:text-text-primary'
-                    }`}
-                  >
-                    {active && (
-                      <motion.span
-                        layoutId="profileTabActive"
-                        className="absolute inset-0 rounded-xl bg-mansion-gold shadow-[0_14px_32px_rgba(201,168,76,0.18)]"
-                        transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-                      />
-                    )}
-                    <span className={`relative flex h-8 w-8 items-center justify-center rounded-full transition-colors lg:h-7 lg:w-7 ${
-                      active ? 'bg-mansion-base/12' : 'bg-white/[0.04] text-mansion-gold/85'
-                    }`}>
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <span className="relative whitespace-nowrap">{label}</span>
-                  </button>
-                );
-              })}
+          {/* Action pills row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => navigate('/historia/nueva', { state: { from: '/perfil' } })}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-mansion-crimson/10 border border-mansion-crimson/25 text-[11px] font-medium text-mansion-crimson hover:bg-mansion-crimson/20 transition-all"
+            >
+              <Film className="w-3 h-3" />
+              {user?.has_active_story ? 'Ver / nueva historia' : 'Subir historia'}
+            </button>
+
+            {user?.has_active_story && (
+              <button
+                onClick={async () => {
+                  if (!confirm('¿Eliminar tu historia actual?')) return;
+                  try {
+                    const storiesData = await getStories({ limit: 50 });
+                    const currentStory = (storiesData.stories || []).find((story) => story.user_id === user?.id);
+                    if (currentStory?.id) await deleteOwnStory(currentStory.id);
+                    const me = await getMe().catch(() => null);
+                    if (me?.user) {
+                      setUser({ ...me.user, has_active_story: false });
+                    } else {
+                      setUser(prev => prev ? { ...prev, has_active_story: false } : prev);
+                    }
+                  } catch { /* best-effort */ }
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-[11px] text-red-400 hover:bg-red-500/15 transition-all"
+              >
+                <X className="w-3 h-3" />
+                Eliminar historia
+              </button>
+            )}
+          </div>
+        </motion.div>
+
+        {/* ── Stats Row ── */}
+        <motion.div variants={fadeUp} className="grid grid-cols-3 gap-px mb-5 rounded-2xl overflow-hidden bg-mansion-border/10">
+          {[
+            { value: photos.length, label: 'Fotos', icon: Image },
+            { value: receivedGifts.length, label: 'Regalos', icon: Gift },
+            { value: visitors.length, label: 'Visitas', icon: Users },
+          ].map(({ value, label, icon: Icon }) => (
+            <div key={label} className="flex flex-col items-center py-3.5 bg-mansion-card/40">
+              <Icon className="w-3.5 h-3.5 text-mansion-gold/50 mb-1" />
+              <span className="text-lg font-bold text-text-primary font-display">{value}</span>
+              <span className="text-[10px] uppercase tracking-wider text-text-dim mt-0.5">{label}</span>
             </div>
+          ))}
+        </motion.div>
+
+        <motion.div variants={fadeUp} className="sticky top-[calc(var(--safe-top)+72px)] z-20 mb-6 -mx-1 overflow-x-auto rounded-2xl border border-mansion-border/20 bg-mansion-base/80 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:top-4 lg:mx-0">
+          <div className="grid min-w-max grid-cols-4 gap-1 lg:min-w-0">
+            {PROFILE_TABS.map(({ id, label, icon: Icon }) => {
+              const active = activeTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActiveTab(id)}
+                  className={`relative flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold transition-all lg:text-sm ${
+                    active ? 'text-mansion-base' : 'text-text-muted hover:bg-white/[0.04] hover:text-text-primary'
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="profileTabActive"
+                      className="absolute inset-0 rounded-xl bg-mansion-gold shadow-[0_14px_32px_rgba(201,168,76,0.18)]"
+                      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                    />
+                  )}
+                  <Icon className="relative h-4 w-4" />
+                  <span className="relative whitespace-nowrap">{label}</span>
+                </button>
+              );
+            })}
           </div>
         </motion.div>
 
         <AnimatePresence mode="wait">
           {activeTab === 'gallery' && (
-            <motion.section key="gallery" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1">
-              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-2 shadow-[0_24px_80px_rgba(0,0,0,0.18)] lg:p-3">
-                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <motion.section key="gallery" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.18)] lg:p-6">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="font-display text-2xl font-bold text-text-primary">Galería</h3>
                     <p className="mt-1 text-sm text-text-dim">Ordená tus fotos y suma contenido nuevo desde el mismo panel.</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      disabled={uploading}
+                      className="inline-flex items-center gap-2 rounded-full bg-mansion-gold px-4 py-2 text-xs font-bold text-mansion-base transition-all hover:brightness-110 disabled:opacity-60"
+                    >
+                      <Plus className="h-4 w-4" />
+                      {uploading ? 'Subiendo...' : 'Subir foto'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/historia/nueva', { state: { from: '/perfil' } })}
+                      className="inline-flex items-center gap-2 rounded-full border border-mansion-crimson/35 bg-mansion-crimson/12 px-4 py-2 text-xs font-bold text-mansion-crimson transition-all hover:bg-mansion-crimson/18"
+                    >
+                      <Film className="h-4 w-4" />
+                      Subir video
+                    </button>
                     <button
                       type="button"
                       onClick={() => setGalleryEditing(prev => !prev)}
@@ -823,7 +903,7 @@ export default function ProfilePage() {
 
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
                   {photos.map((url, i) => (
-                    <div
+                    <motion.div
                       key={url}
                       data-drag-idx={i}
                       draggable={galleryEditing && photos.length > 1}
@@ -834,92 +914,150 @@ export default function ProfilePage() {
                       onTouchMove={galleryEditing ? handleTouchMove : undefined}
                       onTouchEnd={galleryEditing ? handleTouchEnd : undefined}
                       onClick={galleryEditing ? undefined : () => { setLightboxIndex(i); setLightboxOpen(true); }}
-                      className={`group relative aspect-[4/5] w-full min-w-0 overflow-hidden rounded-[1.4rem] border border-mansion-border/20 bg-mansion-card ${
+                      layout
+                      initial={{ opacity: 0, scale: 0.92 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.025 }}
+                      className={`group relative aspect-[4/5] overflow-hidden rounded-[1.4rem] border border-mansion-border/20 bg-mansion-card ${
                         galleryEditing ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
                       }`}
                     >
-                      <img
-                        src={resolveMediaUrl(url)}
-                        alt={`Foto ${i + 1}`}
-                        referrerPolicy="no-referrer"
-                        loading={i < 4 ? 'eager' : 'lazy'}
-                        decoding="async"
-                        draggable={false}
-                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
+                      <img src={resolveMediaUrl(url)} alt={`Foto ${i + 1}`} referrerPolicy="no-referrer" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/28 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
                       {galleryEditing && (
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleDeletePhoto(url); }}
                           disabled={deleting === url}
-                          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/85 text-white shadow-lg ring-1 ring-white/25 backdrop-blur transition-opacity disabled:opacity-50 lg:opacity-0 lg:group-hover:opacity-100"
+                          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/62 text-white backdrop-blur transition-opacity disabled:opacity-50 lg:opacity-0 lg:group-hover:opacity-100"
                         >
                           {deleting === url ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <X className="h-4 w-4" />}
                         </button>
                       )}
-                    </div>
+                    </motion.div>
                   ))}
 
                   <button
                     type="button"
                     onClick={() => galleryInputRef.current?.click()}
                     disabled={uploading}
-                    className="aspect-[4/5] w-full min-w-0 overflow-hidden rounded-[1.4rem] border-2 border-dashed border-mansion-border/30 bg-mansion-card/25 p-3 text-text-dim transition-colors hover:border-mansion-gold/40 hover:text-mansion-gold disabled:opacity-50 sm:p-4"
+                    className="aspect-[4/5] rounded-[1.4rem] border-2 border-dashed border-mansion-border/30 bg-mansion-card/25 p-4 text-text-dim transition-colors hover:border-mansion-gold/40 hover:text-mansion-gold disabled:opacity-50"
                   >
                     <div className="flex h-full flex-col items-center justify-center gap-2">
                       <Plus className="h-6 w-6" />
-                      <span className="whitespace-nowrap text-[11px] font-semibold leading-tight sm:text-xs">{uploading ? 'Subiendo...' : '+ Subir Foto'}</span>
+                      <span className="text-xs font-semibold">{uploading ? 'Subiendo...' : 'Nueva foto'}</span>
                     </div>
                   </button>
                   <button
                     type="button"
                     onClick={() => navigate('/historia/nueva', { state: { from: '/perfil' } })}
-                    className="aspect-[4/5] w-full min-w-0 overflow-hidden rounded-[1.4rem] border border-mansion-crimson/25 bg-[radial-gradient(circle_at_top,rgba(212,24,61,0.2),transparent_60%),rgba(212,24,61,0.08)] p-3 text-mansion-crimson transition-colors hover:border-mansion-crimson/45 hover:bg-mansion-crimson/12 sm:p-4"
+                    className="aspect-[4/5] rounded-[1.4rem] border border-mansion-crimson/25 bg-[radial-gradient(circle_at_top,rgba(212,24,61,0.2),transparent_60%),rgba(212,24,61,0.08)] p-4 text-mansion-crimson transition-colors hover:border-mansion-crimson/45 hover:bg-mansion-crimson/12"
                   >
                     <div className="flex h-full flex-col items-center justify-center gap-2">
                       <Film className="h-7 w-7" />
-                      <span className="whitespace-nowrap text-[11px] font-bold leading-tight sm:text-xs">+ Subir Video</span>
+                      <span className="text-xs font-bold">{user?.has_active_story ? 'Cambiar video' : 'Subir video'}</span>
                     </div>
                   </button>
                 </div>
                 <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleGalleryUpload} />
               </div>
+
+              <aside className="space-y-4">
+                {receivedGifts.length > 0 && (
+                  <div className="rounded-[1.75rem] border border-mansion-border/20 bg-mansion-card/35 p-4">
+                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-text-dim">Regalos recibidos</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {receivedGifts.map((g, i) => (
+                        <motion.div key={g.id} initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.035 }} className="flex items-center gap-2 rounded-2xl border border-mansion-border/15 bg-mansion-card/55 px-3 py-2" title={`De ${g.sender_name}`}>
+                          <span className="text-xl">{g.gift_emoji}</span>
+                          <div className="text-xs">
+                            <p className="font-medium text-text-primary">{g.gift_name}</p>
+                            <p className="text-text-dim">de {g.sender_name}</p>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {visitors.length > 0 && (
+                  <div className="rounded-[1.75rem] border border-mansion-border/20 bg-mansion-card/35 p-4">
+                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-text-dim">Visitas recientes</h3>
+                    <div className="space-y-2">
+                      {visitors.slice(0, 6).map((v, i) => (
+                        <motion.button key={v.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} onClick={() => openFollowProfile(v)} className="group flex w-full items-center gap-3 rounded-2xl bg-mansion-card/40 p-3 text-left transition-all hover:bg-mansion-card/70">
+                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-mansion-elevated">
+                            {v.avatar_url ? <AvatarImg src={v.avatar_url} crop={v.avatar_crop} alt={v.name} className="h-full w-full" /> : <div className="flex h-full w-full items-center justify-center text-text-dim"><Camera className="h-4 w-4" /></div>}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-text-primary">{v.name}</p>
+                            <p className="truncate text-xs text-text-dim">Te visitó {timeAgo(v.visited_at).toLowerCase()}</p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-text-dim group-hover:text-mansion-gold" />
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </aside>
             </motion.section>
           )}
 
           {activeTab === 'preferences' && (
-            <motion.section key="preferences" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1 space-y-4">
-              <div className="grid items-start gap-4 xl:grid-cols-2">
-                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-2 lg:p-3">
-                  <div className="mb-3 min-h-[58px] lg:mb-4">
-                    <h3 className="flex items-center gap-2 font-display text-2xl font-bold text-text-primary">
-                      <Heart className="h-5 w-5 text-mansion-gold" />
-                      Busco
-                    </h3>
-                    <p className="mt-1 text-sm text-text-dim">Elegí varios roles para ordenar tu feed por afinidad.</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                    {SEEKING_OPTIONS.map((option) => (
-                      <RoleSelectorTile
-                        key={option.id}
-                        option={option}
-                        active={seekingArr.includes(option.id)}
-                        roleImage={roleImages[option.id]}
-                        onClick={() => toggleSeekingRole(option.id)}
-                      />
-                    ))}
+            <motion.section key="preferences" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
+                <div className="mb-5">
+                  <h3 className="font-display text-2xl font-bold text-text-primary">Preferencias</h3>
+                  <p className="mt-1 text-sm text-text-dim">Elegí varios roles para ordenar tu feed por afinidad.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                  {SEEKING_OPTIONS.map((option) => (
+                    <RoleSelectorTile
+                      key={option.id}
+                      option={option}
+                      active={seekingArr.includes(option.id)}
+                      roleImage={roleImages[option.id]}
+                      onClick={() => toggleSeekingRole(option.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
+                  <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
+                    <Filter className="h-3.5 w-3.5 text-mansion-gold" />
+                    Intereses
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {INTEREST_OPTIONS.map((interest) => {
+                      const active = userInterests.includes(interest.id);
+                      return (
+                        <motion.button
+                          key={interest.id}
+                          type="button"
+                          whileTap={{ scale: 0.96 }}
+                          onClick={() => toggleInterest(interest.id)}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition-all ${
+                            active
+                              ? 'border-mansion-gold/45 bg-mansion-gold/14 text-mansion-gold'
+                              : 'border-mansion-border/25 bg-mansion-card/55 text-text-muted hover:border-mansion-gold/25 hover:text-text-primary'
+                          }`}
+                        >
+                          <span>{interest.emoji}</span>
+                          <span>{interest.label}</span>
+                        </motion.button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-2 lg:p-3">
-                  <div className="mb-3 min-h-[58px] lg:mb-4">
-                    <h3 className="flex items-center gap-2 font-display text-2xl font-bold text-text-primary">
-                      <Shield className="h-5 w-5 text-mansion-crimson" />
-                      Bloquear
-                    </h3>
-                    <p className="mt-1 text-sm text-text-dim">Los roles seleccionados no podrán iniciarte chat.</p>
-                  </div>
+                <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
+                  <h3 className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
+                    <Shield className="h-3.5 w-3.5 text-mansion-crimson" />
+                    Bloquear mensajes de
+                  </h3>
+                  <p className="mb-4 text-xs text-text-dim">Los roles seleccionados no podrán iniciarte chat.</p>
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                     {SEEKING_OPTIONS.map((option) => (
                       <RoleSelectorTile
@@ -934,40 +1072,11 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
-
-              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-2 lg:p-3">
-                <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
-                  <Filter className="h-3.5 w-3.5 text-mansion-gold" />
-                  Intereses
-                </h3>
-                <p className="mb-4 text-xs text-text-dim">Estos intereses afinan el orden del feed después de tus preferencias principales.</p>
-                <div className="flex flex-wrap gap-2">
-                  {INTEREST_OPTIONS.map((interest) => {
-                    const active = userInterests.includes(interest.id);
-                    return (
-                      <motion.button
-                        key={interest.id}
-                        type="button"
-                        whileTap={{ scale: 0.96 }}
-                        onClick={() => toggleInterest(interest.id)}
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition-all ${
-                          active
-                            ? 'border-mansion-gold/45 bg-mansion-gold/14 text-mansion-gold'
-                            : 'border-mansion-border/25 bg-mansion-card/55 text-text-muted hover:border-mansion-gold/25 hover:text-text-primary'
-                        }`}
-                      >
-                        <span>{interest.emoji}</span>
-                        <span>{interest.label}</span>
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              </div>
             </motion.section>
           )}
 
           {activeTab === 'followers' && (
-            <motion.section key="followers" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1 rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-2 lg:p-3">
+            <motion.section key="followers" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <h3 className="font-display text-2xl font-bold text-text-primary">Seguidores</h3>
@@ -993,14 +1102,14 @@ export default function ProfilePage() {
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-mansion-gold/25 border-t-mansion-gold" />
                 </div>
               ) : followersError ? (
-                <div className="mt-4 rounded-2xl border border-mansion-crimson/20 bg-mansion-crimson/8 p-4 text-sm text-red-300">{followersError}</div>
+                <div className="mt-6 rounded-2xl border border-mansion-crimson/20 bg-mansion-crimson/8 p-4 text-sm text-red-300">{followersError}</div>
               ) : followProfiles.length === 0 ? (
-                <div className="mt-4 rounded-[1.5rem] bg-mansion-card/45 p-10 text-center">
+                <div className="mt-6 rounded-[1.5rem] bg-mansion-card/45 p-10 text-center">
                   <Heart className="mx-auto mb-3 h-10 w-10 text-text-dim" />
                   <p className="text-sm text-text-dim">{followTab === 'followers' ? 'Todavía no tienes seguidores.' : 'Todavía no sigues a ningún perfil.'}</p>
                 </div>
               ) : (
-                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {followProfiles.map((profile) => (
                     <FollowMiniCard key={`${followTab}-${profile.id}`} profile={profile} relation={followTab === 'followers' ? (profile.mutual_follow ? 'Mutuo' : 'Te sigue') : (profile.mutual_follow ? 'Mutuo' : 'Siguiendo')} onOpen={() => openFollowProfile(profile)} />
                   ))}
@@ -1010,7 +1119,7 @@ export default function ProfilePage() {
           )}
 
           {activeTab === 'account' && (
-            <motion.section key="account" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1 grid gap-6 xl:grid-cols-2">
+            <motion.section key="account" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="grid gap-6 xl:grid-cols-2">
               <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
                 <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-text-dim">Mi cuenta</h3>
                 {[
@@ -1161,6 +1270,19 @@ export default function ProfilePage() {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {showStoryPreview && user?.active_story_url && (
+        <div className="fixed inset-0 z-50 bg-black lg:left-64 xl:left-72 lg:bg-mansion-base">
+          <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
+            <StoryPreviewOverlay
+              videoUrl={user.active_story_url}
+              user={user}
+              navBottomOffset={navBottomOffset}
+              onDismiss={() => setShowStoryPreview(false)}
+            />
+          </div>
         </div>
       )}
     </div>

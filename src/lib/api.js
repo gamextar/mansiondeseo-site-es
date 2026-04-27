@@ -117,15 +117,6 @@ function mergeMeCache(partialUser) {
   }
 }
 
-function invalidateProfileMediaCaches({ preserveMe = false, preserveOwnDashboard = false } = {}) {
-  const currentUser = getStoredUser();
-  if (currentUser?.id) sharedGetCache.delete(`profile:${currentUser.id}`);
-  if (!preserveMe) invalidateMeCache();
-  invalidateBootstrapCache();
-  if (!preserveOwnDashboard) invalidateOwnProfileDashboardCache();
-  markFeedDirty();
-}
-
 function invalidateUnreadCountCache() {
   sharedGetCache.delete('unreadCount');
   sessionCache.delete('unreadCount');
@@ -863,9 +854,6 @@ export async function updateProfile(fields) {
     'locality',
     'premium',
     'ghost_mode',
-    'photos',
-    'avatar_url',
-    'avatar_crop',
   ].some((key) => Object.prototype.hasOwnProperty.call(fields || {}, key));
 
   if (touchesBrowseState) {
@@ -1011,8 +999,10 @@ export async function uploadImage(file, { purpose = 'asset' } = {}) {
       mergeMeCache({ avatar_url: data?.avatar_url || data?.url || '', avatar_crop: null });
     }
   } else if (purpose === 'gallery' && Array.isArray(data?.photos)) {
+    invalidateMeCache();
+    invalidateBootstrapCache();
+    invalidateOwnProfileDashboardCache();
     mergeMeCache({ photos: data.photos, avatar_url: data?.avatar_url });
-    invalidateProfileMediaCaches({ preserveMe: true, preserveOwnDashboard: true });
   }
   return data;
 }
@@ -1024,7 +1014,6 @@ export async function deletePhoto(url) {
   }).then((data) => {
     if (Array.isArray(data?.photos)) {
       mergeMeCache({ photos: data.photos, avatar_url: data?.avatar_url });
-      invalidateProfileMediaCaches({ preserveMe: true, preserveOwnDashboard: true });
     }
     return data;
   });
