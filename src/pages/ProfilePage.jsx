@@ -300,8 +300,13 @@ export default function ProfilePage() {
   // Auto-save reordered photos
   const persistOrder = useCallback(async (newPhotos) => {
     setUser(prev => prev ? { ...prev, photos: newPhotos } : prev);
+    invalidateProfilesCache();
+    try { sessionStorage.setItem('mansion_feed_dirty', '1'); localStorage.removeItem('mansion_feed'); } catch {}
     try {
-      await updateProfile({ photos: newPhotos });
+      const data = await updateProfile({ photos: newPhotos });
+      if (Array.isArray(data?.user?.photos)) {
+        setUser(prev => prev ? { ...prev, photos: data.user.photos } : prev);
+      }
     } catch {
       // Silently fail — local state already updated
     }
@@ -458,8 +463,20 @@ export default function ProfilePage() {
     try {
       for (const file of files) {
         const data = await uploadImage(file, { purpose: 'gallery' });
-        setUser(prev => prev ? { ...prev, photos: [...getGalleryPhotos(prev), data.url] } : prev);
+        setUser(prev => {
+          if (!prev) return prev;
+          const nextPhotos = Array.isArray(data?.photos)
+            ? data.photos
+            : [...getGalleryPhotos(prev), data?.url].filter(Boolean);
+          return {
+            ...prev,
+            photos: nextPhotos,
+            avatar_url: data?.avatar_url ?? prev.avatar_url,
+          };
+        });
       }
+      invalidateProfilesCache();
+      try { sessionStorage.setItem('mansion_feed_dirty', '1'); localStorage.removeItem('mansion_feed'); } catch {}
     } catch {
       // Partial upload ok
     } finally {
@@ -474,6 +491,8 @@ export default function ProfilePage() {
     try {
       const data = await deletePhoto(url);
       setUser(prev => prev ? { ...prev, photos: data.photos, avatar_url: data.avatar_url } : prev);
+      invalidateProfilesCache();
+      try { sessionStorage.setItem('mansion_feed_dirty', '1'); localStorage.removeItem('mansion_feed'); } catch {}
     } catch {
       // Silently fail
     } finally {
@@ -802,9 +821,9 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+                <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] items-stretch gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
                   {photos.map((url, i) => (
-                    <motion.div
+                    <div
                       key={url}
                       data-drag-idx={i}
                       draggable={galleryEditing && photos.length > 1}
@@ -815,14 +834,12 @@ export default function ProfilePage() {
                       onTouchMove={galleryEditing ? handleTouchMove : undefined}
                       onTouchEnd={galleryEditing ? handleTouchEnd : undefined}
                       onClick={galleryEditing ? undefined : () => { setLightboxIndex(i); setLightboxOpen(true); }}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: i * 0.025 }}
-                      className={`group relative aspect-[4/5] overflow-hidden rounded-[1.4rem] border border-mansion-border/20 bg-mansion-card ${
+                      style={{ aspectRatio: '4 / 5' }}
+                      className={`group relative block w-full min-w-0 max-w-none overflow-hidden rounded-[1.4rem] border border-mansion-border/20 bg-mansion-card ${
                         galleryEditing ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
                       }`}
                     >
-                      <img src={resolveMediaUrl(url)} alt={`Foto ${i + 1}`} referrerPolicy="no-referrer" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      <img src={resolveMediaUrl(url)} alt={`Foto ${i + 1}`} referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/28 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
                       {galleryEditing && (
                         <button
@@ -834,7 +851,7 @@ export default function ProfilePage() {
                           {deleting === url ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <X className="h-4 w-4" />}
                         </button>
                       )}
-                    </motion.div>
+                    </div>
                   ))}
 
                   <button
