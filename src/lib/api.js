@@ -117,12 +117,12 @@ function mergeMeCache(partialUser) {
   }
 }
 
-function invalidateProfileMediaCaches() {
+function invalidateProfileMediaCaches({ preserveMe = false, preserveOwnDashboard = false } = {}) {
   const currentUser = getStoredUser();
   if (currentUser?.id) sharedGetCache.delete(`profile:${currentUser.id}`);
-  invalidateMeCache();
+  if (!preserveMe) invalidateMeCache();
   invalidateBootstrapCache();
-  invalidateOwnProfileDashboardCache();
+  if (!preserveOwnDashboard) invalidateOwnProfileDashboardCache();
   markFeedDirty();
 }
 
@@ -1011,8 +1011,8 @@ export async function uploadImage(file, { purpose = 'asset' } = {}) {
       mergeMeCache({ avatar_url: data?.avatar_url || data?.url || '', avatar_crop: null });
     }
   } else if (purpose === 'gallery' && Array.isArray(data?.photos)) {
-    invalidateProfileMediaCaches();
     mergeMeCache({ photos: data.photos, avatar_url: data?.avatar_url });
+    invalidateProfileMediaCaches({ preserveMe: true, preserveOwnDashboard: true });
   }
   return data;
 }
@@ -1023,8 +1023,8 @@ export async function deletePhoto(url) {
     body: JSON.stringify({ url }),
   }).then((data) => {
     if (Array.isArray(data?.photos)) {
-      invalidateProfileMediaCaches();
       mergeMeCache({ photos: data.photos, avatar_url: data?.avatar_url });
+      invalidateProfileMediaCaches({ preserveMe: true, preserveOwnDashboard: true });
     }
     return data;
   });
