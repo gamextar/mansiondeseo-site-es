@@ -1166,7 +1166,7 @@ export default function ProfilePage() {
                   className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-mansion-crimson px-4 py-3 text-sm font-semibold text-white hover:bg-mansion-crimson/90 disabled:opacity-50"
                 >
                   {deleteAccountSending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Enviar código
+                  Eliminar Cuenta
                 </button>
               </div>
             )}

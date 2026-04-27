@@ -672,8 +672,8 @@ async function deleteUserMediaFromR2(env, user, storyRows = []) {
 
 async function ensureAccountDeletionRequestsTable(env) {
   if (!_accountDeletionRequestsReady) {
-    _accountDeletionRequestsReady = Promise.all([
-      env.DB.prepare(`
+    _accountDeletionRequestsReady = (async () => {
+      await env.DB.prepare(`
         CREATE TABLE IF NOT EXISTS account_deletion_requests (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -683,11 +683,11 @@ async function ensureAccountDeletionRequestsTable(env) {
           used INTEGER NOT NULL DEFAULT 0,
           created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
-      `).run(),
-      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_account_deletion_user ON account_deletion_requests(user_id, used, created_at DESC)').run(),
-      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_account_deletion_token ON account_deletion_requests(token)').run(),
-      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_account_deletion_expires ON account_deletion_requests(expires_at)').run(),
-    ]).catch((err) => {
+      `).run();
+      await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_account_deletion_user ON account_deletion_requests(user_id, used, created_at DESC)').run();
+      await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_account_deletion_token ON account_deletion_requests(token)').run();
+      await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_account_deletion_expires ON account_deletion_requests(expires_at)').run();
+    })().catch((err) => {
       _accountDeletionRequestsReady = null;
       throw err;
     });
