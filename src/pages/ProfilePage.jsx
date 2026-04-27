@@ -667,7 +667,7 @@ export default function ProfilePage() {
         className="w-full px-3 pt-6 lg:px-10 lg:pt-8"
       >
         {/* ── Profile Header ── */}
-        <motion.div variants={fadeUp} className="sticky top-[calc(var(--safe-top)+72px)] z-30 -mx-3 mb-3 border-b border-mansion-border/15 bg-mansion-base/90 px-3 pb-3 pt-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:top-4 lg:-mx-10 lg:px-10 lg:pt-4">
+        <motion.div variants={fadeUp} className="-mx-3 mb-3 border-b border-mansion-border/15 bg-mansion-base/90 px-3 pb-3 pt-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:-mx-10 lg:px-10 lg:pt-4">
           {/* Avatar + info row */}
           <div className="mb-3 flex items-center gap-4">
             {/* Avatar */}
