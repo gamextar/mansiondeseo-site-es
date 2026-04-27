@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Heart, MessageCircle, Shield, Crown,
-  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, Lock, X, ZoomIn, GripVertical, Gift, Eye, AlertTriangle, Star, CircleAlert,
+  MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, X, ZoomIn, GripVertical, Gift, Eye, AlertTriangle, Star, CircleAlert,
 } from 'lucide-react';
 import { getProfile, getToken, toggleFavorite, updateProfile, adminUpdateUser, invalidateProfilesCache, getGiftCatalog, sendGift as apiSendGift, reportProfile } from '../lib/api';
 import { useAuth } from '../lib/authContext';
@@ -735,7 +735,7 @@ export default function ProfileDetailPage({ initialData }) {
                       <div className="flex flex-col items-center gap-2 text-white/80">
                         {isGhostBlurred
                           ? <MaskIcon className="w-9 h-9" customSvg={settings.incognitoIconSvg || ''} />
-                          : <Lock className="w-8 h-8" />}
+                          : <Crown className="w-8 h-8" />}
                         <span className="text-sm font-semibold">{isGhostBlurred ? 'Modo Incógnito' : 'Contenido VIP'}</span>
                         <span className="text-xs text-white/60">Solo visible para usuarios VIP</span>
                       </div>
@@ -1171,7 +1171,7 @@ export default function ProfileDetailPage({ initialData }) {
                       />
                       {blocked && (
                         <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                          <Lock className="w-4 h-4 text-white/60" />
+                          <Crown className="w-4 h-4 text-white/60" />
                         </div>
                       )}
                       {isReordering ? (
@@ -1578,7 +1578,7 @@ export default function ProfileDetailPage({ initialData }) {
                       {blocked && (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <div className="flex flex-col items-center gap-2 text-white/80">
-                            <Lock className="w-10 h-10" />
+                            <Crown className="w-10 h-10" />
                             <span className="text-base font-semibold">Contenido VIP</span>
                           </div>
                         </div>
