@@ -105,34 +105,120 @@ function getMessageIdValue(message) {
   return message?.id == null ? '' : String(message.id);
 }
 
+function areMessagesEqual(message, other) {
+  return getMessageIdValue(message) === getMessageIdValue(other)
+    && message?.senderId === other?.senderId
+    && String(message?.text || '') === String(other?.text || '')
+    && (message?.createdAt || message?.created_at || null) === (other?.createdAt || other?.created_at || null)
+    && Number(message?.is_read ?? 0) === Number(other?.is_read ?? 0);
+}
+
 function areMessageListsEqual(left = [], right = []) {
   if (left === right) return true;
   if (left.length !== right.length) return false;
-  return left.every((message, index) => {
-    const other = right[index];
-    return getMessageIdValue(message) === getMessageIdValue(other)
-      && message.senderId === other?.senderId
-      && String(message.text || '') === String(other?.text || '')
-      && (message.createdAt || message.created_at || null) === (other?.createdAt || other?.created_at || null)
-      && Number(message.is_read ?? 0) === Number(other?.is_read ?? 0);
-  });
+  return left.every((message, index) => areMessagesEqual(message, right[index]));
 }
 
-function mergeFreshHistoryWithCurrent(freshMessages, currentMessages, requestStartedAt = 0) {
-  if (!currentMessages?.length) return freshMessages;
+function sortMessagesByTime(messages) {
+  return messages
+    .map((message, index) => ({ message, index }))
+    .sort((a, b) => {
+      const timeA = getMessageTimeValue(a.message);
+      const timeB = getMessageTimeValue(b.message);
+      if (timeA && timeB && timeA !== timeB) return timeA - timeB;
+      if (timeA && !timeB) return -1;
+      if (!timeA && timeB) return 1;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.message);
+}
 
-  const freshIds = new Set(freshMessages.map(getMessageIdValue).filter(Boolean));
-  const freshLastTime = freshMessages.reduce((max, message) => Math.max(max, getMessageTimeValue(message)), 0);
-  const preserveAfter = Math.max(freshLastTime, requestStartedAt);
-  const extras = currentMessages.filter((message) => {
-    const messageId = getMessageIdValue(message);
-    if (!messageId || freshIds.has(messageId)) return false;
-    if (message.isPreview || messageId.startsWith('preview-')) return false;
-    if (messageId.startsWith('temp-')) return true;
-    return getMessageTimeValue(message) >= preserveAfter - 1000;
+function hydrateVisibleMessages(freshMessages, currentMessages, requestStartedAt = 0) {
+  if (!currentMessages?.length) {
+    return { messages: freshMessages, omittedOlder: false };
+  }
+
+  const freshById = new Map();
+  freshMessages.forEach((message) => {
+    const id = getMessageIdValue(message);
+    if (id) freshById.set(id, message);
   });
 
-  return [...freshMessages, ...extras];
+  const firstCurrentTime = currentMessages.reduce((min, message) => {
+    const time = getMessageTimeValue(message);
+    return time ? Math.min(min, time) : min;
+  }, Infinity);
+  const visibleStartTime = Number.isFinite(firstCurrentTime) ? firstCurrentTime : 0;
+  const consumedFreshIds = new Set();
+
+  const hydratedCurrent = currentMessages.map((message) => {
+    const messageId = getMessageIdValue(message);
+    const byId = messageId ? freshById.get(messageId) : null;
+    if (byId) {
+      consumedFreshIds.add(messageId);
+      return areMessagesEqual(message, byId) ? message : byId;
+    }
+
+    if (messageId.startsWith('temp-')) {
+      const messageTime = getMessageTimeValue(message);
+      const replacement = freshMessages.find((fresh) => {
+        const freshId = getMessageIdValue(fresh);
+        if (!freshId || consumedFreshIds.has(freshId)) return false;
+        const freshTime = getMessageTimeValue(fresh);
+        return fresh.senderId === message.senderId
+          && String(fresh.text || '') === String(message.text || '')
+          && (!messageTime || !freshTime || Math.abs(freshTime - messageTime) <= 15_000);
+      });
+
+      if (replacement) {
+        consumedFreshIds.add(getMessageIdValue(replacement));
+        return replacement;
+      }
+    }
+
+    return message;
+  });
+
+  const additions = [];
+  let omittedOlder = false;
+
+  freshMessages.forEach((message) => {
+    const messageId = getMessageIdValue(message);
+    if (messageId && consumedFreshIds.has(messageId)) return;
+
+    const messageTime = getMessageTimeValue(message);
+    const belongsToVisibleWindow = !visibleStartTime || !messageTime || messageTime >= visibleStartTime - 1000;
+    const arrivedDuringRequest = requestStartedAt && messageTime >= requestStartedAt - 1000;
+
+    if (belongsToVisibleWindow || arrivedDuringRequest) {
+      additions.push(message);
+      if (messageId) consumedFreshIds.add(messageId);
+    } else {
+      omittedOlder = true;
+    }
+  });
+
+  const messages = sortMessagesByTime([...hydratedCurrent, ...additions]);
+  return { messages, omittedOlder };
+}
+
+function hasMessagesBeforeVisibleWindow(freshMessages, currentMessages) {
+  if (!currentMessages?.length) return false;
+
+  const firstCurrentTime = currentMessages.reduce((min, message) => {
+    const time = getMessageTimeValue(message);
+    return time ? Math.min(min, time) : min;
+  }, Infinity);
+  if (!Number.isFinite(firstCurrentTime)) return false;
+
+  const currentIds = new Set(currentMessages.map(getMessageIdValue).filter(Boolean));
+  return freshMessages.some((message) => {
+    const messageId = getMessageIdValue(message);
+    const messageTime = getMessageTimeValue(message);
+    return messageTime
+      && messageTime < firstCurrentTime - 1000
+      && (!messageId || !currentIds.has(messageId));
+  });
 }
 
 function readChatCache(partnerId) {
@@ -724,7 +810,7 @@ export default function ChatPage() {
           .map((msg) => msg.id);
 
         setMessages((prev) => {
-          const merged = mergeFreshHistoryWithCurrent(formattedHistory, prev);
+          const { messages: merged } = hydrateVisibleMessages(formattedHistory, prev);
           return areMessageListsEqual(prev, merged) ? prev : merged;
         });
         setHasOlderMessages(Array.isArray(payload) ? historyRows.length >= INITIAL_CHAT_PAGE_SIZE : !!payload?.hasMore);
@@ -812,11 +898,12 @@ export default function ChatPage() {
     apiGetMessages(partnerId, { limit: INITIAL_CHAT_PAGE_SIZE }).then((data) => {
       if (cancelled) return;
       const latestMessages = normalizeMessages(data.messages || []);
+      const hasHiddenOlderMessages = hasMessagesBeforeVisibleWindow(latestMessages, nextInitialMessages);
       setMessages((prev) => {
-        const merged = mergeFreshHistoryWithCurrent(latestMessages, prev, historyRequestStartedAt);
+        const { messages: merged } = hydrateVisibleMessages(latestMessages, prev, historyRequestStartedAt);
         return areMessageListsEqual(prev, merged) ? prev : merged;
       });
-      setHasOlderMessages(!!data.hasMore);
+      setHasOlderMessages(!!data.hasMore || hasHiddenOlderMessages);
       setLoading(false);
       if (!nextCachedChat?.messages?.length || wasAtBottomRef.current) {
         wasAtBottomRef.current = true;
@@ -1127,7 +1214,7 @@ export default function ChatPage() {
     ? { transform: `translateY(${viewportOffsetTop}px)` }
     : undefined;
   const shellMinHeightClass = isStandaloneMobileChat ? 'min-h-screen' : 'min-h-0';
-  const shellTransitionClass = isMobileBrowserChat ? 'transition-[height] duration-150 ease-out' : '';
+  const shellTransitionClass = isMobileBrowserChat && keyboardActive ? 'transition-[height] duration-150 ease-out' : '';
   const composerTransitionClass = isMobileBrowserChat ? 'transition-transform duration-150 ease-out' : '';
 
   return (
