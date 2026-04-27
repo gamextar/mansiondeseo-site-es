@@ -1033,7 +1033,7 @@ export default function ProfilePage() {
                   onTouchMove={handleLbTouchMove}
                   onTouchEnd={handleLbTouchEnd}
                 >
-                  <div className="relative h-[82dvh] max-h-[900px] w-[min(92vw,61.5dvh)] max-w-[675px] overflow-hidden rounded-[1.75rem] bg-mansion-card shadow-[0_24px_80px_rgba(0,0,0,0.45)] lg:h-[86dvh] lg:max-h-[920px] lg:w-[min(72vw,64.5dvh)] lg:max-w-[690px]">
+                  <div className="relative h-[90dvh] max-h-[980px] w-[min(94vw,67.5dvh)] max-w-[735px] overflow-hidden rounded-[1.75rem] bg-mansion-card shadow-[0_24px_80px_rgba(0,0,0,0.45)] lg:h-[92dvh] lg:max-h-[1000px] lg:w-[min(74vw,69dvh)] lg:max-w-[750px]">
                     <img
                       src={resolveMediaUrl(url)}
                       alt={`Foto ${i + 1}`}
