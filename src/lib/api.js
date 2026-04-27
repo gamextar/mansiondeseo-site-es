@@ -741,6 +741,21 @@ export async function requestMagicLink(email) {
   });
 }
 
+export async function requestAccountDeletion() {
+  return apiFetch('/account/delete/request', { method: 'POST' });
+}
+
+export async function confirmAccountDeletion(code) {
+  const data = await apiFetch('/account/delete/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+  invalidateMeCache();
+  invalidateOwnProfileDashboardCache();
+  clearAuth();
+  return data;
+}
+
 export async function getMe({ force = false } = {}) {
   const cached = force ? null : sessionCache.get(AUTH_ME_CACHE_KEY, AUTH_ME_CACHE_TTL_MS);
   if (cached?.user) {

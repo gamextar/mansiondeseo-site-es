@@ -1,10 +1,10 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil, Trash2, AlertTriangle, Mail, Loader2 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
-import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache } from '../lib/api';
+import { logout as apiLogout, uploadImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache, requestAccountDeletion, confirmAccountDeletion } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
 import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
@@ -80,6 +80,14 @@ export default function ProfilePage() {
   const [adjustUrl, setAdjustUrl] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [togglingGhost, setTogglingGhost] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [deleteAccountStep, setDeleteAccountStep] = useState('intro');
+  const [deleteAccountCode, setDeleteAccountCode] = useState('');
+  const [deleteAccountMessage, setDeleteAccountMessage] = useState('');
+  const [deleteAccountError, setDeleteAccountError] = useState('');
+  const [deleteAccountDevCode, setDeleteAccountDevCode] = useState('');
+  const [deleteAccountSending, setDeleteAccountSending] = useState(false);
+  const [deleteAccountConfirming, setDeleteAccountConfirming] = useState(false);
   const [visitors, setVisitors] = useState([]);
   const [receivedGifts, setReceivedGifts] = useState([]);
   const dragItem = useRef(null);
@@ -293,6 +301,63 @@ export default function ProfilePage() {
     setUser(null);
     setRegistered(false);
     window.location.href = '/';
+  };
+
+  const openDeleteAccountDialog = () => {
+    setDeleteAccountStep('intro');
+    setDeleteAccountCode('');
+    setDeleteAccountMessage('');
+    setDeleteAccountError('');
+    setDeleteAccountDevCode('');
+    setDeleteAccountOpen(true);
+  };
+
+  const closeDeleteAccountDialog = () => {
+    if (deleteAccountSending || deleteAccountConfirming) return;
+    setDeleteAccountOpen(false);
+  };
+
+  const handleSendDeleteAccountCode = async () => {
+    setDeleteAccountSending(true);
+    setDeleteAccountError('');
+    setDeleteAccountMessage('');
+    setDeleteAccountDevCode('');
+    try {
+      const data = await requestAccountDeletion();
+      setDeleteAccountStep('code');
+      setDeleteAccountMessage(data?.message || 'Te enviamos el código de confirmación.');
+      if (data?.devCode) {
+        setDeleteAccountDevCode(String(data.devCode));
+        setDeleteAccountCode(String(data.devCode));
+      } else {
+        setDeleteAccountCode('');
+      }
+    } catch (err) {
+      setDeleteAccountError(err?.message || 'No pudimos enviar el código. Intentá nuevamente.');
+    } finally {
+      setDeleteAccountSending(false);
+    }
+  };
+
+  const handleConfirmDeleteAccount = async (e) => {
+    e.preventDefault();
+    if (deleteAccountCode.length !== 6) {
+      setDeleteAccountError('Ingresá el código de 6 dígitos.');
+      return;
+    }
+
+    setDeleteAccountConfirming(true);
+    setDeleteAccountError('');
+    try {
+      await confirmAccountDeletion(deleteAccountCode);
+      setUser(null);
+      setRegistered(false);
+      window.location.href = '/';
+    } catch (err) {
+      setDeleteAccountError(err?.message || 'No pudimos eliminar la cuenta. Revisá el código e intentá nuevamente.');
+    } finally {
+      setDeleteAccountConfirming(false);
+    }
   };
 
   const handleAvatarSelect = (e) => {
@@ -987,7 +1052,127 @@ export default function ProfilePage() {
             <span className="text-sm font-medium">Cerrar sesión</span>
           </button>
         </motion.div>
+
+        <motion.div variants={fadeUp} className="pb-7">
+          <button
+            onClick={openDeleteAccountDialog}
+            className="w-full flex items-center gap-3 p-3 rounded-2xl border border-mansion-crimson/20 bg-mansion-crimson/5 text-mansion-crimson/80 hover:bg-mansion-crimson/10 hover:text-mansion-crimson transition-all"
+          >
+            <div className="w-10 h-10 rounded-xl bg-mansion-crimson/12 flex items-center justify-center">
+              <Trash2 className="w-4.5 h-4.5" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-medium">Eliminar cuenta</p>
+              <p className="text-xs text-mansion-crimson/55">Requiere confirmación por email</p>
+            </div>
+          </button>
+        </motion.div>
       </motion.div>
+
+      {deleteAccountOpen && (
+        <div className="fixed inset-0 z-[95] flex items-end justify-center px-4 pb-6 pt-20 lg:items-center lg:pb-0" onClick={closeDeleteAccountDialog}>
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="relative w-full max-w-md rounded-3xl border border-mansion-border/30 bg-mansion-card/95 p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={closeDeleteAccountDialog}
+              disabled={deleteAccountSending || deleteAccountConfirming}
+              className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-text-dim hover:bg-white/10 hover:text-text-primary disabled:opacity-40"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-mansion-crimson/12 text-mansion-crimson">
+              {deleteAccountStep === 'code' ? <Mail className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+            </div>
+
+            <h3 className="font-display text-xl font-bold text-text-primary">Eliminar cuenta</h3>
+            <p className="mt-2 text-sm leading-6 text-text-muted">
+              {deleteAccountStep === 'code'
+                ? `Ingresá el código que enviamos a ${user?.email || 'tu email'} para confirmar el borrado definitivo.`
+                : 'Te enviaremos un código a tu email antes de borrar definitivamente tu perfil, fotos, chats y actividad.'}
+            </p>
+
+            {deleteAccountMessage && (
+              <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+                {deleteAccountMessage}
+              </div>
+            )}
+            {deleteAccountDevCode && (
+              <div className="mt-3 rounded-2xl border border-mansion-gold/20 bg-mansion-gold/10 px-4 py-3 text-xs text-mansion-gold">
+                Código dev: {deleteAccountDevCode}
+              </div>
+            )}
+            {deleteAccountError && (
+              <div className="mt-4 rounded-2xl border border-mansion-crimson/25 bg-mansion-crimson/10 px-4 py-3 text-sm text-mansion-crimson">
+                {deleteAccountError}
+              </div>
+            )}
+
+            {deleteAccountStep === 'code' ? (
+              <form onSubmit={handleConfirmDeleteAccount} className="mt-5 space-y-4">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-text-muted">Código de confirmación</span>
+                  <input
+                    value={deleteAccountCode}
+                    onChange={(e) => {
+                      setDeleteAccountCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                      setDeleteAccountError('');
+                    }}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="000000"
+                    className="w-full rounded-2xl border border-mansion-border/30 bg-black/25 px-4 py-3 text-center text-2xl font-bold tracking-[0.45em] text-text-primary placeholder:text-text-dim focus:border-mansion-crimson/50 focus:ring-mansion-crimson/20"
+                  />
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSendDeleteAccountCode}
+                    disabled={deleteAccountSending || deleteAccountConfirming}
+                    className="flex-1 rounded-2xl border border-mansion-border/30 px-4 py-3 text-sm font-medium text-text-muted hover:bg-white/[0.04] disabled:opacity-50"
+                  >
+                    Reenviar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={deleteAccountConfirming || deleteAccountCode.length !== 6}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-mansion-crimson px-4 py-3 text-sm font-semibold text-white hover:bg-mansion-crimson/90 disabled:opacity-50"
+                  >
+                    {deleteAccountConfirming && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Eliminar
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={closeDeleteAccountDialog}
+                  disabled={deleteAccountSending}
+                  className="flex-1 rounded-2xl border border-mansion-border/30 px-4 py-3 text-sm font-medium text-text-muted hover:bg-white/[0.04] disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendDeleteAccountCode}
+                  disabled={deleteAccountSending}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-mansion-crimson px-4 py-3 text-sm font-semibold text-white hover:bg-mansion-crimson/90 disabled:opacity-50"
+                >
+                  {deleteAccountSending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Enviar código
+                </button>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
 
       {/* ── Lightbox ── */}
       {lightboxOpen && (

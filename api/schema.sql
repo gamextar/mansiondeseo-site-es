@@ -130,6 +130,21 @@ CREATE INDEX IF NOT EXISTS idx_vtokens_token ON verification_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_vtokens_email ON verification_tokens(email);
 CREATE INDEX IF NOT EXISTS idx_vtokens_expires ON verification_tokens(expires_at);
 
+-- Account deletion confirmation tokens
+CREATE TABLE IF NOT EXISTS account_deletion_requests (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email      TEXT NOT NULL,
+  token      TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  used       INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_deletion_user ON account_deletion_requests(user_id, used, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_account_deletion_token ON account_deletion_requests(token);
+CREATE INDEX IF NOT EXISTS idx_account_deletion_expires ON account_deletion_requests(expires_at);
+
 -- Sessions
 CREATE TABLE IF NOT EXISTS sessions (
   id         TEXT PRIMARY KEY,

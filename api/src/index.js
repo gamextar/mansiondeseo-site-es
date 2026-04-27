@@ -63,6 +63,7 @@ let _userMessageBlockRolesColumnReady = null;
 let _userBlocksReady = null;
 let _profileReportsReady = null;
 let _userLastIpColumnReady = null;
+let _accountDeletionRequestsReady = null;
 let _profileVisitStructuresReady = null;
 let _profileStatsBackfillReady = null;
 let _errorLogsReady = null;
@@ -669,11 +670,37 @@ async function deleteUserMediaFromR2(env, user, storyRows = []) {
   await deleteR2KeysBestEffort(env, [...keys]);
 }
 
+async function ensureAccountDeletionRequestsTable(env) {
+  if (!_accountDeletionRequestsReady) {
+    _accountDeletionRequestsReady = Promise.all([
+      env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS account_deletion_requests (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          email TEXT NOT NULL,
+          token TEXT NOT NULL UNIQUE,
+          expires_at TEXT NOT NULL,
+          used INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `).run(),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_account_deletion_user ON account_deletion_requests(user_id, used, created_at DESC)').run(),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_account_deletion_token ON account_deletion_requests(token)').run(),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_account_deletion_expires ON account_deletion_requests(expires_at)').run(),
+    ]).catch((err) => {
+      _accountDeletionRequestsReady = null;
+      throw err;
+    });
+  }
+  return _accountDeletionRequestsReady;
+}
+
 async function deleteUserCompletely(env, user) {
   const userId = user.id;
   await ensureProfileVisitStructures(env);
   await ensureUserBlocksTable(env);
   await ensureProfileReportsTable(env);
+  await ensureAccountDeletionRequestsTable(env);
   const storyRowsResult = await env.DB.prepare(
     'SELECT id, video_url FROM stories WHERE user_id = ?'
   ).bind(userId).all();
@@ -694,12 +721,18 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM profile_visits WHERE visitor_id = ? OR visited_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM user_gifts WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM verification_tokens WHERE user_id = ? OR email = ?').bind(userId, user.email),
+    env.DB.prepare('DELETE FROM account_deletion_requests WHERE user_id = ? OR email = ?').bind(userId, user.email),
     env.DB.prepare('DELETE FROM processed_payments WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM message_limits WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM profile_stats WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
+
+  _fullUserCache.delete(userId);
+  _viewerCache.delete(userId);
+  _accountStatusCache.delete(userId);
+  invalidateFeedBrowseCache();
 }
 
 async function ensureProfileReportsTable(env) {
@@ -2261,6 +2294,71 @@ async function sendPasswordResetEmail(env, toEmail, code) {
   }
 }
 
+function accountDeletionEmailHTML(code) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;padding:0;background:#08080E;font-family:'Helvetica Neue',Arial,sans-serif}
+  .wrap{max-width:480px;margin:0 auto;padding:40px 24px}
+  .card{background:#111118;border-radius:16px;padding:40px 32px;border:1px solid rgba(212,24,61,0.22)}
+  .logo{text-align:center;font-size:24px;font-weight:700;color:#C9A84C;letter-spacing:1px;margin-bottom:8px}
+  .sub{text-align:center;color:#d45a72;font-size:13px;margin-bottom:32px}
+  .code-box{background:#08080E;border:2px solid rgba(212,24,61,0.35);border-radius:12px;padding:20px;text-align:center;margin:24px 0}
+  .code{font-size:36px;letter-spacing:12px;font-weight:700;color:#D4183D;font-family:'Courier New',monospace}
+  .msg{color:#c4c4d0;font-size:14px;line-height:1.6;text-align:center}
+  .footer{text-align:center;color:#555;font-size:11px;margin-top:32px}
+  .warn{color:#D4183D;font-size:12px;text-align:center;margin-top:16px}
+</style></head>
+<body><div class="wrap"><div class="card">
+  <div class="logo">MANSIÓN DESEO</div>
+  <div class="sub">Eliminar cuenta</div>
+  <p class="msg">Tu código para confirmar la eliminación de la cuenta es:</p>
+  <div class="code-box"><div class="code">${code}</div></div>
+  <p class="msg">Introduce este código en la app para eliminar definitivamente tu cuenta. El código expira en <strong>30 minutos</strong>.</p>
+  <p class="warn">Si no solicitaste esto, cambia tu contraseña e ignora este email.</p>
+</div>
+<div class="footer">© Mansión Deseo · Este email fue enviado automáticamente</div>
+</div></body></html>`;
+}
+
+async function sendAccountDeletionEmail(env, toEmail, code) {
+  const { apiKey, mailFrom } = await getResendCredentials(env);
+  const fromEmail = mailFrom;
+  const fromName = 'Mansión Deseo';
+
+  if (!apiKey) {
+    console.error('Resend send failed: RESEND_API_KEY is not configured');
+    return false;
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        from: `${fromName} <${fromEmail}>`,
+        to: [toEmail],
+        subject: `${code} — Confirmar eliminación de cuenta`,
+        text: `Tu código para eliminar tu cuenta de Mansión Deseo es: ${code}\n\nExpira en 30 minutos. Esta acción elimina definitivamente tu perfil y datos asociados.\n\nSi no solicitaste esto, cambia tu contraseña e ignora este email.`,
+        html: accountDeletionEmailHTML(code),
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`Resend error ${res.status}:`, body);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Resend send failed:', err.message);
+    return false;
+  }
+}
+
 async function handleForgotPassword(request, env) {
   const { email } = await request.json();
 
@@ -2473,6 +2571,84 @@ async function handleMe(request, env) {
   if (!user) return error('Usuario no encontrado', 404);
 
   return json({ user: sanitizeUser(user, env) });
+}
+
+// ── POST /api/account/delete/request ────────────────────
+
+async function handleRequestAccountDeletion(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  await ensureAccountDeletionRequestsTable(env);
+
+  const user = await env.DB.prepare(
+    "SELECT id, email, username FROM users WHERE id = ? AND status = 'verified'"
+  ).bind(auth.sub).first();
+  if (!user?.email) return error('Usuario no encontrado', 404);
+
+  await env.DB.prepare(
+    'UPDATE account_deletion_requests SET used = 1 WHERE user_id = ? AND used = 0'
+  ).bind(auth.sub).run();
+
+  const code = generateVerificationCode();
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000)
+    .toISOString()
+    .replace('T', ' ')
+    .replace('Z', '')
+    .split('.')[0];
+
+  await env.DB.prepare(`
+    INSERT INTO account_deletion_requests (id, user_id, email, token, expires_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(generateId(), auth.sub, String(user.email).toLowerCase(), code, expiresAt).run();
+
+  if (env.ENVIRONMENT === 'production') {
+    const sent = await sendAccountDeletionEmail(env, String(user.email).toLowerCase(), code);
+    if (!sent) return error('No pudimos enviar el email de confirmación. Intentá nuevamente en unos minutos.', 502);
+  } else {
+    debugLog(env, `🗑️ ACCOUNT DELETE CODE for ${user.email}: ${code}`);
+  }
+
+  return json({
+    message: 'Te enviamos un código para confirmar la eliminación de tu cuenta.',
+    ...(env.ENVIRONMENT !== 'production' && { devCode: code }),
+  });
+}
+
+// ── POST /api/account/delete/confirm ────────────────────
+
+async function handleConfirmAccountDeletion(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const { code } = await request.json().catch(() => ({}));
+  const normalizedCode = String(code || '').replace(/\D/g, '').slice(0, 6);
+  if (normalizedCode.length !== 6) return error('Código requerido', 400);
+
+  await ensureAccountDeletionRequestsTable(env);
+
+  const record = await env.DB.prepare(`
+    SELECT id
+    FROM account_deletion_requests
+    WHERE user_id = ? AND token = ? AND used = 0 AND expires_at > datetime('now')
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(auth.sub, normalizedCode).first();
+
+  if (!record) return error('Código inválido o expirado', 401);
+
+  const user = await env.DB.prepare(
+    'SELECT id, email, username, avatar_url, photos FROM users WHERE id = ?'
+  ).bind(auth.sub).first();
+  if (!user) return error('Usuario no encontrado', 404);
+
+  await env.DB.prepare('UPDATE account_deletion_requests SET used = 1 WHERE id = ?')
+    .bind(record.id).run();
+
+  await deleteUserCompletely(env, user);
+  await bumpFeedCacheVersion(env);
+
+  console.log(`🗑️ Usuario eliminó su cuenta ${auth.sub} (${user.email})`);
+  return json({ success: true, message: 'Cuenta eliminada correctamente.' });
 }
 
 async function handleAppBootstrap(request, env) {
@@ -6752,6 +6928,8 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/auth/logout' && method === 'POST') return handleLogout(request, env);
   if (path === '/api/app/bootstrap' && method === 'GET') return handleAppBootstrap(request, env);
   if (path === '/api/me/dashboard' && method === 'GET') return handleOwnProfileDashboard(request, env);
+  if (path === '/api/account/delete/request' && method === 'POST') return handleRequestAccountDeletion(request, env);
+  if (path === '/api/account/delete/confirm' && method === 'POST') return handleConfirmAccountDeletion(request, env);
 
   // ── Profile routes
   if (path === '/api/profiles' && method === 'GET') return handleProfiles(request, env);
