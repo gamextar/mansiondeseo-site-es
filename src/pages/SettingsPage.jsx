@@ -25,6 +25,15 @@ const STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT = 3;
 const STORY_RAIL_FALLBACK_GAP_MOBILE = 6;
 const STORY_RAIL_FALLBACK_GAP_DESKTOP = 7;
 const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
+const PROFILE_BLUR_HERO_MULTIPLIER = 1.8;
+const PROFILE_BLUR_THUMB_MULTIPLIER = 0.7;
+const PROFILE_BLUR_LIGHTBOX_MULTIPLIER = 2.5;
+
+function normalizeBlurMultiplier(value, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(3, Math.round(numeric * 10) / 10));
+}
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -38,6 +47,9 @@ export default function SettingsPage() {
   // Photo & Blur
   const [blurMobile, setBlurMobile] = useState(14);
   const [blurDesktop, setBlurDesktop] = useState(8);
+  const [profileBlurHeroMultiplier, setProfileBlurHeroMultiplier] = useState(PROFILE_BLUR_HERO_MULTIPLIER);
+  const [profileBlurThumbMultiplier, setProfileBlurThumbMultiplier] = useState(PROFILE_BLUR_THUMB_MULTIPLIER);
+  const [profileBlurLightboxMultiplier, setProfileBlurLightboxMultiplier] = useState(PROFILE_BLUR_LIGHTBOX_MULTIPLIER);
   const [freeVisiblePhotos, setFreeVisiblePhotos] = useState(1);
 
   // VIP
@@ -214,6 +226,9 @@ export default function SettingsPage() {
         const s = data.settings;
         setBlurMobile(s.blurMobile);
         setBlurDesktop(s.blurDesktop);
+        setProfileBlurHeroMultiplier(normalizeBlurMultiplier(s.profileBlurHeroMultiplier, PROFILE_BLUR_HERO_MULTIPLIER));
+        setProfileBlurThumbMultiplier(normalizeBlurMultiplier(s.profileBlurThumbMultiplier, PROFILE_BLUR_THUMB_MULTIPLIER));
+        setProfileBlurLightboxMultiplier(normalizeBlurMultiplier(s.profileBlurLightboxMultiplier, PROFILE_BLUR_LIGHTBOX_MULTIPLIER));
         setFreeVisiblePhotos(s.freeVisiblePhotos);
         setShowVipButton(s.showVipButton);
         setDailyMessageLimit(s.dailyMessageLimit);
@@ -380,6 +395,9 @@ export default function SettingsPage() {
       const data = await updateSettings({
         blur_mobile: blurMobile,
         blur_desktop: blurDesktop,
+        profile_blur_hero_multiplier: profileBlurHeroMultiplier,
+        profile_blur_thumb_multiplier: profileBlurThumbMultiplier,
+        profile_blur_lightbox_multiplier: profileBlurLightboxMultiplier,
         free_visible_photos: freeVisiblePhotos,
         show_vip_button: showVipButton ? '1' : '0',
         daily_message_limit: dailyMessageLimit,
@@ -456,6 +474,9 @@ export default function SettingsPage() {
       const s = data.settings;
       setBlurMobile(s.blurMobile);
       setBlurDesktop(s.blurDesktop);
+      setProfileBlurHeroMultiplier(normalizeBlurMultiplier(s.profileBlurHeroMultiplier, PROFILE_BLUR_HERO_MULTIPLIER));
+      setProfileBlurThumbMultiplier(normalizeBlurMultiplier(s.profileBlurThumbMultiplier, PROFILE_BLUR_THUMB_MULTIPLIER));
+      setProfileBlurLightboxMultiplier(normalizeBlurMultiplier(s.profileBlurLightboxMultiplier, PROFILE_BLUR_LIGHTBOX_MULTIPLIER));
       setFreeVisiblePhotos(s.freeVisiblePhotos);
       setShowVipButton(s.showVipButton);
       setDailyMessageLimit(s.dailyMessageLimit);
@@ -686,6 +707,58 @@ export default function SettingsPage() {
                 <span className="text-mansion-gold font-medium">{blurDesktop}px</span>
                 <span>Máximo</span>
               </div>
+            </div>
+
+            {/* Profile Detail Blur */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Sliders className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Blur en perfil</h3>
+                  <p className="text-[11px] text-text-dim">Multiplicadores sobre el blur base</p>
+                </div>
+              </div>
+
+              {[
+                {
+                  label: 'Foto principal',
+                  value: profileBlurHeroMultiplier,
+                  setter: setProfileBlurHeroMultiplier,
+                },
+                {
+                  label: 'Miniaturas',
+                  value: profileBlurThumbMultiplier,
+                  setter: setProfileBlurThumbMultiplier,
+                },
+                {
+                  label: 'Lightbox',
+                  value: profileBlurLightboxMultiplier,
+                  setter: setProfileBlurLightboxMultiplier,
+                },
+              ].map(({ label, value, setter }) => {
+                const normalized = normalizeBlurMultiplier(value, 1);
+                return (
+                  <div key={label} className="mb-4 last:mb-0">
+                    <div className="mb-1 flex items-center justify-between text-[11px]">
+                      <span className="font-medium text-text-muted">{label}</span>
+                      <span className="font-semibold text-mansion-gold">
+                        x{normalized.toFixed(1)} · {Math.round(blurDesktop * normalized)}px desktop
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="3"
+                      step="0.1"
+                      value={normalized}
+                      onChange={(e) => setter(normalizeBlurMultiplier(e.target.value, normalized))}
+                      className="w-full accent-mansion-gold"
+                    />
+                  </div>
+                );
+              })}
             </div>
 
             {/* Free Visible Photos (Others) */}

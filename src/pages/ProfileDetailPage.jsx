@@ -36,7 +36,21 @@ const REPORT_REASONS = [
 
 const PROFILE_DETAIL_CACHE_PREFIX = 'mansion_profile_detail_';
 const PROFILE_DETAIL_CACHE_TTL_MS = 5 * 60_000;
-const DEFAULT_PROFILE_SETTINGS = { blurLevel: 14, blurMobile: 14, blurDesktop: 8, freeVisiblePhotos: 1, freeOwnPhotos: 3 };
+const DEFAULT_PROFILE_SETTINGS = {
+  blurLevel: 14,
+  blurMobile: 14,
+  blurDesktop: 8,
+  profileBlurHeroMultiplier: 1.8,
+  profileBlurThumbMultiplier: 0.7,
+  profileBlurLightboxMultiplier: 2.5,
+  freeVisiblePhotos: 1,
+  freeOwnPhotos: 3,
+};
+
+function getBlurMultiplier(value, fallback) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
 
 function buildPreviewProfile(preview) {
   if (!preview) return null;
@@ -668,10 +682,9 @@ export default function ProfileDetailPage({ initialData }) {
   const isPhotoBlocked = (index) => index >= visiblePhotos;
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
   const baseBlur = isMobile ? (settings.blurMobile ?? settings.blurLevel ?? 14) : (settings.blurDesktop ?? settings.blurLevel ?? 8);
-  // Scale blur proportionally: hero gets 1.8x, thumbnails 0.7x, lightbox 2.5x
-  const heroBlur = Math.round(baseBlur * 1.8);
-  const thumbBlur = Math.round(baseBlur * 0.7);
-  const lightboxBlur = Math.round(baseBlur * 2.5);
+  const heroBlur = Math.round(baseBlur * getBlurMultiplier(settings.profileBlurHeroMultiplier, 1.8));
+  const thumbBlur = Math.round(baseBlur * getBlurMultiplier(settings.profileBlurThumbMultiplier, 0.7));
+  const lightboxBlur = Math.round(baseBlur * getBlurMultiplier(settings.profileBlurLightboxMultiplier, 2.5));
   const publicProfileTopBounceStyle = {
     transform: 'translate3d(0, var(--public-profile-top-bounce-y, 0px), 0)',
     transition: 'var(--public-profile-top-bounce-transition, none)',

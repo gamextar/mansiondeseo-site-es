@@ -1097,6 +1097,7 @@ export async function updateSettings(fields) {
   }).then((data) => {
     sharedGetCache.delete('publicSettings');
     sessionCache.delete('publicSettings');
+    removeMatchingStorageKeys(sessionStorage, (key) => key.startsWith('mansion_profile_detail_'));
     markFeedDirty();
     return data;
   });

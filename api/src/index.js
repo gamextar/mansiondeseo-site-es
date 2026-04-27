@@ -4129,6 +4129,9 @@ async function loadSettings(env) {
     blurLevel: parseInt(settings.blur_level || '14', 10),
     blurMobile: parseInt(settings.blur_mobile || settings.blur_level || '14', 10),
     blurDesktop: parseInt(settings.blur_desktop || settings.blur_level || '8', 10),
+    profileBlurHeroMultiplier: parseNumberSetting(settings.profile_blur_hero_multiplier, 1.8),
+    profileBlurThumbMultiplier: parseNumberSetting(settings.profile_blur_thumb_multiplier, 0.7),
+    profileBlurLightboxMultiplier: parseNumberSetting(settings.profile_blur_lightbox_multiplier, 2.5),
     freeVisiblePhotos: parseInt(settings.free_visible_photos || '1', 10),
     showVipButton: settings.show_vip_button !== '0',
     dailyMessageLimit: parseInt(settings.daily_message_limit || '5', 10),
@@ -4299,6 +4302,9 @@ function getPublicSettingsPayload(settings) {
     showVipButton: settings.showVipButton,
     blurMobile: settings.blurMobile,
     blurDesktop: settings.blurDesktop,
+    profileBlurHeroMultiplier: settings.profileBlurHeroMultiplier,
+    profileBlurThumbMultiplier: settings.profileBlurThumbMultiplier,
+    profileBlurLightboxMultiplier: settings.profileBlurLightboxMultiplier,
     freeVisiblePhotos: settings.freeVisiblePhotos,
     allowedCountries: settings.allowedCountries,
     coinPack1Coins: settings.coinPack1Coins,
@@ -4385,6 +4391,7 @@ async function handleUpdateSettings(request, env) {
   const body = await request.json();
   const allowed = [
     'blur_level', 'blur_mobile', 'blur_desktop',
+    'profile_blur_hero_multiplier', 'profile_blur_thumb_multiplier', 'profile_blur_lightbox_multiplier',
     'free_visible_photos', 'show_vip_button',
     'daily_message_limit', 'site_country', 'site_locale', 'site_timezone', 'site_currency',
     'hide_password_register',
@@ -4456,6 +4463,16 @@ async function handleUpdateSettings(request, env) {
       ).bind(key, String(body[key]), String(body[key])).run();
     }
   }
+  const shouldBumpFeedCacheVersion = [
+    'blur_level',
+    'blur_mobile',
+    'blur_desktop',
+    'profile_blur_hero_multiplier',
+    'profile_blur_thumb_multiplier',
+    'profile_blur_lightbox_multiplier',
+    'free_visible_photos',
+  ].some((key) => body[key] !== undefined);
+  if (shouldBumpFeedCacheVersion) await bumpFeedCacheVersion(env);
   // Invalidate settings cache so new values take effect immediately
   _cache.delete('settings');
   invalidateFeedBrowseCache();
