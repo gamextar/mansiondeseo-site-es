@@ -1782,6 +1782,7 @@ async function authenticate(request, env) {
   const cachedStatus = _accountStatusCache.get(userId);
   if (cachedStatus && now < cachedStatus.exp) {
     if (cachedStatus.status === 'missing') return null;
+    if (cachedStatus.status === 'under_review') return null;
     if (cachedStatus.status === 'suspended') return null;
   } else {
     const userRow = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
@@ -1794,6 +1795,7 @@ async function authenticate(request, env) {
     _accountStatusCache.set(userId, { status: userRow?.account_status, exp: now + ACCOUNT_STATUS_TTL_MS });
     setCachedViewer(userId, userRow);
     setCachedFullUser(userId, userRow);
+    if (userRow?.account_status === 'under_review') return null;
     if (userRow?.account_status === 'suspended') return null;
   }
 
@@ -2334,9 +2336,9 @@ function accountDeletionEmailHTML(code) {
 <body><div class="wrap"><div class="card">
   <div class="logo">MANSIÓN DESEO</div>
   <div class="sub">Eliminar cuenta</div>
-  <p class="msg">Tu código para confirmar la eliminación de la cuenta es:</p>
+  <p class="msg">Tu código para confirmar la solicitud de baja es:</p>
   <div class="code-box"><div class="code">${code}</div></div>
-  <p class="msg">Introduce este código en la app para eliminar definitivamente tu cuenta. El código expira en <strong>30 minutos</strong>.</p>
+  <p class="msg">Introduce este código en la app para poner tu cuenta en revisión. El código expira en <strong>30 minutos</strong>.</p>
   <p class="warn">Si no solicitaste esto, cambia tu contraseña e ignora este email.</p>
 </div>
 <div class="footer">© Mansión Deseo · Este email fue enviado automáticamente</div>
@@ -2363,8 +2365,8 @@ async function sendAccountDeletionEmail(env, toEmail, code) {
       body: JSON.stringify({
         from: `${fromName} <${fromEmail}>`,
         to: [toEmail],
-        subject: `${code} — Confirmar eliminación de cuenta`,
-        text: `Tu código para eliminar tu cuenta de Mansión Deseo es: ${code}\n\nExpira en 30 minutos. Esta acción elimina definitivamente tu perfil y datos asociados.\n\nSi no solicitaste esto, cambia tu contraseña e ignora este email.`,
+        subject: `${code} — Confirmar solicitud de baja`,
+        text: `Tu código para solicitar la baja de tu cuenta en Mansión Deseo es: ${code}\n\nExpira en 30 minutos. Esta acción pondrá tu cuenta en revisión para completar la baja.\n\nSi no solicitaste esto, cambia tu contraseña e ignora este email.`,
         html: accountDeletionEmailHTML(code),
       }),
     });
@@ -2500,6 +2502,14 @@ async function handleLogin(request, env) {
     return error('Debes verificar tu email antes de iniciar sesión. Revisa tu bandeja de entrada.', 403);
   }
 
+  if (user.account_status === 'under_review') {
+    return error('Tu cuenta está en revisión. Te contactaremos cuando finalice el proceso.', 403);
+  }
+
+  if (user.account_status === 'suspended') {
+    return error('Tu cuenta está suspendida.', 403);
+  }
+
   const valid = await verifyPassword(password, user.password_hash);
   if (!valid) {
     return error('Credenciales inválidas', 401);
@@ -2632,7 +2642,7 @@ async function handleRequestAccountDeletion(request, env) {
   }
 
   return json({
-    message: 'Te enviamos un código para confirmar la eliminación de tu cuenta.',
+    message: 'Te enviamos un código para confirmar la solicitud de baja.',
     ...(env.ENVIRONMENT !== 'production' && { devCode: code }),
   });
 }
@@ -2659,18 +2669,28 @@ async function handleConfirmAccountDeletion(request, env) {
   if (!record) return error('Código inválido o expirado', 401);
 
   const user = await env.DB.prepare(
-    'SELECT id, email, username, avatar_url, photos FROM users WHERE id = ?'
+    'SELECT id, email, username FROM users WHERE id = ?'
   ).bind(auth.sub).first();
   if (!user) return error('Usuario no encontrado', 404);
 
-  await env.DB.prepare('UPDATE account_deletion_requests SET used = 1 WHERE id = ?')
-    .bind(record.id).run();
-
-  await deleteUserCompletely(env, user);
+  await env.DB.batch([
+    env.DB.prepare('UPDATE account_deletion_requests SET used = 1 WHERE id = ?').bind(record.id),
+    env.DB.prepare(`
+      UPDATE users
+      SET account_status = 'under_review',
+          online = 0,
+          last_active = datetime('now')
+      WHERE id = ?
+    `).bind(auth.sub),
+    env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(auth.sub),
+  ]);
+  _fullUserCache.delete(auth.sub);
+  _viewerCache.delete(auth.sub);
+  _accountStatusCache.delete(auth.sub);
   await bumpFeedCacheVersion(env);
 
-  console.log(`🗑️ Usuario eliminó su cuenta ${auth.sub} (${user.email})`);
-  return json({ success: true, message: 'Cuenta eliminada correctamente.' });
+  console.log(`🕵️ Usuario solicitó eliminación y quedó en revisión ${auth.sub} (${user.email})`);
+  return json({ success: true, message: 'Tu cuenta quedó en revisión para completar la baja.' });
 }
 
 async function handleAppBootstrap(request, env) {

@@ -1093,8 +1093,8 @@ export default function ProfilePage() {
             <h3 className="font-display text-xl font-bold text-text-primary">Eliminar cuenta</h3>
             <p className="mt-2 text-sm leading-6 text-text-muted">
               {deleteAccountStep === 'code'
-                ? `Ingresá el código que enviamos a ${user?.email || 'tu email'} para confirmar el borrado definitivo.`
-                : 'Te enviaremos un código a tu email antes de borrar definitivamente tu perfil, fotos, chats y actividad.'}
+                ? `Ingresá el código que enviamos a ${user?.email || 'tu email'} para confirmar la solicitud de baja.`
+                : 'Te enviaremos un código a tu email antes de poner tu cuenta en revisión para completar la baja.'}
             </p>
 
             {deleteAccountMessage && (
@@ -1145,7 +1145,7 @@ export default function ProfilePage() {
                     className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-mansion-crimson px-4 py-3 text-sm font-semibold text-white hover:bg-mansion-crimson/90 disabled:opacity-50"
                   >
                     {deleteAccountConfirming && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Eliminar
+                    Confirmar
                   </button>
                 </div>
               </form>
