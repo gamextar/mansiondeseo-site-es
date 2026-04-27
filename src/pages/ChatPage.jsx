@@ -18,7 +18,7 @@ const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const CHAT_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
 const CHAT_CACHE_MAX_CHATS = 15;
-const CHAT_CACHE_MESSAGE_LIMIT = 10;
+const CHAT_CACHE_MESSAGE_LIMIT = 15;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
 
@@ -131,6 +131,23 @@ function sortMessagesByTime(messages) {
       return a.index - b.index;
     })
     .map((entry) => entry.message);
+}
+
+function mergeMessagesForCache(...messageGroups) {
+  const byId = new Map();
+  const withoutId = [];
+
+  messageGroups.flat().forEach((message) => {
+    if (!message || message.isPreview) return;
+    const messageId = getMessageIdValue(message);
+    if (messageId) {
+      byId.set(messageId, message);
+    } else {
+      withoutId.push(message);
+    }
+  });
+
+  return sortMessagesByTime([...byId.values(), ...withoutId]).slice(-CHAT_CACHE_MESSAGE_LIMIT);
 }
 
 function hydrateVisibleMessages(freshMessages, currentMessages, requestStartedAt = 0) {
@@ -404,6 +421,7 @@ export default function ChatPage() {
   const pendingScrollBehaviorRef = useRef(null);
   const pendingScrollForceRef = useRef(false);
   const restoreScrollAfterPrependRef = useRef(null);
+  const cacheMessagesRef = useRef(initialMessages);
   const suppressTypingUntilRef = useRef(0);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const [headerHeight, setHeaderHeight] = useState(96);
@@ -756,6 +774,7 @@ export default function ChatPage() {
     const nextCachedChat = readChatCache(partnerId);
     const nextPartnerPreview = partnerPreview;
     const nextInitialMessages = nextCachedChat?.messages || [];
+    cacheMessagesRef.current = nextInitialMessages;
     myUserIdRef.current = String(user.id);
     setActiveChatId([String(user.id), partnerId].sort().join('-'));
 
@@ -809,6 +828,7 @@ export default function ChatPage() {
           .filter((msg) => msg.sender_id !== myUserIdRef.current && !msg.is_read)
           .map((msg) => msg.id);
 
+        cacheMessagesRef.current = mergeMessagesForCache(cacheMessagesRef.current, formattedHistory);
         setMessages((prev) => {
           const { messages: merged } = hydrateVisibleMessages(formattedHistory, prev);
           return areMessageListsEqual(prev, merged) ? prev : merged;
@@ -899,11 +919,20 @@ export default function ChatPage() {
       if (cancelled) return;
       const latestMessages = normalizeMessages(data.messages || []);
       const hasHiddenOlderMessages = hasMessagesBeforeVisibleWindow(latestMessages, nextInitialMessages);
+      const nextHasOlderMessages = !!data.hasMore || hasHiddenOlderMessages;
+      cacheMessagesRef.current = mergeMessagesForCache(cacheMessagesRef.current, latestMessages);
       setMessages((prev) => {
         const { messages: merged } = hydrateVisibleMessages(latestMessages, prev, historyRequestStartedAt);
         return areMessageListsEqual(prev, merged) ? prev : merged;
       });
-      setHasOlderMessages(!!data.hasMore || hasHiddenOlderMessages);
+      setHasOlderMessages(nextHasOlderMessages);
+      writeChatCache(partnerId, {
+        partner: nextCachedChat?.partner || nextPartnerPreview || null,
+        messages: cacheMessagesRef.current,
+        apiLimit: nextCachedChat?.apiLimit || null,
+        blockState: nextCachedChat?.blockState || { blockedByMe: false, blockedMe: false },
+        hasOlderMessages: nextHasOlderMessages,
+      });
       setLoading(false);
       if (!nextCachedChat?.messages?.length || wasAtBottomRef.current) {
         wasAtBottomRef.current = true;
@@ -931,9 +960,11 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;
+    const messagesForCache = mergeMessagesForCache(cacheMessagesRef.current, messages);
+    cacheMessagesRef.current = messagesForCache;
     writeChatCache(partnerId, {
       partner,
-      messages,
+      messages: messagesForCache,
       apiLimit,
       blockState,
       hasOlderMessages,
