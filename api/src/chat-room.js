@@ -1,16 +1,13 @@
 // ═══════════════════════════════════════════════════════
 // MANSIÓN DESEO — ChatRoom Durable Object
-// WebSocket Hibernation + SQLite storage
+// WebSocket Hibernation + D1-backed history
 // ═══════════════════════════════════════════════════════
 
 export class ChatRoom {
   constructor(state, env) {
     this.state = state;
     this.env = env;
-    this.sql = state.storage.sql;
-    this.initPromise = this.init();
     this.hiddenConversationsReady = null;
-    this.chatId = null;
     this.dailyLimitCache = { value: null, expiresAt: 0 };
     this.userStatusCache = new Map();
     this.userPreviewCache = new Map();
@@ -254,19 +251,6 @@ export class ChatRoom {
     };
   }
 
-  async getChatId() {
-    if (this.chatId) return this.chatId;
-    const stored = await this.state.storage.get('chatId');
-    this.chatId = stored || null;
-    return this.chatId;
-  }
-
-  async rememberChatId(chatId) {
-    if (!chatId || this.chatId === chatId) return;
-    this.chatId = chatId;
-    await this.state.storage.put('chatId', chatId);
-  }
-
   async getDailyLimit() {
     const now = Date.now();
     if (this.dailyLimitCache.value != null && now < this.dailyLimitCache.expiresAt) {
@@ -305,17 +289,23 @@ export class ChatRoom {
     return next;
   }
 
-  async init() {
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS messages (
-        id TEXT PRIMARY KEY,
-        sender_id TEXT NOT NULL,
-        content TEXT NOT NULL,
-        is_read INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
-      );
-      CREATE INDEX IF NOT EXISTS idx_msg_created ON messages(created_at);
-    `);
+  getSocketChatId(ws) {
+    try {
+      const tags = this.state.getTags(ws);
+      if (tags?.[1]) return tags[1];
+    } catch {}
+
+    return null;
+  }
+
+  getPartnerIdFromChatId(chatId, userId) {
+    const match = String(chatId || '').match(/^([0-9a-f-]{36})-([0-9a-f-]{36})$/i);
+    if (!match) return null;
+    const [, id1, id2] = match;
+    const safeUserId = String(userId);
+    if (id1 === safeUserId) return id2;
+    if (id2 === safeUserId) return id1;
+    return null;
   }
 
   async ensureConversationStateTables() {
@@ -478,14 +468,7 @@ export class ChatRoom {
   }
 
   async fetch(request) {
-    await this.initPromise;
-
     const url = new URL(request.url);
-
-    // Handle cleanup request from admin
-    if (url.pathname === '/cleanup') {
-      return this.handleCleanup();
-    }
 
     // Handle notify — broadcast a new message to connected sockets (from HTTP send)
     if (url.pathname === '/notify') {
@@ -505,15 +488,13 @@ export class ChatRoom {
 
     // Extract chatId: may be in query params (old) or in URL path (new: /api/chat/ws/{chatId})
     const chatId = url.searchParams.get('chatId') || url.pathname.split('/').pop();
-    if (chatId) {
-      await this.rememberChatId(chatId);
-    }
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
-    // Hibernation API: tag the socket with the userId
-    this.state.acceptWebSocket(server, [userId]);
+    // Hibernation API: tag socket with userId and chatId so we do not need
+    // per-room Durable Object storage just to remember the conversation.
+    this.state.acceptWebSocket(server, chatId ? [userId, chatId] : [userId]);
 
     // Send message history to the new connection.
     this.state.waitUntil(this.sendHistory(server, userId, chatId));
@@ -523,13 +504,7 @@ export class ChatRoom {
 
   async sendHistory(ws, userId, chatId) {
     try {
-      const partnerId = chatId
-        ? (() => {
-            const id1 = chatId.slice(0, 36);
-            const id2 = chatId.slice(37);
-            return id1 !== userId ? id1 : id2;
-          })()
-        : null;
+      const partnerId = this.getPartnerIdFromChatId(chatId, userId);
 
       if (userId && partnerId) {
         await this.ensureHiddenConversationsTable();
@@ -562,11 +537,7 @@ export class ChatRoom {
         return;
       }
 
-      const rows = this.sql.exec(
-        'SELECT id, sender_id, content, is_read, created_at FROM messages ORDER BY created_at DESC LIMIT 30'
-      ).toArray().reverse();
-
-      ws.send(JSON.stringify({ type: 'history', messages: rows, hasMore: rows.length >= 30 }));
+      ws.send(JSON.stringify({ type: 'history', messages: [], hasMore: false }));
     } catch (err) {
       console.error('sendHistory error:', err.message);
     }
@@ -622,14 +593,8 @@ export class ChatRoom {
 
     // Derive receiverId from stored chatId if receiver is not connected
     if (!receiverId) {
-      const chatId = await this.getChatId();
-      if (chatId) {
-        // chatId = "uuid1-uuid2" where each UUID is 36 chars (8-4-4-4-12)
-        // Split at position 36 (the separator hyphen between the two UUIDs)
-        const id1 = chatId.slice(0, 36);
-        const id2 = chatId.slice(37);
-        receiverId = id1 !== senderId ? id1 : id2;
-      }
+      const chatId = this.getSocketChatId(ws);
+      receiverId = this.getPartnerIdFromChatId(chatId, senderId);
     }
 
     if (receiverId) {
@@ -696,12 +661,6 @@ export class ChatRoom {
 
     const msgId = crypto.randomUUID();
     const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
-
-    // Save to DO SQLite (instant)
-    this.sql.exec(
-      'INSERT INTO messages (id, sender_id, content, created_at) VALUES (?, ?, ?, ?)',
-      msgId, senderId, content, now
-    );
 
     const msg = {
       id: msgId,
@@ -775,13 +734,6 @@ export class ChatRoom {
 
     const chunkSize = 50;
 
-    // Update DO SQLite
-    for (let index = 0; index < uniqueMessageIds.length; index += chunkSize) {
-      const chunk = uniqueMessageIds.slice(index, index + chunkSize);
-      const placeholders = chunk.map(() => '?').join(', ');
-      this.sql.exec(`UPDATE messages SET is_read = 1 WHERE id IN (${placeholders})`, ...chunk);
-    }
-
     // Notify other sockets
     const allSockets = this.state.getWebSockets();
     for (const sock of allSockets) {
@@ -795,13 +747,8 @@ export class ChatRoom {
 
     // Async: update D1
     this.state.waitUntil((async () => {
-      const chatId = await this.getChatId();
-      let partnerId = null;
-      if (chatId) {
-        const id1 = chatId.slice(0, 36);
-        const id2 = chatId.slice(37);
-        partnerId = id1 !== readerId ? id1 : id2;
-      }
+      const chatId = this.getSocketChatId(ws);
+      const partnerId = this.getPartnerIdFromChatId(chatId, readerId);
       for (let index = 0; index < uniqueMessageIds.length; index += chunkSize) {
         const chunk = uniqueMessageIds.slice(index, index + chunkSize);
         const placeholders = chunk.map(() => '?').join(', ');
@@ -836,15 +783,6 @@ export class ChatRoom {
       console.error('[ChatRoom.handleNotify] error:', e.message);
       return new Response('error', { status: 500 });
     }
-  }
-
-  async handleCleanup() {
-    const deleted = this.sql.exec(
-      "DELETE FROM messages WHERE created_at < datetime('now', '-30 days')"
-    );
-    return new Response(JSON.stringify({ cleaned: true }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
   }
 
   async webSocketClose(ws, code, reason) {
