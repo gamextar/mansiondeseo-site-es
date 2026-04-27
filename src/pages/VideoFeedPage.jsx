@@ -546,7 +546,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
             WebkitTransform: `translateZ(0) scale(${isLimitBlocked ? blockedVideoScale : videoScale})`,
             transform: `translateZ(0) scale(${isLimitBlocked ? blockedVideoScale : videoScale})`,
             filter: isLimitBlocked ? `blur(${limitBlurLevel}px)` : undefined,
-            opacity: enableCinematicReveal ? (isVideoReady ? 1 : 0) : 1,
+            opacity: isLimitBlocked ? 1 : (enableCinematicReveal ? (isVideoReady ? 1 : 0) : 1),
           }}
           loop
           playsInline
@@ -984,6 +984,13 @@ export default function VideoFeedPage() {
   const backendLimitLabel = backendLimitActive
     ? `${Math.min(backendViewedToday, backendDailyLimit)}/${backendDailyLimit}`
     : 'VIP';
+  const isStoryBlockedByLimit = useCallback((story) => {
+    const storyId = String(story?.story_id || story?.id || '').trim();
+    if (!storyId || user?.premium) return false;
+    if (storyLimitBlock?.storyId && String(storyLimitBlock.storyId) === storyId) return true;
+    if (!backendLimitActive || backendRemaining === null || backendRemaining > 0) return false;
+    return !allowedStoryViewsRef.current.has(storyId);
+  }, [backendLimitActive, backendRemaining, storyLimitBlock?.storyId, user?.premium]);
   const flushPendingViewedStories = useCallback(() => {
     try {
       if (!user?.id) return;
@@ -1064,8 +1071,7 @@ export default function VideoFeedPage() {
     ? stories[desktopActiveIdx - 1] || stories[0] || null
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const activeStoryId = String(activeStory?.story_id || activeStory?.id || '').trim();
-  const blockedStoryId = String(storyLimitBlock?.storyId || '').trim();
-  const activeStoryLimitBlocked = Boolean(activeStoryId && blockedStoryId && activeStoryId === blockedStoryId);
+  const activeStoryLimitBlocked = Boolean(activeStoryId && isStoryBlockedByLimit(activeStory));
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const isStandaloneMobileApp = detectStandaloneMobile();
   const mobileBrowserRoute = standaloneMobileRoute && !isStandaloneMobileApp;
@@ -1289,6 +1295,15 @@ export default function VideoFeedPage() {
       return undefined;
     }
 
+    if (backendLimitActive && backendRemaining !== null && backendRemaining <= 0) {
+      setStoryLimitBlock({
+        storyId,
+        limit: storyViewLimit || { dailyLimit: backendDailyLimit, viewedToday: backendViewedToday, remaining: 0 },
+        message: 'Alcanzaste el límite diario de videos.',
+      });
+      return undefined;
+    }
+
     if (recordingStoryViewsRef.current.has(storyId)) {
       return undefined;
     }
@@ -1334,7 +1349,7 @@ export default function VideoFeedPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeStory?.id, activeStory?.story_id, activeStory?.user_id, isOverlayPreview, markStoryViewed, navigate, queueStoryViewed, user?.premium]);
+  }, [activeStory?.id, activeStory?.story_id, activeStory?.user_id, backendDailyLimit, backendLimitActive, backendRemaining, backendViewedToday, isOverlayPreview, markStoryViewed, navigate, queueStoryViewed, storyViewLimit, user?.premium]);
 
   useEffect(() => {
     return subscribe((event) => {
@@ -1806,8 +1821,7 @@ export default function VideoFeedPage() {
               const rawDistance = Math.abs(index - activeIndex);
               const circularDistance = Math.min(rawDistance, stories.length - rawDistance);
               const isActive = index === activeIndex;
-              const storyId = String(story.story_id || story.id || '').trim();
-              const isStoryBlocked = Boolean(blockedStoryId && storyId === blockedStoryId);
+              const isStoryBlocked = isStoryBlockedByLimit(story);
               const shouldLoad = stories.length <= 3 || circularDistance <= 1;
               const enableCinematicReveal = isActive && !entryRevealReady;
 
@@ -1870,8 +1884,7 @@ export default function VideoFeedPage() {
             const shouldLoad = dist <= 3 || isBoundary;
             const enableCinematicReveal = displayIndex === activeDispIdx && !entryRevealReady;
             const mobileStoryKey = story.story_id || story.id || story.user_id || story.video_url || displayIndex;
-            const storyId = String(story.story_id || story.id || '').trim();
-            const isStoryBlocked = Boolean(blockedStoryId && storyId === blockedStoryId);
+            const isStoryBlocked = isStoryBlockedByLimit(story);
             return (
               <div
                 key={`${displayIndex}-${mobileStoryKey}`}
