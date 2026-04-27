@@ -1560,7 +1560,7 @@ export default function ProfileDetailPage({ initialData }) {
                     onTouchMove={handleLbTouchMove}
                     onTouchEnd={handleLbTouchEnd}
                   >
-                    <div className="relative h-[90dvh] max-h-[980px] w-[min(94vw,67.5dvh)] max-w-[735px] overflow-hidden rounded-[1.75rem] bg-mansion-card shadow-[0_24px_80px_rgba(0,0,0,0.45)] lg:h-[92dvh] lg:max-h-[1000px] lg:w-[min(74vw,69dvh)] lg:max-w-[750px]">
+                    <div className="relative h-[92dvh] max-h-[1000px] w-[min(90vw,64dvh)] max-w-[700px] overflow-hidden rounded-[1.75rem] bg-mansion-card shadow-[0_24px_80px_rgba(0,0,0,0.45)] lg:h-[94dvh] lg:max-h-[1020px] lg:w-[min(70vw,66dvh)] lg:max-w-[720px]">
                       <img
                         src={resolveMediaUrl(photo)}
                         alt={blocked ? '' : `${name} ${i + 1}`}
