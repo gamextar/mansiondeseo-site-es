@@ -32,7 +32,6 @@ const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
 const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 68;
 const VIDEO_FEED_RAIL_SOURCE = 'rail';
-const VIDEO_LIMIT_BLOCKED_PREVIEW_MS = 2800;
 
 function getStoryIdentity(story) {
   if (!story) return null;
@@ -254,7 +253,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const userPausedRef = useRef(false);
   const resumeAfterAppFocusRef = useRef(false);
   const recoveryTimerRef = useRef(null);
-  const limitPreviewTimerRef = useRef(null);
   const playAttemptIdRef = useRef(0);
   const lastRecoveryAtRef = useRef(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -336,54 +334,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       if (looksSuspended) resetSuspendedVideo();
     }, 900);
   }, [activeSrc, forcePaused, isActive, resetSuspendedVideo]);
-
-  useEffect(() => {
-    if (limitPreviewTimerRef.current) {
-      window.clearTimeout(limitPreviewTimerRef.current);
-      limitPreviewTimerRef.current = null;
-    }
-
-    if (!isLimitBlocked || !isActive || !activeSrc || forcePaused || typeof window === 'undefined') {
-      return undefined;
-    }
-
-    userPausedRef.current = false;
-    if (progressBarRef.current) progressBarRef.current.style.width = '0%';
-
-    const video = videoRef.current;
-    if (video) {
-      try {
-        video.currentTime = 0;
-      } catch {}
-    }
-
-    attemptPlay();
-
-    limitPreviewTimerRef.current = window.setTimeout(() => {
-      limitPreviewTimerRef.current = null;
-      userPausedRef.current = true;
-      resumeAfterAppFocusRef.current = false;
-      if (recoveryTimerRef.current) {
-        window.clearTimeout(recoveryTimerRef.current);
-        recoveryTimerRef.current = null;
-      }
-
-      const currentVideo = videoRef.current;
-      if (currentVideo) {
-        try {
-          currentVideo.pause();
-        } catch {}
-      }
-      setIsPlaying(false);
-    }, VIDEO_LIMIT_BLOCKED_PREVIEW_MS);
-
-    return () => {
-      if (limitPreviewTimerRef.current) {
-        window.clearTimeout(limitPreviewTimerRef.current);
-        limitPreviewTimerRef.current = null;
-      }
-    };
-  }, [activeSrc, attemptPlay, forcePaused, isActive, isLimitBlocked]);
 
   useEffect(() => {
     if (isActive) {
@@ -547,10 +497,6 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     if (recoveryTimerRef.current) {
       window.clearTimeout(recoveryTimerRef.current);
       recoveryTimerRef.current = null;
-    }
-    if (limitPreviewTimerRef.current) {
-      window.clearTimeout(limitPreviewTimerRef.current);
-      limitPreviewTimerRef.current = null;
     }
   }, []);
 
