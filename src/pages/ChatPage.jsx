@@ -16,7 +16,9 @@ import { recordD1WriteEstimate } from '../lib/d1Debug';
 
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const CHAT_CACHE_TTL_MS = 10 * 60_000;
-const CHAT_CACHE_MESSAGE_LIMIT = 60;
+const CHAT_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+const CHAT_CACHE_MAX_CHATS = 10;
+const CHAT_CACHE_MESSAGE_LIMIT = 20;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
 
@@ -29,7 +31,59 @@ function detectStandaloneMobile() {
 }
 
 function getChatCacheKey(partnerId) {
+  const viewerId = getStoredUser()?.id;
+  return `${CHAT_CACHE_PREFIX}${viewerId || 'anonymous'}:${partnerId}`;
+}
+
+function getLegacyChatCacheKey(partnerId) {
   return `${CHAT_CACHE_PREFIX}${partnerId}`;
+}
+
+function getStorageItem(storage, key) {
+  try {
+    return storage?.getItem?.(key) || null;
+  } catch {
+    return null;
+  }
+}
+
+function removeStorageItem(storage, key) {
+  try {
+    storage?.removeItem?.(key);
+  } catch {
+    // ignore unavailable storage
+  }
+}
+
+function pruneChatCache(currentKey) {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  const viewerId = getStoredUser()?.id;
+  if (!viewerId) return;
+  const prefix = `${CHAT_CACHE_PREFIX}${viewerId}:`;
+  const entries = [];
+
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(prefix)) continue;
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : null;
+      const cachedAt = Number(parsed?.cachedAt || 0);
+      if (!cachedAt || Date.now() - cachedAt > CHAT_CACHE_MAX_AGE_MS) {
+        localStorage.removeItem(key);
+        continue;
+      }
+      entries.push({ key, cachedAt });
+    }
+
+    entries
+      .filter((entry) => entry.key !== currentKey)
+      .sort((a, b) => b.cachedAt - a.cachedAt)
+      .slice(Math.max(0, CHAT_CACHE_MAX_CHATS - 1))
+      .forEach((entry) => localStorage.removeItem(entry.key));
+  } catch {
+    // Best-effort cache pruning only.
+  }
 }
 
 function normalizeMessages(messages = []) {
@@ -85,17 +139,45 @@ function mergeFreshHistoryWithCurrent(freshMessages, currentMessages, requestSta
   return [...freshMessages, ...extras];
 }
 
+function mergePreviewIntoCachedMessages(cachedMessages = [], previewMessage = null) {
+  if (!previewMessage) return cachedMessages;
+  if (!cachedMessages.length) return [previewMessage];
+
+  const previewTime = getMessageTimeValue(previewMessage);
+  const exists = cachedMessages.some((message) => (
+    message.id === previewMessage.id ||
+    (
+      getMessageTimeValue(message) === previewTime &&
+      message.senderId === previewMessage.senderId &&
+      message.text === previewMessage.text
+    )
+  ));
+  if (exists) return cachedMessages;
+
+  const lastCachedTime = cachedMessages.reduce((max, message) => Math.max(max, getMessageTimeValue(message)), 0);
+  if (previewTime && previewTime >= lastCachedTime - 1000) {
+    return [...cachedMessages, previewMessage].slice(-CHAT_CACHE_MESSAGE_LIMIT);
+  }
+
+  return cachedMessages;
+}
+
 function readChatCache(partnerId) {
   if (typeof window === 'undefined') return null;
+  const key = getChatCacheKey(partnerId);
+  const legacyKey = getLegacyChatCacheKey(partnerId);
   try {
-    const raw = sessionStorage.getItem(getChatCacheKey(partnerId));
+    const raw = getStorageItem(localStorage, key)
+      || getStorageItem(sessionStorage, key)
+      || getStorageItem(sessionStorage, legacyKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.cachedAt) return null;
-    // Use cache as placeholder even if slightly stale — WS history will replace it.
-    // Only discard if very old (>30 min) to avoid showing wildly outdated data.
-    if (Date.now() - parsed.cachedAt > 30 * 60_000) {
-      sessionStorage.removeItem(getChatCacheKey(partnerId));
+    // Use cache as an instant placeholder even if stale; D1 refreshes it after mount.
+    if (Date.now() - parsed.cachedAt > CHAT_CACHE_MAX_AGE_MS) {
+      removeStorageItem(localStorage, key);
+      removeStorageItem(sessionStorage, key);
+      removeStorageItem(sessionStorage, legacyKey);
       return null;
     }
     return {
@@ -110,13 +192,15 @@ function readChatCache(partnerId) {
 
 function writeChatCache(partnerId, payload) {
   if (typeof window === 'undefined') return;
+  const key = getChatCacheKey(partnerId);
   try {
     const stableMessages = normalizeMessages(payload.messages || []).filter((message) => !message.isPreview);
-    sessionStorage.setItem(getChatCacheKey(partnerId), JSON.stringify({
+    localStorage.setItem(key, JSON.stringify({
       ...payload,
       messages: stableMessages.slice(-CHAT_CACHE_MESSAGE_LIMIT),
       cachedAt: Date.now(),
     }));
+    pruneChatCache(key);
   } catch {
     // Silently fail
   }
@@ -224,7 +308,7 @@ export default function ChatPage() {
   const partnerPreview = location.state?.partnerPreview || null;
   const lastMessagePreview = location.state?.lastMessagePreview || null;
   const previewMessage = buildPreviewMessage(lastMessagePreview);
-  const initialMessages = cachedChat?.messages?.length ? cachedChat.messages : (previewMessage ? [previewMessage] : []);
+  const initialMessages = mergePreviewIntoCachedMessages(cachedChat?.messages || [], previewMessage);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState(initialMessages);
   const [apiLimit, setApiLimit] = useState(cachedChat?.apiLimit || null);
@@ -615,7 +699,7 @@ export default function ChatPage() {
     const nextCachedChat = readChatCache(partnerId);
     const nextPartnerPreview = partnerPreview;
     const nextPreviewMessage = buildPreviewMessage(lastMessagePreview);
-    const nextInitialMessages = nextCachedChat?.messages?.length ? nextCachedChat.messages : (nextPreviewMessage ? [nextPreviewMessage] : []);
+    const nextInitialMessages = mergePreviewIntoCachedMessages(nextCachedChat?.messages || [], nextPreviewMessage);
     myUserIdRef.current = String(user.id);
     setActiveChatId([String(user.id), partnerId].sort().join('-'));
 

@@ -20,6 +20,7 @@ const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
 const CLIENT_CACHE_VERSION_KEY = 'mansion_client_cache_version';
 const CLIENT_CACHE_VERSION = 'media-paths-v7-avatar-race-fix';
 const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
+const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const sharedGetCache = new Map();
 let avatarUploadCacheSeq = 0;
 const sessionCache = {
@@ -447,8 +448,41 @@ export function hasEverLoggedIn() {
   return localStorage.getItem(EVER_LOGGED_IN_KEY) === '1';
 }
 
+function removeMatchingStorageKeys(storage, shouldRemove) {
+  try {
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index);
+      if (key && shouldRemove(key)) storage.removeItem(key);
+    }
+  } catch {
+    // Cache cleanup is best-effort.
+  }
+}
+
+function removeAllStoredChatCaches() {
+  if (typeof window === 'undefined') return;
+  const shouldRemove = (key) => key.startsWith(CHAT_CACHE_PREFIX);
+  removeMatchingStorageKeys(localStorage, shouldRemove);
+  removeMatchingStorageKeys(sessionStorage, shouldRemove);
+}
+
+function removeStoredChatCacheForPartner(partnerId) {
+  if (typeof window === 'undefined' || !partnerId) return;
+  const viewerId = getStoredUser()?.id;
+  const legacyKey = `${CHAT_CACHE_PREFIX}${partnerId}`;
+  const scopedKey = viewerId ? `${CHAT_CACHE_PREFIX}${viewerId}:${partnerId}` : null;
+  const shouldRemove = (key) => (
+    key === legacyKey ||
+    (scopedKey && key === scopedKey) ||
+    key.endsWith(`:${partnerId}`)
+  );
+  removeMatchingStorageKeys(localStorage, shouldRemove);
+  removeMatchingStorageKeys(sessionStorage, shouldRemove);
+}
+
 export function clearAuth() {
   if (typeof localStorage === 'undefined') return;
+  removeAllStoredChatCaches();
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem('mansion_registered');
@@ -904,6 +938,7 @@ export async function deleteConversation(otherUserId) {
     method: 'DELETE',
   }).then((data) => {
     recordD1WriteEstimate('chat_delete', 2);
+    removeStoredChatCacheForPartner(otherUserId);
     invalidateMessageHistoryCache(otherUserId);
     invalidateConversationsCache();
     invalidateUnreadCountCache();
