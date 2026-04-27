@@ -39,6 +39,28 @@ function normalizeMessages(messages = []) {
   }));
 }
 
+function formatChatTime(value) {
+  if (!value) return '';
+  const normalized = typeof value === 'string' && !value.endsWith('Z') ? `${value}Z` : value;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
+
+function buildPreviewMessage(preview) {
+  if (!preview?.text) return null;
+  const createdAt = preview.createdAt || preview.timestamp || null;
+  return {
+    id: preview.id || `preview-${createdAt || Date.now()}`,
+    senderId: preview.senderId === 'me' ? 'me' : 'them',
+    text: preview.text,
+    timestamp: preview.timestampLabel || formatChatTime(createdAt),
+    createdAt,
+    is_read: preview.is_read ?? 1,
+    isPreview: true,
+  };
+}
+
 function getMessageTimeValue(message) {
   const value = message?.createdAt || message?.created_at;
   if (!value) return 0;
@@ -55,6 +77,7 @@ function mergeFreshHistoryWithCurrent(freshMessages, currentMessages, requestSta
   const preserveAfter = Math.max(freshLastTime, requestStartedAt);
   const extras = currentMessages.filter((message) => {
     if (!message?.id || freshIds.has(message.id)) return false;
+    if (message.isPreview || String(message.id).startsWith('preview-')) return false;
     if (String(message.id).startsWith('temp-')) return true;
     return getMessageTimeValue(message) >= preserveAfter - 1000;
   });
@@ -77,7 +100,7 @@ function readChatCache(partnerId) {
     }
     return {
       ...parsed,
-      messages: normalizeMessages(parsed.messages || []),
+      messages: normalizeMessages(parsed.messages || []).filter((message) => !message.isPreview),
       isStale: Date.now() - parsed.cachedAt > CHAT_CACHE_TTL_MS,
     };
   } catch {
@@ -88,9 +111,10 @@ function readChatCache(partnerId) {
 function writeChatCache(partnerId, payload) {
   if (typeof window === 'undefined') return;
   try {
+    const stableMessages = normalizeMessages(payload.messages || []).filter((message) => !message.isPreview);
     sessionStorage.setItem(getChatCacheKey(partnerId), JSON.stringify({
       ...payload,
-      messages: normalizeMessages(payload.messages || []).slice(-CHAT_CACHE_MESSAGE_LIMIT),
+      messages: stableMessages.slice(-CHAT_CACHE_MESSAGE_LIMIT),
       cachedAt: Date.now(),
     }));
   } catch {
@@ -115,6 +139,8 @@ function updateConversationPreviewCache(partnerId, partner, message) {
       avatar: partner?.avatar_url || partner?.avatar || '',
       avatarCrop: partner?.avatar_crop ?? partner?.avatarCrop ?? null,
       lastMessage: String(message.text || '').slice(0, 50),
+      lastMessageId: String(message.id || '').startsWith('temp-') ? null : message.id,
+      lastSenderId: message.senderId === 'me' ? (getStoredUser()?.id || null) : partnerId,
       timestamp: message.createdAt || new Date().toISOString().replace('T', ' ').slice(0, 19),
       unread: 0,
       online: Boolean(partner?.online),
@@ -196,8 +222,11 @@ export default function ChatPage() {
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
+  const lastMessagePreview = location.state?.lastMessagePreview || null;
+  const previewMessage = buildPreviewMessage(lastMessagePreview);
+  const initialMessages = cachedChat?.messages?.length ? cachedChat.messages : (previewMessage ? [previewMessage] : []);
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState(cachedChat?.messages || []);
+  const [messages, setMessages] = useState(initialMessages);
   const [apiLimit, setApiLimit] = useState(cachedChat?.apiLimit || null);
   const [blockState, setBlockState] = useState(cachedChat?.blockState || { blockedByMe: false, blockedMe: false });
   const [partner, setPartner] = useState(cachedChat?.partner || partnerPreview || null);
@@ -585,6 +614,8 @@ export default function ChatPage() {
 
     const nextCachedChat = readChatCache(partnerId);
     const nextPartnerPreview = partnerPreview;
+    const nextPreviewMessage = buildPreviewMessage(lastMessagePreview);
+    const nextInitialMessages = nextCachedChat?.messages?.length ? nextCachedChat.messages : (nextPreviewMessage ? [nextPreviewMessage] : []);
     myUserIdRef.current = String(user.id);
     setActiveChatId([String(user.id), partnerId].sort().join('-'));
 
@@ -609,12 +640,12 @@ export default function ChatPage() {
     } catch { /* ignore */ }
 
     setPartner(nextCachedChat?.partner || nextPartnerPreview || null);
-    setMessages(nextCachedChat?.messages || []);
+    setMessages(nextInitialMessages);
     setApiLimit(nextCachedChat?.apiLimit || null);
     setBlockState(nextCachedChat?.blockState || { blockedByMe: false, blockedMe: false });
     setHasOlderMessages(nextCachedChat?.hasOlderMessages || false);
-    setLoading(!nextCachedChat && !nextPartnerPreview);
-    if ((nextCachedChat?.messages || []).length > 0) {
+    setLoading(!nextCachedChat && !nextPartnerPreview && !nextPreviewMessage);
+    if (nextInitialMessages.length > 0) {
       wasAtBottomRef.current = true;
       requestScrollToBottom('auto');
     }
@@ -740,7 +771,7 @@ export default function ChatPage() {
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [decrementUnread, id, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, setActiveChatId, stopTypingSignal]);
+  }, [decrementUnread, id, lastMessagePreview, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, setActiveChatId, stopTypingSignal]);
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;

@@ -60,6 +60,24 @@ function isConversationCacheFresh(timestamp) {
   return timestamp > 0 && Date.now() - timestamp < CONV_CACHE_TTL_MS;
 }
 
+function buildLastMessagePreview(conv) {
+  const text = String(conv?.lastMessage || '').trim();
+  if (!text || !conv?.timestamp) return null;
+
+  const myId = getStoredUser()?.id;
+  const lastSenderId = conv.lastSenderId ? String(conv.lastSenderId) : '';
+  const senderId = lastSenderId && myId && lastSenderId === String(myId) ? 'me' : 'them';
+
+  return {
+    id: conv.lastMessageId ? `preview-${conv.lastMessageId}` : `preview-${conv.profileId}-${conv.timestamp}`,
+    senderId,
+    text,
+    createdAt: conv.timestamp,
+    timestamp: conv.timestamp,
+    is_read: senderId === 'me' ? 1 : (conv.unread > 0 ? 0 : 1),
+  };
+}
+
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
   const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
@@ -104,9 +122,14 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
     setRevealed(true);
   }, []);
 
+  const prefetchChat = useCallback(() => {
+    if (!conv?.profileId) return;
+    getMessages(conv.profileId, { limit: CHAT_PREFETCH_PAGE_SIZE }).catch(() => {});
+  }, [conv]);
+
   const handleNavigate = useCallback(() => {
     if (isDraggingRef.current || deleting) return;
-    getMessages(conv.profileId, { limit: CHAT_PREFETCH_PAGE_SIZE }).catch(() => {});
+    prefetchChat();
     if (conv.unread > 0) onRead?.(conv.profileId);
     navigate(`/mensajes/${conv.profileId}`, {
       state: {
@@ -119,9 +142,10 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
           photos: [],
           online: conv.online,
         },
+        lastMessagePreview: buildLastMessagePreview(conv),
       },
     });
-  }, [conv, deleting, navigate, onRead]);
+  }, [conv, deleting, navigate, onRead, prefetchChat]);
 
   return (
     <div
@@ -166,6 +190,9 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
       >
         <button
           type="button"
+          onPointerDown={prefetchChat}
+          onMouseEnter={prefetchChat}
+          onFocus={prefetchChat}
           onClick={handleNavigate}
           className="w-full text-left flex items-center gap-3.5 px-3 py-4 rounded-xl bg-mansion-base hover:bg-mansion-card/50 transition-all group lg:gap-4 lg:px-4 lg:py-5"
         >

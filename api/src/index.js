@@ -3321,7 +3321,29 @@ async function handleConversations(request, env) {
       u.username,
       u.avatar_url,
       u.avatar_crop,
-      u.last_active
+      u.last_active,
+      (
+        SELECT m.sender_id
+        FROM messages m
+        WHERE m.conversation_id = CASE
+          WHEN cs.user_id < cs.partner_id THEN cs.user_id || ':' || cs.partner_id
+          ELSE cs.partner_id || ':' || cs.user_id
+        END
+          AND m.created_at = cs.last_message_at
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT 1
+      ) AS last_sender_id,
+      (
+        SELECT m.id
+        FROM messages m
+        WHERE m.conversation_id = CASE
+          WHEN cs.user_id < cs.partner_id THEN cs.user_id || ':' || cs.partner_id
+          ELSE cs.partner_id || ':' || cs.user_id
+        END
+          AND m.created_at = cs.last_message_at
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT 1
+      ) AS last_message_id
     FROM conversation_state cs
     JOIN users u ON u.id = cs.partner_id
     WHERE cs.user_id = ?
@@ -3335,6 +3357,8 @@ async function handleConversations(request, env) {
     avatar: row.avatar_url || '',
     avatarCrop: safeParseJSON(row.avatar_crop, null),
     lastMessage: (row.last_message || '').slice(0, 50),
+    lastMessageId: row.last_message_id || null,
+    lastSenderId: row.last_sender_id || null,
     timestamp: row.last_message_at,
     unread: Number(row.unread_count || 0),
     online: isOnline(row.last_active),
