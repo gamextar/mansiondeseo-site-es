@@ -1129,8 +1129,15 @@ export async function getSettings() {
   return apiFetch('/settings');
 }
 
-export async function getPublicSettings() {
-  return apiFetch('/settings/public');
+export async function getPublicSettings({ fresh = false } = {}) {
+  const path = fresh ? `/settings/public?ts=${Date.now()}` : '/settings/public';
+  return apiFetch(path, fresh ? {
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  } : {});
 }
 
 export async function detectCountry() {

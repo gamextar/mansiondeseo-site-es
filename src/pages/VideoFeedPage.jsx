@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X, Crown } from 'lucide-react';
-import { getStories, recordStoryView, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { getStories, recordStoryView, getPublicSettings, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
@@ -925,7 +925,7 @@ export default function VideoFeedPage() {
   const safariDesktop = isSafariDesktopBrowser();
   const location = useLocation();
   const navigate = useNavigate();
-  const { siteSettings, user, setUser } = useAuth();
+  const { siteSettings, user, setUser, setSiteSettings } = useAuth();
   const { subscribe } = useUnreadMessages();
 
   // Gift modal state
@@ -1022,6 +1022,25 @@ export default function VideoFeedPage() {
   const apiRespondedRef = useRef(false);
   const allowedStoryViewsRef = useRef(new Set());
   const recordingStoryViewsRef = useRef(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    getPublicSettings({ fresh: true })
+      .then((data) => {
+        if (cancelled || !data?.settings) return;
+        setSiteSettings((current) => {
+          const next = { ...(current || {}), ...data.settings };
+          try {
+            sessionStorage.setItem('mansion_site_settings', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [setSiteSettings]);
 
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
