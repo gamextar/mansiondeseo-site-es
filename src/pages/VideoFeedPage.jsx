@@ -1026,9 +1026,10 @@ export default function VideoFeedPage() {
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
-  const limitBlurLevel = isDesktopViewport
-    ? (siteSettings?.blurDesktop ?? siteSettings?.blurLevel ?? 8)
-    : (siteSettings?.blurMobile ?? siteSettings?.blurLevel ?? 14);
+  const limitBlurLevel = siteSettings?.videoLimitBlur
+    ?? (isDesktopViewport
+      ? (siteSettings?.blurDesktop ?? siteSettings?.blurLevel ?? 8)
+      : (siteSettings?.blurMobile ?? siteSettings?.blurLevel ?? 14));
   const backendDailyLimit = Math.max(0, Number(storyViewLimit?.dailyLimit ?? siteSettings?.freeVideoStoryLimit ?? 10) || 0);
   const backendViewedToday = Math.max(0, Number(storyViewLimit?.viewedToday ?? 0) || 0);
   const backendRemaining = storyViewLimit?.remaining === null || storyViewLimit?.remaining === undefined

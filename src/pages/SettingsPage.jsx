@@ -131,6 +131,7 @@ export default function SettingsPage() {
   const [videoGradientHeight, setVideoGradientHeight] = useState(64);
   const [videoGradientOpacity, setVideoGradientOpacity] = useState(40);
   const [videoAvatarSize, setVideoAvatarSize] = useState(52);
+  const [videoLimitBlur, setVideoLimitBlur] = useState(14);
   const [storyMaxDurationSeconds, setStoryMaxDurationSeconds] = useState('15');
 
   // Encoder
@@ -300,6 +301,7 @@ export default function SettingsPage() {
         setVideoGradientHeight(s.videoGradientHeight ?? 64);
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
         setVideoAvatarSize(s.videoAvatarSize ?? 52);
+        setVideoLimitBlur(s.videoLimitBlur ?? s.blurMobile ?? 14);
         setStoryMaxDurationSeconds(String(s.storyMaxDurationSeconds ?? 15));
         setEncoderThreads(String(s.encoderThreads ?? 4));
         setEncoderCrf(s.encoderCrf || '29');
@@ -470,6 +472,7 @@ export default function SettingsPage() {
         video_gradient_height: videoGradientHeight,
         video_gradient_opacity: videoGradientOpacity,
         video_avatar_size: videoAvatarSize,
+        video_limit_blur: videoLimitBlur,
         story_max_duration_seconds: storyMaxDurationSeconds,
         encoder_threads: encoderThreads,
         encoder_crf: encoderCrf,
@@ -547,6 +550,7 @@ export default function SettingsPage() {
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
       setVideoAvatarSize(s.videoAvatarSize ?? 52);
+      setVideoLimitBlur(s.videoLimitBlur ?? s.blurMobile ?? 14);
       setStoryMaxDurationSeconds(String(s.storyMaxDurationSeconds ?? 15));
       setEncoderThreads(String(s.encoderThreads ?? 4));
       setEncoderCrf(s.encoderCrf || '29');
@@ -2294,8 +2298,33 @@ export default function SettingsPage() {
             </div>
 
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <EyeOff className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Blur de videos bloqueados</h3>
+                  <p className="text-[11px] text-text-dim">Nivel aplicado cuando un no VIP alcanza el límite</p>
+                </div>
+              </div>
+              <input type="range" min="0" max="40" value={videoLimitBlur} onChange={e => setVideoLimitBlur(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>Sin blur</span>
+                <span className="text-mansion-gold font-medium">{videoLimitBlur}px</span>
+                <span>40px</span>
+              </div>
+            </div>
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
               <h3 className="text-xs font-bold text-text-dim uppercase tracking-wider mb-3">Vista previa</h3>
               <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-mansion-elevated to-black" style={{ height: 140 }}>
+                <div
+                  className="absolute inset-0 bg-gradient-to-br from-mansion-gold/25 via-mansion-crimson/20 to-black"
+                  style={{
+                    filter: `blur(${videoLimitBlur}px)`,
+                    transform: videoLimitBlur > 0 ? 'scale(1.08)' : undefined,
+                  }}
+                />
                 <div
                   className="absolute inset-x-0 bottom-0"
                   style={{
