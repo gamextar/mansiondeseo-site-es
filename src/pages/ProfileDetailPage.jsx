@@ -1560,28 +1560,30 @@ export default function ProfileDetailPage({ initialData }) {
                     onTouchMove={handleLbTouchMove}
                     onTouchEnd={handleLbTouchEnd}
                   >
-                    <img
-                      src={resolveMediaUrl(photo)}
-                      alt={blocked ? '' : `${name} ${i + 1}`}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-contain select-none"
-                      style={{
-                        ...(blocked ? { filter: `blur(${lightboxBlur}px)` } : {}),
-                        ...(i === lightboxIndex ? {
-                          transform: `scale(${lightboxZoom}) translate(${lightboxPan.x / lightboxZoom}px, ${lightboxPan.y / lightboxZoom}px)`,
-                          transition: lbPinchRef.current.active || lbDragRef.current.active ? 'none' : 'transform 0.2s ease-out',
-                        } : {}),
-                      }}
-                      draggable={false}
-                    />
-                    {blocked && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="flex flex-col items-center gap-2 text-white/80">
-                          <Lock className="w-10 h-10" />
-                          <span className="text-base font-semibold">Contenido VIP</span>
+                    <div className="relative h-[82dvh] max-h-[900px] w-[min(92vw,61.5dvh)] max-w-[675px] overflow-hidden rounded-[1.75rem] bg-mansion-card shadow-[0_24px_80px_rgba(0,0,0,0.45)] lg:h-[86dvh] lg:max-h-[920px] lg:w-[min(72vw,64.5dvh)] lg:max-w-[690px]">
+                      <img
+                        src={resolveMediaUrl(photo)}
+                        alt={blocked ? '' : `${name} ${i + 1}`}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover select-none"
+                        style={{
+                          ...(blocked ? { filter: `blur(${lightboxBlur}px)` } : {}),
+                          ...(i === lightboxIndex ? {
+                            transform: `scale(${lightboxZoom}) translate(${lightboxPan.x / lightboxZoom}px, ${lightboxPan.y / lightboxZoom}px)`,
+                            transition: lbPinchRef.current.active || lbDragRef.current.active ? 'none' : 'transform 0.2s ease-out',
+                          } : {}),
+                        }}
+                        draggable={false}
+                      />
+                      {blocked && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="flex flex-col items-center gap-2 text-white/80">
+                            <Lock className="w-10 h-10" />
+                            <span className="text-base font-semibold">Contenido VIP</span>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 );
               })}
