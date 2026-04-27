@@ -1781,14 +1781,19 @@ async function authenticate(request, env) {
   // that would otherwise do a second serial D1 round-trip to the same user.
   const cachedStatus = _accountStatusCache.get(userId);
   if (cachedStatus && now < cachedStatus.exp) {
+    if (cachedStatus.status === 'missing') return null;
     if (cachedStatus.status === 'suspended') return null;
   } else {
     const userRow = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
-    _accountStatusCache.set(userId, { status: userRow?.account_status, exp: now + ACCOUNT_STATUS_TTL_MS });
-    if (userRow) {
-      setCachedViewer(userId, userRow);
-      setCachedFullUser(userId, userRow);
+    if (!userRow) {
+      _accountStatusCache.set(userId, { status: 'missing', exp: now + ACCOUNT_STATUS_TTL_MS });
+      _viewerCache.delete(userId);
+      _fullUserCache.delete(userId);
+      return null;
     }
+    _accountStatusCache.set(userId, { status: userRow?.account_status, exp: now + ACCOUNT_STATUS_TTL_MS });
+    setCachedViewer(userId, userRow);
+    setCachedFullUser(userId, userRow);
     if (userRow?.account_status === 'suspended') return null;
   }
 
