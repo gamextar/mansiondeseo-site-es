@@ -143,6 +143,10 @@ export default function VipPage() {
           </div>
         )}
 
+        <p className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center text-xs leading-5 text-gray-400">
+          El pago aparecerá en el resumen como <span className="font-semibold text-mansion-gold">UNICOAPPS</span> para preservar tu privacidad.
+        </p>
+
         {/* Botón pagar */}
         <button
           onClick={handlePagar}
