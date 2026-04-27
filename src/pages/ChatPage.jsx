@@ -93,34 +93,6 @@ function normalizeMessages(messages = []) {
   }));
 }
 
-function formatChatTime(value) {
-  if (!value) return '';
-  const normalized = typeof value === 'string' && !value.endsWith('Z') ? `${value}Z` : value;
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-}
-
-function buildPreviewMessage(preview) {
-  if (!preview?.text) return null;
-  const createdAt = preview.createdAt || preview.timestamp || null;
-  const hasExplicitSourceId = Object.prototype.hasOwnProperty.call(preview, 'sourceMessageId');
-  const sourceMessageId = hasExplicitSourceId
-    ? (preview.sourceMessageId || null)
-    : (String(preview.id || '').startsWith('preview-') ? String(preview.id).slice('preview-'.length) : null);
-
-  return {
-    id: preview.id || `preview-${createdAt || Date.now()}`,
-    sourceMessageId,
-    senderId: preview.senderId === 'me' ? 'me' : 'them',
-    text: preview.text,
-    timestamp: preview.timestampLabel || formatChatTime(createdAt),
-    createdAt,
-    is_read: preview.is_read ?? 1,
-    isPreview: true,
-  };
-}
-
 function getMessageTimeValue(message) {
   const value = message?.createdAt || message?.created_at;
   if (!value) return 0;
@@ -131,6 +103,19 @@ function getMessageTimeValue(message) {
 
 function getMessageIdValue(message) {
   return message?.id == null ? '' : String(message.id);
+}
+
+function areMessageListsEqual(left = [], right = []) {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  return left.every((message, index) => {
+    const other = right[index];
+    return getMessageIdValue(message) === getMessageIdValue(other)
+      && message.senderId === other?.senderId
+      && String(message.text || '') === String(other?.text || '')
+      && (message.createdAt || message.created_at || null) === (other?.createdAt || other?.created_at || null)
+      && Number(message.is_read ?? 0) === Number(other?.is_read ?? 0);
+  });
 }
 
 function mergeFreshHistoryWithCurrent(freshMessages, currentMessages, requestStartedAt = 0) {
@@ -148,40 +133,6 @@ function mergeFreshHistoryWithCurrent(freshMessages, currentMessages, requestSta
   });
 
   return [...freshMessages, ...extras];
-}
-
-function mergePreviewIntoCachedMessages(cachedMessages = [], previewMessage = null) {
-  if (!previewMessage) return cachedMessages;
-  if (!cachedMessages.length) return [previewMessage];
-
-  const previewId = getMessageIdValue(previewMessage);
-  const sourceMessageId = previewMessage.sourceMessageId ? String(previewMessage.sourceMessageId) : '';
-  const previewTime = getMessageTimeValue(previewMessage);
-  const exists = cachedMessages.some((message) => {
-    const messageId = getMessageIdValue(message);
-    const messageText = String(message?.text || '');
-    const previewText = String(previewMessage.text || '');
-    const sameMessageId = (sourceMessageId && messageId === sourceMessageId) || (previewId && messageId === previewId);
-    const samePreviewText = previewText
-      && (messageText === previewText || messageText.startsWith(previewText) || previewText.startsWith(messageText));
-    const sameNearTimestamp = previewTime
-      && Math.abs(getMessageTimeValue(message) - previewTime) <= 1000;
-
-    return sameMessageId || (
-      sameNearTimestamp
-      && message.senderId === previewMessage.senderId
-      && samePreviewText
-    );
-  });
-  if (exists) return cachedMessages;
-  if (!sourceMessageId) return cachedMessages;
-
-  const lastCachedTime = cachedMessages.reduce((max, message) => Math.max(max, getMessageTimeValue(message)), 0);
-  if (previewTime && previewTime > lastCachedTime + 1000) {
-    return [...cachedMessages, previewMessage].slice(-CHAT_CACHE_MESSAGE_LIMIT);
-  }
-
-  return cachedMessages;
 }
 
 function readChatCache(partnerId) {
@@ -328,9 +279,7 @@ export default function ChatPage() {
   const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
-  const lastMessagePreview = location.state?.lastMessagePreview || null;
-  const previewMessage = buildPreviewMessage(lastMessagePreview);
-  const initialMessages = mergePreviewIntoCachedMessages(cachedChat?.messages || [], previewMessage);
+  const initialMessages = cachedChat?.messages || [];
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState(initialMessages);
   const [apiLimit, setApiLimit] = useState(cachedChat?.apiLimit || null);
@@ -720,8 +669,7 @@ export default function ChatPage() {
 
     const nextCachedChat = readChatCache(partnerId);
     const nextPartnerPreview = partnerPreview;
-    const nextPreviewMessage = buildPreviewMessage(lastMessagePreview);
-    const nextInitialMessages = mergePreviewIntoCachedMessages(nextCachedChat?.messages || [], nextPreviewMessage);
+    const nextInitialMessages = nextCachedChat?.messages || [];
     myUserIdRef.current = String(user.id);
     setActiveChatId([String(user.id), partnerId].sort().join('-'));
 
@@ -746,11 +694,11 @@ export default function ChatPage() {
     } catch { /* ignore */ }
 
     setPartner(nextCachedChat?.partner || nextPartnerPreview || null);
-    setMessages(nextInitialMessages);
+    setMessages((prev) => (areMessageListsEqual(prev, nextInitialMessages) ? prev : nextInitialMessages));
     setApiLimit(nextCachedChat?.apiLimit || null);
     setBlockState(nextCachedChat?.blockState || { blockedByMe: false, blockedMe: false });
     setHasOlderMessages(nextCachedChat?.hasOlderMessages || false);
-    setLoading(!nextCachedChat && !nextPartnerPreview && !nextPreviewMessage);
+    setLoading(!nextCachedChat && !nextPartnerPreview);
     if (nextInitialMessages.length > 0) {
       wasAtBottomRef.current = true;
       requestScrollToBottom('auto');
@@ -775,7 +723,10 @@ export default function ChatPage() {
           .filter((msg) => msg.sender_id !== myUserIdRef.current && !msg.is_read)
           .map((msg) => msg.id);
 
-        setMessages((prev) => mergeFreshHistoryWithCurrent(formattedHistory, prev));
+        setMessages((prev) => {
+          const merged = mergeFreshHistoryWithCurrent(formattedHistory, prev);
+          return areMessageListsEqual(prev, merged) ? prev : merged;
+        });
         setHasOlderMessages(Array.isArray(payload) ? historyRows.length >= INITIAL_CHAT_PAGE_SIZE : !!payload?.hasMore);
         setLoading(false);
         wasAtBottomRef.current = true;
@@ -793,7 +744,8 @@ export default function ChatPage() {
         const formatted = formatMsg(msg);
         // Deduplicate: skip if message already exists
         setMessages(prev => {
-          if (prev.some(m => m.id === msg.id)) return prev;
+          const messageId = getMessageIdValue(msg);
+          if (prev.some((m) => getMessageIdValue(m) === messageId)) return prev;
           return [...prev, formatted];
         });
         updateConversationPreviewCache(partnerId, partner, formatted);
@@ -813,15 +765,23 @@ export default function ChatPage() {
             return updated;
           }
           // If no temp found, just add (deduplicated)
-          if (prev.some(m => m.id === msg.id)) return prev;
+          const messageId = getMessageIdValue(msg);
+          if (prev.some((m) => getMessageIdValue(m) === messageId)) return prev;
           return [...prev, formatted];
         });
         updateConversationPreviewCache(partnerId, partner, formatted);
       },
       onRead(messageIds) {
-        setMessages(prev => prev.map(m =>
-          messageIds.includes(m.id) ? { ...m, is_read: 1 } : m
-        ));
+        const readIds = new Set(messageIds.map(String));
+        setMessages((prev) => {
+          let changed = false;
+          const next = prev.map((message) => {
+            if (!readIds.has(getMessageIdValue(message)) || Number(message.is_read) === 1) return message;
+            changed = true;
+            return { ...message, is_read: 1 };
+          });
+          return changed ? next : prev;
+        });
       },
       onLimit(data) {
         setApiLimit({ remaining: data.remaining, max: data.max, canSend: data.canSend });
@@ -852,7 +812,10 @@ export default function ChatPage() {
     apiGetMessages(partnerId, { limit: INITIAL_CHAT_PAGE_SIZE }).then((data) => {
       if (cancelled) return;
       const latestMessages = normalizeMessages(data.messages || []);
-      setMessages((prev) => mergeFreshHistoryWithCurrent(latestMessages, prev, historyRequestStartedAt));
+      setMessages((prev) => {
+        const merged = mergeFreshHistoryWithCurrent(latestMessages, prev, historyRequestStartedAt);
+        return areMessageListsEqual(prev, merged) ? prev : merged;
+      });
       setHasOlderMessages(!!data.hasMore);
       setLoading(false);
       if (!nextCachedChat?.messages?.length || wasAtBottomRef.current) {
@@ -877,7 +840,7 @@ export default function ChatPage() {
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [decrementUnread, id, lastMessagePreview, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, setActiveChatId, stopTypingSignal]);
+  }, [decrementUnread, id, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, setActiveChatId, stopTypingSignal]);
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;

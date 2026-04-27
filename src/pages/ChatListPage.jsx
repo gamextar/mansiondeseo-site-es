@@ -59,27 +59,6 @@ function isConversationCacheFresh(timestamp) {
   return timestamp > 0 && Date.now() - timestamp < CONV_CACHE_TTL_MS;
 }
 
-function buildLastMessagePreview(conv) {
-  const text = String(conv?.lastMessage || '').trim();
-  if (!text || !conv?.timestamp) return null;
-
-  const myId = getStoredUser()?.id;
-  const lastSenderId = conv.lastSenderId ? String(conv.lastSenderId) : '';
-  if (!myId || !lastSenderId) return null;
-
-  const senderId = lastSenderId === String(myId) ? 'me' : 'them';
-
-  return {
-    id: conv.lastMessageId ? `preview-${conv.lastMessageId}` : `preview-${conv.profileId}-${conv.timestamp}`,
-    sourceMessageId: conv.lastMessageId || null,
-    senderId,
-    text,
-    createdAt: conv.timestamp,
-    timestamp: conv.timestamp,
-    is_read: senderId === 'me' ? 1 : (conv.unread > 0 ? 0 : 1),
-  };
-}
-
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
   const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
@@ -138,7 +117,6 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
           photos: [],
           online: conv.online,
         },
-        lastMessagePreview: buildLastMessagePreview(conv),
       },
     });
   }, [conv, deleting, navigate, onRead]);
