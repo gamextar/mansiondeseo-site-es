@@ -2,8 +2,8 @@ import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Film, MessageCircle, User, Settings, Camera, Heart, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
-import { useState } from 'react';
-import { logout as apiLogout, peekOwnProfileDashboard } from '../lib/api';
+import { useEffect, useState } from 'react';
+import { getMe, logout as apiLogout, peekOwnProfileDashboard } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import AvatarImg from './AvatarImg';
 import { warmVideoFeed } from '../lib/videoFeedWarmup';
@@ -39,6 +39,15 @@ export default function DesktopSidebar() {
   const [visitors] = useState(() => peekOwnProfileDashboard()?.visitors || []);
   const [loggingOut, setLoggingOut] = useState(false);
   const { user, setRegistered, setUser } = useAuth();
+
+  useEffect(() => {
+    if (!user?.id || user.avatar_url) return;
+    let cancelled = false;
+    getMe({ force: true }).then((data) => {
+      if (!cancelled && data?.user) setUser(data.user);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [setUser, user?.avatar_url, user?.id]);
 
   // Hide on landing/onboarding/register/login
   const hiddenPaths = ['/bienvenida', '/registro', '/login'];

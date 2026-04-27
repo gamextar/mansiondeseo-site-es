@@ -193,11 +193,17 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!user?.id) return;
+    let cancelled = false;
+    getMe({ force: true }).then((data) => {
+      if (!cancelled && data?.user) setUser(data.user);
+    }).catch(() => {});
     getOwnProfileDashboard().then(data => {
+      if (cancelled) return;
       setVisitors(data.visitors || []);
       setReceivedGifts(data.gifts || []);
     }).catch(() => {});
-  }, [user?.id]);
+    return () => { cancelled = true; };
+  }, [setUser, user?.id]);
 
   useEffect(() => () => {
     if (avatarPreviewUrlRef.current) {

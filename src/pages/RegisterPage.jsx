@@ -20,7 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getGeoDefaults, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername } from '../lib/api';
+import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getGeoDefaults, getMe, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername } from '../lib/api';
 import { calculateAgeFromBirthdate, isAdultBirthdate } from '../lib/birthdate';
 import { formatLocation } from '../lib/location';
 import ImageCropper from '../components/ImageCropper';
@@ -1881,6 +1881,11 @@ export default function RegisterPage() {
         const nextAvatarUrl = uploadResult?.avatar_url || uploadResult?.url || '';
         if (nextAvatarUrl) {
           setUser(prev => prev ? { ...prev, avatar_url: nextAvatarUrl, avatar_crop: null } : prev);
+          getMe({ force: true })
+            .then((fresh) => {
+              if (fresh?.user) setUser(fresh.user);
+            })
+            .catch(() => {});
         }
       } catch {
         // Photo upload failed — user can retry later from profile
