@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X, Crown } from 'lucide-react';
-import { getStories, recordStoryView, invalidateStoriesCache, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { getStories, recordStoryView, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
@@ -32,6 +32,7 @@ const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
 const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 68;
 const VIDEO_FEED_RAIL_SOURCE = 'rail';
+const VIDEO_LIMIT_BLOCKED_PREVIEW_MS = 2800;
 
 function getStoryIdentity(story) {
   if (!story) return null;
@@ -253,6 +254,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const userPausedRef = useRef(false);
   const resumeAfterAppFocusRef = useRef(false);
   const recoveryTimerRef = useRef(null);
+  const limitPreviewTimerRef = useRef(null);
   const playAttemptIdRef = useRef(0);
   const lastRecoveryAtRef = useRef(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -334,6 +336,54 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       if (looksSuspended) resetSuspendedVideo();
     }, 900);
   }, [activeSrc, forcePaused, isActive, resetSuspendedVideo]);
+
+  useEffect(() => {
+    if (limitPreviewTimerRef.current) {
+      window.clearTimeout(limitPreviewTimerRef.current);
+      limitPreviewTimerRef.current = null;
+    }
+
+    if (!isLimitBlocked || !isActive || !activeSrc || forcePaused || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    userPausedRef.current = false;
+    if (progressBarRef.current) progressBarRef.current.style.width = '0%';
+
+    const video = videoRef.current;
+    if (video) {
+      try {
+        video.currentTime = 0;
+      } catch {}
+    }
+
+    attemptPlay();
+
+    limitPreviewTimerRef.current = window.setTimeout(() => {
+      limitPreviewTimerRef.current = null;
+      userPausedRef.current = true;
+      resumeAfterAppFocusRef.current = false;
+      if (recoveryTimerRef.current) {
+        window.clearTimeout(recoveryTimerRef.current);
+        recoveryTimerRef.current = null;
+      }
+
+      const currentVideo = videoRef.current;
+      if (currentVideo) {
+        try {
+          currentVideo.pause();
+        } catch {}
+      }
+      setIsPlaying(false);
+    }, VIDEO_LIMIT_BLOCKED_PREVIEW_MS);
+
+    return () => {
+      if (limitPreviewTimerRef.current) {
+        window.clearTimeout(limitPreviewTimerRef.current);
+        limitPreviewTimerRef.current = null;
+      }
+    };
+  }, [activeSrc, attemptPlay, forcePaused, isActive, isLimitBlocked]);
 
   useEffect(() => {
     if (isActive) {
@@ -498,6 +548,10 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       window.clearTimeout(recoveryTimerRef.current);
       recoveryTimerRef.current = null;
     }
+    if (limitPreviewTimerRef.current) {
+      window.clearTimeout(limitPreviewTimerRef.current);
+      limitPreviewTimerRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -506,7 +560,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   }, [isMuted]);
 
   const togglePlay = () => {
-    if (forcePaused) return;
+    if (forcePaused || isLimitBlocked) return;
     const video = videoRef.current;
     if (!video) return;
     if (video.paused || !isPlaying) {
@@ -522,7 +576,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   };
 
   const handleVideoEnd = () => {
-    if (forcePaused) return;
+    if (forcePaused || isLimitBlocked) return;
     const video = videoRef.current;
     if (video) {
       video.currentTime = 0;
@@ -981,9 +1035,6 @@ export default function VideoFeedPage() {
     ? null
     : Math.max(0, Number(storyViewLimit.remaining) || 0);
   const backendLimitActive = storyViewLimit?.limited !== false;
-  const backendLimitLabel = backendLimitActive
-    ? `${Math.min(backendViewedToday, backendDailyLimit)}/${backendDailyLimit}`
-    : 'VIP';
   const isStoryBlockedByLimit = useCallback((story) => {
     const storyId = String(story?.story_id || story?.id || '').trim();
     if (!storyId || user?.premium) return false;
@@ -1200,11 +1251,6 @@ export default function VideoFeedPage() {
     setStories(fresh);
     return fresh;
   }, [requestedStorySeed, requestedStoryUserId]);
-  const refreshStoryLimitCounter = useCallback(() => {
-    invalidateStoriesCache();
-    refreshStories().catch(() => {});
-  }, [refreshStories]);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -1793,26 +1839,6 @@ export default function VideoFeedPage() {
           </div>
         )}
 
-        <div
-          className="fixed left-1/2 top-4 z-[85] w-[min(92vw,360px)] -translate-x-1/2 rounded-2xl border border-mansion-gold/35 bg-black/70 px-5 py-4 text-center text-white shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-md lg:top-6"
-          style={{ top: 'max(env(safe-area-inset-top, 16px), 16px)' }}
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mansion-gold/90">Límite backend</p>
-          <div className="mt-1 font-display text-5xl font-bold leading-none text-white">{backendLimitLabel}</div>
-          <p className="mt-2 text-xs font-medium text-white/70">
-            {backendLimitActive
-              ? `${backendRemaining ?? Math.max(0, backendDailyLimit - backendViewedToday)} disponibles hoy`
-              : 'Sin límite diario por VIP'}
-          </p>
-          <button
-            type="button"
-            onClick={refreshStoryLimitCounter}
-            className="mt-3 inline-flex h-9 items-center justify-center rounded-full border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white transition-colors hover:bg-white/18 active:bg-white/25"
-          >
-            Releer
-          </button>
-        </div>
-
         {isDesktopViewport ? (
         <div className="h-full overflow-hidden" onWheel={handleDesktopWheel}>
           <div className="relative w-full h-full">
@@ -1855,7 +1881,6 @@ export default function VideoFeedPage() {
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={isActive ? handleEntryRevealReady : undefined}
                   enableCinematicReveal={enableCinematicReveal}
-                  forcePaused={isStoryBlocked}
                   isLimitBlocked={isStoryBlocked}
                   limit={storyLimitBlock?.limit || storyViewLimit}
                   limitBlurLevel={limitBlurLevel}
@@ -1907,7 +1932,6 @@ export default function VideoFeedPage() {
                   onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
                   enableCinematicReveal={enableCinematicReveal}
                   pauseOnAppBackground
-                  forcePaused={isStoryBlocked}
                   isLimitBlocked={isStoryBlocked}
                   limit={storyLimitBlock?.limit || storyViewLimit}
                   limitBlurLevel={limitBlurLevel}
