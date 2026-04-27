@@ -245,7 +245,7 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, enableCinematicReveal = false, pauseOnAppBackground = false, videoScale = 1, forcePaused = false }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, enableCinematicReveal = false, pauseOnAppBackground = false, videoScale = 1, forcePaused = false, isLimitBlocked = false, limit = null, limitBlurLevel = 14, onVip }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
@@ -259,6 +259,10 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [videoResetToken, setVideoResetToken] = useState(0);
+  const limitDaily = Number(limit?.dailyLimit ?? 10);
+  const limitViewed = Number(limit?.viewedToday ?? limitDaily);
+  const limitLabel = limitDaily > 0 ? `${Math.min(limitViewed, limitDaily)}/${limitDaily}` : '0';
+  const blockedVideoScale = Math.max(videoScale, 1.08);
 
   // Once src is set, never clear it — clearing causes browser to reload the video
   // which produces the black flash/glitch at boundaries. Matches original behavior.
@@ -539,8 +543,9 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           src={activeSrc}
           className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[1400ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
           style={{
-            WebkitTransform: `translateZ(0) scale(${videoScale})`,
-            transform: `translateZ(0) scale(${videoScale})`,
+            WebkitTransform: `translateZ(0) scale(${isLimitBlocked ? blockedVideoScale : videoScale})`,
+            transform: `translateZ(0) scale(${isLimitBlocked ? blockedVideoScale : videoScale})`,
+            filter: isLimitBlocked ? `blur(${limitBlurLevel}px)` : undefined,
             opacity: enableCinematicReveal ? (isVideoReady ? 1 : 0) : 1,
           }}
           loop
@@ -583,6 +588,25 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
         />
         <div className="absolute inset-x-0 top-0 hidden h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none lg:block lg:rounded-t-2xl" />
 
+        {isLimitBlocked && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/28 px-6 text-center">
+            <button
+              type="button"
+              onClick={onVip}
+              className="group flex max-w-[300px] flex-col items-center rounded-[1.75rem] border border-mansion-gold/35 bg-black/48 px-6 py-6 text-white shadow-[0_22px_70px_rgba(0,0,0,0.45)] backdrop-blur-md transition-transform active:scale-[0.98] lg:hover:scale-[1.02]"
+            >
+              <span className="mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-mansion-gold/45 bg-mansion-gold/15 text-mansion-gold shadow-[0_0_40px_rgba(212,175,55,0.2)]">
+                <Crown className="h-10 w-10" />
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-mansion-gold/95">Límite diario</span>
+              <span className="mt-2 font-display text-2xl font-bold leading-tight text-white">Límite de videos Free alcanzado</span>
+              <span className="mt-3 text-sm leading-relaxed text-white/76">
+                Ya viste {limitLabel} videos hoy. Hazte VIP para seguir mirando sin límite.
+              </span>
+            </button>
+          </div>
+        )}
+
         <div className="hidden lg:flex absolute left-5 bottom-8 z-20 flex-col items-start gap-2.5 max-w-[360px]">
           <button onClick={() => navigate(`/perfiles/${story.user_id}`, { state: { from: '/videos' } })} className="flex flex-col items-start gap-2.5">
             <div className="rounded-full border-[2.5px] border-white/80 overflow-hidden bg-mansion-elevated shadow-lg" style={{ width: avatarSize + 12, height: avatarSize + 12 }}>
@@ -611,9 +635,11 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
         )}
       </div>
 
-      <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 350px)', bottom: '60px' }}>
-        <DesktopActionButtons story={story} onLike={onLike} navigate={navigate} onGift={onGift} isOwnStory={isOwnStory} />
-      </div>
+      {!isLimitBlocked && (
+        <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 350px)', bottom: '60px' }}>
+          <DesktopActionButtons story={story} onLike={onLike} navigate={navigate} onGift={onGift} isOwnStory={isOwnStory} />
+        </div>
+      )}
     </div>
   );
 }
@@ -841,55 +867,6 @@ function DesktopActionButtons({ story, onLike, navigate, onGift, isOwnStory = fa
   );
 }
 
-function StoryDailyLimitOverlay({ limit, onVip, onBack }) {
-  const dailyLimit = Number(limit?.dailyLimit ?? 10);
-  const viewedToday = Number(limit?.viewedToday ?? dailyLimit);
-  const label = dailyLimit > 0 ? `${Math.min(viewedToday, dailyLimit)}/${dailyLimit}` : '0';
-
-  return (
-    <motion.div
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/88 px-5 backdrop-blur-2xl"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.18, ease: 'easeOut' }}
-    >
-      <motion.div
-        className="w-full max-w-sm rounded-[2rem] border border-mansion-gold/25 bg-mansion-base/95 p-6 text-center shadow-[0_24px_80px_rgba(0,0,0,0.42)]"
-        initial={{ y: 18, scale: 0.96, opacity: 0 }}
-        animate={{ y: 0, scale: 1, opacity: 1 }}
-        exit={{ y: 12, scale: 0.98, opacity: 0 }}
-        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-      >
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-mansion-gold/12 text-mansion-gold">
-          <Crown className="h-8 w-8" />
-        </div>
-        <p className="text-xs font-bold uppercase tracking-[0.28em] text-mansion-gold">Límite diario</p>
-        <h2 className="mt-2 font-display text-2xl font-bold text-text-primary">Stories gratis usadas</h2>
-        <p className="mt-3 text-sm leading-relaxed text-text-muted">
-          Ya viste {label} stories hoy. Con VIP puedes seguir mirando stories sin límite diario.
-        </p>
-        <div className="mt-5 grid gap-2">
-          <button
-            type="button"
-            onClick={onVip}
-            className="rounded-2xl bg-mansion-gold px-5 py-3 text-sm font-bold text-mansion-base transition-colors hover:bg-mansion-gold-light"
-          >
-            Ver planes VIP
-          </button>
-          <button
-            type="button"
-            onClick={onBack}
-            className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-text-secondary transition-colors hover:bg-white/10"
-          >
-            Volver al feed
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
 export default function VideoFeedPage() {
   const safariDesktop = isSafariDesktopBrowser();
   const location = useLocation();
@@ -995,6 +972,9 @@ export default function VideoFeedPage() {
   const gradientHeight = siteSettings?.videoGradientHeight ?? 64;
   const gradientOpacity = siteSettings?.videoGradientOpacity ?? 40;
   const avatarSize = siteSettings?.videoAvatarSize ?? AVATAR_SIZE_DEFAULT;
+  const limitBlurLevel = isDesktopViewport
+    ? (siteSettings?.blurDesktop ?? siteSettings?.blurLevel ?? 8)
+    : (siteSettings?.blurMobile ?? siteSettings?.blurLevel ?? 14);
   const backendDailyLimit = Math.max(0, Number(storyViewLimit?.dailyLimit ?? siteSettings?.freeVideoStoryLimit ?? 10) || 0);
   const backendViewedToday = Math.max(0, Number(storyViewLimit?.viewedToday ?? 0) || 0);
   const backendRemaining = storyViewLimit?.remaining === null || storyViewLimit?.remaining === undefined
@@ -1847,9 +1827,9 @@ export default function VideoFeedPage() {
                 >
                   <StoryCard
                     story={story}
-                    videoSrc={isStoryBlocked ? '' : story.video_url}
-                    isActive={isActive && !isStoryBlocked}
-                    shouldLoad={shouldLoad && !isStoryBlocked}
+                    videoSrc={story.video_url}
+                    isActive={isActive}
+                    shouldLoad={shouldLoad || isStoryBlocked}
                     isMuted={isMuted}
                     avatarSize={avatarSize}
                     onLike={handleLike}
@@ -1862,6 +1842,10 @@ export default function VideoFeedPage() {
                   onRevealReady={isActive ? handleEntryRevealReady : undefined}
                   enableCinematicReveal={enableCinematicReveal}
                   forcePaused={isStoryBlocked}
+                  isLimitBlocked={isStoryBlocked}
+                  limit={storyLimitBlock?.limit || storyViewLimit}
+                  limitBlurLevel={limitBlurLevel}
+                  onVip={() => navigate('/vip', { state: { from: '/videos' } })}
                 />
               </div>
             );
@@ -1895,9 +1879,9 @@ export default function VideoFeedPage() {
               >
                 <StoryCard
                   story={story}
-                  videoSrc={isStoryBlocked ? '' : story.video_url}
-                  isActive={displayIndex === activeDispIdx && !isStoryBlocked}
-                  shouldLoad={shouldLoad && !isStoryBlocked}
+                  videoSrc={story.video_url}
+                  isActive={displayIndex === activeDispIdx}
+                  shouldLoad={shouldLoad || isStoryBlocked}
                   isMuted={isMuted}
                   avatarSize={avatarSize}
                   onLike={handleLike}
@@ -1911,6 +1895,10 @@ export default function VideoFeedPage() {
                   enableCinematicReveal={enableCinematicReveal}
                   pauseOnAppBackground
                   forcePaused={isStoryBlocked}
+                  isLimitBlocked={isStoryBlocked}
+                  limit={storyLimitBlock?.limit || storyViewLimit}
+                  limitBlurLevel={limitBlurLevel}
+                  onVip={() => navigate('/vip', { state: { from: '/videos' } })}
                 />
               </div>
             );
@@ -1918,7 +1906,7 @@ export default function VideoFeedPage() {
         </div>
         )}
 
-        {activeStory && (
+        {activeStory && !activeStoryLimitBlocked && (
         <div
           className="pointer-events-none fixed right-3 flex flex-col items-center gap-6 z-[70] lg:hidden"
           style={{ bottom: `calc(${navBottomOffset} + 16px)` }}
@@ -1936,7 +1924,7 @@ export default function VideoFeedPage() {
         </div>
         )}
 
-        {activeStory && (
+        {activeStory && !activeStoryLimitBlocked && (
         <div
           className="pointer-events-none fixed left-4 right-20 z-[70] lg:hidden"
           style={{ bottom: `calc(${navBottomOffset} + 8px)` }}
@@ -1988,16 +1976,6 @@ export default function VideoFeedPage() {
           </button>
         </>
         )}
-
-        <AnimatePresence>
-          {activeStoryLimitBlocked && (
-            <StoryDailyLimitOverlay
-              limit={storyLimitBlock?.limit || storyViewLimit}
-              onVip={() => navigate('/vip', { state: { from: '/videos' } })}
-              onBack={closeToHomeFeed}
-            />
-          )}
-        </AnimatePresence>
 
         {/* Gift Modal */}
         <AnimatePresence>
