@@ -518,9 +518,12 @@ export default function ProfileDetailPage({ initialData }) {
   const goToVip = useCallback((event) => {
     event?.preventDefault?.();
     event?.stopPropagation?.();
-    closeLightbox();
-    navigate('/vip');
-  }, [closeLightbox, navigate]);
+    if (typeof window !== 'undefined') {
+      window.location.assign('/vip');
+      return;
+    }
+    navigate('/vip', { state: null });
+  }, [navigate]);
 
   // Sync lightbox scroll position when opening or index changes
   useEffect(() => {
