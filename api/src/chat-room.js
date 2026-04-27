@@ -8,7 +8,7 @@ export class ChatRoom {
     this.state = state;
     this.env = env;
     this.hiddenConversationsReady = null;
-    this.dailyLimitCache = { value: null, expiresAt: 0 };
+    this.messageLimitSettingsCache = { value: null, expiresAt: 0 };
     this.userStatusCache = new Map();
     this.userPreviewCache = new Map();
     this.messageConversationIdReady = null;
@@ -251,27 +251,41 @@ export class ChatRoom {
     };
   }
 
-  async getDailyLimit() {
-    const now = Date.now();
-    if (this.dailyLimitCache.value != null && now < this.dailyLimitCache.expiresAt) {
-      return this.dailyLimitCache.value;
-    }
-
-    const limitSetting = await this.env.DB.prepare(
-      "SELECT value FROM site_settings WHERE key = 'daily_message_limit'"
-    ).first();
-    const dailyLimit = parseInt(limitSetting?.value || '5', 10);
-    this.dailyLimitCache = {
-      value: dailyLimit,
-      expiresAt: now + 60_000,
-    };
-    return dailyLimit;
+  normalizeMessageLimitWindowHours(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 12;
+    return Math.max(1, Math.min(168, Math.round(parsed)));
   }
 
-  getMessageLimitWindowUTC(date = new Date()) {
-    const isoDate = date.toISOString().slice(0, 10);
-    const hourBucket = date.getUTCHours() < 12 ? '00' : '12';
-    return `${isoDate}-${hourBucket}`;
+  async getMessageLimitSettings() {
+    const now = Date.now();
+    if (this.messageLimitSettingsCache.value && now < this.messageLimitSettingsCache.expiresAt) {
+      return this.messageLimitSettingsCache.value;
+    }
+
+    const { results = [] } = await this.env.DB.prepare(
+      "SELECT key, value FROM site_settings WHERE key IN ('daily_message_limit', 'message_limit_window_hours')"
+    ).all();
+    const settings = Object.fromEntries(results.map((row) => [row.key, row.value]));
+    const maxMessages = parseInt(settings.daily_message_limit || '5', 10);
+    const value = {
+      maxMessages: Number.isFinite(maxMessages) ? Math.max(1, maxMessages) : 5,
+      windowHours: this.normalizeMessageLimitWindowHours(settings.message_limit_window_hours),
+    };
+    this.messageLimitSettingsCache = {
+      value,
+      expiresAt: now + 60_000,
+    };
+    return value;
+  }
+
+  getMessageLimitWindowUTC(hours = 12, date = new Date()) {
+    const windowHours = this.normalizeMessageLimitWindowHours(hours);
+    const windowMs = windowHours * 60 * 60 * 1000;
+    const bucket = Math.floor(date.getTime() / windowMs);
+    const bucketStart = new Date(bucket * windowMs);
+    const bucketStamp = bucketStart.toISOString().replace(/[-:]/g, '').slice(0, 11);
+    return `${windowHours}h-${bucketStamp}`;
   }
 
   async getSenderStatus(userId) {
@@ -618,14 +632,16 @@ export class ChatRoom {
       }
     }
 
-    // Check free-user message limit via D1 in 12-hour windows.
+    // Check free-user message limit via D1 in the configured window.
     try {
-      const limitWindow = this.getMessageLimitWindowUTC();
       const senderStatus = await this.getSenderStatus(senderId);
       const isPremium = senderStatus.isPremium;
 
       if (!isPremium) {
-        const dailyLimit = await this.getDailyLimit();
+        const limitSettings = await this.getMessageLimitSettings();
+        const dailyLimit = limitSettings.maxMessages;
+        const windowHours = limitSettings.windowHours;
+        const limitWindow = this.getMessageLimitWindowUTC(windowHours);
 
         const limitRow = await this.env.DB.prepare(
           'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
@@ -636,10 +652,10 @@ export class ChatRoom {
           ws.send(JSON.stringify({
             type: 'error',
             code: 'LIMIT_REACHED',
-            message: `Has alcanzado el límite de ${dailyLimit} mensajes cada 12 horas. Desbloquea VIP para mensajes ilimitados.`,
+            message: `Has alcanzado el límite de ${dailyLimit} mensajes cada ${windowHours} horas. Desbloquea VIP para mensajes ilimitados.`,
             remaining: 0,
             max: dailyLimit,
-            windowHours: 12,
+            windowHours,
           }));
           return;
         }
@@ -662,7 +678,7 @@ export class ChatRoom {
           remaining: dailyLimit - newCount,
           max: dailyLimit,
           canSend: newCount < dailyLimit,
-          windowHours: 12,
+          windowHours,
         }));
       }
     } catch (err) {

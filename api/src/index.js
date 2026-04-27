@@ -1600,10 +1600,21 @@ function todayUTC() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function messageLimitWindowUTC(date = new Date()) {
-  const isoDate = date.toISOString().slice(0, 10);
-  const hourBucket = date.getUTCHours() < 12 ? '00' : '12';
-  return `${isoDate}-${hourBucket}`;
+const MESSAGE_LIMIT_WINDOW_HOURS_DEFAULT = 12;
+
+function normalizeMessageLimitWindowHours(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return MESSAGE_LIMIT_WINDOW_HOURS_DEFAULT;
+  return Math.max(1, Math.min(168, Math.round(parsed)));
+}
+
+function messageLimitWindowUTC(hours = MESSAGE_LIMIT_WINDOW_HOURS_DEFAULT, date = new Date()) {
+  const windowHours = normalizeMessageLimitWindowHours(hours);
+  const windowMs = windowHours * 60 * 60 * 1000;
+  const bucket = Math.floor(date.getTime() / windowMs);
+  const bucketStart = new Date(bucket * windowMs);
+  const bucketStamp = bucketStart.toISOString().replace(/[-:]/g, '').slice(0, 11);
+  return `${windowHours}h-${bucketStamp}`;
 }
 
 // ── Password hashing (using Web Crypto) ─────────────────
@@ -3161,7 +3172,8 @@ async function handleProfileDetail(request, env, userId) {
   const includeParam = new URL(request.url).searchParams.get('include') || '';
   let messageLimit = undefined;
   if (includeParam.includes('messageLimit')) {
-    const limitWindow = messageLimitWindowUTC();
+    const windowHours = settings.messageLimitWindowHours || MESSAGE_LIMIT_WINDOW_HOURS_DEFAULT;
+    const limitWindow = messageLimitWindowUTC(windowHours);
     const limitRow = await env.DB.prepare(
       'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
     ).bind(auth.sub, limitWindow).first();
@@ -3173,7 +3185,7 @@ async function handleProfileDetail(request, env, userId) {
       remaining: senderPremium ? 999 : Math.max(0, dailyLimit - count),
       canSend: senderPremium ? true : count < dailyLimit,
       max: senderPremium ? 999 : dailyLimit,
-      windowHours: 12,
+      windowHours,
     };
   }
 
@@ -3238,7 +3250,8 @@ async function handleChatBootstrap(request, env, userId) {
 
   if (!user) return error('Perfil no encontrado', 404);
 
-  const limitWindow = messageLimitWindowUTC();
+  const windowHours = settings.messageLimitWindowHours || MESSAGE_LIMIT_WINDOW_HOURS_DEFAULT;
+  const limitWindow = messageLimitWindowUTC(windowHours);
   const limitRow = await env.DB.prepare(
     'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
   ).bind(auth.sub, limitWindow).first();
@@ -3269,7 +3282,7 @@ async function handleChatBootstrap(request, env, userId) {
       remaining: senderPremium ? 999 : Math.max(0, dailyLimit - count),
       canSend: senderPremium ? true : count < dailyLimit,
       max: senderPremium ? 999 : dailyLimit,
-      windowHours: 12,
+      windowHours,
     },
     blockState: {
       blockedByMe: Number(blockState?.blocked_by_me || 0) === 1,
@@ -3329,24 +3342,25 @@ async function handleSendMessage(request, env) {
     return json({ error: messagingAllowed.message, code: messagingAllowed.code || 'MESSAGE_BLOCKED' }, messagingAllowed.status || 403);
   }
 
-  // Check free-user message limit in 12-hour windows.
-  const limitWindow = messageLimitWindowUTC();
-  const [limit, sender, receiver, siteSettings] = await Promise.all([
-    env.DB.prepare(
-      'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
-    ).bind(auth.sub, limitWindow).first(),
+  // Check free-user message limit in the configured rolling window.
+  const [sender, receiver, siteSettings] = await Promise.all([
     env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
     env.DB.prepare('SELECT COALESCE(fake, 0) AS fake FROM users WHERE id = ?').bind(receiver_id).first(),
     cached('settings', 300_000, () => loadSettings(env)),
   ]);
   const receiverIsFake = Number(receiver?.fake || 0) === 1;
+  const windowHours = siteSettings.messageLimitWindowHours || MESSAGE_LIMIT_WINDOW_HOURS_DEFAULT;
+  const limitWindow = messageLimitWindowUTC(windowHours);
+  const limit = await env.DB.prepare(
+    'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
+  ).bind(auth.sub, limitWindow).first();
 
   const currentCount = limit?.msg_count || 0;
 
   const dailyLimit = siteSettings.dailyMessageLimit || 5;
 
   if (!isPremiumActive(sender) && currentCount >= dailyLimit) {
-    return error(`Has alcanzado el límite de ${dailyLimit} mensajes cada 12 horas. Desbloquea VIP para mensajes ilimitados.`, 403);
+    return error(`Has alcanzado el límite de ${dailyLimit} mensajes cada ${windowHours} horas. Desbloquea VIP para mensajes ilimitados.`, 403);
   }
 
   // Insert message
@@ -3632,14 +3646,15 @@ async function handleMessageLimit(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
-  const limitWindow = messageLimitWindowUTC();
-  const [limit, sender, siteSettings] = await Promise.all([
-    env.DB.prepare(
-      'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
-    ).bind(auth.sub, limitWindow).first(),
+  const [sender, siteSettings] = await Promise.all([
     env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
     cached('settings', 300_000, () => loadSettings(env)),
   ]);
+  const windowHours = siteSettings.messageLimitWindowHours || MESSAGE_LIMIT_WINDOW_HOURS_DEFAULT;
+  const limitWindow = messageLimitWindowUTC(windowHours);
+  const limit = await env.DB.prepare(
+    'SELECT msg_count FROM message_limits WHERE user_id = ? AND date_utc = ?'
+  ).bind(auth.sub, limitWindow).first();
 
   const count = limit?.msg_count || 0;
 
@@ -3651,7 +3666,7 @@ async function handleMessageLimit(request, env) {
     remaining: senderPremium ? 999 : Math.max(0, dailyLimit - count),
     canSend: senderPremium ? true : count < dailyLimit,
     max: senderPremium ? 999 : dailyLimit,
-    windowHours: 12,
+    windowHours,
   });
 }
 
@@ -4320,6 +4335,7 @@ async function loadSettings(env) {
     freeVisiblePhotos: parseInt(settings.free_visible_photos || '1', 10),
     showVipButton: settings.show_vip_button !== '0',
     dailyMessageLimit: parseInt(settings.daily_message_limit || '5', 10),
+    messageLimitWindowHours: normalizeMessageLimitWindowHours(settings.message_limit_window_hours),
     freeVideoStoryLimit: parseIntegerSetting(settings.free_video_story_daily_limit, FREE_VIDEO_STORY_DAILY_LIMIT, 0, 500),
     siteCountry,
     siteLocale: settings.site_locale || (siteCountry === 'ES' ? 'es-ES' : 'es-AR'),
@@ -4578,7 +4594,7 @@ async function handleUpdateSettings(request, env) {
     'blur_level', 'blur_mobile', 'blur_desktop',
     'profile_blur_hero_multiplier', 'profile_blur_thumb_multiplier', 'profile_blur_lightbox_multiplier',
     'free_visible_photos', 'show_vip_button',
-    'daily_message_limit', 'site_country', 'site_locale', 'site_timezone', 'site_currency',
+    'daily_message_limit', 'message_limit_window_hours', 'site_country', 'site_locale', 'site_timezone', 'site_currency',
     'hide_password_register',
     'vip_price_monthly', 'vip_price_3months', 'vip_price_6months',
     'incognito_icon_svg',

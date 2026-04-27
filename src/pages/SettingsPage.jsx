@@ -35,6 +35,12 @@ function normalizeBlurMultiplier(value, fallback) {
   return Math.max(0, Math.min(3, Math.round(numeric * 10) / 10));
 }
 
+function normalizeMessageLimitWindowHours(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 12;
+  return Math.max(1, Math.min(168, Math.round(numeric)));
+}
+
 export default function SettingsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -60,6 +66,7 @@ export default function SettingsPage() {
 
   // Messaging
   const [dailyMessageLimit, setDailyMessageLimit] = useState(5);
+  const [messageLimitWindowHours, setMessageLimitWindowHours] = useState(12);
   const [onlineThresholdMinutes, setOnlineThresholdMinutes] = useState(60);
 
   // Site
@@ -232,6 +239,7 @@ export default function SettingsPage() {
         setFreeVisiblePhotos(s.freeVisiblePhotos);
         setShowVipButton(s.showVipButton);
         setDailyMessageLimit(s.dailyMessageLimit);
+        setMessageLimitWindowHours(s.messageLimitWindowHours ?? 12);
         setOnlineThresholdMinutes(s.onlineThresholdMinutes ?? 60);
         setSiteCountry(s.siteCountry);
         setSiteLocale(s.siteLocale || 'es-AR');
@@ -393,6 +401,8 @@ export default function SettingsPage() {
     setSaving(true);
     setSaved(false);
     try {
+      const committedMessageLimitWindowHours = normalizeMessageLimitWindowHours(messageLimitWindowHours);
+      setMessageLimitWindowHours(committedMessageLimitWindowHours);
       const data = await updateSettings({
         blur_mobile: blurMobile,
         blur_desktop: blurDesktop,
@@ -402,6 +412,7 @@ export default function SettingsPage() {
         free_visible_photos: freeVisiblePhotos,
         show_vip_button: showVipButton ? '1' : '0',
         daily_message_limit: dailyMessageLimit,
+        message_limit_window_hours: committedMessageLimitWindowHours,
         online_threshold_minutes: onlineThresholdMinutes,
         site_country: siteCountry,
         site_locale: siteLocale,
@@ -481,6 +492,7 @@ export default function SettingsPage() {
       setFreeVisiblePhotos(s.freeVisiblePhotos);
       setShowVipButton(s.showVipButton);
       setDailyMessageLimit(s.dailyMessageLimit);
+      setMessageLimitWindowHours(s.messageLimitWindowHours ?? 12);
       setOnlineThresholdMinutes(s.onlineThresholdMinutes ?? 60);
       setSiteCountry(s.siteCountry);
       setSiteLocale(s.siteLocale || 'es-AR');
@@ -791,17 +803,31 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-3">
             <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
                     <MessageCircle className="w-4 h-4 text-mansion-gold" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-text-primary">Mensajes cada 12 h (free)</h3>
-                    <p className="text-[11px] text-text-dim">Límite para usuarios no VIP por ventana de 12 horas</p>
+                    <h3 className="text-sm font-semibold text-text-primary">Mensajes por ventana (free)</h3>
+                    <p className="text-[11px] text-text-dim">Límite para usuarios no VIP y duración en horas</p>
                   </div>
                 </div>
-                <Counter value={dailyMessageLimit} onChange={setDailyMessageLimit} min={1} max={50} />
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <Counter value={dailyMessageLimit} onChange={setDailyMessageLimit} min={1} max={50} />
+                  <label className="flex items-center gap-2 text-[11px] text-text-dim">
+                    <span>Horas</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="168"
+                      value={messageLimitWindowHours}
+                      onChange={(event) => setMessageLimitWindowHours(event.target.value)}
+                      onBlur={() => setMessageLimitWindowHours(normalizeMessageLimitWindowHours(messageLimitWindowHours))}
+                      className="w-16 rounded-lg border border-white/10 bg-mansion-elevated px-2 py-1 text-center text-sm font-semibold text-text-primary outline-none focus:border-mansion-gold"
+                    />
+                  </label>
+                </div>
               </div>
             </div>
 
