@@ -550,7 +550,8 @@ export default function SettingsPage() {
       setVideoGradientHeight(s.videoGradientHeight ?? 64);
       setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
       setVideoAvatarSize(s.videoAvatarSize ?? 52);
-      setVideoLimitBlur(s.videoLimitBlur ?? s.blurMobile ?? 14);
+      const nextVideoLimitBlur = s.videoLimitBlur ?? videoLimitBlur;
+      setVideoLimitBlur(nextVideoLimitBlur);
       setStoryMaxDurationSeconds(String(s.storyMaxDurationSeconds ?? 15));
       setEncoderThreads(String(s.encoderThreads ?? 4));
       setEncoderCrf(s.encoderCrf || '29');
@@ -564,9 +565,10 @@ export default function SettingsPage() {
       setMailFrom(s.mailFrom || '');
       setRegistrationEmailBcc(s.registrationEmailBcc ?? 'registro@gamextar.com');
       // Propagate to global context so dependent components update live
-      setSiteSettings(s);
+      const nextSiteSettings = { ...s, videoLimitBlur: nextVideoLimitBlur };
+      setSiteSettings(nextSiteSettings);
       try {
-        sessionStorage.setItem('mansion_site_settings', JSON.stringify(s));
+        sessionStorage.setItem('mansion_site_settings', JSON.stringify(nextSiteSettings));
         localStorage.removeItem('mansion_feed');
       } catch {}
       setSaved(true);
