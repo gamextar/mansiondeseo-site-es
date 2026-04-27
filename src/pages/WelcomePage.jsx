@@ -2,7 +2,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronRight, Sparkles } from 'lucide-react';
 import { useSeoMeta } from '../lib/seo';
-import { getToken, hasEverLoggedIn } from '../lib/api';
+import { clearAccountLocalData, getToken, hasEverLoggedIn } from '../lib/api';
 import { SITE_ORIGIN } from '../lib/siteConfig';
 
 export default function WelcomePage() {
@@ -90,7 +90,10 @@ export default function WelcomePage() {
 
         {/* CTA */}
         <button
-          onClick={() => navigate('/registro')}
+          onClick={() => {
+            clearAccountLocalData();
+            navigate('/registro');
+          }}
           className="fade-in-up fade-delay-700 btn-gold w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 active:scale-[0.97]"
         >
           Registrarme

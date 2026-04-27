@@ -466,6 +466,62 @@ function removeAllStoredChatCaches() {
   removeMatchingStorageKeys(sessionStorage, shouldRemove);
 }
 
+function clearSiteStorageKeys(storage) {
+  const exactKeys = new Set([
+    TOKEN_KEY,
+    USER_KEY,
+    EVER_LOGGED_IN_KEY,
+    'mansion_registered',
+    'mansion_feed',
+    'mansion_feed_cache_version',
+    'mansion_feed_dirty',
+    'mansion_feed_filter',
+    'mansion_feed_force_refresh',
+    'mansion_feed_scroll_y',
+    'mansion_conversations',
+    'mansion_pending_story_likes',
+    'appBootstrap',
+    AUTH_ME_CACHE_KEY,
+    OWN_PROFILE_DASHBOARD_CACHE_KEY,
+    'conversations',
+    'unreadCount',
+    'vf_active_story',
+    'vf_idx',
+    'vf_prefetched',
+    'vf_stories',
+  ]);
+  const prefixes = [
+    CHAT_CACHE_PREFIX,
+    'mansion_profile_detail_',
+    'mansion_pending_viewed_story_users:',
+    'viewed_story_users:',
+  ];
+  const shouldRemove = (key) => (
+    exactKeys.has(key) ||
+    prefixes.some((prefix) => key.startsWith(prefix))
+  );
+  removeMatchingStorageKeys(storage, shouldRemove);
+}
+
+export function clearAccountLocalData() {
+  sharedGetCache.clear();
+  if (typeof localStorage !== 'undefined') {
+    clearSiteStorageKeys(localStorage);
+  }
+  if (typeof sessionStorage !== 'undefined') {
+    clearSiteStorageKeys(sessionStorage);
+  }
+  if (typeof caches !== 'undefined') {
+    caches.keys()
+      .then((keys) => Promise.all(
+        keys
+          .filter((key) => key.toLowerCase().includes('mansion'))
+          .map((key) => caches.delete(key))
+      ))
+      .catch(() => {});
+  }
+}
+
 function removeStoredChatCacheForPartner(partnerId) {
   if (typeof window === 'undefined' || !partnerId) return;
   const viewerId = getStoredUser()?.id;
@@ -750,9 +806,7 @@ export async function confirmAccountDeletion(code) {
     method: 'POST',
     body: JSON.stringify({ code }),
   });
-  invalidateMeCache();
-  invalidateOwnProfileDashboardCache();
-  clearAuth();
+  clearAccountLocalData();
   return data;
 }
 

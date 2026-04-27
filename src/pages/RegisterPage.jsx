@@ -20,7 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getGeoDefaults, getMe, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername } from '../lib/api';
+import { clearAccountLocalData, register as apiRegister, uploadImage, verifyCode as apiVerifyCode, resendCode as apiResendCode, detectCountry as apiDetectCountry, getGeoDefaults, getMe, getPublicSettings, checkEmail as apiCheckEmail, checkUsername as apiCheckUsername } from '../lib/api';
 import { calculateAgeFromBirthdate, isAdultBirthdate } from '../lib/birthdate';
 import { formatLocation } from '../lib/location';
 import ImageCropper from '../components/ImageCropper';
@@ -1639,6 +1639,12 @@ export default function RegisterPage() {
   const [hidePasswordDefault, setHidePasswordDefault] = useState(true);
   const [roleImages, setRoleImages] = useState({});
   const [optimizeOnboardingMotion, setOptimizeOnboardingMotion] = useState(false);
+
+  useEffect(() => {
+    clearAccountLocalData();
+    setUser(null);
+    setRegistered(false);
+  }, [setRegistered, setUser]);
 
   useEffect(() => {
     if (!emailDeliveryPending) return undefined;
