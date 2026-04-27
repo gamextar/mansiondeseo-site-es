@@ -144,7 +144,7 @@ const staticHomeStructuredData = JSON.stringify({
   name: 'Mansión Deseo',
   alternateName: 'Mansion Deseo',
   url: `${SITE_ORIGIN}/`,
-  description: 'Club privado para adultos registrados, parejas liberales, swingers y conexiones discretas.',
+  description: 'Únete a Mansión Deseo, la plataforma reservada para parejas liberales y solteros. Perfiles verificados, privacidad total y el entorno más seguro para explorar el lifestyle swinger.',
   inLanguage: SITE_LOCALE,
 });
 const intentLabelMap = {
@@ -167,8 +167,8 @@ const staticHomeHtml = `<!doctype html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Mansión Deseo | Swingers Argentina y contactos adultos privados</title>
-  <meta name="description" content="Mansión Deseo es una comunidad privada para adultos en Argentina: swingers, parejas liberales, tríos y contactos discretos con perfiles cuidados." />
+  <title>Mansión Deseo | Comunidad Liberal y Parejas Swinger Exclusiva</title>
+  <meta name="description" content="Únete a Mansión Deseo, la plataforma reservada para parejas liberales y solteros. Perfiles verificados, privacidad total y el entorno más seguro para explorar el lifestyle swinger." />
   <meta name="keywords" content="swingers argentina, parejas liberales argentina, contactos adultos, intercambio de parejas, tríos argentina, comunidad liberal, club privado adultos" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="${SITE_ORIGIN}/" />
@@ -180,14 +180,14 @@ const staticHomeHtml = `<!doctype html>
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Mansión Deseo" />
-  <meta property="og:title" content="Mansión Deseo | Swingers Argentina y contactos adultos privados" />
-  <meta property="og:description" content="Comunidad privada para adultos en Argentina: swingers, parejas liberales, tríos y conexiones discretas." />
+  <meta property="og:title" content="Mansión Deseo | Comunidad Liberal y Parejas Swinger Exclusiva" />
+  <meta property="og:description" content="Únete a Mansión Deseo, la plataforma reservada para parejas liberales y solteros. Perfiles verificados, privacidad total y el entorno más seguro para explorar el lifestyle swinger." />
   <meta property="og:image" content="${SITE_ORIGIN}/icon-512.png" />
   <meta property="og:url" content="${SITE_ORIGIN}/" />
   <meta property="og:locale" content="${ogLocale}" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Mansión Deseo | Swingers Argentina y contactos adultos privados" />
-  <meta name="twitter:description" content="Comunidad privada para adultos en Argentina: swingers, parejas liberales, tríos y conexiones discretas." />
+  <meta name="twitter:title" content="Mansión Deseo | Comunidad Liberal y Parejas Swinger Exclusiva" />
+  <meta name="twitter:description" content="Únete a Mansión Deseo, la plataforma reservada para parejas liberales y solteros. Perfiles verificados, privacidad total y el entorno más seguro para explorar el lifestyle swinger." />
   <meta name="twitter:image" content="${SITE_ORIGIN}/icon-512.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -247,8 +247,8 @@ const staticHomeHtml = `<!doctype html>
     <section class="hero" aria-label="Mansión Deseo">
       <div>
         <div class="badge"><span class="badge-icon">✦</span> Acceso privado para adultos registrados</div>
-        <h1 class="title">Una comunidad privada para perfiles reales, afinidad y discrecion total.</h1>
-        <p class="lead">Mansion Deseo funciona como puerta de entrada publica y experiencia privada: landings indexables para captar busquedas locales y una app cerrada para explorar perfiles verificados, historias, mensajes y conexiones con afinidad real.</p>
+        <h1 class="title">Donde la exclusividad encuentra su refugio más íntimo.</h1>
+        <p class="lead">Un espacio reservado para parejas liberales y solteros exigentes que valoran la discreción tanto como el deseo. Únete a la comunidad líder en encuentros auténticos, seguros y de alto nivel.</p>
         <div class="cta">
           <a class="pill-btn gold" href="/registro/">Registrarme →</a>
         </div>
@@ -261,15 +261,15 @@ const staticHomeHtml = `<!doctype html>
         <div class="inner">
           <div class="showcase-head">
             <div>
-              <p class="eyebrow">Visibilidad publica</p>
-              <h2>SEO fuerte por intencion y ciudad</h2>
+              <p class="eyebrow">Los tres pilares</p>
+              <h2>Exclusividad, seguridad y verificación</h2>
             </div>
             <div class="icon-box">◎</div>
           </div>
           <div class="features">
-            <article class="feature"><div class="feature-icon">✓</div><div><p class="feature-title">Perfiles verificados</p><p class="feature-text">Una comunidad cerrada para adultos registrados, con foco en discrecion y acceso controlado.</p></div></article>
-            <article class="feature"><div class="feature-icon">⌖</div><div><p class="feature-title">Intencion local real</p><p class="feature-text">Entradas SEO por ciudad e intencion para captar trafico local y dirigirlo a una experiencia privada.</p></div></article>
-            <article class="feature"><div class="feature-icon">♡</div><div><p class="feature-title">Conexiones afines</p><p class="feature-text">Parejas, trios, swingers, hombres, mujeres y perfiles trans con filtros y afinidad real.</p></div></article>
+            <article class="feature"><div class="feature-icon">◇</div><div><p class="feature-title">Comunidad Reservada</p><p class="feature-text">Aquí no somos miles, somos los indicados. Filtramos el ruido para que solo interactúes con personas que comparten tu mismo estilo de vida y nivel de respeto.</p></div></article>
+            <article class="feature"><div class="feature-icon">⌾</div><div><p class="feature-title">Entorno 100% Seguro</p><p class="feature-text">Tu privacidad es nuestro cimiento. Con nuestra infraestructura de última generación, tus datos y conversaciones permanecen en el anonimato más absoluto.</p></div></article>
+            <article class="feature"><div class="feature-icon">✓</div><div><p class="feature-title">Perfiles Verificados</p><p class="feature-text">Adiós a los engaños. Contamos con un riguroso sistema de verificación para asegurar que cada pareja o persona sea real, activa y esté lista para conectar.</p></div></article>
           </div>
         </div>
       </aside>

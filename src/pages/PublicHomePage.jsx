@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, ShieldCheck, Sparkles, Users, MapPin, HeartHandshake } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Sparkles, Users, HeartHandshake } from 'lucide-react';
 import { useSeoMeta, useStructuredData } from '../lib/seo';
 import { useAuth } from '../lib/authContext';
 import { login as apiLogin } from '../lib/api';
@@ -9,19 +9,19 @@ import { SITE_CONFIG, SITE_ORIGIN } from '../lib/siteConfig';
 
 const featureCards = [
   {
-    icon: ShieldCheck,
-    title: 'Perfiles verificados',
-    text: 'Una comunidad cerrada para adultos registrados, con foco en discrecion y acceso controlado.',
+    icon: Users,
+    title: 'Comunidad Reservada',
+    text: 'Aquí no somos miles, somos los indicados. Filtramos el ruido para que solo interactúes con personas que comparten tu mismo estilo de vida y nivel de respeto.',
   },
   {
-    icon: MapPin,
-    title: 'Intencion local real',
-    text: 'Entradas SEO por ciudad e intencion para captar trafico local y dirigirlo a una experiencia privada.',
+    icon: ShieldCheck,
+    title: 'Entorno 100% Seguro',
+    text: 'Tu privacidad es nuestro cimiento. Con nuestra infraestructura de última generación, tus datos y conversaciones permanecen en el anonimato más absoluto.',
   },
   {
     icon: HeartHandshake,
-    title: 'Conexiones afines',
-    text: 'Parejas, trios, swingers, hombres, mujeres y perfiles trans con filtros y afinidad real.',
+    title: 'Perfiles Verificados',
+    text: 'Adiós a los engaños. Contamos con un riguroso sistema de verificación para asegurar que cada pareja o persona sea real, activa y esté lista para conectar.',
   },
 ];
 
@@ -49,15 +49,15 @@ export default function PublicHomePage() {
   const [loggingIn, setLoggingIn] = useState(false);
 
   useSeoMeta({
-    title: 'Mansion Deseo | Club privado para adultos registrados',
-    description: 'Comunidad privada para adultos registrados, pensada para parejas, swingers, trios y conexiones discretas con perfiles verificados.',
+    title: 'Mansión Deseo | Comunidad Liberal y Parejas Swinger Exclusiva',
+    description: 'Únete a Mansión Deseo, la plataforma reservada para parejas liberales y solteros. Perfiles verificados, privacidad total y el entorno más seguro para explorar el lifestyle swinger.',
     canonical: `${SITE_ORIGIN}/`,
   });
 
   useStructuredData({
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: 'Mansion Deseo',
+    name: 'Mansión Deseo',
     url: `${SITE_ORIGIN}/`,
     potentialAction: {
       '@type': 'SearchAction',
@@ -162,7 +162,7 @@ export default function PublicHomePage() {
               transition={{ duration: 0.5, delay: 0.08 }}
               className="mt-6 max-w-3xl font-display text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl"
             >
-              Una comunidad privada para perfiles reales, afinidad y discrecion total.
+              Donde la exclusividad encuentra su refugio más íntimo.
             </motion.h1>
 
             <motion.p
@@ -171,9 +171,8 @@ export default function PublicHomePage() {
               transition={{ duration: 0.5, delay: 0.16 }}
               className="mt-5 max-w-2xl text-base leading-7 text-text-muted sm:text-lg"
             >
-              Mansion Deseo funciona como puerta de entrada publica y experiencia privada:
-              landings indexables para captar busquedas locales y una app cerrada para explorar
-              perfiles verificados, historias, mensajes y conexiones con afinidad real.
+              Un espacio reservado para parejas liberales y solteros exigentes que valoran la discreción
+              tanto como el deseo. Únete a la comunidad líder en encuentros auténticos, seguros y de alto nivel.
             </motion.p>
 
             <motion.div
@@ -219,8 +218,8 @@ export default function PublicHomePage() {
               <div className="rounded-[1.5rem] border border-white/10 bg-black/30 p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.22em] text-text-dim">Visibilidad publica</p>
-                    <h2 className="mt-2 text-2xl font-semibold text-white">SEO fuerte por intencion y ciudad</h2>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-text-dim">Los tres pilares</p>
+                    <h2 className="mt-2 text-2xl font-semibold text-white">Exclusividad, seguridad y verificación</h2>
                   </div>
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-mansion-gold/15">
                     <Users className="h-6 w-6 text-mansion-gold" />
