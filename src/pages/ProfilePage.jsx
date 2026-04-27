@@ -667,9 +667,9 @@ export default function ProfilePage() {
         className="w-full px-3 pt-6 lg:px-10 lg:pt-8"
       >
         {/* ── Profile Header ── */}
-        <motion.div variants={fadeUp} className="-mx-3 mb-3 border-b border-mansion-border/15 bg-mansion-base/90 px-3 pb-3 pt-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:-mx-10 lg:px-10 lg:pt-4">
+        <motion.div variants={fadeUp} className="-mx-3 mb-0.5 border-b border-mansion-border/15 bg-mansion-base/90 px-3 pb-3 pt-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:-mx-10 lg:px-10 lg:pt-4">
           {/* Avatar + info row */}
-          <div className="mb-3 flex items-center gap-4">
+          <div className="mb-[17px] flex items-center gap-4">
             {/* Avatar */}
             <div className="relative flex-shrink-0">
               <div className={`rounded-full p-[3px] ${user?.has_active_story ? 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400' : 'bg-gradient-to-br from-mansion-gold/50 to-mansion-gold-light/30'}`}>
@@ -779,7 +779,7 @@ export default function ProfilePage() {
 
         <AnimatePresence mode="wait">
           {activeTab === 'gallery' && (
-            <motion.section key="gallery" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit">
+            <motion.section key="gallery" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1">
               <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.18)] lg:p-5">
                 <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -883,7 +883,7 @@ export default function ProfilePage() {
           )}
 
           {activeTab === 'preferences' && (
-            <motion.section key="preferences" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="space-y-4">
+            <motion.section key="preferences" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1 space-y-4">
               <div className="grid items-start gap-4 xl:grid-cols-2">
                 <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-5">
                   <div className="mb-3 min-h-[58px] lg:mb-4">
@@ -961,7 +961,7 @@ export default function ProfilePage() {
           )}
 
           {activeTab === 'followers' && (
-            <motion.section key="followers" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-5">
+            <motion.section key="followers" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1 rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <h3 className="font-display text-2xl font-bold text-text-primary">Seguidores</h3>
@@ -1004,7 +1004,7 @@ export default function ProfilePage() {
           )}
 
           {activeTab === 'account' && (
-            <motion.section key="account" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="grid gap-6 xl:grid-cols-2">
+            <motion.section key="account" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1 grid gap-6 xl:grid-cols-2">
               <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-6">
                 <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-text-dim">Mi cuenta</h3>
                 {[
