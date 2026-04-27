@@ -744,7 +744,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="-mx-1 overflow-x-auto rounded-2xl border border-mansion-border/20 bg-mansion-card/45 p-1.5">
+          <div className="-mx-1 overflow-x-auto scrollbar-hide rounded-2xl border border-mansion-border/20 bg-mansion-card/45 p-1.5">
             <div className="grid min-w-max grid-cols-4 gap-1 lg:min-w-0">
               {PROFILE_TABS.map(({ id, label, icon: Icon }) => {
                 const active = activeTab === id;
@@ -780,7 +780,7 @@ export default function ProfilePage() {
         <AnimatePresence mode="wait">
           {activeTab === 'gallery' && (
             <motion.section key="gallery" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1">
-              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.18)] lg:p-5">
+              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-3 shadow-[0_24px_80px_rgba(0,0,0,0.18)] lg:p-4">
                 <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="font-display text-2xl font-bold text-text-primary">Galería</h3>
@@ -885,7 +885,7 @@ export default function ProfilePage() {
           {activeTab === 'preferences' && (
             <motion.section key="preferences" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1 space-y-4">
               <div className="grid items-start gap-4 xl:grid-cols-2">
-                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-5">
+                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-3 lg:p-4">
                   <div className="mb-3 min-h-[58px] lg:mb-4">
                     <h3 className="flex items-center gap-2 font-display text-2xl font-bold text-text-primary">
                       <Heart className="h-5 w-5 text-mansion-gold" />
@@ -906,7 +906,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-5">
+                <div className="h-full rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-3 lg:p-4">
                   <div className="mb-3 min-h-[58px] lg:mb-4">
                     <h3 className="flex items-center gap-2 font-display text-2xl font-bold text-text-primary">
                       <Shield className="h-5 w-5 text-mansion-crimson" />
@@ -929,7 +929,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-5">
+              <div className="rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-3 lg:p-4">
                 <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
                   <Filter className="h-3.5 w-3.5 text-mansion-gold" />
                   Intereses
@@ -961,7 +961,7 @@ export default function ProfilePage() {
           )}
 
           {activeTab === 'followers' && (
-            <motion.section key="followers" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1 rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-4 lg:p-5">
+            <motion.section key="followers" variants={tabPanelMotion} initial="initial" animate="animate" exit="exit" className="-mx-1 rounded-[2rem] border border-mansion-border/20 bg-mansion-card/35 p-3 lg:p-4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <h3 className="font-display text-2xl font-bold text-text-primary">Seguidores</h3>
