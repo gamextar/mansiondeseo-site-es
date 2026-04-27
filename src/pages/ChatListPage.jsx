@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, MessageCircle, Trash2 } from 'lucide-react';
-import { deleteConversation, getConversations, getToken, getStoredUser, invalidateConversationsCache } from '../lib/api';
+import { deleteConversation, getConversations, getMessages, getToken, getStoredUser, invalidateConversationsCache } from '../lib/api';
 import { getBottomNavPagePadding } from '../lib/bottomNavConfig';
 import AvatarImg from '../components/AvatarImg';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
@@ -28,6 +28,7 @@ function timeAgo(dateStr) {
 
 const CONV_CACHE_KEY = 'mansion_conversations';
 const CONV_CACHE_TTL_MS = 2 * 60_000;
+const CHAT_PREFETCH_PAGE_SIZE = 30;
 
 function getCachedConversations() {
   try {
@@ -105,6 +106,7 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
 
   const handleNavigate = useCallback(() => {
     if (isDraggingRef.current || deleting) return;
+    getMessages(conv.profileId, { limit: CHAT_PREFETCH_PAGE_SIZE }).catch(() => {});
     if (conv.unread > 0) onRead?.(conv.profileId);
     navigate(`/mensajes/${conv.profileId}`, {
       state: {

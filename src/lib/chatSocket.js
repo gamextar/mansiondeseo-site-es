@@ -26,9 +26,14 @@ const CHAT_MAX_RETRIES = 5;
  *   - onStateChange(state): 'connecting' | 'connected' | 'disconnected'
  * @returns {{ send, markRead, close, getState }}
  */
-export function createChatSocket(myUserId, partnerId, token, callbacks) {
+export function createChatSocket(myUserId, partnerId, token, callbacks, options = {}) {
   const chatId = [myUserId, partnerId].sort().join('-');
-  const url = `${WS_BASE}/api/chat/ws/${chatId}?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(myUserId)}`;
+  const params = new URLSearchParams({
+    token,
+    userId: myUserId,
+  });
+  if (options.loadHistory === false) params.set('history', '0');
+  const url = `${WS_BASE}/api/chat/ws/${chatId}?${params.toString()}`;
 
   let ws = null;
   let state = 'disconnected';

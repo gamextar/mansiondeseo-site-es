@@ -496,8 +496,11 @@ export class ChatRoom {
     // per-room Durable Object storage just to remember the conversation.
     this.state.acceptWebSocket(server, chatId ? [userId, chatId] : [userId]);
 
-    // Send message history to the new connection.
-    this.state.waitUntil(this.sendHistory(server, userId, chatId));
+    if (url.searchParams.get('history') !== '0') {
+      // Legacy clients can still ask the room for history. New clients load
+      // history over HTTP so this object stays focused on realtime delivery.
+      this.state.waitUntil(this.sendHistory(server, userId, chatId));
+    }
 
     return new Response(null, { status: 101, webSocket: client });
   }

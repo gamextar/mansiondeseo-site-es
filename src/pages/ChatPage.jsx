@@ -39,6 +39,29 @@ function normalizeMessages(messages = []) {
   }));
 }
 
+function getMessageTimeValue(message) {
+  const value = message?.createdAt || message?.created_at;
+  if (!value) return 0;
+  const normalized = typeof value === 'string' && !value.endsWith('Z') ? `${value}Z` : value;
+  const time = new Date(normalized).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function mergeFreshHistoryWithCurrent(freshMessages, currentMessages, requestStartedAt = 0) {
+  if (!currentMessages?.length) return freshMessages;
+
+  const freshIds = new Set(freshMessages.map((message) => message.id).filter(Boolean));
+  const freshLastTime = freshMessages.reduce((max, message) => Math.max(max, getMessageTimeValue(message)), 0);
+  const preserveAfter = Math.max(freshLastTime, requestStartedAt);
+  const extras = currentMessages.filter((message) => {
+    if (!message?.id || freshIds.has(message.id)) return false;
+    if (String(message.id).startsWith('temp-')) return true;
+    return getMessageTimeValue(message) >= preserveAfter - 1000;
+  });
+
+  return [...freshMessages, ...extras];
+}
+
 function readChatCache(partnerId) {
   if (typeof window === 'undefined') return null;
   try {
@@ -211,8 +234,6 @@ export default function ChatPage() {
   const pendingScrollBehaviorRef = useRef(null);
   const pendingScrollForceRef = useRef(false);
   const restoreScrollAfterPrependRef = useRef(null);
-  const initialHistoryLoadedRef = useRef(false);
-  const historyFallbackTimerRef = useRef(null);
   const suppressTypingUntilRef = useRef(0);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const [headerHeight, setHeaderHeight] = useState(96);
@@ -564,8 +585,6 @@ export default function ChatPage() {
 
     const nextCachedChat = readChatCache(partnerId);
     const nextPartnerPreview = partnerPreview;
-    initialHistoryLoadedRef.current = false;
-    clearTimeout(historyFallbackTimerRef.current);
     myUserIdRef.current = String(user.id);
     setActiveChatId([String(user.id), partnerId].sort().join('-'));
 
@@ -619,9 +638,7 @@ export default function ChatPage() {
           .filter((msg) => msg.sender_id !== myUserIdRef.current && !msg.is_read)
           .map((msg) => msg.id);
 
-        initialHistoryLoadedRef.current = true;
-        clearTimeout(historyFallbackTimerRef.current);
-        setMessages(formattedHistory);
+        setMessages((prev) => mergeFreshHistoryWithCurrent(formattedHistory, prev));
         setHasOlderMessages(Array.isArray(payload) ? historyRows.length >= INITIAL_CHAT_PAGE_SIZE : !!payload?.hasMore);
         setLoading(false);
         wasAtBottomRef.current = true;
@@ -692,31 +709,25 @@ export default function ChatPage() {
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 5500);
       },
-    });
+    }, { loadHistory: false });
 
-    if (!nextCachedChat?.messages?.length) {
-      historyFallbackTimerRef.current = setTimeout(() => {
-        if (cancelled || initialHistoryLoadedRef.current) return;
-
-        apiGetMessages(partnerId, { limit: INITIAL_CHAT_PAGE_SIZE }).then((data) => {
-          if (cancelled || initialHistoryLoadedRef.current) return;
-          initialHistoryLoadedRef.current = true;
-          setMessages(normalizeMessages(data.messages || []));
-          setHasOlderMessages(!!data.hasMore);
-          setLoading(false);
-          wasAtBottomRef.current = true;
-          requestScrollToBottom('auto', { force: true });
-        }).catch(() => {
-          if (!cancelled) setLoading(false);
-        });
-      }, 2500);
-    } else {
+    const historyRequestStartedAt = Date.now();
+    apiGetMessages(partnerId, { limit: INITIAL_CHAT_PAGE_SIZE }).then((data) => {
+      if (cancelled) return;
+      const latestMessages = normalizeMessages(data.messages || []);
+      setMessages((prev) => mergeFreshHistoryWithCurrent(latestMessages, prev, historyRequestStartedAt));
+      setHasOlderMessages(!!data.hasMore);
       setLoading(false);
-    }
+      if (!nextCachedChat?.messages?.length || wasAtBottomRef.current) {
+        wasAtBottomRef.current = true;
+        requestScrollToBottom('auto', { force: true });
+      }
+    }).catch(() => {
+      if (!cancelled && !nextCachedChat?.messages?.length) setLoading(false);
+    });
 
     return () => {
       cancelled = true;
-      clearTimeout(historyFallbackTimerRef.current);
       clearTimeout(typingTimeoutRef.current);
       stopTypingSignal();
       incomingMessageTimersRef.current.forEach((timer) => clearTimeout(timer));
@@ -900,8 +911,8 @@ export default function ChatPage() {
     setPartnerTyping(false);
     localSendMessage();
 
-    // Send via WebSocket (same channel as typing — proven real-time)
-    // The DO handles: save to SQLite + D1, limit check, broadcast to receiver, ack to sender
+    // Send via WebSocket (same channel as typing — proven real-time).
+    // The DO writes to D1, checks limits, broadcasts to receiver, and acks sender.
     const estimatedMessageWrites = effectiveMax >= 999 ? 3 : 4;
     if (chatRef.current?.getState() === 'connected') {
       recordD1WriteEstimate('chat_message_ws', estimatedMessageWrites);
