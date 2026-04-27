@@ -104,8 +104,14 @@ function formatChatTime(value) {
 function buildPreviewMessage(preview) {
   if (!preview?.text) return null;
   const createdAt = preview.createdAt || preview.timestamp || null;
+  const hasExplicitSourceId = Object.prototype.hasOwnProperty.call(preview, 'sourceMessageId');
+  const sourceMessageId = hasExplicitSourceId
+    ? (preview.sourceMessageId || null)
+    : (String(preview.id || '').startsWith('preview-') ? String(preview.id).slice('preview-'.length) : null);
+
   return {
     id: preview.id || `preview-${createdAt || Date.now()}`,
+    sourceMessageId,
     senderId: preview.senderId === 'me' ? 'me' : 'them',
     text: preview.text,
     timestamp: preview.timestampLabel || formatChatTime(createdAt),
@@ -123,16 +129,21 @@ function getMessageTimeValue(message) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function getMessageIdValue(message) {
+  return message?.id == null ? '' : String(message.id);
+}
+
 function mergeFreshHistoryWithCurrent(freshMessages, currentMessages, requestStartedAt = 0) {
   if (!currentMessages?.length) return freshMessages;
 
-  const freshIds = new Set(freshMessages.map((message) => message.id).filter(Boolean));
+  const freshIds = new Set(freshMessages.map(getMessageIdValue).filter(Boolean));
   const freshLastTime = freshMessages.reduce((max, message) => Math.max(max, getMessageTimeValue(message)), 0);
   const preserveAfter = Math.max(freshLastTime, requestStartedAt);
   const extras = currentMessages.filter((message) => {
-    if (!message?.id || freshIds.has(message.id)) return false;
-    if (message.isPreview || String(message.id).startsWith('preview-')) return false;
-    if (String(message.id).startsWith('temp-')) return true;
+    const messageId = getMessageIdValue(message);
+    if (!messageId || freshIds.has(messageId)) return false;
+    if (message.isPreview || messageId.startsWith('preview-')) return false;
+    if (messageId.startsWith('temp-')) return true;
     return getMessageTimeValue(message) >= preserveAfter - 1000;
   });
 
@@ -143,19 +154,30 @@ function mergePreviewIntoCachedMessages(cachedMessages = [], previewMessage = nu
   if (!previewMessage) return cachedMessages;
   if (!cachedMessages.length) return [previewMessage];
 
+  const previewId = getMessageIdValue(previewMessage);
+  const sourceMessageId = previewMessage.sourceMessageId ? String(previewMessage.sourceMessageId) : '';
   const previewTime = getMessageTimeValue(previewMessage);
-  const exists = cachedMessages.some((message) => (
-    message.id === previewMessage.id ||
-    (
-      getMessageTimeValue(message) === previewTime &&
-      message.senderId === previewMessage.senderId &&
-      message.text === previewMessage.text
-    )
-  ));
+  const exists = cachedMessages.some((message) => {
+    const messageId = getMessageIdValue(message);
+    const messageText = String(message?.text || '');
+    const previewText = String(previewMessage.text || '');
+    const sameMessageId = (sourceMessageId && messageId === sourceMessageId) || (previewId && messageId === previewId);
+    const samePreviewText = previewText
+      && (messageText === previewText || messageText.startsWith(previewText) || previewText.startsWith(messageText));
+    const sameNearTimestamp = previewTime
+      && Math.abs(getMessageTimeValue(message) - previewTime) <= 1000;
+
+    return sameMessageId || (
+      sameNearTimestamp
+      && message.senderId === previewMessage.senderId
+      && samePreviewText
+    );
+  });
   if (exists) return cachedMessages;
+  if (!sourceMessageId) return cachedMessages;
 
   const lastCachedTime = cachedMessages.reduce((max, message) => Math.max(max, getMessageTimeValue(message)), 0);
-  if (previewTime && previewTime >= lastCachedTime - 1000) {
+  if (previewTime && previewTime > lastCachedTime + 1000) {
     return [...cachedMessages, previewMessage].slice(-CHAT_CACHE_MESSAGE_LIMIT);
   }
 

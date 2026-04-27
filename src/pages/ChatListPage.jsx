@@ -65,10 +65,13 @@ function buildLastMessagePreview(conv) {
 
   const myId = getStoredUser()?.id;
   const lastSenderId = conv.lastSenderId ? String(conv.lastSenderId) : '';
-  const senderId = lastSenderId && myId && lastSenderId === String(myId) ? 'me' : 'them';
+  if (!myId || !lastSenderId) return null;
+
+  const senderId = lastSenderId === String(myId) ? 'me' : 'them';
 
   return {
     id: conv.lastMessageId ? `preview-${conv.lastMessageId}` : `preview-${conv.profileId}-${conv.timestamp}`,
+    sourceMessageId: conv.lastMessageId || null,
     senderId,
     text,
     createdAt: conv.timestamp,
