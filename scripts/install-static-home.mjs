@@ -176,6 +176,10 @@ const staticHomeHtml = `<!doctype html>
   <meta name="twitter:title" content="${homeTitle}" />
   <meta name="twitter:description" content="${homeDescription}" />
   <meta name="twitter:image" content="${SITE_ORIGIN}/icon-512.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500&display=swap" rel="stylesheet" /></noscript>
   <script type="application/ld+json">${staticHomeStructuredData}</script>
   <script>
     (function(){
