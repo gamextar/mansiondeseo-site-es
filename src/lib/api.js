@@ -1076,14 +1076,7 @@ export async function getSettings() {
 }
 
 export async function getPublicSettings() {
-  const sessionKey = 'publicSettings';
-  const cached = sessionCache.get(sessionKey, 30 * 60_000);
-  if (cached) return Promise.resolve(cached);
-
-  return sharedGet('publicSettings', () => apiFetch('/settings/public').then((data) => {
-    sessionCache.set(sessionKey, data);
-    return data;
-  }), { ttlMs: 5 * 60_000 });
+  return apiFetch('/settings/public');
 }
 
 export async function detectCountry() {

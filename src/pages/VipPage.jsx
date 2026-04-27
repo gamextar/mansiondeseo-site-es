@@ -19,6 +19,14 @@ const BENEFICIOS = [
   { icon: <Zap className="w-5 h-5" />, text: 'Prioridad en resultados de búsqueda' },
 ];
 
+function parseAdminPrice(value, fallback) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return fallback;
+  const digits = raw.replace(/[^\d]/g, '');
+  const amount = Number(digits);
+  return Number.isFinite(amount) && amount > 0 ? amount : fallback;
+}
+
 export default function VipPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -31,9 +39,9 @@ export default function VipPage() {
     getPublicSettings().then(data => {
       const s = data.settings;
       const updated = [...DEFAULT_PLANES];
-      if (s.vipPriceMonthly) updated[0] = { ...updated[0], amount: Number(s.vipPriceMonthly) };
-      if (s.vipPrice3Months) updated[1] = { ...updated[1], amount: Number(s.vipPrice3Months) };
-      if (s.vipPrice6Months) updated[2] = { ...updated[2], amount: Number(s.vipPrice6Months) };
+      updated[0] = { ...updated[0], amount: parseAdminPrice(s.vipPriceMonthly, updated[0].amount) };
+      updated[1] = { ...updated[1], amount: parseAdminPrice(s.vipPrice3Months, updated[1].amount) };
+      updated[2] = { ...updated[2], amount: parseAdminPrice(s.vipPrice6Months, updated[2].amount) };
       setPlanes(updated);
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps

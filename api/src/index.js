@@ -4466,7 +4466,7 @@ async function handleGeoDefaults(request) {
 async function handleGetPublicSettings(request, env) {
   const settings = await loadSettings(env);
   return json({ settings: getPublicSettingsPayload(settings) }, 200, {
-    'Cache-Control': 'public, max-age=300, s-maxage=300',
+    'Cache-Control': 'no-store, max-age=0',
   });
 }
 
