@@ -178,8 +178,8 @@ const staticHomeHtml = `<!doctype html>
   <meta name="twitter:image" content="${SITE_ORIGIN}/icon-512.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
-  <noscript><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500&display=swap" rel="stylesheet" /></noscript>
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" /></noscript>
   <script type="application/ld+json">${staticHomeStructuredData}</script>
   <script>
     (function(){
@@ -203,7 +203,7 @@ const staticHomeHtml = `<!doctype html>
     :root{--bg:#08080e;--card:#111118;--elevated:#1a1a24;--border:#2a2a38;--text:#f0ede8;--muted:#888899;--dim:#555566;--gold:#c9a84c;--gold-light:#e0c97a;--crimson:#d4183d;--crimson-dark:#9b1c3a}
     *{box-sizing:border-box}
     html{background:var(--bg)}
-    body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}
+    body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;overflow:hidden}
     a{color:inherit;text-decoration:none}
     button{font:inherit}
     .welcome{position:relative;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:24px}
@@ -227,10 +227,10 @@ const staticHomeHtml = `<!doctype html>
     .particle:nth-child(9){left:75%;top:54%;animation-delay:1.08s,2.4s}
     .particle:nth-child(10){left:85%;top:76%;animation-delay:1.16s,2.7s}
     .title,.copy,.cta,.login-line,.features{opacity:0;animation:fadeInUp .5s ease-out forwards}
-    .title{margin:0 0 12px;font-family:"Playfair Display",Georgia,"Times New Roman",serif;font-size:30px;line-height:1.2;font-weight:700;background:linear-gradient(90deg,var(--gold),var(--gold-light),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+    .title{margin:0 0 12px;font-family:"Playfair Display",Georgia,serif;font-size:30px;line-height:1.2;font-weight:700;background:linear-gradient(90deg,var(--gold),var(--gold-light),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
     .copy{max-width:320px;margin:0 auto 32px;color:var(--muted);font-size:14px;line-height:1.63;animation-delay:.6s}
     .cta{animation-delay:.7s}
-    .register-btn{display:flex;width:100%;align-items:center;justify-content:center;gap:8px;border:0;border-radius:16px;background:linear-gradient(90deg,var(--gold),var(--gold-light));padding:16px 24px;color:var(--bg);font-family:"Playfair Display",Georgia,"Times New Roman",serif;font-size:18px;font-weight:600;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease}
+    .register-btn{display:flex;width:100%;align-items:center;justify-content:center;gap:8px;border:0;border-radius:16px;background:linear-gradient(90deg,var(--gold),var(--gold-light));padding:16px 24px;color:var(--bg);font-family:"Playfair Display",Georgia,serif;font-size:18px;font-weight:600;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease}
     .register-btn:hover{box-shadow:0 0 20px rgba(201,168,76,.15);transform:scale(1.02)}
     .register-btn:active{transform:scale(.97)}
     .register-btn svg{width:20px;height:20px}
