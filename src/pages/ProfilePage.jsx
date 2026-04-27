@@ -1042,18 +1042,7 @@ export default function ProfilePage() {
           )}
         </motion.div>
 
-        {/* ── Logout ── */}
-        <motion.div variants={fadeUp} className="pt-2 pb-4">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl text-mansion-crimson/70 hover:text-mansion-crimson hover:bg-mansion-crimson/5 transition-all"
-          >
-            <LogOut className="w-4.5 h-4.5" />
-            <span className="text-sm font-medium">Cerrar sesión</span>
-          </button>
-        </motion.div>
-
-        <motion.div variants={fadeUp} className="pb-7">
+        <motion.div variants={fadeUp} className="pt-2 pb-3">
           <button
             onClick={openDeleteAccountDialog}
             className="w-full flex items-center gap-3 p-3 rounded-2xl border border-mansion-crimson/20 bg-mansion-crimson/5 text-mansion-crimson/80 hover:bg-mansion-crimson/10 hover:text-mansion-crimson transition-all"
@@ -1065,6 +1054,17 @@ export default function ProfilePage() {
               <p className="text-sm font-medium">Eliminar cuenta</p>
               <p className="text-xs text-mansion-crimson/55">Requiere confirmación por email</p>
             </div>
+          </button>
+        </motion.div>
+
+        {/* ── Logout ── */}
+        <motion.div variants={fadeUp} className="pb-7">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl text-mansion-crimson/70 hover:text-mansion-crimson hover:bg-mansion-crimson/5 transition-all"
+          >
+            <LogOut className="w-4.5 h-4.5" />
+            <span className="text-sm font-medium">Cerrar sesión</span>
           </button>
         </motion.div>
       </motion.div>
