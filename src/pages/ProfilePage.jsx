@@ -821,7 +821,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] items-stretch gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
                   {photos.map((url, i) => (
                     <div
                       key={url}
@@ -834,8 +834,7 @@ export default function ProfilePage() {
                       onTouchMove={galleryEditing ? handleTouchMove : undefined}
                       onTouchEnd={galleryEditing ? handleTouchEnd : undefined}
                       onClick={galleryEditing ? undefined : () => { setLightboxIndex(i); setLightboxOpen(true); }}
-                      style={{ aspectRatio: '4 / 5' }}
-                      className={`group relative block w-full min-w-0 max-w-none overflow-hidden rounded-[1.4rem] border border-mansion-border/20 bg-mansion-card ${
+                      className={`group relative aspect-[4/5] w-full min-w-0 overflow-hidden rounded-[1.4rem] border border-mansion-border/20 bg-mansion-card ${
                         galleryEditing ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
                       }`}
                     >
@@ -858,21 +857,21 @@ export default function ProfilePage() {
                     type="button"
                     onClick={() => galleryInputRef.current?.click()}
                     disabled={uploading}
-                    className="aspect-[4/5] rounded-[1.4rem] border-2 border-dashed border-mansion-border/30 bg-mansion-card/25 p-4 text-text-dim transition-colors hover:border-mansion-gold/40 hover:text-mansion-gold disabled:opacity-50"
+                    className="aspect-[4/5] w-full min-w-0 overflow-hidden rounded-[1.4rem] border-2 border-dashed border-mansion-border/30 bg-mansion-card/25 p-3 text-text-dim transition-colors hover:border-mansion-gold/40 hover:text-mansion-gold disabled:opacity-50 sm:p-4"
                   >
                     <div className="flex h-full flex-col items-center justify-center gap-2">
                       <Plus className="h-6 w-6" />
-                      <span className="text-xs font-semibold">{uploading ? 'Subiendo...' : '+ Subir Foto'}</span>
+                      <span className="whitespace-nowrap text-[11px] font-semibold leading-tight sm:text-xs">{uploading ? 'Subiendo...' : '+ Subir Foto'}</span>
                     </div>
                   </button>
                   <button
                     type="button"
                     onClick={() => navigate('/historia/nueva', { state: { from: '/perfil' } })}
-                    className="aspect-[4/5] rounded-[1.4rem] border border-mansion-crimson/25 bg-[radial-gradient(circle_at_top,rgba(212,24,61,0.2),transparent_60%),rgba(212,24,61,0.08)] p-4 text-mansion-crimson transition-colors hover:border-mansion-crimson/45 hover:bg-mansion-crimson/12"
+                    className="aspect-[4/5] w-full min-w-0 overflow-hidden rounded-[1.4rem] border border-mansion-crimson/25 bg-[radial-gradient(circle_at_top,rgba(212,24,61,0.2),transparent_60%),rgba(212,24,61,0.08)] p-3 text-mansion-crimson transition-colors hover:border-mansion-crimson/45 hover:bg-mansion-crimson/12 sm:p-4"
                   >
                     <div className="flex h-full flex-col items-center justify-center gap-2">
                       <Film className="h-7 w-7" />
-                      <span className="text-xs font-bold">+ Subir Video</span>
+                      <span className="whitespace-nowrap text-[11px] font-bold leading-tight sm:text-xs">+ Subir Video</span>
                     </div>
                   </button>
                 </div>

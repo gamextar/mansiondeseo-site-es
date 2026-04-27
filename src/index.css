@@ -91,6 +91,15 @@ body {
     @apply bg-mansion-elevated/90 backdrop-blur-xl border border-mansion-border/60;
   }
 
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   .btn-gold {
     @apply bg-gradient-to-r from-mansion-gold to-mansion-gold-light text-mansion-base 
            font-semibold rounded-xl px-6 py-3 transition-all duration-300 
