@@ -789,23 +789,6 @@ export default function ProfilePage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => galleryInputRef.current?.click()}
-                      disabled={uploading}
-                      className="inline-flex items-center gap-2 rounded-full bg-mansion-gold px-4 py-2 text-xs font-bold text-mansion-base transition-all hover:brightness-110 disabled:opacity-60"
-                    >
-                      <Plus className="h-4 w-4" />
-                      {uploading ? 'Subiendo...' : 'Subir foto'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => navigate('/historia/nueva', { state: { from: '/perfil' } })}
-                      className="inline-flex items-center gap-2 rounded-full border border-mansion-crimson/35 bg-mansion-crimson/12 px-4 py-2 text-xs font-bold text-mansion-crimson transition-all hover:bg-mansion-crimson/18"
-                    >
-                      <Film className="h-4 w-4" />
-                      Subir video
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => setGalleryEditing(prev => !prev)}
                       className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition-all ${
                         galleryEditing
@@ -832,7 +815,6 @@ export default function ProfilePage() {
                       onTouchMove={galleryEditing ? handleTouchMove : undefined}
                       onTouchEnd={galleryEditing ? handleTouchEnd : undefined}
                       onClick={galleryEditing ? undefined : () => { setLightboxIndex(i); setLightboxOpen(true); }}
-                      layout
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.025 }}
@@ -863,7 +845,7 @@ export default function ProfilePage() {
                   >
                     <div className="flex h-full flex-col items-center justify-center gap-2">
                       <Plus className="h-6 w-6" />
-                      <span className="text-xs font-semibold">{uploading ? 'Subiendo...' : 'Nueva foto'}</span>
+                      <span className="text-xs font-semibold">{uploading ? 'Subiendo...' : '+ Subir Foto'}</span>
                     </div>
                   </button>
                   <button
@@ -873,7 +855,7 @@ export default function ProfilePage() {
                   >
                     <div className="flex h-full flex-col items-center justify-center gap-2">
                       <Film className="h-7 w-7" />
-                      <span className="text-xs font-bold">{user?.has_active_story ? 'Cambiar video' : 'Subir video'}</span>
+                      <span className="text-xs font-bold">+ Subir Video</span>
                     </div>
                   </button>
                 </div>
