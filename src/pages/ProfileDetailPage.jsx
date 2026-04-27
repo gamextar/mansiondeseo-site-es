@@ -515,6 +515,13 @@ export default function ProfileDetailPage({ initialData }) {
     lbZoomRef.current = 1; lbPanRef.current = { x: 0, y: 0 };
   }, []);
 
+  const goToVip = useCallback((event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    closeLightbox();
+    navigate('/vip');
+  }, [closeLightbox, navigate]);
+
   // Sync lightbox scroll position when opening or index changes
   useEffect(() => {
     if (lightboxOpen && lightboxScrollRef.current) {
@@ -720,7 +727,7 @@ export default function ProfileDetailPage({ initialData }) {
                 <div
                   key={i}
                   className="w-full h-full flex-shrink-0 snap-start relative cursor-pointer overflow-hidden"
-                  onClick={() => !blocked && openLightbox(i)}
+                  onClick={(event) => (blocked ? goToVip(event) : openLightbox(i))}
                 >
                   <img
                     src={resolveMediaUrl(photo)}
@@ -1170,7 +1177,10 @@ export default function ProfileDetailPage({ initialData }) {
                         draggable={false}
                       />
                       {blocked && (
-                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                        <div
+                          className="absolute inset-0 bg-black/30 flex items-center justify-center cursor-pointer"
+                          onClick={goToVip}
+                        >
                           <Crown className="w-4 h-4 text-white/60" />
                         </div>
                       )}
@@ -1576,7 +1586,10 @@ export default function ProfileDetailPage({ initialData }) {
                         draggable={false}
                       />
                       {blocked && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div
+                          className="absolute inset-0 flex cursor-pointer items-center justify-center"
+                          onClick={goToVip}
+                        >
                           <div className="flex flex-col items-center gap-2 text-white/80">
                             <Crown className="w-10 h-10" />
                             <span className="text-base font-semibold">Contenido VIP</span>
