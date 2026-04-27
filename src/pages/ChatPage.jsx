@@ -133,6 +133,54 @@ function sortMessagesByTime(messages) {
     .map((entry) => entry.message);
 }
 
+function isTempMessage(message) {
+  return getMessageIdValue(message).startsWith('temp-');
+}
+
+function areLikelySamePendingMessage(message, other) {
+  if (!message || !other) return false;
+  const oneIsTemp = isTempMessage(message) !== isTempMessage(other);
+  if (!oneIsTemp) return false;
+  if (message?.senderId !== other?.senderId) return false;
+  if (String(message?.text || '') !== String(other?.text || '')) return false;
+
+  const messageTime = getMessageTimeValue(message);
+  const otherTime = getMessageTimeValue(other);
+  return !messageTime || !otherTime || Math.abs(messageTime - otherTime) <= 30_000;
+}
+
+function mergeDuplicateMessage(existing, incoming) {
+  if (isTempMessage(existing) && !isTempMessage(incoming)) return { ...existing, ...incoming };
+  if (!isTempMessage(existing) && isTempMessage(incoming)) return existing;
+  return {
+    ...existing,
+    ...incoming,
+    is_read: Math.max(Number(existing?.is_read ?? 0), Number(incoming?.is_read ?? 0)),
+  };
+}
+
+function dedupeMessages(messages = []) {
+  const result = [];
+
+  sortMessagesByTime(messages).forEach((message) => {
+    if (!message || message.isPreview) return;
+    const messageId = getMessageIdValue(message);
+    const duplicateIndex = result.findIndex((existing) => (
+      (messageId && getMessageIdValue(existing) === messageId) ||
+      areLikelySamePendingMessage(existing, message)
+    ));
+
+    if (duplicateIndex >= 0) {
+      result[duplicateIndex] = mergeDuplicateMessage(result[duplicateIndex], message);
+      return;
+    }
+
+    result.push(message);
+  });
+
+  return result;
+}
+
 function mergeMessagesForCache(...messageGroups) {
   const byId = new Map();
   const withoutId = [];
@@ -147,7 +195,7 @@ function mergeMessagesForCache(...messageGroups) {
     }
   });
 
-  return sortMessagesByTime([...byId.values(), ...withoutId]).slice(-CHAT_CACHE_MESSAGE_LIMIT);
+  return dedupeMessages([...byId.values(), ...withoutId]).slice(-CHAT_CACHE_MESSAGE_LIMIT);
 }
 
 function hydrateVisibleMessages(freshMessages, currentMessages, requestStartedAt = 0) {
@@ -215,7 +263,7 @@ function hydrateVisibleMessages(freshMessages, currentMessages, requestStartedAt
     }
   });
 
-  const messages = sortMessagesByTime([...hydratedCurrent, ...additions]);
+  const messages = dedupeMessages([...hydratedCurrent, ...additions]);
   return { messages, omittedOlder };
 }
 
@@ -258,7 +306,7 @@ function readChatCache(partnerId) {
     }
     return {
       ...parsed,
-      messages: normalizeMessages(parsed.messages || []).filter((message) => !message.isPreview),
+      messages: dedupeMessages(normalizeMessages(parsed.messages || []).filter((message) => !message.isPreview)),
       isStale: Date.now() - parsed.cachedAt > CHAT_CACHE_TTL_MS,
     };
   } catch {
@@ -270,7 +318,7 @@ function writeChatCache(partnerId, payload) {
   if (typeof window === 'undefined') return;
   const key = getChatCacheKey(partnerId);
   try {
-    const stableMessages = normalizeMessages(payload.messages || []).filter((message) => !message.isPreview);
+    const stableMessages = dedupeMessages(normalizeMessages(payload.messages || []).filter((message) => !message.isPreview));
     localStorage.setItem(key, JSON.stringify({
       ...payload,
       messages: stableMessages.slice(-CHAT_CACHE_MESSAGE_LIMIT),
@@ -848,11 +896,15 @@ export default function ChatPage() {
         clearTimeout(typingTimeoutRef.current);
         setPartnerTyping(false);
         const formatted = formatMsg(msg);
-        // Deduplicate: skip if message already exists
         setMessages(prev => {
-          const messageId = getMessageIdValue(msg);
-          if (prev.some((m) => getMessageIdValue(m) === messageId)) return prev;
-          return [...prev, formatted];
+          const tempIdx = prev.findIndex((message) => areLikelySamePendingMessage(message, formatted));
+          if (tempIdx !== -1) {
+            const updated = [...prev];
+            updated[tempIdx] = mergeDuplicateMessage(updated[tempIdx], formatted);
+            return dedupeMessages(updated);
+          }
+          const merged = dedupeMessages([...prev, formatted]);
+          return areMessageListsEqual(prev, merged) ? prev : merged;
         });
         updateConversationPreviewCache(partnerId, partner, formatted);
         if (shouldStickToBottom) requestScrollToBottom('smooth', { force: true });
@@ -864,16 +916,14 @@ export default function ChatPage() {
         const formatted = formatMsg(msg);
         // Replace optimistic temp message with real one from DO
         setMessages(prev => {
-          const tempIdx = prev.findIndex(m => m.id?.startsWith('temp-') && m.senderId === 'me');
+          const tempIdx = prev.findIndex((message) => areLikelySamePendingMessage(message, formatted));
           if (tempIdx !== -1) {
             const updated = [...prev];
-            updated[tempIdx] = formatted;
-            return updated;
+            updated[tempIdx] = mergeDuplicateMessage(updated[tempIdx], formatted);
+            return dedupeMessages(updated);
           }
-          // If no temp found, just add (deduplicated)
-          const messageId = getMessageIdValue(msg);
-          if (prev.some((m) => getMessageIdValue(m) === messageId)) return prev;
-          return [...prev, formatted];
+          const merged = dedupeMessages([...prev, formatted]);
+          return areMessageListsEqual(prev, merged) ? prev : merged;
         });
         updateConversationPreviewCache(partnerId, partner, formatted);
       },
@@ -1030,10 +1080,10 @@ export default function ChatPage() {
       const olderMessages = normalizeMessages(data.messages || []);
       setMessages((prev) => {
         const existingIds = new Set(prev.map((message) => message.id));
-        return [
+        return dedupeMessages([
           ...olderMessages.filter((message) => !existingIds.has(message.id)),
           ...prev,
-        ];
+        ]);
       });
       setHasOlderMessages(!!data.hasMore);
     } catch {
@@ -1122,7 +1172,7 @@ export default function ChatPage() {
 
     wasAtBottomRef.current = true;
     requestScrollToBottom('auto', { force: true });
-    setMessages((prev) => [...prev, newMsg]);
+    setMessages((prev) => dedupeMessages([...prev, newMsg]));
     updateConversationPreviewCache(partnerId, partner, newMsg);
     setInput('');
     stopTypingSignal();
