@@ -137,9 +137,8 @@ await addSitemapRoutes();
 await Promise.all([...appRoutes].map((route) => writeAppRoute(route, appHtml)));
 const prewarmAssetHrefs = collectAppAssetHrefs(appHtml);
 const ogLocale = SITE_LOCALE.replace('-', '_');
-const homeTitle = 'Mansión Deseo | Acceso privado para parejas liberales';
-const homeDescription = 'Mansión Deseo es una comunidad privada para parejas liberales y adultos que valoran la discreción, la verificación y el acceso curado.';
-const activeCouplesNow = '1.248';
+const homeTitle = 'Mansión Deseo | Acceso privado para adultos';
+const homeDescription = 'Comunidad privada y selecta para adultos registrados, pensada para parejas y usuarios solos que valoran perfiles verificados y acceso discreto.';
 const staticHomeStructuredData = JSON.stringify({
   '@context': 'https://schema.org',
   '@type': 'WebSite',
@@ -151,7 +150,7 @@ const staticHomeStructuredData = JSON.stringify({
 });
 
 const staticHomeHtml = `<!doctype html>
-<html lang="${SITE_LOCALE.split('-')[0] || 'es'}" style="background:#000000;color-scheme:dark">
+<html lang="${SITE_LOCALE.split('-')[0] || 'es'}" style="background:#08080e;color-scheme:dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -160,7 +159,7 @@ const staticHomeHtml = `<!doctype html>
   <meta name="keywords" content="parejas liberales, comunidad privada adultos, swingers argentina, acceso privado, perfiles verificados, club liberal" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="${SITE_ORIGIN}/" />
-  <meta name="theme-color" content="#000000" />
+  <meta name="theme-color" content="#08080E" />
   <meta name="color-scheme" content="dark" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/svg+xml" href="/icon.svg" />
@@ -197,161 +196,166 @@ const staticHomeHtml = `<!doctype html>
     })();
   </script>
   <style>
-    :root{--bg:#000000;--text:#f4f4f4;--muted:rgba(244,244,244,.64);--soft:rgba(244,244,244,.38);--line:rgba(255,255,255,.08);--gold:#c5a059;--gold-hover:#d4b36c}
+    :root{--bg:#08080e;--card:#111118;--elevated:#1a1a24;--border:#2a2a38;--text:#f0ede8;--muted:#888899;--dim:#555566;--gold:#c9a84c;--gold-light:#e0c97a;--crimson:#d4183d;--crimson-dark:#9b1c3a}
     *{box-sizing:border-box}
     html{background:var(--bg)}
-    body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:Inter,Montserrat,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow-x:hidden}
+    body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}
     a{color:inherit;text-decoration:none}
-    button,input{font:inherit}
-    .page{width:100%;max-width:1280px;margin:0 auto;padding:0 24px}
-    .top{height:80px;display:flex;align-items:center;justify-content:space-between;gap:24px;border-bottom:1px solid var(--line)}
-    .brand{display:flex;align-items:center;gap:12px;min-width:0}
-    .mark{width:36px;height:36px;display:grid;place-items:center;border:1px solid rgba(197,160,89,.5);color:var(--gold);font-family:"Playfair Display",Georgia,"Times New Roman",serif;font-size:14px;font-weight:600}
-    .brand-text{font-family:"Playfair Display",Georgia,"Times New Roman",serif;font-size:20px;font-weight:500;color:var(--text);white-space:nowrap}
-    .login-inline{position:relative;display:grid;grid-template-columns:12rem 10rem auto;gap:16px;align-items:center}
-    .home-input{height:36px;width:100%;border:0;border-bottom:1px solid rgba(255,255,255,.2);border-radius:0;background:transparent;padding:4px 0;color:var(--text);font-size:14px;outline:none}
-    .home-input::placeholder{color:rgba(244,244,244,.35)}
-    .home-input:focus{border-bottom-color:var(--gold)}
-    .login-btn,.mobile-login{height:36px;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(197,160,89,.7);border-radius:0;background:transparent;padding:0 20px;color:var(--gold);font-size:14px;font-weight:500;cursor:pointer;transition:background .18s ease,border-color .18s ease,color .18s ease,opacity .18s ease}
-    .login-btn:hover,.mobile-login:hover{border-color:var(--gold);background:var(--gold);color:#000}
-    .login-btn:disabled{cursor:wait;opacity:.6}
-    .mobile-login{display:none}
-    .login-error{position:absolute;right:0;top:44px;margin:0;max-width:320px;color:var(--gold);font-size:12px;text-align:right}
-    .hero{max-width:960px;min-height:calc(100svh - 176px);display:flex;flex-direction:column;justify-content:center;padding:96px 0 112px}
-    .title{max-width:900px;margin:0;font-family:"Playfair Display",Georgia,"Times New Roman",serif;font-size:72px;line-height:1.05;font-weight:500;color:var(--text)}
-    .lead{max-width:680px;margin:32px 0 0;color:var(--muted);font-size:20px;font-weight:300;line-height:1.6}
-    .cta{margin-top:40px}
-    .access-btn{min-height:48px;display:inline-flex;align-items:center;gap:12px;background:var(--gold);border:1px solid var(--gold);padding:12px 28px;color:#000;font-size:14px;font-weight:700;transition:background .18s ease,border-color .18s ease}
-    .access-btn:hover{background:var(--gold-hover);border-color:var(--gold-hover)}
-    .access-btn svg{width:16px;height:16px}
-    .social-proof{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:32px 0;text-align:center}
-    .social-proof p{margin:0;color:rgba(244,244,244,.7);font-size:14px;font-weight:300}
-    .social-proof strong{color:var(--gold);font-weight:500}
-    .benefits{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:48px;padding:96px 0 128px}
-    .benefit{border-top:1px solid var(--line);padding-top:32px}
-    .benefit svg{width:24px;height:24px;color:var(--gold)}
-    .benefit h2{margin:32px 0 0;font-family:"Playfair Display",Georgia,"Times New Roman",serif;font-size:26px;line-height:1.2;font-weight:500;color:var(--text)}
-    .benefit p{max-width:360px;margin:16px 0 0;color:rgba(244,244,244,.58);font-size:14px;font-weight:300;line-height:1.75}
-    .footer{display:flex;align-items:center;justify-content:space-between;gap:20px;border-top:1px solid var(--line);padding:40px 0;color:var(--soft);font-size:12px}
-    .footer nav{display:flex;flex-wrap:wrap;gap:24px}
-    .footer a{color:var(--soft);transition:color .18s ease}
-    .footer a:hover{color:var(--gold)}
-    @media(max-width:767px){
-      .page{padding:0 20px}
-      .top{height:72px;gap:16px}
-      .mark{width:34px;height:34px}
-      .brand-text{font-size:18px}
-      .login-inline{display:none}
-      .mobile-login{display:inline-flex}
-      .hero{min-height:auto;padding:80px 0 88px}
-      .title{font-size:44px;line-height:1.08}
-      .lead{margin-top:28px;font-size:18px;line-height:1.55}
-      .cta{margin-top:36px}
-      .access-btn{width:100%;justify-content:center}
-      .social-proof{padding:28px 0}
-      .benefits{grid-template-columns:1fr;gap:44px;padding:80px 0 96px}
-      .footer{align-items:flex-start;flex-direction:column}
-      .footer nav{gap:18px}
-    }
-    @media(min-width:768px) and (max-width:1023px){
-      .title{font-size:60px}
-      .benefits{gap:32px}
-    }
+    button{font:inherit}
+    .welcome{position:relative;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:24px}
+    .ambient{position:absolute;inset:0;pointer-events:none}
+    .ambient:before{content:"";position:absolute;top:25%;left:50%;width:384px;height:384px;transform:translateX(-50%);border-radius:999px;background:rgba(212,24,61,.05);filter:blur(64px)}
+    .ambient:after{content:"";position:absolute;bottom:25%;left:25%;width:256px;height:256px;border-radius:999px;background:rgba(201,168,76,.05);filter:blur(64px)}
+    .panel{position:relative;z-index:1;width:100%;max-width:384px;text-align:center}
+    .mansion-visual{position:relative;width:192px;height:224px;margin:0 auto 40px;opacity:0;animation:visualEnter .68s cubic-bezier(.2,.9,.2,1.08) .2s forwards}
+    .visual-glow{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+    .visual-glow:before{content:"";width:160px;height:160px;border-radius:999px;background:linear-gradient(135deg,rgba(212,24,61,.2),rgba(201,168,76,.1));filter:blur(32px)}
+    .door-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotate(-10deg);animation:doorSettle .62s cubic-bezier(.2,.9,.2,1.1) .4s forwards}
+    .door{position:relative;display:flex;width:112px;height:144px;align-items:flex-end;justify-content:center;border:2px solid rgba(201,168,76,.4);border-bottom-color:rgba(201,168,76,.34);border-radius:56px 56px 0 0;background:rgba(26,26,36,.5);padding-bottom:16px}
+    .knob{width:12px;height:12px;border-radius:999px;background:var(--gold)}
+    .particle{position:absolute;width:6px;height:6px;border-radius:999px;background:var(--gold);opacity:0;animation:particleEnter .42s ease-out forwards,floatParticle 3s ease-in-out infinite}
+    .particle:nth-child(3){left:15%;top:10%;animation-delay:.6s,.6s}
+    .particle:nth-child(4){left:25%;top:32%;animation-delay:.68s,.9s}
+    .particle:nth-child(5){left:35%;top:54%;animation-delay:.76s,1.2s}
+    .particle:nth-child(6){left:45%;top:76%;animation-delay:.84s,1.5s}
+    .particle:nth-child(7){left:55%;top:10%;animation-delay:.92s,1.8s}
+    .particle:nth-child(8){left:65%;top:32%;animation-delay:1s,2.1s}
+    .particle:nth-child(9){left:75%;top:54%;animation-delay:1.08s,2.4s}
+    .particle:nth-child(10){left:85%;top:76%;animation-delay:1.16s,2.7s}
+    .title,.copy,.cta,.login-line,.features{opacity:0;animation:fadeInUp .5s ease-out forwards}
+    .title{margin:0 0 12px;font-family:"Playfair Display",Georgia,"Times New Roman",serif;font-size:30px;line-height:1.2;font-weight:700;background:linear-gradient(90deg,var(--gold),var(--gold-light),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+    .copy{max-width:320px;margin:0 auto 32px;color:var(--muted);font-size:14px;line-height:1.63;animation-delay:.6s}
+    .cta{animation-delay:.7s}
+    .register-btn{display:flex;width:100%;align-items:center;justify-content:center;gap:8px;border:0;border-radius:16px;background:linear-gradient(90deg,var(--gold),var(--gold-light));padding:16px 24px;color:var(--bg);font-family:"Playfair Display",Georgia,"Times New Roman",serif;font-size:18px;font-weight:600;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease}
+    .register-btn:hover{box-shadow:0 0 20px rgba(201,168,76,.15);transform:scale(1.02)}
+    .register-btn:active{transform:scale(.97)}
+    .register-btn svg{width:20px;height:20px}
+    .login-line{margin:20px 0 0;font-size:14px;animation-delay:.9s}
+    .login-line span{color:var(--dim)}
+    .login-line a{color:var(--gold);font-weight:500}
+    .login-line a:hover{text-decoration:underline}
+    .features{display:flex;align-items:center;justify-content:center;gap:20px;margin-top:32px;color:var(--dim);font-size:12px;animation-delay:.9s}
+    .features span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+    .features svg{width:12px;height:12px;color:var(--gold)}
+    @keyframes visualEnter{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}
+    @keyframes doorSettle{from{transform:rotate(-10deg)}to{transform:rotate(0)}}
+    @keyframes particleEnter{from{opacity:0;transform:scale(0)}to{opacity:.6;transform:scale(1)}}
+    @keyframes floatParticle{0%,100%{transform:translateY(-5px) scale(1)}50%{transform:translateY(5px) scale(1)}}
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+    .title{animation-delay:.5s}
+    @media(min-width:768px){.title{font-size:36px}}
+    @media(max-width:374px){.features{gap:12px;font-size:11px}.copy{max-width:300px}.title{font-size:28px}}
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
   </style>
 </head>
 <body>
-  <main class="page">
-    <header class="top">
-      <a class="brand" href="/" aria-label="Mansión Deseo">
-        <span class="mark">MD</span>
-        <span class="brand-text">Mansión Deseo</span>
-      </a>
-      <form class="login-inline" id="homeLogin" autocomplete="on">
-        <input class="home-input" id="homeLoginEmail" type="email" name="username" placeholder="Email" autocomplete="username" inputmode="email" required />
-        <input class="home-input" id="homeLoginPassword" type="password" name="password" placeholder="Contraseña" autocomplete="current-password" required />
-        <button class="login-btn" id="homeLoginSubmit" type="submit">Entrar</button>
-        <p class="login-error" id="homeLoginError" role="alert" aria-live="polite"></p>
-      </form>
-      <a class="mobile-login" href="/login/">Login</a>
-    </header>
+  <main class="welcome">
+    <div class="ambient" aria-hidden="true"></div>
+    <section class="panel" aria-label="Mansión Deseo">
+      <div class="mansion-visual" aria-hidden="true">
+        <div class="visual-glow"></div>
+        <div class="door-wrap">
+          <div class="door"><span class="knob"></span></div>
+        </div>
+        <span class="particle"></span>
+        <span class="particle"></span>
+        <span class="particle"></span>
+        <span class="particle"></span>
+        <span class="particle"></span>
+        <span class="particle"></span>
+        <span class="particle"></span>
+        <span class="particle"></span>
+      </div>
 
-    <section class="hero" aria-label="Mansión Deseo">
-      <h1 class="title">Mansión Deseo, el club privado donde el deseo entra sin ruido.</h1>
-      <p class="lead">Acceso reservado, perfiles cuidados y privacidad diseñada para explorar con elegancia.</p>
+      <h1 class="title">Mansión Deseo</h1>
+      <p class="copy">
+        Un espacio selecto para quienes buscan experiencias únicas con discreción total,
+        perfiles verificados y conexiones reales entre parejas y usuarios solos.
+      </p>
+
       <div class="cta">
-        <a class="access-btn" href="/registro/">Solicitar Acceso <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg></a>
+        <a class="register-btn" href="/registro/" id="registerLink">
+          Registrarme
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+        </a>
+      </div>
+
+      <p class="login-line">
+        <span>¿Ya tienes cuenta? </span><a href="/login/">Acceder</a>
+      </p>
+
+      <div class="features" aria-label="Beneficios">
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.9 2.9 8.5 8.5 2.9 9.9l5.6 1.4 1.4 5.6 1.4-5.6 5.6-1.4-5.6-1.4-1.4-5.6Z"></path><path d="M19 15v4"></path><path d="M21 17h-4"></path></svg> Perfiles verificados</span>
+        <span>•</span>
+        <span>Confidencial</span>
+        <span>•</span>
+        <span>Acceso Privado</span>
       </div>
     </section>
-
-    <section class="social-proof" aria-label="Actividad actual">
-      <p><strong>${activeCouplesNow}</strong> Parejas activas ahora</p>
-    </section>
-
-    <section class="benefits" aria-label="Beneficios">
-      <article class="benefit">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 19 6v5c0 5-3 8-7 10-4-2-7-5-7-10V6l7-3Z"></path><path d="m9.5 12 1.7 1.7 3.8-4"></path></svg>
-        <h2>Privacidad por defecto</h2>
-        <p>Un entorno reservado, discreto y pensado para adultos que cuidan su exposición.</p>
-      </article>
-      <article class="benefit">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 19v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1"></path><circle cx="10" cy="7" r="4"></circle><path d="M20 19v-1a4 4 0 0 0-3-3.86"></path><path d="M17 3.13a4 4 0 0 1 0 7.75"></path></svg>
-        <h2>Perfiles Verificados</h2>
-        <p>Menos ruido, más intención: perfiles cuidados antes de entrar a la comunidad.</p>
-      </article>
-      <article class="benefit">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-4.35-9-9a5 5 0 0 1 8-5.7L12 7.4l1-1.1a5 5 0 0 1 8 5.7c-2 4.65-9 9-9 9Z"></path></svg>
-        <h2>Acceso curado</h2>
-        <p>Una experiencia selectiva para conectar con personas que buscan lo mismo.</p>
-      </article>
-    </section>
-
-    <footer class="footer">
-      <span>© 2026 Mansión Deseo · Mayores de 18 años.</span>
-      <nav aria-label="Privacidad y redes">
-        <a href="/privacidad/">Privacidad</a>
-        <a href="/terminos/">Términos</a>
-        <a href="https://instagram.com/mansiondeseo" target="_blank" rel="noreferrer">Instagram</a>
-        <a href="https://x.com/mansiondeseo" target="_blank" rel="noreferrer">X</a>
-      </nav>
-    </footer>
   </main>
   <script>
     (function(){
-      var loginForm = document.getElementById('homeLogin');
-      var loginEmail = document.getElementById('homeLoginEmail');
-      var loginPassword = document.getElementById('homeLoginPassword');
-      var loginError = document.getElementById('homeLoginError');
-      var loginSubmit = document.getElementById('homeLoginSubmit');
-      if (loginForm) {
-        loginForm.addEventListener('submit', function(event) {
-          event.preventDefault();
-          if (!loginEmail || !loginPassword || !loginSubmit) return;
-          loginError.textContent = '';
-          loginSubmit.disabled = true;
-          loginSubmit.textContent = 'Entrando...';
-          fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: loginEmail.value, password: loginPassword.value })
-          })
-            .then(function(response) {
-              return response.json().then(function(data) {
-                if (!response.ok) throw new Error(data && data.error ? data.error : 'Credenciales inválidas');
-                return data;
-              });
+      var registerLink = document.getElementById('registerLink');
+      function removeMatchingStorageKeys(storage, shouldRemove) {
+        try {
+          for (var index = storage.length - 1; index >= 0; index -= 1) {
+            var key = storage.key(index);
+            if (key && shouldRemove(key)) storage.removeItem(key);
+          }
+        } catch (_) {}
+      }
+      function clearAccountLocalData() {
+        var exactKeys = {
+          mansion_token: true,
+          mansion_user: true,
+          mansion_ever_logged_in: true,
+          mansion_registered: true,
+          mansion_feed: true,
+          mansion_feed_cache_version: true,
+          mansion_feed_dirty: true,
+          mansion_feed_filter: true,
+          mansion_feed_force_refresh: true,
+          mansion_feed_scroll_y: true,
+          mansion_conversations: true,
+          mansion_pending_story_likes: true,
+          appBootstrap: true,
+          authMe: true,
+          ownProfileDashboard: true,
+          conversations: true,
+          unreadCount: true,
+          vf_active_story: true,
+          vf_idx: true,
+          vf_prefetched: true,
+          vf_stories: true
+        };
+        var prefixes = [
+          'mansion_chat_',
+          'mansion_profile_detail_',
+          'mansion_pending_viewed_story_users:',
+          'viewed_story_users:'
+        ];
+        var shouldRemove = function(key) {
+          if (exactKeys[key]) return true;
+          for (var i = 0; i < prefixes.length; i += 1) {
+            if (key.indexOf(prefixes[i]) === 0) return true;
+          }
+          return false;
+        };
+        removeMatchingStorageKeys(localStorage, shouldRemove);
+        removeMatchingStorageKeys(sessionStorage, shouldRemove);
+        if ('caches' in window) {
+          caches.keys()
+            .then(function(keys) {
+              return Promise.all(keys.filter(function(key) {
+                return key.toLowerCase().indexOf('mansion') >= 0;
+              }).map(function(key) { return caches.delete(key); }));
             })
-            .then(function(data) {
-              localStorage.setItem('mansion_token', data.token);
-              localStorage.setItem('mansion_user', JSON.stringify(data.user));
-              localStorage.setItem('mansion_registered', 'true');
-              localStorage.setItem('mansion_ever_logged_in', '1');
-              location.href = '/feed/';
-            })
-            .catch(function(error) {
-              loginError.textContent = error.message || 'Credenciales inválidas';
-              loginSubmit.disabled = false;
-              loginSubmit.textContent = 'Entrar';
-            });
+            .catch(function(){});
+        }
+      }
+      if (registerLink) {
+        registerLink.addEventListener('click', function() {
+          clearAccountLocalData();
         });
       }
       if (new URLSearchParams(location.search).get('geo_debug') === '1') {
