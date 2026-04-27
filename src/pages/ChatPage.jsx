@@ -17,8 +17,8 @@ import { recordD1WriteEstimate } from '../lib/d1Debug';
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const CHAT_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
-const CHAT_CACHE_MAX_CHATS = 10;
-const CHAT_CACHE_MESSAGE_LIMIT = 20;
+const CHAT_CACHE_MAX_CHATS = 15;
+const CHAT_CACHE_MESSAGE_LIMIT = 10;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
 
