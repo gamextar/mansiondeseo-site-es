@@ -1037,13 +1037,17 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
       pendingScrollBehaviorRef.current = null;
       pendingScrollForceRef.current = false;
       if (!force && !wasAtBottomRef.current) return;
+      if (embeddedDesktop) {
+        scrollToBottom('auto');
+        return;
+      }
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           scrollToBottom(behavior);
         });
       });
     }
-  }, [messages, partnerTyping, scrollToBottom]);
+  }, [embeddedDesktop, messages, partnerTyping, scrollToBottom]);
 
   useLayoutEffect(() => {
     keepChatPinnedToBottom('auto');
@@ -1424,7 +1428,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
               wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
             }
           }}
-          className="h-full overflow-y-auto overscroll-y-contain px-[5vw] lg:px-[4vw]"
+          className="h-full overflow-y-auto overscroll-y-contain px-[5vw] [scrollbar-gutter:stable] lg:px-[4vw]"
           style={scrollAreaStyle}
         >
           <div

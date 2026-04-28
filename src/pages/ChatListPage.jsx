@@ -474,7 +474,7 @@ export function ChatConversationsPanel({ embedded = false, activeProfileId = '',
       {/* Conversation list */}
       <motion.div
         className={embedded
-          ? 'min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-4'
+          ? 'min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-4 [scrollbar-gutter:stable]'
           : 'w-full max-w-[88rem] mx-auto space-y-2 px-[5vw] lg:px-[4vw]'}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

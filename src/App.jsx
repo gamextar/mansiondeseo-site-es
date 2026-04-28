@@ -851,7 +851,7 @@ function AppLayout() {
                 {isMobileViewport ? (
                   <ChatPage key={`chat:${location.key || location.pathname}`} />
                 ) : (
-                  <ChatDesktopPage key={`chat-desktop:${location.pathname}`} />
+                  <ChatDesktopPage />
                 )}
               </RequireRegistration>
             }
@@ -944,7 +944,7 @@ function AppLayout() {
                 {isMobileViewport ? (
                   <ChatListPage key={`chat-list:${location.key || location.pathname}`} />
                 ) : (
-                  <ChatDesktopPage key={`chat-desktop:${location.pathname}`} />
+                  <ChatDesktopPage />
                 )}
               </RequireRegistration>
             }
