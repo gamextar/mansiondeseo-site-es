@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Crown, Eye, MapPin, Shield, Trophy } from 'lucide-react';
+import { BadgeCheck, Crown, Eye, MapPin, Trophy } from 'lucide-react';
 import { getTopVisitedProfiles, peekTopVisitedProfiles } from '../lib/api';
 import { formatLocation } from '../lib/location';
 import AvatarImg from '../components/AvatarImg';
@@ -93,7 +93,12 @@ function RankCard({ profile, compact = false, safariDesktop = false, imageLoadin
               </div>
               <div className="mt-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-text-dim/75">
                 <span>{profile.role}</span>
-                {profile.verified && <Shield className="h-3.5 w-3.5 text-emerald-400" />}
+                {profile.verified && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-emerald-200">
+                    <BadgeCheck className="h-3 w-3 text-emerald-300" />
+                    Verificado
+                  </span>
+                )}
                 {profile.premium && <Crown className="h-3.5 w-3.5 text-mansion-gold" />}
               </div>
             </div>

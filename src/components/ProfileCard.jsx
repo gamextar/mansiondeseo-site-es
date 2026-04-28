@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
-import { MapPin, Shield, Crown, Lock } from 'lucide-react';
+import { BadgeCheck, MapPin, Crown, Lock } from 'lucide-react';
 import { getDisplayPhotos, getPrimaryProfileThumbnail } from '../lib/profileMedia';
 import { formatLocation } from '../lib/location';
 import { resolveMediaUrl } from '../lib/media';
@@ -198,8 +198,9 @@ export default function ProfileCard({
                 </span>
               )}
               {verified && (
-                <span className={`flex items-center gap-1 border border-mansion-border/40 rounded-full px-2 py-0.5 text-[10px] font-medium text-text-muted ${safariDesktop ? 'bg-black/55' : 'bg-mansion-elevated/80 backdrop-blur-sm'}`}>
-                  <Shield className="w-3 h-3 text-green-400" />
+                <span className={`flex items-center gap-1 border border-emerald-400/25 rounded-full px-2 py-0.5 text-[10px] font-semibold text-emerald-200 ${safariDesktop ? 'bg-black/55' : 'bg-emerald-500/15 backdrop-blur-sm'}`}>
+                  <BadgeCheck className="w-3 h-3 text-emerald-300" />
+                  Verificado
                 </span>
               )}
             </div>

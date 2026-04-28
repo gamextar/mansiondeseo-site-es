@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft, Heart, MessageCircle, Shield, Crown,
+  ArrowLeft, Heart, MessageCircle, BadgeCheck, Crown,
   MapPin, ChevronLeft, ChevronRight as ChevronRightIcon, X, ZoomIn, GripVertical, Gift, Eye, AlertTriangle, Star, CircleAlert,
 } from 'lucide-react';
 import { getProfile, getToken, toggleFavorite, updateProfile, adminUpdateUser, invalidateProfilesCache, getGiftCatalog, sendGift as apiSendGift, reportProfile } from '../lib/api';
@@ -916,7 +916,12 @@ export default function ProfileDetailPage({ initialData }) {
                 </span>
               )}
               <div className="flex items-center gap-1.5">
-                {verified && <Shield className="w-4 h-4 text-green-400" />}
+                {verified && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-200">
+                    <BadgeCheck className="h-3.5 w-3.5 text-emerald-300" />
+                    Verificado
+                  </span>
+                )}
                 {premium && <Crown className="w-4 h-4 text-mansion-gold" />}
               </div>
             </div>
