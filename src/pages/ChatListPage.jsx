@@ -87,7 +87,7 @@ function useGridColumns() {
   return cols;
 }
 
-function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
+function ConversationRow({ conv, typing, onDelete, onRead, deleting, active = false, compact = false, onSelect }) {
   const navigate = useNavigate();
   const [dragX, setDragX] = useState(0);
   const [revealed, setRevealed] = useState(false);
@@ -106,24 +106,33 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
   const handleNavigate = useCallback(() => {
     if (isDraggingRef.current || deleting) return;
     if (conv.unread > 0) onRead?.(conv.profileId);
+    const partnerPreview = {
+      id: conv.profileId,
+      name: conv.name,
+      avatar_url: conv.avatar,
+      avatar_crop: conv.avatarCrop,
+      photos: [],
+      online: conv.online,
+    };
+    if (onSelect) {
+      onSelect(conv, { partnerPreview });
+      return;
+    }
     navigate(`/mensajes/${conv.profileId}`, {
       state: {
         from: '/mensajes',
-        partnerPreview: {
-          id: conv.profileId,
-          name: conv.name,
-          avatar_url: conv.avatar,
-          avatar_crop: conv.avatarCrop,
-          photos: [],
-          online: conv.online,
-        },
+        partnerPreview,
       },
     });
-  }, [conv, deleting, navigate, onRead]);
+  }, [conv, deleting, navigate, onRead, onSelect]);
 
   return (
     <div
-      className="relative overflow-hidden rounded-xl bg-mansion-base"
+      className={`relative overflow-hidden rounded-xl border transition-colors ${
+        active
+          ? 'border-mansion-gold/35 bg-mansion-card/75'
+          : 'border-transparent bg-mansion-base'
+      }`}
     >
       <div className="absolute inset-y-0 right-0 z-0 flex items-center gap-2 pr-3">
         <button
@@ -144,7 +153,7 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
       </div>
 
       <motion.div
-        drag="x"
+        drag={compact ? false : 'x'}
         dragConstraints={{ left: -88, right: 0 }}
         dragElastic={0.04}
         dragMomentum={false}
@@ -165,10 +174,14 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
         <button
           type="button"
           onClick={handleNavigate}
-          className="w-full text-left flex items-center gap-3.5 px-3 py-4 rounded-xl bg-mansion-base hover:bg-mansion-card/50 transition-all group lg:gap-4 lg:px-4 lg:py-5"
+          className={`w-full text-left flex items-center gap-3.5 px-3 py-4 rounded-xl transition-all group ${
+            active ? 'bg-mansion-card/70' : 'bg-mansion-base hover:bg-mansion-card/50'
+          } ${compact ? 'lg:gap-3 lg:px-3 lg:py-3.5' : 'lg:gap-4 lg:px-4 lg:py-5'}`}
         >
           <div className="relative flex-shrink-0">
-            <div className={`w-[60px] h-[60px] rounded-full overflow-hidden lg:w-[72px] lg:h-[72px] ${
+            <div className={`w-[60px] h-[60px] rounded-full overflow-hidden ${
+              compact ? 'lg:w-[56px] lg:h-[56px]' : 'lg:w-[72px] lg:h-[72px]'
+            } ${
               conv.unread > 0 ? 'ring-2 ring-mansion-gold/50' : ''
             }`}>
               <AvatarImg
@@ -185,19 +198,19 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <h3 className={`font-medium text-[15px] truncate lg:text-[18px] ${
+              <h3 className={`font-medium text-[15px] truncate ${compact ? 'lg:text-[15px]' : 'lg:text-[18px]'} ${
                 conv.unread > 0 ? 'text-text-primary' : 'text-text-muted'
               }`}>
                 {conv.name}
               </h3>
-              <span className={`text-xs flex-shrink-0 ml-2 lg:text-sm ${
+              <span className={`text-xs flex-shrink-0 ml-2 ${compact ? 'lg:text-xs' : 'lg:text-sm'} ${
                 conv.unread > 0 ? 'text-mansion-gold' : 'text-text-dim'
               }`}>
                 {timeAgo(conv.timestamp)}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <p className={`text-[13px] truncate pr-2 lg:text-[15px] ${
+              <p className={`text-[13px] truncate pr-2 ${compact ? 'lg:text-[13px]' : 'lg:text-[15px]'} ${
                 typing
                   ? 'text-mansion-gold italic'
                   : conv.unread > 0 ? 'text-text-primary font-medium' : 'text-text-dim'
@@ -217,16 +230,13 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting }) {
   );
 }
 
-export default function ChatListPage() {
-  const cols = useGridColumns();
-  const isDesktopViewport = cols >= 4;
-  const isStandaloneMobileApp = detectStandaloneMobile();
-  const navBottomOffset = getBottomNavPagePadding(isStandaloneMobileApp);
+export function ChatConversationsPanel({ embedded = false, activeProfileId = '', onSelect }) {
   const cachedState = getCachedConversations();
   const [conversations, setConversations] = useState(cachedState.conversations);
   const [loading, setLoading] = useState(cachedState.conversations.length === 0);
   const [deletingId, setDeletingId] = useState(null);
   const [typingChats, setTypingChats] = useState({});
+  const [query, setQuery] = useState('');
   const typingTimersRef = useRef({});
   const lastSyncAtRef = useRef(cachedState.timestamp || 0);
   const navigate = useNavigate();
@@ -424,37 +434,48 @@ export default function ChatListPage() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, fetchConversations, subscribe, applyConversationUpdate, applyLocalConversationPreview]);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleConversations = normalizedQuery
+    ? conversations.filter((conv) => (
+        String(conv.name || '').toLowerCase().includes(normalizedQuery) ||
+        String(conv.lastMessage || '').toLowerCase().includes(normalizedQuery)
+      ))
+    : conversations;
+
   return (
-    <div
-      className="min-h-0 min-h-[100dvh] bg-mansion-base lg:min-h-screen lg:pt-0 lg:pb-[84px]"
-      style={{
-        paddingTop: 'calc(var(--safe-top) + 20px)',
-        paddingBottom: isDesktopViewport ? undefined : navBottomOffset,
-      }}
-    >
+    <>
       {/* Header */}
       <motion.div
-        className="w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] pt-0 lg:pt-6 pb-3"
+        className={embedded
+          ? 'w-full px-4 pt-4 pb-3'
+          : 'w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] pt-0 lg:pt-6 pb-3'}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
       >
-        <h1 className="font-display text-2xl font-bold text-text-primary mb-4 lg:text-3xl lg:mb-5">Mensajes</h1>
+        <h1 className={`font-display font-bold text-text-primary ${embedded ? 'mb-3 text-2xl' : 'mb-4 text-2xl lg:text-3xl lg:mb-5'}`}>
+          Mensajes
+        </h1>
 
         {/* Search bar */}
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim lg:left-4 lg:w-5 lg:h-5" />
           <input
             type="text"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar conversación..."
-            className="w-full pl-10 py-2.5 text-sm lg:pl-12 lg:py-3.5 lg:text-base"
+            className={`w-full pl-10 py-2.5 text-sm lg:pl-12 ${embedded ? 'lg:py-3 lg:text-sm' : 'lg:py-3.5 lg:text-base'}`}
           />
         </div>
       </motion.div>
 
       {/* Conversation list */}
       <motion.div
-        className="w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw]"
+        className={embedded
+          ? 'min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-4'
+          : 'w-full max-w-[88rem] mx-auto space-y-2 px-[5vw] lg:px-[4vw]'}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, delay: 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
@@ -469,8 +490,13 @@ export default function ChatListPage() {
             <p className="text-text-muted text-lg mb-2">Sin mensajes aún</p>
             <p className="text-text-dim text-sm">Explora perfiles y envía tu primer mensaje</p>
           </motion.div>
+        ) : visibleConversations.length === 0 ? (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-14">
+            <MessageCircle className="w-10 h-10 text-text-dim mx-auto mb-4" />
+            <p className="text-text-muted text-sm">No hay conversaciones con ese nombre</p>
+          </motion.div>
         ) : (
-        conversations.map((conv, index) => (
+        visibleConversations.map((conv) => (
           <ConversationRow
             key={conv.id}
             conv={conv}
@@ -478,10 +504,32 @@ export default function ChatListPage() {
             deleting={deletingId === conv.id}
             onDelete={handleDeleteConversation}
             onRead={markConversationRead}
+            active={String(activeProfileId || '') === String(conv.profileId)}
+            compact={embedded}
+            onSelect={onSelect}
           />
         ))
         )}
       </motion.div>
+    </>
+  );
+}
+
+export default function ChatListPage() {
+  const cols = useGridColumns();
+  const isDesktopViewport = cols >= 4;
+  const isStandaloneMobileApp = detectStandaloneMobile();
+  const navBottomOffset = getBottomNavPagePadding(isStandaloneMobileApp);
+
+  return (
+    <div
+      className="min-h-0 min-h-[100dvh] bg-mansion-base lg:min-h-screen lg:pt-0 lg:pb-[84px]"
+      style={{
+        paddingTop: 'calc(var(--safe-top) + 20px)',
+        paddingBottom: isDesktopViewport ? undefined : navBottomOffset,
+      }}
+    >
+      <ChatConversationsPanel />
     </div>
   );
 }

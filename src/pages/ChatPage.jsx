@@ -417,17 +417,18 @@ function readChatDebugMetrics({
   };
 }
 
-export default function ChatPage() {
-  const { id } = useParams();
+export default function ChatPage({ conversationId = '', embeddedDesktop = false }) {
+  const { id: routeId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const isStandaloneMobileChat = detectStandaloneMobile();
-  const isMobileBrowserChat = typeof window !== 'undefined'
+  const activeRouteId = conversationId || routeId || '';
+  const isStandaloneMobileChat = !embeddedDesktop && detectStandaloneMobile();
+  const isMobileBrowserChat = !embeddedDesktop && typeof window !== 'undefined'
     ? window.matchMedia('(max-width: 1023px)').matches && !isStandaloneMobileChat
     : false;
   const { canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
-  const partnerId = id.startsWith('conv-') ? id.replace('conv-', '') : id;
+  const partnerId = activeRouteId.startsWith('conv-') ? activeRouteId.replace('conv-', '') : activeRouteId;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
   const initialMessages = cachedChat?.messages || [];
@@ -1006,7 +1007,7 @@ export default function ChatPage() {
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [decrementUnread, id, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, setActiveChatId, stopTypingSignal]);
+  }, [decrementUnread, activeRouteId, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, setActiveChatId, stopTypingSignal]);
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;
@@ -1278,6 +1279,19 @@ export default function ChatPage() {
         height: `${messagesAreaHeight}px`,
       }
     : undefined;
+  const shellStyle = embeddedDesktop ? { height: '100%' } : (viewportHeight ? { height: `${viewportHeight}px` } : undefined);
+  const headerStyle = !embeddedDesktop && isMobileBrowserChat && viewportOffsetTop
+    ? { transform: `translateY(${viewportOffsetTop}px)` }
+    : undefined;
+  const shellMinHeightClass = isStandaloneMobileChat ? 'min-h-screen' : 'min-h-0';
+  const shellTransitionClass = isMobileBrowserChat && keyboardActive ? 'transition-[height] duration-150 ease-out' : '';
+  const composerTransitionClass = isMobileBrowserChat ? 'transition-transform duration-150 ease-out' : '';
+  const shellLayoutClass = embeddedDesktop
+    ? 'h-full lg:min-h-0 lg:pl-0'
+    : 'h-[100dvh] lg:min-h-screen lg:pl-64 xl:pl-72';
+  const headerLayoutClass = embeddedDesktop
+    ? 'glass relative shrink-0 border-b border-mansion-border/30 z-30'
+    : 'glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30';
   const scrollAreaStyle = {
     ...(isMobileBrowserChat && keyboardActive && messagesAreaHeight ? {
       position: 'fixed',
@@ -1287,34 +1301,27 @@ export default function ChatPage() {
       height: `${messagesAreaHeight}px`,
       zIndex: 10,
     } : null),
-    paddingTop: `${headerHeight + 14}px`,
+    paddingTop: embeddedDesktop ? '16px' : `${headerHeight + 14}px`,
     paddingBottom: '12px',
   };
-  const shellStyle = viewportHeight ? { height: `${viewportHeight}px` } : undefined;
-  const headerStyle = isMobileBrowserChat && viewportOffsetTop
-    ? { transform: `translateY(${viewportOffsetTop}px)` }
-    : undefined;
-  const shellMinHeightClass = isStandaloneMobileChat ? 'min-h-screen' : 'min-h-0';
-  const shellTransitionClass = isMobileBrowserChat && keyboardActive ? 'transition-[height] duration-150 ease-out' : '';
-  const composerTransitionClass = isMobileBrowserChat ? 'transition-transform duration-150 ease-out' : '';
 
   return (
     <>
-    <DesktopSidebar />
+    {!embeddedDesktop && <DesktopSidebar />}
     <div
-      className={`${shellMinHeightClass} h-[100dvh] bg-mansion-base flex flex-col overflow-hidden lg:min-h-screen lg:pl-64 xl:pl-72 ${shellTransitionClass}`}
+      className={`${shellMinHeightClass} ${shellLayoutClass} bg-mansion-base flex flex-col overflow-hidden ${shellTransitionClass}`}
       style={shellStyle}
     >
       {/* Header */}
       <div
         ref={headerRef}
-        className="glass fixed top-0 left-0 right-0 lg:left-64 xl:left-72 shrink-0 border-b border-mansion-border/30 safe-top z-30"
+        className={headerLayoutClass}
         style={headerStyle}
       >
         <div className="relative flex items-center gap-3 w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] py-3 lg:gap-3 lg:py-4">
           <button
             onClick={handleBackClick}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0 lg:absolute lg:left-1 lg:top-1/2 lg:z-10 lg:w-12 lg:h-12 lg:-translate-y-1/2 lg:bg-mansion-elevated/65 lg:border lg:border-mansion-border/30"
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0 lg:absolute lg:left-1 lg:top-1/2 lg:z-10 lg:w-12 lg:h-12 lg:-translate-y-1/2 lg:bg-mansion-elevated/65 lg:border lg:border-mansion-border/30 ${embeddedDesktop ? 'lg:hidden' : ''}`}
             aria-label="Volver a la lista de chats"
           >
             <ChevronLeft className="w-5 h-5 lg:w-7 lg:h-7" />

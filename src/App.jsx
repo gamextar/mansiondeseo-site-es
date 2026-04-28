@@ -9,6 +9,7 @@ import DesktopSidebar from './components/DesktopSidebar';
 import FeedPage from './pages/FeedPage';
 import ChatListPage from './pages/ChatListPage';
 import ChatPage from './pages/ChatPage';
+import ChatDesktopPage from './pages/ChatDesktopPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -248,7 +249,7 @@ function AppLayout() {
     FULLSCREEN_PATHS.some((p) => location.pathname.startsWith(p)) ||
     FULLSCREEN_PATHS.includes(location.pathname);
   const isChatDetail = location.pathname.match(/^\/mensajes\/.+$/);
-  const showChrome = !isFullscreen && !isChatDetail && !isPublicHome && !isPublicInfoRoute;
+  const showChrome = !isFullscreen && !(isChatDetail && isMobileViewport) && !isPublicHome && !isPublicInfoRoute;
   const scrollLockRef = useRef(null);
   const publicProfileScrollTuning = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -299,7 +300,7 @@ function AppLayout() {
     );
   const showDesktopSidebar = showChrome && !routeOverlayOpen;
   const showTopNavbar = showChrome && !routeOverlayOpen && !immersiveMobileApp;
-  const showBottomNav = (((!isChatDetail && !isFullscreen) || standaloneVideosRoute || mobileBrowserVideosRoute) && !routeOverlayOpen);
+  const showBottomNav = (((!(isChatDetail && isMobileViewport) && !isFullscreen) || standaloneVideosRoute || mobileBrowserVideosRoute) && !routeOverlayOpen);
   const isPrivateNoindexRoute =
     routePath === '/feed' ||
     routePath === '/explorar' ||
@@ -845,7 +846,15 @@ function AppLayout() {
           {/* Chat detail (full-screen but with custom header) */}
           <Route
             path="/mensajes/:id"
-            element={<ChatPage key={`chat:${location.key || location.pathname}`} />}
+            element={
+              <RequireRegistration>
+                {isMobileViewport ? (
+                  <ChatPage key={`chat:${location.key || location.pathname}`} />
+                ) : (
+                  <ChatDesktopPage key={`chat-desktop:${location.pathname}`} />
+                )}
+              </RequireRegistration>
+            }
           />
 
           {/* Standard layout pages (require registration) */}
@@ -932,7 +941,11 @@ function AppLayout() {
             path="/mensajes"
             element={
               <RequireRegistration>
-                <ChatListPage key={`chat-list:${location.key || location.pathname}`} />
+                {isMobileViewport ? (
+                  <ChatListPage key={`chat-list:${location.key || location.pathname}`} />
+                ) : (
+                  <ChatDesktopPage key={`chat-desktop:${location.pathname}`} />
+                )}
               </RequireRegistration>
             }
           />
