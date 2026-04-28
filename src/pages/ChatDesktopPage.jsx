@@ -25,7 +25,7 @@ export default function ChatDesktopPage() {
   }, [navigate]);
 
   return (
-    <div className="hidden h-screen min-h-0 bg-mansion-base lg:flex">
+    <div className="hidden h-[100dvh] min-h-0 overflow-hidden bg-mansion-base lg:flex">
       <aside className="flex h-full w-[360px] min-w-[320px] max-w-[380px] flex-col border-r border-mansion-border/30 bg-mansion-base">
         <ChatConversationsPanel
           embedded
@@ -34,7 +34,7 @@ export default function ChatDesktopPage() {
         />
       </aside>
 
-      <section className="min-w-0 flex-1 border-l border-white/[0.02] bg-mansion-base">
+      <section className="relative min-w-0 flex-1 overflow-hidden border-l border-white/[0.02] bg-mansion-base [scrollbar-gutter:stable]">
         {activeProfileId ? (
           <ChatPage
             key={activeProfileId}
@@ -42,7 +42,7 @@ export default function ChatDesktopPage() {
             embeddedDesktop
           />
         ) : (
-          <div className="flex h-full items-center justify-center px-8 text-center">
+          <div className="absolute inset-0 flex items-center justify-center px-8 text-center">
             <div>
               <MessageCircle className="mx-auto mb-5 h-12 w-12 text-text-dim" />
               <h2 className="font-display text-2xl text-text-primary">Selecciona una conversación</h2>

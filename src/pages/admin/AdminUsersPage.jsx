@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Pause, Play, Film, Pencil, Copy, Flag, Star, BadgeCheck, XCircle } from 'lucide-react';
+import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Ban, Play, Film, Pencil, Copy, Flag, Star, BadgeCheck, XCircle, MessageCircleOff } from 'lucide-react';
 import { adminGetUsers, adminGetUser, adminUpdateUser, adminUploadAvatarThumb, adminUploadGalleryThumb, adminDeleteGalleryPhoto, adminCloseProfileReport, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory, adminReviewPhotoOtpVerification, adminGetPhotoOtpVerificationPhotoBlob } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 import { resolveMediaUrl } from '../../lib/media';
@@ -922,6 +922,10 @@ export default function AdminUsersPage() {
                               {u.online && <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
                               {u.is_admin && <Shield className="w-3 h-3 text-red-400 flex-shrink-0" />}
                               {Number(u.feed_priority || 0) > 0 && <Star className="w-3 h-3 text-mansion-gold flex-shrink-0 fill-mansion-gold/30" />}
+                              {u.account_status === 'suspended' && <Ban className="w-3 h-3 text-red-400 flex-shrink-0" aria-label="Usuario suspendido" />}
+                              {Array.isArray(u.message_block_roles) && u.message_block_roles.length > 0 && (
+                                <MessageCircleOff className="w-3 h-3 text-orange-300 flex-shrink-0" aria-label="Bloquea mensajes por rol" />
+                              )}
                               {u.photo_verification_status === 'pending' && <BadgeCheck className="w-3 h-3 text-sky-300 flex-shrink-0" />}
                               {u.duplicate_flag && <Copy className="w-3 h-3 text-amber-300 flex-shrink-0" />}
                               {Number(u.reports_count || 0) > 0 && (
@@ -948,9 +952,15 @@ export default function AdminUsersPage() {
                       <td className="px-4 py-3 text-center hidden sm:table-cell">
                         <div className="flex flex-col items-center gap-1">
                           {u.account_status === 'suspended' ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-semibold">Suspendida</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-semibold">
+                              <Ban className="w-3 h-3" />
+                              Suspendida
+                            </span>
                           ) : u.account_status === 'under_review' ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[10px] font-semibold">En revisión</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[10px] font-semibold">
+                              <AlertTriangle className="w-3 h-3" />
+                              En revisión
+                            </span>
                           ) : (
                             <span className="text-green-400 text-[10px]">Activa</span>
                           )}
@@ -1044,7 +1054,10 @@ export default function AdminUsersPage() {
                   <p className="text-text-primary">{selected.role} → {selected.seeking}</p>
                 </div>
                 <div className="bg-mansion-elevated rounded-xl p-3 col-span-2">
-                  <p className="text-text-dim text-[10px] uppercase tracking-wider mb-1">Bloqueo de mensajes</p>
+                  <p className="mb-1 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-dim">
+                    <MessageCircleOff className="h-3 w-3" />
+                    Bloqueo de mensajes
+                  </p>
                   {Array.isArray(selected.message_block_roles) && selected.message_block_roles.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {selected.message_block_roles.map((role) => (
@@ -1115,7 +1128,10 @@ export default function AdminUsersPage() {
                   </span>
                 )}
                 {selected.account_status === 'suspended' && (
-                  <span className="px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-semibold">Suspendida</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-semibold">
+                    <Ban className="w-3 h-3" />
+                    Suspendida
+                  </span>
                 )}
                 {selected.account_status === 'under_review' && (
                   <span className="px-2 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[10px] font-semibold">En revisión</span>
@@ -1362,7 +1378,7 @@ export default function AdminUsersPage() {
                     {selected.account_status === 'suspended' ? (
                       <><Play className="w-4 h-4 text-green-400" /><span className="text-xs text-green-400 font-semibold">Reactivar cuenta</span></>
                     ) : (
-                      <><Pause className="w-4 h-4 text-orange-400" /><span className="text-xs text-orange-400 font-semibold">Suspender cuenta</span></>
+                      <><Ban className="w-4 h-4 text-orange-400" /><span className="text-xs text-orange-400 font-semibold">Suspender cuenta</span></>
                     )}
                   </button>
                 </div>

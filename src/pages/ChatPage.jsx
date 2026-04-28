@@ -1380,16 +1380,17 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
               } : null,
             },
           })}>
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="min-w-0">
               <h2 className="font-semibold text-sm text-text-primary truncate lg:text-[20px]">{partner.name}</h2>
-              <span className={`hidden sm:inline-flex flex-shrink-0 items-center gap-1.5 text-[11px] lg:text-[13px] ${partner.online ? 'text-green-400' : 'text-text-dim'}`}>
-                <span className={`w-2 h-2 rounded-full ${partner.online ? 'bg-green-400' : 'bg-text-dim/70'}`} />
-                {partner.online ? 'Online' : 'Offline'}
-              </span>
             </div>
-            {partnerTyping && (
-              <p className="text-[11px] text-mansion-gold lg:text-[14px]">Escribiendo...</p>
-            )}
+            <p className={`mt-0.5 inline-flex items-center gap-1.5 text-[11px] lg:text-[13px] ${
+              partnerTyping ? 'text-mansion-gold' : partner.online ? 'text-green-400' : 'text-text-dim'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${
+                partnerTyping ? 'bg-mansion-gold' : partner.online ? 'bg-green-400' : 'bg-text-dim/70'
+              }`} />
+              {partnerTyping ? 'Escribiendo...' : partner.online ? 'Online' : 'Offline'}
+            </p>
           </div>
 
           <button
