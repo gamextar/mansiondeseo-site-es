@@ -23,7 +23,7 @@ const CHAT_CACHE_MESSAGE_LIMIT = 15;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
 
-const BlockUserIcon = ({ customSvg = '', className = 'h-9 w-9 lg:h-[62px] lg:w-[62px]' }) => {
+const BlockUserIcon = ({ customSvg = '', className = 'h-7 w-7 lg:h-10 lg:w-10' }) => {
   const value = String(customSvg || '').trim();
   if (value.startsWith('<')) return <span className={className} dangerouslySetInnerHTML={{ __html: value }} />;
   if (value) return <img src={value} alt="" className={`${className} object-contain`} />;
@@ -1407,7 +1407,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             onClick={handleToggleBlock}
             disabled={blockUpdating}
             title={isBlockedByMe ? 'Desbloquear usuario' : 'Bloquear usuario'}
-            className={`inline-flex h-11 w-11 shrink-0 items-center justify-center transition-colors disabled:opacity-60 lg:h-[62px] lg:w-[62px] ${
+            className={`inline-flex h-12 w-14 shrink-0 flex-col items-center justify-center gap-0.5 transition-colors disabled:opacity-60 lg:h-[62px] lg:w-[72px] ${
               isBlockedByMe
                 ? 'text-mansion-gold hover:text-mansion-gold/80'
                 : 'text-red-300 hover:text-red-200'
@@ -1415,6 +1415,9 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             aria-label={isBlockedByMe ? `Desbloquear a ${partner.name}` : `Bloquear a ${partner.name}`}
           >
             <BlockUserIcon customSvg={siteSettings?.blockUserIconSvg || ''} />
+            <span className="text-[9px] font-semibold leading-none tracking-[0.04em] lg:text-[10px]">
+              {isBlockedByMe ? 'Desbloquear' : 'Bloquear'}
+            </span>
           </button>
 
         </div>
