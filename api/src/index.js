@@ -2840,6 +2840,41 @@ async function handleStartPhotoOtpVerification(request, env) {
   return json({ verified: false, verification: serializePhotoVerification(created) }, 201);
 }
 
+async function handleCancelPhotoOtpVerification(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  await ensurePhotoVerificationRequestsTable(env);
+
+  const user = await env.DB.prepare(
+    "SELECT id, verified FROM users WHERE id = ? AND status = 'verified'"
+  ).bind(auth.sub).first();
+  if (!user) return error('Usuario no encontrado', 404);
+  if (user.verified) return json({ verified: true, verification: null });
+
+  const activeRequest = await env.DB.prepare(`
+    SELECT id, photo_key
+    FROM photo_verification_requests
+    WHERE user_id = ?
+      AND status IN ('code_issued', 'pending')
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+  `).bind(auth.sub).first();
+
+  if (!activeRequest) {
+    return json({ verified: false, verification: null });
+  }
+
+  await env.DB.prepare('DELETE FROM photo_verification_requests WHERE id = ? AND user_id = ?')
+    .bind(activeRequest.id, auth.sub)
+    .run();
+
+  if (activeRequest.photo_key) {
+    await deleteR2KeysBestEffort(env, [activeRequest.photo_key]);
+  }
+
+  return json({ verified: false, verification: null });
+}
+
 async function handleUploadPhotoOtpVerification(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
@@ -7698,6 +7733,7 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/account/delete/confirm' && method === 'POST') return handleConfirmAccountDeletion(request, env);
   if (path === '/api/verification/photo-otp' && method === 'GET') return handleGetPhotoOtpVerification(request, env);
   if (path === '/api/verification/photo-otp/start' && method === 'POST') return handleStartPhotoOtpVerification(request, env);
+  if (path === '/api/verification/photo-otp/cancel' && method === 'POST') return handleCancelPhotoOtpVerification(request, env);
   if (path === '/api/verification/photo-otp/photo' && method === 'POST') return handleUploadPhotoOtpVerification(request, env);
   const photoVerificationPhotoMatch = path.match(/^\/api\/verification\/photo-otp\/photo\/([a-f0-9-]+)$/);
   if (photoVerificationPhotoMatch && method === 'GET') return handleGetPhotoOtpVerificationPhoto(request, env, photoVerificationPhotoMatch[1]);

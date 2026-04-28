@@ -1,10 +1,10 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil, Trash2, AlertTriangle, Mail, Loader2, BadgeCheck, RotateCcw } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil, Trash2, AlertTriangle, Mail, Loader2, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
-import { logout as apiLogout, uploadAvatar, uploadGalleryImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache, requestAccountDeletion, confirmAccountDeletion, getPhotoOtpVerification, startPhotoOtpVerification, uploadPhotoOtpVerificationPhoto, getPhotoOtpVerificationPhotoBlob } from '../lib/api';
+import { logout as apiLogout, uploadAvatar, uploadGalleryImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache, requestAccountDeletion, confirmAccountDeletion, getPhotoOtpVerification, startPhotoOtpVerification, cancelPhotoOtpVerification, uploadPhotoOtpVerificationPhoto, getPhotoOtpVerificationPhotoBlob } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
 import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
@@ -87,6 +87,7 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [photoOtpLoading, setPhotoOtpLoading] = useState(false);
   const [photoOtpUploading, setPhotoOtpUploading] = useState(false);
+  const [photoOtpCancelling, setPhotoOtpCancelling] = useState(false);
   const [photoOtpError, setPhotoOtpError] = useState('');
   const [photoOtpVerification, setPhotoOtpVerification] = useState(null);
   const [photoOtpPreviewUrl, setPhotoOtpPreviewUrl] = useState('');
@@ -531,23 +532,39 @@ export default function ProfilePage() {
   };
 
   const handleStartPhotoOtp = async () => {
-    if (photoOtpLoading || photoOtpUploading || user?.verified) return;
+    if (photoOtpLoading || photoOtpUploading || photoOtpCancelling || user?.verified) return;
     setPhotoOtpLoading(true);
     setPhotoOtpError('');
     try {
       const data = await startPhotoOtpVerification();
       setPhotoOtpVerification(data?.verification || null);
     } catch (err) {
-      setPhotoOtpError(err?.message || 'No pudimos generar el código.');
+      setPhotoOtpError(err?.message || 'No pudimos iniciar la verificación.');
     } finally {
       setPhotoOtpLoading(false);
+    }
+  };
+
+  const handleCancelPhotoOtp = async () => {
+    if (photoOtpLoading || photoOtpUploading || photoOtpCancelling || user?.verified) return;
+    if (!photoOtpVerification || !['code_issued', 'pending'].includes(photoOtpVerification.status)) return;
+
+    setPhotoOtpCancelling(true);
+    setPhotoOtpError('');
+    try {
+      const data = await cancelPhotoOtpVerification();
+      setPhotoOtpVerification(data?.verification || null);
+    } catch (err) {
+      setPhotoOtpError(err?.message || 'No pudimos cancelar la verificación.');
+    } finally {
+      setPhotoOtpCancelling(false);
     }
   };
 
   const handlePhotoOtpSelect = async (e) => {
     const file = e.target.files?.[0];
     if (photoOtpInputRef.current) photoOtpInputRef.current.value = '';
-    if (!file || photoOtpUploading) return;
+    if (!file || photoOtpUploading || photoOtpCancelling) return;
 
     setPhotoOtpUploading(true);
     setPhotoOtpError('');
@@ -592,6 +609,8 @@ export default function ProfilePage() {
   const photoOtpStatus = user?.verified ? 'approved' : (photoOtpVerification?.status || '');
   const photoOtpMeta = PHOTO_OTP_STATUS[photoOtpStatus] || null;
   const showPhotoOtpCode = !user?.verified && photoOtpVerification?.code && ['code_issued', 'pending'].includes(photoOtpStatus);
+  const canStartPhotoOtp = !user?.verified && (!photoOtpVerification || ['rejected', 'expired'].includes(photoOtpVerification.status));
+  const hasActivePhotoOtp = !user?.verified && photoOtpVerification && ['code_issued', 'pending'].includes(photoOtpVerification.status);
   const ownProfilePreview = user ? {
     id: user.id,
     name: user.username,
@@ -790,7 +809,7 @@ export default function ProfilePage() {
           </div>
         </motion.div>
 
-        <motion.div variants={fadeUp} className="mb-5 rounded-2xl border border-mansion-border/20 bg-mansion-card/35 p-4">
+        <motion.div variants={fadeUp} className="mb-5 rounded-2xl border border-mansion-gold/15 bg-mansion-card/35 p-4">
           <div className="flex items-start gap-3">
             <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl ${
               user?.verified ? 'bg-emerald-500/10 text-emerald-300' : 'bg-mansion-gold/10 text-mansion-gold'
@@ -799,7 +818,9 @@ export default function ProfilePage() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-semibold text-text-primary">Verificación por foto</h3>
+                <h3 className="text-sm font-semibold text-text-primary">
+                  {user?.verified ? 'Cuenta verificada' : 'Recordatorio de verificación'}
+                </h3>
                 {photoOtpMeta && (
                   <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${photoOtpMeta.tone}`}>
                     {photoOtpMeta.label}
@@ -808,13 +829,15 @@ export default function ProfilePage() {
               </div>
               <p className="mt-1 text-xs leading-5 text-text-dim">
                 {user?.verified
-                  ? 'Tu perfil ya está verificado y queda habilitado para funciones de confianza.'
-                  : 'Generá un código y subí una foto sosteniendo un cartel con Mansión Deseo, el código y la fecha.'}
+                  ? 'Tu cuenta ya está verificada y tiene acceso a las funciones de confianza.'
+                  : showPhotoOtpCode
+                    ? 'Usá este código en la foto de verificación. Si querés empezar de nuevo, podés cancelar el proceso.'
+                    : 'Recordá verificar tu cuenta para acceder a todas las funciones de la Mansión.'}
               </p>
 
               {showPhotoOtpCode && (
                 <div className="mt-3 rounded-2xl border border-mansion-gold/20 bg-black/25 px-4 py-3">
-                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Código para el cartel</p>
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Código de verificación</p>
                   <p className="mt-1 font-display text-2xl font-bold tracking-[0.12em] text-mansion-gold">{photoOtpVerification.code}</p>
                 </div>
               )}
@@ -839,26 +862,37 @@ export default function ProfilePage() {
 
               {!user?.verified && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {(!photoOtpVerification || photoOtpVerification.status === 'rejected' || photoOtpVerification.status === 'expired') && (
+                  {canStartPhotoOtp && (
                     <button
                       type="button"
                       onClick={handleStartPhotoOtp}
-                      disabled={photoOtpLoading || photoOtpUploading}
+                      disabled={photoOtpLoading || photoOtpUploading || photoOtpCancelling}
                       className="inline-flex items-center gap-2 rounded-full border border-mansion-gold/25 bg-mansion-gold/10 px-3 py-2 text-xs font-semibold text-mansion-gold transition-colors hover:bg-mansion-gold/15 disabled:opacity-50"
                     >
-                      {photoOtpLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                      Generar código
+                      {photoOtpLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Shield className="h-3.5 w-3.5" />}
+                      Verificar Cuenta
                     </button>
                   )}
-                  {photoOtpVerification && ['code_issued', 'pending'].includes(photoOtpVerification.status) && (
+                  {hasActivePhotoOtp && (
                     <button
                       type="button"
                       onClick={() => photoOtpInputRef.current?.click()}
-                      disabled={photoOtpUploading || photoOtpLoading}
+                      disabled={photoOtpUploading || photoOtpLoading || photoOtpCancelling}
                       className="inline-flex items-center gap-2 rounded-full bg-mansion-gold px-3 py-2 text-xs font-bold text-black transition-colors hover:bg-mansion-gold-light disabled:opacity-50"
                     >
                       {photoOtpUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
                       {photoOtpVerification.status === 'pending' ? 'Reemplazar foto' : 'Subir foto'}
+                    </button>
+                  )}
+                  {hasActivePhotoOtp && (
+                    <button
+                      type="button"
+                      onClick={handleCancelPhotoOtp}
+                      disabled={photoOtpLoading || photoOtpUploading || photoOtpCancelling}
+                      className="inline-flex items-center gap-2 rounded-full border border-mansion-border/30 bg-transparent px-3 py-2 text-xs font-semibold text-text-muted transition-colors hover:border-mansion-crimson/35 hover:text-mansion-crimson disabled:opacity-50"
+                    >
+                      {photoOtpCancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                      Cancelar
                     </button>
                   )}
                   <input ref={photoOtpInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoOtpSelect} />

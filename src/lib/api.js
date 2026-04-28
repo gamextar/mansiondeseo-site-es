@@ -1219,6 +1219,16 @@ export async function startPhotoOtpVerification() {
   });
 }
 
+export async function cancelPhotoOtpVerification() {
+  const data = await apiFetch('/verification/photo-otp/cancel', {
+    method: 'POST',
+    body: '{}',
+  });
+  invalidateMeCache();
+  invalidateBootstrapCache();
+  return data;
+}
+
 export async function uploadPhotoOtpVerificationPhoto(file) {
   const data = await apiUpload('/verification/photo-otp/photo', {
     method: 'POST',
