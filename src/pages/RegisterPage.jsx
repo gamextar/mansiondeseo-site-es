@@ -1279,7 +1279,20 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
             )}
           </div>
         </div>
-        <input type="hidden" value={data.locality} readOnly />
+        <div>
+          <label className="text-text-muted text-xs font-medium mb-1.5 block">Localidad</label>
+          <div className="relative">
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" />
+            <input
+              type="text"
+              value={data.locality}
+              onChange={(e) => onChange({ ...data, locality: e.target.value.slice(0, 40) })}
+              placeholder="Palermo, Rosario, Córdoba..."
+              maxLength={40}
+              className="w-full pl-10"
+            />
+          </div>
+        </div>
         <div>
           <label className="text-text-muted text-xs font-medium mb-1.5 block">Bio corta</label>
           <textarea
@@ -1758,7 +1771,7 @@ export default function RegisterPage() {
     if (step === 0) return EMAIL_REGEX.test(email) && isValidEmailTld(email) && password.length >= 10 && emailStatus !== 'exists' && emailStatus !== 'invalid' && isAdultBirthdate(info.birthdate);
     if (step === 1) return !!iAm;
     if (step === 2) return seeking.length > 0;
-    if (step === 3) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && info.province && (!showCountryPicker || selectedCountry);
+    if (step === 3) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && info.province && info.locality && (!showCountryPicker || selectedCountry);
     if (step === 4) return !!photoFile;
     return true;
   };
