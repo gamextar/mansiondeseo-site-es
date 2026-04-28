@@ -41,6 +41,13 @@ function normalizeMessageLimitWindowHours(value) {
   return Math.max(1, Math.min(168, Math.round(numeric)));
 }
 
+function renderConfiguredIcon(value, fallback) {
+  const source = String(value || '').trim();
+  if (!source) return fallback;
+  if (source.startsWith('<')) return <span className="w-6 h-6" dangerouslySetInnerHTML={{ __html: source }} />;
+  return <img src={source} alt="" className="w-6 h-6 object-contain" />;
+}
+
 export default function SettingsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -1095,26 +1102,36 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Ícono Bloquear Usuario</h3>
-                  <p className="text-[11px] text-text-dim">Sube un archivo .svg. Vacío = círculo bloqueado por defecto.</p>
+                  <p className="text-[11px] text-text-dim">Sube SVG, PNG, JPG o WebP. Vacío = círculo bloqueado por defecto.</p>
                 </div>
               </div>
 
               <label className="flex flex-col items-center justify-center gap-2 w-full h-24 rounded-xl border-2 border-dashed border-mansion-border/40 hover:border-mansion-gold/40 cursor-pointer transition-colors bg-mansion-elevated/50">
                 <Ban className="w-5 h-5 text-text-dim" />
                 <span className="text-[11px] text-text-dim">
-                  {blockUserIconSvg.trim() ? 'Haz clic para reemplazar el SVG' : 'Haz clic para subir un archivo .svg'}
+                  {blockUserIconSvg.trim() ? 'Haz clic para reemplazar el ícono' : 'Haz clic para subir un ícono'}
                 </span>
                 <input
                   type="file"
-                  accept=".svg,image/svg+xml"
+                  accept=".svg,image/svg+xml,image/png,image/jpeg,image/webp"
                   className="hidden"
-                  onChange={e => {
+                  onChange={async e => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = ev => setBlockUserIconSvg(ev.target.result);
-                    reader.readAsText(file);
-                    e.target.value = '';
+                    try {
+                      if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
+                        const reader = new FileReader();
+                        reader.onload = ev => setBlockUserIconSvg(ev.target.result);
+                        reader.readAsText(file);
+                      } else {
+                        const result = await uploadImage(file);
+                        if (result.url) setBlockUserIconSvg(result.url);
+                      }
+                    } catch (err) {
+                      console.error('Error uploading block user icon:', err);
+                    } finally {
+                      e.target.value = '';
+                    }
                   }}
                 />
               </label>
@@ -1122,10 +1139,7 @@ export default function SettingsPage() {
               <div className="mt-3 flex items-center gap-4">
                 <span className="text-[11px] text-text-dim">Vista previa:</span>
                 <div className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center text-white">
-                  {blockUserIconSvg.trim()
-                    ? <span className="w-6 h-6" dangerouslySetInnerHTML={{ __html: blockUserIconSvg }} />
-                    : <Ban className="w-6 h-6" />
-                  }
+                  {renderConfiguredIcon(blockUserIconSvg, <Ban className="w-6 h-6" />)}
                 </div>
                 {blockUserIconSvg.trim() && (
                   <button onClick={() => setBlockUserIconSvg('')} className="text-[11px] text-mansion-crimson hover:underline">Restaurar default</button>
