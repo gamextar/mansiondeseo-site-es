@@ -2971,6 +2971,9 @@ async function handleAdminReviewPhotoVerification(request, env, requestId) {
   if (nextStatus !== 'approved' && nextStatus !== 'rejected') {
     return error('Estado de verificación inválido', 400);
   }
+  if (nextStatus === 'rejected' && !adminNote) {
+    return error('Indicá un motivo para rechazar la verificación', 400);
+  }
 
   const record = await env.DB.prepare('SELECT * FROM photo_verification_requests WHERE id = ?')
     .bind(requestId)

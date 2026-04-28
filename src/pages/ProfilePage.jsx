@@ -609,6 +609,7 @@ export default function ProfilePage() {
   const photoOtpStatus = user?.verified ? 'approved' : (photoOtpVerification?.status || '');
   const photoOtpMeta = PHOTO_OTP_STATUS[photoOtpStatus] || null;
   const isPhotoOtpPendingReview = !user?.verified && photoOtpStatus === 'pending';
+  const isPhotoOtpRejected = !user?.verified && photoOtpStatus === 'rejected';
   const showPhotoOtpCode = !user?.verified && photoOtpVerification?.code && photoOtpStatus === 'code_issued';
   const canStartPhotoOtp = !user?.verified && (!photoOtpVerification || ['rejected', 'expired'].includes(photoOtpVerification.status));
   const hasActivePhotoOtp = !user?.verified && photoOtpVerification && photoOtpVerification.status === 'code_issued';
@@ -841,6 +842,8 @@ export default function ProfilePage() {
                   ? 'Tu cuenta ya está verificada y tiene acceso a las funciones de confianza.'
                   : isPhotoOtpPendingReview
                     ? 'Tu foto fue enviada. Estamos revisando la verificación para habilitar todas las funciones.'
+                    : isPhotoOtpRejected
+                      ? 'No pudimos aprobar la verificación. Revisá el motivo y volvé a intentarlo.'
                     : showPhotoOtpCode
                     ? 'Usá este código en la foto de verificación. Si querés empezar de nuevo, podés cancelar el proceso.'
                     : 'Recordá verificar tu cuenta para acceder a todas las funciones de la Mansión.'}
@@ -861,7 +864,8 @@ export default function ProfilePage() {
 
               {photoOtpVerification?.status === 'rejected' && photoOtpVerification?.admin_note && (
                 <p className="mt-3 rounded-2xl border border-mansion-crimson/20 bg-mansion-crimson/10 px-3 py-2 text-xs leading-5 text-mansion-crimson">
-                  {photoOtpVerification.admin_note}
+                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-mansion-crimson/80">Motivo del rechazo</span>
+                  <span className="mt-1 block">{photoOtpVerification.admin_note}</span>
                 </p>
               )}
 
@@ -881,7 +885,7 @@ export default function ProfilePage() {
                       className="inline-flex items-center gap-2 rounded-full border border-mansion-gold/25 bg-mansion-gold/10 px-3 py-2 text-xs font-semibold text-mansion-gold transition-colors hover:bg-mansion-gold/15 disabled:opacity-50"
                     >
                       {photoOtpLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Shield className="h-3.5 w-3.5" />}
-                      Verificar Cuenta
+                      {isPhotoOtpRejected ? 'Volver a verificar' : 'Verificar Cuenta'}
                     </button>
                   )}
                   {hasActivePhotoOtp && (

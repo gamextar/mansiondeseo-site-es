@@ -100,6 +100,7 @@ export default function AdminUsersPage() {
   const [galleryThumbBatchProgress, setGalleryThumbBatchProgress] = useState('');
   const [refreshedGalleryThumbUserIds, setRefreshedGalleryThumbUserIds] = useState([]);
   const [photoVerificationPreviewUrl, setPhotoVerificationPreviewUrl] = useState('');
+  const [photoVerificationRejectReason, setPhotoVerificationRejectReason] = useState('La foto no permite validar el código con claridad.');
   const storyInputRef = useRef(null);
   const galleryDragItem = useRef(null);
   const galleryDragOverItem = useRef(null);
@@ -158,9 +159,11 @@ export default function AdminUsersPage() {
     const requestId = selected?.photo_verification?.id;
     if (!selected?.id || !requestId) return;
 
-    const adminNote = status === 'rejected'
-      ? (prompt('Motivo opcional para mostrar al usuario:', 'La foto no permite validar el código con claridad.') || '')
-      : '';
+    const adminNote = status === 'rejected' ? photoVerificationRejectReason.trim() : '';
+    if (status === 'rejected' && !adminNote) {
+      alert('Indicá un motivo de rechazo para que el usuario pueda corregirlo.');
+      return;
+    }
 
     setActionLoading(true);
     try {
@@ -248,9 +251,18 @@ export default function AdminUsersPage() {
     setThumbProgress('');
     setStoryCaption('');
     setStoryVipOnly(false);
+    setPhotoVerificationRejectReason('');
     galleryDragItem.current = null;
     galleryDragOverItem.current = null;
   }, []);
+
+  useEffect(() => {
+    if (selected?.photo_verification?.status === 'pending') {
+      setPhotoVerificationRejectReason('La foto no permite validar el código con claridad.');
+    } else {
+      setPhotoVerificationRejectReason('');
+    }
+  }, [selected?.photo_verification?.id, selected?.photo_verification?.status]);
 
   useEffect(() => {
     if (photoVerificationPreviewUrlRef.current) {
@@ -1140,7 +1152,7 @@ export default function AdminUsersPage() {
                         </button>
                         <button
                           type="button"
-                          disabled={actionLoading}
+                          disabled={actionLoading || !photoVerificationRejectReason.trim()}
                           onClick={() => handlePhotoVerificationReview('rejected')}
                           className="inline-flex items-center gap-1 rounded-full border border-red-500/25 bg-red-500/10 px-3 py-1.5 text-[11px] font-semibold text-red-300 transition-colors hover:bg-red-500/15 disabled:opacity-60"
                         >
@@ -1167,6 +1179,22 @@ export default function AdminUsersPage() {
                     <div className="rounded-2xl border border-mansion-border/20 bg-mansion-elevated/40 px-4 py-4 text-xs text-text-dim">
                       El usuario todavía no subió la foto.
                     </div>
+                  )}
+
+                  {selected.photo_verification.status === 'pending' && (
+                    <label className="block">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-text-dim">
+                        Motivo si se rechaza
+                      </span>
+                      <textarea
+                        value={photoVerificationRejectReason}
+                        onChange={(e) => setPhotoVerificationRejectReason(e.target.value)}
+                        maxLength={1000}
+                        rows={3}
+                        className="mt-1 w-full resize-none rounded-xl border border-mansion-border/25 bg-black/20 px-3 py-2 text-xs leading-5 text-text-primary outline-none transition-colors placeholder:text-text-dim focus:border-mansion-gold/35"
+                        placeholder="Explicá qué debe corregir el usuario para poder verificar la cuenta."
+                      />
+                    </label>
                   )}
 
                   {selected.photo_verification.admin_note && (
