@@ -23,7 +23,7 @@ const CHAT_CACHE_MESSAGE_LIMIT = 15;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
 
-const BlockUserIcon = ({ customSvg = '', className = 'h-5 w-5 lg:h-7 lg:w-7' }) => {
+const BlockUserIcon = ({ customSvg = '', className = 'h-9 w-9 lg:h-[62px] lg:w-[62px]' }) => {
   const value = String(customSvg || '').trim();
   if (value.startsWith('<')) return <span className={className} dangerouslySetInnerHTML={{ __html: value }} />;
   if (value) return <img src={value} alt="" className={`${className} object-contain`} />;
@@ -1331,7 +1331,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
         className={headerLayoutClass}
         style={headerStyle}
       >
-        <div className="relative flex items-center gap-3 w-full max-w-[88rem] mx-auto px-[4vw] lg:px-[3vw] py-3 lg:gap-3 lg:py-4">
+        <div className="relative flex items-center gap-3 w-full max-w-[88rem] mx-auto px-[3vw] lg:px-[2vw] py-3 lg:gap-3 lg:py-4">
           <button
             onClick={handleBackClick}
             className={`w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0 lg:absolute lg:left-1 lg:top-1/2 lg:z-10 lg:w-12 lg:h-12 lg:-translate-y-1/2 lg:bg-mansion-elevated/65 lg:border lg:border-mansion-border/30 ${embeddedDesktop ? 'lg:hidden' : ''}`}
@@ -1407,10 +1407,10 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             onClick={handleToggleBlock}
             disabled={blockUpdating}
             title={isBlockedByMe ? 'Desbloquear usuario' : 'Bloquear usuario'}
-            className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors disabled:opacity-60 lg:h-[62px] lg:w-[62px] ${
+            className={`inline-flex h-11 w-11 shrink-0 items-center justify-center transition-colors disabled:opacity-60 lg:h-[62px] lg:w-[62px] ${
               isBlockedByMe
-                ? 'border-mansion-gold/35 bg-mansion-gold/15 text-mansion-gold hover:bg-mansion-gold/20'
-                : 'border-red-500/25 bg-red-500/10 text-red-300 hover:bg-red-500/15'
+                ? 'text-mansion-gold hover:text-mansion-gold/80'
+                : 'text-red-300 hover:text-red-200'
             }`}
             aria-label={isBlockedByMe ? `Desbloquear a ${partner.name}` : `Bloquear a ${partner.name}`}
           >
@@ -1437,7 +1437,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
               wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
             }
           }}
-          className="h-full overflow-y-auto overscroll-y-contain px-[4vw] [scrollbar-gutter:stable] lg:px-[3vw]"
+          className="h-full overflow-y-auto overscroll-y-contain px-[3vw] [scrollbar-gutter:stable] lg:px-[2vw]"
           style={scrollAreaStyle}
         >
           <div
@@ -1540,7 +1540,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
         ref={composerRef}
         className={`${isStandaloneMobileChat ? 'safe-bottom ' : ''}sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 ${composerTransitionClass}`}
       >
-        <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[4vw] lg:px-[3vw] py-3">
+        <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[3vw] lg:px-[2vw] py-3">
           {/* Textarea + emoji */}
           <div className="flex-1 relative flex items-end">
             <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors min-h-[44px] lg:min-h-[52px]">
