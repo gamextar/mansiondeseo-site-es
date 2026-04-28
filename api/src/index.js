@@ -758,6 +758,8 @@ async function deleteUserCompletely(env, user) {
   await ensureProfileReportsTable(env);
   await ensureAccountDeletionRequestsTable(env);
   await ensurePhotoVerificationRequestsTable(env);
+  await ensureStoriesTable(env);
+  await ensureErrorLogsTable(env);
   const storyRowsResult = await env.DB.prepare(
     'SELECT id, video_url FROM stories WHERE user_id = ?'
   ).bind(userId).all();
@@ -768,6 +770,8 @@ async function deleteUserCompletely(env, user) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM story_likes WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM story_likes WHERE story_id IN (SELECT id FROM stories WHERE user_id = ?)').bind(userId),
+    env.DB.prepare('DELETE FROM story_daily_views WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM story_daily_views WHERE story_id IN (SELECT id FROM stories WHERE user_id = ?)').bind(userId),
     env.DB.prepare('DELETE FROM stories WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM hidden_conversations WHERE user_id = ? OR partner_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM user_blocks WHERE blocker_id = ? OR blocked_id = ?').bind(userId, userId),
@@ -784,6 +788,8 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM message_limits WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM profile_stats WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM error_logs WHERE user_id = ?').bind(userId),
+    env.DB.prepare('UPDATE photo_verification_requests SET reviewed_by = NULL WHERE reviewed_by = ?').bind(userId),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
 
