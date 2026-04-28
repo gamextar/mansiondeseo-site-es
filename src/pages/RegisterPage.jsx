@@ -1885,8 +1885,8 @@ export default function RegisterPage() {
   };
 
   const handleVerified = async (data) => {
-    setUser(data.user);
-    setRegistered(true);
+    let verifiedUser = data.user;
+    setUser(verifiedUser);
 
     // Save seeking as feed filter preference
     if (seeking.length > 0) {
@@ -1901,23 +1901,29 @@ export default function RegisterPage() {
         const nextAvatarUrl = uploadResult?.avatar_url || uploadResult?.url || '';
         const nextAvatarThumbUrl = uploadResult?.avatar_thumb_url || '';
         if (nextAvatarUrl) {
-          setUser(prev => prev ? {
-            ...prev,
+          verifiedUser = {
+            ...verifiedUser,
             avatar_url: nextAvatarUrl,
             avatar_thumb_url: nextAvatarThumbUrl,
             avatar_crop: null,
-          } : prev);
-          getMe({ force: true })
-            .then((fresh) => {
-              if (fresh?.user) setUser(fresh.user);
-            })
-            .catch(() => {});
+          };
+          setUser(verifiedUser);
+          try {
+            const fresh = await getMe({ force: true });
+            if (fresh?.user?.avatar_url) {
+              verifiedUser = fresh.user;
+              setUser(verifiedUser);
+            }
+          } catch {
+            // Keep the upload response in local state if the refresh fails.
+          }
         }
       } catch {
         // Photo upload failed — user can retry later from profile
       }
     }
 
+    setRegistered(true);
     setCompleted(true);
   };
 

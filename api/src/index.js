@@ -4344,6 +4344,8 @@ async function handleUpload(request, env) {
     await env.DB.prepare(`
       UPDATE users SET avatar_url = ?, avatar_thumb_url = '', avatar_crop = NULL WHERE id = ?
     `).bind(publicUrl, auth.sub).run();
+    _fullUserCache.delete(auth.sub);
+    _viewerCache.delete(auth.sub);
 
     await deleteR2KeysBestEffort(env, [previousAvatarKey, previousAvatarThumbKey].filter((oldKey) => oldKey && oldKey !== key));
 
@@ -4355,6 +4357,8 @@ async function handleUpload(request, env) {
     await env.DB.prepare(`
       UPDATE users SET avatar_thumb_url = ? WHERE id = ?
     `).bind(publicUrl, auth.sub).run();
+    _fullUserCache.delete(auth.sub);
+    _viewerCache.delete(auth.sub);
 
     if (previousAvatarThumbKey && previousAvatarThumbKey !== key) {
       await deleteR2KeysBestEffort(env, [previousAvatarThumbKey]);
@@ -4369,6 +4373,8 @@ async function handleUpload(request, env) {
     await env.DB.prepare(`
       UPDATE users SET photos = ?, photo_thumbs = ? WHERE id = ?
     `).bind(JSON.stringify(nextPhotos), JSON.stringify(nextPhotoThumbs), auth.sub).run();
+    _fullUserCache.delete(auth.sub);
+    _viewerCache.delete(auth.sub);
 
     return json({ url: publicUrl, key, avatar_url: user.avatar_url || '', photos: nextPhotos, photo_thumbs: nextPhotoThumbs }, 201);
   }
@@ -4379,6 +4385,8 @@ async function handleUpload(request, env) {
     await env.DB.prepare(`
       UPDATE users SET photo_thumbs = ? WHERE id = ?
     `).bind(JSON.stringify(nextPhotoThumbs), auth.sub).run();
+    _fullUserCache.delete(auth.sub);
+    _viewerCache.delete(auth.sub);
 
     if (previousThumbKey && previousThumbKey !== key) {
       await deleteR2KeysBestEffort(env, [previousThumbKey]);
