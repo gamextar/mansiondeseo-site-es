@@ -608,9 +608,10 @@ export default function ProfilePage() {
   const displayPhotos = getDisplayPhotos(user);
   const photoOtpStatus = user?.verified ? 'approved' : (photoOtpVerification?.status || '');
   const photoOtpMeta = PHOTO_OTP_STATUS[photoOtpStatus] || null;
-  const showPhotoOtpCode = !user?.verified && photoOtpVerification?.code && ['code_issued', 'pending'].includes(photoOtpStatus);
+  const isPhotoOtpPendingReview = !user?.verified && photoOtpStatus === 'pending';
+  const showPhotoOtpCode = !user?.verified && photoOtpVerification?.code && photoOtpStatus === 'code_issued';
   const canStartPhotoOtp = !user?.verified && (!photoOtpVerification || ['rejected', 'expired'].includes(photoOtpVerification.status));
-  const hasActivePhotoOtp = !user?.verified && photoOtpVerification && ['code_issued', 'pending'].includes(photoOtpVerification.status);
+  const hasActivePhotoOtp = !user?.verified && photoOtpVerification && photoOtpVerification.status === 'code_issued';
   const ownProfilePreview = user ? {
     id: user.id,
     name: user.username,
@@ -809,17 +810,25 @@ export default function ProfilePage() {
           </div>
         </motion.div>
 
-        <motion.div variants={fadeUp} className="mb-5 rounded-2xl border border-mansion-gold/15 bg-mansion-card/35 p-4">
+        <motion.div variants={fadeUp} className={`mb-5 rounded-2xl border border-mansion-gold/15 bg-mansion-card/35 ${isPhotoOtpPendingReview ? 'p-3' : 'p-4'}`}>
           <div className="flex items-start gap-3">
             <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl ${
-              user?.verified ? 'bg-emerald-500/10 text-emerald-300' : 'bg-mansion-gold/10 text-mansion-gold'
+              user?.verified
+                ? 'bg-emerald-500/10 text-emerald-300'
+                : isPhotoOtpPendingReview
+                  ? 'bg-sky-500/10 text-sky-300'
+                  : 'bg-mansion-gold/10 text-mansion-gold'
             }`}>
               {user?.verified ? <BadgeCheck className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-semibold text-text-primary">
-                  {user?.verified ? 'Cuenta verificada' : 'Recordatorio de verificación'}
+                  {user?.verified
+                    ? 'Cuenta verificada'
+                    : isPhotoOtpPendingReview
+                      ? 'Verificación en proceso'
+                      : 'Recordatorio de verificación'}
                 </h3>
                 {photoOtpMeta && (
                   <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${photoOtpMeta.tone}`}>
@@ -830,7 +839,9 @@ export default function ProfilePage() {
               <p className="mt-1 text-xs leading-5 text-text-dim">
                 {user?.verified
                   ? 'Tu cuenta ya está verificada y tiene acceso a las funciones de confianza.'
-                  : showPhotoOtpCode
+                  : isPhotoOtpPendingReview
+                    ? 'Tu foto fue enviada. Estamos revisando la verificación para habilitar todas las funciones.'
+                    : showPhotoOtpCode
                     ? 'Usá este código en la foto de verificación. Si querés empezar de nuevo, podés cancelar el proceso.'
                     : 'Recordá verificar tu cuenta para acceder a todas las funciones de la Mansión.'}
               </p>
@@ -842,7 +853,7 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {photoOtpPreviewUrl && !user?.verified && (
+              {photoOtpPreviewUrl && !user?.verified && !isPhotoOtpPendingReview && (
                 <div className="mt-3 w-28 overflow-hidden rounded-2xl border border-mansion-border/20 bg-mansion-elevated">
                   <img src={photoOtpPreviewUrl} alt="Foto de verificación enviada" className="h-28 w-28 object-cover" />
                 </div>
@@ -860,7 +871,7 @@ export default function ProfilePage() {
                 </p>
               )}
 
-              {!user?.verified && (
+              {!user?.verified && !isPhotoOtpPendingReview && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {canStartPhotoOtp && (
                     <button
