@@ -1,16 +1,17 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil, Trash2, AlertTriangle, Mail, Loader2 } from 'lucide-react';
+import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil, Trash2, AlertTriangle, Mail, Loader2, BadgeCheck, RotateCcw } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
-import { logout as apiLogout, uploadImage, uploadAvatar, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache, requestAccountDeletion, confirmAccountDeletion } from '../lib/api';
+import { logout as apiLogout, uploadAvatar, uploadGalleryImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache, requestAccountDeletion, confirmAccountDeletion, getPhotoOtpVerification, startPhotoOtpVerification, uploadPhotoOtpVerificationPhoto, getPhotoOtpVerificationPhotoBlob } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
 import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
 import { formatLocation } from '../lib/location';
-import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
+import { getDisplayPhotos, getGalleryPhotos, getGalleryPhotoThumbnail } from '../lib/profileMedia';
 import { resolveMediaUrl } from '../lib/media';
+import { optimizeGalleryPhotoFile, optimizePhotoFile } from '../lib/imageOptimize';
 
 const ROLE_COLOR = {
   Pareja: 'bg-purple-500/15 text-purple-300 border-purple-500/25',
@@ -45,6 +46,14 @@ const fadeUp = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [.25,.46,.45,.94] } },
 };
 
+const PHOTO_OTP_STATUS = {
+  code_issued: { label: 'Código generado', tone: 'text-mansion-gold border-mansion-gold/25 bg-mansion-gold/10' },
+  pending: { label: 'En revisión', tone: 'text-sky-300 border-sky-400/20 bg-sky-500/10' },
+  approved: { label: 'Aprobada', tone: 'text-emerald-300 border-emerald-400/20 bg-emerald-500/10' },
+  rejected: { label: 'Rechazada', tone: 'text-mansion-crimson border-mansion-crimson/25 bg-mansion-crimson/10' },
+  expired: { label: 'Expirada', tone: 'text-text-muted border-mansion-border/25 bg-mansion-elevated/60' },
+};
+
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
   const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
@@ -74,7 +83,13 @@ export default function ProfilePage() {
     : getBrowserBottomNavOffset();
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
+  const photoOtpInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
+  const [photoOtpLoading, setPhotoOtpLoading] = useState(false);
+  const [photoOtpUploading, setPhotoOtpUploading] = useState(false);
+  const [photoOtpError, setPhotoOtpError] = useState('');
+  const [photoOtpVerification, setPhotoOtpVerification] = useState(null);
+  const [photoOtpPreviewUrl, setPhotoOtpPreviewUrl] = useState('');
   const [cropFile, setCropFile] = useState(null);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [adjustUrl, setAdjustUrl] = useState(null);
@@ -94,6 +109,7 @@ export default function ProfilePage() {
   const dragOverItem = useRef(null);
   const avatarUploadSeqRef = useRef(0);
   const avatarPreviewUrlRef = useRef(null);
+  const photoOtpPreviewUrlRef = useRef(null);
   const [galleryEditing, setGalleryEditing] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -191,6 +207,20 @@ export default function ProfilePage() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [lightboxOpen, user]);
 
+  const refreshPhotoOtpVerification = useCallback(async () => {
+    if (!user?.id) return;
+    setPhotoOtpLoading(true);
+    setPhotoOtpError('');
+    try {
+      const data = await getPhotoOtpVerification();
+      setPhotoOtpVerification(data?.verification || null);
+    } catch (err) {
+      setPhotoOtpError(err?.message || 'No pudimos cargar la verificación.');
+    } finally {
+      setPhotoOtpLoading(false);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
@@ -202,15 +232,45 @@ export default function ProfilePage() {
       setVisitors(data.visitors || []);
       setReceivedGifts(data.gifts || []);
     }).catch(() => {});
+    refreshPhotoOtpVerification();
     return () => { cancelled = true; };
-  }, [setUser, user?.id]);
+  }, [refreshPhotoOtpVerification, setUser, user?.id]);
 
   useEffect(() => () => {
     if (avatarPreviewUrlRef.current) {
       URL.revokeObjectURL(avatarPreviewUrlRef.current);
       avatarPreviewUrlRef.current = null;
     }
+    if (photoOtpPreviewUrlRef.current) {
+      URL.revokeObjectURL(photoOtpPreviewUrlRef.current);
+      photoOtpPreviewUrlRef.current = null;
+    }
   }, []);
+
+  useEffect(() => {
+    if (photoOtpPreviewUrlRef.current) {
+      URL.revokeObjectURL(photoOtpPreviewUrlRef.current);
+      photoOtpPreviewUrlRef.current = null;
+      setPhotoOtpPreviewUrl('');
+    }
+
+    const requestId = photoOtpVerification?.id;
+    if (!requestId || !photoOtpVerification?.has_photo) return undefined;
+
+    let cancelled = false;
+    getPhotoOtpVerificationPhotoBlob(requestId)
+      .then((blob) => {
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        photoOtpPreviewUrlRef.current = url;
+        setPhotoOtpPreviewUrl(url);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [photoOtpVerification?.has_photo, photoOtpVerification?.id]);
 
   // Auto-save reordered photos
   const persistOrder = useCallback(async (newPhotos) => {
@@ -441,8 +501,13 @@ export default function ProfilePage() {
     setUploading(true);
     try {
       for (const file of files) {
-        const data = await uploadImage(file, { purpose: 'gallery' });
-        setUser(prev => prev ? { ...prev, photos: [...getGalleryPhotos(prev), data.url] } : prev);
+        const { file: optimizedFile, thumbnailFile } = await optimizeGalleryPhotoFile(file, { maxSize: 1800, quality: 0.84 });
+        const data = await uploadGalleryImage(optimizedFile, thumbnailFile);
+        setUser(prev => prev ? {
+          ...prev,
+          photos: [...getGalleryPhotos(prev), data.url],
+          photo_thumbs: data.photo_thumbs || prev.photo_thumbs || {},
+        } : prev);
       }
     } catch {
       // Partial upload ok
@@ -457,11 +522,47 @@ export default function ProfilePage() {
     setDeleting(url);
     try {
       const data = await deletePhoto(url);
-      setUser(prev => prev ? { ...prev, photos: data.photos, avatar_url: data.avatar_url } : prev);
+      setUser(prev => prev ? { ...prev, photos: data.photos, photo_thumbs: data.photo_thumbs || {}, avatar_url: data.avatar_url } : prev);
     } catch {
       // Silently fail
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleStartPhotoOtp = async () => {
+    if (photoOtpLoading || photoOtpUploading || user?.verified) return;
+    setPhotoOtpLoading(true);
+    setPhotoOtpError('');
+    try {
+      const data = await startPhotoOtpVerification();
+      setPhotoOtpVerification(data?.verification || null);
+    } catch (err) {
+      setPhotoOtpError(err?.message || 'No pudimos generar el código.');
+    } finally {
+      setPhotoOtpLoading(false);
+    }
+  };
+
+  const handlePhotoOtpSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (photoOtpInputRef.current) photoOtpInputRef.current.value = '';
+    if (!file || photoOtpUploading) return;
+
+    setPhotoOtpUploading(true);
+    setPhotoOtpError('');
+    try {
+      const optimizedFile = await optimizePhotoFile(file, {
+        maxSize: 1400,
+        quality: 0.86,
+        suffix: '-verificacion',
+      });
+      const data = await uploadPhotoOtpVerificationPhoto(optimizedFile);
+      setPhotoOtpVerification(data?.verification || null);
+    } catch (err) {
+      setPhotoOtpError(err?.message || 'No pudimos subir la foto de verificación.');
+    } finally {
+      setPhotoOtpUploading(false);
     }
   };
 
@@ -488,6 +589,9 @@ export default function ProfilePage() {
   const avatarUrl = user?.avatar_url || '';
   const photos = getGalleryPhotos(user);
   const displayPhotos = getDisplayPhotos(user);
+  const photoOtpStatus = user?.verified ? 'approved' : (photoOtpVerification?.status || '');
+  const photoOtpMeta = PHOTO_OTP_STATUS[photoOtpStatus] || null;
+  const showPhotoOtpCode = !user?.verified && photoOtpVerification?.code && ['code_issued', 'pending'].includes(photoOtpStatus);
   const ownProfilePreview = user ? {
     id: user.id,
     name: user.username,
@@ -571,7 +675,7 @@ export default function ProfilePage() {
         initial="initial"
         animate="animate"
         variants={stagger}
-        className="w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[4vw] pt-6 lg:pt-6"
+        className="w-full max-w-[88rem] mx-auto px-[5vw] lg:px-[20%] pt-6 lg:pt-6"
       >
         {/* ── Hero Section ── */}
         <motion.div variants={fadeUp} className="mb-4">
@@ -686,6 +790,84 @@ export default function ProfilePage() {
           </div>
         </motion.div>
 
+        <motion.div variants={fadeUp} className="mb-5 rounded-2xl border border-mansion-border/20 bg-mansion-card/35 p-4">
+          <div className="flex items-start gap-3">
+            <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl ${
+              user?.verified ? 'bg-emerald-500/10 text-emerald-300' : 'bg-mansion-gold/10 text-mansion-gold'
+            }`}>
+              {user?.verified ? <BadgeCheck className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-semibold text-text-primary">Verificación por foto</h3>
+                {photoOtpMeta && (
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${photoOtpMeta.tone}`}>
+                    {photoOtpMeta.label}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs leading-5 text-text-dim">
+                {user?.verified
+                  ? 'Tu perfil ya está verificado y queda habilitado para funciones de confianza.'
+                  : 'Generá un código y subí una foto sosteniendo un cartel con Mansión Deseo, el código y la fecha.'}
+              </p>
+
+              {showPhotoOtpCode && (
+                <div className="mt-3 rounded-2xl border border-mansion-gold/20 bg-black/25 px-4 py-3">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Código para el cartel</p>
+                  <p className="mt-1 font-display text-2xl font-bold tracking-[0.12em] text-mansion-gold">{photoOtpVerification.code}</p>
+                </div>
+              )}
+
+              {photoOtpPreviewUrl && !user?.verified && (
+                <div className="mt-3 w-28 overflow-hidden rounded-2xl border border-mansion-border/20 bg-mansion-elevated">
+                  <img src={photoOtpPreviewUrl} alt="Foto de verificación enviada" className="h-28 w-28 object-cover" />
+                </div>
+              )}
+
+              {photoOtpVerification?.status === 'rejected' && photoOtpVerification?.admin_note && (
+                <p className="mt-3 rounded-2xl border border-mansion-crimson/20 bg-mansion-crimson/10 px-3 py-2 text-xs leading-5 text-mansion-crimson">
+                  {photoOtpVerification.admin_note}
+                </p>
+              )}
+
+              {photoOtpError && (
+                <p className="mt-3 rounded-2xl border border-mansion-crimson/20 bg-mansion-crimson/10 px-3 py-2 text-xs leading-5 text-mansion-crimson">
+                  {photoOtpError}
+                </p>
+              )}
+
+              {!user?.verified && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {(!photoOtpVerification || photoOtpVerification.status === 'rejected' || photoOtpVerification.status === 'expired') && (
+                    <button
+                      type="button"
+                      onClick={handleStartPhotoOtp}
+                      disabled={photoOtpLoading || photoOtpUploading}
+                      className="inline-flex items-center gap-2 rounded-full border border-mansion-gold/25 bg-mansion-gold/10 px-3 py-2 text-xs font-semibold text-mansion-gold transition-colors hover:bg-mansion-gold/15 disabled:opacity-50"
+                    >
+                      {photoOtpLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                      Generar código
+                    </button>
+                  )}
+                  {photoOtpVerification && ['code_issued', 'pending'].includes(photoOtpVerification.status) && (
+                    <button
+                      type="button"
+                      onClick={() => photoOtpInputRef.current?.click()}
+                      disabled={photoOtpUploading || photoOtpLoading}
+                      className="inline-flex items-center gap-2 rounded-full bg-mansion-gold px-3 py-2 text-xs font-bold text-black transition-colors hover:bg-mansion-gold-light disabled:opacity-50"
+                    >
+                      {photoOtpUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+                      {photoOtpVerification.status === 'pending' ? 'Reemplazar foto' : 'Subir foto'}
+                    </button>
+                  )}
+                  <input ref={photoOtpInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoOtpSelect} />
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.div>
+
         {/* ── Stats Row ── */}
         <motion.div variants={fadeUp} className="grid grid-cols-3 gap-px mb-5 rounded-2xl overflow-hidden bg-mansion-border/10">
           {[
@@ -750,7 +932,7 @@ export default function ProfilePage() {
                   galleryEditing ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
                 }`}
               >
-                <img src={resolveMediaUrl(url)} alt={`Foto ${i + 1}`} referrerPolicy="no-referrer" className="w-full h-full object-cover pointer-events-none transition-transform duration-300 group-hover:scale-105" />
+                <img src={resolveMediaUrl(getGalleryPhotoThumbnail(user, url))} alt={`Foto ${i + 1}`} referrerPolicy="no-referrer" className="w-full h-full object-cover pointer-events-none transition-transform duration-300 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                 {galleryEditing && (
                   <button

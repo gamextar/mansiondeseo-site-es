@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
   bio                TEXT DEFAULT '',
   avatar_url         TEXT DEFAULT '',
   avatar_thumb_url   TEXT DEFAULT '',
+  photo_thumbs       TEXT DEFAULT '{}',
   photos             TEXT DEFAULT '[]',
   status             TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','verified')),
   premium            INTEGER NOT NULL DEFAULT 0,
@@ -52,6 +53,25 @@ CREATE INDEX IF NOT EXISTS idx_users_status_country_role_active ON users(status,
 CREATE INDEX IF NOT EXISTS idx_users_fake ON users(fake);
 CREATE INDEX IF NOT EXISTS idx_users_feed_priority ON users(feed_priority);
 CREATE INDEX IF NOT EXISTS idx_users_duplicate_flag ON users(duplicate_flag);
+
+-- Photo OTP verification requests
+CREATE TABLE IF NOT EXISTS photo_verification_requests (
+  id                 TEXT PRIMARY KEY,
+  user_id            TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code               TEXT NOT NULL,
+  photo_key          TEXT DEFAULT '',
+  photo_content_type TEXT DEFAULT '',
+  status             TEXT NOT NULL DEFAULT 'code_issued' CHECK(status IN ('code_issued','pending','approved','rejected','expired')),
+  admin_note         TEXT DEFAULT '',
+  reviewed_by        TEXT REFERENCES users(id),
+  reviewed_at        TEXT DEFAULT NULL,
+  expires_at         TEXT NOT NULL,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_photo_verification_user_created ON photo_verification_requests(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_photo_verification_status_created ON photo_verification_requests(status, created_at DESC);
 
 -- Processed payments
 CREATE TABLE IF NOT EXISTS processed_payments (

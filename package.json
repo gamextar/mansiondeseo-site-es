@@ -28,6 +28,7 @@
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "@jsquash/webp": "^1.5.0",
     "framer-motion": "^11.11.1",
     "lucide-react": "^0.454.0",
     "react": "^18.3.1",

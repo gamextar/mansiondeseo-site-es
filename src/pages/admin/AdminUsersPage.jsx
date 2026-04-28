@@ -1,8 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Pause, Play, Film, Pencil, Copy, Flag } from 'lucide-react';
-import { adminGetUsers, adminGetUser, adminUpdateUser, adminCloseProfileReport, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory } from '../../lib/api';
+import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Pause, Play, Film, Pencil, Copy, Flag, Star, BadgeCheck, XCircle } from 'lucide-react';
+import { adminGetUsers, adminGetUser, adminUpdateUser, adminUploadAvatarThumb, adminUploadGalleryThumb, adminDeleteGalleryPhoto, adminCloseProfileReport, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory, adminReviewPhotoOtpVerification, adminGetPhotoOtpVerificationPhotoBlob } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 import { resolveMediaUrl } from '../../lib/media';
+import { getGalleryPhotoThumbnail } from '../../lib/profileMedia';
+import { optimizeAvatarThumbnailFromUrl, optimizeGalleryThumbnailFromUrl } from '../../lib/imageOptimize';
+
+const ADMIN_SELECTED_GALLERY_THUMB_BATCH_LIMIT = 20;
+const ADMIN_GALLERY_THUMB_USER_BATCH_LIMIT = 20;
+const ADMIN_AVATAR_THUMB_BATCH_LIMIT = 20;
 
 function timeAgo(dateStr) {
   if (!dateStr) return 'Nunca';
@@ -50,6 +56,17 @@ function reportReasonLabel(reason) {
   return map[reason] || reason || 'Denuncia';
 }
 
+function photoVerificationLabel(status) {
+  const map = {
+    code_issued: 'Código emitido',
+    pending: 'Foto OTP pendiente',
+    approved: 'Foto OTP aprobada',
+    rejected: 'Foto OTP rechazada',
+    expired: 'Foto OTP expirada',
+  };
+  return map[status] || 'Sin solicitud';
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
@@ -62,6 +79,8 @@ export default function AdminUsersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [createdFilter, setCreatedFilter] = useState('all');
   const [reportedFilter, setReportedFilter] = useState('all');
+  const [featuredFilter, setFeaturedFilter] = useState('all');
+  const [verificationFilter, setVerificationFilter] = useState('all');
   const [searchInput, setSearchInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -73,11 +92,20 @@ export default function AdminUsersPage() {
   const [storyVipOnly, setStoryVipOnly] = useState(false);
   const [galleryEditing, setGalleryEditing] = useState(false);
   const [gallerySaving, setGallerySaving] = useState(false);
+  const [thumbGenerating, setThumbGenerating] = useState(false);
+  const [thumbProgress, setThumbProgress] = useState('');
+  const [avatarThumbGenerating, setAvatarThumbGenerating] = useState(false);
+  const [avatarThumbProgress, setAvatarThumbProgress] = useState('');
+  const [galleryThumbBatchGenerating, setGalleryThumbBatchGenerating] = useState(false);
+  const [galleryThumbBatchProgress, setGalleryThumbBatchProgress] = useState('');
+  const [refreshedGalleryThumbUserIds, setRefreshedGalleryThumbUserIds] = useState([]);
+  const [photoVerificationPreviewUrl, setPhotoVerificationPreviewUrl] = useState('');
   const storyInputRef = useRef(null);
   const galleryDragItem = useRef(null);
   const galleryDragOverItem = useRef(null);
+  const photoVerificationPreviewUrlRef = useRef(null);
 
-  const fetchUsers = useCallback(async (p = page, q = query, fake = fakeFilter, duplicate = duplicateFilter, role = roleFilter, status = statusFilter, created = createdFilter, reported = reportedFilter) => {
+  const fetchUsers = useCallback(async (p = page, q = query, fake = fakeFilter, duplicate = duplicateFilter, role = roleFilter, status = statusFilter, created = createdFilter, reported = reportedFilter, featured = featuredFilter, verification = verificationFilter) => {
     setLoading(true);
     try {
       const data = await adminGetUsers({
@@ -90,20 +118,23 @@ export default function AdminUsersPage() {
         status: status === 'all' ? '' : status,
         created: created === 'all' ? '' : created,
         reported: reported === 'all' ? '' : reported,
+        featured: featured === 'all' ? '' : featured,
+        verification: verification === 'all' ? '' : verification,
       });
       setUsers(data.users);
       setTotal(data.total);
       setPage(data.page);
       setPages(data.pages);
       setSelectedIds([]);
+      setRefreshedGalleryThumbUserIds([]);
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
-  }, [page, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter]);
+  }, [page, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter, featuredFilter, verificationFilter]);
 
-  useEffect(() => { fetchUsers(1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter); }, [query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter]); // eslint-disable-line
+  useEffect(() => { fetchUsers(1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter, featuredFilter, verificationFilter); }, [query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter, featuredFilter, verificationFilter]); // eslint-disable-line
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -118,6 +149,40 @@ export default function AdminUsersPage() {
       if (selected?.id === userId) setSelected(s => ({ ...s, ...data.user }));
     } catch (err) {
       alert(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePhotoVerificationReview = async (status) => {
+    const requestId = selected?.photo_verification?.id;
+    if (!selected?.id || !requestId) return;
+
+    const adminNote = status === 'rejected'
+      ? (prompt('Motivo opcional para mostrar al usuario:', 'La foto no permite validar el código con claridad.') || '')
+      : '';
+
+    setActionLoading(true);
+    try {
+      const data = await adminReviewPhotoOtpVerification(requestId, { status, adminNote });
+      setSelected((prev) => (prev ? {
+        ...prev,
+        ...data.user,
+        photo_verification: data.verification,
+      } : prev));
+      setUsers((prev) => prev.map((user) => (
+        user.id === data.user.id
+          ? {
+              ...user,
+              verified: data.user.verified,
+              photo_verification_status: data.verification?.status || user.photo_verification_status,
+              photo_verification_has_photo: !!data.verification?.has_photo,
+              photo_verification_updated_at: data.verification?.updated_at || user.photo_verification_updated_at,
+            }
+          : user
+      )));
+    } catch (err) {
+      alert(err.message || 'No se pudo actualizar la verificación');
     } finally {
       setActionLoading(false);
     }
@@ -179,10 +244,44 @@ export default function AdminUsersPage() {
     setSelectedLoading(false);
     setGalleryEditing(false);
     setGallerySaving(false);
+    setThumbGenerating(false);
+    setThumbProgress('');
     setStoryCaption('');
     setStoryVipOnly(false);
     galleryDragItem.current = null;
     galleryDragOverItem.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (photoVerificationPreviewUrlRef.current) {
+      URL.revokeObjectURL(photoVerificationPreviewUrlRef.current);
+      photoVerificationPreviewUrlRef.current = null;
+      setPhotoVerificationPreviewUrl('');
+    }
+
+    const verification = selected?.photo_verification;
+    if (!verification?.id || !verification?.has_photo) return undefined;
+
+    let cancelled = false;
+    adminGetPhotoOtpVerificationPhotoBlob(verification.id)
+      .then((blob) => {
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        photoVerificationPreviewUrlRef.current = url;
+        setPhotoVerificationPreviewUrl(url);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.photo_verification?.has_photo, selected?.photo_verification?.id]);
+
+  useEffect(() => () => {
+    if (photoVerificationPreviewUrlRef.current) {
+      URL.revokeObjectURL(photoVerificationPreviewUrlRef.current);
+      photoVerificationPreviewUrlRef.current = null;
+    }
   }, []);
 
   const persistGalleryPhotos = useCallback(async (nextPhotos) => {
@@ -225,11 +324,22 @@ export default function AdminUsersPage() {
     persistGalleryPhotos(next);
   }, [persistGalleryPhotos, selected]);
 
-  const handleGalleryDeletePhoto = useCallback((url) => {
-    if (!Array.isArray(selected?.photos)) return;
-    const next = selected.photos.filter((photo) => photo !== url);
-    persistGalleryPhotos(next);
-  }, [persistGalleryPhotos, selected]);
+  const handleGalleryDeletePhoto = useCallback(async (url) => {
+    if (!selected?.id || !Array.isArray(selected.photos)) return;
+    const previous = selected;
+    const nextPhotos = selected.photos.filter((photo) => photo !== url);
+    setGallerySaving(true);
+    setSelected((prev) => (prev && prev.id === selected.id ? { ...prev, photos: nextPhotos } : prev));
+    try {
+      const data = await adminDeleteGalleryPhoto(selected.id, url);
+      setSelected((prev) => (prev && prev.id === selected.id ? { ...prev, ...data.user } : prev));
+    } catch (err) {
+      setSelected(previous);
+      alert(err.message || 'Error al borrar la foto');
+    } finally {
+      setGallerySaving(false);
+    }
+  }, [selected]);
 
   const handleUsePhotoAsAvatar = useCallback(async (url) => {
     if (!selected?.id || !Array.isArray(selected.photos) || selected.avatar_url === url) return;
@@ -249,7 +359,7 @@ export default function AdminUsersPage() {
       setSelected((prev) => (prev && prev.id === selected.id ? { ...prev, ...data.user } : prev));
       setUsers((prev) => prev.map((user) => (
         user.id === selected.id
-          ? { ...user, avatar_url: data.user.avatar_url, avatar_crop: data.user.avatar_crop, photos: data.user.photos }
+          ? { ...user, avatar_url: data.user.avatar_url, avatar_thumb_url: data.user.avatar_thumb_url, avatar_crop: data.user.avatar_crop, photos: data.user.photos, photo_thumbs: data.user.photo_thumbs }
           : user
       )));
     } catch (err) {
@@ -258,6 +368,49 @@ export default function AdminUsersPage() {
       setGallerySaving(false);
     }
   }, [selected]);
+
+  const selectedPhotoThumbs = selected?.photo_thumbs && typeof selected.photo_thumbs === 'object' && !Array.isArray(selected.photo_thumbs)
+    ? selected.photo_thumbs
+    : {};
+  const selectedGalleryPhotos = Array.isArray(selected?.photos)
+    ? selected.photos.filter((url) => url)
+    : [];
+  const missingGalleryThumbs = Array.isArray(selected?.photos)
+    ? selected.photos.filter((url) => url && !selectedPhotoThumbs[url])
+    : [];
+
+  const handleGenerateSelectedGalleryThumbs = useCallback(async (mode = 'missing') => {
+    if (!selected?.id || thumbGenerating) return;
+    const sourceUrls = mode === 'all'
+      ? selectedGalleryPhotos
+      : missingGalleryThumbs.slice(0, ADMIN_SELECTED_GALLERY_THUMB_BATCH_LIMIT);
+    if (sourceUrls.length === 0) return;
+
+    setThumbGenerating(true);
+    try {
+      for (let i = 0; i < sourceUrls.length; i += 1) {
+        const sourceUrl = sourceUrls[i];
+        setThumbProgress(`${i + 1}/${sourceUrls.length}`);
+        const thumbnailFile = await optimizeGalleryThumbnailFromUrl(resolveMediaUrl(sourceUrl), {
+          fileName: `gallery-${selected.id}-${i + 1}`,
+        });
+        const data = await adminUploadGalleryThumb(selected.id, sourceUrl, thumbnailFile);
+        if (data?.user) {
+          setSelected((prev) => (prev && prev.id === selected.id ? { ...prev, ...data.user } : prev));
+          setUsers((prev) => prev.map((user) => (
+            user.id === selected.id
+              ? { ...user, photo_thumbs: data.user.photo_thumbs }
+              : user
+          )));
+        }
+      }
+    } catch (err) {
+      alert(err.message || 'No se pudieron generar todas las miniaturas');
+    } finally {
+      setThumbGenerating(false);
+      setThumbProgress('');
+    }
+  }, [missingGalleryThumbs, selected?.id, selectedGalleryPhotos, thumbGenerating]);
 
   const handleDelete = async (userId, email) => {
     if (!confirm(`¿Eliminar PERMANENTEMENTE a ${email}?\n\nEsto borrará todos sus mensajes, favoritos, visitas y regalos.`)) return;
@@ -307,6 +460,106 @@ export default function AdminUsersPage() {
       alert(err.message || 'Error al borrar usuarios');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const missingAvatarThumbUsers = users.filter((user) => user.avatar_url && !user.avatar_thumb_url);
+  const galleryThumbRefreshUsers = users
+    .map((user) => {
+      const photos = Array.isArray(user.photos) ? user.photos : [];
+      const pendingPhotos = photos
+        .map((sourceUrl, index) => ({ sourceUrl, index }))
+        .filter((photo) => photo.sourceUrl);
+
+      return {
+        userId: user.id,
+        username: user.username,
+        pendingPhotos,
+      };
+    })
+    .filter((user) => user.pendingPhotos.length > 0 && !refreshedGalleryThumbUserIds.includes(user.userId));
+  const galleryThumbRefreshPhotoCount = galleryThumbRefreshUsers.reduce((sum, user) => sum + user.pendingPhotos.length, 0);
+
+  const handleGenerateAvatarThumbBatch = async () => {
+    if (avatarThumbGenerating || galleryThumbBatchGenerating || missingAvatarThumbUsers.length === 0) return;
+    const batch = missingAvatarThumbUsers.slice(0, ADMIN_AVATAR_THUMB_BATCH_LIMIT);
+    setAvatarThumbGenerating(true);
+    try {
+      for (let i = 0; i < batch.length; i += 1) {
+        const user = batch[i];
+        setAvatarThumbProgress(`${i + 1}/${batch.length}`);
+        const thumbnailFile = await optimizeAvatarThumbnailFromUrl(resolveMediaUrl(user.avatar_url), {
+          fileName: `avatar-${user.id}`,
+        });
+        const data = await adminUploadAvatarThumb(user.id, thumbnailFile);
+        if (data?.user) {
+          setUsers((prev) => prev.map((item) => (
+            item.id === user.id
+              ? { ...item, avatar_thumb_url: data.user.avatar_thumb_url }
+              : item
+          )));
+          setSelected((prev) => (
+            prev?.id === user.id ? { ...prev, avatar_thumb_url: data.user.avatar_thumb_url } : prev
+          ));
+        }
+      }
+    } catch (err) {
+      alert(err.message || 'No se pudieron generar todos los thumbnails de avatar');
+    } finally {
+      setAvatarThumbGenerating(false);
+      setAvatarThumbProgress('');
+    }
+  };
+
+  const handleGenerateGalleryThumbBatch = async () => {
+    if (galleryThumbBatchGenerating || avatarThumbGenerating || galleryThumbRefreshUsers.length === 0) return;
+    const batch = galleryThumbRefreshUsers.slice(0, ADMIN_GALLERY_THUMB_USER_BATCH_LIMIT);
+    const totalPhotos = batch.reduce((sum, user) => sum + user.pendingPhotos.length, 0);
+    let failedCount = 0;
+    let processedCount = 0;
+    const completedUserIds = [];
+    setGalleryThumbBatchGenerating(true);
+    try {
+      for (let i = 0; i < batch.length; i += 1) {
+        const userJob = batch[i];
+        let userFailed = false;
+        for (let j = 0; j < userJob.pendingPhotos.length; j += 1) {
+          const photo = userJob.pendingPhotos[j];
+          processedCount += 1;
+          setGalleryThumbBatchProgress(`${i + 1}/${batch.length} u · ${processedCount}/${totalPhotos} f`);
+          try {
+            const thumbnailFile = await optimizeGalleryThumbnailFromUrl(resolveMediaUrl(photo.sourceUrl), {
+              fileName: `gallery-${userJob.userId}-${photo.index + 1}`,
+            });
+            const data = await adminUploadGalleryThumb(userJob.userId, photo.sourceUrl, thumbnailFile);
+            if (data?.user) {
+              setUsers((prev) => prev.map((user) => (
+                user.id === userJob.userId
+                  ? { ...user, photos: data.user.photos, photo_thumbs: data.user.photo_thumbs }
+                  : user
+              )));
+              setSelected((prev) => (
+                prev?.id === userJob.userId ? { ...prev, ...data.user } : prev
+              ));
+            }
+          } catch (err) {
+            failedCount += 1;
+            userFailed = true;
+            console.warn('Gallery thumbnail batch item failed:', err);
+          }
+        }
+        if (!userFailed) completedUserIds.push(userJob.userId);
+      }
+
+      if (completedUserIds.length > 0) {
+        setRefreshedGalleryThumbUserIds((prev) => [...new Set([...prev, ...completedUserIds])]);
+      }
+      if (failedCount > 0) {
+        alert(`Se generaron ${totalPhotos - failedCount} miniaturas. ${failedCount} no se pudieron procesar.`);
+      }
+    } finally {
+      setGalleryThumbBatchGenerating(false);
+      setGalleryThumbBatchProgress('');
     }
   };
 
@@ -384,6 +637,29 @@ export default function AdminUsersPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-display font-bold text-text-primary">Usuarios</h1>
           <p className="text-sm text-text-dim mt-1">{total} usuarios registrados</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={avatarThumbGenerating || galleryThumbBatchGenerating || missingAvatarThumbUsers.length === 0}
+              onClick={handleGenerateAvatarThumbBatch}
+              className="rounded-xl border border-mansion-gold/25 bg-mansion-gold/10 px-3 py-2 text-xs font-semibold text-mansion-gold transition-colors hover:bg-mansion-gold/15 disabled:opacity-50"
+            >
+              {avatarThumbGenerating
+                ? `Generando avatar thumbs ${avatarThumbProgress}`
+                : `Generar avatar thumbs (${Math.min(missingAvatarThumbUsers.length, ADMIN_AVATAR_THUMB_BATCH_LIMIT)}/${missingAvatarThumbUsers.length})`}
+            </button>
+            <button
+              type="button"
+              disabled={galleryThumbBatchGenerating || avatarThumbGenerating || galleryThumbRefreshUsers.length === 0}
+              onClick={handleGenerateGalleryThumbBatch}
+              className="rounded-xl border border-mansion-gold/25 bg-mansion-gold/10 px-3 py-2 text-xs font-semibold text-mansion-gold transition-colors hover:bg-mansion-gold/15 disabled:opacity-50"
+            >
+              {galleryThumbBatchGenerating
+                ? `Generando galería thumbs ${galleryThumbBatchProgress}`
+                : `Regenerar galería thumbs (${Math.min(galleryThumbRefreshUsers.length, ADMIN_GALLERY_THUMB_USER_BATCH_LIMIT)}/${galleryThumbRefreshUsers.length} usuarios · ${galleryThumbRefreshPhotoCount} fotos)`}
+            </button>
+            <span className="text-[11px] text-text-dim">Tandas de hasta {ADMIN_AVATAR_THUMB_BATCH_LIMIT} avatares o {ADMIN_GALLERY_THUMB_USER_BATCH_LIMIT} usuarios con galería de esta página.</span>
+          </div>
         </div>
 
         {selectedIds.length > 0 && (
@@ -499,6 +775,35 @@ export default function AdminUsersPage() {
             </button>
           ))}
 
+          <button
+            type="button"
+            onClick={() => setFeaturedFilter((current) => (current === '1' ? 'all' : '1'))}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
+              featuredFilter === '1'
+                ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
+                : 'bg-mansion-card border-mansion-border/20 text-text-dim hover:text-text-primary'
+            }`}
+          >
+            Destacados
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setVerificationFilter((current) => (current === 'pending' ? 'all' : 'pending'));
+              setDuplicateFilter('all');
+              setReportedFilter('all');
+              setStatusFilter('all');
+            }}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
+              verificationFilter === 'pending'
+                ? 'bg-mansion-gold/10 border-mansion-gold/30 text-mansion-gold'
+                : 'bg-mansion-card border-mansion-border/20 text-text-dim hover:text-text-primary'
+            }`}
+          >
+            Foto OTP pendiente
+          </button>
+
           {[
             { id: 'under_review', label: '⚠️ En revisión' },
             { id: 'reported', label: '❗ Denunciados' },
@@ -604,6 +909,8 @@ export default function AdminUsersPage() {
                               <span className="text-text-primary font-medium truncate text-xs">{u.username}</span>
                               {u.online && <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
                               {u.is_admin && <Shield className="w-3 h-3 text-red-400 flex-shrink-0" />}
+                              {Number(u.feed_priority || 0) > 0 && <Star className="w-3 h-3 text-mansion-gold flex-shrink-0 fill-mansion-gold/30" />}
+                              {u.photo_verification_status === 'pending' && <BadgeCheck className="w-3 h-3 text-sky-300 flex-shrink-0" />}
                               {u.duplicate_flag && <Copy className="w-3 h-3 text-amber-300 flex-shrink-0" />}
                               {Number(u.reports_count || 0) > 0 && (
                                 <span className="inline-flex items-center gap-1 rounded-full border border-red-500/25 bg-red-500/10 px-1.5 py-0.5 text-[9px] font-bold text-red-300">
@@ -627,13 +934,20 @@ export default function AdminUsersPage() {
                         {u.premium ? <Crown className="w-4 h-4 text-mansion-gold mx-auto" /> : <span className="text-text-dim text-xs">—</span>}
                       </td>
                       <td className="px-4 py-3 text-center hidden sm:table-cell">
-                        {u.account_status === 'suspended' ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-semibold">Suspendida</span>
-                        ) : u.account_status === 'under_review' ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[10px] font-semibold">En revisión</span>
-                        ) : (
-                          <span className="text-green-400 text-[10px]">Activa</span>
-                        )}
+                        <div className="flex flex-col items-center gap-1">
+                          {u.account_status === 'suspended' ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-semibold">Suspendida</span>
+                          ) : u.account_status === 'under_review' ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[10px] font-semibold">En revisión</span>
+                          ) : (
+                            <span className="text-green-400 text-[10px]">Activa</span>
+                          )}
+                          {u.photo_verification_status === 'pending' && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-500/10 border border-sky-400/20 text-sky-300 text-[10px] font-semibold">
+                              Foto OTP
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-center text-xs text-text-muted hidden sm:table-cell">{u.coins}</td>
                       <td className="px-4 py-3 text-[10px] text-text-dim font-mono hidden lg:table-cell">{u.last_ip || '—'}</td>
@@ -658,7 +972,7 @@ export default function AdminUsersPage() {
         {pages > 1 && (
           <div className="flex items-center justify-center gap-2 mt-4">
             <button
-              onClick={() => fetchUsers(page - 1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter)}
+              onClick={() => fetchUsers(page - 1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter, featuredFilter, verificationFilter)}
               disabled={page <= 1}
               className="p-2 rounded-lg bg-mansion-card border border-mansion-border/20 text-text-muted disabled:opacity-30 hover:text-mansion-gold transition-colors"
             >
@@ -666,7 +980,7 @@ export default function AdminUsersPage() {
             </button>
             <span className="text-sm text-text-dim px-3">{page} / {pages}</span>
             <button
-              onClick={() => fetchUsers(page + 1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter)}
+              onClick={() => fetchUsers(page + 1, query, fakeFilter, duplicateFilter, roleFilter, statusFilter, createdFilter, reportedFilter, featuredFilter, verificationFilter)}
               disabled={page >= pages}
               className="p-2 rounded-lg bg-mansion-card border border-mansion-border/20 text-text-muted disabled:opacity-30 hover:text-mansion-gold transition-colors"
             >
@@ -774,7 +1088,7 @@ export default function AdminUsersPage() {
                   <span className="px-2 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[10px] font-semibold">Ghost</span>
                 )}
                 {selected.verified && (
-                  <span className="px-2 py-1 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-semibold">Verificado</span>
+                  <span className="px-2 py-1 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-semibold">Verificación humana</span>
                 )}
                 {selected.online && (
                   <span className="px-2 py-1 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-semibold">Online</span>
@@ -795,6 +1109,73 @@ export default function AdminUsersPage() {
                   <span className="px-2 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[10px] font-semibold">En revisión</span>
                 )}
               </div>
+
+              {selected.photo_verification && (
+                <div className="space-y-3 rounded-2xl border border-sky-400/15 bg-sky-500/5 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-wider text-text-dim">Foto OTP</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold text-text-primary">{photoVerificationLabel(selected.photo_verification.status)}</span>
+                        {selected.photo_verification.code && (
+                          <span className="rounded-lg border border-mansion-gold/20 bg-mansion-gold/10 px-2 py-1 font-mono text-[11px] font-bold text-mansion-gold">
+                            {selected.photo_verification.code}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[11px] text-text-dim">
+                        {selected.photo_verification.updated_at ? `Actualizada ${timeAgo(selected.photo_verification.updated_at)}` : 'Sin fecha'}
+                      </p>
+                    </div>
+                    {selected.photo_verification.status === 'pending' && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={actionLoading}
+                          onClick={() => handlePhotoVerificationReview('approved')}
+                          className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/15 disabled:opacity-60"
+                        >
+                          <BadgeCheck className="h-3.5 w-3.5" />
+                          Aprobar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionLoading}
+                          onClick={() => handlePhotoVerificationReview('rejected')}
+                          className="inline-flex items-center gap-1 rounded-full border border-red-500/25 bg-red-500/10 px-3 py-1.5 text-[11px] font-semibold text-red-300 transition-colors hover:bg-red-500/15 disabled:opacity-60"
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                          Rechazar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {photoVerificationPreviewUrl ? (
+                    <div className="overflow-hidden rounded-2xl border border-mansion-border/20 bg-mansion-elevated">
+                      <img
+                        src={photoVerificationPreviewUrl}
+                        alt={`Foto OTP de ${selected.username}`}
+                        className="max-h-[420px] w-full object-contain"
+                      />
+                    </div>
+                  ) : selected.photo_verification.has_photo ? (
+                    <div className="rounded-2xl border border-mansion-border/20 bg-mansion-elevated/60 px-4 py-6 text-center text-xs text-text-dim">
+                      Cargando foto OTP...
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-mansion-border/20 bg-mansion-elevated/40 px-4 py-4 text-xs text-text-dim">
+                      El usuario todavía no subió la foto.
+                    </div>
+                  )}
+
+                  {selected.photo_verification.admin_note && (
+                    <p className="rounded-xl border border-mansion-border/20 bg-black/15 px-3 py-2 text-[11px] text-text-muted">
+                      {selected.photo_verification.admin_note}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {Array.isArray(selected.reports) && selected.reports.length > 0 && (
                 <div className="space-y-2 rounded-2xl border border-red-500/20 bg-red-950/10 p-3">
@@ -903,7 +1284,7 @@ export default function AdminUsersPage() {
                   className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-mansion-elevated hover:bg-green-500/10 transition-colors text-left"
                 >
                   <UserCheck className={`w-4 h-4 ${selected.verified ? 'text-green-400' : 'text-text-dim'}`} />
-                  <span className="text-xs text-text-primary">{selected.verified ? 'Quitar verificación' : 'Verificar usuario'}</span>
+                  <span className="text-xs text-text-primary">{selected.verified ? 'Quitar verificación humana' : 'Marcar verificado manualmente'}</span>
                 </button>
 
                 <button
@@ -997,13 +1378,33 @@ export default function AdminUsersPage() {
                       <p className="text-[10px] text-text-dim uppercase tracking-wider">Galería</p>
                       <p className="text-[11px] text-text-dim mt-1">
                         {Array.isArray(selected.photos) ? selected.photos.length : 0} foto{selected.photos?.length === 1 ? '' : 's'}
+                        {missingGalleryThumbs.length > 0 ? ` · ${missingGalleryThumbs.length} sin thumb` : ''}
                         {galleryEditing ? ' · Arrastra para reordenar' : ''}
                       </p>
                     </div>
                     {Array.isArray(selected.photos) && selected.photos.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        {missingGalleryThumbs.length > 0 && (
+                          <button
+                            type="button"
+                            disabled={gallerySaving || thumbGenerating}
+                            onClick={() => handleGenerateSelectedGalleryThumbs('missing')}
+                            className="rounded-full border border-mansion-gold/25 px-2.5 py-1 text-[11px] font-semibold text-mansion-gold transition-colors hover:bg-mansion-gold/10 disabled:opacity-60"
+                          >
+                            {thumbGenerating ? `Thumbs ${thumbProgress}` : 'Generar faltantes'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={gallerySaving || thumbGenerating}
+                          onClick={() => handleGenerateSelectedGalleryThumbs('all')}
+                          className="rounded-full border border-mansion-gold/25 px-2.5 py-1 text-[11px] font-semibold text-mansion-gold transition-colors hover:bg-mansion-gold/10 disabled:opacity-60"
+                        >
+                          {thumbGenerating ? `Thumbs ${thumbProgress}` : 'Regenerar thumbs'}
+                        </button>
                       <button
                         type="button"
-                        disabled={gallerySaving}
+                        disabled={gallerySaving || thumbGenerating}
                         onClick={() => setGalleryEditing((prev) => !prev)}
                         className={`flex items-center gap-1 text-xs transition-colors ${
                           galleryEditing
@@ -1014,6 +1415,7 @@ export default function AdminUsersPage() {
                         <Pencil className="w-3.5 h-3.5" />
                         {galleryEditing ? (gallerySaving ? 'Guardando...' : 'Listo') : 'Editar'}
                       </button>
+                      </div>
                     )}
                   </div>
 
@@ -1031,7 +1433,7 @@ export default function AdminUsersPage() {
                           }`}
                         >
                           <img
-                            src={resolveMediaUrl(url)}
+                            src={resolveMediaUrl(getGalleryPhotoThumbnail(selected, url))}
                             alt={`Foto ${index + 1}`}
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-cover"

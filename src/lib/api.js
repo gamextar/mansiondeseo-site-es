@@ -619,6 +619,36 @@ async function apiFetch(path, options = {}) {
   return data;
 }
 
+async function apiBlob(path, options = {}) {
+  const token = getToken();
+  const headers = { ...options.headers };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (res.status === 401 && token) {
+    clearAuth();
+    window.location.href = '/';
+    throw new Error('Sesión expirada');
+  }
+
+  if (!res.ok) {
+    let message = 'Error del servidor';
+    try {
+      const data = await res.json();
+      message = data.error || message;
+    } catch {}
+    const err = new Error(message);
+    err.status = res.status;
+    throw err;
+  }
+
+  return res.blob();
+}
+
 async function apiUpload(path, options = {}) {
   const token = options.tokenOverride ?? getToken();
   const headers = { ...options.headers };
@@ -1085,8 +1115,11 @@ export async function debugInspectMediaCache(urls = []) {
 
 // ── Upload ──────────────────────────────────────────────
 
-export async function uploadImage(file, { purpose = 'asset' } = {}) {
-  const qs = purpose ? `?purpose=${encodeURIComponent(purpose)}` : '';
+export async function uploadImage(file, { purpose = 'asset', sourceUrl = '' } = {}) {
+  const params = new URLSearchParams();
+  if (purpose) params.set('purpose', purpose);
+  if (sourceUrl) params.set('source_url', sourceUrl);
+  const qs = params.toString() ? `?${params.toString()}` : '';
   const currentAvatarUploadSeq = purpose === 'avatar' ? avatarUploadCacheSeq + 1 : 0;
   if (purpose === 'avatar') avatarUploadCacheSeq = currentAvatarUploadSeq;
 
@@ -1115,7 +1148,12 @@ export async function uploadImage(file, { purpose = 'asset' } = {}) {
     invalidateMeCache();
     invalidateBootstrapCache();
     invalidateOwnProfileDashboardCache();
-    mergeMeCache({ photos: data.photos, avatar_url: data?.avatar_url });
+    mergeMeCache({ photos: data.photos, photo_thumbs: data?.photo_thumbs, avatar_url: data?.avatar_url });
+  } else if (purpose === 'gallery_thumb') {
+    invalidateMeCache();
+    invalidateBootstrapCache();
+    invalidateOwnProfileDashboardCache();
+    mergeMeCache({ photo_thumbs: data?.photo_thumbs });
   }
   return data;
 }
@@ -1136,16 +1174,64 @@ export async function uploadAvatar(file, thumbnailFile) {
   }
 }
 
+export async function uploadGalleryImage(file, thumbnailFile) {
+  const galleryData = await uploadImage(file, { purpose: 'gallery' });
+  if (!thumbnailFile || !galleryData?.url) return galleryData;
+
+  try {
+    const thumbData = await uploadImage(thumbnailFile, {
+      purpose: 'gallery_thumb',
+      sourceUrl: galleryData.url,
+    });
+    return {
+      ...galleryData,
+      photo_thumbs: thumbData?.photo_thumbs || galleryData?.photo_thumbs || {},
+      photo_thumb_url: thumbData?.photo_thumb_url || thumbData?.url || '',
+    };
+  } catch (err) {
+    console.warn('Gallery thumbnail upload failed:', err);
+    return galleryData;
+  }
+}
+
 export async function deletePhoto(url) {
   return apiFetch('/photos', {
     method: 'DELETE',
     body: JSON.stringify({ url }),
   }).then((data) => {
     if (Array.isArray(data?.photos)) {
-      mergeMeCache({ photos: data.photos, avatar_url: data?.avatar_url });
+      mergeMeCache({ photos: data.photos, photo_thumbs: data?.photo_thumbs, avatar_url: data?.avatar_url });
     }
     return data;
   });
+}
+
+// ── Photo OTP verification ─────────────────────────────
+
+export async function getPhotoOtpVerification() {
+  return apiFetch('/verification/photo-otp');
+}
+
+export async function startPhotoOtpVerification() {
+  return apiFetch('/verification/photo-otp/start', {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export async function uploadPhotoOtpVerificationPhoto(file) {
+  const data = await apiUpload('/verification/photo-otp/photo', {
+    method: 'POST',
+    headers: { 'Content-Type': file.type },
+    body: await file.arrayBuffer(),
+  });
+  invalidateMeCache();
+  invalidateBootstrapCache();
+  return data;
+}
+
+export async function getPhotoOtpVerificationPhotoBlob(requestId) {
+  return apiBlob(`/verification/photo-otp/photo/${requestId}`);
 }
 
 // ── Settings ────────────────────────────────────────────
@@ -1339,7 +1425,7 @@ export async function adminResetAllCoins() {
 
 // ── Admin: Users ────────────────────────────────────────
 
-export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', role = '', status = '', duplicate = '', created = '', reported = '' } = {}) {
+export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', role = '', status = '', duplicate = '', created = '', reported = '', featured = '', verification = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (q) params.set('q', q);
   if (fake === '1' || fake === '0') params.set('fake', fake);
@@ -1348,10 +1434,12 @@ export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', r
   if (duplicate === '1' || duplicate === '0') params.set('duplicate', duplicate);
   if (['1d', '72h'].includes(created)) params.set('created', created);
   if (reported === '1' || reported === '0') params.set('reported', reported);
+  if (featured === '1' || featured === '0') params.set('featured', featured);
+  if (['pending', 'verified', 'unverified'].includes(verification)) params.set('verification', verification);
   return apiFetch(`/admin/users?${params}`);
 }
 
-export async function adminGetUserIds({ q = '', fake = '', role = '', status = '', duplicate = '', created = '', reported = '' } = {}) {
+export async function adminGetUserIds({ q = '', fake = '', role = '', status = '', duplicate = '', created = '', reported = '', featured = '', verification = '' } = {}) {
   const params = new URLSearchParams();
   if (q) params.set('q', q);
   if (fake === '1' || fake === '0') params.set('fake', fake);
@@ -1360,6 +1448,8 @@ export async function adminGetUserIds({ q = '', fake = '', role = '', status = '
   if (duplicate === '1' || duplicate === '0') params.set('duplicate', duplicate);
   if (['1d', '72h'].includes(created)) params.set('created', created);
   if (reported === '1' || reported === '0') params.set('reported', reported);
+  if (featured === '1' || featured === '0') params.set('featured', featured);
+  if (['pending', 'verified', 'unverified'].includes(verification)) params.set('verification', verification);
   return apiFetch(`/admin/users/ids?${params}`);
 }
 
@@ -1372,6 +1462,43 @@ export async function adminUpdateUser(userId, fields) {
     method: 'PUT',
     body: JSON.stringify(fields),
   });
+}
+
+export async function adminUploadGalleryThumb(userId, sourceUrl, file) {
+  const params = new URLSearchParams({ source_url: sourceUrl });
+  return apiUpload(`/admin/users/${userId}/gallery-thumb?${params.toString()}`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type },
+    body: await file.arrayBuffer(),
+  });
+}
+
+export async function adminUploadAvatarThumb(userId, file) {
+  return apiUpload(`/admin/users/${userId}/avatar-thumb`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type },
+    body: await file.arrayBuffer(),
+  });
+}
+
+export async function adminDeleteGalleryPhoto(userId, url) {
+  return apiFetch(`/admin/users/${userId}/gallery-photo`, {
+    method: 'DELETE',
+    body: JSON.stringify({ url }),
+  });
+}
+
+export async function adminReviewPhotoOtpVerification(requestId, { status, adminNote = '' } = {}) {
+  const result = await apiFetch(`/admin/photo-verifications/${requestId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, admin_note: adminNote }),
+  });
+  markFeedDirty();
+  return result;
+}
+
+export async function adminGetPhotoOtpVerificationPhotoBlob(requestId) {
+  return apiBlob(`/admin/photo-verifications/${requestId}/photo`);
 }
 
 export async function adminCloseProfileReport(reportId) {

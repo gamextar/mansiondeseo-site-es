@@ -61,6 +61,7 @@ let _userMaritalStatusColumnReady = null;
 let _userSexualOrientationColumnReady = null;
 let _userMessageBlockRolesColumnReady = null;
 let _userAvatarThumbColumnReady = null;
+let _userPhotoThumbsColumnReady = null;
 let _userBlocksReady = null;
 let _profileReportsReady = null;
 let _userLastIpColumnReady = null;
@@ -68,10 +69,12 @@ let _accountDeletionRequestsReady = null;
 let _profileVisitStructuresReady = null;
 let _profileStatsBackfillReady = null;
 let _errorLogsReady = null;
+let _photoVerificationRequestsReady = null;
 
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
+const PHOTO_VERIFICATION_STATUSES = ['code_issued', 'pending', 'approved', 'rejected', 'expired'];
 const FEED_PROFILE_LIMIT = 42;
 const FEED_SNAPSHOT_LIMIT = 180;
 const FEED_SNAPSHOT_TTL_MS = 300_000;
@@ -379,6 +382,7 @@ function buildFeedBaseProfiles(rows, env, activeStoryUserIds, activeStoryUrlMap)
     const profileIsPremium = isPremiumActive(u);
     const hasGhostMode = profileIsPremium && !!u.ghost_mode;
     const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(u.photos, []), u.avatar_url);
+    const photoThumbs = normalizePhotoThumbs(u.photo_thumbs, galleryPhotos);
     const displayPhotos = buildDisplayPhotos(u.avatar_url, galleryPhotos);
     const profileInterests = safeParseJSON(u.interests, []);
 
@@ -391,6 +395,7 @@ function buildFeedBaseProfiles(rows, env, activeStoryUserIds, activeStoryUrlMap)
       interests: profileInterests,
       bio: u.bio,
       photos: galleryPhotos,
+      photo_thumbs: photoThumbs,
       totalPhotos: displayPhotos.length,
       verified: !!u.verified,
       online: isOnline(u.last_active),
@@ -632,7 +637,51 @@ function buildProfileMediaKey(username, kind, ext) {
   const slug = sanitizeStorageSegment(username, 'user');
   if (kind === 'avatar') return `profiles/${slug}/avatar-${generateId()}.${ext}`;
   if (kind === 'avatar_thumb') return `profiles/${slug}/avatar-thumb-${generateId()}.${ext}`;
+  if (kind === 'gallery_thumb') return `profiles/${slug}/photo-thumb-${generateId()}.${ext}`;
   return `profiles/${slug}/photo-${generateId()}.${ext}`;
+}
+
+function buildPhotoVerificationKey(userId, requestId, ext) {
+  const userSlug = sanitizeStorageSegment(userId, 'user');
+  const requestSlug = sanitizeStorageSegment(requestId, generateId());
+  return `verifications/photo-otp/${userSlug}/${requestSlug}.${ext}`;
+}
+
+function getPhotoVerificationEffectiveStatus(row) {
+  const rawStatus = PHOTO_VERIFICATION_STATUSES.includes(String(row?.status || ''))
+    ? String(row.status)
+    : 'code_issued';
+  if (
+    (rawStatus === 'code_issued' || rawStatus === 'pending') &&
+    row?.expires_at &&
+    new Date(String(row.expires_at).replace(' ', 'T') + 'Z').getTime() <= Date.now()
+  ) {
+    return 'expired';
+  }
+  return rawStatus;
+}
+
+function serializePhotoVerification(row, { admin = false } = {}) {
+  if (!row) return null;
+  const status = getPhotoVerificationEffectiveStatus(row);
+  const hasPhoto = !!row.photo_key;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    code: row.code || '',
+    status,
+    admin_note: row.admin_note || '',
+    reviewed_by: row.reviewed_by || '',
+    reviewed_at: row.reviewed_at || '',
+    expires_at: row.expires_at || '',
+    created_at: row.created_at || '',
+    updated_at: row.updated_at || '',
+    has_photo: hasPhoto,
+    photo_content_type: row.photo_content_type || '',
+    photo_url: hasPhoto
+      ? (admin ? `/api/admin/photo-verifications/${row.id}/photo` : `/api/verification/photo-otp/photo/${row.id}`)
+      : '',
+  };
 }
 
 async function deleteR2KeysBestEffort(env, keys) {
@@ -648,24 +697,28 @@ async function deleteR2KeysBestEffort(env, keys) {
 async function deleteUserMediaFromR2(env, user, storyRows = []) {
   const keys = new Set();
   const photos = safeParseJSON(user?.photos, []);
+  const photoThumbs = Object.values(normalizePhotoThumbs(user?.photo_thumbs, normalizeGalleryPhotos(photos, user?.avatar_url)));
 
-  for (const url of [user?.avatar_url, user?.avatar_thumb_url, ...photos, ...storyRows.map((row) => row.video_url)]) {
+  for (const url of [user?.avatar_url, user?.avatar_thumb_url, ...photos, ...photoThumbs, ...storyRows.map((row) => row.video_url)]) {
     const key = extractMediaKey(url, env);
     if (key) keys.add(key);
   }
 
   const usernameSlug = sanitizeStorageSegment(user?.username, user?.id || 'user');
   const profilePrefix = `profiles/${usernameSlug}/`;
+  const verificationPrefix = `verifications/photo-otp/${sanitizeStorageSegment(user?.id, 'user')}/`;
 
   try {
-    let cursor;
-    do {
-      const listed = await env.IMAGES.list({ prefix: profilePrefix, cursor });
-      for (const object of listed.objects || []) {
-        if (object?.key) keys.add(object.key);
-      }
-      cursor = listed.truncated ? listed.cursor : undefined;
-    } while (cursor);
+    for (const prefix of [profilePrefix, verificationPrefix]) {
+      let cursor;
+      do {
+        const listed = await env.IMAGES.list({ prefix, cursor });
+        for (const object of listed.objects || []) {
+          if (object?.key) keys.add(object.key);
+        }
+        cursor = listed.truncated ? listed.cursor : undefined;
+      } while (cursor);
+    }
   } catch {
     // best effort
   }
@@ -704,6 +757,7 @@ async function deleteUserCompletely(env, user) {
   await ensureUserBlocksTable(env);
   await ensureProfileReportsTable(env);
   await ensureAccountDeletionRequestsTable(env);
+  await ensurePhotoVerificationRequestsTable(env);
   const storyRowsResult = await env.DB.prepare(
     'SELECT id, video_url FROM stories WHERE user_id = ?'
   ).bind(userId).all();
@@ -724,6 +778,7 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM profile_visits WHERE visitor_id = ? OR visited_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM user_gifts WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM verification_tokens WHERE user_id = ? OR email = ?').bind(userId, user.email),
+    env.DB.prepare('DELETE FROM photo_verification_requests WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM account_deletion_requests WHERE user_id = ? OR email = ?').bind(userId, user.email),
     env.DB.prepare('DELETE FROM processed_payments WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM message_limits WHERE user_id = ?').bind(userId),
@@ -1127,6 +1182,28 @@ async function ensureUsersAvatarThumbColumn(env) {
   return _userAvatarThumbColumnReady;
 }
 
+async function ensureUsersPhotoThumbsColumn(env) {
+  if (!_userPhotoThumbsColumnReady) {
+    _userPhotoThumbsColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          "ALTER TABLE users ADD COLUMN photo_thumbs TEXT DEFAULT '{}'"
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+    })().catch((err) => {
+      _userPhotoThumbsColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userPhotoThumbsColumnReady;
+}
+
 async function ensureUsersLastIpColumn(env) {
   if (!_userLastIpColumnReady) {
     _userLastIpColumnReady = (async () => {
@@ -1147,6 +1224,42 @@ async function ensureUsersLastIpColumn(env) {
   }
 
   return _userLastIpColumnReady;
+}
+
+async function ensurePhotoVerificationRequestsTable(env) {
+  if (!_photoVerificationRequestsReady) {
+    _photoVerificationRequestsReady = (async () => {
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS photo_verification_requests (
+          id                 TEXT PRIMARY KEY,
+          user_id            TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          code               TEXT NOT NULL,
+          photo_key          TEXT DEFAULT '',
+          photo_content_type TEXT DEFAULT '',
+          status             TEXT NOT NULL DEFAULT 'code_issued' CHECK(status IN ('code_issued','pending','approved','rejected','expired')),
+          admin_note         TEXT DEFAULT '',
+          reviewed_by        TEXT REFERENCES users(id),
+          reviewed_at        TEXT DEFAULT NULL,
+          expires_at         TEXT NOT NULL,
+          created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `).run();
+      await Promise.all([
+        env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_photo_verification_user_created ON photo_verification_requests(user_id, created_at DESC)'
+        ).run(),
+        env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_photo_verification_status_created ON photo_verification_requests(status, created_at DESC)'
+        ).run(),
+      ]);
+    })().catch((err) => {
+      _photoVerificationRequestsReady = null;
+      throw err;
+    });
+  }
+
+  return _photoVerificationRequestsReady;
 }
 
 function normalizeRoleArray(rawValue, validValues, fallback = []) {
@@ -1438,6 +1551,23 @@ function normalizeGalleryPhotos(rawPhotos, avatarUrl = '') {
   return gallery;
 }
 
+function normalizePhotoThumbs(rawThumbs, photos = []) {
+  const parsed = rawThumbs && typeof rawThumbs === 'object'
+    ? rawThumbs
+    : safeParseJSON(rawThumbs, {});
+  const photoSet = new Set((Array.isArray(photos) ? photos : []).filter((url) => typeof url === 'string' && url));
+  const out = {};
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return out;
+
+  for (const [photoUrl, thumbUrl] of Object.entries(parsed)) {
+    if (typeof photoUrl !== 'string' || !photoUrl) continue;
+    if (photoSet.size > 0 && !photoSet.has(photoUrl)) continue;
+    if (typeof thumbUrl !== 'string' || !thumbUrl) continue;
+    out[photoUrl] = thumbUrl;
+  }
+  return out;
+}
+
 function buildDisplayPhotos(avatarUrl = '', rawPhotos = []) {
   const gallery = normalizeGalleryPhotos(rawPhotos, avatarUrl);
   return avatarUrl ? [avatarUrl, ...gallery] : gallery;
@@ -1473,6 +1603,9 @@ function normalizeMetricRoute(path) {
   if (/^\/api\/gifts\/received\/[a-f0-9-]+$/.test(path)) return '/api/gifts/received/:userId';
   if (/^\/api\/admin\/gifts\/[a-zA-Z0-9-]+$/.test(path)) return '/api/admin/gifts/:id';
   if (/^\/api\/admin\/profile-reports\/[a-f0-9-]+$/.test(path)) return '/api/admin/profile-reports/:id';
+  if (/^\/api\/admin\/photo-verifications\/[a-f0-9-]+\/photo$/.test(path)) return '/api/admin/photo-verifications/:id/photo';
+  if (/^\/api\/admin\/photo-verifications\/[a-f0-9-]+$/.test(path)) return '/api/admin/photo-verifications/:id';
+  if (/^\/api\/verification\/photo-otp\/photo\/[a-f0-9-]+$/.test(path)) return '/api/verification/photo-otp/photo/:id';
   if (/^\/api\/admin\/users\/[a-f0-9-]+$/.test(path)) return '/api/admin/users/:id';
   if (/^\/api\/admin\/error-logs\/[a-f0-9-]+$/.test(path)) return '/api/admin/error-logs/:id';
   return path;
@@ -1977,6 +2110,10 @@ function generateVerificationCode() {
   const array = new Uint32Array(1);
   crypto.getRandomValues(array);
   return String(array[0] % 1000000).padStart(6, '0');
+}
+
+function generatePhotoOtpCode() {
+  return `MD-${generateVerificationCode()}`;
 }
 
 function normalizeBirthdate(value) {
@@ -2630,6 +2767,232 @@ async function handleMe(request, env) {
   return json({ user: sanitizeUser(user, env) });
 }
 
+// ── Photo OTP verification ──────────────────────────────
+
+async function getLatestPhotoVerification(env, userId) {
+  await ensurePhotoVerificationRequestsTable(env);
+  return env.DB.prepare(`
+    SELECT *
+    FROM photo_verification_requests
+    WHERE user_id = ?
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+  `).bind(userId).first();
+}
+
+async function handleGetPhotoOtpVerification(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const [user, requestRow] = await Promise.all([
+    env.DB.prepare('SELECT id, verified FROM users WHERE id = ?').bind(auth.sub).first(),
+    getLatestPhotoVerification(env, auth.sub),
+  ]);
+  if (!user) return error('Usuario no encontrado', 404);
+
+  return json({
+    verified: !!user.verified,
+    verification: serializePhotoVerification(requestRow),
+  });
+}
+
+async function handleStartPhotoOtpVerification(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  await ensurePhotoVerificationRequestsTable(env);
+
+  const user = await env.DB.prepare(
+    "SELECT id, verified, status FROM users WHERE id = ? AND status = 'verified'"
+  ).bind(auth.sub).first();
+  if (!user) return error('Usuario no encontrado', 404);
+  if (user.verified) {
+    return json({ verified: true, verification: null });
+  }
+
+  const current = await getLatestPhotoVerification(env, auth.sub);
+  const currentStatus = getPhotoVerificationEffectiveStatus(current);
+  if (current && currentStatus !== current.status && currentStatus === 'expired') {
+    await env.DB.prepare(
+      "UPDATE photo_verification_requests SET status = 'expired', updated_at = datetime('now') WHERE id = ?"
+    ).bind(current.id).run();
+  }
+  if (current && (currentStatus === 'code_issued' || currentStatus === 'pending')) {
+    return json({ verified: false, verification: serializePhotoVerification(current) });
+  }
+
+  const requestId = generateId();
+  const code = generatePhotoOtpCode();
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000)
+    .toISOString()
+    .replace('T', ' ')
+    .replace('Z', '')
+    .split('.')[0];
+
+  await env.DB.prepare(`
+    INSERT INTO photo_verification_requests (id, user_id, code, expires_at)
+    VALUES (?, ?, ?, ?)
+  `).bind(requestId, auth.sub, code, expiresAt).run();
+
+  const created = await env.DB.prepare('SELECT * FROM photo_verification_requests WHERE id = ?')
+    .bind(requestId)
+    .first();
+
+  return json({ verified: false, verification: serializePhotoVerification(created) }, 201);
+}
+
+async function handleUploadPhotoOtpVerification(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  await ensurePhotoVerificationRequestsTable(env);
+
+  const user = await env.DB.prepare(
+    "SELECT id, verified FROM users WHERE id = ? AND status = 'verified'"
+  ).bind(auth.sub).first();
+  if (!user) return error('Usuario no encontrado', 404);
+  if (user.verified) return error('Tu perfil ya está verificado', 409);
+
+  const contentType = request.headers.get('Content-Type') || '';
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedTypes.includes(contentType)) {
+    return error('Formato no soportado. Usa JPEG, PNG o WebP.', 400);
+  }
+
+  const declaredLength = Number(request.headers.get('Content-Length') || 0);
+  if (declaredLength > 6 * 1024 * 1024) return error('La foto no puede superar 6MB', 400);
+
+  const activeRequest = await env.DB.prepare(`
+    SELECT *
+    FROM photo_verification_requests
+    WHERE user_id = ?
+      AND status IN ('code_issued', 'pending')
+      AND expires_at > datetime('now')
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+  `).bind(auth.sub).first();
+  if (!activeRequest) return error('Generá un código nuevo antes de subir la foto', 400);
+
+  const imageData = await request.arrayBuffer();
+  if (imageData.byteLength > 6 * 1024 * 1024) return error('La foto no puede superar 6MB', 400);
+
+  const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
+  const key = buildPhotoVerificationKey(auth.sub, activeRequest.id, ext);
+
+  await env.IMAGES.put(key, imageData, {
+    httpMetadata: {
+      contentType,
+      cacheControl: 'private, max-age=0, no-store',
+    },
+  });
+
+  const previousKey = activeRequest.photo_key || '';
+  await env.DB.prepare(`
+    UPDATE photo_verification_requests
+    SET photo_key = ?, photo_content_type = ?, status = 'pending', admin_note = '', reviewed_by = NULL, reviewed_at = NULL, updated_at = datetime('now')
+    WHERE id = ?
+  `).bind(key, contentType, activeRequest.id).run();
+
+  if (previousKey && previousKey !== key) {
+    await deleteR2KeysBestEffort(env, [previousKey]);
+  }
+
+  const updated = await env.DB.prepare('SELECT * FROM photo_verification_requests WHERE id = ?')
+    .bind(activeRequest.id)
+    .first();
+
+  return json({ verified: false, verification: serializePhotoVerification(updated) }, 201);
+}
+
+async function handleGetPhotoOtpVerificationPhoto(request, env, requestId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  await ensurePhotoVerificationRequestsTable(env);
+
+  const row = await env.DB.prepare(
+    'SELECT id, user_id, photo_key, photo_content_type FROM photo_verification_requests WHERE id = ? AND user_id = ?'
+  ).bind(requestId, auth.sub).first();
+  if (!row?.photo_key) return error('Foto no encontrada', 404);
+
+  const object = await env.IMAGES.get(row.photo_key);
+  if (!object?.body) return error('Foto no encontrada', 404);
+
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': row.photo_content_type || object.httpMetadata?.contentType || 'image/jpeg',
+      'Cache-Control': 'private, max-age=60',
+    },
+  });
+}
+
+async function handleAdminReviewPhotoVerification(request, env, requestId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+  await ensurePhotoVerificationRequestsTable(env);
+
+  const body = await request.json().catch(() => ({}));
+  const nextStatus = String(body?.status || '').trim();
+  const adminNote = String(body?.admin_note || '').trim().slice(0, 1000);
+  if (nextStatus !== 'approved' && nextStatus !== 'rejected') {
+    return error('Estado de verificación inválido', 400);
+  }
+
+  const record = await env.DB.prepare('SELECT * FROM photo_verification_requests WHERE id = ?')
+    .bind(requestId)
+    .first();
+  if (!record) return error('Solicitud no encontrada', 404);
+  if (nextStatus === 'approved' && !record.photo_key) {
+    return error('No se puede aprobar una solicitud sin foto', 400);
+  }
+
+  await env.DB.batch([
+    env.DB.prepare(`
+      UPDATE photo_verification_requests
+      SET status = ?, admin_note = ?, reviewed_by = ?, reviewed_at = datetime('now'), updated_at = datetime('now')
+      WHERE id = ?
+    `).bind(nextStatus, adminNote, auth.sub, requestId),
+    env.DB.prepare('UPDATE users SET verified = ? WHERE id = ?')
+      .bind(nextStatus === 'approved' ? 1 : 0, record.user_id),
+  ]);
+
+  _fullUserCache.delete(record.user_id);
+  _viewerCache.delete(record.user_id);
+  invalidateFeedBrowseCache();
+
+  const [updatedVerification, updatedUser] = await Promise.all([
+    env.DB.prepare('SELECT * FROM photo_verification_requests WHERE id = ?').bind(requestId).first(),
+    env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first(),
+  ]);
+
+  return json({
+    verification: serializePhotoVerification(updatedVerification, { admin: true }),
+    user: sanitizeUser(updatedUser, env),
+  });
+}
+
+async function handleAdminGetPhotoVerificationPhoto(request, env, requestId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+  await ensurePhotoVerificationRequestsTable(env);
+
+  const row = await env.DB.prepare(
+    'SELECT id, photo_key, photo_content_type FROM photo_verification_requests WHERE id = ?'
+  ).bind(requestId).first();
+  if (!row?.photo_key) return error('Foto no encontrada', 404);
+
+  const object = await env.IMAGES.get(row.photo_key);
+  if (!object?.body) return error('Foto no encontrada', 404);
+
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': row.photo_content_type || object.httpMetadata?.contentType || 'image/jpeg',
+      'Cache-Control': 'private, max-age=60',
+    },
+  });
+}
+
 // ── POST /api/account/delete/request ────────────────────
 
 async function handleRequestAccountDeletion(request, env) {
@@ -2904,6 +3267,7 @@ async function handleProfiles(request, env) {
       u.bio,
       u.avatar_url,
       u.avatar_thumb_url,
+      u.photo_thumbs,
       u.avatar_crop,
       u.photos,
       u.verified,
@@ -3198,6 +3562,7 @@ async function handleProfileDetail(request, env, userId) {
   }
 
   const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
+  const photoThumbs = normalizePhotoThumbs(user.photo_thumbs, galleryPhotos);
   const displayPhotos = buildDisplayPhotos(user.avatar_url, galleryPhotos);
   // Keep avatar separate from gallery; frontend can merge both when it needs a full media carousel.
   const visibleLimit = settings.freeVisiblePhotos;
@@ -3253,6 +3618,7 @@ async function handleProfileDetail(request, env, userId) {
       interests: safeParseJSON(user.interests, []),
       bio: user.bio,
       photos: galleryPhotos,
+      photo_thumbs: photoThumbs,
       totalPhotos: displayPhotos.length,
       visiblePhotos,
       verified: !!user.verified,
@@ -3883,8 +4249,9 @@ async function handleUpload(request, env) {
   if (!auth) return error('No autorizado', 401);
   const uploadUrl = new URL(request.url);
   const purpose = uploadUrl.searchParams.get('purpose') || 'asset';
+  const sourceUrl = uploadUrl.searchParams.get('source_url') || '';
 
-  if (!['asset', 'avatar', 'avatar_thumb', 'gallery'].includes(purpose)) {
+  if (!['asset', 'avatar', 'avatar_thumb', 'gallery', 'gallery_thumb'].includes(purpose)) {
     return error('purpose inválido', 400);
   }
 
@@ -3907,10 +4274,18 @@ async function handleUpload(request, env) {
   }
 
   const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
-  const user = await env.DB.prepare('SELECT username, photos, avatar_url, avatar_thumb_url FROM users WHERE id = ?').bind(auth.sub).first();
+  const user = await env.DB.prepare('SELECT username, photos, avatar_url, avatar_thumb_url, photo_thumbs FROM users WHERE id = ?').bind(auth.sub).first();
   if (!user) return error('Usuario no encontrado', 404);
+  const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
+  const photoThumbs = normalizePhotoThumbs(user.photo_thumbs, galleryPhotos);
 
-  const key = purpose === 'avatar' || purpose === 'avatar_thumb' || purpose === 'gallery'
+  if (purpose === 'gallery_thumb') {
+    if (!sourceUrl || !galleryPhotos.includes(sourceUrl) || !isTrustedMediaUrl(sourceUrl, env)) {
+      return error('Foto de galería inválida', 400);
+    }
+  }
+
+  const key = purpose === 'avatar' || purpose === 'avatar_thumb' || purpose === 'gallery' || purpose === 'gallery_thumb'
     ? buildProfileMediaKey(user.username, purpose, ext)
     : `assets/${generateId()}.${ext}`;
 
@@ -3924,7 +4299,6 @@ async function handleUpload(request, env) {
   });
 
   const publicUrl = buildPublicMediaUrl(key, env);
-  const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
 
   if (purpose === 'avatar') {
     const previousAvatarKey = extractMediaKey(user.avatar_url, env);
@@ -3953,11 +4327,34 @@ async function handleUpload(request, env) {
 
   if (purpose === 'gallery') {
     const nextPhotos = [...galleryPhotos, publicUrl];
+    const nextPhotoThumbs = normalizePhotoThumbs(photoThumbs, nextPhotos);
     await env.DB.prepare(`
-      UPDATE users SET photos = ? WHERE id = ?
-    `).bind(JSON.stringify(nextPhotos), auth.sub).run();
+      UPDATE users SET photos = ?, photo_thumbs = ? WHERE id = ?
+    `).bind(JSON.stringify(nextPhotos), JSON.stringify(nextPhotoThumbs), auth.sub).run();
 
-    return json({ url: publicUrl, key, avatar_url: user.avatar_url || '', photos: nextPhotos }, 201);
+    return json({ url: publicUrl, key, avatar_url: user.avatar_url || '', photos: nextPhotos, photo_thumbs: nextPhotoThumbs }, 201);
+  }
+
+  if (purpose === 'gallery_thumb') {
+    const previousThumbKey = extractMediaKey(photoThumbs[sourceUrl], env);
+    const nextPhotoThumbs = { ...photoThumbs, [sourceUrl]: publicUrl };
+    await env.DB.prepare(`
+      UPDATE users SET photo_thumbs = ? WHERE id = ?
+    `).bind(JSON.stringify(nextPhotoThumbs), auth.sub).run();
+
+    if (previousThumbKey && previousThumbKey !== key) {
+      await deleteR2KeysBestEffort(env, [previousThumbKey]);
+    }
+
+    return json({
+      url: publicUrl,
+      key,
+      source_url: sourceUrl,
+      photo_thumb_url: publicUrl,
+      avatar_url: user.avatar_url || '',
+      photos: galleryPhotos,
+      photo_thumbs: nextPhotoThumbs,
+    }, 201);
   }
 
   return json({ url: publicUrl, key }, 201);
@@ -4034,31 +4431,33 @@ async function handleDeletePhoto(request, env) {
   if (!url || typeof url !== 'string') return error('URL requerida', 400);
 
   // Get user's current photos
-  const user = await env.DB.prepare('SELECT photos, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
+  const user = await env.DB.prepare('SELECT photos, avatar_url, photo_thumbs FROM users WHERE id = ?').bind(auth.sub).first();
   if (!user) return error('Usuario no encontrado', 404);
   if (user.avatar_url === url) return error('La foto de perfil se gestiona por separado', 400);
 
   const photos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
+  const photoThumbs = normalizePhotoThumbs(user.photo_thumbs, photos);
   const index = photos.indexOf(url);
   if (index === -1) return error('Foto no encontrada', 404);
+  const thumbUrl = photoThumbs[url] || '';
 
   // Remove from array
   photos.splice(index, 1);
+  delete photoThumbs[url];
 
-  await env.DB.prepare('UPDATE users SET photos = ? WHERE id = ?')
-    .bind(JSON.stringify(photos), auth.sub).run();
+  await env.DB.prepare('UPDATE users SET photos = ?, photo_thumbs = ? WHERE id = ?')
+    .bind(JSON.stringify(photos), JSON.stringify(normalizePhotoThumbs(photoThumbs, photos)), auth.sub).run();
 
   // Try to delete from R2 (extract key from URL)
   try {
     const key = extractMediaKey(url, env);
-    if (key) {
-      await env.IMAGES.delete(key);
-    }
+    const thumbKey = extractMediaKey(thumbUrl, env);
+    await deleteR2KeysBestEffort(env, [key, thumbKey]);
   } catch {
     // R2 delete is best-effort
   }
 
-  return json({ photos, avatar_url: user.avatar_url || '' });
+  return json({ photos, photo_thumbs: normalizePhotoThumbs(photoThumbs, photos), avatar_url: user.avatar_url || '' });
 }
 
 // handleServeImage removed — images now served directly from R2 public bucket
@@ -4084,9 +4483,15 @@ async function handleUpdateProfile(request, env) {
   }
 
   await ensureUsersMessageBlockRolesColumn(env);
-  const allowedFields = ['username', 'role', 'seeking', 'interests', 'message_block_roles', 'age', 'birthdate', 'city', 'locality', 'marital_status', 'sexual_orientation', 'bio', 'avatar_url', 'avatar_crop', 'premium'];
-  const currentUser = await env.DB.prepare('SELECT premium, premium_until, avatar_url FROM users WHERE id = ?').bind(auth.sub).first();
+  const allowedFields = ['username', 'role', 'seeking', 'interests', 'message_block_roles', 'age', 'birthdate', 'city', 'locality', 'marital_status', 'sexual_orientation', 'bio', 'avatar_url', 'avatar_thumb_url', 'avatar_crop', 'premium'];
+  const currentUser = await env.DB.prepare('SELECT premium, premium_until, avatar_url, avatar_thumb_url, photos, photo_thumbs FROM users WHERE id = ?').bind(auth.sub).first();
   if (!currentUser) return error('Usuario no encontrado', 404);
+  const currentGalleryPhotos = normalizeGalleryPhotos(safeParseJSON(currentUser.photos, []), currentUser.avatar_url);
+  const currentPhotoThumbs = normalizePhotoThumbs(currentUser.photo_thumbs, currentGalleryPhotos);
+
+  if (normalizedBody.avatar_url !== undefined && normalizedBody.avatar_thumb_url === undefined) {
+    normalizedBody.avatar_thumb_url = currentPhotoThumbs[normalizedBody.avatar_url] || '';
+  }
 
   // Validate and allow photos reorder (all URLs must originate from our R2 bucket)
   if (body.photos !== undefined) {
@@ -4126,7 +4531,10 @@ async function handleUpdateProfile(request, env) {
         updates.push(`${field} = ?`);
         if (field === 'photos') {
           const effectiveAvatarUrl = normalizedBody.avatar_url !== undefined ? normalizedBody.avatar_url : currentUser.avatar_url;
-          values.push(JSON.stringify(normalizeGalleryPhotos(normalizedBody[field], effectiveAvatarUrl)));
+          const nextPhotos = normalizeGalleryPhotos(normalizedBody[field], effectiveAvatarUrl);
+          values.push(JSON.stringify(nextPhotos));
+          updates.push('photo_thumbs = ?');
+          values.push(JSON.stringify(normalizePhotoThumbs(currentPhotoThumbs, nextPhotos)));
         } else {
           values.push(JSON.stringify(normalizedBody[field]));
         }
@@ -4236,6 +4644,7 @@ function sanitizeUser(user, env) {
     message_block_roles: normalizeRoleArray(safeParseJSON(safe.message_block_roles, []), SEEKING_ROLE_IDS, []),
     interests: safeParseJSON(safe.interests, []),
     photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
+    photo_thumbs: normalizePhotoThumbs(safe.photo_thumbs, normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url)),
     avatar_thumb_url: safe.avatar_thumb_url || '',
     avatar_crop: safeParseJSON(safe.avatar_crop, null),
     verified: !!safe.verified,
@@ -5127,17 +5536,26 @@ async function handleAdminGetUsers(request, env) {
   const statusFilter = (url.searchParams.get('status') || '').trim();
   const createdFilter = (url.searchParams.get('created') || '').trim();
   const reportedFilter = url.searchParams.get('reported');
+  const featuredFilter = url.searchParams.get('featured');
+  const verificationFilter = (url.searchParams.get('verification') || '').trim();
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
   await ensureUsersMessageBlockRolesColumn(env);
   await ensureUsersDuplicateFlagColumn(env);
   await ensureUsersFeedPriorityColumn(env);
-  let dataQuery = `SELECT id, email, username, role, seeking, message_block_roles, age, birthdate, city, locality, marital_status, sexual_orientation, country, avatar_url, status,
-    premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, feed_priority, duplicate_flag, account_status, last_active, last_ip, created_at,
+  await ensureUsersPhotoThumbsColumn(env);
+  let dataQuery = `SELECT id, email, username, role, seeking, message_block_roles, age, birthdate, city, locality, marital_status, sexual_orientation, country, avatar_url, avatar_thumb_url, status,
+    photos, photo_thumbs, premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, feed_priority, duplicate_flag, account_status, last_active, last_ip, created_at,
     (SELECT COUNT(*) FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open') as reports_count,
     (SELECT pr.reason FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open' ORDER BY pr.updated_at DESC LIMIT 1) as latest_report_reason,
     (SELECT pr.updated_at FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open' ORDER BY pr.updated_at DESC LIMIT 1) as latest_report_at,
+    (SELECT pvr.id FROM photo_verification_requests pvr WHERE pvr.user_id = users.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_id,
+    (SELECT pvr.status FROM photo_verification_requests pvr WHERE pvr.user_id = users.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_status,
+    (SELECT pvr.photo_key FROM photo_verification_requests pvr WHERE pvr.user_id = users.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_key,
+    (SELECT pvr.expires_at FROM photo_verification_requests pvr WHERE pvr.user_id = users.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_expires_at,
+    (SELECT pvr.created_at FROM photo_verification_requests pvr WHERE pvr.user_id = users.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_created_at,
+    (SELECT pvr.updated_at FROM photo_verification_requests pvr WHERE pvr.user_id = users.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_updated_at,
     (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id,
     (SELECT COALESCE(s.vip_only, 0) FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_vip_only
     FROM users`;
@@ -5184,6 +5602,20 @@ async function handleAdminGetUsers(request, env) {
     filters.push("NOT EXISTS (SELECT 1 FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open')");
   }
 
+  if (featuredFilter === '1') {
+    filters.push('COALESCE(feed_priority, 0) > 0');
+  } else if (featuredFilter === '0') {
+    filters.push('COALESCE(feed_priority, 0) = 0');
+  }
+
+  if (verificationFilter === 'pending') {
+    filters.push("EXISTS (SELECT 1 FROM photo_verification_requests pvr WHERE pvr.user_id = users.id AND pvr.status = 'pending' AND pvr.expires_at > datetime('now'))");
+  } else if (verificationFilter === 'verified') {
+    filters.push('COALESCE(verified, 0) = 1');
+  } else if (verificationFilter === 'unverified') {
+    filters.push('COALESCE(verified, 0) = 0');
+  }
+
   if (filters.length > 0) {
     const whereClause = ` WHERE ${filters.join(' AND ')}`;
     countQuery += whereClause;
@@ -5202,29 +5634,42 @@ async function handleAdminGetUsers(request, env) {
   const [countRes, dataRes] = await Promise.all([countStmt.first(), dataStmt.all()]);
 
   return json({
-    users: dataRes.results.map(u => ({
-      ...u,
-      age: getPublicAge(u),
-      birthdate: normalizeBirthdate(u.birthdate) || '',
-      province: u.city || '',
-      locality: u.locality || '',
-      marital_status: u.marital_status || '',
-      sexual_orientation: u.sexual_orientation || '',
-      message_block_roles: normalizeRoleArray(safeParseJSON(u.message_block_roles, []), SEEKING_ROLE_IDS, []),
-      premium: isPremiumActive(u),
-      online: isOnline(u.last_active),
-      is_admin: !!u.is_admin,
-      fake: !!u.fake,
-      feed_priority: Math.max(0, Number(u.feed_priority || 0)),
-      duplicate_flag: !!u.duplicate_flag,
-      reports_count: Number(u.reports_count || 0),
-      latest_report_reason: u.latest_report_reason || '',
-      latest_report_at: u.latest_report_at || '',
-      story_id: u.story_id || null,
-      story_vip_only: Number(u.story_vip_only || 0) === 1,
-      interests: undefined,
-      photos: undefined,
-    })),
+    users: dataRes.results.map(u => {
+      const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(u.photos, []), u.avatar_url);
+      const photoThumbs = normalizePhotoThumbs(u.photo_thumbs, galleryPhotos);
+      return {
+        ...u,
+        age: getPublicAge(u),
+        birthdate: normalizeBirthdate(u.birthdate) || '',
+        province: u.city || '',
+        locality: u.locality || '',
+        marital_status: u.marital_status || '',
+        sexual_orientation: u.sexual_orientation || '',
+        message_block_roles: normalizeRoleArray(safeParseJSON(u.message_block_roles, []), SEEKING_ROLE_IDS, []),
+        premium: isPremiumActive(u),
+        online: isOnline(u.last_active),
+        is_admin: !!u.is_admin,
+        fake: !!u.fake,
+        feed_priority: Math.max(0, Number(u.feed_priority || 0)),
+        duplicate_flag: !!u.duplicate_flag,
+        reports_count: Number(u.reports_count || 0),
+        latest_report_reason: u.latest_report_reason || '',
+        latest_report_at: u.latest_report_at || '',
+        photo_verification_id: u.photo_verification_id || '',
+        photo_verification_status: u.photo_verification_status
+          ? getPhotoVerificationEffectiveStatus({ status: u.photo_verification_status, expires_at: u.photo_verification_expires_at })
+          : '',
+        photo_verification_has_photo: !!u.photo_verification_key,
+        photo_verification_expires_at: u.photo_verification_expires_at || '',
+        photo_verification_created_at: u.photo_verification_created_at || '',
+        photo_verification_updated_at: u.photo_verification_updated_at || '',
+        story_id: u.story_id || null,
+        story_vip_only: Number(u.story_vip_only || 0) === 1,
+        interests: undefined,
+        photos: galleryPhotos,
+        photo_thumbs: photoThumbs,
+      };
+    }),
     total: countRes.total,
     page,
     pages: Math.ceil(countRes.total / limit),
@@ -5233,7 +5678,9 @@ async function handleAdminGetUsers(request, env) {
 
 async function handleAdminGetUserIds(request, env) {
   await ensureUsersDuplicateFlagColumn(env);
+  await ensureUsersFeedPriorityColumn(env);
   await ensureProfileReportsTable(env);
+  await ensurePhotoVerificationRequestsTable(env);
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -5247,6 +5694,8 @@ async function handleAdminGetUserIds(request, env) {
   const statusFilter = (url.searchParams.get('status') || '').trim();
   const createdFilter = (url.searchParams.get('created') || '').trim();
   const reportedFilter = url.searchParams.get('reported');
+  const featuredFilter = url.searchParams.get('featured');
+  const verificationFilter = (url.searchParams.get('verification') || '').trim();
 
   let query = 'SELECT id, fake FROM users';
   const filters = [];
@@ -5290,6 +5739,20 @@ async function handleAdminGetUserIds(request, env) {
     filters.push("EXISTS (SELECT 1 FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open')");
   } else if (reportedFilter === '0') {
     filters.push("NOT EXISTS (SELECT 1 FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open')");
+  }
+
+  if (featuredFilter === '1') {
+    filters.push('COALESCE(feed_priority, 0) > 0');
+  } else if (featuredFilter === '0') {
+    filters.push('COALESCE(feed_priority, 0) = 0');
+  }
+
+  if (verificationFilter === 'pending') {
+    filters.push("EXISTS (SELECT 1 FROM photo_verification_requests pvr WHERE pvr.user_id = users.id AND pvr.status = 'pending' AND pvr.expires_at > datetime('now'))");
+  } else if (verificationFilter === 'verified') {
+    filters.push('COALESCE(verified, 0) = 1');
+  } else if (verificationFilter === 'unverified') {
+    filters.push('COALESCE(verified, 0) = 0');
   }
 
   if (filters.length > 0) {
@@ -5649,6 +6112,7 @@ async function handleAdminGetUser(request, env, userId) {
   const reportCount = await env.DB.prepare(
     "SELECT COUNT(*) AS total FROM profile_reports WHERE reported_id = ? AND status = 'open'"
   ).bind(userId).first();
+  const photoVerification = await getLatestPhotoVerification(env, userId);
   const reports = (reportRows.results || []).map((row) => ({
     id: row.id,
     reporter_id: row.reporter_id,
@@ -5673,6 +6137,7 @@ async function handleAdminGetUser(request, env, userId) {
       message_block_roles: normalizeRoleArray(safeParseJSON(safe.message_block_roles, []), SEEKING_ROLE_IDS, []),
       interests: safeParseJSON(safe.interests, []),
       photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
+      photo_thumbs: normalizePhotoThumbs(safe.photo_thumbs, normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url)),
       avatar_crop: safeParseJSON(safe.avatar_crop, null),
       premium: isPremiumActive(safe),
       online: isOnline(safe.last_active),
@@ -5682,6 +6147,7 @@ async function handleAdminGetUser(request, env, userId) {
       duplicate_flag: !!safe.duplicate_flag,
       reports_count: Number(reportCount?.total || 0),
       reports,
+      photo_verification: serializePhotoVerification(photoVerification, { admin: true }),
       story_id: story?.id || null,
       story_vip_only: Number(story?.vip_only || 0) === 1,
     }
@@ -5739,13 +6205,20 @@ async function handleAdminUpdateUser(request, env, userId) {
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
 
-  const user = await env.DB.prepare('SELECT id, avatar_url, avatar_crop FROM users WHERE id = ?').bind(userId).first();
+  const user = await env.DB.prepare('SELECT id, avatar_url, avatar_thumb_url, avatar_crop, photos, photo_thumbs FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
 
   const body = await request.json();
   const updates = [];
   const vals = [];
   const effectiveAvatarUrl = body.avatar_url !== undefined ? (body.avatar_url || '') : (user.avatar_url || '');
+  const currentGalleryPhotos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
+  const currentPhotoThumbs = normalizePhotoThumbs(user.photo_thumbs, currentGalleryPhotos);
+  const effectiveAvatarThumbUrl = body.avatar_thumb_url !== undefined
+    ? (body.avatar_thumb_url || '')
+    : body.avatar_url !== undefined
+      ? (currentPhotoThumbs[effectiveAvatarUrl] || '')
+      : (user.avatar_thumb_url || '');
 
   if (body.premium !== undefined) { updates.push('premium = ?'); vals.push(body.premium ? 1 : 0); }
   if (body.premium_until !== undefined) { updates.push('premium_until = ?'); vals.push(body.premium_until || null); }
@@ -5768,11 +6241,22 @@ async function handleAdminUpdateUser(request, env, userId) {
   if (body.account_status !== undefined && ['active', 'under_review', 'suspended'].includes(body.account_status)) {
     updates.push('account_status = ?'); vals.push(body.account_status);
   }
-  if (body.avatar_url !== undefined) { updates.push('avatar_url = ?'); vals.push(effectiveAvatarUrl || null); }
+  if (body.avatar_url !== undefined) {
+    updates.push('avatar_url = ?');
+    vals.push(effectiveAvatarUrl || null);
+    updates.push('avatar_thumb_url = ?');
+    vals.push(effectiveAvatarThumbUrl || '');
+  } else if (body.avatar_thumb_url !== undefined) {
+    updates.push('avatar_thumb_url = ?');
+    vals.push(effectiveAvatarThumbUrl || '');
+  }
   if (body.avatar_crop !== undefined) { updates.push('avatar_crop = ?'); vals.push(JSON.stringify(body.avatar_crop || null)); }
   if (body.photos !== undefined) {
+    const nextPhotos = normalizeGalleryPhotos(body.photos, effectiveAvatarUrl);
     updates.push('photos = ?');
-    vals.push(JSON.stringify(normalizeGalleryPhotos(body.photos, effectiveAvatarUrl)));
+    vals.push(JSON.stringify(nextPhotos));
+    updates.push('photo_thumbs = ?');
+    vals.push(JSON.stringify(normalizePhotoThumbs(currentPhotoThumbs, nextPhotos)));
   }
 
   if (updates.length === 0) return error('Nada que actualizar');
@@ -5797,6 +6281,7 @@ async function handleAdminUpdateUser(request, env, userId) {
       message_block_roles: normalizeRoleArray(safeParseJSON(safe.message_block_roles, []), SEEKING_ROLE_IDS, []),
       interests: safeParseJSON(safe.interests, []),
       photos: normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url),
+      photo_thumbs: normalizePhotoThumbs(safe.photo_thumbs, normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url)),
       avatar_crop: safeParseJSON(safe.avatar_crop, null),
       premium: isPremiumActive(safe),
       online: isOnline(safe.last_active),
@@ -5808,6 +6293,184 @@ async function handleAdminUpdateUser(request, env, userId) {
   });
 }
 
+async function handleAdminUploadGalleryThumb(request, env, userId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const uploadUrl = new URL(request.url);
+  const sourceUrl = uploadUrl.searchParams.get('source_url') || '';
+  if (!sourceUrl || !isTrustedMediaUrl(sourceUrl, env)) return error('Foto de galería inválida', 400);
+
+  const contentType = request.headers.get('Content-Type') || '';
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedTypes.includes(contentType)) {
+    return error('Formato no soportado. Usa JPEG, PNG o WebP.', 400);
+  }
+
+  const imageData = await request.arrayBuffer();
+  if (imageData.byteLength > 2 * 1024 * 1024) {
+    return error('La miniatura no puede superar 2MB', 400);
+  }
+
+  const user = await env.DB.prepare(
+    'SELECT id, username, avatar_url, avatar_thumb_url, avatar_crop, photos, photo_thumbs FROM users WHERE id = ?'
+  ).bind(userId).first();
+  if (!user) return error('Usuario no encontrado', 404);
+
+  const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
+  if (!galleryPhotos.includes(sourceUrl)) return error('Foto no encontrada en la galería', 404);
+
+  const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
+  const key = buildProfileMediaKey(user.username, 'gallery_thumb', ext);
+
+  await env.IMAGES.put(key, imageData, {
+    httpMetadata: {
+      contentType,
+      cacheControl: 'public, max-age=31536000, immutable',
+    },
+  });
+
+  const publicUrl = buildPublicMediaUrl(key, env);
+  const photoThumbs = normalizePhotoThumbs(user.photo_thumbs, galleryPhotos);
+  const previousThumbKey = extractMediaKey(photoThumbs[sourceUrl], env);
+  const nextPhotoThumbs = { ...photoThumbs, [sourceUrl]: publicUrl };
+
+  await env.DB.prepare('UPDATE users SET photo_thumbs = ? WHERE id = ?')
+    .bind(JSON.stringify(nextPhotoThumbs), userId).run();
+
+  if (previousThumbKey && previousThumbKey !== key) {
+    await deleteR2KeysBestEffort(env, [previousThumbKey]);
+  }
+
+  _fullUserCache.delete(userId);
+  _viewerCache.delete(userId);
+  invalidateFeedBrowseCache();
+
+  const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  const { password_hash, ...safe } = updated;
+  const updatedPhotos = normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url);
+
+  return json({
+    url: publicUrl,
+    source_url: sourceUrl,
+    photo_thumb_url: publicUrl,
+    photo_thumbs: normalizePhotoThumbs(safe.photo_thumbs, updatedPhotos),
+    user: {
+      ...safe,
+      age: getPublicAge(safe),
+      birthdate: normalizeBirthdate(safe.birthdate) || '',
+      province: safe.city || '',
+      locality: safe.locality || '',
+      marital_status: safe.marital_status || '',
+      sexual_orientation: safe.sexual_orientation || '',
+      message_block_roles: normalizeRoleArray(safeParseJSON(safe.message_block_roles, []), SEEKING_ROLE_IDS, []),
+      interests: safeParseJSON(safe.interests, []),
+      photos: updatedPhotos,
+      photo_thumbs: normalizePhotoThumbs(safe.photo_thumbs, updatedPhotos),
+      avatar_crop: safeParseJSON(safe.avatar_crop, null),
+      premium: isPremiumActive(safe),
+      online: isOnline(safe.last_active),
+      is_admin: !!safe.is_admin,
+      fake: !!safe.fake,
+      feed_priority: Math.max(0, Number(safe.feed_priority || 0)),
+      duplicate_flag: !!safe.duplicate_flag,
+    },
+  }, 201);
+}
+
+async function handleAdminUploadAvatarThumb(request, env, userId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const contentType = request.headers.get('Content-Type') || '';
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedTypes.includes(contentType)) {
+    return error('Formato no soportado. Usa JPEG, PNG o WebP.', 400);
+  }
+
+  const imageData = await request.arrayBuffer();
+  if (imageData.byteLength > 2 * 1024 * 1024) {
+    return error('La miniatura no puede superar 2MB', 400);
+  }
+
+  const user = await env.DB.prepare(
+    'SELECT id, username, avatar_url, avatar_thumb_url FROM users WHERE id = ?'
+  ).bind(userId).first();
+  if (!user) return error('Usuario no encontrado', 404);
+  if (!user.avatar_url || !isTrustedMediaUrl(user.avatar_url, env)) return error('Avatar inválido', 400);
+
+  const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
+  const key = buildProfileMediaKey(user.username, 'avatar_thumb', ext);
+
+  await env.IMAGES.put(key, imageData, {
+    httpMetadata: {
+      contentType,
+      cacheControl: 'public, max-age=31536000, immutable',
+    },
+  });
+
+  const publicUrl = buildPublicMediaUrl(key, env);
+  const previousThumbKey = extractMediaKey(user.avatar_thumb_url, env);
+  await env.DB.prepare('UPDATE users SET avatar_thumb_url = ? WHERE id = ?')
+    .bind(publicUrl, userId).run();
+
+  if (previousThumbKey && previousThumbKey !== key) {
+    await deleteR2KeysBestEffort(env, [previousThumbKey]);
+  }
+
+  _fullUserCache.delete(userId);
+  _viewerCache.delete(userId);
+  invalidateFeedBrowseCache();
+
+  const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  return json({ avatar_thumb_url: publicUrl, user: sanitizeUser(updated, env) }, 201);
+}
+
+async function handleAdminDeleteGalleryPhoto(request, env, userId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const { url } = await request.json().catch(() => ({}));
+  if (!url || typeof url !== 'string') return error('URL requerida', 400);
+
+  const user = await env.DB.prepare(
+    'SELECT id, avatar_url, photo_thumbs, photos FROM users WHERE id = ?'
+  ).bind(userId).first();
+  if (!user) return error('Usuario no encontrado', 404);
+  if (user.avatar_url === url) return error('La foto de perfil se gestiona por separado', 400);
+
+  const photos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
+  const index = photos.indexOf(url);
+  if (index === -1) return error('Foto no encontrada', 404);
+
+  const photoThumbs = normalizePhotoThumbs(user.photo_thumbs, photos);
+  const thumbUrl = photoThumbs[url] || '';
+  photos.splice(index, 1);
+  delete photoThumbs[url];
+  const nextPhotoThumbs = normalizePhotoThumbs(photoThumbs, photos);
+
+  await env.DB.prepare('UPDATE users SET photos = ?, photo_thumbs = ? WHERE id = ?')
+    .bind(JSON.stringify(photos), JSON.stringify(nextPhotoThumbs), userId).run();
+
+  await deleteR2KeysBestEffort(env, [
+    extractMediaKey(url, env),
+    extractMediaKey(thumbUrl, env),
+  ]);
+
+  _fullUserCache.delete(userId);
+  _viewerCache.delete(userId);
+  invalidateFeedBrowseCache();
+
+  const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  return json({ photos, photo_thumbs: nextPhotoThumbs, user: sanitizeUser(updated, env) });
+}
+
 // ── Admin: DELETE /api/admin/users/:id ───────────────────
 async function handleAdminDeleteUser(request, env, userId) {
   const auth = await authenticate(request, env);
@@ -5817,7 +6480,7 @@ async function handleAdminDeleteUser(request, env, userId) {
 
   if (userId === auth.sub) return error('No puedes eliminarte a ti mismo', 400);
 
-  const user = await env.DB.prepare('SELECT id, email, username, avatar_url, avatar_thumb_url, photos FROM users WHERE id = ?').bind(userId).first();
+  const user = await env.DB.prepare('SELECT id, email, username, avatar_url, avatar_thumb_url, photo_thumbs, photos FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
 
   await deleteUserCompletely(env, user);
@@ -5845,7 +6508,7 @@ async function handleAdminBulkDeleteUsers(request, env) {
       continue;
     }
 
-    const user = await env.DB.prepare('SELECT id, email, username, avatar_url, avatar_thumb_url, photos FROM users WHERE id = ?').bind(userId).first();
+    const user = await env.DB.prepare('SELECT id, email, username, avatar_url, avatar_thumb_url, photo_thumbs, photos FROM users WHERE id = ?').bind(userId).first();
     if (!user) {
       results.push({ user_id: userId, deleted: false, reason: 'not_found' });
       continue;
@@ -6995,6 +7658,8 @@ async function handleRequest(request, env, ctx) {
   await ensureUsersMaritalStatusColumn(env);
   await ensureUsersSexualOrientationColumn(env);
   await ensureUsersAvatarThumbColumn(env);
+  await ensureUsersPhotoThumbsColumn(env);
+  await ensurePhotoVerificationRequestsTable(env);
 
   // CORS preflight
   if (method === 'OPTIONS') return handleOptions(env, request);
@@ -7031,6 +7696,11 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/me/dashboard' && method === 'GET') return handleOwnProfileDashboard(request, env);
   if (path === '/api/account/delete/request' && method === 'POST') return handleRequestAccountDeletion(request, env);
   if (path === '/api/account/delete/confirm' && method === 'POST') return handleConfirmAccountDeletion(request, env);
+  if (path === '/api/verification/photo-otp' && method === 'GET') return handleGetPhotoOtpVerification(request, env);
+  if (path === '/api/verification/photo-otp/start' && method === 'POST') return handleStartPhotoOtpVerification(request, env);
+  if (path === '/api/verification/photo-otp/photo' && method === 'POST') return handleUploadPhotoOtpVerification(request, env);
+  const photoVerificationPhotoMatch = path.match(/^\/api\/verification\/photo-otp\/photo\/([a-f0-9-]+)$/);
+  if (photoVerificationPhotoMatch && method === 'GET') return handleGetPhotoOtpVerificationPhoto(request, env, photoVerificationPhotoMatch[1]);
 
   // ── Profile routes
   if (path === '/api/profiles' && method === 'GET') return handleProfiles(request, env);
@@ -7108,8 +7778,18 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/admin/fake-inbox/conversation' && method === 'GET') return handleAdminGetFakeInboxConversation(request, env);
   if (path === '/api/admin/fake-inbox/reply' && method === 'POST') return handleAdminReplyFakeInbox(request, env);
   const adminUserMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)$/);
+  const adminGalleryThumbMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)\/gallery-thumb$/);
+  const adminGalleryPhotoMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)\/gallery-photo$/);
+  const adminAvatarThumbMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)\/avatar-thumb$/);
+  const adminPhotoVerificationMatch = path.match(/^\/api\/admin\/photo-verifications\/([a-f0-9-]+)$/);
+  const adminPhotoVerificationPhotoMatch = path.match(/^\/api\/admin\/photo-verifications\/([a-f0-9-]+)\/photo$/);
   const adminProfileReportMatch = path.match(/^\/api\/admin\/profile-reports\/([a-f0-9-]+)$/);
   if (adminProfileReportMatch && method === 'PATCH') return handleAdminUpdateProfileReport(request, env, adminProfileReportMatch[1]);
+  if (adminPhotoVerificationPhotoMatch && method === 'GET') return handleAdminGetPhotoVerificationPhoto(request, env, adminPhotoVerificationPhotoMatch[1]);
+  if (adminPhotoVerificationMatch && method === 'PATCH') return handleAdminReviewPhotoVerification(request, env, adminPhotoVerificationMatch[1]);
+  if (adminAvatarThumbMatch && method === 'POST') return handleAdminUploadAvatarThumb(request, env, adminAvatarThumbMatch[1]);
+  if (adminGalleryThumbMatch && method === 'POST') return handleAdminUploadGalleryThumb(request, env, adminGalleryThumbMatch[1]);
+  if (adminGalleryPhotoMatch && method === 'DELETE') return handleAdminDeleteGalleryPhoto(request, env, adminGalleryPhotoMatch[1]);
   if (adminUserMatch && method === 'GET') return handleAdminGetUser(request, env, adminUserMatch[1]);
   if (adminUserMatch && method === 'PUT') return handleAdminUpdateUser(request, env, adminUserMatch[1]);
   if (adminUserMatch && method === 'DELETE') return handleAdminDeleteUser(request, env, adminUserMatch[1]);

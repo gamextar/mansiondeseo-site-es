@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, X } from 'lucide-react';
+import { buildOptimizedImageName, exportCanvasImage } from '../lib/imageOptimize';
 
 const CIRCLE_SIZE = 280;
 const OUTPUT_SIZE = 1080;
 const THUMB_SIZE = 480;
-const EXPORT_MIME = 'image/webp';
 const EXPORT_QUALITY = 0.88;
 const THUMB_QUALITY = 0.78;
 
@@ -15,24 +15,6 @@ function loadImage(src) {
 		img.onload = () => resolve(img);
 		img.onerror = () => reject(new Error('No se pudo cargar la imagen.'));
 		img.src = src;
-	});
-}
-
-function buildExportName(fileName, suffix, mimeType) {
-	const base = String(fileName || 'avatar')
-		.replace(/\.[^.]+$/, '')
-		.trim() || 'avatar';
-	const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
-	return `${base}${suffix}.${ext}`;
-}
-
-function canvasToBlob(canvas, mimeType, quality) {
-	return new Promise((resolve, reject) => {
-		canvas.toBlob(
-			(blob) => (blob ? resolve(blob) : reject(new Error('No se pudo exportar la imagen.'))),
-			mimeType,
-			quality,
-		);
 	});
 }
 
@@ -67,15 +49,13 @@ async function cropCircle(file, image, zoom, offsetX, offsetY, containerW, conta
 	thumbCtx.drawImage(canvas, 0, 0, THUMB_SIZE, THUMB_SIZE);
 
 	const [blob, thumbBlob] = await Promise.all([
-		canvasToBlob(canvas, EXPORT_MIME, EXPORT_QUALITY),
-		canvasToBlob(thumbCanvas, EXPORT_MIME, THUMB_QUALITY),
+		exportCanvasImage(canvas, { quality: EXPORT_QUALITY }),
+		exportCanvasImage(thumbCanvas, { quality: THUMB_QUALITY, fallbackQuality: 0.82 }),
 	]);
-	const mimeType = blob.type || EXPORT_MIME;
-	const thumbMimeType = thumbBlob.type || EXPORT_MIME;
 
 	return {
-		file: new File([blob], buildExportName(file.name, '', mimeType), { type: mimeType, lastModified: Date.now() }),
-		thumbnailFile: new File([thumbBlob], buildExportName(file.name, '-thumb', thumbMimeType), { type: thumbMimeType, lastModified: Date.now() }),
+		file: new File([blob], buildOptimizedImageName(file.name, '', blob.type), { type: blob.type, lastModified: Date.now() }),
+		thumbnailFile: new File([thumbBlob], buildOptimizedImageName(file.name, '-thumb', thumbBlob.type), { type: thumbBlob.type, lastModified: Date.now() }),
 	};
 }
 

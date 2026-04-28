@@ -8,7 +8,7 @@ import {
 import { getProfile, getToken, toggleFavorite, updateProfile, adminUpdateUser, invalidateProfilesCache, getGiftCatalog, sendGift as apiSendGift, reportProfile } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { formatLocation } from '../lib/location';
-import { getDisplayPhotos, getGalleryPhotos } from '../lib/profileMedia';
+import { getDisplayPhotos, getGalleryPhotos, getGalleryPhotoThumbnail } from '../lib/profileMedia';
 import { resolveMediaUrl } from '../lib/media';
 import { formatNumber } from '../lib/siteConfig';
 
@@ -1172,7 +1172,7 @@ export default function ProfileDetailPage({ initialData }) {
                       }`}
                     >
                       <img
-                        src={resolveMediaUrl(photo)}
+                        src={resolveMediaUrl(getGalleryPhotoThumbnail(profile, photo))}
                         alt=""
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
