@@ -13,6 +13,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { publishLocalConversationUpdate } from '../lib/localConversationEvents';
 import { recordD1WriteEstimate } from '../lib/d1Debug';
+import { useAuth } from '../lib/authContext';
 
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const CHAT_CACHE_TTL_MS = 10 * 60_000;
@@ -21,6 +22,11 @@ const CHAT_CACHE_MAX_CHATS = 15;
 const CHAT_CACHE_MESSAGE_LIMIT = 15;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
+
+const BlockUserIcon = ({ customSvg = '', className = 'h-3.5 w-3.5 lg:h-4 lg:w-4' }) => {
+  if (customSvg) return <span className={className} dangerouslySetInnerHTML={{ __html: customSvg }} />;
+  return <Ban className={className} />;
+};
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -428,6 +434,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     : false;
   const { canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
+  const { siteSettings } = useAuth();
   const partnerId = activeRouteId.startsWith('conv-') ? activeRouteId.replace('conv-', '') : activeRouteId;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
@@ -1404,7 +1411,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             }`}
             aria-label={isBlockedByMe ? `Desbloquear a ${partner.name}` : `Bloquear a ${partner.name}`}
           >
-            <Ban className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+            <BlockUserIcon customSvg={siteSettings?.blockUserIconSvg || ''} />
             <span className="hidden sm:inline">{isBlockedByMe ? 'Desbloquear' : 'Bloquear'}</span>
             <span className="sm:hidden">{isBlockedByMe ? 'Desbloq.' : 'Bloq.'}</span>
           </button>
