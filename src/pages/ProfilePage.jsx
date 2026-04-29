@@ -55,6 +55,15 @@ const PHOTO_OTP_STATUS = {
 };
 
 const MAX_GALLERY_PHOTOS = 9;
+const GALLERY_LEVELS = [
+  { line: 'Línea 1', label: 'Foto Sensual', placeholderKey: 'galleryPlaceholderSensualImg' },
+  { line: 'Línea 2', label: 'Foto Hot', placeholderKey: 'galleryPlaceholderHotImg' },
+  { line: 'Línea 3', label: 'Foto Super Hot', placeholderKey: 'galleryPlaceholderSuperHotImg' },
+];
+
+function getGalleryLevel(slotIndex) {
+  return GALLERY_LEVELS[Math.min(GALLERY_LEVELS.length - 1, Math.floor(slotIndex / 3))];
+}
 
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
@@ -78,7 +87,7 @@ function timeAgo(dateStr) {
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { setRegistered, setUser, user } = useAuth();
+  const { setRegistered, setUser, user, siteSettings } = useAuth();
   const isStandaloneMobileApp = detectStandaloneMobile();
   const navBottomOffset = isStandaloneMobileApp
     ? getStandaloneBottomNavOffset()
@@ -1010,29 +1019,49 @@ export default function ProfilePage() {
                 )}
               </motion.div>
             ))}
-            {Array.from({ length: galleryPlaceholderCount }).map((_, slotIndex) => (
-              <motion.button
-                key={`gallery-placeholder-${slotIndex}`}
-                type="button"
-                onClick={() => galleryInputRef.current?.click()}
-                disabled={uploading}
-                initial={{ opacity: 0, scale: 0.94 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: (photos.length + slotIndex) * 0.025 }}
-                className="group aspect-square rounded-2xl border border-dashed border-mansion-border/35 bg-mansion-card/35 transition-colors hover:border-mansion-gold/45 hover:bg-mansion-gold/5 disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label={`Agregar foto ${photos.length + slotIndex + 1}`}
-                title={uploading ? 'Subiendo...' : 'Agregar foto'}
-              >
-                <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-text-dim transition-colors group-hover:text-mansion-gold">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full border border-mansion-border/40 bg-black/20 transition-colors group-hover:border-mansion-gold/35">
-                    <Plus className="h-5 w-5" />
+            {Array.from({ length: galleryPlaceholderCount }).map((_, slotIndex) => {
+              const absoluteSlotIndex = photos.length + slotIndex;
+              const galleryLevel = getGalleryLevel(absoluteSlotIndex);
+              const placeholderUrl = siteSettings?.[galleryLevel.placeholderKey] || '';
+
+              return (
+                <motion.button
+                  key={`gallery-placeholder-${slotIndex}`}
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  disabled={uploading}
+                  initial={{ opacity: 0, scale: 0.94 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: absoluteSlotIndex * 0.025 }}
+                  className="group relative aspect-square overflow-hidden rounded-2xl border border-dashed border-mansion-border/35 bg-mansion-card/35 transition-colors hover:border-mansion-gold/45 hover:bg-mansion-gold/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label={`Agregar ${galleryLevel.label}`}
+                  title={uploading ? 'Subiendo...' : `Agregar ${galleryLevel.label}`}
+                >
+                  {placeholderUrl && (
+                    <>
+                      <img
+                        src={resolveMediaUrl(placeholderUrl)}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        className="absolute inset-0 h-full w-full object-cover opacity-70 transition-transform duration-300 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/45" />
+                    </>
+                  )}
+                  <div className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-1.5 px-2 text-text-dim transition-colors group-hover:text-mansion-gold">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full border border-mansion-border/40 bg-black/35 transition-colors group-hover:border-mansion-gold/35">
+                      <Plus className="h-5 w-5" />
+                    </div>
+                    <span className="text-center text-[9px] font-semibold uppercase leading-none tracking-wider text-text-dim group-hover:text-mansion-gold/80">
+                      {galleryLevel.line}
+                    </span>
+                    <span className="text-center text-[10px] font-medium uppercase leading-3 tracking-wider">
+                      {galleryLevel.label}
+                    </span>
                   </div>
-                  <span className="text-[10px] font-medium uppercase tracking-wider">
-                    Foto
-                  </span>
-                </div>
-              </motion.button>
-            ))}
+                </motion.button>
+              );
+            })}
           </div>
 
           <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleGalleryUpload} />

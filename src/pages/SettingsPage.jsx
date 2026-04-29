@@ -66,6 +66,9 @@ export default function SettingsPage() {
   const [profileBlurLightboxMultiplier, setProfileBlurLightboxMultiplier] = useState(PROFILE_BLUR_LIGHTBOX_MULTIPLIER);
   const [chatImageBlur, setChatImageBlur] = useState(24);
   const [freeVisiblePhotos, setFreeVisiblePhotos] = useState(1);
+  const [galleryPlaceholderSensualImg, setGalleryPlaceholderSensualImg] = useState('');
+  const [galleryPlaceholderHotImg, setGalleryPlaceholderHotImg] = useState('');
+  const [galleryPlaceholderSuperHotImg, setGalleryPlaceholderSuperHotImg] = useState('');
 
   // VIP
   const [showVipButton, setShowVipButton] = useState(true);
@@ -250,6 +253,9 @@ export default function SettingsPage() {
         setProfileBlurLightboxMultiplier(normalizeBlurMultiplier(s.profileBlurLightboxMultiplier, PROFILE_BLUR_LIGHTBOX_MULTIPLIER));
         setChatImageBlur(s.chatImageBlur ?? 24);
         setFreeVisiblePhotos(s.freeVisiblePhotos);
+        setGalleryPlaceholderSensualImg(s.galleryPlaceholderSensualImg || '');
+        setGalleryPlaceholderHotImg(s.galleryPlaceholderHotImg || '');
+        setGalleryPlaceholderSuperHotImg(s.galleryPlaceholderSuperHotImg || '');
         setShowVipButton(s.showVipButton);
         setDailyMessageLimit(s.dailyMessageLimit);
         setMessageLimitWindowHours(s.messageLimitWindowHours ?? 12);
@@ -427,6 +433,9 @@ export default function SettingsPage() {
         profile_blur_lightbox_multiplier: profileBlurLightboxMultiplier,
         chat_image_blur: chatImageBlur,
         free_visible_photos: freeVisiblePhotos,
+        gallery_placeholder_sensual_img: galleryPlaceholderSensualImg,
+        gallery_placeholder_hot_img: galleryPlaceholderHotImg,
+        gallery_placeholder_super_hot_img: galleryPlaceholderSuperHotImg,
         show_vip_button: showVipButton ? '1' : '0',
         daily_message_limit: dailyMessageLimit,
         message_limit_window_hours: committedMessageLimitWindowHours,
@@ -512,6 +521,9 @@ export default function SettingsPage() {
       const nextChatImageBlur = s.chatImageBlur ?? chatImageBlur;
       setChatImageBlur(nextChatImageBlur);
       setFreeVisiblePhotos(s.freeVisiblePhotos);
+      setGalleryPlaceholderSensualImg(s.galleryPlaceholderSensualImg || '');
+      setGalleryPlaceholderHotImg(s.galleryPlaceholderHotImg || '');
+      setGalleryPlaceholderSuperHotImg(s.galleryPlaceholderSuperHotImg || '');
       setShowVipButton(s.showVipButton);
       setDailyMessageLimit(s.dailyMessageLimit);
       setMessageLimitWindowHours(s.messageLimitWindowHours ?? 12);
@@ -651,6 +663,27 @@ export default function SettingsPage() {
       </div>
     );
   };
+
+  const galleryPlaceholderFields = [
+    {
+      line: 'Línea 1',
+      label: 'Foto Sensual',
+      value: galleryPlaceholderSensualImg,
+      setter: setGalleryPlaceholderSensualImg,
+    },
+    {
+      line: 'Línea 2',
+      label: 'Foto Hot',
+      value: galleryPlaceholderHotImg,
+      setter: setGalleryPlaceholderHotImg,
+    },
+    {
+      line: 'Línea 3',
+      label: 'Foto Super Hot',
+      value: galleryPlaceholderSuperHotImg,
+      setter: setGalleryPlaceholderSuperHotImg,
+    },
+  ];
 
   if (loading) {
     return (
@@ -815,6 +848,70 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <Counter value={freeVisiblePhotos} onChange={setFreeVisiblePhotos} max={20} />
+              </div>
+            </div>
+
+            {/* Gallery placeholder images */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Upload className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Placeholders de galería</h3>
+                  <p className="text-[11px] text-text-dim">Una imagen por nivel para los 9 espacios vacíos del perfil.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                {galleryPlaceholderFields.map(({ line, label, value, setter }) => (
+                  <div key={label} className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-semibold text-text-primary">{line}</p>
+                        <p className="text-[11px] text-mansion-gold">{label}</p>
+                      </div>
+                      {value && (
+                        <button onClick={() => setter('')} className="text-[10px] text-mansion-crimson hover:underline">Quitar</button>
+                      )}
+                    </div>
+
+                    <label className="relative flex aspect-square w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-mansion-border/40 bg-mansion-elevated/50 transition-colors hover:border-mansion-gold/40">
+                      {value ? (
+                        <img src={value} alt={label} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 text-text-dim">
+                          <Upload className="w-5 h-5" />
+                          <span className="text-[11px]">Subir foto</span>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const result = await uploadImage(file);
+                            if (result.url) setter(result.url);
+                          } catch (err) {
+                            console.error('Error uploading gallery placeholder:', err);
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={(e) => setter(e.target.value)}
+                      placeholder="URL de imagen"
+                      className="w-full rounded-xl border border-mansion-border/30 bg-mansion-elevated px-3 py-2 text-xs text-text-primary outline-none focus:border-mansion-gold/50"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 
