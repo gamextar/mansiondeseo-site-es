@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Ban, ChevronLeft, Crown, ImagePlus, Send, X } from 'lucide-react';
 import { useMessageLimit } from '../hooks/useMessageLimit';
@@ -1581,26 +1581,40 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
                         : `text-text-primary border rounded-bl-sm ${isPopped ? 'chat-bubble-highlight bg-mansion-gold/10 border-mansion-gold/30 shadow-[0_0_0_1px_rgba(212,175,55,0.08)]' : 'bg-mansion-elevated border-mansion-border/30'}`
                     }`}
                   >
-                    {hasImage && (
-                      <button
-                        type="button"
-                        disabled={imageLocked}
-                        onClick={() => setLightboxImage(msg.imageUrl || msg.imageThumbUrl)}
-                        className={`relative block aspect-square w-[220px] max-w-[70vw] overflow-hidden rounded-xl bg-black/35 lg:w-[328px] ${imageLocked ? 'cursor-default' : 'cursor-zoom-in'}`}
-                        aria-label={imageLocked ? 'Imagen disponible solo para VIP' : 'Abrir imagen'}
+                    {hasImage && imageLocked && (
+                      <Link
+                        to="/vip"
+                        className="relative block aspect-square w-[220px] max-w-[70vw] cursor-pointer overflow-hidden rounded-xl bg-black/35 lg:w-[328px]"
+                        aria-label="Suscribirse para ver imagen de chat"
                       >
                         <img
                           src={msg.imageThumbUrl || msg.imageUrl}
                           alt=""
-                          className={`h-full w-full object-cover transition-transform duration-300 ${imageLocked ? 'scale-110 blur-xl opacity-80' : 'hover:scale-[1.02]'}`}
+                          className="h-full w-full scale-110 object-cover opacity-80 blur-xl transition-transform duration-300 hover:scale-[1.12]"
                           loading="lazy"
                         />
-                        {imageLocked && (
-                          <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/45 px-4 text-center text-white">
-                            <Crown className="h-6 w-6 text-mansion-gold drop-shadow" />
-                            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-white/95">Solo VIP</span>
+                        <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/45 px-4 text-center text-white">
+                          <Crown className="h-6 w-6 text-mansion-gold drop-shadow" />
+                          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-white/95">Solo Miembros</span>
+                          <span className="text-[11px] font-medium text-mansion-gold underline decoration-mansion-gold/50 underline-offset-4 transition-colors hover:text-mansion-gold-light">
+                            [Suscribirse]
                           </span>
-                        )}
+                        </span>
+                      </Link>
+                    )}
+                    {hasImage && !imageLocked && (
+                      <button
+                        type="button"
+                        onClick={() => setLightboxImage(msg.imageUrl || msg.imageThumbUrl)}
+                        className="relative block aspect-square w-[220px] max-w-[70vw] cursor-zoom-in overflow-hidden rounded-xl bg-black/35 lg:w-[328px]"
+                        aria-label="Abrir imagen"
+                      >
+                        <img
+                          src={msg.imageThumbUrl || msg.imageUrl}
+                          alt=""
+                          className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.02]"
+                          loading="lazy"
+                        />
                       </button>
                     )}
                     {msg.text && (
