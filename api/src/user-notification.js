@@ -31,10 +31,6 @@ export class UserNotification {
         const payload = JSON.stringify(data);
         for (const ws of sockets) {
           try {
-            const attachment = this.getSocketAttachment(ws);
-            if (data?.type === 'new_message' && data?.chatId && attachment?.activeChatId === data.chatId) {
-              continue;
-            }
             ws.send(payload);
           } catch { /* dead socket */ }
         }

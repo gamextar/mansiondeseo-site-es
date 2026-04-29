@@ -264,12 +264,15 @@ export function ChatConversationsPanel({ embedded = false, activeProfileId = '',
   const applyConversationUpdate = useCallback((event) => {
     const conversation = event?.conversation;
     if (!conversation?.profileId) return false;
-    const unreadDelta = Number(event?.conversationUnreadDelta || 0);
+    const isActiveConversation = String(activeProfileId || '') === String(conversation.profileId);
+    const unreadDelta = isActiveConversation ? 0 : Number(event?.conversationUnreadDelta || 0);
 
     setConversations((prev) => {
       const pid = String(conversation.profileId);
       const existing = prev.find((item) => String(item.profileId) === pid);
-      const nextUnread = typeof conversation.unread === 'number'
+      const nextUnread = isActiveConversation
+        ? 0
+        : typeof conversation.unread === 'number'
         ? conversation.unread
         : Math.max(0, Number(existing?.unread || 0) + unreadDelta);
       const nextConversation = existing
@@ -293,7 +296,7 @@ export function ChatConversationsPanel({ embedded = false, activeProfileId = '',
     });
 
     return true;
-  }, []);
+  }, [activeProfileId]);
 
   const applyLocalConversationPreview = useCallback((event) => {
     const conversation = event?.conversation;
