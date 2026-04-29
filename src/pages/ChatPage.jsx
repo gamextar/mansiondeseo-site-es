@@ -62,6 +62,12 @@ function getSystemLimitMessageFromError(errorData = {}, fallback = '') {
   return fallback || '';
 }
 
+function canEmitTypingSignal(limit = null, blockState = {}) {
+  if (blockState?.blockedByMe || blockState?.blockedMe) return false;
+  if (!limit) return false;
+  return !getSystemLimitMessage(limit);
+}
+
 const BlockUserIcon = ({ customSvg = '', className = 'h-7 w-7 lg:h-10 lg:w-10' }) => {
   const value = String(customSvg || '').trim();
   if (value.startsWith('<')) return <span className={className} dangerouslySetInnerHTML={{ __html: value }} />;
@@ -709,7 +715,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
 
   const handleTypingInput = useCallback((nextValue) => {
     const hasContent = nextValue.trim().length > 0;
-    if (!hasContent) {
+    if (!hasContent || !canEmitTypingSignal(apiLimit, blockState)) {
       stopTypingSignal();
       return;
     }
@@ -725,7 +731,12 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     }
 
     scheduleTypingStop();
-  }, [scheduleTypingStop, stopTypingSignal]);
+  }, [apiLimit, blockState, scheduleTypingStop, stopTypingSignal]);
+
+  useEffect(() => {
+    if (canEmitTypingSignal(apiLimit, blockState)) return;
+    stopTypingSignal();
+  }, [apiLimit, blockState, stopTypingSignal]);
 
   const settleMobileKeyboardViewport = useCallback((fast = false) => {
     if (!isMobileBrowserChat || typeof window === 'undefined') return;
@@ -1305,6 +1316,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     if (!input.trim() || !canUseComposer) return;
     const localLimitMessage = getSystemLimitMessage(apiLimit);
     if (localLimitMessage) {
+      stopTypingSignal();
       addSystemMessage(localLimitMessage);
       return;
     }
@@ -1386,6 +1398,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     if (!file || !canUseComposer || imageUploading) return;
     const localLimitMessage = getSystemLimitMessage(apiLimit);
     if (localLimitMessage) {
+      stopTypingSignal();
       addSystemMessage(localLimitMessage);
       return;
     }
