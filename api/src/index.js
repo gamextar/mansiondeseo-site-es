@@ -6501,9 +6501,12 @@ async function handleAdminRotateFakeOnline(request, env) {
     240
   );
 
-  const selectFakeCandidates = async ({ limit, excludeRecent = false, excludedIds = [] } = {}) => {
+  const selectFakeCandidates = async ({ limit, excludeRecent = false, excludedIds = [], featuredOnly = false } = {}) => {
     const recentClause = excludeRecent && excludeRecentMinutes > 0
       ? "AND (u.last_active IS NULL OR u.last_active < datetime('now', ?))"
+      : '';
+    const featuredClause = featuredOnly
+      ? 'AND COALESCE(u.feed_priority, 0) > 0'
       : '';
     const excludedClause = excludedIds.length > 0
       ? `AND u.id NOT IN (${excludedIds.map(() => '?').join(', ')})`
@@ -6518,6 +6521,7 @@ async function handleAdminRotateFakeOnline(request, env) {
         u.id,
         u.username,
         u.role,
+        COALESCE(u.feed_priority, 0) AS feed_priority,
         u.last_active,
         CASE WHEN EXISTS (
           SELECT 1 FROM stories s WHERE s.user_id = u.id AND s.active = 1
@@ -6526,21 +6530,34 @@ async function handleAdminRotateFakeOnline(request, env) {
       WHERE COALESCE(u.fake, 0) = 1
         AND u.status = 'verified'
         AND COALESCE(u.account_status, 'active') = 'active'
+        ${featuredClause}
         ${recentClause}
         ${excludedClause}
-      ORDER BY has_story DESC, RANDOM()
+      ORDER BY feed_priority DESC, has_story DESC, RANDOM()
       LIMIT ?
     `).bind(...bindings).all();
     return results || [];
   };
 
-  const selected = await selectFakeCandidates({ limit: count, excludeRecent: true });
-  if (selected.length < count) {
+  const selected = [];
+  const appendCandidates = async (options) => {
+    if (selected.length >= count) return;
     const fill = await selectFakeCandidates({
+      ...options,
       limit: count - selected.length,
       excludedIds: selected.map((user) => user.id),
     });
     selected.push(...fill);
+  };
+
+  // The feed ranks feed_priority before recency, so rotate featured fakes first.
+  await appendCandidates({ featuredOnly: true, excludeRecent: true });
+  await appendCandidates({ featuredOnly: true, excludeRecent: false });
+  await appendCandidates({ featuredOnly: false, excludeRecent: true });
+  await appendCandidates({ featuredOnly: false, excludeRecent: false });
+
+  if (selected.length > count) {
+    selected.length = count;
   }
 
   if (selected.length === 0) {
@@ -6551,6 +6568,7 @@ async function handleAdminRotateFakeOnline(request, env) {
       windowMinutes,
       excludeRecentMinutes,
       activeStoryUsers: 0,
+      activeFeaturedUsers: 0,
       feedCacheVersion: null,
       users: [],
     });
@@ -6570,6 +6588,7 @@ async function handleAdminRotateFakeOnline(request, env) {
 
   const feedCacheVersion = await bumpFeedCacheVersion(env);
   const activeStoryUsers = selected.filter((user) => Number(user.has_story || 0) === 1).length;
+  const activeFeaturedUsers = selected.filter((user) => Number(user.feed_priority || 0) > 0).length;
 
   console.log(`🔧 Admin rotó fake online — ${selected.length}/${count} usuarios en ${windowMinutes} min`);
 
@@ -6580,11 +6599,13 @@ async function handleAdminRotateFakeOnline(request, env) {
     windowMinutes,
     excludeRecentMinutes,
     activeStoryUsers,
+    activeFeaturedUsers,
     feedCacheVersion,
     users: selected.slice(0, 20).map((user) => ({
       id: user.id,
       username: user.username || '',
       role: user.role || '',
+      feed_priority: Math.max(0, Number(user.feed_priority || 0)),
       has_story: Number(user.has_story || 0) === 1,
       last_active: user.rotated_last_active || '',
     })),

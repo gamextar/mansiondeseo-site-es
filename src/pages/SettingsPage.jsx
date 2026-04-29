@@ -1846,7 +1846,7 @@ export default function SettingsPage() {
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Rotar fake online</h3>
-                  <p className="text-[11px] text-text-dim">Actualiza last_active solo en usuarios fake activos/verificados, priorizando quienes tienen stories. Recomendado: 36 por hora.</p>
+                  <p className="text-[11px] text-text-dim">Actualiza last_active solo en usuarios fake activos/verificados, priorizando destacados/feed priority y luego stories. Recomendado: 36 por hora.</p>
                 </div>
                 <button
                   onClick={handleRotateFakeOnline}
@@ -1882,7 +1882,7 @@ export default function SettingsPage() {
                     <p className="text-xs font-semibold">{fakeOnlineResult.error}</p>
                   ) : (
                     <p className="text-xs font-semibold">
-                      {fakeOnlineResult.updated} fake online actualizados · {fakeOnlineResult.activeStoryUsers} con story · ventana {fakeOnlineResult.windowMinutes} min
+                      {fakeOnlineResult.updated} fake online actualizados · {fakeOnlineResult.activeFeaturedUsers ?? 0} destacados · {fakeOnlineResult.activeStoryUsers} con story · ventana {fakeOnlineResult.windowMinutes} min
                     </p>
                   )}
                 </div>
