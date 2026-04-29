@@ -22,6 +22,13 @@ const CHAT_CACHE_MAX_CHATS = 15;
 const CHAT_CACHE_MESSAGE_LIMIT = 15;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
+const DEFAULT_CHAT_IMAGE_BLUR = 24;
+
+function normalizeChatImageBlur(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return DEFAULT_CHAT_IMAGE_BLUR;
+  return Math.max(0, Math.min(40, Math.round(numeric)));
+}
 
 const BlockUserIcon = ({ customSvg = '', className = 'h-7 w-7 lg:h-10 lg:w-10' }) => {
   const value = String(customSvg || '').trim();
@@ -445,6 +452,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const { canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
   const { siteSettings, user: viewer } = useAuth();
+  const chatImageBlur = normalizeChatImageBlur(siteSettings?.chatImageBlur);
   const partnerId = activeRouteId.startsWith('conv-') ? activeRouteId.replace('conv-', '') : activeRouteId;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
@@ -1590,7 +1598,8 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
                         <img
                           src={msg.imageThumbUrl || msg.imageUrl}
                           alt=""
-                          className="h-full w-full scale-110 object-cover opacity-80 blur-xl transition-transform duration-300 hover:scale-[1.12]"
+                          className="h-full w-full scale-110 object-cover opacity-80 transition-transform duration-300 hover:scale-[1.12]"
+                          style={chatImageBlur > 0 ? { filter: `blur(${chatImageBlur}px)` } : undefined}
                           loading="lazy"
                         />
                         <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/45 px-4 text-center text-white">

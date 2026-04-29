@@ -63,6 +63,7 @@ export default function SettingsPage() {
   const [profileBlurHeroMultiplier, setProfileBlurHeroMultiplier] = useState(PROFILE_BLUR_HERO_MULTIPLIER);
   const [profileBlurThumbMultiplier, setProfileBlurThumbMultiplier] = useState(PROFILE_BLUR_THUMB_MULTIPLIER);
   const [profileBlurLightboxMultiplier, setProfileBlurLightboxMultiplier] = useState(PROFILE_BLUR_LIGHTBOX_MULTIPLIER);
+  const [chatImageBlur, setChatImageBlur] = useState(24);
   const [freeVisiblePhotos, setFreeVisiblePhotos] = useState(1);
 
   // VIP
@@ -245,6 +246,7 @@ export default function SettingsPage() {
         setProfileBlurHeroMultiplier(normalizeBlurMultiplier(s.profileBlurHeroMultiplier, PROFILE_BLUR_HERO_MULTIPLIER));
         setProfileBlurThumbMultiplier(normalizeBlurMultiplier(s.profileBlurThumbMultiplier, PROFILE_BLUR_THUMB_MULTIPLIER));
         setProfileBlurLightboxMultiplier(normalizeBlurMultiplier(s.profileBlurLightboxMultiplier, PROFILE_BLUR_LIGHTBOX_MULTIPLIER));
+        setChatImageBlur(s.chatImageBlur ?? 24);
         setFreeVisiblePhotos(s.freeVisiblePhotos);
         setShowVipButton(s.showVipButton);
         setDailyMessageLimit(s.dailyMessageLimit);
@@ -420,6 +422,7 @@ export default function SettingsPage() {
         profile_blur_hero_multiplier: profileBlurHeroMultiplier,
         profile_blur_thumb_multiplier: profileBlurThumbMultiplier,
         profile_blur_lightbox_multiplier: profileBlurLightboxMultiplier,
+        chat_image_blur: chatImageBlur,
         free_visible_photos: freeVisiblePhotos,
         show_vip_button: showVipButton ? '1' : '0',
         daily_message_limit: dailyMessageLimit,
@@ -502,6 +505,8 @@ export default function SettingsPage() {
       setProfileBlurHeroMultiplier(normalizeBlurMultiplier(s.profileBlurHeroMultiplier, PROFILE_BLUR_HERO_MULTIPLIER));
       setProfileBlurThumbMultiplier(normalizeBlurMultiplier(s.profileBlurThumbMultiplier, PROFILE_BLUR_THUMB_MULTIPLIER));
       setProfileBlurLightboxMultiplier(normalizeBlurMultiplier(s.profileBlurLightboxMultiplier, PROFILE_BLUR_LIGHTBOX_MULTIPLIER));
+      const nextChatImageBlur = s.chatImageBlur ?? chatImageBlur;
+      setChatImageBlur(nextChatImageBlur);
       setFreeVisiblePhotos(s.freeVisiblePhotos);
       setShowVipButton(s.showVipButton);
       setDailyMessageLimit(s.dailyMessageLimit);
@@ -576,7 +581,7 @@ export default function SettingsPage() {
       setMailFrom(s.mailFrom || '');
       setRegistrationEmailBcc(s.registrationEmailBcc ?? 'registro@gamextar.com');
       // Propagate to global context so dependent components update live
-      const nextSiteSettings = { ...s, videoLimitBlur: nextVideoLimitBlur };
+      const nextSiteSettings = { ...s, videoLimitBlur: nextVideoLimitBlur, chatImageBlur: nextChatImageBlur };
       setSiteSettings(nextSiteSettings);
       try {
         sessionStorage.setItem('mansion_site_settings', JSON.stringify(nextSiteSettings));
@@ -845,6 +850,25 @@ export default function SettingsPage() {
                     />
                   </label>
                 </div>
+              </div>
+            </div>
+
+            {/* Chat image blur */}
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Image className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Blur de imagen adjunta</h3>
+                  <p className="text-[11px] text-text-dim">Desenfoque para imágenes bloqueadas en el chat</p>
+                </div>
+              </div>
+              <input type="range" min="0" max="40" value={chatImageBlur} onChange={e => setChatImageBlur(Number(e.target.value))} className="w-full accent-mansion-gold" />
+              <div className="flex justify-between text-[11px] text-text-dim mt-1">
+                <span>Sin blur</span>
+                <span className="text-mansion-gold font-medium">{chatImageBlur}px</span>
+                <span>Máximo</span>
               </div>
             </div>
 

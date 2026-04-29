@@ -4988,6 +4988,7 @@ async function loadSettings(env) {
     profileBlurHeroMultiplier: parseNumberSetting(settings.profile_blur_hero_multiplier, 1.8),
     profileBlurThumbMultiplier: parseNumberSetting(settings.profile_blur_thumb_multiplier, 0.7),
     profileBlurLightboxMultiplier: parseNumberSetting(settings.profile_blur_lightbox_multiplier, 2.5),
+    chatImageBlur: parseIntegerSetting(settings.chat_image_blur, 24, 0, 40),
     freeVisiblePhotos: parseInt(settings.free_visible_photos || '1', 10),
     showVipButton: settings.show_vip_button !== '0',
     dailyMessageLimit: parseInt(settings.daily_message_limit || '5', 10),
@@ -5164,6 +5165,7 @@ function getPublicSettingsPayload(settings) {
     profileBlurHeroMultiplier: settings.profileBlurHeroMultiplier,
     profileBlurThumbMultiplier: settings.profileBlurThumbMultiplier,
     profileBlurLightboxMultiplier: settings.profileBlurLightboxMultiplier,
+    chatImageBlur: settings.chatImageBlur,
     freeVisiblePhotos: settings.freeVisiblePhotos,
     allowedCountries: settings.allowedCountries,
     coinPack1Coins: settings.coinPack1Coins,
@@ -5253,6 +5255,7 @@ async function handleUpdateSettings(request, env) {
   const allowed = [
     'blur_level', 'blur_mobile', 'blur_desktop',
     'profile_blur_hero_multiplier', 'profile_blur_thumb_multiplier', 'profile_blur_lightbox_multiplier',
+    'chat_image_blur',
     'free_visible_photos', 'show_vip_button',
     'daily_message_limit', 'message_limit_window_hours', 'site_country', 'site_locale', 'site_timezone', 'site_currency',
     'hide_password_register',
