@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
-import { getUnreadCount, getToken, invalidateUnreadCache, peekUnreadCountCache, setUnreadCountCache } from '../lib/api';
+import { lazy, Suspense, useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from 'react';
+import { endVideoCall, getUnreadCount, getToken, invalidateUnreadCache, joinVideoCall, peekUnreadCountCache, setUnreadCountCache } from '../lib/api';
 import { recordRealtimeDebug, setRealtimeActiveConnections } from '../lib/realtimeDebug';
 import { resolveWsBase } from '../lib/siteConfig';
 
@@ -15,10 +15,21 @@ const NOTIFICATION_BACKGROUND_GRACE_MS = Infinity; // never disconnect in backgr
 const UNREAD_REFRESH_STALE_MS = 5 * 60_000; // 5 min — HTTP fallback if WS stale
 const UNREAD_FETCH_DEBOUNCE_MS = 4_000;
 const WS_MAX_RETRIES = 5; // backoff: 2,4,8,16,30 ≈ 60s then stop
+const VideoCallModal = lazy(() => import('../components/VideoCallModal'));
+
+function getGlobalVideoCallErrorMessage(error) {
+  const code = error?.data?.code || '';
+  if (code === 'VIDEO_CALL_ENDED') return 'La videollamada ya finalizó.';
+  if (code === 'REALTIME_NOT_CONFIGURED') return 'La videollamada no está disponible temporalmente.';
+  return error?.message || 'No se pudo procesar la videollamada.';
+}
 
 export function UnreadProvider({ children, initialUnread = null, bootstrapResolved = false }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [toast, setToast] = useState(null); // string or { text, icon }
+  const [incomingVideoCall, setIncomingVideoCall] = useState(null);
+  const [activeVideoCall, setActiveVideoCall] = useState(null);
+  const [videoCallLoading, setVideoCallLoading] = useState(false);
   const prevCountRef = useRef(-1); // -1 = not yet loaded
   const listenersRef = useRef(new Set());
   const wsRef = useRef(null);
@@ -239,8 +250,18 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
           } else if (data.type === 'video_call') {
             const isActiveChat = !!activeChatIdRef.current && data.chatId === activeChatIdRef.current;
             if (data.event === 'invite' && !isActiveChat) {
-              setToast({ text: `${data.call?.initiatorName || 'Alguien'} te está llamando` });
-              setTimeout(() => setToast(null), 5000);
+              setIncomingVideoCall({
+                ...(data.call || {}),
+                partnerName: data.call?.initiatorName || 'Videollamada',
+              });
+              setToast(null);
+            } else if (data.event === 'accepted') {
+              const callId = String(data.call?.id || '');
+              setIncomingVideoCall((current) => (String(current?.id || '') === callId ? null : current));
+            } else if (data.event === 'ended') {
+              const callId = String(data.call?.id || '');
+              setIncomingVideoCall((current) => (String(current?.id || '') === callId ? null : current));
+              setActiveVideoCall((current) => (String(current?.id || '') === callId ? null : current));
             }
             notifyListeners(data);
           } else if (data.type === 'gift') {
@@ -398,11 +419,109 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
 
   const refresh = useCallback(() => fetchUnread({ force: true }), [fetchUnread]);
 
+  const handleAcceptVideoCall = useCallback(async () => {
+    const call = incomingVideoCall;
+    if (!call?.id || videoCallLoading) return;
+
+    setVideoCallLoading(true);
+    try {
+      const data = await joinVideoCall(call.id);
+      setActiveVideoCall({
+        ...(data.call || call),
+        authToken: data.token,
+        partnerName: call.partnerName || data.call?.initiatorName || 'Videollamada',
+        direction: 'incoming',
+      });
+      setIncomingVideoCall(null);
+      setToast(null);
+    } catch (err) {
+      setIncomingVideoCall(null);
+      setToast({ text: getGlobalVideoCallErrorMessage(err) });
+      setTimeout(() => setToast(null), 4500);
+    } finally {
+      setVideoCallLoading(false);
+    }
+  }, [incomingVideoCall, videoCallLoading]);
+
+  const handleRejectVideoCall = useCallback(async () => {
+    const callId = incomingVideoCall?.id;
+    setIncomingVideoCall(null);
+    if (!callId) return;
+    try {
+      await endVideoCall(callId);
+    } catch {
+      // Best-effort signalling cleanup.
+    }
+  }, [incomingVideoCall]);
+
+  const handleCloseVideoCall = useCallback(async () => {
+    const callId = activeVideoCall?.id;
+    setActiveVideoCall(null);
+    if (!callId) return;
+    try {
+      await endVideoCall(callId);
+    } catch {
+      // The local RealtimeKit leave already happened; backend cleanup is best-effort.
+    }
+  }, [activeVideoCall]);
+
+  const handleVideoCallModalError = useCallback((err) => {
+    setToast({ text: getGlobalVideoCallErrorMessage(err) });
+    setTimeout(() => setToast(null), 4500);
+  }, []);
+
   const ctxValue = useMemo(() => ({ unreadCount, refresh, subscribe, setActiveChatId, decrementUnread }), [unreadCount, refresh, subscribe, setActiveChatId, decrementUnread]);
 
   return (
     <UnreadContext.Provider value={ctxValue}>
       {children}
+      {incomingVideoCall && !activeVideoCall && (
+        <div className="fixed inset-x-3 bottom-24 z-[10010] mx-auto max-w-md animate-fade-in lg:bottom-8">
+          <div className="rounded-2xl border border-mansion-gold/25 bg-mansion-card/95 p-4 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-mansion-gold/15 text-mansion-gold ring-2 ring-mansion-gold/25">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m22 8-6 4 6 4V8Z" />
+                  <rect width="14" height="12" x="2" y="6" rx="2" ry="2" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-text-primary">
+                  {incomingVideoCall.partnerName || 'Videollamada'}
+                </p>
+                <p className="mt-0.5 text-xs text-text-muted">Videollamada entrante</p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleRejectVideoCall}
+                className="rounded-xl border border-mansion-border/35 bg-mansion-elevated px-3 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary"
+              >
+                Ahora no
+              </button>
+              <button
+                type="button"
+                onClick={handleAcceptVideoCall}
+                disabled={videoCallLoading}
+                className="rounded-xl bg-mansion-gold px-3 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-mansion-gold-light disabled:opacity-70"
+              >
+                {videoCallLoading ? 'Conectando...' : 'Atender'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <Suspense fallback={null}>
+        {activeVideoCall && (
+          <VideoCallModal
+            call={activeVideoCall}
+            partnerName={activeVideoCall.partnerName || 'Videollamada'}
+            onClose={handleCloseVideoCall}
+            onError={handleVideoCallModalError}
+          />
+        )}
+      </Suspense>
       {/* Toast notification */}
       {toast && (
         <div

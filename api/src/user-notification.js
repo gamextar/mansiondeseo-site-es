@@ -37,6 +37,28 @@ export class UserNotification {
         return new Response('ok');
       }
 
+      // GET /presence — internal presence probe used before sending calls.
+      if (url.pathname === '/presence' && request.method === 'GET') {
+        const chatId = url.searchParams.get('chatId') || null;
+        const sockets = this.state.getWebSockets();
+        let activeChatSocketCount = 0;
+
+        if (chatId) {
+          for (const ws of sockets) {
+            const attachment = this.getSocketAttachment(ws);
+            if (attachment?.activeChatId === chatId) {
+              activeChatSocketCount += 1;
+            }
+          }
+        }
+
+        return Response.json({
+          online: sockets.length > 0,
+          socketCount: sockets.length,
+          activeChatSocketCount,
+        });
+      }
+
       // WebSocket upgrade
       if (request.headers.get('Upgrade') !== 'websocket') {
         return new Response('Expected WebSocket', { status: 426 });

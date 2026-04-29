@@ -58,6 +58,9 @@ function getVideoCallErrorMessage(error) {
   if (code === 'VIDEO_CALL_VIP_REQUIRED') {
     return getVideoCallUnavailableMessage();
   }
+  if (code === 'VIDEO_CALL_RECEIVER_OFFLINE') {
+    return 'Este usuario no está online en este momento. Probá llamarlo cuando vuelva a conectarse.';
+  }
   if (code === 'VIDEO_CALL_ENDED') {
     return 'La videollamada ya finalizó.';
   }

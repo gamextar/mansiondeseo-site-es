@@ -1557,6 +1557,25 @@ async function notifyChatRoomVideoCall(env, userA, userB, payload) {
   }
 }
 
+async function getUserNotificationPresence(env, userId, { chatId = '' } = {}) {
+  try {
+    const doId = env.USER_NOTIFICATIONS.idFromName(userId);
+    const stub = env.USER_NOTIFICATIONS.get(doId);
+    const qs = chatId ? `?chatId=${encodeURIComponent(chatId)}` : '';
+    const res = await stub.fetch(`https://do/presence${qs}`, { method: 'GET' });
+    if (!res.ok) return { online: false, socketCount: 0, activeChatSocketCount: 0 };
+    const data = await res.json().catch(() => ({}));
+    return {
+      online: Boolean(data.online),
+      socketCount: Math.max(0, Number(data.socketCount || 0)),
+      activeChatSocketCount: Math.max(0, Number(data.activeChatSocketCount || 0)),
+    };
+  } catch (err) {
+    console.error('[getUserNotificationPresence] error:', err?.message || err);
+    return { online: false, socketCount: 0, activeChatSocketCount: 0 };
+  }
+}
+
 function videoCallErrorResponse(err) {
   if (err?.code === 'REALTIME_NOT_CONFIGURED') {
     return json({
@@ -4309,8 +4328,17 @@ async function handleStartVideoCall(request, env, receiverId) {
     return json({ error: messagingAllowed.message, code: messagingAllowed.code || 'MESSAGE_BLOCKED' }, messagingAllowed.status || 403);
   }
 
+  const conversationId = buildConversationId(auth.sub, receiverId);
+  const chatId = [auth.sub, receiverId].sort().join('-');
+  const receiverPresence = await getUserNotificationPresence(env, receiverId, { chatId });
+  if (!receiverPresence.online) {
+    return json({
+      error: 'Este usuario no está online en este momento. Probá llamarlo cuando vuelva a conectarse.',
+      code: 'VIDEO_CALL_RECEIVER_OFFLINE',
+    }, 409);
+  }
+
   try {
-    const conversationId = buildConversationId(auth.sub, receiverId);
     const callId = generateId();
     const meeting = await createRealtimeKitMeeting(env, `Mansión Deseo ${caller.username || 'Usuario'} / ${receiver.username || 'Usuario'}`);
     const participant = await createRealtimeKitParticipant(env, meeting.id, caller);
