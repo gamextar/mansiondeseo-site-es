@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Save, Sliders, Eye, EyeOff, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail, Activity, Ban, Video } from 'lucide-react';
-import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, uploadImage } from '../lib/api';
+import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, adminRotateFakeOnline, uploadImage } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
 import { estimateRealtimeLoad, getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
@@ -186,6 +186,11 @@ export default function SettingsPage() {
   const [bootDebugFlags, setBootDebugFlagsState] = useState(() => getBootDebugFlags());
   const [swResetting, setSwResetting] = useState(false);
   const [swResetStatus, setSwResetStatus] = useState('');
+  const [fakeOnlineCount, setFakeOnlineCount] = useState(36);
+  const [fakeOnlineWindowMinutes, setFakeOnlineWindowMinutes] = useState(55);
+  const [fakeOnlineExcludeMinutes, setFakeOnlineExcludeMinutes] = useState(60);
+  const [fakeOnlineRunning, setFakeOnlineRunning] = useState(false);
+  const [fakeOnlineResult, setFakeOnlineResult] = useState(null);
   const realtimeEstimate = estimateRealtimeLoad(realtimeDebugSummary);
   const mediaAutoTimerRef = useRef(null);
   const lastMediaAutoKeyRef = useRef('');
@@ -260,6 +265,7 @@ export default function SettingsPage() {
         setDailyMessageLimit(s.dailyMessageLimit);
         setMessageLimitWindowHours(s.messageLimitWindowHours ?? 12);
         setOnlineThresholdMinutes(s.onlineThresholdMinutes ?? 60);
+        setFakeOnlineExcludeMinutes(s.onlineThresholdMinutes ?? 60);
         setSiteCountry(s.siteCountry);
         setSiteLocale(s.siteLocale || 'es-AR');
         setSiteTimezone(s.siteTimezone || 'America/Argentina/Buenos_Aires');
@@ -404,6 +410,26 @@ export default function SettingsPage() {
     }
   };
 
+  const handleRotateFakeOnline = async () => {
+    setFakeOnlineRunning(true);
+    setFakeOnlineResult(null);
+    try {
+      const data = await adminRotateFakeOnline({
+        count: fakeOnlineCount,
+        windowMinutes: fakeOnlineWindowMinutes,
+        excludeRecentMinutes: fakeOnlineExcludeMinutes,
+      });
+      setFakeOnlineResult(data);
+    } catch (err) {
+      setFakeOnlineResult({
+        success: false,
+        error: err?.message || 'No se pudo rotar usuarios fake online',
+      });
+    } finally {
+      setFakeOnlineRunning(false);
+    }
+  };
+
   const handleSave = async () => {
     const parsedDraft = Number(avatarSizeDraft);
     const committedDraftSize = Number.isFinite(parsedDraft)
@@ -528,6 +554,7 @@ export default function SettingsPage() {
       setDailyMessageLimit(s.dailyMessageLimit);
       setMessageLimitWindowHours(s.messageLimitWindowHours ?? 12);
       setOnlineThresholdMinutes(s.onlineThresholdMinutes ?? 60);
+      setFakeOnlineExcludeMinutes(s.onlineThresholdMinutes ?? 60);
       setSiteCountry(s.siteCountry);
       setSiteLocale(s.siteLocale || 'es-AR');
       setSiteTimezone(s.siteTimezone || 'America/Argentina/Buenos_Aires');
@@ -1814,6 +1841,52 @@ export default function SettingsPage() {
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-gold/20 space-y-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Rotar fake online</h3>
+                  <p className="text-[11px] text-text-dim">Actualiza last_active solo en usuarios fake activos/verificados, priorizando quienes tienen stories. Recomendado: 36 por hora.</p>
+                </div>
+                <button
+                  onClick={handleRotateFakeOnline}
+                  disabled={fakeOnlineRunning}
+                  className="px-4 py-2 rounded-xl bg-mansion-gold/15 border border-mansion-gold/30 text-mansion-gold text-sm font-semibold hover:bg-mansion-gold/20 transition-colors disabled:opacity-60"
+                >
+                  {fakeOnlineRunning ? 'Rotando...' : 'Rotar ahora'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-3">
+                  <p className="mb-2 text-[10px] uppercase tracking-wider text-text-dim">Usuarios</p>
+                  <Counter value={fakeOnlineCount} onChange={setFakeOnlineCount} min={1} max={200} step={4} />
+                </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-3">
+                  <p className="mb-2 text-[10px] uppercase tracking-wider text-text-dim">Ventana min</p>
+                  <Counter value={fakeOnlineWindowMinutes} onChange={setFakeOnlineWindowMinutes} min={5} max={240} step={5} />
+                </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-3">
+                  <p className="mb-2 text-[10px] uppercase tracking-wider text-text-dim">Excluir recientes min</p>
+                  <Counter value={fakeOnlineExcludeMinutes} onChange={setFakeOnlineExcludeMinutes} min={0} max={240} step={5} />
+                </div>
+              </div>
+
+              {fakeOnlineResult ? (
+                <div className={`rounded-xl border px-3 py-2 ${
+                  fakeOnlineResult.success === false
+                    ? 'bg-red-500/10 border-red-500/20 text-red-300'
+                    : 'bg-mansion-gold/10 border-mansion-gold/20 text-mansion-gold'
+                }`}>
+                  {fakeOnlineResult.success === false ? (
+                    <p className="text-xs font-semibold">{fakeOnlineResult.error}</p>
+                  ) : (
+                    <p className="text-xs font-semibold">
+                      {fakeOnlineResult.updated} fake online actualizados · {fakeOnlineResult.activeStoryUsers} con story · ventana {fakeOnlineResult.windowMinutes} min
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
             <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-gold/20 space-y-4">
               <div className="flex items-center justify-between gap-3">

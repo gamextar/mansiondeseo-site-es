@@ -1458,6 +1458,19 @@ export async function adminResetAllCoins() {
   return apiFetch('/admin/reset-all-coins', { method: 'POST', body: '{}' });
 }
 
+export async function adminRotateFakeOnline({ count = 36, windowMinutes = 55, excludeRecentMinutes = 60 } = {}) {
+  const result = await apiFetch('/admin/rotate-fake-online', {
+    method: 'POST',
+    body: JSON.stringify({
+      count,
+      window_minutes: windowMinutes,
+      exclude_recent_minutes: excludeRecentMinutes,
+    }),
+  });
+  markFeedDirty();
+  return result;
+}
+
 // ── Admin: Users ────────────────────────────────────────
 
 export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', role = '', status = '', duplicate = '', created = '', reported = '', featured = '', verification = '' } = {}) {

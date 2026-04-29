@@ -110,6 +110,28 @@ function parseIntegerSetting(value, fallback, min = 0, max = Number.MAX_SAFE_INT
   return Math.min(max, Math.max(min, parsed));
 }
 
+function formatSqlDateFromMs(ms) {
+  return new Date(ms).toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
+}
+
+function getCryptoRandomFloat() {
+  const values = new Uint32Array(1);
+  crypto.getRandomValues(values);
+  return values[0] / 0x100000000;
+}
+
+function buildStaggeredMinuteOffsets(count, windowMinutes) {
+  const total = Math.max(0, Number(count) || 0);
+  if (total === 0) return [];
+  const safeWindow = Math.max(1, Number(windowMinutes) || 1);
+  const step = safeWindow / total;
+  return Array.from({ length: total }, (_, index) => {
+    const jitterCap = Math.min(Math.max(step * 0.65, 0.2), 3);
+    const offset = (index * step) + (getCryptoRandomFloat() * jitterCap);
+    return Math.min(safeWindow - 0.1, Math.max(0, offset));
+  });
+}
+
 function parseBooleanSetting(value, fallback = false) {
   if (value === undefined || value === null || value === '') return fallback;
   return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
@@ -6238,6 +6260,116 @@ async function handleAdminResetAllCoins(request, env) {
   return json({ success: true, affected: meta.changes });
 }
 
+// ── Admin: POST /api/admin/rotate-fake-online ───────────
+async function handleAdminRotateFakeOnline(request, env) {
+  await ensureStoriesTable(env);
+
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const body = await request.json().catch(() => ({}));
+  const settings = await cached('settings', 300_000, () => loadSettings(env));
+  const count = parseIntegerSetting(body.count, 36, 1, 200);
+  const windowMinutes = parseIntegerSetting(body.window_minutes ?? body.windowMinutes, 55, 5, 240);
+  const excludeRecentMinutes = parseIntegerSetting(
+    body.exclude_recent_minutes ?? body.excludeRecentMinutes,
+    settings.onlineThresholdMinutes || 60,
+    0,
+    240
+  );
+
+  const selectFakeCandidates = async ({ limit, excludeRecent = false, excludedIds = [] } = {}) => {
+    const recentClause = excludeRecent && excludeRecentMinutes > 0
+      ? "AND (u.last_active IS NULL OR u.last_active < datetime('now', ?))"
+      : '';
+    const excludedClause = excludedIds.length > 0
+      ? `AND u.id NOT IN (${excludedIds.map(() => '?').join(', ')})`
+      : '';
+    const bindings = [];
+    if (recentClause) bindings.push(`-${excludeRecentMinutes} minutes`);
+    bindings.push(...excludedIds);
+    bindings.push(limit);
+
+    const { results } = await env.DB.prepare(`
+      SELECT
+        u.id,
+        u.username,
+        u.role,
+        u.last_active,
+        CASE WHEN EXISTS (
+          SELECT 1 FROM stories s WHERE s.user_id = u.id AND s.active = 1
+        ) THEN 1 ELSE 0 END AS has_story
+      FROM users u
+      WHERE COALESCE(u.fake, 0) = 1
+        AND u.status = 'verified'
+        AND COALESCE(u.account_status, 'active') = 'active'
+        ${recentClause}
+        ${excludedClause}
+      ORDER BY has_story DESC, RANDOM()
+      LIMIT ?
+    `).bind(...bindings).all();
+    return results || [];
+  };
+
+  const selected = await selectFakeCandidates({ limit: count, excludeRecent: true });
+  if (selected.length < count) {
+    const fill = await selectFakeCandidates({
+      limit: count - selected.length,
+      excludedIds: selected.map((user) => user.id),
+    });
+    selected.push(...fill);
+  }
+
+  if (selected.length === 0) {
+    return json({
+      success: true,
+      requested: count,
+      updated: 0,
+      windowMinutes,
+      excludeRecentMinutes,
+      activeStoryUsers: 0,
+      feedCacheVersion: null,
+      users: [],
+    });
+  }
+
+  const now = Date.now();
+  const offsets = buildStaggeredMinuteOffsets(selected.length, windowMinutes);
+  const updates = selected.map((user, index) => {
+    const lastActive = formatSqlDateFromMs(now - Math.round(offsets[index] * 60_000));
+    user.rotated_last_active = lastActive;
+    return env.DB.prepare('UPDATE users SET last_active = ? WHERE id = ?').bind(lastActive, user.id);
+  });
+
+  for (let i = 0; i < updates.length; i += 50) {
+    await env.DB.batch(updates.slice(i, i + 50));
+  }
+
+  const feedCacheVersion = await bumpFeedCacheVersion(env);
+  const activeStoryUsers = selected.filter((user) => Number(user.has_story || 0) === 1).length;
+
+  console.log(`🔧 Admin rotó fake online — ${selected.length}/${count} usuarios en ${windowMinutes} min`);
+
+  return json({
+    success: true,
+    requested: count,
+    updated: selected.length,
+    windowMinutes,
+    excludeRecentMinutes,
+    activeStoryUsers,
+    feedCacheVersion,
+    users: selected.slice(0, 20).map((user) => ({
+      id: user.id,
+      username: user.username || '',
+      role: user.role || '',
+      has_story: Number(user.has_story || 0) === 1,
+      last_active: user.rotated_last_active || '',
+    })),
+  });
+}
+
 // ── Admin: GET /api/admin/users ─────────────────────────
 async function handleAdminGetUsers(request, env) {
   await ensureStoriesTable(env);
@@ -8496,6 +8628,7 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/admin/coins' && method === 'POST') return handleAdminAddCoins(request, env);
   if (path === '/api/admin/remove-all-vip' && method === 'POST') return handleAdminRemoveAllVip(request, env);
   if (path === '/api/admin/reset-all-coins' && method === 'POST') return handleAdminResetAllCoins(request, env);
+  if (path === '/api/admin/rotate-fake-online' && method === 'POST') return handleAdminRotateFakeOnline(request, env);
   if (path === '/api/admin/chat-cleanup' && method === 'POST') return handleAdminChatCleanup(request, env);
   if (path === '/api/debug/media-cache' && method === 'POST') return handleDebugMediaCache(request, env);
 
