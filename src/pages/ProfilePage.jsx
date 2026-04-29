@@ -1280,10 +1280,7 @@ export default function ProfilePage() {
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-2 px-1">Membresía</h3>
           {user?.premium ? (
             <>
-              <button
-                onClick={() => navigate('/vip')}
-                className="w-full flex items-center gap-3 p-3 rounded-2xl bg-mansion-gold/8 border border-mansion-gold/20 transition-all hover:bg-mansion-gold/12"
-              >
+              <div className="w-full flex flex-col gap-3 p-3 rounded-2xl bg-mansion-gold/8 border border-mansion-gold/20 sm:flex-row sm:items-center">
                 <div className="w-10 h-10 rounded-xl bg-mansion-gold/15 text-mansion-gold flex items-center justify-center">
                   <Crown className="w-5 h-5" />
                 </div>
@@ -1293,7 +1290,15 @@ export default function ProfilePage() {
                     {premiumUntilLabel ? `Vence el ${premiumUntilLabel}` : 'Disfrutás de todos los beneficios'}
                   </p>
                 </div>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/vip')}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-full border border-mansion-gold/30 bg-mansion-gold/12 px-3 py-2 text-xs font-semibold text-mansion-gold transition-all hover:bg-mansion-gold/20"
+                >
+                  Extender suscripción
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
 
               <button
                 onClick={handleToggleGhostMode}

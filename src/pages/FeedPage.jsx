@@ -1215,7 +1215,7 @@ export default function FeedPage({ initialData }) {
           </button>
           <div className="relative -top-[2px] flex items-center justify-end gap-1.5 pr-2">
             <Radio className="w-4 h-4 text-mansion-crimson" />
-            <p className="text-text-muted text-sm font-medium leading-none">Video Cards</p>
+            <p className="text-text-muted text-sm font-medium leading-none">Videos</p>
           </div>
         </div>
       )}
@@ -1224,7 +1224,7 @@ export default function FeedPage({ initialData }) {
       <div className="px-0 lg:px-8 pt-0 lg:pt-4 pb-0 fade-in-up">
         <div className="hidden lg:flex items-start justify-end gap-1.5 mb-3 px-2 lg:px-0">
           <Radio className="w-4 h-4 text-mansion-crimson" />
-          <p className="relative -top-[2px] text-text-muted text-sm lg:text-base font-medium">Video Cards</p>
+          <p className="relative -top-[2px] text-text-muted text-sm lg:text-base font-medium">Videos</p>
         </div>
         <div className="pl-[2px] pr-0 lg:px-0">
           <AnimatedBlock
