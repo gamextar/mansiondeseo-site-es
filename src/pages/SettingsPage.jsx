@@ -666,19 +666,16 @@ export default function SettingsPage() {
 
   const galleryPlaceholderFields = [
     {
-      line: 'Línea 1',
       label: 'Foto Sensual',
       value: galleryPlaceholderSensualImg,
       setter: setGalleryPlaceholderSensualImg,
     },
     {
-      line: 'Línea 2',
       label: 'Foto Hot',
       value: galleryPlaceholderHotImg,
       setter: setGalleryPlaceholderHotImg,
     },
     {
-      line: 'Línea 3',
       label: 'Foto Super Hot',
       value: galleryPlaceholderSuperHotImg,
       setter: setGalleryPlaceholderSuperHotImg,
@@ -864,12 +861,11 @@ export default function SettingsPage() {
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">
-                {galleryPlaceholderFields.map(({ line, label, value, setter }) => (
+                {galleryPlaceholderFields.map(({ label, value, setter }) => (
                   <div key={label} className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-xs font-semibold text-text-primary">{line}</p>
-                        <p className="text-[11px] text-mansion-gold">{label}</p>
+                        <p className="text-xs font-semibold text-mansion-gold">{label}</p>
                       </div>
                       {value && (
                         <button onClick={() => setter('')} className="text-[10px] text-mansion-crimson hover:underline">Quitar</button>

@@ -56,9 +56,9 @@ const PHOTO_OTP_STATUS = {
 
 const MAX_GALLERY_PHOTOS = 9;
 const GALLERY_LEVELS = [
-  { line: 'Línea 1', label: 'Foto Sensual', placeholderKey: 'galleryPlaceholderSensualImg' },
-  { line: 'Línea 2', label: 'Foto Hot', placeholderKey: 'galleryPlaceholderHotImg' },
-  { line: 'Línea 3', label: 'Foto Super Hot', placeholderKey: 'galleryPlaceholderSuperHotImg' },
+  { label: 'Foto Sensual', placeholderKey: 'galleryPlaceholderSensualImg' },
+  { label: 'Foto Hot', placeholderKey: 'galleryPlaceholderHotImg' },
+  { label: 'Foto Super Hot', placeholderKey: 'galleryPlaceholderSuperHotImg' },
 ];
 
 function getGalleryLevel(slotIndex) {
@@ -1052,9 +1052,6 @@ export default function ProfilePage() {
                     <div className="flex h-9 w-9 items-center justify-center rounded-full border border-mansion-border/40 bg-black/35 transition-colors group-hover:border-mansion-gold/35">
                       <Plus className="h-5 w-5" />
                     </div>
-                    <span className="text-center text-[9px] font-semibold uppercase leading-none tracking-wider text-text-dim group-hover:text-mansion-gold/80">
-                      {galleryLevel.line}
-                    </span>
                     <span className="text-center text-[10px] font-medium uppercase leading-3 tracking-wider">
                       {galleryLevel.label}
                     </span>
