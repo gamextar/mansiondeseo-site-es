@@ -1469,10 +1469,27 @@ export async function createPayment({ plan_id, amount }) {
 }
 
 export async function confirmPayment(payment_id, { gateway, external_reference } = {}) {
-  return apiFetch('/payment/confirm', {
+  const data = await apiFetch('/payment/confirm', {
     method: 'POST',
     body: JSON.stringify({ payment_id, gateway, external_reference }),
   });
+  invalidateMeCache();
+  invalidateBootstrapCache();
+  invalidateOwnProfileDashboardCache();
+
+  const partialUser = {};
+  if (data?.premium_until) {
+    partialUser.premium = true;
+    partialUser.premium_until = data.premium_until;
+  }
+  if (Number.isFinite(Number(data?.coinsAdded))) {
+    const currentCoins = Number(getStoredUser()?.coins || 0);
+    partialUser.coins = currentCoins + Number(data.coinsAdded);
+  }
+  if (Object.keys(partialUser).length > 0) {
+    mergeMeCache(partialUser);
+  }
+  return data;
 }
 
 // ── Admin ─────────────────────────────────────────────

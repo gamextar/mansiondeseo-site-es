@@ -30,14 +30,14 @@ export default function PagoMonedasExitosoPage() {
           ? { gateway: 'uala', external_reference: externalRef }
           : {};
         await confirmPayment(paymentId, confirmOpts);
-        const data = await getMe();
+        const data = await getMe({ force: true });
         if (data?.user) setUser(data.user);
       } catch (err) {
         console.error('Error confirmando pago de monedas:', err);
       }
     }
     confirm();
-  }, [paymentId, setUser]);
+  }, [externalRef, gateway, paymentId, setUser]);
 
   return (
     <div className="min-h-screen bg-mansion-base flex flex-col items-center justify-center p-6 text-center">

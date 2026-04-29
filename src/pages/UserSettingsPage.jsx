@@ -6,6 +6,7 @@ import { useAuth } from '../lib/authContext';
 import {
   confirmAccountDeletion,
   confirmEmailChange,
+  getMe,
   invalidateProfilesCache,
   requestAccountDeletion,
   requestEmailChange,
@@ -103,6 +104,19 @@ export default function UserSettingsPage() {
     String(localityDraft || '').trim() !== String(user?.locality || '').trim() ||
     String(bioDraft || '').trim() !== String(user?.bio || '').trim()
   );
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let cancelled = false;
+    getMe({ force: true }).then((data) => {
+      if (!cancelled && data?.user) {
+        setUser(prev => prev ? { ...prev, ...data.user } : data.user);
+      }
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [setUser, user?.id]);
 
   useEffect(() => {
     setProvinceDraft(user?.province || user?.city || '');

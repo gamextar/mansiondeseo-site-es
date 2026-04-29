@@ -41,7 +41,7 @@ export default function PagoExitosoPage() {
           : {};
         const result = await confirmPayment(paymentId, confirmOpts);
         if (result.premium || result.coins) {
-          const data = await getMe();
+          const data = await getMe({ force: true });
           if (data?.user) setUser(data.user);
         }
         setConfirmed(true);
@@ -51,7 +51,7 @@ export default function PagoExitosoPage() {
       }
     }
     confirm();
-  }, [paymentId, setUser]);
+  }, [externalRef, gateway, paymentId, setUser]);
 
   // ── Coin purchase success ──
   if (isCoinPurchase) {
