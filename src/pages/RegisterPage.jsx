@@ -639,6 +639,7 @@ function isValidEmailTld(email) {
 }
 const USERNAME_REGEX = /^[a-zA-Z0-9._]+$/;
 const USERNAME_MAX_LENGTH = 18;
+const BIO_MAX_LENGTH = 300;
 
 function BirthdateFields({ data, onChange }) {
   const enteredAge = calculateAgeFromBirthdate(data.birthdate);
@@ -1298,13 +1299,13 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
           <label className="text-text-muted text-xs font-medium mb-1.5 block">Bio corta</label>
           <textarea
             value={data.bio}
-            onChange={(e) => onChange({ ...data, bio: e.target.value.slice(0, 200) })}
+            onChange={(e) => onChange({ ...data, bio: e.target.value.slice(0, BIO_MAX_LENGTH) })}
             placeholder="Cuéntanos qué te trae a la Mansión..."
             rows={3}
-            maxLength={200}
+            maxLength={BIO_MAX_LENGTH}
             className="w-full resize-none"
           />
-          <p className="text-[10px] text-text-dim text-right mt-0.5">{data.bio.length}/200</p>
+          <p className="text-[10px] text-text-dim text-right mt-0.5">{data.bio.length}/{BIO_MAX_LENGTH}</p>
         </div>
 
         {showCountryPicker && (

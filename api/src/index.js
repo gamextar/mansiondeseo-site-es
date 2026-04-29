@@ -95,6 +95,7 @@ const FREE_CHAT_RECIPIENT_LIMIT = 5;
 const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
 const DEFAULT_REALTIMEKIT_PRESET_NAME = 'group_call_host';
 const USERNAME_MAX_LENGTH = 18;
+const BIO_MAX_LENGTH = 300;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -2740,7 +2741,7 @@ async function handleRegister(request, env, ctx) {
     sexualOrientationValue,
     JSON.stringify(messageBlockRolesValue),
     country,
-    bio || '',
+    String(bio || '').trim().slice(0, BIO_MAX_LENGTH),
     inheritedFeedPriority
   ).run();
 
@@ -5485,6 +5486,9 @@ async function handleUpdateProfile(request, env) {
       } else if (field === 'ghost_mode' || field === 'premium') {
         updates.push(`${field} = ?`);
         values.push(normalizedBody[field] ? 1 : 0);
+      } else if (field === 'bio') {
+        updates.push(`${field} = ?`);
+        values.push(String(normalizedBody[field] || '').trim().slice(0, BIO_MAX_LENGTH));
       } else {
         updates.push(`${field} = ?`);
         values.push(normalizedBody[field]);

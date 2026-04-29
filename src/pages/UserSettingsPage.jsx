@@ -41,6 +41,7 @@ const fadeUp = {
 };
 
 const EMAIL_REGEX = /^[^\s@]{1,64}@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,24}$/;
+const BIO_MAX_LENGTH = 300;
 
 function markFeedDirty() {
   invalidateProfilesCache();
@@ -125,7 +126,7 @@ export default function UserSettingsPage() {
       const data = await updateProfile({
         province: String(provinceDraft || '').trim(),
         locality: String(localityDraft || '').trim(),
-        bio: String(bioDraft || '').trim().slice(0, 500),
+        bio: String(bioDraft || '').trim().slice(0, BIO_MAX_LENGTH),
       });
       if (data?.user) setUser(prev => prev ? { ...prev, ...data.user } : data.user);
       setPersonalMessage('Datos actualizados.');
@@ -352,6 +353,33 @@ export default function UserSettingsPage() {
         <div className="grid gap-4">
           <motion.section variants={fadeUp} className="glass-elevated rounded-3xl p-4 lg:p-5">
             <h2 className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
+              <Heart className="h-3 w-3 text-mansion-crimson/70" />
+              Busco
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {SEEKING_OPTIONS.map((option) => {
+                const isActive = seeking.includes(option.id);
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => toggleSeeking(option.id)}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                      isActive
+                        ? option.color
+                        : 'border border-mansion-border/30 bg-mansion-card/60 text-text-muted hover:border-mansion-border/50 hover:text-text-primary'
+                    } ${isActive ? 'border' : ''}`}
+                  >
+                    <span>{option.emoji}</span>
+                    <span>{option.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </motion.section>
+
+          <motion.section variants={fadeUp} className="glass-elevated rounded-3xl p-4 lg:p-5">
+            <h2 className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
               <UserRound className="h-3 w-3 text-mansion-gold/70" />
               Datos personales
             </h2>
@@ -404,16 +432,16 @@ export default function UserSettingsPage() {
                 <textarea
                   value={bioDraft}
                   onChange={(e) => {
-                    setBioDraft(e.target.value.slice(0, 500));
+                    setBioDraft(e.target.value.slice(0, BIO_MAX_LENGTH));
                     setPersonalMessage('');
                     setPersonalError('');
                   }}
                   rows={4}
-                  maxLength={500}
+                  maxLength={BIO_MAX_LENGTH}
                   className="w-full resize-none rounded-2xl border border-mansion-border/30 bg-black/25 px-4 py-3 text-sm leading-6 text-text-primary placeholder:text-text-dim focus:border-mansion-gold/50 focus:ring-mansion-gold/20"
                   placeholder="Contá algo breve sobre vos"
                 />
-                <span className="mt-1 block text-right text-[10px] text-text-dim">{bioDraft.length}/500</span>
+                <span className="mt-1 block text-right text-[10px] text-text-dim">{bioDraft.length}/{BIO_MAX_LENGTH}</span>
               </label>
 
               {(personalMessage || personalError) && (
@@ -599,33 +627,6 @@ export default function UserSettingsPage() {
                 Actualizar contraseña
               </button>
             </form>
-          </motion.section>
-
-          <motion.section variants={fadeUp} className="glass-elevated rounded-3xl p-4 lg:p-5">
-            <h2 className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
-              <Heart className="h-3 w-3 text-mansion-crimson/70" />
-              Busco
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {SEEKING_OPTIONS.map((option) => {
-                const isActive = seeking.includes(option.id);
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => toggleSeeking(option.id)}
-                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
-                      isActive
-                        ? option.color
-                        : 'border border-mansion-border/30 bg-mansion-card/60 text-text-muted hover:border-mansion-border/50 hover:text-text-primary'
-                    } ${isActive ? 'border' : ''}`}
-                  >
-                    <span>{option.emoji}</span>
-                    <span>{option.label}</span>
-                  </button>
-                );
-              })}
-            </div>
           </motion.section>
 
           <motion.section variants={fadeUp} className="glass-elevated rounded-3xl p-4 lg:p-5">
