@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Camera,
-  CameraOff,
+  Eye,
+  EyeOff,
   Mic,
   MicOff,
   PhoneOff,
@@ -19,6 +19,11 @@ function formatCallChatTime(value) {
 
 function getParticipantName(participant, fallback = 'Usuario') {
   return participant?.name || participant?.displayName || participant?.userId || fallback;
+}
+
+function shouldStartWithAudioEnabled() {
+  if (typeof window === 'undefined') return true;
+  return !window.matchMedia('(min-width: 1024px)').matches;
 }
 
 function TrackVideo({ track, enabled, muted = false, mirrored = false, className = '' }) {
@@ -311,10 +316,10 @@ function FaceTimeSurface({ partnerName, joining, closing, onLeave }) {
         <CallControlButton
           active={Boolean(self?.videoEnabled)}
           disabled={!self || closing}
-          label={self?.videoEnabled ? 'Apagar cámara' : 'Activar cámara'}
+          label={self?.videoEnabled ? 'Ocultar cámara' : 'Mostrar cámara'}
           onClick={handleToggleVideo}
         >
-          {self?.videoEnabled ? <Camera className="h-5 w-5" /> : <CameraOff className="h-5 w-5" />}
+          {self?.videoEnabled ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
         </CallControlButton>
         <CallControlButton
           danger
@@ -355,7 +360,7 @@ function MeetingSurface({ authToken, partnerName, closing = false, onLeave, onEr
     initMeeting({
       authToken,
       defaults: {
-        audio: true,
+        audio: shouldStartWithAudioEnabled(),
         video: true,
       },
     }).then(async (client) => {
