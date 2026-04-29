@@ -852,7 +852,6 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
 
     // Optimistically clear the global badge for this conversation immediately.
     // Read the conversation list cache to find how many unreads this conversation had.
-    let clearedUnreadFromCache = 0;
     try {
       const raw = sessionStorage.getItem('mansion_conversations');
       if (raw) {
@@ -860,8 +859,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
         const convs = Array.isArray(parsed?.conversations) ? parsed.conversations : (Array.isArray(parsed) ? parsed : []);
         const conv = convs.find(c => String(c.profileId) === String(partnerId));
         if (conv && conv.unread > 0) {
-          clearedUnreadFromCache = Number(conv.unread || 0);
-          decrementUnread(clearedUnreadFromCache);
+          decrementUnread(conv.unread);
           // Also zero it in the cache
           conv.unread = 0;
           const nextConvs = Array.isArray(parsed?.conversations)
@@ -1001,13 +999,12 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
       const unreadIncomingCount = latestMessages.filter((message) => (
         message.senderId === 'them' && Number(message.is_read || 0) === 0
       )).length;
-      const unreadToClear = Math.max(0, unreadIncomingCount - clearedUnreadFromCache);
-      if (unreadToClear > 0) decrementUnread(unreadToClear);
       if (unreadIncomingCount > 0) {
         publishLocalConversationUpdate({
           type: 'conversation_read',
           partnerId,
         });
+        refreshUnread();
       }
       const hasHiddenOlderMessages = hasMessagesBeforeVisibleWindow(latestMessages, nextInitialMessages);
       const nextHasOlderMessages = !!data.hasMore || hasHiddenOlderMessages;
