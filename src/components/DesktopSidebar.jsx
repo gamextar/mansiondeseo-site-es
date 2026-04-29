@@ -27,7 +27,7 @@ function timeAgo(dateStr) {
 const NAV_ITEMS = [
   { to: '/feed', icon: Home, label: 'Inicio' },
   { to: '/videos', icon: Film, label: 'Videos' },
-  { to: '/seguidores', icon: Heart, label: 'Seguidores' },
+  { to: '/seguidores', icon: Heart, label: 'Me gusta' },
   { to: '/mensajes', icon: MessageCircle, label: 'Mensajes' },
   { to: '/perfil', icon: User, label: 'Mi Perfil' },
   { to: '/configuracion', icon: Settings, label: 'Configuración' },

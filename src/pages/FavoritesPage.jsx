@@ -7,7 +7,7 @@ import { formatNumber } from '../lib/siteConfig';
 import AvatarImg from '../components/AvatarImg';
 
 const FAVORITE_TABS = [
-  { id: 'followers', label: 'Seguidores' },
+  { id: 'followers', label: 'Me gusta' },
   { id: 'following', label: 'Siguiendo' },
 ];
 
@@ -33,8 +33,8 @@ function FollowCard({ profile, tab }) {
   const routerLocation = useLocation();
   const location = formatLocation(profile);
   const relationLabel = tab === 'followers'
-    ? (profile.mutual_follow ? 'Lo sigues también' : 'Te sigue')
-    : (profile.mutual_follow ? 'También te sigue' : 'Lo sigues');
+    ? (profile.mutual_follow ? 'También le diste Me gusta' : 'Te dio Me gusta')
+    : (profile.mutual_follow ? 'También te dio Me gusta' : 'Le diste Me gusta');
   const useOverlayNavigation = typeof window !== 'undefined' && window.innerWidth >= 1024;
 
   return (
@@ -100,7 +100,7 @@ function FollowCard({ profile, tab }) {
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2b241d] px-3 py-1.5 font-medium text-text-primary">
               <Heart className="h-3.5 w-3.5" fill="currentColor" />
               <span className="tabular-nums">{formatNumber(profile.followers_total || 0)}</span>
-              <span className="text-text-dim">seguidores</span>
+              <span className="text-text-dim">me gusta</span>
             </span>
           </div>
 
@@ -148,7 +148,7 @@ export default function FavoritesPage() {
     };
   }, [tab]);
 
-  const title = tab === 'followers' ? 'Tus seguidores' : 'A quién sigues';
+  const title = tab === 'followers' ? 'Tus Me gusta' : 'A quién sigues';
   const subtitle = tab === 'followers'
     ? 'Perfiles que te marcaron con corazón y ya forman parte de tu órbita.'
     : 'Tus favoritos guardados para volver a verlos rápido.';
@@ -161,7 +161,7 @@ export default function FavoritesPage() {
           <div className="relative">
             <div className="inline-flex items-center gap-2 rounded-full bg-[#2f271f] px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-mansion-gold">
               <Heart className="h-3.5 w-3.5" fill="currentColor" />
-              Seguidores
+              Me gusta
             </div>
             <h1 className="mt-4 font-display text-3xl font-bold text-text-primary lg:text-5xl">
               {title}
@@ -174,7 +174,7 @@ export default function FavoritesPage() {
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2b241d] px-3.5 py-2 text-xs text-text-dim">
                 <Heart className="h-3.5 w-3.5 text-mansion-gold" fill="currentColor" />
                 <span className="tabular-nums">{formatNumber(followersCount)}</span>
-                seguidores
+                me gusta
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2b241d] px-3.5 py-2 text-xs text-text-dim">
                 <Users className="h-3.5 w-3.5 text-mansion-gold" />
@@ -218,7 +218,7 @@ export default function FavoritesPage() {
             <Heart className="mx-auto mb-4 h-12 w-12 text-text-dim" />
             <p className="text-sm text-text-dim">
               {tab === 'followers'
-                ? 'Todavía no tienes seguidores en esta cuenta.'
+                ? 'Todavía no recibiste Me gusta en esta cuenta.'
                 : 'Todavía no sigues a ningún perfil.'}
             </p>
           </div>
@@ -227,7 +227,7 @@ export default function FavoritesPage() {
             <div className="mb-5 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-mansion-gold" />
-                <h2 className="text-lg font-semibold text-text-primary">{tab === 'followers' ? 'Listado de seguidores' : 'Listado de seguidos'}</h2>
+                <h2 className="text-lg font-semibold text-text-primary">{tab === 'followers' ? 'Listado de Me gusta' : 'Listado de seguidos'}</h2>
               </div>
               <p className="text-xs text-text-dim">
                 <span className="tabular-nums">{profiles.length}</span> perfiles
