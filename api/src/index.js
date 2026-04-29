@@ -94,6 +94,7 @@ const FREE_VIDEO_STORY_DAILY_LIMIT = 10;
 const FREE_CHAT_RECIPIENT_LIMIT = 5;
 const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
 const DEFAULT_REALTIMEKIT_PRESET_NAME = 'group_call_host';
+const USERNAME_MAX_LENGTH = 18;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -2606,6 +2607,7 @@ function calculateAgeFromBirthdate(birthdate) {
 async function handleRegister(request, env, ctx) {
   const body = await request.json();
   const { email, password, username, role, seeking, interests, age, birthdate, city, province, locality, bio, marital_status, sexual_orientation, message_block_roles } = body;
+  const usernameValue = String(username || '').trim();
   await ensureUsersMessageBlockRolesColumn(env);
   const cfCity = String(request.cf?.city || '').trim();
   const cfRegion = String(request.cf?.region || '').trim();
@@ -2621,7 +2623,7 @@ async function handleRegister(request, env, ctx) {
     ? computedAge
     : (Number.isFinite(fallbackAge) ? fallbackAge : null);
 
-  if (!email || !password || !username || !role || !seeking) {
+  if (!email || !password || !usernameValue || !role || !seeking) {
     return error('Campos requeridos: email, password, username, role, seeking');
   }
 
@@ -2655,26 +2657,26 @@ async function handleRegister(request, env, ctx) {
     return error('La contraseña no puede tener más de 50 caracteres');
   }
 
-  if (username.length > 20) {
-    return error('El nombre de usuario no puede tener más de 20 caracteres');
+  if (usernameValue.length > USERNAME_MAX_LENGTH) {
+    return error(`El nombre de usuario no puede tener más de ${USERNAME_MAX_LENGTH} caracteres`);
   }
 
   // Validate username format: only letters, numbers, dots, underscores
-  if (!/^[a-zA-Z0-9._]+$/.test(username)) {
+  if (!/^[a-zA-Z0-9._]+$/.test(usernameValue)) {
     return error('El nombre de usuario solo puede contener letras, números, puntos y guiones bajos');
   }
 
   // Check duplicate username against real verified users; fake matches are allowed
   const conflictingRealUsername = await env.DB.prepare(
     "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 0 LIMIT 1"
-  ).bind(username).first();
+  ).bind(usernameValue).first();
   if (conflictingRealUsername) {
     return error('Este nombre de usuario ya está en uso. Elegí otro.', 409);
   }
 
   const conflictingFakeUsernames = await env.DB.prepare(
     "SELECT id, COALESCE(feed_priority, 0) AS feed_priority FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 1"
-  ).bind(username).all();
+  ).bind(usernameValue).all();
 
   const conflictingFakeIds = (conflictingFakeUsernames?.results || [])
     .map((row) => row?.id)
@@ -2725,7 +2727,7 @@ async function handleRegister(request, env, ctx) {
   `).bind(
     userId,
     email.toLowerCase(),
-    username,
+    usernameValue,
     passwordHash,
     role,
     JSON.stringify(seekingArr),
@@ -3084,12 +3086,16 @@ async function handleCheckEmail(request, env) {
 
 async function handleCheckUsername(request, env) {
   const { username } = await request.json();
-  if (!username) return error('Username requerido');
+  const usernameValue = String(username || '').trim();
+  if (!usernameValue) return error('Username requerido');
+  if (usernameValue.length > USERNAME_MAX_LENGTH || !/^[a-zA-Z0-9._]+$/.test(usernameValue)) {
+    return json({ exists: false, invalid: true });
+  }
 
   const existing = await env.DB.prepare(
     "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 0"
   )
-    .bind(username).first();
+    .bind(usernameValue).first();
 
   return json({ exists: !!existing });
 }
@@ -5446,6 +5452,21 @@ async function handleUpdateProfile(request, env) {
         const filtered = normalizeRoleArray(normalizedBody[field], SEEKING_ROLE_IDS, []);
         updates.push(`${field} = ?`);
         values.push(JSON.stringify(filtered));
+      } else if (field === 'username') {
+        const nextUsername = String(normalizedBody[field] || '').trim();
+        if (!nextUsername) return error('Username requerido', 400);
+        if (nextUsername.length > USERNAME_MAX_LENGTH) {
+          return error(`El nombre de usuario no puede tener más de ${USERNAME_MAX_LENGTH} caracteres`, 400);
+        }
+        if (!/^[a-zA-Z0-9._]+$/.test(nextUsername)) {
+          return error('El nombre de usuario solo puede contener letras, números, puntos y guiones bajos', 400);
+        }
+        const existingUsername = await env.DB.prepare(
+          "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ? AND status = 'verified' AND COALESCE(fake, 0) = 0 LIMIT 1"
+        ).bind(nextUsername, auth.sub).first();
+        if (existingUsername) return error('Este nombre de usuario ya está en uso. Elegí otro.', 409);
+        updates.push(`${field} = ?`);
+        values.push(nextUsername);
       } else if (field === 'role') {
         if (!REGISTER_ROLE_IDS.includes(normalizedBody[field])) continue;
         updates.push(`${field} = ?`);

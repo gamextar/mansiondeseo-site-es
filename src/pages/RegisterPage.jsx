@@ -638,6 +638,7 @@ function isValidEmailTld(email) {
   return COMMON_TLDS.has(parts[parts.length - 1]);
 }
 const USERNAME_REGEX = /^[a-zA-Z0-9._]+$/;
+const USERNAME_MAX_LENGTH = 18;
 
 function BirthdateFields({ data, onChange }) {
   const enteredAge = calculateAgeFromBirthdate(data.birthdate);
@@ -1210,12 +1211,12 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
               type="text"
               value={data.name}
               onChange={(e) => {
-                const val = e.target.value.replace(/[^a-zA-Z0-9._]/g, '').slice(0, 20);
+                const val = e.target.value.replace(/[^a-zA-Z0-9._]/g, '').slice(0, USERNAME_MAX_LENGTH);
                 onChange({ ...data, name: val });
               }}
               onBlur={onUsernameBlur}
               placeholder="Evita datos reales como Apellido etc"
-              maxLength={20}
+              maxLength={USERNAME_MAX_LENGTH}
               className={`w-full pr-10 ${
                 usernameStatus === 'valid' ? 'border-green-500/60' :
                 usernameStatus === 'exists' || usernameStatus === 'invalid' ? 'border-mansion-crimson/60' : ''
@@ -1233,7 +1234,7 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
           </div>
           <div className="flex justify-between mt-0.5">
             <p className="text-[10px] text-text-dim">Solo letras, números, puntos y _</p>
-            <p className="text-[10px] text-text-dim">{data.name.length}/20</p>
+            <p className="text-[10px] text-text-dim">{data.name.length}/{USERNAME_MAX_LENGTH}</p>
           </div>
           {usernameStatus === 'exists' && (
             <p className="text-mansion-crimson text-[11px] mt-0.5">Este nombre ya está en uso</p>
@@ -1771,7 +1772,7 @@ export default function RegisterPage() {
     if (step === 0) return EMAIL_REGEX.test(email) && isValidEmailTld(email) && password.length >= 10 && emailStatus !== 'exists' && emailStatus !== 'invalid' && isAdultBirthdate(info.birthdate);
     if (step === 1) return !!iAm;
     if (step === 2) return seeking.length > 0;
-    if (step === 3) return info.name && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && info.province && info.locality && (!showCountryPicker || selectedCountry);
+    if (step === 3) return info.name && info.name.length <= USERNAME_MAX_LENGTH && USERNAME_REGEX.test(info.name) && usernameStatus !== 'exists' && usernameStatus !== 'invalid' && info.province && info.locality && (!showCountryPicker || selectedCountry);
     if (step === 4) return !!photoFile;
     return true;
   };
@@ -1804,14 +1805,14 @@ export default function RegisterPage() {
   const handleUsernameBlur = useCallback(async () => {
     const name = info.name.trim();
     if (!name) return;
-    if (!USERNAME_REGEX.test(name)) {
+    if (name.length > USERNAME_MAX_LENGTH || !USERNAME_REGEX.test(name)) {
       setUsernameStatus('invalid');
       return;
     }
     setUsernameStatus('checking');
     try {
-      const { exists } = await apiCheckUsername(name);
-      setUsernameStatus(exists ? 'exists' : 'valid');
+      const { exists, invalid } = await apiCheckUsername(name);
+      setUsernameStatus(invalid ? 'invalid' : exists ? 'exists' : 'valid');
     } catch {
       setUsernameStatus('idle');
     }
