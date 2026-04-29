@@ -1396,6 +1396,13 @@ async function clearConversationStateUnread(env, userId, partnerId) {
   ).bind(userId, partnerId).run();
 }
 
+async function getUnreadCountForUser(env, userId) {
+  const row = await env.DB.prepare(
+    'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'
+  ).bind(userId).first();
+  return Number(row?.unread || 0);
+}
+
 async function deleteConversationState(env, userId, partnerId) {
   await env.DB.prepare(
     'DELETE FROM conversation_state WHERE user_id = ? AND partner_id = ?'
@@ -3926,12 +3933,16 @@ async function handleSendMessage(request, env) {
 
   if (!receiverIsFake) {
     // Fake/placeholders do not need realtime delivery; keep their path D1-only.
-    notifyChatRoom(env, auth.sub, receiver_id, msg).catch(() => {});
-
     const events = await buildNewMessageEvents(env, auth.sub, receiver_id, msg);
+    const receiverUnreadCount = await getUnreadCountForUser(env, receiver_id).catch(() => null);
+    if (receiverUnreadCount !== null) events.receiver.unreadCount = receiverUnreadCount;
 
-    // Notify receiver's notification channel (updates ChatListPage in real-time)
-    notifyUser(env, receiver_id, events.receiver).catch(() => {});
+    // HTTP sends (used by image attachments) must wait for realtime fanout;
+    // otherwise the Worker can finish before the notification DO receives it.
+    await Promise.allSettled([
+      notifyChatRoom(env, auth.sub, receiver_id, msg),
+      notifyUser(env, receiver_id, events.receiver),
+    ]);
   }
 
   return json({ message: msg }, 201);
@@ -4012,6 +4023,12 @@ async function handleGetMessages(request, env, otherUserId) {
       AND (? IS NULL OR created_at > ?)
   `).bind(otherUserId, auth.sub, hiddenBefore, hiddenBefore).run();
   await clearConversationStateUnread(env, auth.sub, otherUserId);
+  try {
+    const unreadCount = await getUnreadCountForUser(env, auth.sub);
+    await notifyUser(env, auth.sub, { type: 'unread_count', unreadCount }).catch(() => {});
+  } catch {
+    // Unread sync is best-effort; message history should still load.
+  }
 
   const messages = windowedResults.map(m => ({
     id: m.id,
@@ -4324,11 +4341,7 @@ async function handleUnreadCount(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
-  const row = await env.DB.prepare(
-    'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'
-  ).bind(auth.sub).first();
-
-  return json({ unread: Number(row?.unread || 0) });
+  return json({ unread: await getUnreadCountForUser(env, auth.sub) });
 }
 
 // ── POST /api/admin/chat-cleanup ────────────────────────

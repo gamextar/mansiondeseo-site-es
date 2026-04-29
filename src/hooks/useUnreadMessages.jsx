@@ -177,7 +177,7 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
             const isActiveChat = !!activeChatIdRef.current && data.chatId === activeChatIdRef.current;
             if (typeof data.unreadCount === 'number') {
               applyUnreadCount(
-                isActiveChat ? Math.max(0, data.unreadCount - 1) : data.unreadCount,
+                data.unreadCount,
                 { showToast: !isActiveChat }
               );
             } else if (typeof data.unreadDelta === 'number') {
@@ -216,6 +216,14 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
                   }));
                 }
               } catch { /* ignore */ }
+            }
+            notifyListeners(data);
+          } else if (data.type === 'unread_count') {
+            invalidateUnreadCache();
+            if (typeof data.unreadCount === 'number') {
+              applyUnreadCount(data.unreadCount);
+            } else {
+              fetchUnread({ force: true }).catch(() => {});
             }
             notifyListeners(data);
           } else if (data.type === 'conversation_deleted') {

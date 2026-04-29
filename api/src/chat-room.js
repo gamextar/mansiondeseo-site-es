@@ -258,6 +258,23 @@ export class ChatRoom {
     };
   }
 
+  async getUnreadCount(userId) {
+    const row = await this.env.DB.prepare(
+      'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'
+    ).bind(userId).first();
+    return Number(row?.unread || 0);
+  }
+
+  async notifyUser(userId, data) {
+    const doId = this.env.USER_NOTIFICATIONS.idFromName(userId);
+    const stub = this.env.USER_NOTIFICATIONS.get(doId);
+    return stub.fetch('https://do/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
   normalizeMessageLimitWindowHours(value) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return 12;
@@ -767,15 +784,11 @@ export class ChatRoom {
         // Notify only the receiver's UserNotification DO.
         // Sender-side conversation previews are synchronized locally in the browser.
         const events = await this.buildNewMessageEvents(senderId, receiverId, msg);
+        const receiverUnreadCount = await this.getUnreadCount(receiverId).catch(() => null);
+        if (receiverUnreadCount !== null) events.receiver.unreadCount = receiverUnreadCount;
         try {
           this.debug('[ChatRoom.handleMessage] notifying UserNotification for:', receiverId);
-          const doId = this.env.USER_NOTIFICATIONS.idFromName(receiverId);
-          const stub = this.env.USER_NOTIFICATIONS.get(doId);
-          const res = await stub.fetch('https://do/notify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(events.receiver),
-          });
+          const res = await this.notifyUser(receiverId, events.receiver);
           this.debug('[ChatRoom.handleMessage] UserNotification response:', res.status, 'for:', receiverId);
         } catch (err) {
           console.error('[ChatRoom.handleMessage] UserNotification error for', receiverId, ':', err.message);
@@ -821,6 +834,13 @@ export class ChatRoom {
       }
       if (partnerId) {
         await this.clearConversationStateUnread(readerId, partnerId).catch(() => {});
+        const unreadCount = await this.getUnreadCount(readerId).catch(() => null);
+        if (unreadCount !== null) {
+          await this.notifyUser(readerId, {
+            type: 'unread_count',
+            unreadCount,
+          }).catch(() => {});
+        }
       }
     })());
   }
