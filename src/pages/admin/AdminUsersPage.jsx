@@ -67,6 +67,11 @@ function photoVerificationLabel(status) {
   return map[status] || 'Sin solicitud';
 }
 
+function messageBlockRolesTooltip(roles = []) {
+  if (!Array.isArray(roles) || roles.length === 0) return 'Sin bloqueo de mensajes por rol';
+  return `Bloquea mensajes de: ${roles.map(roleLabel).join(', ')}`;
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
@@ -919,17 +924,61 @@ export default function AdminUsersPage() {
                           <div className="min-w-0">
                             <div className="flex items-center gap-1">
                               <span className="text-text-primary font-medium truncate text-xs">{u.username}</span>
-                              {u.online && <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
-                              {u.is_admin && <Shield className="w-3 h-3 text-red-400 flex-shrink-0" />}
-                              {Number(u.feed_priority || 0) > 0 && <Star className="w-3 h-3 text-mansion-gold flex-shrink-0 fill-mansion-gold/30" />}
-                              {u.account_status === 'suspended' && <Ban className="w-3 h-3 text-red-400 flex-shrink-0" aria-label="Usuario suspendido" />}
-                              {Array.isArray(u.message_block_roles) && u.message_block_roles.length > 0 && (
-                                <MessageCircleOff className="w-3 h-3 text-orange-300 flex-shrink-0" aria-label="Bloquea mensajes por rol" />
+                              {u.online && (
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0"
+                                  title="Online ahora"
+                                  aria-label="Online ahora"
+                                />
                               )}
-                              {u.photo_verification_status === 'pending' && <BadgeCheck className="w-3 h-3 text-sky-300 flex-shrink-0" />}
-                              {u.duplicate_flag && <Copy className="w-3 h-3 text-amber-300 flex-shrink-0" />}
+                              {u.is_admin && (
+                                <Shield
+                                  className="w-3 h-3 text-red-400 flex-shrink-0"
+                                  title="Administrador"
+                                  aria-label="Administrador"
+                                />
+                              )}
+                              {Number(u.feed_priority || 0) > 0 && (
+                                <Star
+                                  className="w-3 h-3 text-mansion-gold flex-shrink-0 fill-mansion-gold/30"
+                                  title={`Destacado / feed priority ${Number(u.feed_priority || 0)}`}
+                                  aria-label={`Destacado / feed priority ${Number(u.feed_priority || 0)}`}
+                                />
+                              )}
+                              {u.account_status === 'suspended' && (
+                                <Ban
+                                  className="w-3 h-3 text-red-400 flex-shrink-0"
+                                  title="Cuenta suspendida"
+                                  aria-label="Cuenta suspendida"
+                                />
+                              )}
+                              {Array.isArray(u.message_block_roles) && u.message_block_roles.length > 0 && (
+                                <MessageCircleOff
+                                  className="w-3 h-3 text-orange-300 flex-shrink-0"
+                                  title={messageBlockRolesTooltip(u.message_block_roles)}
+                                  aria-label={messageBlockRolesTooltip(u.message_block_roles)}
+                                />
+                              )}
+                              {u.photo_verification_status === 'pending' && (
+                                <BadgeCheck
+                                  className="w-3 h-3 text-sky-300 flex-shrink-0"
+                                  title="Verificación por foto pendiente de revisión"
+                                  aria-label="Verificación por foto pendiente de revisión"
+                                />
+                              )}
+                              {u.duplicate_flag && (
+                                <Copy
+                                  className="w-3 h-3 text-amber-300 flex-shrink-0"
+                                  title="Marcado como posible duplicado"
+                                  aria-label="Marcado como posible duplicado"
+                                />
+                              )}
                               {Number(u.reports_count || 0) > 0 && (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-red-500/25 bg-red-500/10 px-1.5 py-0.5 text-[9px] font-bold text-red-300">
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full border border-red-500/25 bg-red-500/10 px-1.5 py-0.5 text-[9px] font-bold text-red-300"
+                                  title={`${Number(u.reports_count || 0)} denuncia${Number(u.reports_count || 0) === 1 ? '' : 's'} abierta${Number(u.reports_count || 0) === 1 ? '' : 's'}`}
+                                  aria-label={`${Number(u.reports_count || 0)} denuncia${Number(u.reports_count || 0) === 1 ? '' : 's'} abierta${Number(u.reports_count || 0) === 1 ? '' : 's'}`}
+                                >
                                   <Flag className="w-2.5 h-2.5" />
                                   {Number(u.reports_count || 0)}
                                 </span>
