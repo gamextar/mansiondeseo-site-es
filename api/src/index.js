@@ -769,6 +769,7 @@ async function deleteUserCompletely(env, user) {
   await ensureStoriesTable(env);
   await ensureErrorLogsTable(env);
   await ensureChatRecipientLimitTable(env);
+  await ensureVideoCallSessionsTable(env);
   const storyRowsResult = await env.DB.prepare(
     'SELECT id, video_url FROM stories WHERE user_id = ?'
   ).bind(userId).all();
@@ -796,6 +797,7 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM processed_payments WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM message_limits WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM chat_recipient_limits WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM video_call_sessions WHERE initiator_id = ? OR receiver_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM profile_stats WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM error_logs WHERE user_id = ?').bind(userId),
