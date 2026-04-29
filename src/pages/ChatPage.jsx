@@ -6,7 +6,7 @@ import { useMessageLimit } from '../hooks/useMessageLimit';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import AvatarImg from '../components/AvatarImg';
-import { getMessageLimit, getChatBootstrap, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, invalidateConversationsCache, setUserBlocked, uploadImage } from '../lib/api';
+import { getMessageLimit, getChatBootstrap, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, invalidateConversationsCache, setUserBlocked, uploadImage, getPublicSettings } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
@@ -451,7 +451,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     : false;
   const { canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
-  const { siteSettings, user: viewer } = useAuth();
+  const { siteSettings, setSiteSettings, user: viewer } = useAuth();
   const chatImageBlur = normalizeChatImageBlur(siteSettings?.chatImageBlur);
   const partnerId = activeRouteId.startsWith('conv-') ? activeRouteId.replace('conv-', '') : activeRouteId;
   const cachedChat = readChatCache(partnerId);
@@ -498,6 +498,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const pendingScrollForceRef = useRef(false);
   const restoreScrollAfterPrependRef = useRef(null);
   const cacheMessagesRef = useRef(initialMessages);
+  const lastSettingsRefreshRef = useRef(0);
   const suppressTypingUntilRef = useRef(0);
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const [headerHeight, setHeaderHeight] = useState(96);
@@ -526,6 +527,46 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     };
   }
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    let cancelled = false;
+
+    const refreshPublicSettings = async ({ force = false } = {}) => {
+      const now = Date.now();
+      if (!force && now - lastSettingsRefreshRef.current < 30_000) return;
+      lastSettingsRefreshRef.current = now;
+
+      try {
+        const data = await getPublicSettings({ fresh: true });
+        const nextSettings = data?.settings;
+        if (cancelled || !nextSettings) return;
+        setSiteSettings((current) => {
+          const merged = { ...(current || {}), ...nextSettings };
+          try {
+            sessionStorage.setItem('mansion_site_settings', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      } catch {
+        // Chat should keep working even if the settings refresh fails.
+      }
+    };
+
+    refreshPublicSettings({ force: true });
+
+    const handleFocus = () => refreshPublicSettings();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshPublicSettings();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [setSiteSettings]);
 
   // Helper: is user at bottom?
   const isAtBottom = useCallback((tolerance = 40) => {
