@@ -105,7 +105,7 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting, active = fa
 
   const handleNavigate = useCallback(() => {
     if (isDraggingRef.current || deleting) return;
-    if (conv.unread > 0) onRead?.(conv.profileId);
+    if (conv.unread > 0) onRead?.(conv.profileId, conv.unread);
     const partnerPreview = {
       id: conv.profileId,
       name: conv.name,
@@ -243,13 +243,12 @@ export function ChatConversationsPanel({ embedded = false, activeProfileId = '',
   const { refresh: refreshUnread, subscribe, decrementUnread } = useUnreadMessages();
 
   // Optimistically mark a conversation as read in local state + cache + global badge
-  const markConversationRead = useCallback((profileId) => {
+  const markConversationRead = useCallback((profileId, unreadHint = 0) => {
     const pid = String(profileId);
-    let delta = 0;
+    const currentUnread = Number(conversations.find(c => String(c.profileId) === pid)?.unread || unreadHint || 0);
     setConversations((prev) => {
       const idx = prev.findIndex(c => String(c.profileId) === pid);
       if (idx === -1 || prev[idx].unread === 0) return prev;
-      delta = prev[idx].unread;
       const updated = [...prev];
       updated[idx] = { ...updated[idx], unread: 0 };
       setCachedConversations(updated);
@@ -257,10 +256,10 @@ export function ChatConversationsPanel({ embedded = false, activeProfileId = '',
     });
     // Decrement global sidebar/bottomnav badge outside the state updater
     // so it's never skipped by React batching.
-    if (delta > 0) decrementUnread(delta);
+    if (currentUnread > 0) decrementUnread(currentUnread);
     // Invalidate API-level conversation cache so next fetch gets fresh data
     invalidateConversationsCache();
-  }, [decrementUnread]);
+  }, [conversations, decrementUnread]);
 
   const applyConversationUpdate = useCallback((event) => {
     const conversation = event?.conversation;
