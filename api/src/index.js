@@ -3967,6 +3967,22 @@ async function notifyChatRoom(env, senderId, receiverId, msg) {
   }
 }
 
+async function notifyChatRoomRead(env, readerId, partnerId, messageIds) {
+  if (!Array.isArray(messageIds) || messageIds.length === 0) return;
+  try {
+    const chatId = [readerId, partnerId].sort().join('-');
+    const doId = env.CHAT_ROOMS.idFromName(chatId);
+    const stub = env.CHAT_ROOMS.get(doId);
+    await stub.fetch('https://do/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ readerId, messageIds }),
+    });
+  } catch (err) {
+    console.error('[notifyChatRoomRead] error:', err.message);
+  }
+}
+
 // ── GET /api/messages/:userId ───────────────────────────
 
 async function handleGetMessages(request, env, otherUserId) {
@@ -4015,20 +4031,42 @@ async function handleGetMessages(request, env, otherUserId) {
   const hasMore = results.length > limit;
   const windowedResults = hasMore ? results.slice(1) : results;
   const settings = await cached('settings', 300_000, () => loadSettings(env));
+  const [unreadRowsResult, stateRow] = await Promise.all([
+    env.DB.prepare(`
+      SELECT id
+      FROM messages
+      WHERE sender_id = ? AND receiver_id = ? AND is_read = 0
+        AND (? IS NULL OR created_at > ?)
+      LIMIT 1000
+    `).bind(otherUserId, auth.sub, hiddenBefore, hiddenBefore).all(),
+    env.DB.prepare(
+      'SELECT unread_count FROM conversation_state WHERE user_id = ? AND partner_id = ?'
+    ).bind(auth.sub, otherUserId).first(),
+  ]);
+  const readMessageIds = (unreadRowsResult?.results || []).map((row) => row.id).filter(Boolean);
+  const hadUnreadState = Number(stateRow?.unread_count || 0) > 0;
 
   // Mark as read
-  await env.DB.prepare(`
-    UPDATE messages SET is_read = 1
-    WHERE sender_id = ? AND receiver_id = ? AND is_read = 0
-      AND (? IS NULL OR created_at > ?)
-  `).bind(otherUserId, auth.sub, hiddenBefore, hiddenBefore).run();
-  await clearConversationStateUnread(env, auth.sub, otherUserId);
-  try {
-    const unreadCount = await getUnreadCountForUser(env, auth.sub);
-    await notifyUser(env, auth.sub, { type: 'unread_count', unreadCount }).catch(() => {});
-  } catch {
-    // Unread sync is best-effort; message history should still load.
+  if (readMessageIds.length > 0 || hadUnreadState) {
+    if (readMessageIds.length > 0) {
+      await env.DB.prepare(`
+        UPDATE messages SET is_read = 1
+        WHERE sender_id = ? AND receiver_id = ? AND is_read = 0
+          AND (? IS NULL OR created_at > ?)
+      `).bind(otherUserId, auth.sub, hiddenBefore, hiddenBefore).run();
+    }
+    await clearConversationStateUnread(env, auth.sub, otherUserId);
+    try {
+      const unreadCount = await getUnreadCountForUser(env, auth.sub);
+      await Promise.allSettled([
+        notifyUser(env, auth.sub, { type: 'unread_count', unreadCount }),
+        notifyChatRoomRead(env, auth.sub, otherUserId, readMessageIds),
+      ]);
+    } catch {
+      // Unread sync is best-effort; message history should still load.
+    }
   }
+  const readMessageIdSet = new Set(readMessageIds);
 
   const messages = windowedResults.map(m => ({
     id: m.id,
@@ -4039,7 +4077,7 @@ async function handleGetMessages(request, env, otherUserId) {
     imageMime: m.image_mime || '',
     timestamp: new Date(m.created_at + 'Z').toLocaleTimeString(settings.siteLocale, { hour: '2-digit', minute: '2-digit', timeZone: settings.siteTimezone }),
     created_at: m.created_at,
-    is_read: m.is_read,
+    is_read: readMessageIdSet.has(m.id) ? 1 : m.is_read,
   }));
 
   return json({ messages, hasMore });

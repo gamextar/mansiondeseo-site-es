@@ -547,6 +547,10 @@ export class ChatRoom {
       return this.handleNotify(request);
     }
 
+    if (url.pathname === '/read') {
+      return this.handleNotifyRead(request);
+    }
+
     // WebSocket upgrade
     const upgrade = request.headers.get('Upgrade');
     if (!upgrade || upgrade !== 'websocket') {
@@ -863,6 +867,31 @@ export class ChatRoom {
       return new Response('ok', { status: 200 });
     } catch (e) {
       console.error('[ChatRoom.handleNotify] error:', e.message);
+      return new Response('error', { status: 500 });
+    }
+  }
+
+  async handleNotifyRead(request) {
+    try {
+      const data = await request.json();
+      const readerId = String(data?.readerId || '');
+      const messageIds = Array.isArray(data?.messageIds) ? data.messageIds : [];
+      const uniqueMessageIds = [...new Set(messageIds.filter((id) => typeof id === 'string' && id))];
+      if (!readerId || uniqueMessageIds.length === 0) {
+        return new Response('ok', { status: 200 });
+      }
+
+      for (const sock of this.state.getWebSockets()) {
+        const [tag] = this.state.getTags(sock);
+        if (tag !== readerId) {
+          try {
+            sock.send(JSON.stringify({ type: 'read', messageIds: uniqueMessageIds }));
+          } catch { /* socket might be closed */ }
+        }
+      }
+      return new Response('ok', { status: 200 });
+    } catch (e) {
+      console.error('[ChatRoom.handleNotifyRead] error:', e.message);
       return new Response('error', { status: 500 });
     }
   }
