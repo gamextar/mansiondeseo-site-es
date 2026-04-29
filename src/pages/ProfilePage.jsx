@@ -54,6 +54,8 @@ const PHOTO_OTP_STATUS = {
   expired: { label: 'Expirada', tone: 'text-text-muted border-mansion-border/25 bg-mansion-elevated/60' },
 };
 
+const MAX_GALLERY_PHOTOS = 9;
+
 function detectStandaloneMobile() {
   if (typeof window === 'undefined') return false;
   const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
@@ -499,9 +501,16 @@ export default function ProfilePage() {
   const handleGalleryUpload = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+    const remainingSlots = Math.max(0, MAX_GALLERY_PHOTOS - getGalleryPhotos(user).length);
+    const filesToUpload = files.slice(0, remainingSlots);
+    if (!filesToUpload.length) {
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
+      return;
+    }
+
     setUploading(true);
     try {
-      for (const file of files) {
+      for (const file of filesToUpload) {
         const { file: optimizedFile, thumbnailFile } = await optimizeGalleryPhotoFile(file, { maxSize: 1800, quality: 0.84 });
         const data = await uploadGalleryImage(optimizedFile, thumbnailFile);
         setUser(prev => prev ? {
@@ -605,6 +614,8 @@ export default function ProfilePage() {
   const displayRole = ROLE_LABELS[user?.role] || user?.role || '';
   const avatarUrl = user?.avatar_url || '';
   const photos = getGalleryPhotos(user);
+  const canAddGalleryPhoto = photos.length < MAX_GALLERY_PHOTOS;
+  const galleryPlaceholderCount = Math.max(0, MAX_GALLERY_PHOTOS - photos.length);
   const displayPhotos = getDisplayPhotos(user);
   const photoOtpStatus = user?.verified ? 'approved' : (photoOtpVerification?.status || '');
   const photoOtpMeta = PHOTO_OTP_STATUS[photoOtpStatus] || null;
@@ -937,8 +948,9 @@ export default function ProfilePage() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">Mi Galería</h3>
             <div className="flex items-center gap-2">
-              {galleryEditing && (
+              {galleryEditing && canAddGalleryPhoto && (
                 <button
+                  type="button"
                   onClick={() => galleryInputRef.current?.click()}
                   disabled={uploading}
                   className="flex items-center gap-1 text-xs text-mansion-gold hover:text-mansion-gold-light transition-colors disabled:opacity-50"
@@ -998,16 +1010,29 @@ export default function ProfilePage() {
                 )}
               </motion.div>
             ))}
-            {galleryEditing && (
-              <button
+            {Array.from({ length: galleryPlaceholderCount }).map((_, slotIndex) => (
+              <motion.button
+                key={`gallery-placeholder-${slotIndex}`}
+                type="button"
                 onClick={() => galleryInputRef.current?.click()}
                 disabled={uploading}
-                className="aspect-square rounded-2xl border-2 border-dashed border-mansion-border/30 hover:border-mansion-gold/40 flex flex-col items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                initial={{ opacity: 0, scale: 0.94 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: (photos.length + slotIndex) * 0.025 }}
+                className="group aspect-square rounded-2xl border border-dashed border-mansion-border/35 bg-mansion-card/35 transition-colors hover:border-mansion-gold/45 hover:bg-mansion-gold/5 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={`Agregar foto ${photos.length + slotIndex + 1}`}
+                title={uploading ? 'Subiendo...' : 'Agregar foto'}
               >
-                <Plus className="w-5 h-5 text-text-dim" />
-                <span className="text-[10px] text-text-dim">Foto</span>
-              </button>
-            )}
+                <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-text-dim transition-colors group-hover:text-mansion-gold">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full border border-mansion-border/40 bg-black/20 transition-colors group-hover:border-mansion-gold/35">
+                    <Plus className="h-5 w-5" />
+                  </div>
+                  <span className="text-[10px] font-medium uppercase tracking-wider">
+                    Foto
+                  </span>
+                </div>
+              </motion.button>
+            ))}
           </div>
 
           <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleGalleryUpload} />
