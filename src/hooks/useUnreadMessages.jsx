@@ -32,11 +32,11 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
   const activeChatIdRef = useRef(null);
   const lastSyncedActiveChatRef = useRef(undefined);
 
-  const applyUnreadCount = useCallback((total, { showToast = false } = {}) => {
+  const applyUnreadCount = useCallback((total, { showToast = false, toastText = '' } = {}) => {
     const nextTotal = Math.max(0, Number(total) || 0);
     if (showToast && prevCountRef.current >= 0 && nextTotal > prevCountRef.current) {
       const diff = nextTotal - prevCountRef.current;
-      setToast(`${diff} nuevo${diff > 1 ? 's' : ''} mensaje${diff > 1 ? 's' : ''}`);
+      setToast(toastText || `${diff} nuevo${diff > 1 ? 's' : ''} mensaje${diff > 1 ? 's' : ''}`);
       setTimeout(() => setToast(null), 4000);
     }
     prevCountRef.current = nextTotal;
@@ -175,15 +175,26 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
           }
           if (data.type === 'new_message') {
             const isActiveChat = !!activeChatIdRef.current && data.chatId === activeChatIdRef.current;
+            const toastText = data.messageKind === 'image' ? 'Nueva imagen recibida' : '';
+            const listenerEvent = isActiveChat
+              ? {
+                  ...data,
+                  unreadDelta: 0,
+                  conversationUnreadDelta: 0,
+                  conversation: data.conversation
+                    ? { ...data.conversation, unread: 0 }
+                    : data.conversation,
+                }
+              : data;
             if (typeof data.unreadCount === 'number') {
               applyUnreadCount(
                 isActiveChat ? Math.max(0, data.unreadCount - 1) : data.unreadCount,
-                { showToast: !isActiveChat }
+                { showToast: !isActiveChat, toastText }
               );
             } else if (typeof data.unreadDelta === 'number') {
               if (prevCountRef.current >= 0) {
                 const nextCount = Math.max(0, prevCountRef.current + (isActiveChat ? 0 : data.unreadDelta));
-                applyUnreadCount(nextCount, { showToast: !isActiveChat && data.unreadDelta > 0 });
+                applyUnreadCount(nextCount, { showToast: !isActiveChat && data.unreadDelta > 0, toastText });
               } else {
                 fetchUnread({ force: true }).catch(() => {});
               }
@@ -202,13 +213,13 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
                   const convs = Array.isArray(parsed?.conversations) ? parsed.conversations : (Array.isArray(parsed) ? parsed : []);
                   const pid = String(data.conversation.profileId);
                   const existing = convs.find(c => String(c.profileId) === pid);
-                  const unreadDelta = Number(data.conversationUnreadDelta || 0);
-                  const nextUnread = typeof data.conversation.unread === 'number'
-                    ? data.conversation.unread
+                  const unreadDelta = Number(listenerEvent.conversationUnreadDelta || 0);
+                  const nextUnread = typeof listenerEvent.conversation.unread === 'number'
+                    ? listenerEvent.conversation.unread
                     : Math.max(0, Number(existing?.unread || 0) + (isActiveChat ? 0 : unreadDelta));
                   const updated = existing
-                    ? { ...existing, ...data.conversation, unread: nextUnread }
-                    : { unread: nextUnread, ...data.conversation };
+                    ? { ...existing, ...listenerEvent.conversation, unread: nextUnread }
+                    : { unread: nextUnread, ...listenerEvent.conversation };
                   const next = [updated, ...convs.filter(c => String(c.profileId) !== pid)];
                   sessionStorage.setItem(CONV_KEY, JSON.stringify({
                     conversations: next,
@@ -217,7 +228,7 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
                 }
               } catch { /* ignore */ }
             }
-            notifyListeners(data);
+            notifyListeners(listenerEvent);
           } else if (data.type === 'conversation_deleted') {
             invalidateUnreadCache();
             if (typeof data.unreadCount === 'number') {
