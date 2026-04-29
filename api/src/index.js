@@ -137,6 +137,14 @@ function parseBooleanSetting(value, fallback = false) {
   return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
 }
 
+function normalizeEmailAddress(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isValidEmailAddress(value) {
+  return /^[^\s@]{1,64}@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,24}$/.test(String(value || '').trim());
+}
+
 function getRoleBucketsForFilters(filterParts = []) {
   const bucketMap = new Map();
   for (const role of [...new Set(filterParts)].filter((value) => SEEKING_ROLE_IDS.includes(value))) {
@@ -2481,6 +2489,71 @@ async function sendVerificationEmail(env, toEmail, code) {
   }
 }
 
+function emailChangeVerificationEmailHTML(code) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;padding:0;background:#08080E;font-family:'Helvetica Neue',Arial,sans-serif}
+  .wrap{max-width:480px;margin:0 auto;padding:40px 24px}
+  .card{background:#111118;border-radius:16px;padding:40px 32px;border:1px solid rgba(201,168,76,0.15)}
+  .logo{text-align:center;font-size:24px;font-weight:700;color:#C9A84C;letter-spacing:1px;margin-bottom:8px}
+  .sub{text-align:center;color:#8a8a9a;font-size:13px;margin-bottom:32px}
+  .code-box{background:#08080E;border:2px solid rgba(201,168,76,0.3);border-radius:12px;padding:20px;text-align:center;margin:24px 0}
+  .code{font-size:36px;letter-spacing:12px;font-weight:700;color:#C9A84C;font-family:'Courier New',monospace}
+  .msg{color:#c4c4d0;font-size:14px;line-height:1.6;text-align:center}
+  .footer{text-align:center;color:#555;font-size:11px;margin-top:32px}
+  .warn{color:#D4183D;font-size:12px;text-align:center;margin-top:16px}
+</style></head>
+<body><div class="wrap"><div class="card">
+  <div class="logo">MANSIÓN DESEO</div>
+  <div class="sub">Cambio de email</div>
+  <p class="msg">Tu código para confirmar el nuevo email es:</p>
+  <div class="code-box"><div class="code">${code}</div></div>
+  <p class="msg">Introduce este código en la app para actualizar el email de tu cuenta. El código expira en <strong>30 minutos</strong>.</p>
+  <p class="warn">Si no solicitaste esto, ignora este email.</p>
+</div>
+<div class="footer">© Mansión Deseo · Este email fue enviado automáticamente</div>
+</div></body></html>`;
+}
+
+async function sendEmailChangeVerificationEmail(env, toEmail, code) {
+  const { apiKey, mailFrom } = await getResendCredentials(env);
+  const fromEmail = mailFrom;
+  const fromName = 'Mansión Deseo';
+
+  if (!apiKey) {
+    console.error('Resend send failed: RESEND_API_KEY is not configured');
+    return false;
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        from: `${fromName} <${fromEmail}>`,
+        to: [toEmail],
+        subject: `${code} — Confirmá tu nuevo email`,
+        text: `Tu código para confirmar el nuevo email de Mansión Deseo es: ${code}\n\nExpira en 30 minutos.\n\nSi no solicitaste esto, ignora este email.`,
+        html: emailChangeVerificationEmailHTML(code),
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`Resend error ${res.status}:`, body);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Resend send failed:', err.message);
+    return false;
+  }
+}
+
 // ── POST /api/auth/register ─────────────────────────────
 
 function generateVerificationCode() {
@@ -3494,6 +3567,129 @@ async function handleConfirmAccountDeletion(request, env) {
 
   console.log(`🕵️ Usuario solicitó eliminación y quedó en revisión ${auth.sub} (${user.email})`);
   return json({ success: true, message: 'Tu cuenta quedó en revisión para completar la baja.' });
+}
+
+// ── POST /api/account/email-change/request ──────────────
+
+async function handleRequestEmailChange(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const body = await request.json().catch(() => ({}));
+  const nextEmail = normalizeEmailAddress(body.newEmail ?? body.email);
+  if (!nextEmail || !isValidEmailAddress(nextEmail)) {
+    return error('Ingresá un email válido', 400);
+  }
+
+  const user = await env.DB.prepare(
+    "SELECT id, email FROM users WHERE id = ? AND status = 'verified' AND COALESCE(account_status, 'active') = 'active'"
+  ).bind(auth.sub).first();
+  if (!user) return error('Usuario no encontrado', 404);
+
+  const currentEmail = normalizeEmailAddress(user.email);
+  if (nextEmail === currentEmail) {
+    return error('Ese email ya está asociado a tu cuenta', 400);
+  }
+
+  const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1')
+    .bind(nextEmail, auth.sub).first();
+  if (existing) {
+    return json({ error: 'Este email ya está registrado', code: 'EMAIL_EXISTS' }, 409);
+  }
+
+  await env.DB.prepare("UPDATE verification_tokens SET used = 1 WHERE user_id = ? AND purpose = 'change_email' AND used = 0")
+    .bind(auth.sub).run();
+
+  const code = generateVerificationCode();
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  await env.DB.prepare(`
+    INSERT INTO verification_tokens (id, user_id, email, token, purpose, expires_at)
+    VALUES (?, ?, ?, ?, 'change_email', ?)
+  `).bind(generateId(), auth.sub, nextEmail, code, expiresAt).run();
+
+  if (env.ENVIRONMENT === 'production') {
+    const sent = await sendEmailChangeVerificationEmail(env, nextEmail, code);
+    if (!sent) return error('No pudimos enviar el código al nuevo email. Intentá nuevamente en unos minutos.', 502);
+  } else {
+    debugLog(env, `📧 EMAIL CHANGE CODE for ${nextEmail}: ${code}`);
+  }
+
+  return json({
+    success: true,
+    email: nextEmail,
+    message: 'Te enviamos un código al nuevo email.',
+    ...(env.ENVIRONMENT !== 'production' ? { devCode: code } : {}),
+  });
+}
+
+// ── POST /api/account/email-change/confirm ──────────────
+
+async function handleConfirmEmailChange(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const body = await request.json().catch(() => ({}));
+  const nextEmail = normalizeEmailAddress(body.newEmail ?? body.email);
+  const code = String(body.code || '').trim();
+  if (!nextEmail || !code) return error('Email y código requeridos', 400);
+  if (!isValidEmailAddress(nextEmail)) return error('Ingresá un email válido', 400);
+
+  const record = await env.DB.prepare(`
+    SELECT * FROM verification_tokens
+    WHERE user_id = ? AND email = ? AND token = ? AND purpose = 'change_email' AND used = 0 AND expires_at > datetime('now')
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(auth.sub, nextEmail, code).first();
+  if (!record) return error('Código inválido o expirado', 401);
+
+  const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1')
+    .bind(nextEmail, auth.sub).first();
+  if (existing) {
+    await env.DB.prepare('UPDATE verification_tokens SET used = 1 WHERE id = ?').bind(record.id).run();
+    return json({ error: 'Este email ya está registrado', code: 'EMAIL_EXISTS' }, 409);
+  }
+
+  await env.DB.batch([
+    env.DB.prepare('UPDATE users SET email = ? WHERE id = ?').bind(nextEmail, auth.sub),
+    env.DB.prepare("UPDATE verification_tokens SET used = 1 WHERE user_id = ? AND purpose = 'change_email' AND used = 0").bind(auth.sub),
+  ]);
+
+  const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!user) return error('Usuario no encontrado', 404);
+  setCachedViewer(auth.sub, user);
+  setCachedFullUser(auth.sub, user);
+
+  const token = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
+  return json({
+    success: true,
+    message: 'Email actualizado correctamente.',
+    token,
+    user: sanitizeUser(user, env),
+  });
+}
+
+// ── POST /api/account/password ──────────────────────────
+
+async function handleUpdatePassword(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  const body = await request.json().catch(() => ({}));
+  const currentPassword = String(body.currentPassword || '');
+  const newPassword = String(body.newPassword || '');
+  if (!currentPassword || !newPassword) return error('Contraseña actual y nueva contraseña requeridas', 400);
+  if (newPassword.length < 10) return error('La contraseña debe tener al menos 10 caracteres', 400);
+  if (newPassword.length > 50) return error('La contraseña no puede tener más de 50 caracteres', 400);
+
+  const user = await env.DB.prepare('SELECT id, password_hash FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!user?.password_hash) return error('No se encontró una contraseña local para esta cuenta', 400);
+
+  const valid = await verifyPassword(currentPassword, user.password_hash);
+  if (!valid) return error('La contraseña actual no es correcta', 401);
+
+  const passwordHash = await hashPassword(newPassword);
+  await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(passwordHash, auth.sub).run();
+
+  return json({ success: true, message: 'Contraseña actualizada correctamente.' });
 }
 
 async function handleAppBootstrap(request, env) {
@@ -8551,6 +8747,9 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/me/dashboard' && method === 'GET') return handleOwnProfileDashboard(request, env);
   if (path === '/api/account/delete/request' && method === 'POST') return handleRequestAccountDeletion(request, env);
   if (path === '/api/account/delete/confirm' && method === 'POST') return handleConfirmAccountDeletion(request, env);
+  if (path === '/api/account/email-change/request' && method === 'POST') return handleRequestEmailChange(request, env);
+  if (path === '/api/account/email-change/confirm' && method === 'POST') return handleConfirmEmailChange(request, env);
+  if (path === '/api/account/password' && method === 'POST') return handleUpdatePassword(request, env);
   if (path === '/api/verification/photo-otp' && method === 'GET') return handleGetPhotoOtpVerification(request, env);
   if (path === '/api/verification/photo-otp/start' && method === 'POST') return handleStartPhotoOtpVerification(request, env);
   if (path === '/api/verification/photo-otp/cancel' && method === 'POST') return handleCancelPhotoOtpVerification(request, env);

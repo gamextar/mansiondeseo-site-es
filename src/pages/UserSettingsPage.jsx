@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { AlertTriangle, ChevronRight, Crown, Eye, EyeOff, Filter, Heart, Loader2, Mail, Shield, Trash2, X } from 'lucide-react';
+import { AlertTriangle, AtSign, ChevronRight, Crown, Eye, EyeOff, FileText, Filter, Heart, KeyRound, Loader2, Mail, MapPin, Save, Shield, Trash2, UserRound, X } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import {
   confirmAccountDeletion,
+  confirmEmailChange,
   invalidateProfilesCache,
   requestAccountDeletion,
+  requestEmailChange,
+  updateAccountPassword,
   updateProfile,
 } from '../lib/api';
 import { formatDate } from '../lib/siteConfig';
@@ -37,6 +40,8 @@ const fadeUp = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [.25, .46, .45, .94] } },
 };
 
+const EMAIL_REGEX = /^[^\s@]{1,64}@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,24}$/;
+
 function markFeedDirty() {
   invalidateProfilesCache();
   try {
@@ -63,11 +68,158 @@ export default function UserSettingsPage() {
   const [deleteAccountDevCode, setDeleteAccountDevCode] = useState('');
   const [deleteAccountSending, setDeleteAccountSending] = useState(false);
   const [deleteAccountConfirming, setDeleteAccountConfirming] = useState(false);
+  const [provinceDraft, setProvinceDraft] = useState(() => user?.province || user?.city || '');
+  const [localityDraft, setLocalityDraft] = useState(() => user?.locality || '');
+  const [bioDraft, setBioDraft] = useState(() => user?.bio || '');
+  const [personalSaving, setPersonalSaving] = useState(false);
+  const [personalMessage, setPersonalMessage] = useState('');
+  const [personalError, setPersonalError] = useState('');
+  const [emailDraft, setEmailDraft] = useState(() => user?.email || '');
+  const [emailPending, setEmailPending] = useState('');
+  const [emailCode, setEmailCode] = useState('');
+  const [emailDevCode, setEmailDevCode] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailConfirming, setEmailConfirming] = useState(false);
+  const [emailMessage, setEmailMessage] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [showPasswords, setShowPasswords] = useState(false);
 
   const seeking = Array.isArray(user?.seeking) ? user.seeking : (user?.seeking ? [user.seeking] : []);
   const blockedRoles = Array.isArray(user?.message_block_roles) ? user.message_block_roles : [];
   const interests = Array.isArray(user?.interests) ? user.interests : [];
   const premiumUntilLabel = formatPremiumUntil(user?.premium_until);
+  const currentEmail = String(user?.email || '').trim().toLowerCase();
+  const normalizedEmailDraft = String(emailDraft || '').trim().toLowerCase();
+  const emailChanged = normalizedEmailDraft && normalizedEmailDraft !== currentEmail;
+  const personalChanged = (
+    String(provinceDraft || '').trim() !== String(user?.province || user?.city || '').trim() ||
+    String(localityDraft || '').trim() !== String(user?.locality || '').trim() ||
+    String(bioDraft || '').trim() !== String(user?.bio || '').trim()
+  );
+
+  useEffect(() => {
+    setProvinceDraft(user?.province || user?.city || '');
+    setLocalityDraft(user?.locality || '');
+    setBioDraft(user?.bio || '');
+    setEmailDraft(user?.email || '');
+    setEmailPending('');
+    setEmailCode('');
+    setEmailDevCode('');
+    setEmailMessage('');
+    setEmailError('');
+  }, [user?.id]);
+
+  const handleSavePersonalData = async (e) => {
+    e.preventDefault();
+    if (personalSaving || !personalChanged) return;
+    setPersonalSaving(true);
+    setPersonalMessage('');
+    setPersonalError('');
+    try {
+      const data = await updateProfile({
+        province: String(provinceDraft || '').trim(),
+        locality: String(localityDraft || '').trim(),
+        bio: String(bioDraft || '').trim().slice(0, 500),
+      });
+      if (data?.user) setUser(prev => prev ? { ...prev, ...data.user } : data.user);
+      setPersonalMessage('Datos actualizados.');
+    } catch (err) {
+      setPersonalError(err?.message || 'No pudimos actualizar tus datos.');
+    } finally {
+      setPersonalSaving(false);
+    }
+  };
+
+  const handleRequestEmailChange = async () => {
+    if (emailSending || !emailChanged) return;
+    setEmailSending(true);
+    setEmailMessage('');
+    setEmailError('');
+    setEmailDevCode('');
+    try {
+      if (!EMAIL_REGEX.test(normalizedEmailDraft)) {
+        throw new Error('Ingresá un email válido.');
+      }
+      const data = await requestEmailChange(normalizedEmailDraft);
+      const pending = data?.email || normalizedEmailDraft;
+      setEmailPending(pending);
+      setEmailCode(data?.devCode ? String(data.devCode) : '');
+      setEmailDevCode(data?.devCode ? String(data.devCode) : '');
+      setEmailMessage(data?.message || `Te enviamos un código a ${pending}.`);
+    } catch (err) {
+      setEmailError(err?.message || 'No pudimos enviar el código.');
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
+  const handleConfirmEmailChange = async (e) => {
+    e.preventDefault();
+    const targetEmail = emailPending || normalizedEmailDraft;
+    const cleanCode = emailCode.replace(/\D/g, '').slice(0, 6);
+    if (cleanCode.length !== 6) {
+      setEmailError('Ingresá el código de 6 dígitos.');
+      return;
+    }
+
+    setEmailConfirming(true);
+    setEmailError('');
+    try {
+      const data = await confirmEmailChange(targetEmail, cleanCode);
+      if (data?.user) setUser(prev => prev ? { ...prev, ...data.user } : data.user);
+      setEmailDraft(data?.user?.email || targetEmail);
+      setEmailPending('');
+      setEmailCode('');
+      setEmailDevCode('');
+      setEmailMessage(data?.message || 'Email actualizado correctamente.');
+    } catch (err) {
+      setEmailError(err?.message || 'No pudimos confirmar el email.');
+    } finally {
+      setEmailConfirming(false);
+    }
+  };
+
+  const cancelEmailChange = () => {
+    setEmailPending('');
+    setEmailCode('');
+    setEmailDevCode('');
+    setEmailMessage('');
+    setEmailError('');
+    setEmailDraft(user?.email || '');
+  };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    setPasswordMessage('');
+    setPasswordError('');
+    if (newPassword.length < 10) {
+      setPasswordError('La nueva contraseña debe tener al menos 10 caracteres.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Las contraseñas nuevas no coinciden.');
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      const data = await updateAccountPassword({ currentPassword, newPassword });
+      setPasswordMessage(data?.message || 'Contraseña actualizada correctamente.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      setPasswordError(err?.message || 'No pudimos actualizar la contraseña.');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
 
   const toggleSeeking = async (optionId) => {
     const isActive = seeking.includes(optionId);
@@ -198,6 +350,257 @@ export default function UserSettingsPage() {
         </motion.div>
 
         <div className="grid gap-4">
+          <motion.section variants={fadeUp} className="glass-elevated rounded-3xl p-4 lg:p-5">
+            <h2 className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
+              <UserRound className="h-3 w-3 text-mansion-gold/70" />
+              Datos personales
+            </h2>
+
+            <form onSubmit={handleSavePersonalData} className="space-y-3">
+              <div className="grid gap-3 lg:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-text-muted">
+                    <MapPin className="h-3.5 w-3.5" />
+                    Provincia
+                  </span>
+                  <input
+                    value={provinceDraft}
+                    onChange={(e) => {
+                      setProvinceDraft(e.target.value);
+                      setPersonalMessage('');
+                      setPersonalError('');
+                    }}
+                    maxLength={80}
+                    autoComplete="address-level1"
+                    className="w-full rounded-2xl border border-mansion-border/30 bg-black/25 px-4 py-3 text-sm text-text-primary placeholder:text-text-dim focus:border-mansion-gold/50 focus:ring-mansion-gold/20"
+                    placeholder="Provincia"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-text-muted">
+                    <MapPin className="h-3.5 w-3.5" />
+                    Localidad
+                  </span>
+                  <input
+                    value={localityDraft}
+                    onChange={(e) => {
+                      setLocalityDraft(e.target.value);
+                      setPersonalMessage('');
+                      setPersonalError('');
+                    }}
+                    maxLength={80}
+                    autoComplete="address-level2"
+                    className="w-full rounded-2xl border border-mansion-border/30 bg-black/25 px-4 py-3 text-sm text-text-primary placeholder:text-text-dim focus:border-mansion-gold/50 focus:ring-mansion-gold/20"
+                    placeholder="Localidad"
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-text-muted">
+                  <FileText className="h-3.5 w-3.5" />
+                  Bio
+                </span>
+                <textarea
+                  value={bioDraft}
+                  onChange={(e) => {
+                    setBioDraft(e.target.value.slice(0, 500));
+                    setPersonalMessage('');
+                    setPersonalError('');
+                  }}
+                  rows={4}
+                  maxLength={500}
+                  className="w-full resize-none rounded-2xl border border-mansion-border/30 bg-black/25 px-4 py-3 text-sm leading-6 text-text-primary placeholder:text-text-dim focus:border-mansion-gold/50 focus:ring-mansion-gold/20"
+                  placeholder="Contá algo breve sobre vos"
+                />
+                <span className="mt-1 block text-right text-[10px] text-text-dim">{bioDraft.length}/500</span>
+              </label>
+
+              {(personalMessage || personalError) && (
+                <p className={`rounded-2xl border px-4 py-3 text-xs ${
+                  personalError
+                    ? 'border-mansion-crimson/25 bg-mansion-crimson/10 text-mansion-crimson'
+                    : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+                }`}>
+                  {personalError || personalMessage}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={personalSaving || !personalChanged}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-mansion-gold px-4 py-3 text-sm font-semibold text-black transition-all hover:bg-mansion-gold/90 disabled:opacity-45"
+              >
+                {personalSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Guardar datos
+              </button>
+            </form>
+
+            <div className="my-5 h-px bg-mansion-border/20" />
+
+            <div className="space-y-3">
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-text-muted">
+                  <AtSign className="h-3.5 w-3.5" />
+                  Email
+                </span>
+                <input
+                  type="email"
+                  value={emailDraft}
+                  onChange={(e) => {
+                    setEmailDraft(e.target.value);
+                    setEmailPending('');
+                    setEmailCode('');
+                    setEmailDevCode('');
+                    setEmailMessage('');
+                    setEmailError('');
+                  }}
+                  autoComplete="email"
+                  inputMode="email"
+                  className="w-full rounded-2xl border border-mansion-border/30 bg-black/25 px-4 py-3 text-sm text-text-primary placeholder:text-text-dim focus:border-mansion-gold/50 focus:ring-mansion-gold/20"
+                  placeholder="tu@email.com"
+                />
+              </label>
+
+              {emailPending ? (
+                <form onSubmit={handleConfirmEmailChange} className="space-y-3 rounded-2xl border border-mansion-gold/20 bg-mansion-gold/8 p-3">
+                  <p className="text-xs leading-5 text-text-muted">
+                    Ingresá el código que enviamos a <span className="font-medium text-mansion-gold">{emailPending}</span>.
+                  </p>
+                  <input
+                    value={emailCode}
+                    onChange={(e) => {
+                      setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                      setEmailError('');
+                    }}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="000000"
+                    className="w-full rounded-2xl border border-mansion-border/30 bg-black/25 px-4 py-3 text-center text-xl font-bold tracking-[0.45em] text-text-primary placeholder:text-text-dim focus:border-mansion-gold/50 focus:ring-mansion-gold/20"
+                  />
+                  {emailDevCode && (
+                    <p className="rounded-2xl border border-mansion-gold/20 bg-mansion-gold/10 px-4 py-3 text-xs text-mansion-gold">Código dev: {emailDevCode}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelEmailChange}
+                      disabled={emailConfirming}
+                      className="flex-1 rounded-2xl border border-mansion-border/30 px-4 py-3 text-sm font-medium text-text-muted hover:bg-white/[0.04] disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={emailConfirming || emailCode.length !== 6}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-mansion-gold px-4 py-3 text-sm font-semibold text-black hover:bg-mansion-gold/90 disabled:opacity-50"
+                    >
+                      {emailConfirming && <Loader2 className="h-4 w-4 animate-spin" />}
+                      Confirmar
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRequestEmailChange}
+                  disabled={emailSending || !emailChanged || !EMAIL_REGEX.test(normalizedEmailDraft)}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-mansion-gold/25 bg-mansion-gold/10 px-4 py-3 text-sm font-semibold text-mansion-gold transition-all hover:bg-mansion-gold/15 disabled:opacity-45"
+                >
+                  {emailSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                  Enviar código
+                </button>
+              )}
+
+              {(emailMessage || emailError) && (
+                <p className={`rounded-2xl border px-4 py-3 text-xs ${
+                  emailError
+                    ? 'border-mansion-crimson/25 bg-mansion-crimson/10 text-mansion-crimson'
+                    : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+                }`}>
+                  {emailError || emailMessage}
+                </p>
+              )}
+            </div>
+
+            <div className="my-5 h-px bg-mansion-border/20" />
+
+            <form onSubmit={handleUpdatePassword} className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-text-muted">
+                  <KeyRound className="h-3.5 w-3.5" />
+                  Contraseña
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords(value => !value)}
+                  className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] text-text-dim hover:bg-white/5 hover:text-text-primary"
+                >
+                  {showPasswords ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  {showPasswords ? 'Ocultar' : 'Ver'}
+                </button>
+              </div>
+              <input
+                type={showPasswords ? 'text' : 'password'}
+                value={currentPassword}
+                onChange={(e) => {
+                  setCurrentPassword(e.target.value);
+                  setPasswordMessage('');
+                  setPasswordError('');
+                }}
+                autoComplete="current-password"
+                className="w-full rounded-2xl border border-mansion-border/30 bg-black/25 px-4 py-3 text-sm text-text-primary placeholder:text-text-dim focus:border-mansion-gold/50 focus:ring-mansion-gold/20"
+                placeholder="Contraseña actual"
+              />
+              <div className="grid gap-3 lg:grid-cols-2">
+                <input
+                  type={showPasswords ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    setPasswordMessage('');
+                    setPasswordError('');
+                  }}
+                  autoComplete="new-password"
+                  className="w-full rounded-2xl border border-mansion-border/30 bg-black/25 px-4 py-3 text-sm text-text-primary placeholder:text-text-dim focus:border-mansion-gold/50 focus:ring-mansion-gold/20"
+                  placeholder="Nueva contraseña"
+                />
+                <input
+                  type={showPasswords ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setPasswordMessage('');
+                    setPasswordError('');
+                  }}
+                  autoComplete="new-password"
+                  className="w-full rounded-2xl border border-mansion-border/30 bg-black/25 px-4 py-3 text-sm text-text-primary placeholder:text-text-dim focus:border-mansion-gold/50 focus:ring-mansion-gold/20"
+                  placeholder="Repetir nueva"
+                />
+              </div>
+
+              {(passwordMessage || passwordError) && (
+                <p className={`rounded-2xl border px-4 py-3 text-xs ${
+                  passwordError
+                    ? 'border-mansion-crimson/25 bg-mansion-crimson/10 text-mansion-crimson'
+                    : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+                }`}>
+                  {passwordError || passwordMessage}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-mansion-border/30 px-4 py-3 text-sm font-semibold text-text-primary transition-all hover:bg-white/[0.04] disabled:opacity-45"
+              >
+                {passwordSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                Actualizar contraseña
+              </button>
+            </form>
+          </motion.section>
+
           <motion.section variants={fadeUp} className="glass-elevated rounded-3xl p-4 lg:p-5">
             <h2 className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-dim">
               <Heart className="h-3 w-3 text-mansion-crimson/70" />

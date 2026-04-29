@@ -840,6 +840,33 @@ export async function confirmAccountDeletion(code) {
   return data;
 }
 
+export async function requestEmailChange(newEmail) {
+  return apiFetch('/account/email-change/request', {
+    method: 'POST',
+    body: JSON.stringify({ newEmail }),
+  });
+}
+
+export async function confirmEmailChange(newEmail, code) {
+  const data = await apiFetch('/account/email-change/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ newEmail, code }),
+  });
+  if (data?.token) setToken(data.token);
+  if (data?.user) {
+    cacheMeResponse({ user: data.user });
+    invalidateBootstrapCache();
+  }
+  return data;
+}
+
+export async function updateAccountPassword({ currentPassword, newPassword }) {
+  return apiFetch('/account/password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
 export async function getMe({ force = false } = {}) {
   const cached = force ? null : sessionCache.get(AUTH_ME_CACHE_KEY, AUTH_ME_CACHE_TTL_MS);
   if (cached?.user) {
