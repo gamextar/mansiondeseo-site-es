@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, Sliders, Eye, EyeOff, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail, Activity, Ban } from 'lucide-react';
+import { ArrowLeft, Save, Sliders, Eye, EyeOff, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail, Activity, Ban, Video } from 'lucide-react';
 import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, uploadImage } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
@@ -108,6 +108,7 @@ export default function SettingsPage() {
   // Iconografía
   const [incognitoIconSvg, setIncognitoIconSvg] = useState('');
   const [blockUserIconSvg, setBlockUserIconSvg] = useState('');
+  const [videoCallIconSvg, setVideoCallIconSvg] = useState('');
   const [roleHombreImg, setRoleHombreImg] = useState('');
   const [roleMujerImg, setRoleMujerImg] = useState('');
   const [roleParejaImg, setRoleParejaImg] = useState('');
@@ -275,6 +276,7 @@ export default function SettingsPage() {
         setVipPrice6Months(s.vipPrice6Months);
         setIncognitoIconSvg(s.incognitoIconSvg || '');
         setBlockUserIconSvg(s.blockUserIconSvg || '');
+        setVideoCallIconSvg(s.videoCallIconSvg || '');
         setRoleHombreImg(s.roleHombreImg || '');
         setRoleMujerImg(s.roleMujerImg || '');
         setRoleParejaImg(s.roleParejaImg || '');
@@ -451,6 +453,7 @@ export default function SettingsPage() {
         vip_price_6months: vipPrice6Months,
         incognito_icon_svg: incognitoIconSvg,
         block_user_icon_svg: blockUserIconSvg,
+        video_call_icon_svg: videoCallIconSvg,
         role_hombre_img: roleHombreImg,
         role_mujer_img: roleMujerImg,
         role_pareja_img: roleParejaImg,
@@ -535,6 +538,7 @@ export default function SettingsPage() {
       setVipPrice6Months(s.vipPrice6Months);
       setIncognitoIconSvg(s.incognitoIconSvg || '');
       setBlockUserIconSvg(s.blockUserIconSvg || '');
+      setVideoCallIconSvg(s.videoCallIconSvg || '');
       setCoinPack1Coins(s.coinPack1Coins || '1000');
       setCoinPack1Price(s.coinPack1Price || '');
       setCoinPack2Coins(s.coinPack2Coins || '2000');
@@ -1168,6 +1172,58 @@ export default function SettingsPage() {
                 </div>
                 {blockUserIconSvg.trim() && (
                   <button onClick={() => setBlockUserIconSvg('')} className="text-[11px] text-mansion-crimson hover:underline">Restaurar default</button>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                  <Video className="w-4 h-4 text-mansion-gold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Ícono Videollamada</h3>
+                  <p className="text-[11px] text-text-dim">Sube SVG, PNG, JPG o WebP. Vacío = cámara por defecto.</p>
+                </div>
+              </div>
+
+              <label className="flex flex-col items-center justify-center gap-2 w-full h-24 rounded-xl border-2 border-dashed border-mansion-border/40 hover:border-mansion-gold/40 cursor-pointer transition-colors bg-mansion-elevated/50">
+                <Video className="w-5 h-5 text-text-dim" />
+                <span className="text-[11px] text-text-dim">
+                  {videoCallIconSvg.trim() ? 'Haz clic para reemplazar el ícono' : 'Haz clic para subir un ícono'}
+                </span>
+                <input
+                  type="file"
+                  accept=".svg,image/svg+xml,image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
+                        const reader = new FileReader();
+                        reader.onload = ev => setVideoCallIconSvg(ev.target.result);
+                        reader.readAsText(file);
+                      } else {
+                        const result = await uploadImage(file);
+                        if (result.url) setVideoCallIconSvg(result.url);
+                      }
+                    } catch (err) {
+                      console.error('Error uploading video call icon:', err);
+                    } finally {
+                      e.target.value = '';
+                    }
+                  }}
+                />
+              </label>
+
+              <div className="mt-3 flex items-center gap-4">
+                <span className="text-[11px] text-text-dim">Vista previa:</span>
+                <div className="w-10 h-10 rounded-xl bg-mansion-elevated flex items-center justify-center text-white">
+                  {renderConfiguredIcon(videoCallIconSvg, <Video className="w-6 h-6" />)}
+                </div>
+                {videoCallIconSvg.trim() && (
+                  <button onClick={() => setVideoCallIconSvg('')} className="text-[11px] text-mansion-crimson hover:underline">Restaurar default</button>
                 )}
               </div>
             </div>

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Ban, ChevronLeft, Crown, ImagePlus, Send, X } from 'lucide-react';
+import { Ban, ChevronLeft, Crown, ImagePlus, Send, Video, X } from 'lucide-react';
 import { useMessageLimit } from '../hooks/useMessageLimit';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
@@ -24,6 +24,7 @@ const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
 const DEFAULT_CHAT_IMAGE_BLUR = 24;
 const VIP_MEMBER_LABEL = 'Miembro VIP';
+const VIP_MEMBER_LABEL_PLURAL = 'Miembros VIP';
 
 function normalizeChatImageBlur(value) {
   const numeric = Number(value);
@@ -42,6 +43,10 @@ function getRecipientLimitSystemMessage() {
 
 function getMessageLimitSystemMessage(windowHours = 12) {
   return `Llegaste al límite de mensajes cada ${formatLimitWindowHours(windowHours)}.\nHacete ${VIP_MEMBER_LABEL} para enviar mensajes ilimitados.`;
+}
+
+function getVideoCallUnavailableMessage() {
+  return `La videollamada solo esta disponible para ${VIP_MEMBER_LABEL_PLURAL}`;
 }
 
 function getSystemLimitMessage(limit = null) {
@@ -78,19 +83,21 @@ function getSystemLimitMessageFromError(errorData = {}, fallback = '') {
 }
 
 function renderSystemMessageContent(text) {
-  return String(text || '').split(VIP_MEMBER_LABEL).map((part, index, parts) => (
-    <span key={`${part}-${index}`}>
-      {part}
-      {index < parts.length - 1 && (
+  return String(text || '').split(new RegExp(`(${VIP_MEMBER_LABEL_PLURAL}|${VIP_MEMBER_LABEL})`, 'g')).filter(Boolean).map((part, index) => {
+    const isVipLabel = part === VIP_MEMBER_LABEL || part === VIP_MEMBER_LABEL_PLURAL;
+    return (
+      <span key={`${part}-${index}`}>
+        {isVipLabel ? (
         <Link
           to="/vip"
           className="font-semibold text-mansion-gold underline decoration-mansion-gold/50 underline-offset-4 transition-colors hover:text-mansion-gold-light"
         >
-          {VIP_MEMBER_LABEL}
+          {part}
         </Link>
-      )}
-    </span>
-  ));
+        ) : part}
+      </span>
+    );
+  });
 }
 
 function canEmitTypingSignal(limit = null, blockState = {}) {
@@ -104,6 +111,13 @@ const BlockUserIcon = ({ customSvg = '', className = 'h-7 w-7 lg:h-10 lg:w-10' }
   if (value.startsWith('<')) return <span className={className} dangerouslySetInnerHTML={{ __html: value }} />;
   if (value) return <img src={value} alt="" className={`${className} object-contain`} />;
   return <Ban className={className} />;
+};
+
+const VideoCallIcon = ({ customSvg = '', className = 'h-7 w-7 lg:h-10 lg:w-10' }) => {
+  const value = String(customSvg || '').trim();
+  if (value.startsWith('<')) return <span className={className} dangerouslySetInnerHTML={{ __html: value }} />;
+  if (value) return <img src={value} alt="" className={`${className} object-contain`} />;
+  return <Video className={className} />;
 };
 
 function detectStandaloneMobile() {
@@ -1319,6 +1333,11 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
       ? 'Este usuario no acepta mensajes tuyos'
       : 'Escribe un mensaje...';
 
+  const handleVideoCallClick = () => {
+    if (viewerIsPremium) return;
+    addSystemMessage(getVideoCallUnavailableMessage());
+  };
+
   const handleToggleBlock = async () => {
     if (blockUpdating) return;
     const nextBlocked = !isBlockedByMe;
@@ -1695,23 +1714,38 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleToggleBlock}
-            disabled={blockUpdating}
-            title={isBlockedByMe ? 'Desbloquear usuario' : 'Bloquear usuario'}
-            className={`inline-flex h-12 w-14 shrink-0 flex-col items-center justify-center gap-0.5 transition-colors disabled:opacity-60 lg:h-[62px] lg:w-[72px] ${
-              isBlockedByMe
-                ? 'text-mansion-gold hover:text-mansion-gold/80'
-                : 'text-red-300 hover:text-red-200'
-            }`}
-            aria-label={isBlockedByMe ? `Desbloquear a ${partner.name}` : `Bloquear a ${partner.name}`}
-          >
-            <BlockUserIcon customSvg={siteSettings?.blockUserIconSvg || ''} />
-            <span className="text-[9px] font-semibold leading-none tracking-[0.04em] lg:text-[10px]">
-              {isBlockedByMe ? 'Desbloquear' : 'Bloquear'}
-            </span>
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={handleVideoCallClick}
+              title="Videollamada"
+              className="inline-flex h-12 w-16 shrink-0 flex-col items-center justify-center gap-0.5 text-text-dim transition-colors hover:text-mansion-gold lg:h-[62px] lg:w-[78px]"
+              aria-label={`Videollamada con ${partner.name}`}
+            >
+              <VideoCallIcon customSvg={siteSettings?.videoCallIconSvg || ''} />
+              <span className="text-[9px] font-semibold leading-none tracking-[0.04em] lg:text-[10px]">
+                Videollamada
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleToggleBlock}
+              disabled={blockUpdating}
+              title={isBlockedByMe ? 'Desbloquear usuario' : 'Bloquear usuario'}
+              className={`inline-flex h-12 w-14 shrink-0 flex-col items-center justify-center gap-0.5 transition-colors disabled:opacity-60 lg:h-[62px] lg:w-[72px] ${
+                isBlockedByMe
+                  ? 'text-mansion-gold hover:text-mansion-gold/80'
+                  : 'text-red-300 hover:text-red-200'
+              }`}
+              aria-label={isBlockedByMe ? `Desbloquear a ${partner.name}` : `Bloquear a ${partner.name}`}
+            >
+              <BlockUserIcon customSvg={siteSettings?.blockUserIconSvg || ''} />
+              <span className="text-[9px] font-semibold leading-none tracking-[0.04em] lg:text-[10px]">
+                {isBlockedByMe ? 'Desbloquear' : 'Bloquear'}
+              </span>
+            </button>
+          </div>
 
         </div>
       </div>
