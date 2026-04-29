@@ -1131,6 +1131,7 @@ export default function ProfilePage() {
           </motion.div>
         )}
 
+        <div className="lg:hidden">
         {/* ── Busco (seeking) ── */}
         <motion.div variants={fadeUp} className="mb-6 glass-elevated rounded-3xl p-4">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-3 flex items-center gap-1.5">
@@ -1335,6 +1336,7 @@ export default function ProfilePage() {
             </div>
           </button>
         </motion.div>
+        </div>
 
         {/* ── Logout ── */}
         <motion.div variants={fadeUp} className="pb-7">

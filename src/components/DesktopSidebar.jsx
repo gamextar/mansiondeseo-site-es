@@ -30,6 +30,7 @@ const NAV_ITEMS = [
   { to: '/seguidores', icon: Heart, label: 'Seguidores' },
   { to: '/mensajes', icon: MessageCircle, label: 'Mensajes' },
   { to: '/perfil', icon: User, label: 'Mi Perfil' },
+  { to: '/configuracion', icon: Settings, label: 'Configuración' },
 ];
 
 export default function DesktopSidebar() {

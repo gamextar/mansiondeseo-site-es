@@ -41,7 +41,8 @@ import { isSeoIntentVariant } from './lib/seoVariants';
 const ExplorePage = lazy(lazyWithRetry(() => import('./pages/ExplorePage'), 'mansion-lazy-retry:explore'));
 const ProfileDetailPage = lazy(lazyWithRetry(() => import('./pages/ProfileDetailPage'), 'mansion-lazy-retry:profile-detail'));
 const FavoritesPage = lazy(lazyWithRetry(() => import('./pages/FavoritesPage'), 'mansion-lazy-retry:favorites'));
-const SettingsPage = lazy(lazyWithRetry(() => import('./pages/SettingsPage'), 'mansion-lazy-retry:settings'));
+const AdminSettingsPage = lazy(lazyWithRetry(() => import('./pages/SettingsPage'), 'mansion-lazy-retry:admin-settings'));
+const UserSettingsPage = lazy(lazyWithRetry(() => import('./pages/UserSettingsPage'), 'mansion-lazy-retry:user-settings'));
 const AdminLayout = lazy(lazyWithRetry(() => import('./components/AdminLayout'), 'mansion-lazy-retry:admin-layout'));
 const AdminUsersPage = lazy(lazyWithRetry(() => import('./pages/admin/AdminUsersPage'), 'mansion-lazy-retry:admin-users'));
 const AdminErrorLogsPage = lazy(lazyWithRetry(() => import('./pages/admin/AdminErrorLogsPage'), 'mansion-lazy-retry:admin-error-logs'));
@@ -977,7 +978,7 @@ function AppLayout() {
             path="/configuracion"
             element={
               <RequireRegistration>
-                <SettingsPage />
+                <UserSettingsPage />
               </RequireRegistration>
             }
           />
@@ -991,7 +992,7 @@ function AppLayout() {
             <Route path="usuarios" element={<AdminUsersPage />} />
             <Route path="bandeja-fake" element={<AdminFakeInboxPage />} />
             <Route path="errores" element={<AdminErrorLogsPage />} />
-            <Route path="configuracion" element={<SettingsPage />} />
+            <Route path="configuracion" element={<AdminSettingsPage />} />
             <Route path="video-lab" element={<VideoLabPage />} />
           </Route>
         </Routes>
