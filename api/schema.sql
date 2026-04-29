@@ -138,6 +138,16 @@ CREATE TABLE IF NOT EXISTS message_limits (
   PRIMARY KEY (user_id, date_utc)
 );
 
+CREATE TABLE IF NOT EXISTS chat_recipient_limits (
+  sender_id  TEXT NOT NULL REFERENCES users(id),
+  receiver_id TEXT NOT NULL REFERENCES users(id),
+  window_key TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (sender_id, receiver_id, window_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_recipient_limits_sender_window ON chat_recipient_limits(sender_id, window_key);
+
 -- Verification tokens
 CREATE TABLE IF NOT EXISTS verification_tokens (
   id         TEXT PRIMARY KEY,

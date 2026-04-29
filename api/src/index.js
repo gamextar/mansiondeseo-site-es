@@ -71,6 +71,7 @@ let _profileVisitStructuresReady = null;
 let _profileStatsBackfillReady = null;
 let _errorLogsReady = null;
 let _photoVerificationRequestsReady = null;
+let _chatRecipientLimitsReady = null;
 
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
@@ -89,6 +90,8 @@ const STORY_RAIL_FALLBACK_GAP_MOBILE = 6;
 const STORY_RAIL_FALLBACK_GAP_DESKTOP = 7;
 const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
 const FREE_VIDEO_STORY_DAILY_LIMIT = 10;
+const FREE_CHAT_RECIPIENT_LIMIT = 5;
+const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -763,6 +766,7 @@ async function deleteUserCompletely(env, user) {
   await ensurePhotoVerificationRequestsTable(env);
   await ensureStoriesTable(env);
   await ensureErrorLogsTable(env);
+  await ensureChatRecipientLimitTable(env);
   const storyRowsResult = await env.DB.prepare(
     'SELECT id, video_url FROM stories WHERE user_id = ?'
   ).bind(userId).all();
@@ -789,6 +793,7 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM account_deletion_requests WHERE user_id = ? OR email = ?').bind(userId, user.email),
     env.DB.prepare('DELETE FROM processed_payments WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM message_limits WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM chat_recipient_limits WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM profile_stats WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM error_logs WHERE user_id = ?').bind(userId),
@@ -1824,6 +1829,92 @@ function messageLimitWindowUTC(hours = MESSAGE_LIMIT_WINDOW_HOURS_DEFAULT, date 
   const bucketStart = new Date(bucket * windowMs);
   const bucketStamp = bucketStart.toISOString().replace(/[-:]/g, '').slice(0, 11);
   return `${windowHours}h-${bucketStamp}`;
+}
+
+async function ensureChatRecipientLimitTable(env) {
+  if (!_chatRecipientLimitsReady) {
+    _chatRecipientLimitsReady = Promise.all([
+      env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS chat_recipient_limits (
+          sender_id TEXT NOT NULL REFERENCES users(id),
+          receiver_id TEXT NOT NULL REFERENCES users(id),
+          window_key TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (sender_id, receiver_id, window_key)
+        )
+      `).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_chat_recipient_limits_sender_window ON chat_recipient_limits(sender_id, window_key)'
+      ).run(),
+    ]).catch((err) => {
+      _chatRecipientLimitsReady = null;
+      throw err;
+    });
+  }
+
+  return _chatRecipientLimitsReady;
+}
+
+async function getChatRecipientLimitState(env, senderId, receiverId) {
+  await ensureChatRecipientLimitTable(env);
+  const windowHours = CHAT_RECIPIENT_LIMIT_WINDOW_HOURS;
+  const windowKey = messageLimitWindowUTC(windowHours);
+  const [existingRow, countRow] = await Promise.all([
+    receiverId
+      ? env.DB.prepare(
+        'SELECT 1 FROM chat_recipient_limits WHERE sender_id = ? AND receiver_id = ? AND window_key = ?'
+      ).bind(senderId, receiverId, windowKey).first()
+      : Promise.resolve(null),
+    env.DB.prepare(
+      'SELECT COUNT(*) AS recipient_count FROM chat_recipient_limits WHERE sender_id = ? AND window_key = ?'
+    ).bind(senderId, windowKey).first(),
+  ]);
+  const recipientCount = Number(countRow?.recipient_count || 0);
+  const receiverAlreadyCounted = !!existingRow;
+  return {
+    recipientCount,
+    receiverAlreadyCounted,
+    remainingRecipients: Math.max(0, FREE_CHAT_RECIPIENT_LIMIT - recipientCount),
+    canSendToReceiver: receiverAlreadyCounted || recipientCount < FREE_CHAT_RECIPIENT_LIMIT,
+    maxRecipients: FREE_CHAT_RECIPIENT_LIMIT,
+    recipientWindowHours: windowHours,
+  };
+}
+
+async function reserveFreeChatRecipientSlot(env, senderId, receiverId) {
+  await ensureChatRecipientLimitTable(env);
+  const windowHours = CHAT_RECIPIENT_LIMIT_WINDOW_HOURS;
+  const windowKey = messageLimitWindowUTC(windowHours);
+  const existingRow = await env.DB.prepare(
+    'SELECT 1 FROM chat_recipient_limits WHERE sender_id = ? AND receiver_id = ? AND window_key = ?'
+  ).bind(senderId, receiverId, windowKey).first();
+
+  if (existingRow) {
+    const state = await getChatRecipientLimitState(env, senderId, receiverId);
+    return { ok: true, reserved: false, ...state };
+  }
+
+  const insertResult = await env.DB.prepare(`
+    INSERT OR IGNORE INTO chat_recipient_limits (sender_id, receiver_id, window_key, created_at)
+    SELECT ?, ?, ?, datetime('now')
+    WHERE (
+      SELECT COUNT(*)
+      FROM chat_recipient_limits
+      WHERE sender_id = ? AND window_key = ?
+    ) < ?
+  `).bind(senderId, receiverId, windowKey, senderId, windowKey, FREE_CHAT_RECIPIENT_LIMIT).run();
+
+  if (Number(insertResult?.meta?.changes || 0) > 0) {
+    const state = await getChatRecipientLimitState(env, senderId, receiverId);
+    return { ok: true, reserved: true, ...state };
+  }
+
+  const state = await getChatRecipientLimitState(env, senderId, receiverId);
+  return {
+    ok: state.canSendToReceiver,
+    reserved: false,
+    ...state,
+  };
 }
 
 // ── Password hashing (using Web Crypto) ─────────────────
@@ -3686,12 +3777,24 @@ async function handleProfileDetail(request, env, userId) {
     const count = limitRow?.msg_count || 0;
     const dailyLimit = settings.dailyMessageLimit || 5;
     const senderPremium = viewerIsPremium;
+    const recipientLimit = senderPremium
+      ? {
+        recipientCount: 0,
+        remainingRecipients: 999,
+        canSendToReceiver: true,
+        maxRecipients: 999,
+        recipientWindowHours: CHAT_RECIPIENT_LIMIT_WINDOW_HOURS,
+      }
+      : await getChatRecipientLimitState(env, auth.sub, userId);
+    const messageCanSend = senderPremium || count < dailyLimit;
+    const recipientCanSend = senderPremium || recipientLimit.canSendToReceiver;
     messageLimit = {
       sent: count,
       remaining: senderPremium ? 999 : Math.max(0, dailyLimit - count),
-      canSend: senderPremium ? true : count < dailyLimit,
+      canSend: messageCanSend && recipientCanSend,
       max: senderPremium ? 999 : dailyLimit,
       windowHours,
+      recipientLimit,
     };
   }
 
@@ -3767,6 +3870,17 @@ async function handleChatBootstrap(request, env, userId) {
   const count = limitRow?.msg_count || 0;
   const dailyLimit = settings.dailyMessageLimit || 5;
   const senderPremium = isPremiumActive(sender);
+  const recipientLimit = senderPremium
+    ? {
+      recipientCount: 0,
+      remainingRecipients: 999,
+      canSendToReceiver: true,
+      maxRecipients: 999,
+      recipientWindowHours: CHAT_RECIPIENT_LIMIT_WINDOW_HOURS,
+    }
+    : await getChatRecipientLimitState(env, auth.sub, userId);
+  const messageCanSend = senderPremium || count < dailyLimit;
+  const recipientCanSend = senderPremium || recipientLimit.canSendToReceiver;
 
   return json({
     partner: {
@@ -3788,9 +3902,10 @@ async function handleChatBootstrap(request, env, userId) {
     messageLimit: {
       sent: count,
       remaining: senderPremium ? 999 : Math.max(0, dailyLimit - count),
-      canSend: senderPremium ? true : count < dailyLimit,
+      canSend: messageCanSend && recipientCanSend,
       max: senderPremium ? 999 : dailyLimit,
       windowHours,
+      recipientLimit,
     },
     blockState: {
       blockedByMe: Number(blockState?.blocked_by_me || 0) === 1,
@@ -3883,9 +3998,23 @@ async function handleSendMessage(request, env) {
   const currentCount = limit?.msg_count || 0;
 
   const dailyLimit = siteSettings.dailyMessageLimit || 5;
+  const senderPremium = isPremiumActive(sender);
 
-  if (!isPremiumActive(sender) && currentCount >= dailyLimit) {
+  if (!senderPremium && currentCount >= dailyLimit) {
     return error(`Has alcanzado el límite de ${dailyLimit} mensajes cada ${windowHours} horas. Desbloquea VIP para mensajes ilimitados.`, 403);
+  }
+
+  if (!senderPremium) {
+    const recipientLimit = await reserveFreeChatRecipientSlot(env, auth.sub, receiver_id);
+    if (!recipientLimit.ok) {
+      return json({
+        error: `Los usuarios free pueden iniciar chats con hasta ${recipientLimit.maxRecipients} usuarios distintos por hora. Desbloquea VIP para chatear sin límite.`,
+        code: 'CHAT_RECIPIENT_LIMIT_REACHED',
+        maxRecipients: recipientLimit.maxRecipients,
+        recipientCount: recipientLimit.recipientCount,
+        recipientWindowHours: recipientLimit.recipientWindowHours,
+      }, 403);
+    }
   }
 
   // Insert message
@@ -3898,7 +4027,7 @@ async function handleSendMessage(request, env) {
   `).bind(msgId, auth.sub, receiver_id, text, imageUrl, imageThumbUrl, imageMime, now, conversationId).run();
 
   // Update message counter
-  if (!isPremiumActive(sender)) {
+  if (!senderPremium) {
     if (limit) {
       await env.DB.prepare(
         'UPDATE message_limits SET msg_count = msg_count + 1 WHERE user_id = ? AND date_utc = ?'

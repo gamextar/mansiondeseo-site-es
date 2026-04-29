@@ -3,6 +3,9 @@
 // WebSocket Hibernation + D1-backed history
 // ═══════════════════════════════════════════════════════
 
+const FREE_CHAT_RECIPIENT_LIMIT = 5;
+const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
+
 export class ChatRoom {
   constructor(state, env) {
     this.state = state;
@@ -16,6 +19,7 @@ export class ChatRoom {
     this.senderConversationStateWriteAt = new Map();
     this.userMessageBlockRolesColumnReady = null;
     this.userBlocksReady = null;
+    this.chatRecipientLimitsReady = null;
   }
 
   normalizeRoleArray(rawValue, validValues, fallback = []) {
@@ -310,6 +314,92 @@ export class ChatRoom {
     const bucketStart = new Date(bucket * windowMs);
     const bucketStamp = bucketStart.toISOString().replace(/[-:]/g, '').slice(0, 11);
     return `${windowHours}h-${bucketStamp}`;
+  }
+
+  async ensureChatRecipientLimitTable() {
+    if (!this.chatRecipientLimitsReady) {
+      this.chatRecipientLimitsReady = Promise.all([
+        this.env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS chat_recipient_limits (
+            sender_id TEXT NOT NULL REFERENCES users(id),
+            receiver_id TEXT NOT NULL REFERENCES users(id),
+            window_key TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (sender_id, receiver_id, window_key)
+          )
+        `).run(),
+        this.env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_chat_recipient_limits_sender_window ON chat_recipient_limits(sender_id, window_key)'
+        ).run(),
+      ]).catch((err) => {
+        this.chatRecipientLimitsReady = null;
+        throw err;
+      });
+    }
+
+    return this.chatRecipientLimitsReady;
+  }
+
+  async getChatRecipientLimitState(senderId, receiverId) {
+    await this.ensureChatRecipientLimitTable();
+    const windowHours = CHAT_RECIPIENT_LIMIT_WINDOW_HOURS;
+    const windowKey = this.getMessageLimitWindowUTC(windowHours);
+    const [existingRow, countRow] = await Promise.all([
+      receiverId
+        ? this.env.DB.prepare(
+          'SELECT 1 FROM chat_recipient_limits WHERE sender_id = ? AND receiver_id = ? AND window_key = ?'
+        ).bind(senderId, receiverId, windowKey).first()
+        : Promise.resolve(null),
+      this.env.DB.prepare(
+        'SELECT COUNT(*) AS recipient_count FROM chat_recipient_limits WHERE sender_id = ? AND window_key = ?'
+      ).bind(senderId, windowKey).first(),
+    ]);
+    const recipientCount = Number(countRow?.recipient_count || 0);
+    const receiverAlreadyCounted = !!existingRow;
+    return {
+      recipientCount,
+      receiverAlreadyCounted,
+      remainingRecipients: Math.max(0, FREE_CHAT_RECIPIENT_LIMIT - recipientCount),
+      canSendToReceiver: receiverAlreadyCounted || recipientCount < FREE_CHAT_RECIPIENT_LIMIT,
+      maxRecipients: FREE_CHAT_RECIPIENT_LIMIT,
+      recipientWindowHours: windowHours,
+    };
+  }
+
+  async reserveFreeChatRecipientSlot(senderId, receiverId) {
+    await this.ensureChatRecipientLimitTable();
+    const windowHours = CHAT_RECIPIENT_LIMIT_WINDOW_HOURS;
+    const windowKey = this.getMessageLimitWindowUTC(windowHours);
+    const existingRow = await this.env.DB.prepare(
+      'SELECT 1 FROM chat_recipient_limits WHERE sender_id = ? AND receiver_id = ? AND window_key = ?'
+    ).bind(senderId, receiverId, windowKey).first();
+
+    if (existingRow) {
+      const state = await this.getChatRecipientLimitState(senderId, receiverId);
+      return { ok: true, reserved: false, ...state };
+    }
+
+    const insertResult = await this.env.DB.prepare(`
+      INSERT OR IGNORE INTO chat_recipient_limits (sender_id, receiver_id, window_key, created_at)
+      SELECT ?, ?, ?, datetime('now')
+      WHERE (
+        SELECT COUNT(*)
+        FROM chat_recipient_limits
+        WHERE sender_id = ? AND window_key = ?
+      ) < ?
+    `).bind(senderId, receiverId, windowKey, senderId, windowKey, FREE_CHAT_RECIPIENT_LIMIT).run();
+
+    if (Number(insertResult?.meta?.changes || 0) > 0) {
+      const state = await this.getChatRecipientLimitState(senderId, receiverId);
+      return { ok: true, reserved: true, ...state };
+    }
+
+    const state = await this.getChatRecipientLimitState(senderId, receiverId);
+    return {
+      ok: state.canSendToReceiver,
+      reserved: false,
+      ...state,
+    };
   }
 
   async getSenderStatus(userId) {
@@ -714,6 +804,24 @@ export class ChatRoom {
             windowHours,
           }));
           return;
+        }
+
+        if (receiverId) {
+          const recipientLimit = await this.reserveFreeChatRecipientSlot(senderId, receiverId);
+          if (!recipientLimit.ok) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              code: 'CHAT_RECIPIENT_LIMIT_REACHED',
+              message: `Los usuarios free pueden iniciar chats con hasta ${recipientLimit.maxRecipients} usuarios distintos por hora. Desbloquea VIP para chatear sin límite.`,
+              remaining: currentCount < dailyLimit ? dailyLimit - currentCount : 0,
+              max: dailyLimit,
+              canSend: false,
+              maxRecipients: recipientLimit.maxRecipients,
+              recipientCount: recipientLimit.recipientCount,
+              recipientWindowHours: recipientLimit.recipientWindowHours,
+            }));
+            return;
+          }
         }
 
         // Increment counter

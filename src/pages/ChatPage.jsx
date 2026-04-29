@@ -1016,8 +1016,24 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
         setApiLimit({ remaining: data.remaining, max: data.max, canSend: data.canSend });
       },
       onError(data) {
-        if (data.code === 'LIMIT_REACHED') {
-          setApiLimit({ remaining: 0, canSend: false, max: data.max || 5 });
+        if (data.code === 'LIMIT_REACHED' || data.code === 'CHAT_RECIPIENT_LIMIT_REACHED') {
+          setApiLimit((prev) => ({
+            ...(prev || {}),
+            remaining: Number(data.remaining || 0),
+            canSend: false,
+            max: data.max || prev?.max || 5,
+            recipientLimit: data.code === 'CHAT_RECIPIENT_LIMIT_REACHED'
+              ? {
+                ...(prev?.recipientLimit || {}),
+                recipientCount: data.recipientCount,
+                maxRecipients: data.maxRecipients,
+                remainingRecipients: 0,
+                recipientWindowHours: data.recipientWindowHours,
+                canSendToReceiver: false,
+              }
+              : prev?.recipientLimit,
+          }));
+          setMessages((prev) => prev.filter((message) => !String(message.id || '').startsWith('temp-')));
         } else if (data.code === 'USER_BLOCKED_BY_ME' || data.code === 'USER_BLOCKED_ME') {
           setBlockState((prev) => ({
             blockedByMe: data.code === 'USER_BLOCKED_BY_ME' ? true : prev.blockedByMe,
@@ -1198,12 +1214,15 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const isBlockedByMe = !!blockState?.blockedByMe;
   const isBlockedByPartner = !!blockState?.blockedMe;
   const isChatBlocked = isBlockedByMe || isBlockedByPartner;
+  const recipientLimitBlocked = apiLimit?.recipientLimit?.canSendToReceiver === false;
   const effectiveCanSend = !isChatBlocked && (apiLimit ? apiLimit.canSend : canSend);
   const effectiveMax = apiLimit ? apiLimit.max : max;
   const composerPlaceholder = isBlockedByMe
     ? 'Desbloquea al usuario para enviar mensajes'
     : isBlockedByPartner
       ? 'Este usuario no acepta mensajes tuyos'
+      : recipientLimitBlocked
+        ? 'Límite anti-spam alcanzado'
       : effectiveCanSend
         ? 'Escribe un mensaje...'
         : 'Sin mensajes disponibles';
@@ -1275,6 +1294,22 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             setBlockState((prev) => ({
               blockedByMe: code === 'USER_BLOCKED_BY_ME' ? true : prev.blockedByMe,
               blockedMe: code === 'USER_BLOCKED_ME' ? true : prev.blockedMe,
+            }));
+            setMessages((prev) => prev.filter((message) => message.id !== tempId));
+          } else if (code === 'CHAT_RECIPIENT_LIMIT_REACHED') {
+            setApiLimit((prev) => ({
+              ...(prev || {}),
+              remaining: 0,
+              canSend: false,
+              max: prev?.max || 5,
+              recipientLimit: {
+                ...(prev?.recipientLimit || {}),
+                recipientCount: err.data?.recipientCount,
+                maxRecipients: err.data?.maxRecipients,
+                remainingRecipients: 0,
+                recipientWindowHours: err.data?.recipientWindowHours,
+                canSendToReceiver: false,
+              },
             }));
             setMessages((prev) => prev.filter((message) => message.id !== tempId));
           } else {
@@ -1360,7 +1395,23 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
           blockedMe: code === 'USER_BLOCKED_ME' ? true : prev.blockedMe,
         }));
       } else if (err?.status === 403) {
-        setApiLimit({ remaining: 0, canSend: false, max: 5 });
+        const recipientLimitReached = code === 'CHAT_RECIPIENT_LIMIT_REACHED';
+        setApiLimit((prev) => ({
+          ...(recipientLimitReached ? (prev || {}) : {}),
+          remaining: 0,
+          canSend: false,
+          max: prev?.max || 5,
+          recipientLimit: recipientLimitReached
+            ? {
+              ...(prev?.recipientLimit || {}),
+              recipientCount: err.data?.recipientCount,
+              maxRecipients: err.data?.maxRecipients,
+              remainingRecipients: 0,
+              recipientWindowHours: err.data?.recipientWindowHours,
+              canSendToReceiver: false,
+            }
+            : prev?.recipientLimit,
+        }));
       }
       alert(err?.message || 'No se pudo enviar la imagen');
     } finally {
