@@ -60,9 +60,10 @@ METRICS_FLUSH_REQUESTS = "50"
 PROFILE_VISIT_DEDUPE_MINUTES = "30"
 PAYMENT_BRIDGE_URL = "https://unicoapps-site.pages.dev"
 CLOUDFLARE_ACCOUNT_ID = "f251d9341172cd4fa210cc7a0308adc6"
+REALTIMEKIT_APP_ID = "442ff73c-7025-46bb-88f9-e493133b91b5"
 REALTIMEKIT_PRESET_NAME = "group_call_host"
 # BRIDGE_SECRET → configurado como secret via: npx wrangler secret put BRIDGE_SECRET
-# REALTIMEKIT_APP_ID y REALTIMEKIT_API_TOKEN deben configurarse como secrets/vars de producción.
+# REALTIMEKIT_API_TOKEN debe configurarse como secret de producción.
 
 # ── Dev settings ─────────────────────────────────────
 [dev]
