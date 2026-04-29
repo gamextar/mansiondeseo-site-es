@@ -186,11 +186,6 @@ export default function ProfileCard({
           {/* Top badges */}
           <div className="absolute top-3 left-3 right-3 flex items-start justify-between z-20">
             <div className="flex flex-wrap gap-1.5 pr-6">
-              {rolePill && (
-                <span className={`flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm ${rolePill.className}`}>
-                  {rolePill.label}
-                </span>
-              )}
               {premium && (
                 <span className={`flex items-center gap-1 border border-mansion-gold/30 rounded-full px-2 py-0.5 text-[10px] font-semibold text-mansion-gold ${safariDesktop ? 'bg-black/55' : 'bg-mansion-gold/20 backdrop-blur-sm'}`}>
                   <Crown className="w-3 h-3" />
@@ -218,6 +213,11 @@ export default function ProfileCard({
                 <h3 className="font-display text-lg font-semibold text-white leading-tight">
                   {name}<span className="text-text-muted font-body text-sm ml-1">{age}</span>
                 </h3>
+                {rolePill && (
+                  <span className={`mt-1 inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm ${rolePill.className}`}>
+                    {rolePill.label}
+                  </span>
+                )}
                 {locationText && (
                   <div className="flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3 h-3 text-text-muted" />
