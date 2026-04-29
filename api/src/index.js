@@ -4284,7 +4284,6 @@ async function buildNewMessageEvents(env, senderId, receiverId, msg) {
       chatId,
       partnerId: receiverId,
       unreadDelta: 0,
-      messageKind: msg?.image_url ? 'image' : 'text',
       conversation: senderConversation,
     },
     receiver: {
@@ -4293,7 +4292,6 @@ async function buildNewMessageEvents(env, senderId, receiverId, msg) {
       partnerId: senderId,
       unreadDelta: 1,
       conversationUnreadDelta: 1,
-      messageKind: msg?.image_url ? 'image' : 'text',
       conversation: receiverConversation,
     },
   };

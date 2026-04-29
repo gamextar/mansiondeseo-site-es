@@ -245,7 +245,6 @@ export class ChatRoom {
         type: 'new_message',
         chatId,
         partnerId: receiverId,
-        messageKind: msg?.image_url ? 'image' : 'text',
         conversation: senderConversation,
       },
       receiver: {
@@ -254,7 +253,6 @@ export class ChatRoom {
         partnerId: senderId,
         unreadDelta: 1,
         conversationUnreadDelta: 1,
-        messageKind: msg?.image_url ? 'image' : 'text',
         conversation: receiverConversation,
       },
     };

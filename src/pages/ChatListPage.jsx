@@ -239,32 +239,25 @@ export function ChatConversationsPanel({ embedded = false, activeProfileId = '',
   const [query, setQuery] = useState('');
   const typingTimersRef = useRef({});
   const lastSyncAtRef = useRef(cachedState.timestamp || 0);
-  const conversationsRef = useRef(cachedState.conversations);
   const navigate = useNavigate();
   const { refresh: refreshUnread, subscribe, decrementUnread } = useUnreadMessages();
 
-  useEffect(() => {
-    conversationsRef.current = conversations;
-  }, [conversations]);
-
   // Optimistically mark a conversation as read in local state + cache + global badge
-  const markConversationRead = useCallback((profileId, { updateGlobalBadge = true } = {}) => {
+  const markConversationRead = useCallback((profileId) => {
     const pid = String(profileId);
-    const current = conversationsRef.current.find(c => String(c.profileId) === pid);
-    const delta = Number(current?.unread || 0);
-    if (delta <= 0) return;
+    let delta = 0;
     setConversations((prev) => {
       const idx = prev.findIndex(c => String(c.profileId) === pid);
       if (idx === -1 || prev[idx].unread === 0) return prev;
+      delta = prev[idx].unread;
       const updated = [...prev];
       updated[idx] = { ...updated[idx], unread: 0 };
       setCachedConversations(updated);
-      conversationsRef.current = updated;
       return updated;
     });
     // Decrement global sidebar/bottomnav badge outside the state updater
     // so it's never skipped by React batching.
-    if (updateGlobalBadge) decrementUnread(delta);
+    if (delta > 0) decrementUnread(delta);
     // Invalidate API-level conversation cache so next fetch gets fresh data
     invalidateConversationsCache();
   }, [decrementUnread]);
@@ -297,7 +290,6 @@ export function ChatConversationsPanel({ embedded = false, activeProfileId = '',
       ];
 
       setCachedConversations(next);
-      conversationsRef.current = next;
       return next;
     });
 
@@ -319,7 +311,6 @@ export function ChatConversationsPanel({ embedded = false, activeProfileId = '',
         ...prev.filter((item) => String(item.profileId) !== String(conversation.profileId)),
       ];
       setCachedConversations(next);
-      conversationsRef.current = next;
       return next;
     });
 
@@ -332,7 +323,6 @@ export function ChatConversationsPanel({ embedded = false, activeProfileId = '',
       .then(data => {
         const convs = data.conversations || [];
         setConversations(convs);
-        conversationsRef.current = convs;
         setCachedConversations(convs);
         lastSyncAtRef.current = Date.now();
       })
@@ -347,7 +337,6 @@ export function ChatConversationsPanel({ embedded = false, activeProfileId = '',
     setConversations((prev) => {
       const next = prev.filter((item) => String(item.profileId) !== pid);
       setCachedConversations(next);
-      conversationsRef.current = next;
       return next;
     });
     setTypingChats((prev) => {
@@ -435,8 +424,6 @@ export function ChatConversationsPanel({ embedded = false, activeProfileId = '',
     const unsubscribeLocal = subscribeLocalConversationUpdates((event) => {
       if (event?.type === 'conversation_preview') {
         applyLocalConversationPreview(event);
-      } else if (event?.type === 'conversation_read' && event.partnerId) {
-        markConversationRead(event.partnerId, { updateGlobalBadge: false });
       }
     });
 

@@ -866,10 +866,6 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             ? { ...parsed, conversations: convs }
             : convs;
           sessionStorage.setItem('mansion_conversations', JSON.stringify(Array.isArray(parsed?.conversations) ? nextConvs : { conversations: convs, timestamp: parsed?.timestamp || 0 }));
-          publishLocalConversationUpdate({
-            type: 'conversation_read',
-            partnerId,
-          });
         }
       }
     } catch { /* ignore */ }
@@ -996,16 +992,6 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     apiGetMessages(partnerId, { limit: INITIAL_CHAT_PAGE_SIZE }).then((data) => {
       if (cancelled) return;
       const latestMessages = normalizeMessages(data.messages || []);
-      const unreadIncomingCount = latestMessages.filter((message) => (
-        message.senderId === 'them' && Number(message.is_read || 0) === 0
-      )).length;
-      if (unreadIncomingCount > 0) {
-        publishLocalConversationUpdate({
-          type: 'conversation_read',
-          partnerId,
-        });
-        refreshUnread();
-      }
       const hasHiddenOlderMessages = hasMessagesBeforeVisibleWindow(latestMessages, nextInitialMessages);
       const nextHasOlderMessages = !!data.hasMore || hasHiddenOlderMessages;
       cacheMessagesRef.current = mergeMessagesForCache(cacheMessagesRef.current, latestMessages);
