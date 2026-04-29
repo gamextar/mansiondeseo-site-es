@@ -649,6 +649,10 @@ export class ChatRoom {
       return this.handleNotifyRead(request);
     }
 
+    if (url.pathname === '/video-call') {
+      return this.handleVideoCallNotify(request);
+    }
+
     // WebSocket upgrade
     const upgrade = request.headers.get('Upgrade');
     if (!upgrade || upgrade !== 'websocket') {
@@ -1008,6 +1012,33 @@ export class ChatRoom {
       return new Response('ok', { status: 200 });
     } catch (e) {
       console.error('[ChatRoom.handleNotifyRead] error:', e.message);
+      return new Response('error', { status: 500 });
+    }
+  }
+
+  async handleVideoCallNotify(request) {
+    try {
+      const data = await request.json();
+      const participantIds = new Set((Array.isArray(data?.participantIds) ? data.participantIds : [])
+        .map((value) => String(value || ''))
+        .filter(Boolean));
+
+      if (participantIds.size === 0 && data?.call) {
+        if (data.call.initiatorId) participantIds.add(String(data.call.initiatorId));
+        if (data.call.receiverId) participantIds.add(String(data.call.receiverId));
+      }
+
+      const payload = JSON.stringify({ ...data, type: 'video_call' });
+      for (const sock of this.state.getWebSockets()) {
+        const [tag] = this.state.getTags(sock);
+        if (participantIds.size > 0 && !participantIds.has(String(tag))) continue;
+        try {
+          sock.send(payload);
+        } catch { /* socket might be closed */ }
+      }
+      return new Response('ok', { status: 200 });
+    } catch (e) {
+      console.error('[ChatRoom.handleVideoCallNotify] error:', e.message);
       return new Response('error', { status: 500 });
     }
   }

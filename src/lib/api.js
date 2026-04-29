@@ -1077,6 +1077,27 @@ export async function sendMessage(receiverId, content, attachment = {}) {
   });
 }
 
+export async function startVideoCall(receiverId) {
+  return apiFetch(`/chat/video-call/${receiverId}/start`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export async function joinVideoCall(callId) {
+  return apiFetch(`/chat/video-call/${callId}/join`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export async function endVideoCall(callId) {
+  return apiFetch(`/chat/video-call/${callId}/end`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
 export async function getMessageLimit() {
   return apiFetch('/messages/limit');
 }

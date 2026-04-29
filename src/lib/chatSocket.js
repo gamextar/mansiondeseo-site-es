@@ -22,6 +22,7 @@ const CHAT_MAX_RETRIES = 5;
  *   - onRead(messageIds): read receipt
  *   - onAck(msg): sent message confirmed
  *   - onLimit({ remaining, max, canSend }): limit update
+ *   - onVideoCall(event): video call signalling event
  *   - onError(message): server error (e.g., limit reached)
  *   - onStateChange(state): 'connecting' | 'connected' | 'disconnected'
  * @returns {{ send, markRead, close, getState }}
@@ -102,6 +103,9 @@ export function createChatSocket(myUserId, partnerId, token, callbacks, options 
           break;
         case 'limit':
           callbacks.onLimit?.(data);
+          break;
+        case 'video_call':
+          callbacks.onVideoCall?.(data);
           break;
         case 'error':
           callbacks.onError?.(data);

@@ -36,6 +36,10 @@ export default {
             return 'vendor-ffmpeg'
           }
 
+          if (id.includes('/@cloudflare/realtimekit')) {
+            return 'vendor-realtimekit'
+          }
+
           return 'vendor-misc'
         },
       },

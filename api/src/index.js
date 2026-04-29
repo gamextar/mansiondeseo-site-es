@@ -72,6 +72,7 @@ let _profileStatsBackfillReady = null;
 let _errorLogsReady = null;
 let _photoVerificationRequestsReady = null;
 let _chatRecipientLimitsReady = null;
+let _videoCallSessionsReady = null;
 
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
@@ -92,6 +93,7 @@ const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
 const FREE_VIDEO_STORY_DAILY_LIMIT = 10;
 const FREE_CHAT_RECIPIENT_LIMIT = 5;
 const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
+const DEFAULT_REALTIMEKIT_PRESET_NAME = 'group_call_host';
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -1401,6 +1403,183 @@ async function clearConversationStateUnread(env, userId, partnerId) {
   ).bind(userId, partnerId).run();
 }
 
+async function ensureVideoCallSessionsTable(env) {
+  if (!_videoCallSessionsReady) {
+    _videoCallSessionsReady = Promise.all([
+      env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS video_call_sessions (
+          id              TEXT PRIMARY KEY,
+          conversation_id TEXT NOT NULL,
+          meeting_id      TEXT NOT NULL,
+          initiator_id    TEXT NOT NULL REFERENCES users(id),
+          receiver_id     TEXT NOT NULL REFERENCES users(id),
+          status          TEXT NOT NULL DEFAULT 'ringing',
+          created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+          ended_at        TEXT DEFAULT NULL
+        )
+      `).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_video_call_sessions_conversation_created ON video_call_sessions(conversation_id, created_at DESC)'
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_video_call_sessions_participants_status ON video_call_sessions(initiator_id, receiver_id, status, created_at DESC)'
+      ).run(),
+    ]).catch((err) => {
+      _videoCallSessionsReady = null;
+      throw err;
+    });
+  }
+
+  return _videoCallSessionsReady;
+}
+
+function getRealtimeKitConfig(env) {
+  const accountId = String(env.REALTIMEKIT_ACCOUNT_ID || env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+  const appId = String(env.REALTIMEKIT_APP_ID || '').trim();
+  const apiToken = String(env.REALTIMEKIT_API_TOKEN || '').trim();
+  const presetName = String(env.REALTIMEKIT_PRESET_NAME || DEFAULT_REALTIMEKIT_PRESET_NAME).trim() || DEFAULT_REALTIMEKIT_PRESET_NAME;
+
+  if (!accountId || !appId || !apiToken) {
+    const err = new Error('RealtimeKit is not configured');
+    err.code = 'REALTIME_NOT_CONFIGURED';
+    err.status = 503;
+    throw err;
+  }
+
+  return { accountId, appId, apiToken, presetName };
+}
+
+async function realtimeKitRequest(env, path, { method = 'GET', body } = {}) {
+  const { accountId, appId, apiToken } = getRealtimeKitConfig(env);
+  const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/realtime/kit/${appId}${path}`, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok || payload?.success === false) {
+    const err = new Error('RealtimeKit API request failed');
+    err.code = 'REALTIMEKIT_API_ERROR';
+    err.status = response.status >= 400 && response.status < 500 ? response.status : 502;
+    err.details = payload?.errors || payload?.messages || [];
+    throw err;
+  }
+
+  return payload?.data || payload?.result || payload;
+}
+
+async function createRealtimeKitMeeting(env, title) {
+  return realtimeKitRequest(env, '/meetings', {
+    method: 'POST',
+    body: {
+      title,
+      persist_chat: false,
+      record_on_start: false,
+      live_stream_on_start: false,
+      summarize_on_end: false,
+      session_keep_alive_time_in_secs: 60,
+    },
+  });
+}
+
+function sanitizeRealtimeParticipantName(value, fallback = 'Usuario') {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+  return (normalized || fallback).slice(0, 80);
+}
+
+function getRealtimeParticipantPicture(user) {
+  const value = String(user?.avatar_thumb_url || user?.avatar_url || '').trim();
+  return /^https?:\/\//i.test(value) ? value : undefined;
+}
+
+async function createRealtimeKitParticipant(env, meetingId, user) {
+  const { presetName } = getRealtimeKitConfig(env);
+  return realtimeKitRequest(env, `/meetings/${meetingId}/participants`, {
+    method: 'POST',
+    body: {
+      custom_participant_id: String(user.id),
+      name: sanitizeRealtimeParticipantName(user.username),
+      picture: getRealtimeParticipantPicture(user),
+      preset_name: presetName,
+    },
+  });
+}
+
+function buildVideoCallPayload(event, call, extra = {}) {
+  const chatId = [call.initiator_id, call.receiver_id].sort().join('-');
+  const publicCall = {
+    id: call.id,
+    chatId,
+    initiatorId: call.initiator_id,
+    receiverId: call.receiver_id,
+    initiatorName: call.initiator_name || '',
+    receiverName: call.receiver_name || '',
+    status: call.status || 'ringing',
+    createdAt: call.created_at || null,
+    endedAt: call.ended_at || null,
+  };
+
+  return {
+    type: 'video_call',
+    event,
+    eventId: `${call.id}:${event}:${Date.now()}`,
+    chatId,
+    participantIds: [call.initiator_id, call.receiver_id],
+    targetUserId: extra.targetUserId || null,
+    actorId: extra.actorId || null,
+    call: publicCall,
+  };
+}
+
+async function notifyChatRoomVideoCall(env, userA, userB, payload) {
+  try {
+    const chatId = [userA, userB].sort().join('-');
+    const doId = env.CHAT_ROOMS.idFromName(chatId);
+    const stub = env.CHAT_ROOMS.get(doId);
+    await stub.fetch('https://do/video-call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.error('[notifyChatRoomVideoCall] error:', err.message);
+  }
+}
+
+function videoCallErrorResponse(err) {
+  if (err?.code === 'REALTIME_NOT_CONFIGURED') {
+    return json({
+      error: 'La videollamada no está configurada todavía.',
+      code: 'REALTIME_NOT_CONFIGURED',
+    }, 503);
+  }
+
+  if (err?.code === 'REALTIMEKIT_API_ERROR') {
+    console.error('[RealtimeKit] API error:', JSON.stringify(err.details || []));
+    return json({
+      error: 'No se pudo iniciar la videollamada en este momento.',
+      code: 'REALTIME_CALL_FAILED',
+    }, err.status || 502);
+  }
+
+  console.error('[VideoCall] error:', err?.message || err);
+  return json({
+    error: 'No se pudo procesar la videollamada.',
+    code: 'VIDEO_CALL_FAILED',
+  }, err?.status || 500);
+}
+
 async function getUnreadCountForUser(env, userId) {
   const row = await env.DB.prepare(
     'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ? AND unread_count > 0'
@@ -1650,6 +1829,9 @@ function isMetricsLoggingEnabled(env) {
 
 function normalizeMetricRoute(path) {
   if (/^\/api\/chat\/ws\/[a-f0-9-]+$/.test(path)) return '/api/chat/ws/:chatId';
+  if (/^\/api\/chat\/video-call\/[a-f0-9-]+\/start$/.test(path)) return '/api/chat/video-call/:id/start';
+  if (/^\/api\/chat\/video-call\/[a-f0-9-]+\/join$/.test(path)) return '/api/chat/video-call/:id/join';
+  if (/^\/api\/chat\/video-call\/[a-f0-9-]+\/end$/.test(path)) return '/api/chat/video-call/:id/end';
   if (/^\/api\/profiles\/[a-f0-9-]+\/report$/.test(path)) return '/api/profiles/:id/report';
   if (/^\/api\/profiles\/[a-f0-9-]+$/.test(path)) return '/api/profiles/:id';
   if (/^\/api\/messages\/[a-f0-9-]+$/.test(path)) return '/api/messages/:userId';
@@ -4089,6 +4271,176 @@ async function handleSendMessage(request, env) {
   }
 
   return json({ message: msg }, 201);
+}
+
+// ── POST /api/chat/video-call/:userId/start ─────────────
+
+async function handleStartVideoCall(request, env, receiverId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  if (String(auth.sub) === String(receiverId)) return error('No podés llamarte a vos mismo', 400);
+
+  await ensureVideoCallSessionsTable(env);
+  await ensureUsersMessageBlockRolesColumn(env);
+
+  const [caller, receiver] = await Promise.all([
+    env.DB.prepare('SELECT id, username, avatar_url, avatar_thumb_url, premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
+    env.DB.prepare('SELECT id, username, avatar_url, avatar_thumb_url, COALESCE(fake, 0) AS fake FROM users WHERE id = ? AND status = ?').bind(receiverId, 'verified').first(),
+  ]);
+
+  if (!caller) return error('No autorizado', 401);
+  if (!receiver) return error('Usuario no encontrado', 404);
+  if (Number(receiver.fake || 0) === 1) {
+    return json({
+      error: 'La videollamada no está disponible para este perfil.',
+      code: 'VIDEO_CALL_UNAVAILABLE',
+    }, 403);
+  }
+
+  if (!isPremiumActive(caller)) {
+    return json({
+      error: 'La videollamada solo está disponible para Miembros VIP.',
+      code: 'VIDEO_CALL_VIP_REQUIRED',
+    }, 403);
+  }
+
+  const messagingAllowed = await assertMessagingAllowed(env, auth.sub, receiverId);
+  if (!messagingAllowed.ok) {
+    return json({ error: messagingAllowed.message, code: messagingAllowed.code || 'MESSAGE_BLOCKED' }, messagingAllowed.status || 403);
+  }
+
+  try {
+    const conversationId = buildConversationId(auth.sub, receiverId);
+    const callId = generateId();
+    const meeting = await createRealtimeKitMeeting(env, `Mansión Deseo ${caller.username || 'Usuario'} / ${receiver.username || 'Usuario'}`);
+    const participant = await createRealtimeKitParticipant(env, meeting.id, caller);
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+    await env.DB.prepare(`
+      INSERT INTO video_call_sessions (id, conversation_id, meeting_id, initiator_id, receiver_id, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'ringing', ?, ?)
+    `).bind(callId, conversationId, meeting.id, auth.sub, receiverId, now, now).run();
+
+    const call = {
+      id: callId,
+      conversation_id: conversationId,
+      meeting_id: meeting.id,
+      initiator_id: auth.sub,
+      receiver_id: receiverId,
+      initiator_name: caller.username || '',
+      receiver_name: receiver.username || '',
+      status: 'ringing',
+      created_at: now,
+      ended_at: null,
+    };
+    const payload = buildVideoCallPayload('invite', call, { actorId: auth.sub, targetUserId: receiverId });
+
+    await Promise.allSettled([
+      notifyChatRoomVideoCall(env, auth.sub, receiverId, payload),
+      notifyUser(env, receiverId, payload),
+    ]);
+
+    return json({
+      call: payload.call,
+      token: participant.token,
+      participantId: participant.id,
+    }, 201);
+  } catch (err) {
+    return videoCallErrorResponse(err);
+  }
+}
+
+// ── POST /api/chat/video-call/:callId/join ──────────────
+
+async function handleJoinVideoCall(request, env, callId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  await ensureVideoCallSessionsTable(env);
+
+  const call = await env.DB.prepare(`
+    SELECT vcs.*, iu.username AS initiator_name, ru.username AS receiver_name,
+           u.id AS user_id, u.username, u.avatar_url, u.avatar_thumb_url
+    FROM video_call_sessions vcs
+    JOIN users iu ON iu.id = vcs.initiator_id
+    JOIN users ru ON ru.id = vcs.receiver_id
+    JOIN users u ON u.id = ?
+    WHERE vcs.id = ?
+      AND (? = vcs.initiator_id OR ? = vcs.receiver_id)
+    LIMIT 1
+  `).bind(auth.sub, callId, auth.sub, auth.sub).first();
+
+  if (!call) return error('Videollamada no encontrada', 404);
+  if (call.status === 'ended' || call.status === 'cancelled') {
+    return json({ error: 'La videollamada ya finalizó.', code: 'VIDEO_CALL_ENDED' }, 410);
+  }
+
+  try {
+    const participant = await createRealtimeKitParticipant(env, call.meeting_id, {
+      id: call.user_id,
+      username: call.username,
+      avatar_url: call.avatar_url,
+      avatar_thumb_url: call.avatar_thumb_url,
+    });
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    await env.DB.prepare(
+      "UPDATE video_call_sessions SET status = 'active', updated_at = ? WHERE id = ? AND status != 'ended'"
+    ).bind(now, callId).run();
+
+    const activeCall = { ...call, status: 'active' };
+    const payload = buildVideoCallPayload('accepted', activeCall, { actorId: auth.sub });
+    await Promise.allSettled([
+      notifyChatRoomVideoCall(env, call.initiator_id, call.receiver_id, payload),
+      notifyUser(env, call.initiator_id === auth.sub ? call.receiver_id : call.initiator_id, payload),
+    ]);
+
+    return json({
+      call: payload.call,
+      token: participant.token,
+      participantId: participant.id,
+    });
+  } catch (err) {
+    return videoCallErrorResponse(err);
+  }
+}
+
+// ── POST /api/chat/video-call/:callId/end ───────────────
+
+async function handleEndVideoCall(request, env, callId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+
+  await ensureVideoCallSessionsTable(env);
+
+  const call = await env.DB.prepare(`
+    SELECT vcs.*, iu.username AS initiator_name, ru.username AS receiver_name
+    FROM video_call_sessions vcs
+    JOIN users iu ON iu.id = vcs.initiator_id
+    JOIN users ru ON ru.id = vcs.receiver_id
+    WHERE vcs.id = ?
+      AND (? = vcs.initiator_id OR ? = vcs.receiver_id)
+    LIMIT 1
+  `).bind(callId, auth.sub, auth.sub).first();
+
+  if (!call) return error('Videollamada no encontrada', 404);
+
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  if (call.status !== 'ended' && call.status !== 'cancelled') {
+    await env.DB.prepare(
+      "UPDATE video_call_sessions SET status = 'ended', ended_at = ?, updated_at = ? WHERE id = ?"
+    ).bind(now, now, callId).run();
+  }
+
+  const endedCall = { ...call, status: 'ended', ended_at: call.ended_at || now };
+  const otherUserId = call.initiator_id === auth.sub ? call.receiver_id : call.initiator_id;
+  const payload = buildVideoCallPayload('ended', endedCall, { actorId: auth.sub, targetUserId: otherUserId });
+
+  await Promise.allSettled([
+    notifyChatRoomVideoCall(env, call.initiator_id, call.receiver_id, payload),
+    notifyUser(env, otherUserId, payload),
+  ]);
+
+  return json({ ended: true, call: payload.call });
 }
 
 // ── Notify ChatRoom DO of new HTTP message ──────────────
@@ -8053,6 +8405,12 @@ async function handleRequest(request, env, ctx) {
   const msgMatch = path.match(/^\/api\/messages\/([a-f0-9-]+)$/);
   if (msgMatch && method === 'GET') return handleGetMessages(request, env, msgMatch[1]);
   if (msgMatch && method === 'DELETE') return handleDeleteConversation(request, env, msgMatch[1]);
+  const videoCallStartMatch = path.match(/^\/api\/chat\/video-call\/([a-f0-9-]+)\/start$/);
+  if (videoCallStartMatch && method === 'POST') return handleStartVideoCall(request, env, videoCallStartMatch[1]);
+  const videoCallJoinMatch = path.match(/^\/api\/chat\/video-call\/([a-f0-9-]+)\/join$/);
+  if (videoCallJoinMatch && method === 'POST') return handleJoinVideoCall(request, env, videoCallJoinMatch[1]);
+  const videoCallEndMatch = path.match(/^\/api\/chat\/video-call\/([a-f0-9-]+)\/end$/);
+  if (videoCallEndMatch && method === 'POST') return handleEndVideoCall(request, env, videoCallEndMatch[1]);
 
   // ── Upload & Photos
   if (path === '/api/upload' && method === 'POST') return handleUpload(request, env);

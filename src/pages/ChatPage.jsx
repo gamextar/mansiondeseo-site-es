@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { lazy, Suspense, useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Ban, ChevronLeft, Crown, ImagePlus, Send, Video, X } from 'lucide-react';
@@ -6,7 +6,7 @@ import { useMessageLimit } from '../hooks/useMessageLimit';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
 import AvatarImg from '../components/AvatarImg';
-import { getMessageLimit, getChatBootstrap, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, invalidateConversationsCache, setUserBlocked, uploadImage, getPublicSettings } from '../lib/api';
+import { getMessageLimit, getChatBootstrap, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, invalidateConversationsCache, setUserBlocked, uploadImage, getPublicSettings, startVideoCall, joinVideoCall, endVideoCall } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
@@ -25,6 +25,7 @@ const OLDER_CHAT_PAGE_SIZE = 30;
 const DEFAULT_CHAT_IMAGE_BLUR = 24;
 const VIP_MEMBER_LABEL = 'Miembro VIP';
 const VIP_MEMBER_LABEL_PLURAL = 'Miembros VIP';
+const VideoCallModal = lazy(() => import('../components/VideoCallModal'));
 
 function normalizeChatImageBlur(value) {
   const numeric = Number(value);
@@ -47,6 +48,20 @@ function getMessageLimitSystemMessage(windowHours = 12) {
 
 function getVideoCallUnavailableMessage() {
   return `La videollamada solo esta disponible para ${VIP_MEMBER_LABEL_PLURAL}`;
+}
+
+function getVideoCallErrorMessage(error) {
+  const code = error?.data?.code || '';
+  if (code === 'REALTIME_NOT_CONFIGURED') {
+    return 'La videollamada no está disponible temporalmente.';
+  }
+  if (code === 'VIDEO_CALL_VIP_REQUIRED') {
+    return getVideoCallUnavailableMessage();
+  }
+  if (code === 'VIDEO_CALL_ENDED') {
+    return 'La videollamada ya finalizó.';
+  }
+  return error?.message || 'No se pudo iniciar la videollamada.';
 }
 
 function getSystemLimitMessage(limit = null) {
@@ -534,7 +549,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     ? window.matchMedia('(max-width: 1023px)').matches && !isStandaloneMobileChat
     : false;
   const { sendMessage: localSendMessage, max } = useMessageLimit();
-  const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
+  const { setActiveChatId, refresh: refreshUnread, decrementUnread, subscribe } = useUnreadMessages();
   const { siteSettings, setSiteSettings, user: viewer } = useAuth();
   const chatImageBlur = normalizeChatImageBlur(siteSettings?.chatImageBlur);
   const partnerId = activeRouteId.startsWith('conv-') ? activeRouteId.replace('conv-', '') : activeRouteId;
@@ -552,6 +567,9 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const [hasOlderMessages, setHasOlderMessages] = useState(cachedChat?.hasOlderMessages || false);
   const [imageUploading, setImageUploading] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [videoCallLoading, setVideoCallLoading] = useState(false);
+  const [activeVideoCall, setActiveVideoCall] = useState(null);
+  const [incomingVideoCall, setIncomingVideoCall] = useState(null);
   const [wsState, setWsState] = useState('disconnected');
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
@@ -584,6 +602,8 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const cacheMessagesRef = useRef(initialMessages);
   const lastSettingsRefreshRef = useRef(0);
   const suppressTypingUntilRef = useRef(0);
+  const seenVideoCallEventsRef = useRef(new Set());
+  const partnerNameRef = useRef(partner?.name || '');
   const [poppedMessageIds, setPoppedMessageIds] = useState(() => new Set());
   const [headerHeight, setHeaderHeight] = useState(96);
   const [composerHeight, setComposerHeight] = useState(84);
@@ -591,6 +611,10 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
   const backTarget = location.state?.from || '/mensajes';
   const viewerIsPremium = Boolean(viewer?.premium || getStoredUser()?.premium);
+
+  useEffect(() => {
+    partnerNameRef.current = partner?.name || '';
+  }, [partner?.name]);
 
   // Format DO message to UI format
   function formatMsg(msg) {
@@ -696,6 +720,60 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     });
     requestScrollToBottom('smooth', { force: true });
   }, [requestScrollToBottom]);
+
+  const rememberVideoCallEvent = useCallback((event) => {
+    const key = event?.eventId || `${event?.event || 'event'}:${event?.call?.id || ''}:${event?.actorId || ''}`;
+    if (!key) return false;
+    if (seenVideoCallEventsRef.current.has(key)) return false;
+    seenVideoCallEventsRef.current.add(key);
+    window.setTimeout(() => {
+      seenVideoCallEventsRef.current.delete(key);
+    }, 5 * 60_000);
+    return true;
+  }, []);
+
+  const handleVideoCallEvent = useCallback((event) => {
+    if (!event || event.type !== 'video_call') return;
+    if (!rememberVideoCallEvent(event)) return;
+
+    const userId = String(myUserIdRef.current || '');
+    const participants = new Set((event.participantIds || [])
+      .map((value) => String(value || ''))
+      .filter(Boolean));
+    if (participants.size > 0 && !participants.has(userId)) return;
+
+    const call = event.call || {};
+    const callId = String(call.id || '');
+    const isIncomingInvite = event.event === 'invite' && String(call.receiverId || '') === userId;
+
+    if (isIncomingInvite) {
+      const fallbackPartnerName = partnerNameRef.current || 'Videollamada';
+      setIncomingVideoCall({
+        ...call,
+        partnerName: call.initiatorName || fallbackPartnerName,
+      });
+      addSystemMessage(`${call.initiatorName || partnerNameRef.current || 'Alguien'} quiere iniciar una videollamada.`);
+      return;
+    }
+
+    if (event.event === 'accepted') {
+      setIncomingVideoCall((current) => (String(current?.id || '') === callId ? null : current));
+      return;
+    }
+
+    if (event.event === 'ended') {
+      setIncomingVideoCall((current) => (String(current?.id || '') === callId ? null : current));
+      setActiveVideoCall((current) => (String(current?.id || '') === callId ? null : current));
+      addSystemMessage('La videollamada finalizó.');
+    }
+  }, [addSystemMessage, rememberVideoCallEvent]);
+
+  useEffect(() => {
+    if (typeof subscribe !== 'function') return undefined;
+    return subscribe((event) => {
+      if (event?.type === 'video_call') handleVideoCallEvent(event);
+    });
+  }, [handleVideoCallEvent, subscribe]);
 
   const keepChatPinnedToBottom = useCallback((behavior = 'auto') => {
     if (!wasAtBottomRef.current) return;
@@ -1125,6 +1203,9 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
       onLimit(data) {
         setApiLimit({ remaining: data.remaining, max: data.max, canSend: data.canSend });
       },
+      onVideoCall(event) {
+        handleVideoCallEvent(event);
+      },
       onError(data) {
         if (data.code === 'LIMIT_REACHED' || data.code === 'CHAT_RECIPIENT_LIMIT_REACHED') {
           addSystemMessage(getSystemLimitMessageFromError(data, data.message));
@@ -1206,7 +1287,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [addSystemMessage, decrementUnread, activeRouteId, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, setActiveChatId, stopTypingSignal]);
+  }, [addSystemMessage, decrementUnread, activeRouteId, handleVideoCallEvent, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, setActiveChatId, stopTypingSignal]);
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;
@@ -1333,9 +1414,78 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
       ? 'Este usuario no acepta mensajes tuyos'
       : 'Escribe un mensaje...';
 
-  const handleVideoCallClick = () => {
-    if (viewerIsPremium) return;
-    addSystemMessage(getVideoCallUnavailableMessage());
+  const handleVideoCallClick = async () => {
+    if (videoCallLoading || activeVideoCall) return;
+    if (isChatBlocked) {
+      addSystemMessage(isBlockedByMe ? 'Desbloquea a este usuario para iniciar una videollamada.' : 'Este usuario no acepta contactos tuyos.');
+      return;
+    }
+    if (!viewerIsPremium) {
+      addSystemMessage(getVideoCallUnavailableMessage());
+      return;
+    }
+
+    setVideoCallLoading(true);
+    try {
+      const data = await startVideoCall(partnerId);
+      setIncomingVideoCall(null);
+      setActiveVideoCall({
+        ...(data.call || {}),
+        authToken: data.token,
+        partnerName: partner?.name || data.call?.receiverName || 'Videollamada',
+        direction: 'outgoing',
+      });
+    } catch (err) {
+      addSystemMessage(getVideoCallErrorMessage(err));
+    } finally {
+      setVideoCallLoading(false);
+    }
+  };
+
+  const handleAcceptVideoCall = async () => {
+    if (!incomingVideoCall || videoCallLoading) return;
+    setVideoCallLoading(true);
+    try {
+      const data = await joinVideoCall(incomingVideoCall.id);
+      setActiveVideoCall({
+        ...(data.call || incomingVideoCall),
+        authToken: data.token,
+        partnerName: incomingVideoCall.partnerName || data.call?.initiatorName || partner?.name || 'Videollamada',
+        direction: 'incoming',
+      });
+      setIncomingVideoCall(null);
+    } catch (err) {
+      setIncomingVideoCall(null);
+      addSystemMessage(getVideoCallErrorMessage(err));
+    } finally {
+      setVideoCallLoading(false);
+    }
+  };
+
+  const handleRejectVideoCall = async () => {
+    const callId = incomingVideoCall?.id;
+    setIncomingVideoCall(null);
+    if (!callId) return;
+    try {
+      await endVideoCall(callId);
+    } catch {
+      // Ignore signalling cleanup failures.
+    }
+  };
+
+  const handleCloseVideoCall = async () => {
+    const callId = activeVideoCall?.id;
+    setActiveVideoCall(null);
+    if (!callId) return;
+    try {
+      await endVideoCall(callId);
+    } catch {
+      // The local RealtimeKit leave already happened; backend cleanup is best-effort.
+    }
+  };
+
+  const handleVideoCallModalError = (err) => {
+    addSystemMessage(getVideoCallErrorMessage(err));
   };
 
   const handleToggleBlock = async () => {
@@ -1718,11 +1868,16 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             <button
               type="button"
               onClick={handleVideoCallClick}
+              disabled={videoCallLoading || !!activeVideoCall}
               title="Videollamada"
-              className="inline-flex h-12 w-16 shrink-0 flex-col items-center justify-center gap-0.5 text-text-dim transition-colors hover:text-mansion-gold lg:h-[62px] lg:w-[78px]"
+              className="inline-flex h-12 w-16 shrink-0 flex-col items-center justify-center gap-0.5 text-text-dim transition-colors hover:text-mansion-gold disabled:opacity-60 lg:h-[62px] lg:w-[78px]"
               aria-label={`Videollamada con ${partner.name}`}
             >
-              <VideoCallIcon customSvg={siteSettings?.videoCallIconSvg || ''} />
+              {videoCallLoading ? (
+                <span className="h-6 w-6 rounded-full border-2 border-mansion-gold/25 border-t-mansion-gold animate-spin lg:h-8 lg:w-8" />
+              ) : (
+                <VideoCallIcon customSvg={siteSettings?.videoCallIconSvg || ''} />
+              )}
               <span className="text-[9px] font-semibold leading-none tracking-[0.04em] lg:text-[10px]">
                 Videollamada
               </span>
@@ -2013,6 +2168,57 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
         </motion.div>
       )}
     </AnimatePresence>
+    <AnimatePresence>
+      {incomingVideoCall && !activeVideoCall && (
+        <motion.div
+          className="fixed inset-x-3 bottom-24 z-[10010] mx-auto max-w-md lg:bottom-8"
+          initial={{ opacity: 0, y: 20, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 20, scale: 0.98 }}
+        >
+          <div className="rounded-2xl border border-mansion-gold/25 bg-mansion-card/95 p-4 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full ring-2 ring-mansion-gold/30">
+                <AvatarImg src={partnerPhoto} crop={partnerPhotoCrop} alt="" className="h-full w-full" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-text-primary">
+                  {incomingVideoCall.partnerName || partner?.name || 'Videollamada'}
+                </p>
+                <p className="mt-0.5 text-xs text-text-muted">Videollamada entrante</p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleRejectVideoCall}
+                className="rounded-xl border border-mansion-border/35 bg-mansion-elevated px-3 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary"
+              >
+                Ahora no
+              </button>
+              <button
+                type="button"
+                onClick={handleAcceptVideoCall}
+                disabled={videoCallLoading}
+                className="rounded-xl bg-mansion-gold px-3 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-mansion-gold-light disabled:opacity-70"
+              >
+                {videoCallLoading ? 'Conectando...' : 'Atender'}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    <Suspense fallback={null}>
+      {activeVideoCall && (
+        <VideoCallModal
+          call={activeVideoCall}
+          partnerName={activeVideoCall.partnerName || partner?.name || 'Videollamada'}
+          onClose={handleCloseVideoCall}
+          onError={handleVideoCallModalError}
+        />
+      )}
+    </Suspense>
     {chatDebugEnabled && chatDebugMetrics && (
       <div className="fixed left-2 right-2 top-2 z-[10001] pointer-events-none lg:left-auto lg:right-3 lg:w-[360px]">
         <div className="rounded-2xl border border-amber-300/60 bg-black/88 p-3 font-mono text-[10px] leading-4 text-amber-50 shadow-2xl backdrop-blur-md pointer-events-auto">

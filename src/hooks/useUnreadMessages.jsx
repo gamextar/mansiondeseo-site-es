@@ -236,6 +236,13 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
             notifyListeners(data);
           } else if (data.type === 'typing') {
             notifyListeners(data);
+          } else if (data.type === 'video_call') {
+            const isActiveChat = !!activeChatIdRef.current && data.chatId === activeChatIdRef.current;
+            if (data.event === 'invite' && !isActiveChat) {
+              setToast({ text: `${data.call?.initiatorName || 'Alguien'} te está llamando` });
+              setTimeout(() => setToast(null), 5000);
+            }
+            notifyListeners(data);
           } else if (data.type === 'gift') {
             setToast({
               text: `${data.senderName || 'Alguien'} te envió ${data.giftName || 'un regalo'}`,

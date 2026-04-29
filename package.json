@@ -26,6 +26,8 @@
     "postbuild": "node scripts/install-static-home.mjs && node scripts/generate-static-seo-pages.mjs"
   },
   "dependencies": {
+    "@cloudflare/realtimekit-react": "^1.4.0",
+    "@cloudflare/realtimekit-react-ui": "^1.1.2",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@jsquash/webp": "^1.5.0",
