@@ -1525,13 +1525,6 @@ export default function FeedPage({ initialData }) {
       </div>
       )}
 
-      {/* Results count */}
-      <div className={`${isDesktopViewport ? 'px-3 lg:px-8' : 'px-2'} pb-2 fade-in-up fade-delay-300`}>
-        <p className="text-text-dim text-xs">
-          {visibleProfiles.length} {visibleProfiles.length === 1 ? 'usuario' : 'usuarios'} conectados
-        </p>
-      </div>
-
       {/* Grid */}
       <div className={isDesktopViewport ? 'px-3 lg:px-8' : 'px-1'}>
         {loading ? (
