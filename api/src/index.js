@@ -1890,8 +1890,16 @@ async function reserveFreeChatRecipientSlot(env, senderId, receiverId) {
   ).bind(senderId, receiverId, windowKey).first();
 
   if (existingRow) {
-    const state = await getChatRecipientLimitState(env, senderId, receiverId);
-    return { ok: true, reserved: false, ...state };
+    return {
+      ok: true,
+      reserved: false,
+      recipientCount: null,
+      receiverAlreadyCounted: true,
+      remainingRecipients: null,
+      canSendToReceiver: true,
+      maxRecipients: FREE_CHAT_RECIPIENT_LIMIT,
+      recipientWindowHours: windowHours,
+    };
   }
 
   const insertResult = await env.DB.prepare(`
