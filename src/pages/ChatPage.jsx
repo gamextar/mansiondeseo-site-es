@@ -23,7 +23,7 @@ const CHAT_CACHE_MESSAGE_LIMIT = 15;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
 const DEFAULT_CHAT_IMAGE_BLUR = 24;
-const FREE_CHAT_RECIPIENT_LIMIT = 5;
+const VIP_MEMBER_LABEL = 'Miembro VIP';
 
 function normalizeChatImageBlur(value) {
   const numeric = Number(value);
@@ -31,18 +31,27 @@ function normalizeChatImageBlur(value) {
   return Math.max(0, Math.min(40, Math.round(numeric)));
 }
 
+function formatLimitWindowHours(value) {
+  const windowHours = Number(value) || 12;
+  return `${windowHours} ${windowHours === 1 ? 'hora' : 'horas'}`;
+}
+
+function getRecipientLimitSystemMessage() {
+  return `Llegaste al límite de chats distintos permitidos por hora. Podés continuar hablando en tus chats actuales o hacerte ${VIP_MEMBER_LABEL} para chats ilimitados.`;
+}
+
+function getMessageLimitSystemMessage(windowHours = 12) {
+  return `Llegaste al límite de mensajes cada ${formatLimitWindowHours(windowHours)}.\nHacete ${VIP_MEMBER_LABEL} para enviar mensajes ilimitados.`;
+}
+
 function getSystemLimitMessage(limit = null) {
   const recipientLimit = limit?.recipientLimit || {};
   if (recipientLimit.canSendToReceiver === false) {
-    const maxRecipients = recipientLimit.maxRecipients || FREE_CHAT_RECIPIENT_LIMIT;
-    const windowHours = recipientLimit.recipientWindowHours || 1;
-    return `Llegaste al límite de ${maxRecipients} chats distintos por ${windowHours === 1 ? 'hora' : `${windowHours} horas`}. Podés seguir hablando en tus chats actuales o hacerte VIP.`;
+    return getRecipientLimitSystemMessage();
   }
 
   if (limit?.canSend === false || (Number(limit?.remaining) <= 0 && Number(limit?.max || 0) < 999)) {
-    const maxMessages = limit?.max || 5;
-    const windowHours = limit?.windowHours || 12;
-    return `Llegaste al límite de ${maxMessages} mensajes cada ${windowHours} horas. Hacete VIP para enviar mensajes ilimitados.`;
+    return getMessageLimitSystemMessage(limit?.windowHours || 12);
   }
 
   return '';
@@ -50,16 +59,38 @@ function getSystemLimitMessage(limit = null) {
 
 function getSystemLimitMessageFromError(errorData = {}, fallback = '') {
   if (errorData?.code === 'CHAT_RECIPIENT_LIMIT_REACHED') {
-    const maxRecipients = errorData.maxRecipients || FREE_CHAT_RECIPIENT_LIMIT;
-    const windowHours = errorData.recipientWindowHours || 1;
-    return `Llegaste al límite de ${maxRecipients} chats distintos por ${windowHours === 1 ? 'hora' : `${windowHours} horas`}. Podés seguir hablando en tus chats actuales o hacerte VIP.`;
+    return getRecipientLimitSystemMessage();
   }
 
   if (errorData?.code === 'LIMIT_REACHED') {
-    return fallback || 'Llegaste al límite de mensajes disponibles. Hacete VIP para enviar mensajes ilimitados.';
+    return getMessageLimitSystemMessage(errorData?.windowHours || 12);
+  }
+
+  if (/l[ií]mite/i.test(fallback) && /mensaje/i.test(fallback)) {
+    return getMessageLimitSystemMessage(errorData?.windowHours || 12);
+  }
+
+  if (/l[ií]mite/i.test(fallback) && /(chat|usuario)/i.test(fallback)) {
+    return getRecipientLimitSystemMessage();
   }
 
   return fallback || '';
+}
+
+function renderSystemMessageContent(text) {
+  return String(text || '').split(VIP_MEMBER_LABEL).map((part, index, parts) => (
+    <span key={`${part}-${index}`}>
+      {part}
+      {index < parts.length - 1 && (
+        <Link
+          to="/vip"
+          className="font-semibold text-mansion-gold underline decoration-mansion-gold/50 underline-offset-4 transition-colors hover:text-mansion-gold-light"
+        >
+          {VIP_MEMBER_LABEL}
+        </Link>
+      )}
+    </span>
+  ));
 }
 
 function canEmitTypingSignal(limit = null, blockState = {}) {
@@ -1743,8 +1774,8 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
               if (msg.isSystem) {
                 return (
                   <div key={msg.id} className="flex justify-center px-3">
-                    <div className="chat-bubble max-w-[82%] rounded-2xl border border-mansion-gold/20 bg-mansion-gold/10 px-4 py-3 text-center text-[13px] leading-relaxed text-mansion-gold shadow-[0_10px_28px_rgba(0,0,0,0.18)] lg:max-w-[34rem] lg:text-sm">
-                      {msg.text}
+                    <div className="chat-bubble max-w-[82%] whitespace-pre-line rounded-2xl border border-mansion-gold/20 bg-mansion-gold/10 px-4 py-3 text-center text-[13px] leading-relaxed text-text-secondary shadow-[0_10px_28px_rgba(0,0,0,0.18)] lg:max-w-[34rem] lg:text-sm">
+                      {renderSystemMessageContent(msg.text)}
                     </div>
                   </div>
                 );

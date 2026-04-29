@@ -806,7 +806,7 @@ export class ChatRoom {
           ws.send(JSON.stringify({
             type: 'error',
             code: 'LIMIT_REACHED',
-            message: `Has alcanzado el límite de ${dailyLimit} mensajes cada ${windowHours} horas. Desbloquea VIP para mensajes ilimitados.`,
+            message: `Llegaste al límite de mensajes cada ${windowHours} ${windowHours === 1 ? 'hora' : 'horas'}. Hacete Miembro VIP para enviar mensajes ilimitados.`,
             remaining: 0,
             max: dailyLimit,
             windowHours,
@@ -820,7 +820,7 @@ export class ChatRoom {
             ws.send(JSON.stringify({
               type: 'error',
               code: 'CHAT_RECIPIENT_LIMIT_REACHED',
-              message: `Los usuarios free pueden iniciar chats con hasta ${recipientLimit.maxRecipients} usuarios distintos por hora. Desbloquea VIP para chatear sin límite.`,
+              message: 'Llegaste al límite de chats distintos permitidos por hora. Podés continuar hablando en tus chats actuales o hacerte Miembro VIP para chats ilimitados.',
               remaining: currentCount < dailyLimit ? dailyLimit - currentCount : 0,
               max: dailyLimit,
               canSend: false,

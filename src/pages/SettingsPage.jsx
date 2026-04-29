@@ -28,6 +28,7 @@ const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
 const PROFILE_BLUR_HERO_MULTIPLIER = 1.8;
 const PROFILE_BLUR_THUMB_MULTIPLIER = 0.7;
 const PROFILE_BLUR_LIGHTBOX_MULTIPLIER = 2.5;
+const MESSAGE_LIMIT_COUNTER_MAX = 500;
 
 function normalizeBlurMultiplier(value, fallback) {
   const numeric = Number(value);
@@ -836,7 +837,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 self-end sm:self-auto">
-                  <Counter value={dailyMessageLimit} onChange={setDailyMessageLimit} min={1} max={50} />
+                  <Counter value={dailyMessageLimit} onChange={setDailyMessageLimit} min={1} max={MESSAGE_LIMIT_COUNTER_MAX} />
                   <label className="flex items-center gap-2 text-[11px] text-text-dim">
                     <span>Horas</span>
                     <input

@@ -4009,14 +4009,20 @@ async function handleSendMessage(request, env) {
   const senderPremium = isPremiumActive(sender);
 
   if (!senderPremium && currentCount >= dailyLimit) {
-    return error(`Has alcanzado el límite de ${dailyLimit} mensajes cada ${windowHours} horas. Desbloquea VIP para mensajes ilimitados.`, 403);
+    return json({
+      error: `Llegaste al límite de mensajes cada ${windowHours} ${windowHours === 1 ? 'hora' : 'horas'}. Hacete Miembro VIP para enviar mensajes ilimitados.`,
+      code: 'LIMIT_REACHED',
+      remaining: 0,
+      max: dailyLimit,
+      windowHours,
+    }, 403);
   }
 
   if (!senderPremium) {
     const recipientLimit = await reserveFreeChatRecipientSlot(env, auth.sub, receiver_id);
     if (!recipientLimit.ok) {
       return json({
-        error: `Los usuarios free pueden iniciar chats con hasta ${recipientLimit.maxRecipients} usuarios distintos por hora. Desbloquea VIP para chatear sin límite.`,
+        error: 'Llegaste al límite de chats distintos permitidos por hora. Podés continuar hablando en tus chats actuales o hacerte Miembro VIP para chats ilimitados.',
         code: 'CHAT_RECIPIENT_LIMIT_REACHED',
         maxRecipients: recipientLimit.maxRecipients,
         recipientCount: recipientLimit.recipientCount,
