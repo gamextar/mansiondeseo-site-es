@@ -212,6 +212,68 @@ export async function optimizeGalleryPhotoFile(file, {
   };
 }
 
+export async function optimizeChatAttachmentFile(file, {
+  maxSize = 1800,
+  thumbSize = 328,
+  quality = 0.84,
+  thumbQuality = 0.9,
+} = {}) {
+  if (!file || !String(file.type || '').startsWith('image/')) {
+    return { file, thumbnailFile: null };
+  }
+
+  const image = await loadImageFile(file);
+  const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('No se pudo optimizar la imagen.');
+  useHighQualityResize(ctx);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(image, 0, 0, width, height);
+
+  const cropSize = Math.min(width, height);
+  const sourceX = Math.max(0, Math.round((width - cropSize) / 2));
+  const sourceY = Math.max(0, Math.round((height - cropSize) / 2));
+  const thumbCanvas = document.createElement('canvas');
+  thumbCanvas.width = thumbSize;
+  thumbCanvas.height = thumbSize;
+
+  const thumbCtx = thumbCanvas.getContext('2d');
+  if (!thumbCtx) throw new Error('No se pudo optimizar la miniatura.');
+  useHighQualityResize(thumbCtx);
+  thumbCtx.fillStyle = '#000';
+  thumbCtx.fillRect(0, 0, thumbSize, thumbSize);
+  thumbCtx.drawImage(canvas, sourceX, sourceY, cropSize, cropSize, 0, 0, thumbSize, thumbSize);
+
+  const [blob, thumbBlob] = await Promise.all([
+    exportCanvasImage(canvas, {
+      quality,
+      fallbackQuality: Math.min(0.9, quality + 0.02),
+    }),
+    exportCanvasImage(thumbCanvas, {
+      quality: thumbQuality,
+      fallbackQuality: Math.min(0.92, thumbQuality + 0.02),
+    }),
+  ]);
+
+  return {
+    file: new File([blob], buildOptimizedImageName(file.name, '', blob.type), {
+      type: blob.type,
+      lastModified: Date.now(),
+    }),
+    thumbnailFile: new File([thumbBlob], buildOptimizedImageName(file.name, '-chat-thumb', thumbBlob.type), {
+      type: thumbBlob.type,
+      lastModified: Date.now(),
+    }),
+  };
+}
+
 export async function optimizeGalleryThumbnailFromUrl(url, {
   thumbSize = 512,
   quality = 0.9,

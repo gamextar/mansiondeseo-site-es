@@ -88,6 +88,9 @@ CREATE TABLE IF NOT EXISTS messages (
   sender_id       TEXT NOT NULL REFERENCES users(id),
   receiver_id     TEXT NOT NULL REFERENCES users(id),
   content         TEXT NOT NULL,
+  image_url       TEXT NOT NULL DEFAULT '',
+  image_thumb_url TEXT NOT NULL DEFAULT '',
+  image_mime      TEXT NOT NULL DEFAULT '',
   is_read         INTEGER NOT NULL DEFAULT 0,
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   conversation_id TEXT

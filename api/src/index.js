@@ -51,6 +51,7 @@ let _hiddenConversationsReady = null;
 let _messagingIndexesReady = null;
 let _conversationStateReady = null;
 let _messageConversationIdReady = null;
+let _messageAttachmentColumnsReady = null;
 let _userBrowseIndexesReady = null;
 let _userFakeColumnReady = null;
 let _userFeedPriorityColumnReady = null;
@@ -638,6 +639,8 @@ function buildProfileMediaKey(username, kind, ext) {
   if (kind === 'avatar') return `profiles/${slug}/avatar-${generateId()}.${ext}`;
   if (kind === 'avatar_thumb') return `profiles/${slug}/avatar-thumb-${generateId()}.${ext}`;
   if (kind === 'gallery_thumb') return `profiles/${slug}/photo-thumb-${generateId()}.${ext}`;
+  if (kind === 'chat') return `profiles/${slug}/chat-${generateId()}.${ext}`;
+  if (kind === 'chat_thumb') return `profiles/${slug}/chat-thumb-${generateId()}.${ext}`;
   return `profiles/${slug}/photo-${generateId()}.${ext}`;
 }
 
@@ -926,6 +929,35 @@ async function ensureMessageConversationIdColumn(env) {
   }
 
   return _messageConversationIdReady;
+}
+
+async function ensureMessageAttachmentColumns(env) {
+  if (!_messageAttachmentColumnsReady) {
+    _messageAttachmentColumnsReady = (async () => {
+      await ensureMessageConversationIdColumn(env);
+      const columns = [
+        ['image_url', "TEXT NOT NULL DEFAULT ''"],
+        ['image_thumb_url', "TEXT NOT NULL DEFAULT ''"],
+        ['image_mime', "TEXT NOT NULL DEFAULT ''"],
+      ];
+
+      for (const [name, definition] of columns) {
+        try {
+          await env.DB.prepare(`ALTER TABLE messages ADD COLUMN ${name} ${definition}`).run();
+        } catch (err) {
+          const message = String(err?.message || '').toLowerCase();
+          if (!message.includes('duplicate column name')) {
+            throw err;
+          }
+        }
+      }
+    })().catch((err) => {
+      _messageAttachmentColumnsReady = null;
+      throw err;
+    });
+  }
+
+  return _messageAttachmentColumnsReady;
 }
 
 async function ensureConversationStateTables(env) {
@@ -1371,7 +1403,7 @@ async function deleteConversationState(env, userId, partnerId) {
 }
 
 async function syncConversationStateForMessage(env, senderId, receiverId, msg) {
-  const lastMessage = (msg.content || '').slice(0, 50);
+  const lastMessage = getMessagePreviewText(msg);
   await Promise.all([
     setConversationState(env, senderId, receiverId, {
       lastMessage,
@@ -1387,7 +1419,7 @@ async function syncConversationStateForMessage(env, senderId, receiverId, msg) {
 }
 
 async function rebuildConversationStateForPair(env, userA, userB) {
-  await ensureMessageConversationIdColumn(env);
+  await ensureMessageAttachmentColumns(env);
   const conversationId = buildConversationId(userA, userB);
 
   async function rebuildForUser(userId, partnerId) {
@@ -1397,7 +1429,7 @@ async function rebuildConversationStateForPair(env, userA, userB) {
     const hiddenBefore = hiddenRow?.hidden_before || null;
 
     const latestMessage = await env.DB.prepare(`
-      SELECT content, created_at
+      SELECT content, image_url, created_at
       FROM messages
       WHERE conversation_id = ?
         AND (? IS NULL OR created_at > ?)
@@ -1420,7 +1452,7 @@ async function rebuildConversationStateForPair(env, userA, userB) {
     `).bind(conversationId, userId, hiddenBefore, hiddenBefore).first();
 
     await setConversationState(env, userId, partnerId, {
-      lastMessage: (latestMessage.content || '').slice(0, 50),
+      lastMessage: getMessagePreviewText(latestMessage),
       lastMessageAt: latestMessage.created_at,
       unreadCount: Number(unreadRow?.unread || 0),
     });
@@ -1430,6 +1462,12 @@ async function rebuildConversationStateForPair(env, userA, userB) {
     rebuildForUser(userA, userB),
     rebuildForUser(userB, userA),
   ]);
+}
+
+function getMessagePreviewText(msg) {
+  const text = String(msg?.content || '').trim();
+  if (text) return text.slice(0, 50);
+  return msg?.image_url ? 'Imagen' : '';
 }
 
 function getProfileVisitDedupeWindowMinutes(env) {
@@ -3792,12 +3830,29 @@ async function handleReportProfile(request, env, userId) {
 async function handleSendMessage(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
-  await ensureMessageConversationIdColumn(env);
+  await ensureMessageAttachmentColumns(env);
   await ensureUsersMessageBlockRolesColumn(env);
 
-  const { receiver_id, content } = await request.json();
-  if (!receiver_id || !content || !content.trim()) {
-    return error('receiver_id y content requeridos');
+  const {
+    receiver_id,
+    content = '',
+    image_url = '',
+    image_thumb_url = '',
+    image_mime = '',
+  } = await request.json();
+  const text = String(content || '').trim();
+  const imageUrl = String(image_url || '').trim();
+  const imageThumbUrl = String(image_thumb_url || imageUrl).trim();
+  const imageMime = String(image_mime || '').trim().slice(0, 80);
+  if (!receiver_id || (!text && !imageUrl)) {
+    return error('receiver_id y mensaje o imagen requeridos');
+  }
+
+  if (imageUrl && !isTrustedMediaUrl(imageUrl, env)) {
+    return error('Imagen inválida', 400);
+  }
+  if (imageThumbUrl && !isTrustedMediaUrl(imageThumbUrl, env)) {
+    return error('Miniatura inválida', 400);
   }
 
   const messagingAllowed = await assertMessagingAllowed(env, auth.sub, receiver_id);
@@ -3831,8 +3886,9 @@ async function handleSendMessage(request, env) {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
   const conversationId = buildConversationId(auth.sub, receiver_id);
   await env.DB.prepare(`
-    INSERT INTO messages (id, sender_id, receiver_id, content, created_at, conversation_id) VALUES (?, ?, ?, ?, ?, ?)
-  `).bind(msgId, auth.sub, receiver_id, content.trim(), now, conversationId).run();
+    INSERT INTO messages (id, sender_id, receiver_id, content, image_url, image_thumb_url, image_mime, created_at, conversation_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(msgId, auth.sub, receiver_id, text, imageUrl, imageThumbUrl, imageMime, now, conversationId).run();
 
   // Update message counter
   if (!isPremiumActive(sender)) {
@@ -3851,7 +3907,10 @@ async function handleSendMessage(request, env) {
     id: msgId,
     sender_id: auth.sub,
     receiver_id,
-    content: content.trim(),
+    content: text,
+    image_url: imageUrl,
+    image_thumb_url: imageThumbUrl,
+    image_mime: imageMime,
     is_read: 0,
     created_at: now,
   };
@@ -3902,7 +3961,7 @@ async function notifyChatRoom(env, senderId, receiverId, msg) {
 async function handleGetMessages(request, env, otherUserId) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
-  await ensureMessageConversationIdColumn(env);
+  await ensureMessageAttachmentColumns(env);
   const conversationId = buildConversationId(auth.sub, otherUserId);
   const url = new URL(request.url);
   const before = url.searchParams.get('before');
@@ -3958,6 +4017,9 @@ async function handleGetMessages(request, env, otherUserId) {
     id: m.id,
     senderId: m.sender_id === auth.sub ? 'me' : 'them',
     text: m.content,
+    imageUrl: m.image_url || '',
+    imageThumbUrl: m.image_thumb_url || '',
+    imageMime: m.image_mime || '',
     timestamp: new Date(m.created_at + 'Z').toLocaleTimeString(settings.siteLocale, { hour: '2-digit', minute: '2-digit', timeZone: settings.siteTimezone }),
     created_at: m.created_at,
     is_read: m.is_read,
@@ -4182,7 +4244,7 @@ function buildConversationPreview(partner, msg, unread) {
     name: partner.username,
     avatar: partner.avatar_url || '',
     avatarCrop: safeParseJSON(partner.avatar_crop, null),
-    lastMessage: (msg.content || '').slice(0, 50),
+    lastMessage: getMessagePreviewText(msg),
     timestamp: msg.created_at,
     unread,
     online: isOnline(partner.last_active),
@@ -4295,7 +4357,7 @@ async function handleUpload(request, env) {
   const purpose = uploadUrl.searchParams.get('purpose') || 'asset';
   const sourceUrl = uploadUrl.searchParams.get('source_url') || '';
 
-  if (!['asset', 'avatar', 'avatar_thumb', 'gallery', 'gallery_thumb'].includes(purpose)) {
+  if (!['asset', 'avatar', 'avatar_thumb', 'gallery', 'gallery_thumb', 'chat', 'chat_thumb'].includes(purpose)) {
     return error('purpose inválido', 400);
   }
 
@@ -4329,7 +4391,7 @@ async function handleUpload(request, env) {
     }
   }
 
-  const key = purpose === 'avatar' || purpose === 'avatar_thumb' || purpose === 'gallery' || purpose === 'gallery_thumb'
+  const key = purpose === 'avatar' || purpose === 'avatar_thumb' || purpose === 'gallery' || purpose === 'gallery_thumb' || purpose === 'chat' || purpose === 'chat_thumb'
     ? buildProfileMediaKey(user.username, purpose, ext)
     : `assets/${generateId()}.${ext}`;
 

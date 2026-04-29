@@ -1061,10 +1061,14 @@ export async function setUserBlocked(otherUserId, blocked) {
   });
 }
 
-export async function sendMessage(receiverId, content) {
+export async function sendMessage(receiverId, content, attachment = {}) {
   return apiFetch('/messages/send', {
     method: 'POST',
-    body: JSON.stringify({ receiver_id: receiverId, content }),
+    body: JSON.stringify({
+      receiver_id: receiverId,
+      content,
+      ...attachment,
+    }),
   }).then((data) => {
     invalidateMessageHistoryCache(receiverId);
     invalidateConversationsCache();

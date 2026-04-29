@@ -12,6 +12,7 @@ export class ChatRoom {
     this.userStatusCache = new Map();
     this.userPreviewCache = new Map();
     this.messageConversationIdReady = null;
+    this.messageAttachmentColumnsReady = null;
     this.senderConversationStateWriteAt = new Map();
     this.userMessageBlockRolesColumnReady = null;
     this.userBlocksReady = null;
@@ -70,11 +71,17 @@ export class ChatRoom {
       name: partner.username,
       avatar: partner.avatar_url || '',
       avatarCrop: this.safeParseJSON(partner.avatar_crop, null),
-      lastMessage: (msg.content || '').slice(0, 50),
+      lastMessage: this.getMessagePreviewText(msg),
       timestamp: msg.created_at,
       unread,
       online: this.isOnline(partner.last_active),
     };
+  }
+
+  getMessagePreviewText(msg) {
+    const text = String(msg?.content || '').trim();
+    if (text) return text.slice(0, 50);
+    return msg?.image_url ? 'Imagen' : '';
   }
 
   async getUserPreview(userId) {
@@ -383,9 +390,37 @@ export class ChatRoom {
     return this.messageConversationIdReady;
   }
 
+  async ensureMessageAttachmentColumns() {
+    if (!this.messageAttachmentColumnsReady) {
+      this.messageAttachmentColumnsReady = (async () => {
+        await this.ensureMessageConversationIdColumn();
+        const columns = [
+          ['image_url', "TEXT NOT NULL DEFAULT ''"],
+          ['image_thumb_url', "TEXT NOT NULL DEFAULT ''"],
+          ['image_mime', "TEXT NOT NULL DEFAULT ''"],
+        ];
+        for (const [name, definition] of columns) {
+          try {
+            await this.env.DB.prepare(`ALTER TABLE messages ADD COLUMN ${name} ${definition}`).run();
+          } catch (err) {
+            const message = String(err?.message || '').toLowerCase();
+            if (!message.includes('duplicate column name')) {
+              throw err;
+            }
+          }
+        }
+      })().catch((err) => {
+        this.messageAttachmentColumnsReady = null;
+        throw err;
+      });
+    }
+
+    return this.messageAttachmentColumnsReady;
+  }
+
   async syncConversationStateForMessage(senderId, receiverId, msg) {
     await this.ensureConversationStateTables();
-    const lastMessage = (msg.content || '').slice(0, 50);
+    const lastMessage = this.getMessagePreviewText(msg);
     const senderKey = `${senderId}:${receiverId}`;
     const nowMs = Date.now();
     const lastSenderWriteAt = this.senderConversationStateWriteAt.get(senderKey) || 0;
@@ -430,7 +465,7 @@ export class ChatRoom {
 
   async rebuildConversationStateForPair(userA, userB) {
     await this.ensureConversationStateTables();
-    await this.ensureMessageConversationIdColumn();
+    await this.ensureMessageAttachmentColumns();
     const conversationId = this.buildConversationId(userA, userB);
 
     const rebuildForUser = async (userId, partnerId) => {
@@ -440,7 +475,7 @@ export class ChatRoom {
       const hiddenBefore = hiddenRow?.hidden_before || null;
 
       const latestMessage = await this.env.DB.prepare(`
-        SELECT content, created_at
+        SELECT content, image_url, created_at
         FROM messages
         WHERE conversation_id = ?
           AND (? IS NULL OR created_at > ?)
@@ -475,7 +510,7 @@ export class ChatRoom {
       ).bind(
         userId,
         partnerId,
-        (latestMessage.content || '').slice(0, 50),
+        this.getMessagePreviewText(latestMessage),
         latestMessage.created_at,
         Number(unreadRow?.unread || 0),
       ).run();
@@ -531,7 +566,7 @@ export class ChatRoom {
 
       if (userId && partnerId) {
         await this.ensureHiddenConversationsTable();
-        await this.ensureMessageConversationIdColumn();
+        await this.ensureMessageAttachmentColumns();
 
         const conversationId = this.buildConversationId(userId, partnerId);
         const hiddenRow = await this.env.DB.prepare(
@@ -541,9 +576,9 @@ export class ChatRoom {
         const queryLimit = 31;
 
         const { results } = await this.env.DB.prepare(`
-          SELECT id, sender_id, content, is_read, created_at
+          SELECT id, sender_id, content, image_url, image_thumb_url, image_mime, is_read, created_at
           FROM (
-            SELECT id, sender_id, content, is_read, created_at
+            SELECT id, sender_id, content, image_url, image_thumb_url, image_mime, is_read, created_at
             FROM messages
             WHERE conversation_id = ?
               AND (? IS NULL OR created_at > ?)

@@ -1,19 +1,19 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Ban, ChevronLeft, Send, Smile } from 'lucide-react';
+import { Ban, ChevronLeft, Crown, ImagePlus, Send, X } from 'lucide-react';
 import { useMessageLimit } from '../hooks/useMessageLimit';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import DesktopSidebar from '../components/DesktopSidebar';
-import EmojiPicker from '../components/EmojiPicker';
 import AvatarImg from '../components/AvatarImg';
-import { getMessageLimit, getChatBootstrap, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, invalidateConversationsCache, setUserBlocked } from '../lib/api';
+import { getMessageLimit, getChatBootstrap, getToken, getStoredUser, getMessages as apiGetMessages, sendMessage as apiSendMessage, invalidateConversationsCache, setUserBlocked, uploadImage } from '../lib/api';
 import { createChatSocket } from '../lib/chatSocket';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { publishLocalConversationUpdate } from '../lib/localConversationEvents';
 import { recordD1WriteEstimate } from '../lib/d1Debug';
 import { useAuth } from '../lib/authContext';
+import { optimizeChatAttachmentFile } from '../lib/imageOptimize';
 
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const CHAT_CACHE_TTL_MS = 10 * 60_000;
@@ -98,6 +98,9 @@ function normalizeMessages(messages = []) {
   return messages.map((message) => ({
     ...message,
     createdAt: message.createdAt || message.created_at || null,
+    imageUrl: message.imageUrl || message.image_url || '',
+    imageThumbUrl: message.imageThumbUrl || message.image_thumb_url || '',
+    imageMime: message.imageMime || message.image_mime || '',
   }));
 }
 
@@ -117,6 +120,8 @@ function areMessagesEqual(message, other) {
   return getMessageIdValue(message) === getMessageIdValue(other)
     && message?.senderId === other?.senderId
     && String(message?.text || '') === String(other?.text || '')
+    && String(message?.imageUrl || '') === String(other?.imageUrl || '')
+    && String(message?.imageThumbUrl || '') === String(other?.imageThumbUrl || '')
     && (message?.createdAt || message?.created_at || null) === (other?.createdAt || other?.created_at || null)
     && Number(message?.is_read ?? 0) === Number(other?.is_read ?? 0);
 }
@@ -151,6 +156,8 @@ function areLikelySamePendingMessage(message, other) {
   if (!oneIsTemp) return false;
   if (message?.senderId !== other?.senderId) return false;
   if (String(message?.text || '') !== String(other?.text || '')) return false;
+  if (String(message?.imageUrl || '') !== String(other?.imageUrl || '')) return false;
+  if (String(message?.imageThumbUrl || '') !== String(other?.imageThumbUrl || '')) return false;
 
   const messageTime = getMessageTimeValue(message);
   const otherTime = getMessageTimeValue(other);
@@ -339,7 +346,8 @@ function writeChatCache(partnerId, payload) {
 }
 
 function updateConversationPreviewCache(partnerId, partner, message) {
-  if (typeof window === 'undefined' || !partnerId || !message?.text) return;
+  const previewText = String(message?.text || '').trim() || (message?.imageUrl ? 'Imagen' : '');
+  if (typeof window === 'undefined' || !partnerId || !previewText) return;
 
   try {
     const raw = sessionStorage.getItem('mansion_conversations');
@@ -354,7 +362,7 @@ function updateConversationPreviewCache(partnerId, partner, message) {
       name: partner?.username || partner?.name || '',
       avatar: partner?.avatar_url || partner?.avatar || '',
       avatarCrop: partner?.avatar_crop ?? partner?.avatarCrop ?? null,
-      lastMessage: String(message.text || '').slice(0, 50),
+      lastMessage: previewText.slice(0, 50),
       lastMessageId: String(message.id || '').startsWith('temp-') ? null : message.id,
       lastSenderId: message.senderId === 'me' ? (getStoredUser()?.id || null) : partnerId,
       timestamp: message.createdAt || new Date().toISOString().replace('T', ' ').slice(0, 19),
@@ -436,7 +444,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     : false;
   const { canSend, sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
-  const { siteSettings } = useAuth();
+  const { siteSettings, user: viewer } = useAuth();
   const partnerId = activeRouteId.startsWith('conv-') ? activeRouteId.replace('conv-', '') : activeRouteId;
   const cachedChat = readChatCache(partnerId);
   const partnerPreview = location.state?.partnerPreview || null;
@@ -450,7 +458,8 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const [blockUpdating, setBlockUpdating] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlderMessages, setHasOlderMessages] = useState(cachedChat?.hasOlderMessages || false);
-  const [showEmojis, setShowEmojis] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState(null);
   const [wsState, setWsState] = useState('disconnected');
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : null));
@@ -461,6 +470,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const [chatDebugMetrics, setChatDebugMetrics] = useState(null);
   const [chatDebugSnapshots, setChatDebugSnapshots] = useState({});
   const inputRef = useRef(null);
+  const imageInputRef = useRef(null);
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
   const chatRef = useRef(null);
@@ -487,6 +497,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const partnerPhoto = getPrimaryProfilePhoto(partner);
   const partnerPhotoCrop = getPrimaryProfileCrop(partner);
   const backTarget = location.state?.from || '/mensajes';
+  const viewerIsPremium = Boolean(viewer?.premium || getStoredUser()?.premium);
 
   // Format DO message to UI format
   function formatMsg(msg) {
@@ -494,7 +505,10 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     return {
       id: msg.id,
       senderId: msg.sender_id === myId ? 'me' : 'them',
-      text: msg.content,
+      text: msg.content || msg.text || '',
+      imageUrl: msg.image_url || msg.imageUrl || '',
+      imageThumbUrl: msg.image_thumb_url || msg.imageThumbUrl || '',
+      imageMime: msg.image_mime || msg.imageMime || '',
       timestamp: msg.created_at
         ? new Date(msg.created_at.endsWith('Z') ? msg.created_at : msg.created_at + 'Z')
             .toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
@@ -1060,7 +1074,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
 
   useLayoutEffect(() => {
     keepChatPinnedToBottom('auto');
-  }, [viewportHeight, viewportOffsetTop, headerHeight, composerHeight, showEmojis, keepChatPinnedToBottom]);
+  }, [viewportHeight, viewportOffsetTop, headerHeight, composerHeight, keepChatPinnedToBottom]);
 
   useLayoutEffect(() => {
     keepChatPinnedToBottom(partnerTyping ? 'smooth' : 'auto');
@@ -1222,25 +1236,94 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     }
   };
 
+  const handleImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !effectiveCanSend || imageUploading) return;
+
+    let pendingTempId = null;
+    try {
+      setImageUploading(true);
+      const { file: optimizedFile, thumbnailFile } = await optimizeChatAttachmentFile(file, {
+        maxSize: 1800,
+        thumbSize: 328,
+        quality: 0.84,
+        thumbQuality: 0.9,
+      });
+      const thumbUploadFile = thumbnailFile || optimizedFile;
+      const [imageData, thumbData] = await Promise.all([
+        uploadImage(optimizedFile, { purpose: 'chat' }),
+        uploadImage(thumbUploadFile, { purpose: 'chat_thumb' }),
+      ]);
+
+      const tempId = `temp-image-${Date.now()}`;
+      pendingTempId = tempId;
+      const now = new Date();
+      const newMsg = {
+        id: tempId,
+        senderId: 'me',
+        text: '',
+        imageUrl: imageData.url,
+        imageThumbUrl: thumbData.url || imageData.url,
+        imageMime: optimizedFile.type || '',
+        timestamp: now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        createdAt: now.toISOString(),
+        is_read: 0,
+      };
+
+      wasAtBottomRef.current = true;
+      requestScrollToBottom('auto', { force: true });
+      setMessages((prev) => dedupeMessages([...prev, newMsg]));
+      updateConversationPreviewCache(partnerId, partner, newMsg);
+      stopTypingSignal();
+      setPartnerTyping(false);
+      localSendMessage();
+
+      const estimatedMessageWrites = effectiveMax >= 999 ? 3 : 4;
+      recordD1WriteEstimate('chat_message_image_http', estimatedMessageWrites);
+      const data = await apiSendMessage(partnerId, '', {
+        image_url: newMsg.imageUrl,
+        image_thumb_url: newMsg.imageThumbUrl,
+        image_mime: newMsg.imageMime,
+      });
+      if (data?.message) {
+        const formatted = formatMsg(data.message);
+        setMessages((prev) => {
+          const tempIdx = prev.findIndex((message) => message.id === tempId || areLikelySamePendingMessage(message, formatted));
+          if (tempIdx !== -1) {
+            const updated = [...prev];
+            updated[tempIdx] = mergeDuplicateMessage(updated[tempIdx], formatted);
+            return dedupeMessages(updated);
+          }
+          return dedupeMessages([...prev, formatted]);
+        });
+        updateConversationPreviewCache(partnerId, partner, formatted);
+      }
+      getMessageLimit().then(data => setApiLimit(data)).catch(() => {});
+    } catch (err) {
+      if (pendingTempId) {
+        setMessages((prev) => prev.filter((message) => message.id !== pendingTempId));
+      }
+      const code = err?.data?.code || '';
+      if (err?.status === 403 && (code === 'USER_BLOCKED_BY_ME' || code === 'USER_BLOCKED_ME')) {
+        setBlockState((prev) => ({
+          blockedByMe: code === 'USER_BLOCKED_BY_ME' ? true : prev.blockedByMe,
+          blockedMe: code === 'USER_BLOCKED_ME' ? true : prev.blockedMe,
+        }));
+      } else if (err?.status === 403) {
+        setApiLimit({ remaining: 0, canSend: false, max: 5 });
+      }
+      alert(err?.message || 'No se pudo enviar la imagen');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
-  };
-
-  const handleEmojiSelect = (emoji) => {
-    const el = inputRef.current;
-    if (!el) { setInput(prev => prev + emoji); return; }
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const newVal = input.slice(0, start) + emoji + input.slice(end);
-    setInput(newVal);
-    // Restore cursor after emoji
-    requestAnimationFrame(() => {
-      el.focus();
-      el.selectionStart = el.selectionEnd = start + emoji.length;
-    });
   };
 
   const handleInputChange = (e) => {
@@ -1250,7 +1333,6 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   };
 
   const handleInputFocus = () => {
-    setShowEmojis(false);
     if (isMobileBrowserChat) {
       setKeyboardActive(true);
       keyboardFocusedRef.current = true;
@@ -1480,6 +1562,8 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             {messages.map((msg) => {
               const isMe = msg.senderId === 'me';
               const isPopped = poppedMessageIds.has(msg.id);
+              const hasImage = Boolean(msg.imageUrl || msg.imageThumbUrl);
+              const imageLocked = hasImage && !isMe && !viewerIsPremium;
               return (
                 <div
                   key={msg.id}
@@ -1491,14 +1575,38 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
                     </div>
                   )}
                   <div
-                    className={`chat-bubble max-w-[80%] rounded-2xl px-4 py-3 transition-[color,background-color,border-color,box-shadow] duration-300 ${
+                    className={`chat-bubble ${hasImage ? 'max-w-[76vw] p-1.5' : 'max-w-[80%] px-4 py-3'} rounded-2xl transition-[color,background-color,border-color,box-shadow] duration-300 ${
                       isMe
                         ? 'chat-bubble-outgoing bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark text-white rounded-br-sm shadow-[0_10px_28px_rgba(96,14,30,0.22)]'
                         : `text-text-primary border rounded-bl-sm ${isPopped ? 'chat-bubble-highlight bg-mansion-gold/10 border-mansion-gold/30 shadow-[0_0_0_1px_rgba(212,175,55,0.08)]' : 'bg-mansion-elevated border-mansion-border/30'}`
                     }`}
                   >
-                    <p className="text-[15px] leading-relaxed lg:text-[16px]">{msg.text}</p>
-                    <p className={`text-[11px] mt-1.5 flex items-center lg:text-[12px] ${isMe ? 'justify-end text-white/50 gap-1' : 'justify-end text-text-dim'}`}>
+                    {hasImage && (
+                      <button
+                        type="button"
+                        disabled={imageLocked}
+                        onClick={() => setLightboxImage(msg.imageUrl || msg.imageThumbUrl)}
+                        className={`relative block aspect-square w-[220px] max-w-[70vw] overflow-hidden rounded-xl bg-black/35 lg:w-[328px] ${imageLocked ? 'cursor-default' : 'cursor-zoom-in'}`}
+                        aria-label={imageLocked ? 'Imagen disponible solo para VIP' : 'Abrir imagen'}
+                      >
+                        <img
+                          src={msg.imageThumbUrl || msg.imageUrl}
+                          alt=""
+                          className={`h-full w-full object-cover transition-transform duration-300 ${imageLocked ? 'scale-110 blur-xl opacity-80' : 'hover:scale-[1.02]'}`}
+                          loading="lazy"
+                        />
+                        {imageLocked && (
+                          <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/45 px-4 text-center text-white">
+                            <Crown className="h-6 w-6 text-mansion-gold drop-shadow" />
+                            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-white/95">Solo VIP</span>
+                          </span>
+                        )}
+                      </button>
+                    )}
+                    {msg.text && (
+                      <p className={`${hasImage ? 'px-2 pt-2' : ''} text-[15px] leading-relaxed lg:text-[16px]`}>{msg.text}</p>
+                    )}
+                    <p className={`text-[11px] mt-1.5 flex items-center lg:text-[12px] ${hasImage ? 'px-2 pb-1' : ''} ${isMe ? 'justify-end text-white/50 gap-1' : 'justify-end text-text-dim'}`}>
                       {msg.timestamp}
                       {isMe && (
                         <span className={`chat-read-check inline-flex ${msg.is_read ? 'is-read text-blue-400' : 'text-white/40'}`}>
@@ -1544,7 +1652,14 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
         className={`${isStandaloneMobileChat ? 'safe-bottom ' : ''}sticky bottom-0 shrink-0 border-t border-mansion-border/30 bg-mansion-card/90 backdrop-blur-xl z-20 ${composerTransitionClass}`}
       >
         <div className="flex items-end gap-2 w-full max-w-[88rem] mx-auto px-[3vw] lg:px-[2vw] py-3">
-          {/* Textarea + emoji */}
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleImageUpload}
+          />
+          {/* Textarea + image attach */}
           <div className="flex-1 relative flex items-end">
             <div className="flex-1 flex items-end bg-mansion-elevated rounded-2xl border border-mansion-border/30 focus-within:border-mansion-gold/30 transition-colors min-h-[44px] lg:min-h-[52px]">
               <textarea
@@ -1562,23 +1677,22 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
               />
               <button
                 type="button"
-                onClick={() => {
-                  setShowEmojis(v => !v);
-                  keepChatPinnedToBottom('auto');
-                }}
-                className={`flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center transition-colors lg:w-12 lg:pb-3 ${showEmojis ? 'text-mansion-gold' : 'text-text-dim hover:text-mansion-gold'}`}
+                onClick={() => imageInputRef.current?.click()}
+                disabled={!effectiveCanSend || imageUploading}
+                className={`flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center transition-colors lg:w-12 lg:pb-3 ${
+                  effectiveCanSend && !imageUploading
+                    ? 'text-text-dim hover:text-mansion-gold'
+                    : 'text-text-dim/40 cursor-not-allowed'
+                }`}
+                aria-label="Adjuntar imagen"
               >
-                <Smile className="w-5 h-5 lg:w-5.5 lg:h-5.5" />
+                {imageUploading ? (
+                  <span className="h-5 w-5 rounded-full border-2 border-mansion-gold/25 border-t-mansion-gold animate-spin" />
+                ) : (
+                  <ImagePlus className="w-5 h-5 lg:w-5.5 lg:h-5.5" />
+                )}
               </button>
             </div>
-            <AnimatePresence>
-              {showEmojis && (
-                <EmojiPicker
-                  onSelect={(emoji) => { handleEmojiSelect(emoji); }}
-                  onClose={() => setShowEmojis(false)}
-                />
-              )}
-            </AnimatePresence>
           </div>
 
           {/* Send */}
@@ -1600,6 +1714,35 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
         </div>
       </div>
     </div>
+    <AnimatePresence>
+      {lightboxImage && (
+        <motion.div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxImage(null)}
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white/80 transition-colors hover:text-white"
+            aria-label="Cerrar imagen"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <motion.img
+            src={lightboxImage}
+            alt=""
+            className="max-h-[88vh] max-w-[94vw] rounded-2xl object-contain shadow-2xl"
+            initial={{ scale: 0.96 }}
+            animate={{ scale: 1 }}
+            exit={{ scale: 0.96 }}
+            onClick={(event) => event.stopPropagation()}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
     {chatDebugEnabled && chatDebugMetrics && (
       <div className="fixed left-2 right-2 top-2 z-[10001] pointer-events-none lg:left-auto lg:right-3 lg:w-[360px]">
         <div className="rounded-2xl border border-amber-300/60 bg-black/88 p-3 font-mono text-[10px] leading-4 text-amber-50 shadow-2xl backdrop-blur-md pointer-events-auto">
