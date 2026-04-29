@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Settings, Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil, Trash2, AlertTriangle, Mail, Loader2, BadgeCheck } from 'lucide-react';
+import { Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil, Trash2, AlertTriangle, Mail, Loader2, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
 import { logout as apiLogout, uploadAvatar, uploadGalleryImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache, requestAccountDeletion, confirmAccountDeletion, getPhotoOtpVerification, startPhotoOtpVerification, cancelPhotoOtpVerification, uploadPhotoOtpVerificationPhoto, getPhotoOtpVerificationPhotoBlob } from '../lib/api';
@@ -1213,31 +1213,6 @@ export default function ProfilePage() {
               );
             })}
           </div>
-        </motion.div>
-
-        {/* ── Account Section ── */}
-        <motion.div variants={fadeUp} className="glass-elevated rounded-3xl p-4 mb-3 space-y-1">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-2 px-1">Mi Cuenta</h3>
-          {[
-            { icon: Settings, label: 'Configuración', sublabel: 'Privacidad, notificaciones', path: user?.is_admin ? '/admin/configuracion' : null },
-            { icon: Heart, label: 'Seguidores', sublabel: 'Seguidores y siguiendo', path: '/seguidores' },
-            { icon: Shield, label: 'Verificación', sublabel: 'Verificar mi identidad', path: null },
-          ].map(({ icon: Icon, label, sublabel, path }) => (
-            <button
-              key={label}
-              onClick={() => path && navigate(path)}
-              className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/[0.03] transition-all group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-mansion-elevated/60 flex items-center justify-center text-text-muted group-hover:text-mansion-gold transition-colors">
-                <Icon className="w-5 h-5" />
-              </div>
-              <div className="flex-1 text-left">
-                <p className="text-sm font-medium text-text-primary">{label}</p>
-                <p className="text-xs text-text-dim">{sublabel}</p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-text-dim group-hover:text-text-muted transition-colors" />
-            </button>
-          ))}
         </motion.div>
 
         {/* ── VIP Section ── */}
