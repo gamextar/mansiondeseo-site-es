@@ -1398,7 +1398,7 @@ async function clearConversationStateUnread(env, userId, partnerId) {
 
 async function getUnreadCountForUser(env, userId) {
   const row = await env.DB.prepare(
-    'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'
+    'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ? AND unread_count > 0'
   ).bind(userId).first();
   return Number(row?.unread || 0);
 }
@@ -3201,7 +3201,7 @@ async function handleAppBootstrap(request, env) {
       cachedUser ? Promise.resolve(cachedUser) : env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
       env.DB.prepare('SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first(),
       env.DB.prepare(
-        'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'
+        'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ? AND unread_count > 0'
       ).bind(auth.sub).first(),
     ]);
     if (!dbUser) return error('Usuario no encontrado', 404);
@@ -4031,20 +4031,33 @@ async function handleGetMessages(request, env, otherUserId) {
   const hasMore = results.length > limit;
   const windowedResults = hasMore ? results.slice(1) : results;
   const settings = await cached('settings', 300_000, () => loadSettings(env));
-  const [unreadRowsResult, stateRow] = await Promise.all([
-    env.DB.prepare(`
+  const visibleUnreadMessageIds = windowedResults
+    .filter((m) => (
+      String(m.sender_id) === String(otherUserId)
+      && String(m.receiver_id) === String(auth.sub)
+      && Number(m.is_read || 0) === 0
+    ))
+    .map((m) => m.id)
+    .filter(Boolean);
+  const stateRow = await env.DB.prepare(
+    'SELECT unread_count FROM conversation_state WHERE user_id = ? AND partner_id = ?'
+  ).bind(auth.sub, otherUserId).first();
+  const hadUnreadState = Number(stateRow?.unread_count || 0) > 0;
+  let readMessageIds = visibleUnreadMessageIds;
+
+  if (hadUnreadState) {
+    const unreadRowsResult = await env.DB.prepare(`
       SELECT id
       FROM messages
       WHERE sender_id = ? AND receiver_id = ? AND is_read = 0
         AND (? IS NULL OR created_at > ?)
       LIMIT 1000
-    `).bind(otherUserId, auth.sub, hiddenBefore, hiddenBefore).all(),
-    env.DB.prepare(
-      'SELECT unread_count FROM conversation_state WHERE user_id = ? AND partner_id = ?'
-    ).bind(auth.sub, otherUserId).first(),
-  ]);
-  const readMessageIds = (unreadRowsResult?.results || []).map((row) => row.id).filter(Boolean);
-  const hadUnreadState = Number(stateRow?.unread_count || 0) > 0;
+    `).bind(otherUserId, auth.sub, hiddenBefore, hiddenBefore).all();
+    readMessageIds = (unreadRowsResult?.results || []).map((row) => row.id).filter(Boolean);
+    if (readMessageIds.length === 0 && visibleUnreadMessageIds.length > 0) {
+      readMessageIds = visibleUnreadMessageIds;
+    }
+  }
 
   // Mark as read
   if (readMessageIds.length > 0 || hadUnreadState) {
@@ -4160,7 +4173,7 @@ async function handleDeleteConversation(request, env, otherUserId) {
   await deleteConversationState(env, auth.sub, otherUserId);
 
   const unreadRow = await env.DB.prepare(
-    'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'
+    'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ? AND unread_count > 0'
   ).bind(auth.sub).first();
 
   notifyUser(env, auth.sub, {

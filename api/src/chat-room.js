@@ -260,7 +260,7 @@ export class ChatRoom {
 
   async getUnreadCount(userId) {
     const row = await this.env.DB.prepare(
-      'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ?'
+      'SELECT COALESCE(SUM(unread_count), 0) as unread FROM conversation_state WHERE user_id = ? AND unread_count > 0'
     ).bind(userId).first();
     return Number(row?.unread || 0);
   }
