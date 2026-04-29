@@ -12,6 +12,7 @@ import { formatLocation } from '../lib/location';
 import { getDisplayPhotos, getGalleryPhotos, getGalleryPhotoThumbnail } from '../lib/profileMedia';
 import { resolveMediaUrl } from '../lib/media';
 import { optimizeGalleryPhotoFile, optimizePhotoFile } from '../lib/imageOptimize';
+import { formatDate } from '../lib/siteConfig';
 
 const ROLE_COLOR = {
   Pareja: 'bg-purple-500/15 text-purple-300 border-purple-500/25',
@@ -63,6 +64,12 @@ const GALLERY_LEVELS = [
 
 function getGalleryLevel(slotIndex) {
   return GALLERY_LEVELS[Math.min(GALLERY_LEVELS.length - 1, Math.floor(slotIndex / 3))];
+}
+
+function formatPremiumUntil(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return formatDate(raw.endsWith('Z') ? raw : `${raw}Z`);
 }
 
 function detectStandaloneMobile() {
@@ -633,6 +640,7 @@ export default function ProfilePage() {
   const showPhotoOtpCode = !user?.verified && photoOtpVerification?.code && photoOtpStatus === 'code_issued';
   const canStartPhotoOtp = !user?.verified && (!photoOtpVerification || ['rejected', 'expired'].includes(photoOtpVerification.status));
   const hasActivePhotoOtp = !user?.verified && photoOtpVerification && photoOtpVerification.status === 'code_issued';
+  const premiumUntilLabel = formatPremiumUntil(user?.premium_until);
   const ownProfilePreview = user ? {
     id: user.id,
     name: user.username,
@@ -1281,7 +1289,9 @@ export default function ProfilePage() {
                 </div>
                 <div className="flex-1 text-left">
                   <p className="text-sm font-medium text-mansion-gold">VIP activo</p>
-                  <p className="text-xs text-text-dim">Disfrutás de todos los beneficios</p>
+                  <p className="text-xs text-text-dim">
+                    {premiumUntilLabel ? `Vence el ${premiumUntilLabel}` : 'Disfrutás de todos los beneficios'}
+                  </p>
                 </div>
               </button>
 

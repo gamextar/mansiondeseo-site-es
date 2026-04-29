@@ -9,6 +9,7 @@ import {
   requestAccountDeletion,
   updateProfile,
 } from '../lib/api';
+import { formatDate } from '../lib/siteConfig';
 
 const SEEKING_OPTIONS = [
   { id: 'hombre', label: 'Hombres', emoji: '👨', color: 'bg-blue-500/15 text-blue-300 border-blue-500/40' },
@@ -44,6 +45,12 @@ function markFeedDirty() {
   } catch {}
 }
 
+function formatPremiumUntil(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return formatDate(raw.endsWith('Z') ? raw : `${raw}Z`);
+}
+
 export default function UserSettingsPage() {
   const navigate = useNavigate();
   const { user, setRegistered, setUser } = useAuth();
@@ -60,6 +67,7 @@ export default function UserSettingsPage() {
   const seeking = Array.isArray(user?.seeking) ? user.seeking : (user?.seeking ? [user.seeking] : []);
   const blockedRoles = Array.isArray(user?.message_block_roles) ? user.message_block_roles : [];
   const interests = Array.isArray(user?.interests) ? user.interests : [];
+  const premiumUntilLabel = formatPremiumUntil(user?.premium_until);
 
   const toggleSeeking = async (optionId) => {
     const isActive = seeking.includes(optionId);
@@ -287,7 +295,9 @@ export default function UserSettingsPage() {
                   </div>
                   <div className="flex-1 text-left">
                     <p className="text-sm font-medium text-mansion-gold">VIP activo</p>
-                    <p className="text-xs text-text-dim">Disfrutás de todos los beneficios</p>
+                    <p className="text-xs text-text-dim">
+                      {premiumUntilLabel ? `Vence el ${premiumUntilLabel}` : 'Disfrutás de todos los beneficios'}
+                    </p>
                   </div>
                 </button>
 
