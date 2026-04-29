@@ -23,11 +23,43 @@ const CHAT_CACHE_MESSAGE_LIMIT = 15;
 const INITIAL_CHAT_PAGE_SIZE = 30;
 const OLDER_CHAT_PAGE_SIZE = 30;
 const DEFAULT_CHAT_IMAGE_BLUR = 24;
+const FREE_CHAT_RECIPIENT_LIMIT = 5;
 
 function normalizeChatImageBlur(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return DEFAULT_CHAT_IMAGE_BLUR;
   return Math.max(0, Math.min(40, Math.round(numeric)));
+}
+
+function getSystemLimitMessage(limit = null) {
+  const recipientLimit = limit?.recipientLimit || {};
+  if (recipientLimit.canSendToReceiver === false) {
+    const maxRecipients = recipientLimit.maxRecipients || FREE_CHAT_RECIPIENT_LIMIT;
+    const windowHours = recipientLimit.recipientWindowHours || 1;
+    return `Llegaste al límite de ${maxRecipients} chats distintos por ${windowHours === 1 ? 'hora' : `${windowHours} horas`}. Podés seguir hablando en tus chats actuales o hacerte VIP.`;
+  }
+
+  if (limit?.canSend === false || (Number(limit?.remaining) <= 0 && Number(limit?.max || 0) < 999)) {
+    const maxMessages = limit?.max || 5;
+    const windowHours = limit?.windowHours || 12;
+    return `Llegaste al límite de ${maxMessages} mensajes cada ${windowHours} horas. Hacete VIP para enviar mensajes ilimitados.`;
+  }
+
+  return '';
+}
+
+function getSystemLimitMessageFromError(errorData = {}, fallback = '') {
+  if (errorData?.code === 'CHAT_RECIPIENT_LIMIT_REACHED') {
+    const maxRecipients = errorData.maxRecipients || FREE_CHAT_RECIPIENT_LIMIT;
+    const windowHours = errorData.recipientWindowHours || 1;
+    return `Llegaste al límite de ${maxRecipients} chats distintos por ${windowHours === 1 ? 'hora' : `${windowHours} horas`}. Podés seguir hablando en tus chats actuales o hacerte VIP.`;
+  }
+
+  if (errorData?.code === 'LIMIT_REACHED') {
+    return fallback || 'Llegaste al límite de mensajes disponibles. Hacete VIP para enviar mensajes ilimitados.';
+  }
+
+  return fallback || '';
 }
 
 const BlockUserIcon = ({ customSvg = '', className = 'h-7 w-7 lg:h-10 lg:w-10' }) => {
@@ -159,6 +191,7 @@ function isTempMessage(message) {
 
 function areLikelySamePendingMessage(message, other) {
   if (!message || !other) return false;
+  if (message.isSystem || other.isSystem) return false;
   const oneIsTemp = isTempMessage(message) !== isTempMessage(other);
   if (!oneIsTemp) return false;
   if (message?.senderId !== other?.senderId) return false;
@@ -208,7 +241,7 @@ function mergeMessagesForCache(...messageGroups) {
   const withoutId = [];
 
   messageGroups.flat().forEach((message) => {
-    if (!message || message.isPreview) return;
+    if (!message || message.isPreview || message.isSystem) return;
     const messageId = getMessageIdValue(message);
     if (messageId) {
       byId.set(messageId, message);
@@ -328,7 +361,7 @@ function readChatCache(partnerId) {
     }
     return {
       ...parsed,
-      messages: dedupeMessages(normalizeMessages(parsed.messages || []).filter((message) => !message.isPreview)),
+      messages: dedupeMessages(normalizeMessages(parsed.messages || []).filter((message) => !message.isPreview && !message.isSystem)),
       isStale: Date.now() - parsed.cachedAt > CHAT_CACHE_TTL_MS,
     };
   } catch {
@@ -340,7 +373,7 @@ function writeChatCache(partnerId, payload) {
   if (typeof window === 'undefined') return;
   const key = getChatCacheKey(partnerId);
   try {
-    const stableMessages = dedupeMessages(normalizeMessages(payload.messages || []).filter((message) => !message.isPreview));
+    const stableMessages = dedupeMessages(normalizeMessages(payload.messages || []).filter((message) => !message.isPreview && !message.isSystem));
     localStorage.setItem(key, JSON.stringify({
       ...payload,
       messages: stableMessages.slice(-CHAT_CACHE_MESSAGE_LIMIT),
@@ -449,7 +482,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const isMobileBrowserChat = !embeddedDesktop && typeof window !== 'undefined'
     ? window.matchMedia('(max-width: 1023px)').matches && !isStandaloneMobileChat
     : false;
-  const { canSend, sendMessage: localSendMessage, max } = useMessageLimit();
+  const { sendMessage: localSendMessage, max } = useMessageLimit();
   const { setActiveChatId, refresh: refreshUnread, decrementUnread } = useUnreadMessages();
   const { siteSettings, setSiteSettings, user: viewer } = useAuth();
   const chatImageBlur = normalizeChatImageBlur(siteSettings?.chatImageBlur);
@@ -591,6 +624,27 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     pendingScrollBehaviorRef.current = behavior;
     pendingScrollForceRef.current = force;
   }, []);
+
+  const addSystemMessage = useCallback((text) => {
+    const cleanText = String(text || '').trim();
+    if (!cleanText) return;
+    const now = new Date();
+    const systemMessage = {
+      id: `system-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+      senderId: 'system',
+      isSystem: true,
+      text: cleanText,
+      timestamp: now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: now.toISOString(),
+    };
+    wasAtBottomRef.current = true;
+    setMessages((prev) => {
+      const lastVisibleMessage = [...prev].reverse().find((message) => !message.isPreview);
+      if (lastVisibleMessage?.isSystem && lastVisibleMessage.text === cleanText) return prev;
+      return dedupeMessages([...prev, systemMessage]);
+    });
+    requestScrollToBottom('smooth', { force: true });
+  }, [requestScrollToBottom]);
 
   const keepChatPinnedToBottom = useCallback((behavior = 'auto') => {
     if (!wasAtBottomRef.current) return;
@@ -1017,6 +1071,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
       },
       onError(data) {
         if (data.code === 'LIMIT_REACHED' || data.code === 'CHAT_RECIPIENT_LIMIT_REACHED') {
+          addSystemMessage(getSystemLimitMessageFromError(data, data.message));
           setApiLimit((prev) => ({
             ...(prev || {}),
             remaining: Number(data.remaining || 0),
@@ -1095,7 +1150,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
       chatRef.current?.close();
       chatRef.current = null;
     };
-  }, [decrementUnread, activeRouteId, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, setActiveChatId, stopTypingSignal]);
+  }, [addSystemMessage, decrementUnread, activeRouteId, navigate, partnerId, partnerPreview, refreshUnread, requestScrollToBottom, setActiveChatId, stopTypingSignal]);
 
   useEffect(() => {
     if (!partner && messages.length === 0 && !apiLimit) return;
@@ -1214,18 +1269,13 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const isBlockedByMe = !!blockState?.blockedByMe;
   const isBlockedByPartner = !!blockState?.blockedMe;
   const isChatBlocked = isBlockedByMe || isBlockedByPartner;
-  const recipientLimitBlocked = apiLimit?.recipientLimit?.canSendToReceiver === false;
-  const effectiveCanSend = !isChatBlocked && (apiLimit ? apiLimit.canSend : canSend);
+  const canUseComposer = !isChatBlocked;
   const effectiveMax = apiLimit ? apiLimit.max : max;
   const composerPlaceholder = isBlockedByMe
     ? 'Desbloquea al usuario para enviar mensajes'
     : isBlockedByPartner
       ? 'Este usuario no acepta mensajes tuyos'
-      : recipientLimitBlocked
-        ? 'Límite anti-spam alcanzado'
-      : effectiveCanSend
-        ? 'Escribe un mensaje...'
-        : 'Sin mensajes disponibles';
+      : 'Escribe un mensaje...';
 
   const handleToggleBlock = async () => {
     if (blockUpdating) return;
@@ -1252,7 +1302,13 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   };
 
   const handleSend = async () => {
-    if (!input.trim() || !effectiveCanSend) return;
+    if (!input.trim() || !canUseComposer) return;
+    const localLimitMessage = getSystemLimitMessage(apiLimit);
+    if (localLimitMessage) {
+      addSystemMessage(localLimitMessage);
+      return;
+    }
+
     fastKeyboardSettleRef.current = true;
 
     const text = input.trim();
@@ -1297,6 +1353,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             }));
             setMessages((prev) => prev.filter((message) => message.id !== tempId));
           } else if (code === 'CHAT_RECIPIENT_LIMIT_REACHED') {
+            addSystemMessage(getSystemLimitMessageFromError(err.data, err.message));
             setApiLimit((prev) => ({
               ...(prev || {}),
               remaining: 0,
@@ -1313,7 +1370,10 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             }));
             setMessages((prev) => prev.filter((message) => message.id !== tempId));
           } else {
+            const limitMessage = getSystemLimitMessageFromError(err.data, err.message);
+            if (limitMessage) addSystemMessage(limitMessage);
             setApiLimit({ remaining: 0, canSend: false, max: 5 });
+            setMessages((prev) => prev.filter((message) => message.id !== tempId));
           }
         }
       }
@@ -1323,7 +1383,12 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const handleImageUpload = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file || !effectiveCanSend || imageUploading) return;
+    if (!file || !canUseComposer || imageUploading) return;
+    const localLimitMessage = getSystemLimitMessage(apiLimit);
+    if (localLimitMessage) {
+      addSystemMessage(localLimitMessage);
+      return;
+    }
 
     let pendingTempId = null;
     try {
@@ -1396,6 +1461,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
         }));
       } else if (err?.status === 403) {
         const recipientLimitReached = code === 'CHAT_RECIPIENT_LIMIT_REACHED';
+        addSystemMessage(getSystemLimitMessageFromError(err.data, err.message));
         setApiLimit((prev) => ({
           ...(recipientLimitReached ? (prev || {}) : {}),
           remaining: 0,
@@ -1412,8 +1478,9 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             }
             : prev?.recipientLimit,
         }));
+      } else {
+        alert(err?.message || 'No se pudo enviar la imagen');
       }
-      alert(err?.message || 'No se pudo enviar la imagen');
     } finally {
       setImageUploading(false);
     }
@@ -1660,6 +1727,16 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
             )}
 
             {messages.map((msg) => {
+              if (msg.isSystem) {
+                return (
+                  <div key={msg.id} className="flex justify-center px-3">
+                    <div className="chat-bubble max-w-[82%] rounded-2xl border border-mansion-gold/20 bg-mansion-gold/10 px-4 py-3 text-center text-[13px] leading-relaxed text-mansion-gold shadow-[0_10px_28px_rgba(0,0,0,0.18)] lg:max-w-[34rem] lg:text-sm">
+                      {msg.text}
+                    </div>
+                  </div>
+                );
+              }
+
               const isMe = msg.senderId === 'me';
               const isPopped = poppedMessageIds.has(msg.id);
               const hasImage = Boolean(msg.imageUrl || msg.imageThumbUrl);
@@ -1785,7 +1862,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
                 onKeyDown={handleKeyDown}
                 onFocus={handleInputFocus}
                 placeholder={composerPlaceholder}
-                disabled={!effectiveCanSend}
+                disabled={isChatBlocked}
                 rows={1}
                 className="flex-1 resize-none bg-transparent py-3 px-4 text-sm outline-none max-h-32 text-text-primary placeholder:text-text-dim disabled:opacity-50 lg:px-5 lg:py-3.5 lg:text-base"
                 style={{ minHeight: '44px' }}
@@ -1793,9 +1870,9 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
               <button
                 type="button"
                 onClick={() => imageInputRef.current?.click()}
-                disabled={!effectiveCanSend || imageUploading}
+                disabled={isChatBlocked || imageUploading}
                 className={`flex-shrink-0 w-10 self-end pb-2.5 flex items-center justify-center transition-colors lg:w-12 lg:pb-3 ${
-                  effectiveCanSend && !imageUploading
+                  !isChatBlocked && !imageUploading
                     ? 'text-text-dim hover:text-mansion-gold'
                     : 'text-text-dim/40 cursor-not-allowed'
                 }`}
@@ -1814,12 +1891,12 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
           <motion.button
             whileTap={{ scale: 0.9 }}
             onPointerDown={() => {
-              if (input.trim() && effectiveCanSend) fastKeyboardSettleRef.current = true;
+              if (input.trim() && !isChatBlocked) fastKeyboardSettleRef.current = true;
             }}
             onClick={handleSend}
-            disabled={!input.trim() || !effectiveCanSend}
+            disabled={!input.trim() || isChatBlocked}
             className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all lg:w-12 lg:h-12 ${
-              input.trim() && effectiveCanSend
+              input.trim() && !isChatBlocked
                 ? 'bg-mansion-crimson text-white shadow-glow-crimson'
                 : 'bg-mansion-elevated text-text-dim border border-mansion-border/30'
             }`}
