@@ -1523,9 +1523,12 @@ function VerificationScreen({ email, devCode, onVerified, onResend }) {
           >
             {resent ? '✓ Código reenviado' : resending ? 'Reenviando...' : '¿No recibiste el código? Reenviar'}
           </button>
-          <p className="text-text-dim text-[10px]">
-            Revisa tu carpeta de spam
-          </p>
+          <div className="mt-1 flex items-start gap-2 rounded-2xl border border-mansion-gold/15 bg-mansion-gold/8 px-3 py-2 text-left">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-mansion-gold" />
+            <p className="text-[11px] leading-4 text-text-dim">
+              Si no lo ves en tu bandeja de entrada, revisá Spam o Correo no deseado.
+            </p>
+          </div>
           {devCode && (
             <p className="mt-3 px-3 py-2 rounded-lg bg-mansion-gold/10 border border-mansion-gold/20 text-mansion-gold text-xs font-mono">
               DEV: {devCode}
