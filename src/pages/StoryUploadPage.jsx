@@ -451,10 +451,8 @@ export default function StoryUploadPage() {
 	const [previewConfirmed, setPreviewConfirmed] = useState(false);
 	const [engineStatus, setEngineStatus] = useState('idle');
 	const [storyBackdropUrl, setStoryBackdropUrl] = useState('');
-	const [vipOnlyStory, setVipOnlyStory] = useState(false);
 
 	const outputProfile = getOutputProfile(sourceResolution);
-	const canCreateVipOnlyStory = Boolean(user?.premium);
 	const storyStep = result ? (showPreview ? 'preview' : previewConfirmed ? 'done' : 'preview') : sourceFile ? 'process' : 'pick';
 	const storyStepIndex = storyStep === 'pick' ? 0 : storyStep === 'process' ? 1 : 2;
 	const storySteps = [
@@ -493,10 +491,6 @@ export default function StoryUploadPage() {
 			URL.revokeObjectURL(storyBackdropUrl);
 		}
 	}, [storyBackdropUrl]);
-
-	useEffect(() => {
-		if (!canCreateVipOnlyStory) setVipOnlyStory(false);
-	}, [canCreateVipOnlyStory]);
 
 	const ensureEngineLoaded = async ({ suppressErrors = false } = {}) => {
 		const ffmpeg = ffmpegRef.current;
@@ -792,7 +786,7 @@ export default function StoryUploadPage() {
 			setUploadProgress(0);
 			const story = await uploadStory(encodedFileRef.current, {
 				tokenOverride: uploadTokenRef.current || getToken() || undefined,
-				vipOnly: canCreateVipOnlyStory && vipOnlyStory,
+				vipOnly: false,
 				onProgress: (progress) => setUploadProgress(clamp(progress, 0, 1)),
 			});
 			setUploadProgress(1);
@@ -1030,9 +1024,6 @@ export default function StoryUploadPage() {
 										avatarSize={siteSettings?.videoAvatarSize ?? 52}
 										uploading={phase === 'uploading'}
 										uploadProgress={uploadProgress}
-										canRestrictVipOnly={canCreateVipOnlyStory}
-										vipOnly={vipOnlyStory}
-										onVipOnlyChange={setVipOnlyStory}
 										onClose={resetStoryFlow}
 										onDismiss={() => { resetStoryFlow(); navigate(returnPath); }}
 										onConfirm={handlePublish}

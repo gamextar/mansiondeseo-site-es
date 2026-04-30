@@ -21,6 +21,7 @@ const CLIENT_CACHE_VERSION_KEY = 'mansion_client_cache_version';
 const CLIENT_CACHE_VERSION = 'media-paths-v7-avatar-race-fix';
 const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
+export const STORY_FEED_CACHE_INVALIDATED_EVENT = 'mansion-story-feed-cache-invalidated';
 const sharedGetCache = new Map();
 let avatarUploadCacheSeq = 0;
 const sessionCache = {
@@ -1700,10 +1701,21 @@ export function invalidateStoriesCache() {
 
 function invalidateStoryFeedCache() {
   invalidateStoriesCache();
+  invalidateProfilesCache();
+  invalidateBootstrapCache();
+  invalidateMeCache();
+  invalidateOwnProfileDashboardCache();
   try {
+    sessionStorage.setItem('mansion_feed_dirty', '1');
+    sessionStorage.setItem('mansion_feed_force_refresh', '1');
     sessionStorage.removeItem('vf_idx');
+    sessionStorage.removeItem('appBootstrap');
+    localStorage.removeItem('mansion_feed');
     localStorage.removeItem('vf_stories');
   } catch {}
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(STORY_FEED_CACHE_INVALIDATED_EVENT));
+  }
 }
 
 const storyLikesQueue = createMutationQueue({
@@ -1741,7 +1753,11 @@ export async function uploadStory(file, { caption = '', vipOnly = false, onProgr
 	 tokenOverride,
   });
   invalidateStoryFeedCache();
-  mergeMeCache({ has_active_story: true });
+  mergeMeCache({
+    has_active_story: true,
+    active_story_id: data?.id || null,
+    active_story_url: data?.video_url || null,
+  });
   return data;
 }
 

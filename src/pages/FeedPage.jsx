@@ -7,7 +7,7 @@ import { useAuth } from '../lib/authContext';
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } };
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
-import { getProfiles, getProfilesVersion, getStories, getToken } from '../lib/api';
+import { STORY_FEED_CACHE_INVALIDATED_EVENT, getProfiles, getProfilesVersion, getStories, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
@@ -705,18 +705,28 @@ export default function FeedPage({ initialData }) {
       } catch {}
       prefetchedBlocksRef.current.clear();
       prefetchInFlightRef.current.clear();
+      setHomeStories([]);
+      setBootstrapStories([]);
+      void loadHomeStories({ syncBootstrap: true });
       loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
       window.scrollTo(0, 0);
     };
+    const handleStoryFeedCacheInvalidated = () => {
+      setHomeStories([]);
+      setBootstrapStories([]);
+      void loadHomeStories({ syncBootstrap: true });
+    };
     window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
     window.addEventListener(HOME_FEED_RESET_EVENT, handleHomeReset);
+    window.addEventListener(STORY_FEED_CACHE_INVALIDATED_EVENT, handleStoryFeedCacheInvalidated);
     return () => {
       window.removeEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
       window.removeEventListener(HOME_FEED_RESET_EVENT, handleHomeReset);
+      window.removeEventListener(STORY_FEED_CACHE_INVALIDATED_EVENT, handleStoryFeedCacheInvalidated);
       clearTimeout(fadeOutTimer);
       clearTimeout(fadeInTimer);
     };
-  }, [blockSize, loadProfiles]);
+  }, [blockSize, loadHomeStories, loadProfiles, setBootstrapStories]);
 
   useEffect(() => {
     if (loading) return;
