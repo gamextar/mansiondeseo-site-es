@@ -806,6 +806,16 @@ export default function ProfilePage() {
 
           {/* Action pills row */}
           <div className="flex items-center gap-2 flex-wrap">
+            {user?.is_admin && (
+              <button
+                onClick={() => navigate('/admin')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-mansion-gold/10 border border-mansion-gold/25 text-[11px] font-medium text-mansion-gold hover:bg-mansion-gold/15 transition-all"
+              >
+                <Shield className="w-3 h-3" />
+                Panel admin
+              </button>
+            )}
+
             <button
               onClick={() => navigate('/historia/nueva', { state: { from: '/perfil' } })}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-mansion-crimson/10 border border-mansion-crimson/25 text-[11px] font-medium text-mansion-crimson hover:bg-mansion-crimson/20 transition-all"

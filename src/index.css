@@ -71,6 +71,15 @@ body {
 
 /* Custom utilities */
 @layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   .text-gradient-gold {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-mansion-gold via-mansion-gold-light to-mansion-gold;
   }

@@ -22,9 +22,16 @@ export default function AdminLayout() {
   const isErrorsActive = location.pathname.startsWith('/admin/errores');
   const isConfigActive = location.pathname.startsWith('/admin/configuracion');
   const isVideoLabActive = location.pathname.startsWith('/admin/video-lab');
+  const mobileNavItems = [
+    { to: '/admin/usuarios', label: 'Usuarios', icon: Users, active: isUsersActive },
+    { to: '/admin/bandeja-fake', label: 'Bandeja', icon: Inbox, active: isFakeInboxActive },
+    { to: '/admin/video-lab', label: 'Video', icon: Film, active: isVideoLabActive },
+    { to: '/admin/errores', label: 'Errores', icon: AlertTriangle, active: isErrorsActive },
+    { to: '/admin/configuracion', label: 'Config', icon: Shield, active: isConfigActive },
+  ];
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen overflow-x-hidden">
       {/* Sidebar — desktop */}
       <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 xl:w-72 z-40 flex-col bg-mansion-card/50 border-r border-mansion-border/30 backdrop-blur-xl">
         {/* Logo */}
@@ -167,54 +174,68 @@ export default function AdminLayout() {
       {/* Mobile top bar */}
       <header className="fixed top-0 left-0 right-0 z-50 lg:hidden">
         <div className="glass border-b border-mansion-border/30">
-          <div className="px-4 h-14 flex items-center justify-between">
+          <div className="px-4 h-14 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center">
                 <Shield className="w-4 h-4 text-white" />
               </div>
               <span className="font-display text-lg font-semibold text-gradient-gold">Admin</span>
             </div>
-            <div className="flex items-center gap-1">
-              <Link
-                to="/admin/usuarios"
-                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isUsersActive ? 'bg-mansion-gold/10 text-mansion-gold' : 'text-text-muted'}`}
-              >
-                Usuarios
-              </Link>
-              <Link
-                to="/admin/configuracion"
-                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isConfigActive ? 'bg-mansion-gold/10 text-mansion-gold' : 'text-text-muted'}`}
-              >
-                Config
-              </Link>
-              <Link
-                to="/admin/bandeja-fake"
-                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isFakeInboxActive ? 'bg-mansion-gold/10 text-mansion-gold' : 'text-text-muted'}`}
-              >
-                Inbox
-              </Link>
-              <Link
-                to="/admin/errores"
-                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isErrorsActive ? 'bg-mansion-gold/10 text-mansion-gold' : 'text-text-muted'}`}
-              >
-                Logs
-              </Link>
-              <Link
-                to="/admin/video-lab"
-                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isVideoLabActive ? 'bg-mansion-gold/10 text-mansion-gold' : 'text-text-muted'}`}
-              >
-                Video
-              </Link>
-              <Link to="/feed" className="ml-1 px-2 py-2 rounded-lg text-text-dim hover:text-text-muted">
-                <Home className="w-4 h-4" />
-              </Link>
-            </div>
+            <Link
+              to="/feed"
+              className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-mansion-border/25 bg-black/20 px-3 py-2 text-xs font-semibold text-text-dim"
+            >
+              <Home className="w-3.5 h-3.5" />
+              Sitio
+            </Link>
           </div>
+
+          <nav className="overflow-x-auto scrollbar-hide border-t border-white/5">
+            <div className="flex min-w-max gap-1.5 px-3 py-2">
+              {mobileNavItems.map(({ to, label, icon: Icon, active }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  className={`inline-flex flex-shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${
+                    active
+                      ? 'border-mansion-gold/25 bg-mansion-gold/10 text-mansion-gold'
+                      : 'border-transparent bg-black/15 text-text-muted'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </Link>
+              ))}
+            </div>
+          </nav>
+
+          {isConfigActive && (
+            <nav className="overflow-x-auto scrollbar-hide border-t border-white/5 bg-black/10">
+              <div className="flex min-w-max gap-1 px-3 py-2">
+                {ADMIN_SECTIONS.map(({ key, label, icon: Icon }) => {
+                  const to = `/admin/configuracion?section=${key}`;
+                  const isActive = currentSection === key || (!currentSection && key === 'fotos');
+                  return (
+                    <Link
+                      key={key}
+                      to={to}
+                      className={`inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                        isActive ? 'bg-mansion-gold/10 text-mansion-gold' : 'text-text-dim'
+                      }`}
+                    >
+                      <Icon className="w-3 h-3" />
+                      {label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </nav>
+          )}
         </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 lg:ml-64 xl:ml-72 pt-14 lg:pt-0 min-w-0">
+      <main className={`min-w-0 lg:ml-64 xl:ml-72 ${isConfigActive ? 'pt-[154px]' : 'pt-[102px]'} lg:pt-0`}>
         <Outlet />
       </main>
     </div>
