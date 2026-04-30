@@ -935,9 +935,27 @@ export default function FeedPage({ initialData }) {
     const story = typeof storyOrUserId === 'object' && storyOrUserId !== null
       ? storyOrUserId
       : { user_id: storyOrUserId };
-    const storyId = String(story.story_id || '').trim();
+    const storyId = String(story.story_id || story.id || '').trim();
     const userId = String(story.user_id || story.id || '').trim();
     const videoUrl = String(story.video_url || story.active_story_url || '').trim();
+    const storySeed = userId && videoUrl
+      ? {
+          id: storyId || userId,
+          story_id: storyId || userId,
+          user_id: userId,
+          video_url: videoUrl,
+          caption: story.caption || '',
+          likes: Number(story.likes || 0),
+          comments: Number(story.comments || 0),
+          liked: !!story.liked,
+          vip_only: !!story.vip_only,
+          restricted: !!story.restricted,
+          created_at: story.created_at || '',
+          username: story.username || story.name || '',
+          avatar_url: story.avatar_url || '',
+          avatar_crop: story.avatar_crop || null,
+        }
+      : null;
 
     try {
       sessionStorage.removeItem(VIDEO_FEED_INDEX_KEY);
@@ -946,7 +964,12 @@ export default function FeedPage({ initialData }) {
       }
     } catch {}
 
-    navigate('/videos');
+    navigate('/videos', {
+      state: {
+        storyUserId: userId || null,
+        storySeed,
+      },
+    });
   }, [navigate]);
 
   useEffect(() => {
@@ -1267,7 +1290,7 @@ export default function FeedPage({ initialData }) {
                     onClick={user.has_active_story && user.active_story_url
                       ? () => openStoryFromHome({
                           user_id: user.id,
-                          story_id: user.id,
+                          story_id: user.active_story_id || user.id,
                           video_url: user.active_story_url || '',
                           username: user.username || '',
                           avatar_url: user.avatar_url || '',
@@ -1323,7 +1346,7 @@ export default function FeedPage({ initialData }) {
                     onClick={user.has_active_story && user.active_story_url
                       ? () => openStoryFromHome({
                           user_id: user.id,
-                          story_id: user.id,
+                          story_id: user.active_story_id || user.id,
                           video_url: user.active_story_url || '',
                           username: user.username || '',
                           avatar_url: user.avatar_url || '',
@@ -1379,7 +1402,7 @@ export default function FeedPage({ initialData }) {
                     onClick={user.has_active_story && user.active_story_url
                       ? () => openStoryFromHome({
                           user_id: user.id,
-                          story_id: user.id,
+                          story_id: user.active_story_id || user.id,
                           video_url: user.active_story_url || '',
                           username: user.username || '',
                           avatar_url: user.avatar_url || '',
