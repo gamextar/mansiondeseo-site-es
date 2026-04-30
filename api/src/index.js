@@ -66,6 +66,7 @@ let _userPhotoThumbsColumnReady = null;
 let _userBlocksReady = null;
 let _profileReportsReady = null;
 let _userLastIpColumnReady = null;
+let _userDeviceColumnsReady = null;
 let _accountDeletionRequestsReady = null;
 let _profileVisitStructuresReady = null;
 let _profileStatsBackfillReady = null;
@@ -96,6 +97,42 @@ const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
 const DEFAULT_REALTIMEKIT_PRESET_NAME = 'group_call_host';
 const USERNAME_MAX_LENGTH = 18;
 const BIO_MAX_LENGTH = 300;
+
+function detectRequestDevice(request) {
+  const ua = String(request?.headers?.get('User-Agent') || '').toLowerCase();
+  const chMobile = String(request?.headers?.get('Sec-CH-UA-Mobile') || '').trim();
+
+  if (ua.includes('ipad') || ua.includes('tablet') || (ua.includes('macintosh') && ua.includes('mobile/'))) {
+    return 'tablet';
+  }
+
+  if (chMobile === '?1') return 'mobile';
+
+  if (
+    ua.includes('mobi') ||
+    ua.includes('iphone') ||
+    ua.includes('ipod') ||
+    ua.includes('android') ||
+    ua.includes('windows phone') ||
+    ua.includes('opera mini')
+  ) {
+    return 'mobile';
+  }
+
+  if (chMobile === '?0') return 'desktop';
+
+  if (
+    ua.includes('windows nt') ||
+    ua.includes('macintosh') ||
+    ua.includes('x11') ||
+    ua.includes('linux x86_64') ||
+    ua.includes('cros')
+  ) {
+    return 'desktop';
+  }
+
+  return 'unknown';
+}
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -1307,6 +1344,31 @@ async function ensureUsersLastIpColumn(env) {
   return _userLastIpColumnReady;
 }
 
+async function ensureUsersDeviceColumns(env) {
+  if (!_userDeviceColumnsReady) {
+    _userDeviceColumnsReady = (async () => {
+      for (const statement of [
+        "ALTER TABLE users ADD COLUMN signup_device TEXT NOT NULL DEFAULT 'unknown'",
+        "ALTER TABLE users ADD COLUMN last_device TEXT NOT NULL DEFAULT 'unknown'",
+      ]) {
+        try {
+          await env.DB.prepare(statement).run();
+        } catch (err) {
+          const message = String(err?.message || err || '').toLowerCase();
+          if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+            throw err;
+          }
+        }
+      }
+    })().catch((err) => {
+      _userDeviceColumnsReady = null;
+      throw err;
+    });
+  }
+
+  return _userDeviceColumnsReady;
+}
+
 async function ensurePhotoVerificationRequestsTable(env) {
   if (!_photoVerificationRequestsReady) {
     _photoVerificationRequestsReady = (async () => {
@@ -2316,8 +2378,9 @@ async function authenticate(request, env) {
   if (now - lastUpdate > LAST_ACTIVE_DEBOUNCE_MS) {
     _lastActiveCache.set(userId, now);
     const ip = request.headers.get('CF-Connecting-IP') || '';
-    ensureUsersLastIpColumn(env)
-      .then(() => env.DB.prepare("UPDATE users SET last_active = datetime('now'), last_ip = ? WHERE id = ?").bind(ip, userId).run())
+    const device = detectRequestDevice(request);
+    Promise.all([ensureUsersLastIpColumn(env), ensureUsersDeviceColumns(env)])
+      .then(() => env.DB.prepare("UPDATE users SET last_active = datetime('now'), last_ip = ?, last_device = ? WHERE id = ?").bind(ip, device, userId).run())
       .catch(() => {});
   }
 
@@ -2609,7 +2672,11 @@ async function handleRegister(request, env, ctx) {
   const body = await request.json();
   const { email, password, username, role, seeking, interests, age, birthdate, city, province, locality, bio, marital_status, sexual_orientation, message_block_roles } = body;
   const usernameValue = String(username || '').trim();
-  await ensureUsersMessageBlockRolesColumn(env);
+  await Promise.all([
+    ensureUsersMessageBlockRolesColumn(env),
+    ensureUsersDeviceColumns(env),
+  ]);
+  const requestDevice = detectRequestDevice(request);
   const cfCity = String(request.cf?.city || '').trim();
   const cfRegion = String(request.cf?.region || '').trim();
   const provinceValue = String(province || city || cfRegion || '').trim();
@@ -2725,8 +2792,8 @@ async function handleRegister(request, env, ctx) {
   const country = body.country || detectedCountry;
 
   await env.DB.prepare(`
-    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, birthdate, city, locality, marital_status, sexual_orientation, message_block_roles, country, bio, status, coins, feed_priority)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?)
+    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, birthdate, city, locality, marital_status, sexual_orientation, message_block_roles, country, bio, signup_device, last_device, status, coins, feed_priority)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?)
   `).bind(
     userId,
     email.toLowerCase(),
@@ -2744,6 +2811,8 @@ async function handleRegister(request, env, ctx) {
     JSON.stringify(messageBlockRolesValue),
     country,
     String(bio || '').trim().slice(0, BIO_MAX_LENGTH),
+    requestDevice,
+    requestDevice,
     inheritedFeedPriority
   ).run();
 
@@ -2810,10 +2879,11 @@ async function handleVerifyCode(request, env) {
   }
 
   // Verify the user
-  await ensureUsersLastIpColumn(env);
+  await Promise.all([ensureUsersLastIpColumn(env), ensureUsersDeviceColumns(env)]);
   const ipVer = request.headers.get('CF-Connecting-IP') || '';
-  await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now'), last_ip = ? WHERE id = ?")
-    .bind(ipVer, record.user_id).run();
+  const deviceVer = detectRequestDevice(request);
+  await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now'), last_ip = ?, last_device = ? WHERE id = ?")
+    .bind(ipVer, deviceVer, record.user_id).run();
 
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
   if (!user) return error('Usuario no encontrado', 404);
@@ -3137,10 +3207,11 @@ async function handleLogin(request, env) {
   }
 
   // Update online status + IP
-  await ensureUsersLastIpColumn(env);
+  await Promise.all([ensureUsersLastIpColumn(env), ensureUsersDeviceColumns(env)]);
   const ipLogin = request.headers.get('CF-Connecting-IP') || '';
-  await env.DB.prepare("UPDATE users SET online = 1, last_active = datetime('now'), last_ip = ? WHERE id = ?")
-    .bind(ipLogin, user.id).run();
+  const deviceLogin = detectRequestDevice(request);
+  await env.DB.prepare("UPDATE users SET online = 1, last_active = datetime('now'), last_ip = ?, last_device = ? WHERE id = ?")
+    .bind(ipLogin, deviceLogin, user.id).run();
 
   const token = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
 
@@ -3194,18 +3265,21 @@ async function handleVerifyToken(request, env) {
   let user;
   if (record.user_id) {
     user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
-    await ensureUsersLastIpColumn(env);
+    await Promise.all([ensureUsersLastIpColumn(env), ensureUsersDeviceColumns(env)]);
     const ipMagic = request.headers.get('CF-Connecting-IP') || '';
-    await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now'), last_ip = ? WHERE id = ?")
-      .bind(ipMagic, user.id).run();
+    const deviceMagic = detectRequestDevice(request);
+    await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now'), last_ip = ?, last_device = ? WHERE id = ?")
+      .bind(ipMagic, deviceMagic, user.id).run();
   } else {
     // New user via magic link — create minimal account
     const userId = generateId();
     const country = request.headers.get('cf-ipcountry') || '';
+    const deviceMagic = detectRequestDevice(request);
+    await ensureUsersDeviceColumns(env);
     await env.DB.prepare(`
-      INSERT INTO users (id, email, username, role, seeking, country, status)
-      VALUES (?, ?, ?, 'hombre', 'mujer', ?, 'verified')
-    `).bind(userId, record.email, record.email.split('@')[0], country).run();
+      INSERT INTO users (id, email, username, role, seeking, country, signup_device, last_device, status)
+      VALUES (?, ?, ?, 'hombre', 'mujer', ?, ?, ?, 'verified')
+    `).bind(userId, record.email, record.email.split('@')[0], country, deviceMagic, deviceMagic).run();
     user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
   }
 
@@ -6670,8 +6744,9 @@ async function handleAdminGetUsers(request, env) {
   await ensureUsersDuplicateFlagColumn(env);
   await ensureUsersFeedPriorityColumn(env);
   await ensureUsersPhotoThumbsColumn(env);
+  await ensureUsersDeviceColumns(env);
   let dataQuery = `SELECT id, email, username, role, seeking, message_block_roles, age, birthdate, city, locality, marital_status, sexual_orientation, country, avatar_url, avatar_thumb_url, status,
-    photos, photo_thumbs, premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, feed_priority, duplicate_flag, account_status, last_active, last_ip, created_at,
+    photos, photo_thumbs, premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, feed_priority, duplicate_flag, account_status, last_active, last_ip, signup_device, last_device, created_at,
     (SELECT COUNT(*) FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open') as reports_count,
     (SELECT pr.reason FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open' ORDER BY pr.updated_at DESC LIMIT 1) as latest_report_reason,
     (SELECT pr.updated_at FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open' ORDER BY pr.updated_at DESC LIMIT 1) as latest_report_at,

@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS users (
   coins              INTEGER NOT NULL DEFAULT 100,
   premium_until      TEXT DEFAULT NULL,
   last_ip            TEXT DEFAULT '',
+  signup_device      TEXT NOT NULL DEFAULT 'unknown',
+  last_device        TEXT NOT NULL DEFAULT 'unknown',
   account_status     TEXT NOT NULL DEFAULT 'active' CHECK(account_status IN ('active','under_review','suspended')),
   avatar_crop        TEXT DEFAULT NULL,
   fake               INTEGER NOT NULL DEFAULT 0,

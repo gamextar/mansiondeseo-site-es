@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Ban, Play, Film, Pencil, Copy, Flag, Star, BadgeCheck, XCircle, MessageCircleOff } from 'lucide-react';
+import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Ban, Play, Film, Pencil, Copy, Flag, Star, BadgeCheck, XCircle, MessageCircleOff, Smartphone, Monitor, Tablet, HelpCircle } from 'lucide-react';
 import { adminGetUsers, adminGetUser, adminUpdateUser, adminUploadAvatarThumb, adminUploadGalleryThumb, adminDeleteGalleryPhoto, adminCloseProfileReport, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory, adminReviewPhotoOtpVerification, adminGetPhotoOtpVerificationPhotoBlob } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 import { resolveMediaUrl } from '../../lib/media';
@@ -65,6 +65,27 @@ function photoVerificationLabel(status) {
     expired: 'Foto OTP expirada',
   };
   return map[status] || 'Sin solicitud';
+}
+
+function deviceMeta(device) {
+  const normalized = String(device || '').toLowerCase();
+  if (normalized === 'mobile') return { label: 'Móvil', Icon: Smartphone };
+  if (normalized === 'tablet') return { label: 'Tablet', Icon: Tablet };
+  if (normalized === 'desktop') return { label: 'PC', Icon: Monitor };
+  return { label: '—', Icon: HelpCircle };
+}
+
+function DeviceIcon({ device, titlePrefix = 'Último acceso' }) {
+  const { label, Icon } = deviceMeta(device);
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-lg border border-mansion-border/20 bg-black/20 p-1.5 text-text-muted"
+      title={`${titlePrefix}: ${label}`}
+      aria-label={`${titlePrefix}: ${label}`}
+    >
+      <Icon className="h-3.5 w-3.5" />
+    </span>
+  );
 }
 
 function messageBlockRolesTooltip(roles = []) {
@@ -893,6 +914,7 @@ export default function AdminUsersPage() {
                     <th className="px-4 py-3 hidden md:table-cell">Email</th>
                     <th className="px-4 py-3 hidden lg:table-cell">País</th>
                     <th className="px-4 py-3 text-center">VIP</th>
+                    <th className="px-4 py-3 text-center">Disp.</th>
                     <th className="px-4 py-3 text-center hidden sm:table-cell">Estado</th>
                     <th className="px-4 py-3 text-center hidden sm:table-cell">Coins</th>
                     <th className="px-4 py-3 hidden lg:table-cell">IP</th>
@@ -997,6 +1019,19 @@ export default function AdminUsersPage() {
                       <td className="px-4 py-3 text-text-dim text-xs hidden lg:table-cell">{u.country || '—'}</td>
                       <td className="px-4 py-3 text-center">
                         {u.premium ? <Crown className="w-4 h-4 text-mansion-gold mx-auto" /> : <span className="text-text-dim text-xs">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <DeviceIcon device={u.last_device} />
+                          {u.signup_device && u.signup_device !== u.last_device && (
+                            <span
+                              className="text-[9px] text-text-dim"
+                              title={`Registro: ${deviceMeta(u.signup_device).label}`}
+                            >
+                              Reg. {deviceMeta(u.signup_device).label}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-center hidden sm:table-cell">
                         <div className="flex flex-col items-center gap-1">
@@ -1137,6 +1172,20 @@ export default function AdminUsersPage() {
                 <div className="bg-mansion-elevated rounded-xl p-3">
                   <p className="text-text-dim text-[10px] uppercase tracking-wider mb-1">Última IP</p>
                   <p className="text-text-muted font-mono text-[10px]">{selected.last_ip || '—'}</p>
+                </div>
+                <div className="bg-mansion-elevated rounded-xl p-3">
+                  <p className="text-text-dim text-[10px] uppercase tracking-wider mb-1">Dispositivo</p>
+                  <div className="flex items-center gap-2 text-xs text-text-muted">
+                    <DeviceIcon device={selected.last_device} />
+                    <span>{deviceMeta(selected.last_device).label}</span>
+                  </div>
+                </div>
+                <div className="bg-mansion-elevated rounded-xl p-3">
+                  <p className="text-text-dim text-[10px] uppercase tracking-wider mb-1">Registro desde</p>
+                  <div className="flex items-center gap-2 text-xs text-text-muted">
+                    <DeviceIcon device={selected.signup_device} titlePrefix="Registro" />
+                    <span>{deviceMeta(selected.signup_device).label}</span>
+                  </div>
                 </div>
                 <div className="bg-mansion-elevated rounded-xl p-3">
                   <p className="text-text-dim text-[10px] uppercase tracking-wider mb-1">Registro</p>
