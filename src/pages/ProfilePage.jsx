@@ -884,7 +884,7 @@ export default function ProfilePage() {
                   <div className="mt-3 rounded-xl border border-mansion-gold/15 bg-mansion-gold/8 px-3 py-2 text-left">
                     <p className="text-xs font-semibold text-text-primary">Cómo hacer la foto</p>
                     <p className="mt-1 text-[11px] leading-5 text-text-dim">
-                      Escribí este código en un papel o cartel, sostenelo visible y subí una foto donde se vea tu rostro y el código completo.
+                      Escribí este código en un papel, y toma la foto manteniendolo visible junto a vos.
                     </p>
                   </div>
                 </div>
