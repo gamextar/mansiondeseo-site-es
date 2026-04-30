@@ -6703,7 +6703,6 @@ async function handleAdminRotateFakeOnline(request, env) {
 
 // ── Admin: GET /api/admin/users ─────────────────────────
 async function handleAdminGetUsers(request, env) {
-  await ensureStoriesTable(env);
   await ensureProfileReportsTable(env);
 
   const auth = await authenticate(request, env);
