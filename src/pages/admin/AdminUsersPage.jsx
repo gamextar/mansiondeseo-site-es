@@ -912,7 +912,6 @@ export default function AdminUsersPage() {
                     </th>
                     <th className="px-4 py-3">Usuario</th>
                     <th className="px-4 py-3 hidden md:table-cell">Email</th>
-                    <th className="px-4 py-3 hidden lg:table-cell">País</th>
                     <th className="px-4 py-3 text-center">VIP</th>
                     <th className="px-4 py-3 text-center">Disp.</th>
                     <th className="px-4 py-3 text-center hidden sm:table-cell">Coins</th>
@@ -1018,7 +1017,6 @@ export default function AdminUsersPage() {
                         </button>
                       </td>
                       <td className="px-4 py-3 text-text-muted text-xs hidden md:table-cell truncate max-w-[200px]">{u.email}</td>
-                      <td className="px-4 py-3 text-text-dim text-xs hidden lg:table-cell">{u.country || '—'}</td>
                       <td className="px-4 py-3 text-center">
                         {u.premium ? <Crown className="w-4 h-4 text-mansion-gold mx-auto" /> : <span className="text-text-dim text-xs">—</span>}
                       </td>
