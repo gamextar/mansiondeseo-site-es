@@ -873,7 +873,7 @@ export default function ProfilePage() {
                     : isPhotoOtpRejected
                       ? 'No pudimos aprobar la verificación. Revisá el motivo y volvé a intentarlo.'
                     : showPhotoOtpCode
-                    ? 'Usá este código en la foto de verificación. Si querés empezar de nuevo, podés cancelar el proceso.'
+                    ? 'Escribí el código en un papel y subí una foto mostrándolo con claridad.'
                     : 'Recordá verificar tu cuenta para acceder a todas las funciones de la Mansión.'}
               </p>
 
@@ -881,6 +881,12 @@ export default function ProfilePage() {
                 <div className="mt-3 rounded-2xl border border-mansion-gold/20 bg-black/25 px-4 py-3">
                   <p className="text-[10px] uppercase tracking-wider text-text-dim">Código de verificación</p>
                   <p className="mt-1 font-display text-2xl font-bold tracking-[0.12em] text-mansion-gold">{photoOtpVerification.code}</p>
+                  <div className="mt-3 rounded-xl border border-mansion-gold/15 bg-mansion-gold/8 px-3 py-2 text-left">
+                    <p className="text-xs font-semibold text-text-primary">Cómo hacer la foto</p>
+                    <p className="mt-1 text-[11px] leading-5 text-text-dim">
+                      Escribí este código en un papel o cartel, sostenelo visible y subí una foto donde se vea tu rostro y el código completo.
+                    </p>
+                  </div>
                 </div>
               )}
 
