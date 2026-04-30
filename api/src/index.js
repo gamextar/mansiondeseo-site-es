@@ -2711,8 +2711,10 @@ async function handleRegister(request, env, ctx) {
 
   // If pending user exists, delete and re-create
   if (existing) {
+    await env.DB.prepare('DELETE FROM verification_tokens WHERE user_id = ? OR email = ?')
+      .bind(existing.id, email.toLowerCase())
+      .run();
     await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(existing.id).run();
-    await env.DB.prepare('DELETE FROM verification_tokens WHERE user_id = ?').bind(existing.id).run();
   }
 
   const userId = generateId();
