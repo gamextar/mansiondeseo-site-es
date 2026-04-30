@@ -6613,7 +6613,10 @@ async function rotateFakeOnlineUsers(env, {
 }
 
 async function runScheduledFakeOnlineRotation(env, controller = {}) {
-  const result = await rotateFakeOnlineUsers(env, { source: `cron:${controller.cron || 'hourly'}` });
+  const result = await rotateFakeOnlineUsers(env, {
+    count: 72,
+    source: `cron:${controller.cron || 'hourly'}`,
+  });
   console.log(
     `⏱️ Fake online cron finalizado — ${result.updated}/${result.requested} actualizados, ${result.activeFeaturedUsers} destacados`
   );
