@@ -1056,26 +1056,27 @@ export default function VideoFeedPage() {
     if (event.target.closest('[data-story-card-frame="true"]')) return;
     closeOverlay();
   }, [closeOverlay, isDesktopViewport, isOverlayPreview]);
-  const markStoryViewed = useCallback((storyUserId) => {
+  const markStoryViewed = useCallback((storyUserId, storyId = '') => {
     const uid = String(storyUserId || '');
     if (!uid) return;
     try {
       if (!user?.id) return;
-      if (getViewedStoryUsers(user.id).includes(uid)) {
+      const viewedToken = storyId ? `${uid}:${storyId}` : uid;
+      if (getViewedStoryUsers(user.id).includes(viewedToken)) {
         clearPendingViewedStoryUsers(user.id);
         return;
       }
-      markViewedStoryUser(user.id, uid);
+      markViewedStoryUser(user.id, uid, storyId);
       clearPendingViewedStoryUsers(user.id);
       window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
     } catch {}
   }, [user?.id]);
-  const queueStoryViewed = useCallback((storyUserId) => {
+  const queueStoryViewed = useCallback((storyUserId, storyId = '') => {
     const uid = String(storyUserId || '');
     if (!uid) return;
     try {
       if (!user?.id) return;
-      queuePendingViewedStoryUser(user.id, uid);
+      queuePendingViewedStoryUser(user.id, uid, storyId);
     } catch {}
   }, [user?.id]);
 
@@ -1287,10 +1288,10 @@ export default function VideoFeedPage() {
     const storyUserId = activeStory.user_id;
     const markAllowedStoryViewed = () => {
       if (isOverlayPreview) {
-        queueStoryViewed(storyUserId);
+        queueStoryViewed(storyUserId, storyId);
         return;
       }
-      markStoryViewed(storyUserId);
+      markStoryViewed(storyUserId, storyId);
     };
 
     setStoryLimitBlock((current) => (

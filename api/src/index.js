@@ -311,30 +311,16 @@ function compareStoryRows(a, b) {
   const aFake = Number(a?.fake || 0);
   const bFake = Number(b?.fake || 0);
   if (aFake !== bFake) return aFake - bFake;
-  const activeCompare = String(b?.last_active || '').localeCompare(String(a?.last_active || ''));
-  if (activeCompare !== 0) return activeCompare;
   const createdCompare = String(b?.created_at || '').localeCompare(String(a?.created_at || ''));
   if (createdCompare !== 0) return createdCompare;
+  const activeCompare = String(b?.last_active || '').localeCompare(String(a?.last_active || ''));
+  if (activeCompare !== 0) return activeCompare;
   return String(b?.id || '').localeCompare(String(a?.id || ''));
 }
 
 function interleaveStoryRows(rows, roleBuckets, limit = Infinity) {
   const safeRows = Array.isArray(rows) ? rows : [];
-  if (roleBuckets.length <= 1) {
-    return safeRows.sort(compareStoryRows).slice(0, limit);
-  }
-
-  const bucketMap = new Map(roleBuckets.map((bucket) => [bucket.key, []]));
-  for (const row of safeRows) {
-    const bucketKey = getRoleBucketKey(row?.role);
-    if (!bucketMap.has(bucketKey)) continue;
-    bucketMap.get(bucketKey).push(row);
-  }
-  for (const bucket of roleBuckets) {
-    const list = bucketMap.get(bucket.key) || [];
-    list.sort(compareStoryRows);
-  }
-  return interleaveRoleBuckets(roleBuckets, bucketMap, limit);
+  return safeRows.sort(compareStoryRows).slice(0, limit);
 }
 
 async function fetchRowsPerRoleBucket(env, baseQuery, baseBindings, roleBuckets, perBucketLimit) {
@@ -8338,7 +8324,7 @@ async function loadStoriesPayload(request, env, options = {}) {
   appendStoryVisibilityFilters(queryParts, bindings, { includeLiked: true });
   query = queryParts.join('\n');
   query += `
-    ORDER BY COALESCE(u.fake, 0) ASC, u.last_active DESC, s.created_at DESC, s.id DESC
+    ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC, u.last_active DESC, s.id DESC
   `;
 
   const allowFocusWindow = focusUserId && effectivePage === 1;

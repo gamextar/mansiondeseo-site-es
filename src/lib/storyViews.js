@@ -7,6 +7,24 @@ function normalizeUserId(userId) {
   return normalized || '';
 }
 
+function normalizeStoryId(storyId) {
+  const normalized = String(storyId || '').trim();
+  return normalized || '';
+}
+
+function tokenBelongsToUser(token, storyUserId) {
+  const normalizedToken = String(token || '').trim();
+  const normalizedStoryUserId = normalizeUserId(storyUserId);
+  return normalizedToken === normalizedStoryUserId || normalizedToken.startsWith(`${normalizedStoryUserId}:`);
+}
+
+export function getViewedStoryUserToken(storyUserId, storyId = '') {
+  const normalizedStoryUserId = normalizeUserId(storyUserId);
+  if (!normalizedStoryUserId) return '';
+  const normalizedStoryId = normalizeStoryId(storyId);
+  return normalizedStoryId ? `${normalizedStoryUserId}:${normalizedStoryId}` : normalizedStoryUserId;
+}
+
 function normalizeIds(values) {
   const raw = Array.isArray(values) ? values : [];
   return raw
@@ -53,21 +71,32 @@ export function setViewedStoryUsers(userId, values) {
   writeJsonArray(localStorage, getViewedStoryUsersKey(userId), normalized);
 }
 
-export function markViewedStoryUser(userId, storyUserId) {
-  const normalizedStoryUserId = normalizeUserId(storyUserId);
-  if (!normalizedStoryUserId) return false;
+export function isViewedStoryUser(userId, storyUserId, storyId = '') {
+  const token = getViewedStoryUserToken(storyUserId, storyId);
+  if (!token) return false;
   const current = getViewedStoryUsers(userId);
-  if (current.includes(normalizedStoryUserId)) return false;
-  current.push(normalizedStoryUserId);
+  if (storyId) return current.includes(token);
+  return current.some((value) => tokenBelongsToUser(value, storyUserId));
+}
+
+export function markViewedStoryUser(userId, storyUserId, storyId = '') {
+  const token = getViewedStoryUserToken(storyUserId, storyId);
+  if (!token) return false;
+  const current = getViewedStoryUsers(userId);
+  if (current.includes(token)) return false;
+  current.push(token);
   setViewedStoryUsers(userId, current);
   return true;
 }
 
-export function removeViewedStoryUser(userId, storyUserId) {
+export function removeViewedStoryUser(userId, storyUserId, storyId = '') {
   const normalizedStoryUserId = normalizeUserId(storyUserId);
   if (!normalizedStoryUserId || typeof localStorage === 'undefined') return false;
+  const token = getViewedStoryUserToken(storyUserId, storyId);
   const current = getViewedStoryUsers(userId);
-  const filtered = current.filter((value) => value !== normalizedStoryUserId);
+  const filtered = storyId
+    ? current.filter((value) => value !== token)
+    : current.filter((value) => !tokenBelongsToUser(value, normalizedStoryUserId));
   if (filtered.length === current.length) return false;
   setViewedStoryUsers(userId, filtered);
   return true;
@@ -78,13 +107,13 @@ export function getPendingViewedStoryUsers(userId) {
   return readJsonArray(sessionStorage, getPendingViewedStoryUsersKey(userId));
 }
 
-export function queuePendingViewedStoryUser(userId, storyUserId) {
+export function queuePendingViewedStoryUser(userId, storyUserId, storyId = '') {
   if (typeof sessionStorage === 'undefined') return false;
-  const normalizedStoryUserId = normalizeUserId(storyUserId);
-  if (!normalizedStoryUserId) return false;
+  const token = getViewedStoryUserToken(storyUserId, storyId);
+  if (!token) return false;
   const current = getPendingViewedStoryUsers(userId);
-  if (current.includes(normalizedStoryUserId)) return false;
-  current.push(normalizedStoryUserId);
+  if (current.includes(token)) return false;
+  current.push(token);
   if (current.length > MAX_VIEWED_STORY_USERS) {
     current.splice(0, current.length - MAX_VIEWED_STORY_USERS);
   }
@@ -115,4 +144,3 @@ export function applyPendingViewedStoryUsers(userId) {
   setViewedStoryUsers(userId, [...current]);
   return true;
 }
-

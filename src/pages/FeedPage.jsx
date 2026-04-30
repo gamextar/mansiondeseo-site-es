@@ -12,7 +12,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
 import { getBottomNavPagePadding } from '../lib/bottomNavConfig';
-import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsers, getViewedStoryUsersKey } from '../lib/storyViews';
+import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsersKey, isViewedStoryUser } from '../lib/storyViews';
 
 const FEED_CACHE_KEY = 'mansion_feed';
 const FEED_CACHE_VERSION = 2;
@@ -789,9 +789,10 @@ export default function FeedPage({ initialData }) {
     }, []),
     () => (viewedStoriesStorageKey ? localStorage.getItem(viewedStoriesStorageKey) || '[]' : '[]'),
   );
-  const viewedStoryUsers = useMemo(() => {
-    try { return new Set(JSON.parse(viewedRaw)); } catch { return new Set(); }
-  }, [viewedRaw]);
+  const isStoryViewed = useCallback((story) => {
+    if (!user?.id || !story?.id) return false;
+    return isViewedStoryUser(user.id, story.id, story.story_id || story.active_story_id || '');
+  }, [user?.id, viewedRaw]);
   const orderedStoryProfiles = useMemo(() => storyProfiles, [storyProfiles]);
 
   useEffect(() => {
@@ -1312,7 +1313,7 @@ export default function FeedPage({ initialData }) {
                   >
                     <div className={`rounded-full transition-all duration-300 ease-out ${
                       user.has_active_story
-                        ? viewedStoryUsers.has(String(user.id))
+                        ? isStoryViewed({ id: user.id, story_id: user.active_story_id })
                           ? 'bg-white/20'
                           : 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400'
                         : 'bg-mansion-border/40'
@@ -1368,7 +1369,7 @@ export default function FeedPage({ initialData }) {
                   >
                     <div className={`rounded-full transition-all duration-300 ease-out ${
                       user.has_active_story
-                        ? viewedStoryUsers.has(String(user.id))
+                        ? isStoryViewed({ id: user.id, story_id: user.active_story_id })
                           ? 'bg-white/20'
                           : 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400'
                         : 'bg-mansion-border/40'
@@ -1424,7 +1425,7 @@ export default function FeedPage({ initialData }) {
                   >
                     <div className={`rounded-full transition-all duration-300 ease-out ${
                       user.has_active_story
-                        ? viewedStoryUsers.has(String(user.id))
+                        ? isStoryViewed({ id: user.id, story_id: user.active_story_id })
                           ? 'bg-white/20'
                           : 'bg-gradient-to-tr from-emerald-400 via-emerald-500 to-emerald-400'
                         : 'bg-mansion-border/40'
@@ -1460,7 +1461,7 @@ export default function FeedPage({ initialData }) {
           {orderedStoryProfiles.map((p, index) => {
             const photo = getPrimaryProfilePhoto(p);
             const photoCrop = getPrimaryProfileCrop(p);
-            const isViewed = viewedStoryUsers.has(p.id);
+            const isViewed = isStoryViewed(p);
             const size = storyCircleSize;
             const border = storyCircleBorder;
             const innerGap = storyCircleInnerGap;
@@ -1471,7 +1472,7 @@ export default function FeedPage({ initialData }) {
             const isLockedStory = isVipOnlyLockedStory;
             return safariDesktop ? (
               <div
-                key={`story-${p.id}`}
+                key={`story-${p.id}-${p.story_id || ''}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={itemStyle}
@@ -1512,7 +1513,7 @@ export default function FeedPage({ initialData }) {
               </div>
             ) : (
               <div
-                key={`story-${p.id}`}
+                key={`story-${p.id}-${p.story_id || ''}`}
                 ref={(node) => setStoryNodeRef(p.id, node)}
                 className={`flex-shrink-0 ${storiesIntroEnabled ? 'story-circle-enter' : ''}`}
                 style={itemStyle}
