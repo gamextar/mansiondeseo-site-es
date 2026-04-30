@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, Eye, X, Coins, UserCheck, AlertTriangle, Ban, Play, Film, Pencil, Copy, Flag, Star, BadgeCheck, XCircle, MessageCircleOff, Smartphone, Monitor, Tablet, HelpCircle } from 'lucide-react';
+import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, X, Coins, UserCheck, AlertTriangle, Ban, Play, Film, Pencil, Copy, Flag, Star, BadgeCheck, XCircle, MessageCircleOff, Smartphone, Monitor, Tablet, HelpCircle } from 'lucide-react';
 import { adminGetUsers, adminGetUser, adminUpdateUser, adminUploadAvatarThumb, adminUploadGalleryThumb, adminDeleteGalleryPhoto, adminCloseProfileReport, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory, adminReviewPhotoOtpVerification, adminGetPhotoOtpVerificationPhotoBlob } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 import { resolveMediaUrl } from '../../lib/media';
@@ -915,11 +915,9 @@ export default function AdminUsersPage() {
                     <th className="px-4 py-3 hidden lg:table-cell">País</th>
                     <th className="px-4 py-3 text-center">VIP</th>
                     <th className="px-4 py-3 text-center">Disp.</th>
-                    <th className="px-4 py-3 text-center hidden sm:table-cell">Estado</th>
                     <th className="px-4 py-3 text-center hidden sm:table-cell">Coins</th>
                     <th className="px-4 py-3 hidden lg:table-cell">IP</th>
                     <th className="px-4 py-3 hidden md:table-cell">Actividad</th>
-                    <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-mansion-border/10">
@@ -935,7 +933,11 @@ export default function AdminUsersPage() {
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openUserModal(u)}
+                          className="flex w-full items-center gap-2 rounded-xl text-left transition-colors hover:text-mansion-gold focus:outline-none focus:ring-1 focus:ring-mansion-gold/30"
+                        >
                           <div className="w-8 h-8 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0 flex items-center justify-center">
                             {u.avatar_url ? (
                               <AvatarImg src={u.avatar_url} crop={u.avatar_crop} alt="" className="w-full h-full" />
@@ -1013,7 +1015,7 @@ export default function AdminUsersPage() {
                             )}
                             <p className="text-[10px] text-text-dim md:hidden truncate">{u.email}</p>
                           </div>
-                        </div>
+                        </button>
                       </td>
                       <td className="px-4 py-3 text-text-muted text-xs hidden md:table-cell truncate max-w-[200px]">{u.email}</td>
                       <td className="px-4 py-3 text-text-dim text-xs hidden lg:table-cell">{u.country || '—'}</td>
@@ -1033,39 +1035,9 @@ export default function AdminUsersPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center hidden sm:table-cell">
-                        <div className="flex flex-col items-center gap-1">
-                          {u.account_status === 'suspended' ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-semibold">
-                              <Ban className="w-3 h-3" />
-                              Suspendida
-                            </span>
-                          ) : u.account_status === 'under_review' ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[10px] font-semibold">
-                              <AlertTriangle className="w-3 h-3" />
-                              En revisión
-                            </span>
-                          ) : (
-                            <span className="text-green-400 text-[10px]">Activa</span>
-                          )}
-                          {u.photo_verification_status === 'pending' && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-500/10 border border-sky-400/20 text-sky-300 text-[10px] font-semibold">
-                              Foto OTP
-                            </span>
-                          )}
-                        </div>
-                      </td>
                       <td className="px-4 py-3 text-center text-xs text-text-muted hidden sm:table-cell">{u.coins}</td>
                       <td className="px-4 py-3 text-[10px] text-text-dim font-mono hidden lg:table-cell">{u.last_ip || '—'}</td>
                       <td className="px-4 py-3 text-xs text-text-dim hidden md:table-cell">{timeAgo(u.last_active)}</td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => openUserModal(u)}
-                          className="px-2.5 py-1.5 rounded-lg bg-mansion-elevated text-text-muted hover:text-mansion-gold text-xs transition-colors"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
