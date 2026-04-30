@@ -1,17 +1,17 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil, Trash2, AlertTriangle, Mail, Loader2, BadgeCheck } from 'lucide-react';
+import { Camera, Heart, Shield, LogOut, ChevronLeft, ChevronRight, Crown, Plus, X, Image, Eye, EyeOff, Users, Gift, Filter, Move, MapPin, ExternalLink, Film, Pencil, Trash2, AlertTriangle, Mail, Loader2 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
-import { logout as apiLogout, uploadAvatar, uploadGalleryImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache, requestAccountDeletion, confirmAccountDeletion, getPhotoOtpVerification, startPhotoOtpVerification, cancelPhotoOtpVerification, uploadPhotoOtpVerificationPhoto, getPhotoOtpVerificationPhotoBlob } from '../lib/api';
+import { logout as apiLogout, uploadAvatar, uploadGalleryImage, deletePhoto, getMe, getStories, updateProfile, getOwnProfileDashboard, deleteOwnStory, invalidateProfilesCache, requestAccountDeletion, confirmAccountDeletion } from '../lib/api';
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
 import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
 import { formatLocation } from '../lib/location';
 import { getDisplayPhotos, getGalleryPhotos, getGalleryPhotoThumbnail } from '../lib/profileMedia';
 import { resolveMediaUrl } from '../lib/media';
-import { optimizeGalleryPhotoFile, optimizePhotoFile } from '../lib/imageOptimize';
+import { optimizeGalleryPhotoFile } from '../lib/imageOptimize';
 import { formatDate } from '../lib/siteConfig';
 
 const ROLE_COLOR = {
@@ -45,14 +45,6 @@ const stagger = { animate: { transition: { staggerChildren: 0.06 } } };
 const fadeUp = {
   initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [.25,.46,.45,.94] } },
-};
-
-const PHOTO_OTP_STATUS = {
-  code_issued: { label: 'Código generado', tone: 'text-mansion-gold border-mansion-gold/25 bg-mansion-gold/10' },
-  pending: { label: 'En revisión', tone: 'text-sky-300 border-sky-400/20 bg-sky-500/10' },
-  approved: { label: 'Aprobada', tone: 'text-emerald-300 border-emerald-400/20 bg-emerald-500/10' },
-  rejected: { label: 'Rechazada', tone: 'text-mansion-crimson border-mansion-crimson/25 bg-mansion-crimson/10' },
-  expired: { label: 'Expirada', tone: 'text-text-muted border-mansion-border/25 bg-mansion-elevated/60' },
 };
 
 const MAX_GALLERY_PHOTOS = 9;
@@ -101,14 +93,7 @@ export default function ProfilePage() {
     : getBrowserBottomNavOffset();
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
-  const photoOtpInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
-  const [photoOtpLoading, setPhotoOtpLoading] = useState(false);
-  const [photoOtpUploading, setPhotoOtpUploading] = useState(false);
-  const [photoOtpCancelling, setPhotoOtpCancelling] = useState(false);
-  const [photoOtpError, setPhotoOtpError] = useState('');
-  const [photoOtpVerification, setPhotoOtpVerification] = useState(null);
-  const [photoOtpPreviewUrl, setPhotoOtpPreviewUrl] = useState('');
   const [cropFile, setCropFile] = useState(null);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [adjustUrl, setAdjustUrl] = useState(null);
@@ -128,7 +113,6 @@ export default function ProfilePage() {
   const dragOverItem = useRef(null);
   const avatarUploadSeqRef = useRef(0);
   const avatarPreviewUrlRef = useRef(null);
-  const photoOtpPreviewUrlRef = useRef(null);
   const [galleryEditing, setGalleryEditing] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -226,20 +210,6 @@ export default function ProfilePage() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [lightboxOpen, user]);
 
-  const refreshPhotoOtpVerification = useCallback(async () => {
-    if (!user?.id) return;
-    setPhotoOtpLoading(true);
-    setPhotoOtpError('');
-    try {
-      const data = await getPhotoOtpVerification();
-      setPhotoOtpVerification(data?.verification || null);
-    } catch (err) {
-      setPhotoOtpError(err?.message || 'No pudimos cargar la verificación.');
-    } finally {
-      setPhotoOtpLoading(false);
-    }
-  }, [user?.id]);
-
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
@@ -251,45 +221,15 @@ export default function ProfilePage() {
       setVisitors(data.visitors || []);
       setReceivedGifts(data.gifts || []);
     }).catch(() => {});
-    refreshPhotoOtpVerification();
     return () => { cancelled = true; };
-  }, [refreshPhotoOtpVerification, setUser, user?.id]);
+  }, [setUser, user?.id]);
 
   useEffect(() => () => {
     if (avatarPreviewUrlRef.current) {
       URL.revokeObjectURL(avatarPreviewUrlRef.current);
       avatarPreviewUrlRef.current = null;
     }
-    if (photoOtpPreviewUrlRef.current) {
-      URL.revokeObjectURL(photoOtpPreviewUrlRef.current);
-      photoOtpPreviewUrlRef.current = null;
-    }
   }, []);
-
-  useEffect(() => {
-    if (photoOtpPreviewUrlRef.current) {
-      URL.revokeObjectURL(photoOtpPreviewUrlRef.current);
-      photoOtpPreviewUrlRef.current = null;
-      setPhotoOtpPreviewUrl('');
-    }
-
-    const requestId = photoOtpVerification?.id;
-    if (!requestId || !photoOtpVerification?.has_photo) return undefined;
-
-    let cancelled = false;
-    getPhotoOtpVerificationPhotoBlob(requestId)
-      .then((blob) => {
-        if (cancelled) return;
-        const url = URL.createObjectURL(blob);
-        photoOtpPreviewUrlRef.current = url;
-        setPhotoOtpPreviewUrl(url);
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [photoOtpVerification?.has_photo, photoOtpVerification?.id]);
 
   // Auto-save reordered photos
   const persistOrder = useCallback(async (newPhotos) => {
@@ -556,58 +496,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleStartPhotoOtp = async () => {
-    if (photoOtpLoading || photoOtpUploading || photoOtpCancelling || user?.verified) return;
-    setPhotoOtpLoading(true);
-    setPhotoOtpError('');
-    try {
-      const data = await startPhotoOtpVerification();
-      setPhotoOtpVerification(data?.verification || null);
-    } catch (err) {
-      setPhotoOtpError(err?.message || 'No pudimos iniciar la verificación.');
-    } finally {
-      setPhotoOtpLoading(false);
-    }
-  };
-
-  const handleCancelPhotoOtp = async () => {
-    if (photoOtpLoading || photoOtpUploading || photoOtpCancelling || user?.verified) return;
-    if (!photoOtpVerification || !['code_issued', 'pending'].includes(photoOtpVerification.status)) return;
-
-    setPhotoOtpCancelling(true);
-    setPhotoOtpError('');
-    try {
-      const data = await cancelPhotoOtpVerification();
-      setPhotoOtpVerification(data?.verification || null);
-    } catch (err) {
-      setPhotoOtpError(err?.message || 'No pudimos cancelar la verificación.');
-    } finally {
-      setPhotoOtpCancelling(false);
-    }
-  };
-
-  const handlePhotoOtpSelect = async (e) => {
-    const file = e.target.files?.[0];
-    if (photoOtpInputRef.current) photoOtpInputRef.current.value = '';
-    if (!file || photoOtpUploading || photoOtpCancelling) return;
-
-    setPhotoOtpUploading(true);
-    setPhotoOtpError('');
-    try {
-      const optimizedFile = await optimizePhotoFile(file, {
-        maxSize: 1400,
-        quality: 0.86,
-        suffix: '-verificacion',
-      });
-      const data = await uploadPhotoOtpVerificationPhoto(optimizedFile);
-      setPhotoOtpVerification(data?.verification || null);
-    } catch (err) {
-      setPhotoOtpError(err?.message || 'No pudimos subir la foto de verificación.');
-    } finally {
-      setPhotoOtpUploading(false);
-    }
-  };
-
   const handleToggleGhostMode = async () => {
     if (togglingGhost || !user?.premium) return;
     setTogglingGhost(true);
@@ -633,13 +521,6 @@ export default function ProfilePage() {
   const canAddGalleryPhoto = photos.length < MAX_GALLERY_PHOTOS;
   const galleryPlaceholderCount = Math.max(0, MAX_GALLERY_PHOTOS - photos.length);
   const displayPhotos = getDisplayPhotos(user);
-  const photoOtpStatus = user?.verified ? 'approved' : (photoOtpVerification?.status || '');
-  const photoOtpMeta = PHOTO_OTP_STATUS[photoOtpStatus] || null;
-  const isPhotoOtpPendingReview = !user?.verified && photoOtpStatus === 'pending';
-  const isPhotoOtpRejected = !user?.verified && photoOtpStatus === 'rejected';
-  const showPhotoOtpCode = !user?.verified && photoOtpVerification?.code && photoOtpStatus === 'code_issued';
-  const canStartPhotoOtp = !user?.verified && (!photoOtpVerification || ['rejected', 'expired'].includes(photoOtpVerification.status));
-  const hasActivePhotoOtp = !user?.verified && photoOtpVerification && photoOtpVerification.status === 'code_issued';
   const premiumUntilLabel = formatPremiumUntil(user?.premium_until);
   const ownProfilePreview = user ? {
     id: user.id,
@@ -846,118 +727,6 @@ export default function ProfilePage() {
                 Eliminar historia
               </button>
             )}
-          </div>
-        </motion.div>
-
-        <motion.div variants={fadeUp} className={`mb-5 rounded-2xl border border-mansion-gold/15 bg-mansion-card/35 ${isPhotoOtpPendingReview ? 'p-3' : 'p-4'}`}>
-          <div className="flex items-start gap-3">
-            <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl ${
-              user?.verified
-                ? 'bg-emerald-500/10 text-emerald-300'
-                : isPhotoOtpPendingReview
-                  ? 'bg-sky-500/10 text-sky-300'
-                  : 'bg-mansion-gold/10 text-mansion-gold'
-            }`}>
-              {user?.verified ? <BadgeCheck className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-semibold text-text-primary">
-                  {user?.verified
-                    ? 'Cuenta verificada'
-                    : isPhotoOtpPendingReview
-                      ? 'Verificación en proceso'
-                      : 'Recordatorio de verificación'}
-                </h3>
-                {photoOtpMeta && (
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${photoOtpMeta.tone}`}>
-                    {photoOtpMeta.label}
-                  </span>
-                )}
-              </div>
-              <p className="mt-1 text-xs leading-5 text-text-dim">
-                {user?.verified
-                  ? 'Tu cuenta ya está verificada y tiene acceso a las funciones de confianza.'
-                  : isPhotoOtpPendingReview
-                    ? 'Tu foto fue enviada. Estamos revisando la verificación para habilitar todas las funciones.'
-                    : isPhotoOtpRejected
-                      ? 'No pudimos aprobar la verificación. Revisá el motivo y volvé a intentarlo.'
-                    : showPhotoOtpCode
-                    ? 'Escribí el código en un papel y subí una foto mostrándolo con claridad.'
-                    : 'Recordá verificar tu cuenta para acceder a todas las funciones de la Mansión.'}
-              </p>
-
-              {showPhotoOtpCode && (
-                <div className="mt-3 rounded-2xl border border-mansion-gold/20 bg-black/25 px-4 py-3">
-                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Código de verificación</p>
-                  <p className="mt-1 font-display text-2xl font-bold tracking-[0.12em] text-mansion-gold">{photoOtpVerification.code}</p>
-                  <div className="mt-3 rounded-xl border border-mansion-gold/15 bg-mansion-gold/8 px-3 py-2 text-left">
-                    <p className="text-xs font-semibold text-text-primary">Cómo hacer la foto</p>
-                    <p className="mt-1 text-[11px] leading-5 text-text-dim">
-                      Escribí este código en un papel, y toma la foto manteniendolo visible junto a vos.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {photoOtpPreviewUrl && !user?.verified && !isPhotoOtpPendingReview && (
-                <div className="mt-3 w-28 overflow-hidden rounded-2xl border border-mansion-border/20 bg-mansion-elevated">
-                  <img src={photoOtpPreviewUrl} alt="Foto de verificación enviada" className="h-28 w-28 object-cover" />
-                </div>
-              )}
-
-              {photoOtpVerification?.status === 'rejected' && photoOtpVerification?.admin_note && (
-                <p className="mt-3 rounded-2xl border border-mansion-crimson/20 bg-mansion-crimson/10 px-3 py-2 text-xs leading-5 text-mansion-crimson">
-                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-mansion-crimson/80">Motivo del rechazo</span>
-                  <span className="mt-1 block">{photoOtpVerification.admin_note}</span>
-                </p>
-              )}
-
-              {photoOtpError && (
-                <p className="mt-3 rounded-2xl border border-mansion-crimson/20 bg-mansion-crimson/10 px-3 py-2 text-xs leading-5 text-mansion-crimson">
-                  {photoOtpError}
-                </p>
-              )}
-
-              {!user?.verified && !isPhotoOtpPendingReview && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {canStartPhotoOtp && (
-                    <button
-                      type="button"
-                      onClick={handleStartPhotoOtp}
-                      disabled={photoOtpLoading || photoOtpUploading || photoOtpCancelling}
-                      className="inline-flex items-center gap-2 rounded-full border border-mansion-gold/25 bg-mansion-gold/10 px-3 py-2 text-xs font-semibold text-mansion-gold transition-colors hover:bg-mansion-gold/15 disabled:opacity-50"
-                    >
-                      {photoOtpLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Shield className="h-3.5 w-3.5" />}
-                      {isPhotoOtpRejected ? 'Volver a verificar' : 'Verificar Cuenta'}
-                    </button>
-                  )}
-                  {hasActivePhotoOtp && (
-                    <button
-                      type="button"
-                      onClick={() => photoOtpInputRef.current?.click()}
-                      disabled={photoOtpUploading || photoOtpLoading || photoOtpCancelling}
-                      className="inline-flex items-center gap-2 rounded-full bg-mansion-gold px-3 py-2 text-xs font-bold text-black transition-colors hover:bg-mansion-gold-light disabled:opacity-50"
-                    >
-                      {photoOtpUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
-                      {photoOtpVerification.status === 'pending' ? 'Reemplazar foto' : 'Subir foto'}
-                    </button>
-                  )}
-                  {hasActivePhotoOtp && (
-                    <button
-                      type="button"
-                      onClick={handleCancelPhotoOtp}
-                      disabled={photoOtpLoading || photoOtpUploading || photoOtpCancelling}
-                      className="inline-flex items-center gap-2 rounded-full border border-mansion-border/30 bg-transparent px-3 py-2 text-xs font-semibold text-text-muted transition-colors hover:border-mansion-crimson/35 hover:text-mansion-crimson disabled:opacity-50"
-                    >
-                      {photoOtpCancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-                      Cancelar
-                    </button>
-                  )}
-                  <input ref={photoOtpInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoOtpSelect} />
-                </div>
-              )}
-            </div>
           </div>
         </motion.div>
 
@@ -1311,7 +1080,8 @@ export default function ProfilePage() {
                   onClick={() => navigate('/vip')}
                   className="inline-flex items-center justify-center gap-1.5 rounded-full border border-mansion-gold/30 bg-mansion-gold/12 px-3 py-2 text-xs font-semibold text-mansion-gold transition-all hover:bg-mansion-gold/20"
                 >
-                  Extender suscripción
+                  <span className="sm:hidden">Extender</span>
+                  <span className="hidden sm:inline">Extender suscripción</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
