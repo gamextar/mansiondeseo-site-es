@@ -24,6 +24,8 @@ const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PREFETCH_PAGES = 3;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
+const STORY_RAIL_REFRESH_INTERVAL_MS = 60_000;
+const STORY_RAIL_FOCUS_REFRESH_MIN_MS = 15_000;
 const STORIES_RAIL_TRANSITION = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
 const STORY_CIRCLE_FALLBACK_SIZE = 88;
 const STORY_CIRCLE_FALLBACK_BORDER_PERCENT = 4;
@@ -205,6 +207,7 @@ export default function FeedPage({ initialData }) {
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
   const homeStoriesLoadIdRef = useRef(0);
   const homeStoriesInitialLoadRef = useRef(false);
+  const lastHomeStoriesRefreshRef = useRef(0);
   const prefetchedBlocksRef = useRef(new Map());
   const prefetchInFlightRef = useRef(new Map());
   const storiesScrollRef = useRef(null);
@@ -336,17 +339,18 @@ export default function FeedPage({ initialData }) {
       });
   }, [applyLoadedProfiles, fetchProfilesBlock]); // stable — reads settings from settingsRef
 
-  const loadHomeStories = useCallback(async ({ syncBootstrap = false } = {}) => {
+  const loadHomeStories = useCallback(async ({ syncBootstrap = false, fresh = false } = {}) => {
     const myId = ++homeStoriesLoadIdRef.current;
     const resolvedLimit = getInitialStoryLimit(settingsRef.current, isDesktopViewport);
 
     try {
-      const data = await getStories({ limit: resolvedLimit, surface: 'rail' });
+      const data = await getStories({ limit: resolvedLimit, surface: 'rail', fresh });
       if (myId !== homeStoriesLoadIdRef.current) return null;
 
       const nextStories = Array.isArray(data?.stories) ? data.stories : [];
       setHomeStories(mapStoriesToRailProfiles(nextStories).slice(0, resolvedLimit));
       if (syncBootstrap) setBootstrapStories(nextStories);
+      lastHomeStoriesRefreshRef.current = Date.now();
       return nextStories;
     } catch {
       if (myId !== homeStoriesLoadIdRef.current) return null;
@@ -371,7 +375,7 @@ export default function FeedPage({ initialData }) {
       prefetchInFlightRef.current.clear();
       setHomeStories([]);
       setBootstrapStories([]);
-      void loadHomeStories({ syncBootstrap: true });
+      void loadHomeStories({ syncBootstrap: true, fresh: true });
       await loadProfiles({
         forceFresh: true,
         cursor,
@@ -413,7 +417,7 @@ export default function FeedPage({ initialData }) {
 
     if (shouldLoadStories) {
       homeStoriesInitialLoadRef.current = true;
-      void loadHomeStories({ syncBootstrap: true });
+      void loadHomeStories({ syncBootstrap: true, fresh: shouldReloadDirtyFeed });
     }
 
     if (!cachedFeed || !canReuseCached || shouldReloadDirtyFeed) {
@@ -530,6 +534,10 @@ export default function FeedPage({ initialData }) {
   useEffect(() => {
     const onFocus = () => {
       if (!sessionStorage.getItem('mansion_feed_dirty')) {
+        const shouldRefreshStories = Date.now() - lastHomeStoriesRefreshRef.current > STORY_RAIL_FOCUS_REFRESH_MIN_MS;
+        if (shouldRefreshStories) {
+          void loadHomeStories({ syncBootstrap: true, fresh: true });
+        }
         const cachedFeed = getCachedFeed();
         const s = settingsRef.current;
         const nextCardsPerPage = getFeedCardsPerPage(s, isDesktopViewport);
@@ -548,7 +556,7 @@ export default function FeedPage({ initialData }) {
       localStorage.removeItem(FEED_CACHE_KEY);
       setHomeStories([]);
       setBootstrapStories([]);
-      void loadHomeStories({ syncBootstrap: true });
+      void loadHomeStories({ syncBootstrap: true, fresh: true });
       const s = settingsRef.current;
       const nextCardsPerPage = getFeedCardsPerPage(s, isDesktopViewport);
       const nextBlockSize = nextCardsPerPage * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES);
@@ -563,10 +571,33 @@ export default function FeedPage({ initialData }) {
     return () => window.removeEventListener('focus', onFocus);
   }, [isDesktopViewport, loadHomeStories, loadProfiles, pageCursor, refreshIfFeedVersionChanged]);
 
+  useEffect(() => {
+    if (!getToken()) return undefined;
+
+    const refreshVisibleStories = () => {
+      if (document.hidden) return;
+      void loadHomeStories({ syncBootstrap: true, fresh: true });
+    };
+    const handleVisibilityChange = () => {
+      if (document.hidden) return;
+      if (Date.now() - lastHomeStoriesRefreshRef.current > STORY_RAIL_FOCUS_REFRESH_MIN_MS) {
+        refreshVisibleStories();
+      }
+    };
+
+    const intervalId = window.setInterval(refreshVisibleStories, STORY_RAIL_REFRESH_INTERVAL_MS);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [loadHomeStories]);
+
   const { indicatorRef } = usePullToRefresh(
     useCallback(() => Promise.all([
       loadProfiles({ forceFresh: true }),
-      loadHomeStories({ syncBootstrap: true }),
+      loadHomeStories({ syncBootstrap: true, fresh: true }),
     ]), [loadHomeStories, loadProfiles]),
     {
       threshold: 168,
@@ -707,14 +738,14 @@ export default function FeedPage({ initialData }) {
       prefetchInFlightRef.current.clear();
       setHomeStories([]);
       setBootstrapStories([]);
-      void loadHomeStories({ syncBootstrap: true });
+      void loadHomeStories({ syncBootstrap: true, fresh: true });
       loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
       window.scrollTo(0, 0);
     };
     const handleStoryFeedCacheInvalidated = () => {
       setHomeStories([]);
       setBootstrapStories([]);
-      void loadHomeStories({ syncBootstrap: true });
+      void loadHomeStories({ syncBootstrap: true, fresh: true });
     };
     window.addEventListener(HOME_FEED_FOCUS_EVENT, handleHomeFocus);
     window.addEventListener(HOME_FEED_RESET_EVENT, handleHomeReset);
