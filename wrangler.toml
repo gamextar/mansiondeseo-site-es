@@ -19,6 +19,10 @@ zone_name = "mansiondeseo.com"
 enabled = true
 head_sampling_rate = 1
 
+# ── Cron Triggers ─────────────────────────────────────
+[triggers]
+crons = ["0 * * * *"]
+
 # ── D1 Database ──────────────────────────────────────
 [[d1_databases]]
 binding = "DB"

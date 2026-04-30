@@ -6483,21 +6483,19 @@ async function handleAdminResetAllCoins(request, env) {
   return json({ success: true, affected: meta.changes });
 }
 
-// ── Admin: POST /api/admin/rotate-fake-online ───────────
-async function handleAdminRotateFakeOnline(request, env) {
+async function rotateFakeOnlineUsers(env, {
+  count: requestedCount,
+  windowMinutes: requestedWindowMinutes,
+  excludeRecentMinutes: requestedExcludeRecentMinutes,
+  source = 'manual',
+} = {}) {
   await ensureStoriesTable(env);
 
-  const auth = await authenticate(request, env);
-  if (!auth) return error('No autorizado', 401);
-  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
-  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
-
-  const body = await request.json().catch(() => ({}));
   const settings = await cached('settings', 300_000, () => loadSettings(env));
-  const count = parseIntegerSetting(body.count, 36, 1, 200);
-  const windowMinutes = parseIntegerSetting(body.window_minutes ?? body.windowMinutes, 55, 5, 240);
+  const count = parseIntegerSetting(requestedCount, 36, 1, 200);
+  const windowMinutes = parseIntegerSetting(requestedWindowMinutes, 55, 5, 240);
   const excludeRecentMinutes = parseIntegerSetting(
-    body.exclude_recent_minutes ?? body.excludeRecentMinutes,
+    requestedExcludeRecentMinutes,
     settings.onlineThresholdMinutes || 60,
     0,
     240
@@ -6563,7 +6561,7 @@ async function handleAdminRotateFakeOnline(request, env) {
   }
 
   if (selected.length === 0) {
-    return json({
+    return {
       success: true,
       requested: count,
       updated: 0,
@@ -6573,7 +6571,7 @@ async function handleAdminRotateFakeOnline(request, env) {
       activeFeaturedUsers: 0,
       feedCacheVersion: null,
       users: [],
-    });
+    };
   }
 
   const now = Date.now();
@@ -6592,9 +6590,9 @@ async function handleAdminRotateFakeOnline(request, env) {
   const activeStoryUsers = selected.filter((user) => Number(user.has_story || 0) === 1).length;
   const activeFeaturedUsers = selected.filter((user) => Number(user.feed_priority || 0) > 0).length;
 
-  console.log(`🔧 Admin rotó fake online — ${selected.length}/${count} usuarios en ${windowMinutes} min`);
+  console.log(`🔧 Fake online rotation (${source}) — ${selected.length}/${count} usuarios en ${windowMinutes} min`);
 
-  return json({
+  return {
     success: true,
     requested: count,
     updated: selected.length,
@@ -6611,7 +6609,33 @@ async function handleAdminRotateFakeOnline(request, env) {
       has_story: Number(user.has_story || 0) === 1,
       last_active: user.rotated_last_active || '',
     })),
+  };
+}
+
+async function runScheduledFakeOnlineRotation(env, controller = {}) {
+  const result = await rotateFakeOnlineUsers(env, { source: `cron:${controller.cron || 'hourly'}` });
+  console.log(
+    `⏱️ Fake online cron finalizado — ${result.updated}/${result.requested} actualizados, ${result.activeFeaturedUsers} destacados`
+  );
+  return result;
+}
+
+// ── Admin: POST /api/admin/rotate-fake-online ───────────
+async function handleAdminRotateFakeOnline(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const body = await request.json().catch(() => ({}));
+  const result = await rotateFakeOnlineUsers(env, {
+    count: body.count,
+    windowMinutes: body.window_minutes ?? body.windowMinutes,
+    excludeRecentMinutes: body.exclude_recent_minutes ?? body.excludeRecentMinutes,
+    source: 'admin',
   });
+
+  return json(result);
 }
 
 // ── Admin: GET /api/admin/users ─────────────────────────
@@ -9003,5 +9027,32 @@ export default {
       }
       return errRes;
     }
+  },
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil((async () => {
+      try {
+        await runScheduledFakeOnlineRotation(env, controller);
+      } catch (err) {
+        console.error('[cron] fake online rotation failed:', err?.message || err, err?.stack || '');
+        await persistErrorLog(env, {
+          source: 'worker',
+          level: 'error',
+          message: truncateLogValue(err?.message || 'Scheduled fake online rotation failed', 1200),
+          stack: truncateLogValue(err?.stack || '', 12000),
+          route: 'scheduled:fake-online-rotation',
+          method: 'CRON',
+          statusCode: 500,
+          userId: null,
+          requestId: `cron:${controller?.scheduledTime || Date.now()}`,
+          ip: '',
+          userAgent: '',
+          meta: {
+            kind: 'scheduled_exception',
+            cron: controller?.cron || '',
+            scheduledTime: controller?.scheduledTime || null,
+          },
+        });
+      }
+    })());
   },
 };
