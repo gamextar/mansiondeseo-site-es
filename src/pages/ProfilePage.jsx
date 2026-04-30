@@ -8,6 +8,7 @@ import { logout as apiLogout, uploadAvatar, uploadGalleryImage, deletePhoto, get
 import ImageCropper from '../components/ImageCropper';
 import AvatarImg from '../components/AvatarImg';
 import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
+import PhotoOtpVerificationCard from '../components/PhotoOtpVerificationCard';
 import { formatLocation } from '../lib/location';
 import { getDisplayPhotos, getGalleryPhotos, getGalleryPhotoThumbnail } from '../lib/profileMedia';
 import { resolveMediaUrl } from '../lib/media';
@@ -1065,25 +1066,23 @@ export default function ProfilePage() {
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-2 px-1">Membresía</h3>
           {user?.premium ? (
             <>
-              <div className="w-full flex flex-col gap-3 p-3 rounded-2xl bg-mansion-gold/8 border border-mansion-gold/20 sm:flex-row sm:items-center">
-                <div className="w-10 h-10 rounded-xl bg-mansion-gold/15 text-mansion-gold flex items-center justify-center">
+              <div className="grid w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded-2xl border border-mansion-gold/20 bg-mansion-gold/8 p-3">
+                <div className="row-span-2 flex h-10 w-10 items-center justify-center rounded-xl bg-mansion-gold/15 text-mansion-gold">
                   <Crown className="w-5 h-5" />
                 </div>
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium text-mansion-gold">VIP activo</p>
-                  <p className="text-xs text-text-dim">
-                    {premiumUntilLabel ? `Vence el ${premiumUntilLabel}` : 'Disfrutás de todos los beneficios'}
-                  </p>
-                </div>
+                <p className="min-w-0 truncate text-left text-sm font-medium text-mansion-gold">VIP activo</p>
                 <button
                   type="button"
                   onClick={() => navigate('/vip')}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-full border border-mansion-gold/30 bg-mansion-gold/12 px-3 py-2 text-xs font-semibold text-mansion-gold transition-all hover:bg-mansion-gold/20"
+                  className="row-span-2 inline-flex items-center justify-center gap-1 rounded-full border border-mansion-gold/30 bg-mansion-gold/12 px-2.5 py-1.5 text-xs font-semibold text-mansion-gold transition-all hover:bg-mansion-gold/20 sm:gap-1.5 sm:px-3 sm:py-2"
                 >
                   <span className="sm:hidden">Extender</span>
                   <span className="hidden sm:inline">Extender suscripción</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
+                <p className="col-start-2 min-w-0 truncate text-left text-xs text-text-dim">
+                  {premiumUntilLabel ? `Vence el ${premiumUntilLabel}` : 'Disfrutás de todos los beneficios'}
+                </p>
               </div>
 
               <button
@@ -1118,6 +1117,10 @@ export default function ProfilePage() {
               <ChevronRight className="w-4 h-4 text-mansion-gold" />
             </button>
           )}
+        </motion.div>
+
+        <motion.div variants={fadeUp} className="mb-3">
+          <PhotoOtpVerificationCard />
         </motion.div>
 
         <motion.div variants={fadeUp} className="pt-2 pb-3">
