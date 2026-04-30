@@ -88,6 +88,14 @@ function DeviceIcon({ device, titlePrefix = 'Último acceso' }) {
   );
 }
 
+function ipVersionLabel(ip) {
+  const value = String(ip || '').trim();
+  if (!value) return '';
+  if (value.includes(':')) return 'IPv6';
+  if (value.includes('.')) return 'IPv4';
+  return 'IP';
+}
+
 function messageBlockRolesTooltip(roles = []) {
   if (!Array.isArray(roles) || roles.length === 0) return 'Sin bloqueo de mensajes por rol';
   return `Bloquea mensajes de: ${roles.map(roleLabel).join(', ')}`;
@@ -1140,8 +1148,17 @@ export default function AdminUsersPage() {
                   <p className="text-mansion-gold font-bold">{selected.coins}</p>
                 </div>
                 <div className="bg-mansion-elevated rounded-xl p-3">
-                  <p className="text-text-dim text-[10px] uppercase tracking-wider mb-1">Última IP</p>
-                  <p className="text-text-muted font-mono text-[10px]">{selected.last_ip || '—'}</p>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="text-text-dim text-[10px] uppercase tracking-wider">Última IP</p>
+                    {selected.last_ip && (
+                      <span className="rounded-md border border-mansion-border/20 bg-black/20 px-1.5 py-0.5 text-[9px] font-semibold text-text-dim">
+                        {ipVersionLabel(selected.last_ip)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="whitespace-normal break-all font-mono text-[10px] leading-relaxed text-text-muted">
+                    {selected.last_ip || '—'}
+                  </p>
                 </div>
                 <div className="bg-mansion-elevated rounded-xl p-3">
                   <p className="text-text-dim text-[10px] uppercase tracking-wider mb-1">Dispositivo</p>
