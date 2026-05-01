@@ -493,6 +493,7 @@ function clearSiteStorageKeys(storage) {
   ]);
   const prefixes = [
     CHAT_CACHE_PREFIX,
+    'mansion_home_stories:',
     'mansion_profile_detail_',
     'mansion_pending_viewed_story_users:',
     'viewed_story_users:',
@@ -1713,6 +1714,8 @@ function invalidateStoryFeedCache() {
     sessionStorage.removeItem('appBootstrap');
     localStorage.removeItem('mansion_feed');
     localStorage.removeItem('vf_stories');
+    removeMatchingStorageKeys(localStorage, (key) => key.startsWith('mansion_home_stories:'));
+    removeMatchingStorageKeys(sessionStorage, (key) => key.startsWith('mansion_home_stories:'));
   } catch {}
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(STORY_FEED_CACHE_INVALIDATED_EVENT));
