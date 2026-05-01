@@ -32,7 +32,22 @@ const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
 const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 68;
 const VIDEO_FEED_RAIL_SOURCE = 'rail';
-const EXPANDED_STORY_SIDE_OFFSET = 'max(16px, calc(50% - min(520px, calc((100vw - 32px) / 2))))';
+
+function normalizeLandscapeAspectRatio(value) {
+  const ratio = Number(value);
+  if (!Number.isFinite(ratio) || ratio <= 1) return 16 / 9;
+  return Math.min(Math.max(ratio, 1.01), 3);
+}
+
+function getExpandedStoryFrameMaxWidth(aspectRatio = 16 / 9) {
+  const viewportHeight = typeof window === 'undefined' ? 900 : window.innerHeight;
+  return Math.max(520, Math.round(Math.max(320, viewportHeight - 32) * normalizeLandscapeAspectRatio(aspectRatio)));
+}
+
+function getExpandedStorySideOffset(aspectRatio = 16 / 9) {
+  const halfWidth = Math.round(getExpandedStoryFrameMaxWidth(aspectRatio) / 2);
+  return `max(16px, calc(50% - min(50%, ${halfWidth}px) - 92px))`;
+}
 
 function getStoryIdentity(story) {
   if (!story) return null;
@@ -258,12 +273,17 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const [videoFitMode, setVideoFitMode] = useState('cover');
   const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
   const [landscapeExpanded, setLandscapeExpanded] = useState(false);
+  const [videoAspectRatio, setVideoAspectRatio] = useState(16 / 9);
   const limitDaily = Number(limit?.dailyLimit ?? 10);
   const limitViewed = Number(limit?.viewedToday ?? limitDaily);
   const limitLabel = limitDaily > 0 ? `${Math.min(limitViewed, limitDaily)}/${limitDaily}` : '0';
   const blockedVideoScale = Math.max(videoScale, 1.08);
   const videoObjectClass = videoFitMode === 'cover' ? 'object-cover' : 'object-contain';
-  const frameWidthClass = landscapeExpanded ? 'lg:max-w-[900px] xl:max-w-[1040px]' : 'lg:max-w-[520px]';
+  const frameWidthClass = landscapeExpanded ? 'lg:max-w-none' : 'lg:max-w-[520px]';
+  const expandedFrameStyle = landscapeExpanded && isLandscapeVideo
+    ? { maxWidth: `min(100%, ${getExpandedStoryFrameMaxWidth(videoAspectRatio)}px)` }
+    : undefined;
+  const expandedSideOffset = getExpandedStorySideOffset(videoAspectRatio);
 
   // Once src is set, never clear it — clearing causes browser to reload the video
   // which produces the black flash/glitch at boundaries. Matches original behavior.
@@ -278,14 +298,15 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     setIsVideoReady(false);
     setVideoFitMode('cover');
     setIsLandscapeVideo(false);
+    setVideoAspectRatio(16 / 9);
     setLandscapeExpanded(false);
-    if (isActive) onLandscapeExpandedChange?.(false);
+    if (isActive) onLandscapeExpandedChange?.(false, 16 / 9);
   }, [activeSrc]);
 
   useEffect(() => {
     if (!isActive) return;
-    onLandscapeExpandedChange?.(landscapeExpanded);
-  }, [isActive, landscapeExpanded, onLandscapeExpandedChange]);
+    onLandscapeExpandedChange?.(landscapeExpanded, videoAspectRatio);
+  }, [isActive, landscapeExpanded, onLandscapeExpandedChange, videoAspectRatio]);
 
   const handleLoadedMetadata = useCallback((event) => {
     const video = event.currentTarget;
@@ -293,6 +314,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     const height = Number(video.videoHeight || 0);
     const landscape = width > 0 && height > 0 && width > height;
     setIsLandscapeVideo(landscape);
+    setVideoAspectRatio(landscape ? normalizeLandscapeAspectRatio(width / height) : 16 / 9);
     setVideoFitMode('cover');
     if (!landscape) setLandscapeExpanded(false);
   }, []);
@@ -555,6 +577,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       <div
         data-story-card-frame="true"
         className={`relative h-full w-full transition-[max-width] duration-300 ease-out lg:mx-auto lg:my-4 lg:h-[calc(100%-32px)] lg:rounded-2xl lg:overflow-hidden ${frameWidthClass}`}
+        style={expandedFrameStyle}
       >
         {/* eslint-disable-next-line */}
         <video
@@ -671,7 +694,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       {!isLimitBlocked && (
         <div
           className="absolute z-20 hidden flex-col items-center gap-5 transition-[right] duration-300 ease-out lg:flex"
-          style={{ right: landscapeExpanded ? EXPANDED_STORY_SIDE_OFFSET : 'calc(50% - 350px)', bottom: '60px' }}
+          style={{ right: landscapeExpanded ? expandedSideOffset : 'calc(50% - 350px)', bottom: '60px' }}
         >
           <DesktopActionButtons story={story} onLike={onLike} navigate={navigate} onGift={onGift} isOwnStory={isOwnStory} />
         </div>
@@ -923,7 +946,6 @@ export default function VideoFeedPage() {
       return false;
     }
   });
-  const [desktopStoryExpanded, setDesktopStoryExpanded] = useState(false);
   const entryRevealDoneRef = useRef(false);
 
   const handleEntryRevealReady = useCallback(() => {
@@ -989,6 +1011,8 @@ export default function VideoFeedPage() {
   const [isMuted, setIsMuted] = useState(savedMuted);
   const [storyViewLimit, setStoryViewLimit] = useState(null);
   const [storyLimitBlock, setStoryLimitBlock] = useState(null);
+  const [desktopStoryExpanded, setDesktopStoryExpanded] = useState(false);
+  const [desktopStoryExpandedAspect, setDesktopStoryExpandedAspect] = useState(16 / 9);
   const [isDesktopViewport, setIsDesktopViewport] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(min-width: 1024px)').matches;
@@ -1032,6 +1056,13 @@ export default function VideoFeedPage() {
     ? null
     : Math.max(0, Number(storyViewLimit.remaining) || 0);
   const backendLimitActive = storyViewLimit?.limited !== false;
+  const desktopStorySideOffset = desktopStoryExpanded
+    ? getExpandedStorySideOffset(desktopStoryExpandedAspect)
+    : 'calc(50% - 350px)';
+  const handleDesktopStoryExpandedChange = useCallback((expanded, aspectRatio = 16 / 9) => {
+    setDesktopStoryExpanded(!!expanded);
+    setDesktopStoryExpandedAspect(normalizeLandscapeAspectRatio(aspectRatio));
+  }, []);
   const isStoryBlockedByLimit = useCallback((story) => {
     const storyId = String(story?.story_id || story?.id || '').trim();
     if (!storyId || user?.premium) return false;
@@ -1123,8 +1154,8 @@ export default function VideoFeedPage() {
   const activeStoryLimitBlocked = Boolean(activeStoryId && isStoryBlockedByLimit(activeStory));
 
   useEffect(() => {
-    setDesktopStoryExpanded(false);
-  }, [activeStoryId]);
+    handleDesktopStoryExpandedChange(false);
+  }, [activeStoryId, handleDesktopStoryExpandedChange]);
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const isStandaloneMobileApp = detectStandaloneMobile();
   const mobileBrowserRoute = standaloneMobileRoute && !isStandaloneMobileApp;
@@ -1882,7 +1913,7 @@ export default function VideoFeedPage() {
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={isActive ? handleEntryRevealReady : undefined}
-                  onLandscapeExpandedChange={isActive ? setDesktopStoryExpanded : undefined}
+                  onLandscapeExpandedChange={isActive ? handleDesktopStoryExpandedChange : undefined}
                   enableCinematicReveal={enableCinematicReveal}
                   isLimitBlocked={isStoryBlocked}
                   limit={storyLimitBlock?.limit || storyViewLimit}
@@ -1934,7 +1965,7 @@ export default function VideoFeedPage() {
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
-                  onLandscapeExpandedChange={displayIndex === activeDispIdx ? setDesktopStoryExpanded : undefined}
+                  onLandscapeExpandedChange={displayIndex === activeDispIdx ? handleDesktopStoryExpandedChange : undefined}
                   enableCinematicReveal={enableCinematicReveal}
                   pauseOnAppBackground
                   isLimitBlocked={isStoryBlocked}
@@ -2005,14 +2036,14 @@ export default function VideoFeedPage() {
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(-1) : jumpByOne(-1))}
             className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-300 ease-out ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
-            style={{ left: desktopStoryExpanded ? EXPANDED_STORY_SIDE_OFFSET : 'calc(50% - 350px)' }}
+            style={{ left: desktopStorySideOffset }}
           >
             <ChevronLeft className="w-9 h-9 text-white/70" />
           </button>
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(1) : jumpByOne(1))}
             className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-300 ease-out ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
-            style={{ right: desktopStoryExpanded ? EXPANDED_STORY_SIDE_OFFSET : 'calc(50% - 350px)' }}
+            style={{ right: desktopStorySideOffset }}
           >
             <ChevronRight className="w-9 h-9 text-white/70" />
           </button>
