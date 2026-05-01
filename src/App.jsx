@@ -39,6 +39,7 @@ import { getRouteEnabledSeoLocales, isSeoLocale } from './lib/seoLocales';
 import { isSeoIntentVariant } from './lib/seoVariants';
 
 const ExplorePage = lazy(lazyWithRetry(() => import('./pages/ExplorePage'), 'mansion-lazy-retry:explore'));
+const DashboardPage = lazy(lazyWithRetry(() => import('./pages/DashboardPage'), 'mansion-lazy-retry:dashboard'));
 const ProfileDetailPage = lazy(lazyWithRetry(() => import('./pages/ProfileDetailPage'), 'mansion-lazy-retry:profile-detail'));
 const FavoritesPage = lazy(lazyWithRetry(() => import('./pages/FavoritesPage'), 'mansion-lazy-retry:favorites'));
 const AdminSettingsPage = lazy(lazyWithRetry(() => import('./pages/SettingsPage'), 'mansion-lazy-retry:admin-settings'));
@@ -269,6 +270,7 @@ function AppLayout() {
     isMobileViewport &&
     (
       normalizedRoutePath === '/feed' ||
+      normalizedRoutePath === '/dashboard' ||
       normalizedRoutePath === '/explorar' ||
       normalizedRoutePath === '/videos' ||
       normalizedRoutePath === '/perfil' ||
@@ -304,6 +306,7 @@ function AppLayout() {
   const showBottomNav = (((!(isChatDetail && isMobileViewport) && !isFullscreen) || standaloneVideosRoute || mobileBrowserVideosRoute) && !routeOverlayOpen);
   const isPrivateNoindexRoute =
     routePath === '/feed' ||
+    routePath === '/dashboard' ||
     routePath === '/explorar' ||
     routePath === '/videos' ||
     routePath === '/full-mobile-test' ||
@@ -955,6 +958,14 @@ function AppLayout() {
             element={
               <RequireRegistration>
                 <ProfilePage />
+              </RequireRegistration>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <RequireRegistration>
+                <DashboardPage />
               </RequireRegistration>
             }
           />

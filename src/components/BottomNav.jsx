@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Film, MessageCircle, User } from 'lucide-react';
+import { Home, Film, MessageCircle, User, LayoutDashboard } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../lib/authContext';
@@ -21,6 +21,7 @@ const HIDDEN_PATHS = ['/bienvenida', '/registro', '/login'];
 
 const NAV_ITEMS = [
   { to: '/feed', icon: Home, label: 'Inicio' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/videos', icon: Film, label: 'Videos' },
   { to: '/mensajes', icon: MessageCircle, label: 'Mensajes' },
   { to: '/perfil', icon: User, label: 'Perfil' },
@@ -56,7 +57,10 @@ export default function BottomNav({ immersive = false }) {
   const effectiveNavHeight = getBottomNavHeight(isStandaloneMobileApp);
   const visualOffsetPx = getBottomNavVisualOffset(isStandaloneMobileApp);
   const pageExtraPaddingPx = getBottomNavPageExtraPadding(isStandaloneMobileApp);
-  const activeIndicatorSize = isStandaloneMobileApp ? 70 : 62;
+  const compactNav = NAV_ITEMS.length > 4;
+  const activeIndicatorSize = compactNav ? 'clamp(52px, 16vw, 62px)' : (isStandaloneMobileApp ? 70 : 62);
+  const navItemWidth = compactNav ? 'clamp(52px, 17.4vw, 64px)' : (isStandaloneMobileApp ? 76 : 70);
+  const navIconSize = compactNav ? 26 : 29;
   const outerSidePadding = BOTTOM_NAV_SIDE_PADDING;
   const bgColor = `rgba(0,0,0,${(BOTTOM_NAV_OPACITY / 100).toFixed(2)})`;
   const borderColor = `rgba(255,255,255,${(0.08 * BOTTOM_NAV_OPACITY / 100).toFixed(3)})`;
@@ -174,7 +178,7 @@ export default function BottomNav({ immersive = false }) {
                   touchAction: 'manipulation',
                   WebkitTouchCallout: 'none',
                   WebkitUserSelect: 'none',
-                  width: isStandaloneMobileApp ? 76 : 70,
+                  width: navItemWidth,
                 }}
               >
                 {isActive && (
@@ -193,7 +197,7 @@ export default function BottomNav({ immersive = false }) {
                     className={`transition-colors ${
                       isActive ? 'text-white' : 'text-white/50 group-hover:text-white/80'
                     }`}
-                    style={{ width: 29, height: 29 }}
+                    style={{ width: navIconSize, height: navIconSize }}
                   />
                   {to === '/mensajes' && unreadCount > 0 && (
                     <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] rounded-full bg-mansion-crimson text-white text-[9px] font-bold flex items-center justify-center px-1">

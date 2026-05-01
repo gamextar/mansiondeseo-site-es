@@ -16,6 +16,7 @@ const appRoutes = new Set([
   'bienvenida',
   'black-test',
   'configuracion',
+  'dashboard',
   'explorar',
   'favoritos',
   'feed',
