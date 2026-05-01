@@ -25,6 +25,7 @@ function invalidateFeedBrowseCache() {
       String(key).startsWith('profiles:') ||
       String(key).startsWith('count:profiles:') ||
       String(key).startsWith('feed-snapshot:') ||
+      String(key).startsWith('story-rows:') ||
       String(key) === 'active_story_users'
     ) {
       _cache.delete(key);
@@ -535,9 +536,10 @@ function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets,
   return interleaveRoleBuckets(roleBuckets, bucketMap, limit);
 }
 
-function mapStoryRowForResponse(row, env) {
+function mapStoryRowForResponse(row, env, viewerId = '', viewerCanWatchAllStories = false) {
   const vipOnly = Number(row?.vip_only || 0) === 1;
-  const restricted = Number(row?.restricted || 0) === 1;
+  const isOwnStory = viewerId && String(row?.user_id || '') === String(viewerId);
+  const restricted = vipOnly && !isOwnStory && !viewerCanWatchAllStories;
   return {
     id: row.id,
     user_id: row.user_id,
@@ -1076,6 +1078,12 @@ async function ensureUserBrowseIndexes(env) {
       ).run(),
       env.DB.prepare(
         'CREATE INDEX IF NOT EXISTS idx_users_status_active ON users(status, last_active DESC)'
+      ).run(),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS idx_users_feed_active_role_last ON users(role, last_active DESC, id DESC) WHERE status = 'verified' AND COALESCE(account_status, 'active') = 'active'"
+      ).run(),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS idx_users_feed_active_role_fake_last ON users(role, COALESCE(fake, 0), last_active DESC, id DESC) WHERE status = 'verified' AND COALESCE(account_status, 'active') = 'active'"
       ).run(),
     ]).catch((err) => {
       _userBrowseIndexesReady = null;
@@ -4008,10 +4016,9 @@ async function handleProfiles(request, env) {
             )
           : snapshotWindowLimit;
         const snapshotQuery = `${query} ORDER BY last_active DESC, u.id DESC`;
-        const [snapshotRows, storyRows, snapshotCountRow] = await Promise.all([
+        const [snapshotRows, storyRows] = await Promise.all([
           fetchRowsPerRoleBucket(env, snapshotQuery, params, roleBuckets, snapshotDbLimit),
           storyRowsPromise,
-          env.DB.prepare(countQuery).bind(...params).first(),
         ]);
         const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
         const activeStoryUrlMap = new Map();
@@ -4023,9 +4030,10 @@ async function handleProfiles(request, env) {
           }
         }
         const baseProfiles = buildFeedBaseProfiles(snapshotRows, env, activeStoryUserIds, activeStoryUrlMap);
+        const orderedProfiles = orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, snapshotWindowLimit, viewerGeo);
         return {
-          orderedProfiles: orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, snapshotWindowLimit, viewerGeo),
-          totalProfiles: Number(snapshotCountRow?.total ?? 0),
+          orderedProfiles,
+          totalProfiles: orderedProfiles.length,
         };
       })
     : Promise.all([
@@ -4073,7 +4081,7 @@ async function handleProfiles(request, env) {
   const countPromise = (
     canUseFeedSnapshot
       ? Promise.resolve(null)
-      : cached(`count:${profilesCacheKey}`, 60_000, () => env.DB.prepare(countQuery).bind(...params).first())
+      : cached(`count:${profilesCacheKey}`, 600_000, () => env.DB.prepare(countQuery).bind(...params).first())
   ).finally(() => {
     markTiming('countMs', countStartedAt);
   });
@@ -8151,6 +8159,8 @@ async function ensureStoriesTable(env) {
 
       await Promise.all([
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_active ON stories(active, created_at)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_active_created_id ON stories(active, created_at DESC, id DESC)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_active_user_created ON stories(active, user_id, created_at DESC, id DESC)').run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_vip_only ON stories(vip_only, active, created_at)').run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_user_created ON stories(user_id, created_at DESC)').run(),
         env.DB.prepare(`
@@ -8285,24 +8295,25 @@ async function loadStoriesPayload(request, env, options = {}) {
       parts.push(' AND (COALESCE(s.vip_only, 0) = 0 OR s.user_id = ?)');
       values.push(viewerId || '');
     }
-    parts.push(' AND (s.user_id != ? OR ? = \'\' OR s.user_id = ?)');
-    values.push(viewerId || '', viewerId || '', focusUserId);
+    if (focusUserId) {
+      parts.push(' AND (s.user_id != ? OR ? = \'\' OR s.user_id = ?)');
+      values.push(viewerId || '', viewerId || '', focusUserId);
+    } else if (!isRailSurface && viewerId) {
+      parts.push(' AND s.user_id != ?');
+      values.push(viewerId);
+    }
   };
 
+  const includeLiked = !isRailSurface;
   let query = `
     SELECT s.id, s.user_id, s.video_url, s.caption, COALESCE(s.vip_only, 0) AS vip_only,
-           CASE
-             WHEN COALESCE(s.vip_only, 0) = 1 AND s.user_id != ? AND ? = 0 THEN 1
-             ELSE 0
-           END AS restricted,
            s.likes, s.comments, s.created_at,
            u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
            u.last_active, COALESCE(ps.visits_total, 0) AS visits_total,
-           CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
+           ${includeLiked ? 'CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END' : '0'} as liked
   `;
   const queryParts = [query];
-  bindings.push(viewerId || '', viewerCanWatchAllStories ? 1 : 0);
-  appendStoryVisibilityFilters(queryParts, bindings, { includeLiked: true });
+  appendStoryVisibilityFilters(queryParts, bindings, { includeLiked });
   query = queryParts.join('\n');
   query += `
     ORDER BY
@@ -8318,7 +8329,11 @@ async function loadStoriesPayload(request, env, options = {}) {
     offset + effectiveLimit + 1,
     allowFocusWindow ? 400 : effectiveLimit
   );
-  const storyRows = await fetchRowsPerRoleBucket(env, query, bindings, roleBuckets, storyWindowLimit);
+  const canCacheStoryRows = isRailSurface && !focusUserId && effectivePage === 1;
+  const storyRowsCacheKey = `story-rows:${surface || 'rail'}:${roleValues.length ? roleValues.slice().sort().join(',') : 'all'}:${storyWindowLimit}`;
+  const storyRows = canCacheStoryRows
+    ? await cached(storyRowsCacheKey, 120_000, () => fetchRowsPerRoleBucket(env, query, bindings, roleBuckets, storyWindowLimit))
+    : await fetchRowsPerRoleBucket(env, query, bindings, roleBuckets, storyWindowLimit);
   const orderedRows = interleaveStoryRows(storyRows, roleBuckets, storyWindowLimit);
 
   if (allowFocusWindow) {
@@ -8330,7 +8345,7 @@ async function loadStoriesPayload(request, env, options = {}) {
 
   const stories = orderedRows
     .slice(offset, offset + effectiveLimit)
-    .map((row) => mapStoryRowForResponse(row, env));
+    .map((row) => mapStoryRowForResponse(row, env, viewerId || '', viewerCanWatchAllStories));
 
   return {
     stories,

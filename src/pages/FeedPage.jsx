@@ -403,7 +403,8 @@ export default function FeedPage({ initialData }) {
       const data = await getStories({ limit: resolvedLimit, surface: 'rail', fresh });
       if (myId !== homeStoriesLoadIdRef.current) return null;
 
-      const nextStories = Array.isArray(data?.stories) ? data.stories : [];
+      const nextStories = (Array.isArray(data?.stories) ? data.stories : [])
+        .filter((story) => String(story?.user_id || '') !== String(user?.id || ''));
       setCachedHomeStories(user?.id, isDesktopViewport, nextStories, resolvedLimit);
       setHomeStories(mapStoriesToRailProfiles(nextStories).slice(0, resolvedLimit));
       if (syncBootstrap) setBootstrapStories(nextStories);
