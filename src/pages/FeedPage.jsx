@@ -797,11 +797,8 @@ export default function FeedPage({ initialData }) {
       try {
         localStorage.removeItem(FEED_CACHE_KEY);
       } catch {}
-      clearCachedHomeStories();
       prefetchedBlocksRef.current.clear();
       prefetchInFlightRef.current.clear();
-      setHomeStories([]);
-      setBootstrapStories([]);
       void loadHomeStories({ syncBootstrap: true, fresh: true });
       loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
       window.scrollTo(0, 0);
