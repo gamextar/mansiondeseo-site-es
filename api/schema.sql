@@ -55,6 +55,7 @@ CREATE INDEX IF NOT EXISTS idx_users_status_country_role_active ON users(status,
 CREATE INDEX IF NOT EXISTS idx_users_fake ON users(fake);
 CREATE INDEX IF NOT EXISTS idx_users_feed_priority ON users(feed_priority);
 CREATE INDEX IF NOT EXISTS idx_users_duplicate_flag ON users(duplicate_flag);
+CREATE INDEX IF NOT EXISTS idx_users_created_id ON users(created_at DESC, id DESC);
 
 -- Photo OTP verification requests
 CREATE TABLE IF NOT EXISTS photo_verification_requests (
@@ -296,6 +297,7 @@ CREATE TABLE IF NOT EXISTS stories (
 );
 
 CREATE INDEX IF NOT EXISTS idx_stories_active ON stories(active, created_at);
+CREATE INDEX IF NOT EXISTS idx_stories_user_created ON stories(user_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS story_likes (
   user_id    TEXT NOT NULL,

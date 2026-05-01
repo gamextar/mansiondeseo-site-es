@@ -888,6 +888,9 @@ async function ensureProfileReportsTable(env) {
         'CREATE INDEX IF NOT EXISTS idx_profile_reports_reported ON profile_reports(reported_id, status, created_at)'
       ).run(),
       env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_profile_reports_reported_updated ON profile_reports(reported_id, status, updated_at DESC)'
+      ).run(),
+      env.DB.prepare(
         'CREATE INDEX IF NOT EXISTS idx_profile_reports_status ON profile_reports(status, created_at)'
       ).run(),
     ]).catch((err) => {
@@ -6786,7 +6789,7 @@ async function handleAdminGetUsers(request, env) {
     WITH page_users AS (
       SELECT id, email, username, role, seeking, message_block_roles, age, birthdate, city, locality,
              marital_status, sexual_orientation, country, avatar_url, avatar_thumb_url, status,
-             photos, photo_thumbs, premium, premium_until, ghost_mode, verified, online, coins,
+             premium, premium_until, ghost_mode, verified, online, coins,
              is_admin, fake, feed_priority, duplicate_flag, account_status, last_active, last_ip,
              signup_device, last_device, created_at
       FROM users
@@ -6821,8 +6824,6 @@ async function handleAdminGetUsers(request, env) {
 
   return json({
     users: dataRes.results.map(u => {
-      const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(u.photos, []), u.avatar_url);
-      const photoThumbs = normalizePhotoThumbs(u.photo_thumbs, galleryPhotos);
       return {
         ...u,
         age: getPublicAge(u),
@@ -6852,8 +6853,8 @@ async function handleAdminGetUsers(request, env) {
         story_id: u.story_id || null,
         story_vip_only: Number(u.story_vip_only || 0) === 1,
         interests: undefined,
-        photos: galleryPhotos,
-        photo_thumbs: photoThumbs,
+        photos: [],
+        photo_thumbs: {},
       };
     }),
     total: countRes.total,
@@ -8173,6 +8174,7 @@ async function ensureStoriesTable(env) {
       await Promise.all([
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_active ON stories(active, created_at)').run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_vip_only ON stories(vip_only, active, created_at)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_user_created ON stories(user_id, created_at DESC)').run(),
         env.DB.prepare(`
           CREATE TABLE IF NOT EXISTS story_likes (
             user_id   TEXT NOT NULL,
