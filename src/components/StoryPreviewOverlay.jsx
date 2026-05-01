@@ -30,7 +30,7 @@ export default function StoryPreviewOverlay({
   const progressRef = useRef(null);
   const rafRef = useRef(null);
   const [isMuted, setIsMuted] = useState(true);
-  const [videoFitMode, setVideoFitMode] = useState('contain');
+  const [videoFitMode, setVideoFitMode] = useState('cover');
   const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
   const actionBottom = typeof navBottomOffset === 'number'
     ? navBottomOffset + 16
@@ -48,7 +48,7 @@ export default function StoryPreviewOverlay({
     const height = Number(video.videoHeight || 0);
     const landscape = width > 0 && height > 0 && width > height;
     setIsLandscapeVideo(landscape);
-    setVideoFitMode(landscape ? 'contain' : 'cover');
+    setVideoFitMode('cover');
     onLandscapeChange?.(landscape);
     if (!landscape) onLandscapeExpandedChange?.(false);
   }, [onLandscapeChange, onLandscapeExpandedChange]);
@@ -65,7 +65,7 @@ export default function StoryPreviewOverlay({
       video.play().catch(() => {});
     };
 
-    setVideoFitMode('contain');
+    setVideoFitMode('cover');
     setIsLandscapeVideo(false);
     onLandscapeChange?.(false);
     onLandscapeExpandedChange?.(false);

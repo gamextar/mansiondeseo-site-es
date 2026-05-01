@@ -259,7 +259,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [videoResetToken, setVideoResetToken] = useState(0);
-  const [videoFitMode, setVideoFitMode] = useState('contain');
+  const [videoFitMode, setVideoFitMode] = useState('cover');
   const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
   const [landscapeExpanded, setLandscapeExpanded] = useState(false);
   const limitDaily = Number(limit?.dailyLimit ?? 10);
@@ -280,7 +280,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   useEffect(() => {
     revealSentRef.current = false;
     setIsVideoReady(false);
-    setVideoFitMode('contain');
+    setVideoFitMode('cover');
     setIsLandscapeVideo(false);
     setLandscapeExpanded(false);
   }, [activeSrc]);
@@ -291,7 +291,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     const height = Number(video.videoHeight || 0);
     const landscape = width > 0 && height > 0 && width > height;
     setIsLandscapeVideo(landscape);
-    setVideoFitMode(landscape ? 'contain' : 'cover');
+    setVideoFitMode('cover');
     if (!landscape) setLandscapeExpanded(false);
   }, []);
 
