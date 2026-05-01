@@ -245,7 +245,7 @@ function HeartBurst({ trigger }) {
   );
 }
 
-function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, enableCinematicReveal = false, pauseOnAppBackground = false, videoScale = 1, forcePaused = false, isLimitBlocked = false, limit = null, limitBlurLevel = 14, onVip }) {
+function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize, onLike, navigate, gradientHeight, gradientOpacity, resetOnDeactivate = true, onGift, isOwnStory = false, onRevealReady, onLandscapeExpandedChange, enableCinematicReveal = false, pauseOnAppBackground = false, videoScale = 1, forcePaused = false, isLimitBlocked = false, limit = null, limitBlurLevel = 14, onVip }) {
   const videoRef = useRef(null);
   const progressBarRef = useRef(null);
   const rafRef = useRef(null);
@@ -283,7 +283,13 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     setVideoFitMode('cover');
     setIsLandscapeVideo(false);
     setLandscapeExpanded(false);
+    if (isActive) onLandscapeExpandedChange?.(false);
   }, [activeSrc]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    onLandscapeExpandedChange?.(landscapeExpanded);
+  }, [isActive, landscapeExpanded, onLandscapeExpandedChange]);
 
   const handleLoadedMetadata = useCallback((event) => {
     const video = event.currentTarget;
@@ -921,6 +927,7 @@ export default function VideoFeedPage() {
       return false;
     }
   });
+  const [desktopStoryExpanded, setDesktopStoryExpanded] = useState(false);
   const entryRevealDoneRef = useRef(false);
 
   const handleEntryRevealReady = useCallback(() => {
@@ -1124,6 +1131,10 @@ export default function VideoFeedPage() {
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
   const activeStoryId = String(activeStory?.story_id || activeStory?.id || '').trim();
   const activeStoryLimitBlocked = Boolean(activeStoryId && isStoryBlockedByLimit(activeStory));
+
+  useEffect(() => {
+    setDesktopStoryExpanded(false);
+  }, [activeStoryId]);
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const isStandaloneMobileApp = detectStandaloneMobile();
   const mobileBrowserRoute = standaloneMobileRoute && !isStandaloneMobileApp;
@@ -1881,6 +1892,7 @@ export default function VideoFeedPage() {
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={isActive ? handleEntryRevealReady : undefined}
+                  onLandscapeExpandedChange={isActive ? setDesktopStoryExpanded : undefined}
                   enableCinematicReveal={enableCinematicReveal}
                   isLimitBlocked={isStoryBlocked}
                   limit={storyLimitBlock?.limit || storyViewLimit}
@@ -1931,6 +1943,7 @@ export default function VideoFeedPage() {
                   onGift={openGiftModal}
                   isOwnStory={String(story.user_id) === String(user?.id)}
                   onRevealReady={displayIndex === activeDispIdx ? handleEntryRevealReady : undefined}
+                  onLandscapeExpandedChange={displayIndex === activeDispIdx ? setDesktopStoryExpanded : undefined}
                   enableCinematicReveal={enableCinematicReveal}
                   pauseOnAppBackground
                   isLimitBlocked={isStoryBlocked}
@@ -2000,15 +2013,15 @@ export default function VideoFeedPage() {
         <>
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(-1) : jumpByOne(-1))}
-            className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-200 ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
-            style={{ left: 'calc(50% - 350px)' }}
+            className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-300 ease-out ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
+            style={{ left: desktopStoryExpanded ? 'max(16px, calc(50% - 550px))' : 'calc(50% - 350px)' }}
           >
             <ChevronLeft className="w-9 h-9 text-white/70" />
           </button>
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(1) : jumpByOne(1))}
-            className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-200 ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
-            style={{ right: 'calc(50% - 350px)' }}
+            className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-300 ease-out ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
+            style={{ right: desktopStoryExpanded ? 'max(16px, calc(50% - 550px))' : 'calc(50% - 350px)' }}
           >
             <ChevronRight className="w-9 h-9 text-white/70" />
           </button>
