@@ -69,7 +69,6 @@ let _userLastIpColumnReady = null;
 let _userDeviceColumnsReady = null;
 let _accountDeletionRequestsReady = null;
 let _profileVisitStructuresReady = null;
-let _profileStatsBackfillReady = null;
 let _errorLogsReady = null;
 let _photoVerificationRequestsReady = null;
 let _chatRecipientLimitsReady = null;
@@ -1822,33 +1821,9 @@ async function ensureProfileVisitStructures(env) {
 
   await _profileVisitStructuresReady;
 
-  if (!_profileStatsBackfillReady) {
-    _profileStatsBackfillReady = Promise.all([
-      env.DB.prepare(`
-        INSERT INTO profile_stats (user_id, visits_total, updated_at)
-        SELECT visited_id, COUNT(*), datetime('now')
-        FROM profile_visits
-        GROUP BY visited_id
-        ON CONFLICT(user_id) DO UPDATE SET
-          visits_total = MAX(profile_stats.visits_total, excluded.visits_total),
-          updated_at = datetime('now')
-      `).run(),
-      env.DB.prepare(`
-        INSERT INTO profile_stats (user_id, followers_total, updated_at)
-        SELECT target_id, COUNT(*), datetime('now')
-        FROM favorites
-        GROUP BY target_id
-        ON CONFLICT(user_id) DO UPDATE SET
-          followers_total = MAX(profile_stats.followers_total, excluded.followers_total),
-          updated_at = datetime('now')
-      `).run(),
-    ]).catch((err) => {
-      _profileStatsBackfillReady = null;
-      throw err;
-    });
-  }
-
-  await _profileStatsBackfillReady;
+  // Historical totals are maintained incrementally after the one-time backfill.
+  // Running the aggregate backfill on every new Worker isolate is very expensive
+  // in D1 rows read/written and shows up as recurring billing usage.
 }
 
 async function incrementProfileVisitStat(env, userId, increment = 1) {
@@ -6267,14 +6242,9 @@ async function handleGetFavorites(request, env) {
         AND u.status = 'verified'
         AND COALESCE(u.account_status, 'active') = 'active'
     `).bind(auth.sub).first(),
-    env.DB.prepare(`
-      SELECT COUNT(*) as count
-      FROM favorites f
-      JOIN users u ON u.id = f.user_id
-      WHERE f.target_id = ?
-        AND u.status = 'verified'
-        AND COALESCE(u.account_status, 'active') = 'active'
-    `).bind(auth.sub).first(),
+    env.DB.prepare('SELECT COALESCE(followers_total, 0) as count FROM profile_stats WHERE user_id = ?')
+      .bind(auth.sub)
+      .first(),
   ]);
 
   const followingCount = Number(followingCountRow?.count || 0);

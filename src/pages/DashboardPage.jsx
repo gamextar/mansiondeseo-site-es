@@ -252,13 +252,12 @@ export default function DashboardPage() {
     Promise.all([
       getOwnProfileDashboard(),
       getFavorites('following', 9),
-      getFavorites('followers', 1),
     ])
-      .then(([dashboardData, followingData, followersData]) => {
+      .then(([dashboardData, followingData]) => {
         if (cancelled) return;
         setDashboard(dashboardData || null);
         setFollowingProfiles((followingData?.profiles || []).slice(0, 9));
-        setFollowersCount(Number(followersData?.followersCount ?? dashboardData?.user?.followers_total ?? 0));
+        setFollowersCount(Number(followingData?.followersCount ?? dashboardData?.user?.followers_total ?? 0));
       })
       .catch((err) => {
         if (cancelled) return;

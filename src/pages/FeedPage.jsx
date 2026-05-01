@@ -27,8 +27,8 @@ const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PREFETCH_PAGES = 3;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
-const STORY_RAIL_REFRESH_INTERVAL_MS = 60_000;
-const STORY_RAIL_FOCUS_REFRESH_MIN_MS = 15_000;
+const STORY_RAIL_REFRESH_INTERVAL_MS = 5 * 60_000;
+const STORY_RAIL_FOCUS_REFRESH_MIN_MS = 2 * 60_000;
 const STORIES_RAIL_TRANSITION = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
 const STORY_CIRCLE_FALLBACK_SIZE = 88;
 const STORY_CIRCLE_FALLBACK_BORDER_PERCENT = 4;
@@ -598,7 +598,7 @@ export default function FeedPage({ initialData }) {
       if (!sessionStorage.getItem('mansion_feed_dirty')) {
         const shouldRefreshStories = Date.now() - lastHomeStoriesRefreshRef.current > STORY_RAIL_FOCUS_REFRESH_MIN_MS;
         if (shouldRefreshStories) {
-          void loadHomeStories({ syncBootstrap: true, fresh: true });
+          void loadHomeStories({ syncBootstrap: true });
         }
         const cachedFeed = getCachedFeed();
         const s = settingsRef.current;
@@ -639,7 +639,7 @@ export default function FeedPage({ initialData }) {
 
     const refreshVisibleStories = () => {
       if (document.hidden) return;
-      void loadHomeStories({ syncBootstrap: true, fresh: true });
+      void loadHomeStories({ syncBootstrap: true });
     };
     const handleVisibilityChange = () => {
       if (document.hidden) return;
@@ -799,7 +799,9 @@ export default function FeedPage({ initialData }) {
       } catch {}
       prefetchedBlocksRef.current.clear();
       prefetchInFlightRef.current.clear();
-      void loadHomeStories({ syncBootstrap: true, fresh: true });
+      if (Date.now() - lastHomeStoriesRefreshRef.current > STORY_RAIL_FOCUS_REFRESH_MIN_MS) {
+        void loadHomeStories({ syncBootstrap: true });
+      }
       loadProfiles({ cursor: 0, pageSize: blockSize, targetPageCursor: 0 });
       window.scrollTo(0, 0);
     };
