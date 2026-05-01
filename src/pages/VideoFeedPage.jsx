@@ -1927,7 +1927,8 @@ export default function VideoFeedPage() {
             return (
               <div
                 key={`${displayIndex}-${mobileStoryKey}`}
-                className="h-full w-full flex-shrink-0"
+                className="w-full flex-shrink-0"
+                style={{ height: '100dvh' }}
               >
                 <StoryCard
                   story={story}
