@@ -6703,8 +6703,6 @@ async function handleAdminRotateFakeOnline(request, env) {
 
 // ── Admin: GET /api/admin/users ─────────────────────────
 async function handleAdminGetUsers(request, env) {
-  await ensureProfileReportsTable(env);
-
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -6725,25 +6723,6 @@ async function handleAdminGetUsers(request, env) {
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
-  await ensureUsersMessageBlockRolesColumn(env);
-  await ensureUsersDuplicateFlagColumn(env);
-  await ensureUsersFeedPriorityColumn(env);
-  await ensureUsersPhotoThumbsColumn(env);
-  await ensureUsersDeviceColumns(env);
-  let dataQuery = `SELECT id, email, username, role, seeking, message_block_roles, age, birthdate, city, locality, marital_status, sexual_orientation, country, avatar_url, avatar_thumb_url, status,
-    photos, photo_thumbs, premium, premium_until, ghost_mode, verified, online, coins, is_admin, fake, feed_priority, duplicate_flag, account_status, last_active, last_ip, signup_device, last_device, created_at,
-    (SELECT COUNT(*) FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open') as reports_count,
-    (SELECT pr.reason FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open' ORDER BY pr.updated_at DESC LIMIT 1) as latest_report_reason,
-    (SELECT pr.updated_at FROM profile_reports pr WHERE pr.reported_id = users.id AND pr.status = 'open' ORDER BY pr.updated_at DESC LIMIT 1) as latest_report_at,
-    (SELECT pvr.id FROM photo_verification_requests pvr WHERE pvr.user_id = users.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_id,
-    (SELECT pvr.status FROM photo_verification_requests pvr WHERE pvr.user_id = users.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_status,
-    (SELECT pvr.photo_key FROM photo_verification_requests pvr WHERE pvr.user_id = users.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_key,
-    (SELECT pvr.expires_at FROM photo_verification_requests pvr WHERE pvr.user_id = users.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_expires_at,
-    (SELECT pvr.created_at FROM photo_verification_requests pvr WHERE pvr.user_id = users.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_created_at,
-    (SELECT pvr.updated_at FROM photo_verification_requests pvr WHERE pvr.user_id = users.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_updated_at,
-    (SELECT s.id FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_id,
-    (SELECT COALESCE(s.vip_only, 0) FROM stories s WHERE s.user_id = users.id ORDER BY s.created_at DESC LIMIT 1) as story_vip_only
-    FROM users`;
   const filters = [];
   const bindings = [];
 
@@ -6801,13 +6780,35 @@ async function handleAdminGetUsers(request, env) {
     filters.push('COALESCE(verified, 0) = 0');
   }
 
-  if (filters.length > 0) {
-    const whereClause = ` WHERE ${filters.join(' AND ')}`;
-    countQuery += whereClause;
-    dataQuery += whereClause;
-  }
-
-  dataQuery += ' ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?';
+  const whereClause = filters.length > 0 ? ` WHERE ${filters.join(' AND ')}` : '';
+  countQuery += whereClause;
+  const dataQuery = `
+    WITH page_users AS (
+      SELECT id, email, username, role, seeking, message_block_roles, age, birthdate, city, locality,
+             marital_status, sexual_orientation, country, avatar_url, avatar_thumb_url, status,
+             photos, photo_thumbs, premium, premium_until, ghost_mode, verified, online, coins,
+             is_admin, fake, feed_priority, duplicate_flag, account_status, last_active, last_ip,
+             signup_device, last_device, created_at
+      FROM users
+      ${whereClause}
+      ORDER BY created_at DESC, id DESC
+      LIMIT ? OFFSET ?
+    )
+    SELECT pu.*,
+      (SELECT COUNT(*) FROM profile_reports pr WHERE pr.reported_id = pu.id AND pr.status = 'open') as reports_count,
+      (SELECT pr.reason FROM profile_reports pr WHERE pr.reported_id = pu.id AND pr.status = 'open' ORDER BY pr.updated_at DESC LIMIT 1) as latest_report_reason,
+      (SELECT pr.updated_at FROM profile_reports pr WHERE pr.reported_id = pu.id AND pr.status = 'open' ORDER BY pr.updated_at DESC LIMIT 1) as latest_report_at,
+      (SELECT pvr.id FROM photo_verification_requests pvr WHERE pvr.user_id = pu.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_id,
+      (SELECT pvr.status FROM photo_verification_requests pvr WHERE pvr.user_id = pu.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_status,
+      (SELECT pvr.photo_key FROM photo_verification_requests pvr WHERE pvr.user_id = pu.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_key,
+      (SELECT pvr.expires_at FROM photo_verification_requests pvr WHERE pvr.user_id = pu.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_expires_at,
+      (SELECT pvr.created_at FROM photo_verification_requests pvr WHERE pvr.user_id = pu.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_created_at,
+      (SELECT pvr.updated_at FROM photo_verification_requests pvr WHERE pvr.user_id = pu.id ORDER BY pvr.created_at DESC LIMIT 1) as photo_verification_updated_at,
+      (SELECT s.id FROM stories s WHERE s.user_id = pu.id ORDER BY s.created_at DESC LIMIT 1) as story_id,
+      (SELECT COALESCE(s.vip_only, 0) FROM stories s WHERE s.user_id = pu.id ORDER BY s.created_at DESC LIMIT 1) as story_vip_only
+    FROM page_users pu
+    ORDER BY pu.created_at DESC, pu.id DESC
+  `;
 
   const countStmt = bindings.length
     ? env.DB.prepare(countQuery).bind(...bindings)
