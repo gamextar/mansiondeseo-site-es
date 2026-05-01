@@ -93,6 +93,7 @@ const STORY_RAIL_FALLBACK_GAP_DESKTOP = 7;
 const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
 const FREE_VIDEO_STORY_DAILY_LIMIT = 10;
 const FAKE_STORY_ROTATION_POOL_SIZE = 54;
+const STORY_ROWS_CACHE_TTL_MS = 5 * 60_000;
 const FREE_CHAT_RECIPIENT_LIMIT = 5;
 const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
 const DEFAULT_REALTIMEKIT_PRESET_NAME = 'group_call_host';
@@ -8231,6 +8232,8 @@ async function ensureStoriesTable(env) {
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_story_daily_views_user_date ON story_daily_views(user_id, date_utc)').run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_role_position ON fake_story_rotation(role, rotation_position)').run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_position ON fake_story_rotation(rotation_position)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_position_full ON fake_story_rotation(rotation_position, rotated_at DESC, story_id DESC)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_role_position_full ON fake_story_rotation(role, rotation_position, rotated_at DESC, story_id DESC)').run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_user ON fake_story_rotation(user_id)').run(),
       ]);
     })().catch((err) => {
@@ -8438,7 +8441,8 @@ async function syncFakeStoryRotationForUser(env, userId) {
   invalidateFeedBrowseCache();
 }
 
-async function loadRealStoryRowsForFeed(env, { roleValues = [], roleBuckets = [], limit = 25 } = {}) {
+async function loadRealStoryRowsForFeed(env, { roleValues = [], roleBuckets = [], limit = 25, splitByRole = false } = {}) {
+  const safeLimit = parseIntegerSetting(limit, 25, 1, 500);
   const bindings = [];
   let query = `
     /* stories:materialized:real */
@@ -8457,7 +8461,13 @@ async function loadRealStoryRowsForFeed(env, { roleValues = [], roleBuckets = []
   query += `
     ORDER BY s.created_at DESC, u.last_active DESC, s.id DESC
   `;
-  return fetchRowsPerRoleBucket(env, query, bindings, roleBuckets, limit);
+  if (splitByRole && roleBuckets.length > 1) {
+    return fetchRowsPerRoleBucket(env, query, bindings, roleBuckets, safeLimit);
+  }
+  query += ' LIMIT ?';
+  bindings.push(safeLimit);
+  const { results } = await env.DB.prepare(query).bind(...bindings).all();
+  return results || [];
 }
 
 async function loadFakeStoryRotationRows(env, { roleValues = [], limit = 25 } = {}) {
@@ -8504,12 +8514,13 @@ async function loadMaterializedStoryRows(env, {
   roleBuckets = [],
   limit = 25,
   focusUserId = '',
+  splitRealRowsByRole = false,
 } = {}) {
   await ensureStoriesTable(env);
 
   const safeLimit = parseIntegerSetting(limit, 25, 1, 500);
   const [realRows, focusRow] = await Promise.all([
-    loadRealStoryRowsForFeed(env, { roleValues, roleBuckets, limit: safeLimit }),
+    loadRealStoryRowsForFeed(env, { roleValues, roleBuckets, limit: safeLimit, splitByRole: splitRealRowsByRole }),
     focusUserId ? loadFocusedStoryRow(env, focusUserId) : Promise.resolve(null),
   ]);
   const realCount = Array.isArray(realRows) ? realRows.length : 0;
@@ -8604,6 +8615,7 @@ async function loadStoriesPayload(request, env, options = {}) {
   const requestedLimit = Math.min(200, Math.max(1, parseInt(String(options.limit ?? url.searchParams.get('limit') ?? '20'), 10)));
   const focusUserId = String(options.focusUserId ?? url.searchParams.get('focus_user_id') ?? '').trim();
   const surface = String(options.surface ?? url.searchParams.get('surface') ?? 'video').trim().toLowerCase();
+  const fresh = Boolean(options.fresh) || url.searchParams.get('fresh') === '1';
   const isRailSurface = surface === 'rail' || surface === 'home' || surface === 'feed';
 
   // Try to get current user for per-user liked status and server-side seeking filter
@@ -8623,7 +8635,7 @@ async function loadStoriesPayload(request, env, options = {}) {
   }
 
   const viewerCanWatchAllStories = Boolean(viewer && isPremiumActive(viewer));
-  const includeVideoLimit = options.includeVideoLimit !== false;
+  const includeVideoLimit = !isRailSurface && options.includeVideoLimit !== false;
   const storyViewLimit = includeVideoLimit
     ? await getStoryViewLimitStatus(env, viewerId, viewerCanWatchAllStories, settings)
     : null;
@@ -8649,24 +8661,33 @@ async function loadStoriesPayload(request, env, options = {}) {
   );
   const useMaterializedRows = effectivePage === 1;
   const storyRowsCacheKey = `story-rows:${surface || 'rail'}:${roleValues.length ? roleValues.slice().sort().join(',') : 'all'}:${storyWindowLimit}`;
-  const canCacheStoryRows = useMaterializedRows && !focusUserId;
+  const canCacheStoryRows = useMaterializedRows && !focusUserId && !fresh;
 
   let orderedRows;
   let rowsNeedLikedSync = false;
 
   if (useMaterializedRows) {
-    const storyRows = canCacheStoryRows
-      ? await cached(storyRowsCacheKey, 120_000, () => loadMaterializedStoryRows(env, {
-          roleValues,
-          roleBuckets,
-          limit: storyWindowLimit,
-        }))
-      : await loadMaterializedStoryRows(env, {
-          roleValues,
-          roleBuckets,
-          limit: storyWindowLimit,
-          focusUserId,
-        });
+    let storyRows;
+    if (canCacheStoryRows) {
+      storyRows = await cached(storyRowsCacheKey, STORY_ROWS_CACHE_TTL_MS, () => loadMaterializedStoryRows(env, {
+        roleValues,
+        roleBuckets,
+        limit: storyWindowLimit,
+        splitRealRowsByRole: !isRailSurface,
+      }));
+    } else {
+      if (fresh) _cache.delete(storyRowsCacheKey);
+      storyRows = await loadMaterializedStoryRows(env, {
+        roleValues,
+        roleBuckets,
+        limit: storyWindowLimit,
+        focusUserId,
+        splitRealRowsByRole: !isRailSurface,
+      });
+      if (fresh && !focusUserId) {
+        _cache.set(storyRowsCacheKey, { val: storyRows, exp: Date.now() + STORY_ROWS_CACHE_TTL_MS });
+      }
+    }
 
     orderedRows = interleaveStoryRows(storyRows, roleBuckets, storyWindowLimit);
     if (!isRailSurface) {

@@ -27,8 +27,8 @@ const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PREFETCH_PAGES = 3;
 const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
-const STORY_RAIL_REFRESH_INTERVAL_MS = 5 * 60_000;
-const STORY_RAIL_FOCUS_REFRESH_MIN_MS = 2 * 60_000;
+const STORY_RAIL_REFRESH_INTERVAL_MS = 10 * 60_000;
+const STORY_RAIL_FOCUS_REFRESH_MIN_MS = 5 * 60_000;
 const STORIES_RAIL_TRANSITION = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
 const STORY_CIRCLE_FALLBACK_SIZE = 88;
 const STORY_CIRCLE_FALLBACK_BORDER_PERCENT = 4;
@@ -176,18 +176,31 @@ function getHomeStoriesCacheKey(userId, isDesktopViewport) {
   return `${HOME_STORIES_CACHE_PREFIX}${userId || 'viewer'}:${isDesktopViewport ? 'desktop' : 'mobile'}`;
 }
 
-function getCachedHomeStories(userId, isDesktopViewport, limit) {
+function getCachedHomeStoriesEntry(userId, isDesktopViewport, limit, { allowStale = false } = {}) {
   try {
     const raw = localStorage.getItem(getHomeStoriesCacheKey(userId, isDesktopViewport));
-    if (!raw) return [];
+    if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (Number(parsed?.version || 0) !== HOME_STORIES_CACHE_VERSION) return [];
-    if (Date.now() - (Number(parsed?.timestamp) || 0) > HOME_STORIES_CACHE_TTL_MS) return [];
+    if (Number(parsed?.version || 0) !== HOME_STORIES_CACHE_VERSION) return null;
+    const timestamp = Number(parsed?.timestamp) || 0;
+    const ageMs = Date.now() - timestamp;
+    const isFresh = timestamp > 0 && ageMs <= HOME_STORIES_CACHE_TTL_MS;
+    if (!allowStale && !isFresh) return null;
     const stories = Array.isArray(parsed?.stories) ? parsed.stories : [];
-    return stories.slice(0, Math.max(1, Number(limit) || stories.length));
+    if (stories.length === 0) return null;
+    return {
+      stories: stories.slice(0, Math.max(1, Number(limit) || stories.length)),
+      timestamp,
+      ageMs,
+      isFresh,
+    };
   } catch {
-    return [];
+    return null;
   }
+}
+
+function getCachedHomeStories(userId, isDesktopViewport, limit) {
+  return getCachedHomeStoriesEntry(userId, isDesktopViewport, limit)?.stories || [];
 }
 
 function setCachedHomeStories(userId, isDesktopViewport, stories, limit) {
@@ -398,6 +411,16 @@ export default function FeedPage({ initialData }) {
   const loadHomeStories = useCallback(async ({ syncBootstrap = false, fresh = false } = {}) => {
     const myId = ++homeStoriesLoadIdRef.current;
     const resolvedLimit = getInitialStoryLimit(settingsRef.current, isDesktopViewport);
+    const cachedEntry = fresh
+      ? null
+      : getCachedHomeStoriesEntry(user?.id, isDesktopViewport, resolvedLimit);
+    if (cachedEntry?.stories?.length) {
+      const cachedStories = cachedEntry.stories;
+      setHomeStories(mapStoriesToRailProfiles(cachedStories).slice(0, resolvedLimit));
+      if (syncBootstrap) setBootstrapStories(cachedStories);
+      lastHomeStoriesRefreshRef.current = cachedEntry.timestamp || Date.now();
+      return cachedStories;
+    }
 
     try {
       const data = await getStories({ limit: resolvedLimit, surface: 'rail', fresh });
@@ -413,7 +436,7 @@ export default function FeedPage({ initialData }) {
     } catch {
       if (myId !== homeStoriesLoadIdRef.current) return null;
       if (homeStoriesLengthRef.current === 0) {
-        const cachedStories = getCachedHomeStories(user?.id, isDesktopViewport, resolvedLimit);
+        const cachedStories = getCachedHomeStoriesEntry(user?.id, isDesktopViewport, resolvedLimit, { allowStale: true })?.stories || [];
         setHomeStories(mapStoriesToRailProfiles(cachedStories).slice(0, resolvedLimit));
       }
       return null;

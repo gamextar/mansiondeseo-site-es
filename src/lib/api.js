@@ -1673,6 +1673,7 @@ export async function getStories({ page = 1, limit = 25, focusUserId = '', surfa
   const params = new URLSearchParams({ page, limit });
   if (focusUserId) params.set('focus_user_id', focusUserId);
   if (surface) params.set('surface', surface);
+  if (fresh) params.set('fresh', '1');
   const path = `/stories?${params}`;
   if (focusUserId || fresh) {
     // Reopening the same story reuses the same focus_user_id, and rail
@@ -1680,7 +1681,9 @@ export async function getStories({ page = 1, limit = 25, focusUserId = '', surfa
     // Bypass shared cache/promise reuse on these paths to avoid stale modal/rail state.
     return apiFetch(path);
   }
-  return sharedGet(`stories:${surface || 'video'}:${page}:${limit}:`, () => apiFetch(path), { ttlMs: 2 * 60_000 });
+  const surfaceKey = surface || 'video';
+  const ttlMs = ['rail', 'home', 'feed'].includes(surfaceKey) ? 5 * 60_000 : 2 * 60_000;
+  return sharedGet(`stories:${surfaceKey}:${page}:${limit}:`, () => apiFetch(path), { ttlMs });
 }
 
 export async function recordStoryView(storyId, { keepalive = false } = {}) {
