@@ -236,6 +236,7 @@ export default function FeedPage({ initialData }) {
   const pagedFeedConfigRef = useRef('');
   const pagedFeedConfigInitializedRef = useRef(false);
   const settingsRef = useRef(settings);
+  const profilesLengthRef = useRef(profiles.length);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -245,6 +246,10 @@ export default function FeedPage({ initialData }) {
     const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
     isSafariDesktopRef.current = isSafari && isDesktop;
   }, []);
+
+  useEffect(() => {
+    profilesLengthRef.current = profiles.length;
+  }, [profiles.length]);
 
 
 
@@ -310,7 +315,8 @@ export default function FeedPage({ initialData }) {
 
   const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize, targetPageCursor } = {}) => {
     const c = getCachedFeed();
-    if (!c) setLoading(true);
+    const hasVisibleProfiles = profilesLengthRef.current > 0;
+    if (!c && !hasVisibleProfiles) setLoading(true);
     const myId = ++loadIdRef.current;
     return fetchProfilesBlock({ forceFresh, cursor, pageSize })
       .then(data => {
@@ -325,7 +331,7 @@ export default function FeedPage({ initialData }) {
       })
       .catch(() => {
         if (myId !== loadIdRef.current) return;
-        if (!c) {
+        if (!c && !hasVisibleProfiles) {
           setProfiles([]);
           setNextCursor(null);
           setBlockCursor(0);

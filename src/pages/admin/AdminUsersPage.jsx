@@ -47,6 +47,18 @@ function roleLabel(role) {
   return map[role] || role;
 }
 
+function sexLabel(role) {
+  const map = {
+    hombre: 'Hombre',
+    mujer: 'Mujer',
+    pareja: 'Pareja',
+    pareja_hombres: 'Pareja H',
+    pareja_mujeres: 'Pareja M',
+    trans: 'Trans',
+  };
+  return map[role] || role || '—';
+}
+
 function reportReasonLabel(reason) {
   const map = {
     fake_profile: 'Perfil falso',
@@ -919,11 +931,11 @@ export default function AdminUsersPage() {
                       />
                     </th>
                     <th className="px-4 py-3">Usuario</th>
+                    <th className="px-4 py-3 text-center">Sexo</th>
                     <th className="px-4 py-3 hidden md:table-cell">Email</th>
                     <th className="px-4 py-3 text-center">VIP</th>
                     <th className="px-4 py-3 text-center">Disp.</th>
                     <th className="px-4 py-3 text-center hidden sm:table-cell">Coins</th>
-                    <th className="px-4 py-3 hidden lg:table-cell">IP</th>
                     <th className="px-4 py-3 hidden md:table-cell">Actividad</th>
                   </tr>
                 </thead>
@@ -1024,6 +1036,15 @@ export default function AdminUsersPage() {
                           </div>
                         </button>
                       </td>
+                      <td className="px-4 py-3 text-center">
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full border border-mansion-border/20 bg-black/20 px-2 py-1 text-[10px] font-medium text-text-muted"
+                          title={sexLabel(u.role)}
+                        >
+                          <span className="text-text-dim">{roleBadge(u.role)}</span>
+                          <span className="hidden sm:inline">{sexLabel(u.role)}</span>
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-text-muted text-xs hidden md:table-cell truncate max-w-[200px]">{u.email}</td>
                       <td className="px-4 py-3 text-center">
                         {u.premium ? <Crown className="w-4 h-4 text-mansion-gold mx-auto" /> : <span className="text-text-dim text-xs">—</span>}
@@ -1042,7 +1063,6 @@ export default function AdminUsersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center text-xs text-text-muted hidden sm:table-cell">{u.coins}</td>
-                      <td className="px-4 py-3 text-[10px] text-text-dim font-mono hidden lg:table-cell">{u.last_ip || '—'}</td>
                       <td className="px-4 py-3 text-xs text-text-dim hidden md:table-cell">{timeAgo(u.last_active)}</td>
                     </tr>
                   ))}
