@@ -9,12 +9,21 @@ import { formatLocation } from '../lib/location';
 import { formatNumber } from '../lib/siteConfig';
 import AvatarImg from '../components/AvatarImg';
 
-function getDisplayName(user) {
-  return user?.username || user?.name || 'Invitado';
-}
+const ROLE_PILLS = {
+  hombre: { label: 'Hombre', className: 'border-blue-500/40 bg-blue-600/35 text-blue-100' },
+  mujer: { label: 'Mujer', className: 'border-pink-500/40 bg-pink-600/35 text-pink-100' },
+  pareja: { label: 'Pareja', className: 'border-purple-500/40 bg-purple-600/35 text-purple-100' },
+  pareja_hombres: { label: 'Pareja de hombres', className: 'border-sky-500/40 bg-sky-600/35 text-sky-100' },
+  pareja_mujeres: { label: 'Pareja de mujeres', className: 'border-fuchsia-500/40 bg-fuchsia-600/35 text-fuchsia-100' },
+  trans: { label: 'Trans', className: 'border-teal-500/40 bg-teal-600/35 text-teal-100' },
+};
 
 function getProfileName(profile) {
   return profile?.name || profile?.username || 'Perfil';
+}
+
+function getRolePill(role) {
+  return ROLE_PILLS[role] || (role ? { label: role, className: 'border-white/20 bg-white/10 text-white/80' } : null);
 }
 
 function formatVisitAgo(dateStr) {
@@ -91,23 +100,24 @@ function ProfileImage({ profile, className = '' }) {
   );
 }
 
-function MetricIndicator({ icon: Icon, value, label, delay = 0, first = false }) {
+function MetricIndicator({ icon: Icon, value, label, shortLabel, delay = 0, first = false }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.38, delay }}
-      className={`relative min-h-[7.5rem] overflow-hidden border-b border-white/10 px-1 py-5 sm:border-b-0 sm:px-6 ${first ? '' : 'sm:border-l sm:border-white/10'}`}
+      className={`relative min-h-[4.35rem] overflow-hidden px-2 py-2.5 sm:min-h-[7.5rem] sm:px-6 sm:py-5 ${first ? '' : 'border-l border-white/10'}`}
     >
-      <div className="flex items-center justify-between gap-4">
-        <Icon className="h-5 w-5 text-mansion-gold" />
-        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-mansion-gold/80 shadow-[0_0_16px_rgba(201,168,76,0.55)]" />
+      <div className="flex items-center justify-center gap-1.5 sm:justify-between sm:gap-4">
+        <Icon className="h-3.5 w-3.5 text-mansion-gold sm:h-5 sm:w-5" />
+        <span className="hidden h-1.5 w-1.5 animate-pulse rounded-full bg-mansion-gold/80 shadow-[0_0_16px_rgba(201,168,76,0.55)] sm:block" />
       </div>
-      <p className="mt-5 font-display text-[2.35rem] font-semibold leading-none text-text-primary tabular-nums sm:text-[2.75rem]">
+      <p className="mt-1.5 text-center font-display text-[1.45rem] font-semibold leading-none text-text-primary tabular-nums sm:mt-5 sm:text-left sm:text-[2.75rem]">
         {formatNumber(value)}
       </p>
-      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-text-dim">
-        {label}
+      <p className="mt-0.5 text-center text-[9px] font-semibold uppercase leading-tight tracking-[0.12em] text-text-dim sm:mt-2 sm:text-left sm:text-[11px] sm:tracking-[0.22em]">
+        <span className="sm:hidden">{shortLabel || label}</span>
+        <span className="hidden sm:inline">{label}</span>
       </p>
       <motion.span
         initial={{ scaleX: 0 }}
@@ -136,6 +146,7 @@ function VisitorCard({ profile, caption, index = 0 }) {
   const location = useLocation();
   const locationText = formatLocation(profile);
   const profileName = getProfileName(profile);
+  const rolePill = getRolePill(profile.role);
 
   return (
     <motion.div
@@ -149,27 +160,48 @@ function VisitorCard({ profile, caption, index = 0 }) {
         state={buildProfileState(profile, location)}
         className="group block min-w-0"
       >
-        <div className="relative aspect-[4/5] overflow-hidden rounded-lg border border-white/10 bg-[#0d0d0d] shadow-[0_22px_60px_rgba(0,0,0,0.32)] transition duration-300 group-hover:-translate-y-1 group-hover:border-mansion-gold/35">
+        <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-mansion-card shadow-[0_8px_18px_rgba(0,0,0,0.2)] ring-1 ring-white/5 transition duration-300 group-hover:-translate-y-1 group-hover:ring-mansion-gold/35 lg:rounded-2xl lg:shadow-[0_14px_28px_rgba(0,0,0,0.24)]">
           <ProfileImage profile={profile} className="h-full w-full" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-90" />
-          <div className="absolute inset-x-0 bottom-0 p-4">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <p className="truncate text-base font-semibold text-white">{profileName}</p>
-              {profile.verified && <BadgeCheck className="h-4 w-4 shrink-0 text-emerald-300" />}
-              {profile.premium && <Crown className="h-4 w-4 shrink-0 text-mansion-gold" />}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+          <div className="absolute left-2 right-2 top-2 z-20 flex items-start justify-between gap-2 sm:left-3 sm:right-3 sm:top-3">
+            <div className="flex min-w-0 flex-wrap gap-1.5 pr-3">
+              {profile.premium && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-mansion-gold/30 bg-mansion-gold/20 px-1.5 py-0.5 text-[9px] font-semibold text-mansion-gold backdrop-blur-sm sm:px-2 sm:text-[10px]">
+                  <Crown className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                  VIP
+                </span>
+              )}
+              {profile.verified && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-200 backdrop-blur-sm sm:px-2 sm:text-[10px]">
+                  <BadgeCheck className="h-2.5 w-2.5 text-emerald-300 sm:h-3 sm:w-3" />
+                  Verificado
+                </span>
+              )}
             </div>
+            {profile.online && (
+              <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full border-2 border-black/40 bg-green-400 shadow-lg shadow-green-400/30 sm:h-3 sm:w-3" />
+            )}
+          </div>
+          <div className="absolute inset-x-0 bottom-0 z-20 p-3">
+            <h3 className="truncate font-display text-lg font-semibold leading-tight text-white">
+              {profileName}
+              {profile.age ? <span className="ml-1 font-body text-sm text-text-muted">{profile.age}</span> : null}
+            </h3>
+            {rolePill && (
+              <span className={`mt-1 inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm ${rolePill.className}`}>
+                {rolePill.label}
+              </span>
+            )}
             {locationText && (
-              <p className="mt-1.5 flex items-center gap-1 truncate text-xs text-white/62">
-                <MapPin className="h-3.5 w-3.5 shrink-0" />
+              <p className="mt-1 flex items-center gap-1 truncate text-xs text-text-muted">
+                <MapPin className="h-3 w-3 shrink-0" />
                 <span className="truncate">{locationText}</span>
               </p>
             )}
           </div>
-          {profile.online && (
-            <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(74,222,128,0.65)]" />
-          )}
         </div>
-        <p className="mt-3 min-h-[2.25rem] text-center text-[13px] leading-5 text-text-muted">
+        <p className="mt-2 flex min-h-[1.75rem] items-center justify-center gap-1 text-center text-[11px] leading-4 text-text-muted sm:text-[13px] sm:leading-5">
+          <Eye className="h-3.5 w-3.5 shrink-0 text-mansion-gold/70" />
           {caption}
         </p>
       </Link>
@@ -278,24 +310,43 @@ export default function DashboardPage() {
   const likesTotal = Number(followersCount || dashboardUser?.followers_total || 0);
 
   return (
-    <div className="min-h-mobile-browser-screen bg-black pb-mobile-legacy-nav pt-[calc(var(--safe-top)+68px)] text-text-primary lg:pb-16 lg:pt-12">
+    <div className="min-h-mobile-browser-screen bg-black pb-mobile-legacy-nav pt-0 text-text-primary lg:pb-16 lg:pt-12">
+      <div
+        className="flex min-h-[48px] items-center px-0 pr-3 pb-0.5 lg:hidden"
+        style={{ paddingTop: 'calc(var(--safe-top) + 8px)' }}
+      >
+        <Link
+          to="/inicio"
+          className="relative -top-[5px] inline-flex items-center gap-2 rounded-full bg-black/28 px-2.5 py-1.5 backdrop-blur-md"
+        >
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark">
+            <span className="font-display text-xs font-bold text-white">M</span>
+          </div>
+          <span
+            className="font-display text-[15px] font-semibold text-gradient-gold"
+            style={{ textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}
+          >
+            Mansion Deseo
+          </span>
+        </Link>
+      </div>
       <main className="mx-auto w-full max-w-[88rem] px-4 sm:px-6 lg:px-10">
         <motion.header
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.42 }}
-          className="pb-7"
+          className="pb-5 lg:pb-7"
         >
           <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-mansion-gold">
             <Sparkles className="h-3.5 w-3.5" />
             Inicio
           </div>
-          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
+          <div className="mt-3 grid gap-5 lg:mt-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
             <div>
-              <h1 className="font-display text-[2.35rem] font-semibold leading-[1.03] text-text-primary sm:text-6xl">
-                Bienvenido a la Mansión "{getDisplayName(dashboardUser)}"!
+              <h1 className="font-display text-[2.05rem] font-semibold leading-[1.03] text-text-primary sm:text-6xl">
+                Bienvenido a la Mansión..
               </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-text-muted">
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-text-muted lg:mt-4">
                 Tu actividad reciente, señales importantes y perfiles guardados en un solo lugar.
               </p>
             </div>
@@ -305,9 +356,9 @@ export default function DashboardPage() {
           </div>
         </motion.header>
 
-        <section className="grid border-y border-white/10 sm:grid-cols-3">
-          <MetricIndicator icon={MessageCircle} value={unreadCount} label="mensajes nuevos" first delay={0.04} />
-          <MetricIndicator icon={Eye} value={visitsTotal} label="visitas a tu perfil" delay={0.1} />
+        <section className="grid grid-cols-3 border-y border-white/10">
+          <MetricIndicator icon={MessageCircle} value={unreadCount} label="mensajes nuevos" shortLabel="mensajes" first delay={0.04} />
+          <MetricIndicator icon={Eye} value={visitsTotal} label="visitas a tu perfil" shortLabel="visitas" delay={0.1} />
           <MetricIndicator icon={Heart} value={likesTotal} label="likes" delay={0.16} />
         </section>
 
@@ -317,7 +368,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <section className="mt-12">
+        <section className="mt-8 lg:mt-12">
           <SectionIntro
             eyebrow="Actividad reciente"
             title="Últimas visitas"
@@ -334,7 +385,7 @@ export default function DashboardPage() {
           ) : visitors.length === 0 ? (
             <EmptyPanel minHeight="18rem">Todavía no hay visitas recientes.</EmptyPanel>
           ) : (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:gap-x-5 xl:gap-x-6">
+            <div className="grid grid-cols-2 gap-x-2.5 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 lg:gap-x-5 xl:gap-x-6">
               {visitors.map((visitor, index) => {
                 const ago = formatVisitAgo(visitor.visited_at);
                 return (
