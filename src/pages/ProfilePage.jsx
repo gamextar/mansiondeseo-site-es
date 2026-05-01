@@ -1360,7 +1360,7 @@ export default function ProfilePage() {
 
       {showStoryPreview && user?.active_story_url && (
         <div className="fixed inset-0 z-50 bg-black lg:left-64 xl:left-72 lg:bg-mansion-base">
-          <div className={`relative h-full w-full transition-[max-width] duration-300 ease-out lg:mx-auto lg:my-4 lg:h-[calc(100%-32px)] lg:rounded-2xl lg:overflow-hidden ${storyPreviewExpanded ? 'lg:max-w-[920px]' : 'lg:max-w-[520px]'}`}>
+          <div className={`relative h-full w-full transition-[max-width] duration-300 ease-out lg:mx-auto lg:my-4 lg:h-[calc(100%-32px)] lg:rounded-2xl lg:overflow-hidden ${storyPreviewExpanded ? 'lg:max-w-[900px] xl:max-w-[1040px]' : 'lg:max-w-[520px]'}`}>
             <StoryPreviewOverlay
               videoUrl={user.active_story_url}
               user={user}

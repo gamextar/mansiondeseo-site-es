@@ -32,6 +32,7 @@ const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
 const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 68;
 const VIDEO_FEED_RAIL_SOURCE = 'rail';
+const EXPANDED_STORY_SIDE_OFFSET = 'max(16px, calc(50% - min(520px, calc((100vw - 32px) / 2))))';
 
 function getStoryIdentity(story) {
   if (!story) return null;
@@ -267,7 +268,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const limitLabel = limitDaily > 0 ? `${Math.min(limitViewed, limitDaily)}/${limitDaily}` : '0';
   const blockedVideoScale = Math.max(videoScale, 1.08);
   const videoObjectClass = videoFitMode === 'cover' ? 'object-cover' : 'object-contain';
-  const frameWidthClass = landscapeExpanded ? 'lg:max-w-[820px] xl:max-w-[920px]' : 'lg:max-w-[520px]';
+  const frameWidthClass = landscapeExpanded ? 'lg:max-w-[900px] xl:max-w-[1040px]' : 'lg:max-w-[520px]';
 
   // Once src is set, never clear it — clearing causes browser to reload the video
   // which produces the black flash/glitch at boundaries. Matches original behavior.
@@ -675,7 +676,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       {!isLimitBlocked && (
         <div
           className="absolute z-20 hidden flex-col items-center gap-5 transition-[right] duration-300 ease-out lg:flex"
-          style={{ right: landscapeExpanded ? 'max(16px, calc(50% - 550px))' : 'calc(50% - 350px)', bottom: '60px' }}
+          style={{ right: landscapeExpanded ? EXPANDED_STORY_SIDE_OFFSET : 'calc(50% - 350px)', bottom: '60px' }}
         >
           <DesktopActionButtons story={story} onLike={onLike} navigate={navigate} onGift={onGift} isOwnStory={isOwnStory} />
         </div>
@@ -2014,14 +2015,14 @@ export default function VideoFeedPage() {
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(-1) : jumpByOne(-1))}
             className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-300 ease-out ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
-            style={{ left: desktopStoryExpanded ? 'max(16px, calc(50% - 550px))' : 'calc(50% - 350px)' }}
+            style={{ left: desktopStoryExpanded ? EXPANDED_STORY_SIDE_OFFSET : 'calc(50% - 350px)' }}
           >
             <ChevronLeft className="w-9 h-9 text-white/70" />
           </button>
           <button
             onClick={() => (isDesktopViewport ? moveDesktopByOne(1) : jumpByOne(1))}
             className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 z-30 w-[72px] h-[72px] rounded-full items-center justify-center border border-white/10 transition-all duration-300 ease-out ${safariDesktop ? 'bg-black/60' : 'bg-mansion-card/60 backdrop-blur-sm hover:bg-mansion-card/90 hover:border-white/25 hover:scale-110'}`}
-            style={{ right: desktopStoryExpanded ? 'max(16px, calc(50% - 550px))' : 'calc(50% - 350px)' }}
+            style={{ right: desktopStoryExpanded ? EXPANDED_STORY_SIDE_OFFSET : 'calc(50% - 350px)' }}
           >
             <ChevronRight className="w-9 h-9 text-white/70" />
           </button>

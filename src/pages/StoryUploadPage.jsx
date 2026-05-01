@@ -377,7 +377,7 @@ function StoryStageShell({ backgroundImageUrl, children, variant = 'default', ex
 			: 'absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black/58 via-black/16 to-transparent pointer-events-none rounded-b-[inherit]';
 
 	const useAnimatedBg = variant === 'pick' && !backgroundImageUrl;
-	const frameWidthClass = variant === 'preview' && expanded ? 'lg:max-w-[920px]' : 'lg:max-w-[520px]';
+	const frameWidthClass = variant === 'preview' && expanded ? 'lg:max-w-[900px] xl:max-w-[1040px]' : 'lg:max-w-[520px]';
 
 	return (
 		<div className={`${STORY_STAGE_FRAME_CLASS} ${frameWidthClass}`}>
