@@ -572,7 +572,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           playsInline
           webkit-playsinline="true"
           muted={isMuted}
-          autoPlay={isActive && !forcePaused}
+          autoPlay={shouldLoad && !forcePaused}
           preload={shouldLoad && !forcePaused ? 'auto' : 'metadata'}
           onEnded={handleVideoEnd}
           onClick={togglePlay}
