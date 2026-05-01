@@ -1153,9 +1153,6 @@ export default function VideoFeedPage() {
   const activeStoryId = String(activeStory?.story_id || activeStory?.id || '').trim();
   const activeStoryLimitBlocked = Boolean(activeStoryId && isStoryBlockedByLimit(activeStory));
 
-  useEffect(() => {
-    handleDesktopStoryExpandedChange(false);
-  }, [activeStoryId, handleDesktopStoryExpandedChange]);
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const isStandaloneMobileApp = detectStandaloneMobile();
   const mobileBrowserRoute = standaloneMobileRoute && !isStandaloneMobileApp;
