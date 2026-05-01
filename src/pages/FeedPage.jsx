@@ -1329,7 +1329,7 @@ export default function FeedPage({ initialData }) {
         <div className="px-0 pr-3 min-h-[48px] pb-0.5 flex items-center justify-between gap-3 fade-in-up">
           <button
             type="button"
-            onClick={() => navigate('/feed')}
+            onClick={() => navigate('/radar')}
             className="relative -top-[5px] inline-flex items-center gap-2 rounded-full bg-black/28 px-2.5 py-1.5 backdrop-blur-md"
           >
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
@@ -1402,7 +1402,7 @@ export default function FeedPage({ initialData }) {
                           avatar_url: user.avatar_url || '',
                           avatar_crop: user.avatar_crop || null,
                         })
-                      : () => navigate('/historia/nueva', { state: { from: '/feed' } })}
+                      : () => navigate('/historia/nueva', { state: { from: '/radar' } })}
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
                   >
@@ -1430,7 +1430,7 @@ export default function FeedPage({ initialData }) {
                   <button
                     type="button"
                     draggable={false}
-                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/feed' } }); }}
+                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/radar' } }); }}
                     className="absolute bottom-4 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
                     style={{ right: `${ownStoryPlusRight}px` }}
                     onDragStart={handleStoriesNativeDragStart}
@@ -1458,7 +1458,7 @@ export default function FeedPage({ initialData }) {
                           avatar_url: user.avatar_url || '',
                           avatar_crop: user.avatar_crop || null,
                         })
-                      : () => navigate('/historia/nueva', { state: { from: '/feed' } })}
+                      : () => navigate('/historia/nueva', { state: { from: '/radar' } })}
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
                   >
@@ -1486,7 +1486,7 @@ export default function FeedPage({ initialData }) {
                   <button
                     type="button"
                     draggable={false}
-                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/feed' } }); }}
+                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/radar' } }); }}
                     className="absolute bottom-4 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
                     style={{ right: `${ownStoryPlusRight}px` }}
                     onDragStart={handleStoriesNativeDragStart}
@@ -1514,7 +1514,7 @@ export default function FeedPage({ initialData }) {
                           avatar_url: user.avatar_url || '',
                           avatar_crop: user.avatar_crop || null,
                         })
-                      : () => navigate('/historia/nueva', { state: { from: '/feed' } })}
+                      : () => navigate('/historia/nueva', { state: { from: '/radar' } })}
                     className="flex flex-col items-center gap-1 w-full"
                     onDragStart={handleStoriesNativeDragStart}
                   >
@@ -1542,7 +1542,7 @@ export default function FeedPage({ initialData }) {
                   <button
                     type="button"
                     draggable={false}
-                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/feed' } }); }}
+                    onClick={(e) => { e.stopPropagation(); navigate('/historia/nueva', { state: { from: '/radar' } }); }}
                     className="absolute bottom-4 w-5 h-5 rounded-full bg-mansion-gold flex items-center justify-center border-2 border-mansion-base shadow-md"
                     style={{ right: `${ownStoryPlusRight}px` }}
                     onDragStart={handleStoriesNativeDragStart}

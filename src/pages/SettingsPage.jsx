@@ -247,7 +247,7 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    if (!user?.is_admin) { navigate('/feed'); return; }
+    if (!user?.is_admin) { navigate('/inicio'); return; }
     getSettings()
       .then(data => {
         const s = data.settings;
@@ -341,7 +341,7 @@ export default function SettingsPage() {
         setMailFrom(s.mailFrom || '');
         setRegistrationEmailBcc(s.registrationEmailBcc ?? 'registro@gamextar.com');
       })
-      .catch(() => navigate('/feed'))
+      .catch(() => navigate('/inicio'))
       .finally(() => setLoading(false));
     adminGetGifts().then(data => setGifts(data.gifts || [])).catch(() => {});
   }, [user, navigate]);

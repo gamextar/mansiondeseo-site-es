@@ -48,7 +48,7 @@ export default function PublicHomePage() {
   }, 'website-home');
 
   if (user) {
-    return <Navigate to="/feed" replace />;
+    return <Navigate to="/inicio" replace />;
   }
 
   const handleLogin = async (event) => {
@@ -64,7 +64,7 @@ export default function PublicHomePage() {
       const data = await apiLogin({ email: loginEmail, password: loginPassword });
       setUser(data.user);
       setRegistered(true);
-      window.location.href = '/feed';
+      window.location.href = '/inicio';
     } catch (err) {
       setLoginError(err?.message || 'Credenciales inválidas');
       setLoggingIn(false);

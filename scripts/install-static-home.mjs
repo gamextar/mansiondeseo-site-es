@@ -24,6 +24,7 @@ const appRoutes = new Set([
   'full-mobile-test',
   'historia/nueva',
   'ayuda',
+  'inicio',
   'login',
   'mensajes',
   'monedas',
@@ -39,6 +40,7 @@ const appRoutes = new Set([
   'safe-area-debug',
   'seguidores',
   'privacidad',
+  'radar',
   'terminos',
   'videos',
   'vip',
@@ -191,7 +193,7 @@ const staticHomeHtml = `<!doctype html>
         var isHomePath = path === '/' || path === '/index.html';
         if (hasToken || registered) {
           if (isHomePath) {
-            location.replace('/feed/');
+            location.replace('/inicio/');
             return;
           }
           var deepTarget = path + (location.search || '') + (location.hash || '');
@@ -417,7 +419,7 @@ const staticHomeHtml = `<!doctype html>
       }
       var idle = window.requestIdleCallback || function(cb){ return setTimeout(cb, 900); };
       idle(function(){ warm('prefetch'); }, { timeout: 1800 });
-      var intentLinks = document.querySelectorAll('a[href^="/registro"],a[href^="/login"],a[href^="/feed"]');
+      var intentLinks = document.querySelectorAll('a[href^="/registro"],a[href^="/login"],a[href^="/inicio"],a[href^="/radar"],a[href^="/feed"]');
       var events = ['pointerenter', 'focus', 'touchstart', 'mousedown'];
       for (var i = 0; i < intentLinks.length; i += 1) {
         for (var j = 0; j < events.length; j += 1) {

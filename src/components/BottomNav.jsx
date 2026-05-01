@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Film, MessageCircle, User, LayoutDashboard } from 'lucide-react';
+import { Home, Film, MessageCircle, User, Radar } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../lib/authContext';
@@ -16,12 +16,12 @@ import { useRef } from 'react';
 
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
-const HOME_FEED_ROUTES = ['/', '/feed'];
+const HOME_FEED_ROUTES = ['/radar', '/feed'];
 const HIDDEN_PATHS = ['/bienvenida', '/registro', '/login'];
 
 const NAV_ITEMS = [
-  { to: '/feed', icon: Home, label: 'Inicio' },
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/inicio', icon: Home, label: 'Inicio' },
+  { to: '/radar', icon: Radar, label: 'Radar' },
   { to: '/videos', icon: Film, label: 'Videos' },
   { to: '/mensajes', icon: MessageCircle, label: 'Mensajes' },
   { to: '/perfil', icon: User, label: 'Perfil' },
@@ -69,7 +69,7 @@ export default function BottomNav({ immersive = false }) {
   const showNavDebug = new URLSearchParams(location.search).get('nav_debug') === '1';
 
   const handleNavIntent = (to, { isActive, isHomeRoute }) => {
-    if (to === '/feed' && isHomeRoute) {
+    if (to === '/radar' && isHomeRoute) {
       window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT));
       return;
     }
@@ -77,7 +77,7 @@ export default function BottomNav({ immersive = false }) {
     if (to === '/videos') {
       warmVideoFeed();
     }
-    if (to === '/feed') {
+    if (to === '/radar') {
       try { localStorage.removeItem('mansion_feed'); } catch {}
     }
     navigateWithScrollReset(to);
@@ -141,7 +141,7 @@ export default function BottomNav({ immersive = false }) {
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
             const isHomeRoute = HOME_FEED_ROUTES.includes(location.pathname);
             const isActive =
-              to === '/feed'
+              to === '/radar'
                 ? isHomeRoute
                 : to === '/perfil'
                   ? location.pathname === to
@@ -169,7 +169,7 @@ export default function BottomNav({ immersive = false }) {
                     e.preventDefault();
                     return;
                   }
-                  if (isActive && to !== '/feed') return;
+                  if (isActive && to !== '/radar') return;
                   e.preventDefault();
                   handleNavIntent(to, { isActive, isHomeRoute });
                 }}

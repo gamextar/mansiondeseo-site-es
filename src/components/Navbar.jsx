@@ -26,7 +26,7 @@ export function MobileBrandOverlay({ hidden = false }) {
     >
       <div className="max-w-7xl mx-auto pl-0 pr-3 h-10 flex items-center">
         <Link
-          to="/feed"
+          to="/inicio"
           className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-black/28 px-2.5 py-1.5 backdrop-blur-md"
         >
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
@@ -53,7 +53,7 @@ export default function Navbar() {
       style={{ paddingTop: 'var(--safe-top)' }}
     >
       <div className="max-w-7xl mx-auto px-3 h-10 flex items-center">
-        <Link to="/feed" className="flex items-center gap-2">
+        <Link to="/inicio" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
             <span className="font-display text-white text-sm font-bold">M</span>
           </div>

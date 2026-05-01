@@ -261,7 +261,7 @@ export default function DashboardPage() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err.message || 'No pudimos cargar tu dashboard');
+        setError(err.message || 'No pudimos cargar tu inicio');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -288,7 +288,7 @@ export default function DashboardPage() {
         >
           <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-mansion-gold">
             <Sparkles className="h-3.5 w-3.5" />
-            Dashboard
+            Inicio
           </div>
           <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
             <div>

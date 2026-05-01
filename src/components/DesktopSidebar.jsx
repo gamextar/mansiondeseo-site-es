@@ -1,5 +1,5 @@
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Film, MessageCircle, User, Settings, Camera, Heart, LogOut, LayoutDashboard } from 'lucide-react';
+import { Home, Film, MessageCircle, User, Settings, Camera, Heart, LogOut, Radar } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useEffect, useState } from 'react';
@@ -10,7 +10,7 @@ import { warmVideoFeed } from '../lib/videoFeedWarmup';
 
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
-const HOME_FEED_ROUTES = ['/', '/feed'];
+const HOME_FEED_ROUTES = ['/radar', '/feed'];
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -25,8 +25,8 @@ function timeAgo(dateStr) {
 }
 
 const NAV_ITEMS = [
-  { to: '/feed', icon: Home, label: 'Inicio' },
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/inicio', icon: Home, label: 'Inicio' },
+  { to: '/radar', icon: Radar, label: 'Radar' },
   { to: '/videos', icon: Film, label: 'Videos' },
   { to: '/seguidores', icon: Heart, label: 'Me gusta' },
   { to: '/mensajes', icon: MessageCircle, label: 'Mensajes' },
@@ -76,13 +76,7 @@ export default function DesktopSidebar() {
     <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 xl:w-72 z-40 flex-col bg-mansion-card/50 border-r border-mansion-border/30 backdrop-blur-xl">
       {/* Logo */}
       <Link
-        to="/feed"
-        onClick={() => {
-          try { localStorage.removeItem('mansion_feed'); } catch {}
-          if (HOME_FEED_ROUTES.includes(location.pathname)) {
-            window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT));
-          }
-        }}
+        to="/inicio"
         className="px-6 h-16 flex items-center gap-3 border-b border-mansion-border/20 hover:opacity-80 transition-opacity"
       >
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-mansion-crimson to-mansion-crimson-dark flex items-center justify-center">
@@ -124,7 +118,7 @@ export default function DesktopSidebar() {
         {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
           const isHomeRoute = HOME_FEED_ROUTES.includes(location.pathname);
           const isActive =
-            to === '/feed'
+            to === '/radar'
               ? isHomeRoute
               : to === '/perfil'
                 ? location.pathname === to
@@ -143,10 +137,10 @@ export default function DesktopSidebar() {
                 if (to === '/videos') warmVideoFeed();
               }}
               onClick={() => {
-                if (to === '/feed' && isHomeRoute) {
+                if (to === '/radar' && isHomeRoute) {
                   window.dispatchEvent(new CustomEvent(HOME_FEED_RESET_EVENT));
                 }
-                if (to === '/feed') {
+                if (to === '/radar') {
                   try { localStorage.removeItem('mansion_feed'); } catch {}
                 }
                 if (to === '/videos') {

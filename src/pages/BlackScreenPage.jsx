@@ -4,7 +4,7 @@ export default function BlackScreenPage() {
   const exitBlackTest = () => {
     clearBootDebugFlags();
     if (typeof window !== 'undefined') {
-      window.location.replace('/feed');
+      window.location.replace('/inicio');
     }
   };
 

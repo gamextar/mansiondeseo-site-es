@@ -19,7 +19,7 @@ export default function WelcomePage() {
   });
 
   if (hasToken) {
-    return <Navigate to="/feed" replace />;
+    return <Navigate to="/inicio" replace />;
   }
 
   if (returningUser && !registerIntent) {

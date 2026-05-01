@@ -25,7 +25,7 @@ export default function LoginPage() {
       const data = await apiLogin({ email: loginEmail, password: loginPassword });
       setUser(data.user);
       setRegistered(true);
-      navigate('/feed');
+      navigate('/inicio');
     } catch (err) {
       setError(err.message || 'Credenciales inválidas');
     } finally {

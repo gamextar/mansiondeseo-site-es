@@ -71,7 +71,7 @@ export default function PagoMonedasExitosoPage() {
         </div>
 
         <button
-          onClick={() => navigate('/feed')}
+          onClick={() => navigate('/inicio')}
           className="w-full py-4 bg-mansion-gold text-black font-bold text-lg rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
         >
           Volver a la Mansión

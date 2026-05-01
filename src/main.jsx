@@ -93,6 +93,9 @@ if (typeof window !== 'undefined') {
   const isAppHomePath =
     window.location.pathname === '/' ||
     window.location.pathname === '' ||
+    window.location.pathname === '/inicio' ||
+    window.location.pathname === '/dashboard' ||
+    window.location.pathname === '/radar' ||
     window.location.pathname === '/feed';
   if (debugFlags.forceBlackTest && isAppHomePath) {
     window.history.replaceState({}, '', '/black-test');

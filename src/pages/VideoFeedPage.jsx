@@ -1107,11 +1107,11 @@ export default function VideoFeedPage() {
       );
       return;
     }
-    navigate('/feed', { replace: true });
+    navigate('/radar', { replace: true });
   }, [backgroundLocation, flushPendingViewedStories, isOverlayPreview, navigate]);
   const closeToHomeFeed = useCallback(() => {
     flushPendingViewedStories();
-    navigate('/feed', { replace: true });
+    navigate('/radar', { replace: true });
   }, [flushPendingViewedStories, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
     if (!isOverlayPreview || !isDesktopViewport) return;

@@ -11,7 +11,7 @@ export default function AdminLayout() {
   const location = useLocation();
 
   useEffect(() => {
-    if (!user?.is_admin) navigate('/feed');
+    if (!user?.is_admin) navigate('/inicio');
   }, [user, navigate]);
 
   if (!user?.is_admin) return null;
@@ -162,7 +162,7 @@ export default function AdminLayout() {
         {/* Bottom */}
         <div className="px-3 pb-4 space-y-1">
           <Link
-            to="/feed"
+            to="/inicio"
             className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-text-dim hover:text-text-muted transition-colors"
           >
             <Home className="w-4 h-4" />
@@ -182,7 +182,7 @@ export default function AdminLayout() {
               <span className="font-display text-lg font-semibold text-gradient-gold">Admin</span>
             </div>
             <Link
-              to="/feed"
+              to="/inicio"
               className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-mansion-border/25 bg-black/20 px-3 py-2 text-xs font-semibold text-text-dim"
             >
               <Home className="w-3.5 h-3.5" />

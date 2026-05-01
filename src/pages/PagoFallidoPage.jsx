@@ -39,7 +39,7 @@ export default function PagoFallidoPage() {
             Intentar nuevamente
           </button>
           <button
-            onClick={() => navigate('/feed')}
+            onClick={() => navigate('/inicio')}
             className="w-full py-3 text-gray-400 hover:text-white transition-colors"
           >
             Volver al inicio

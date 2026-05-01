@@ -270,7 +270,9 @@ function AppLayout() {
     isMobileViewport &&
     (
       normalizedRoutePath === '/feed' ||
+      normalizedRoutePath === '/radar' ||
       normalizedRoutePath === '/dashboard' ||
+      normalizedRoutePath === '/inicio' ||
       normalizedRoutePath === '/explorar' ||
       normalizedRoutePath === '/videos' ||
       normalizedRoutePath === '/perfil' ||
@@ -291,6 +293,7 @@ function AppLayout() {
     isMobileViewport &&
     !routeOverlayOpen &&
     normalizedRoutePath !== '/feed' &&
+    normalizedRoutePath !== '/radar' &&
     normalizedRoutePath !== '/explorar' &&
     normalizedRoutePath !== '/videos' &&
     immersiveMobileApp;
@@ -306,7 +309,9 @@ function AppLayout() {
   const showBottomNav = (((!(isChatDetail && isMobileViewport) && !isFullscreen) || standaloneVideosRoute || mobileBrowserVideosRoute) && !routeOverlayOpen);
   const isPrivateNoindexRoute =
     routePath === '/feed' ||
+    routePath === '/radar' ||
     routePath === '/dashboard' ||
+    routePath === '/inicio' ||
     routePath === '/explorar' ||
     routePath === '/videos' ||
     routePath === '/full-mobile-test' ||
@@ -870,10 +875,34 @@ function AppLayout() {
           <Route path="/privacidad" element={<PublicInfoPage type="privacy" />} />
           <Route path="/ayuda" element={<PublicInfoPage type="help" />} />
           <Route
-            path="/feed"
+            path="/inicio"
+            element={
+              <RequireRegistration>
+                <DashboardPage />
+              </RequireRegistration>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <RequireRegistration>
+                <Navigate to="/inicio" replace />
+              </RequireRegistration>
+            }
+          />
+          <Route
+            path="/radar"
             element={
               <RequireRegistration>
                 <FeedPage />
+              </RequireRegistration>
+            }
+          />
+          <Route
+            path="/feed"
+            element={
+              <RequireRegistration>
+                <Navigate to="/radar" replace />
               </RequireRegistration>
             }
           />
@@ -929,7 +958,7 @@ function AppLayout() {
             path="/ranking"
             element={
               <RequireRegistration>
-                <Navigate to="/feed" replace />
+                <Navigate to="/radar" replace />
               </RequireRegistration>
             }
           />
@@ -958,14 +987,6 @@ function AppLayout() {
             element={
               <RequireRegistration>
                 <ProfilePage />
-              </RequireRegistration>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <RequireRegistration>
-                <DashboardPage />
               </RequireRegistration>
             }
           />
@@ -1303,7 +1324,7 @@ export default function App() {
       setToken(token);
       localStorage.setItem('mansion_registered', 'true');
       setRegisteredState(true);
-      window.history.replaceState({}, '', '/feed');
+      window.history.replaceState({}, '', '/inicio');
     }
 
     let cancelled = false;
