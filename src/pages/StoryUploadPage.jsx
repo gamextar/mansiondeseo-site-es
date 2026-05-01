@@ -226,7 +226,7 @@ async function captureVideoPoster(fileUrl, { maxWidth = 720, quality = 0.82 } = 
 }
 
 const STORY_STAGE_VIEWPORT_CLASS = 'fixed inset-0 z-10 flex items-center justify-center p-0 sm:p-3';
-const STORY_STAGE_FRAME_CLASS = 'relative h-full w-full overflow-hidden rounded-none bg-black shadow-none sm:rounded-[1.75rem] sm:shadow-[0_18px_60px_rgba(0,0,0,0.45)] lg:my-4 lg:h-[calc(100%-32px)] lg:max-w-[520px]';
+const STORY_STAGE_FRAME_CLASS = 'relative h-full w-full overflow-hidden rounded-none bg-black shadow-none transition-[max-width] duration-300 ease-out sm:rounded-[1.75rem] sm:shadow-[0_18px_60px_rgba(0,0,0,0.45)] lg:my-4 lg:h-[calc(100%-32px)]';
 const STORY_STAGE_CLOSE_BUTTON_CLASS = 'absolute z-30 flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60';
 const STORY_STAGE_CLOSE_BUTTON_STYLE = { top: 'max(env(safe-area-inset-top, 12px), 12px)', right: 16 };
 
@@ -365,7 +365,7 @@ function AnimatedPickBackground() {
 	);
 }
 
-function StoryStageShell({ backgroundImageUrl, children, variant = 'default' }) {
+function StoryStageShell({ backgroundImageUrl, children, variant = 'default', expanded = false }) {
 	const shellOverlayClass = variant === 'pick' ? 'absolute inset-0 bg-black/10' : variant === 'preview' ? 'absolute inset-0 bg-black/14' : 'absolute inset-0 bg-black/28';
 	const topGradientClass = variant === 'pick'
 		? 'absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/12 via-black/4 to-transparent pointer-events-none rounded-t-[inherit]'
@@ -377,9 +377,10 @@ function StoryStageShell({ backgroundImageUrl, children, variant = 'default' }) 
 			: 'absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black/58 via-black/16 to-transparent pointer-events-none rounded-b-[inherit]';
 
 	const useAnimatedBg = variant === 'pick' && !backgroundImageUrl;
+	const frameWidthClass = variant === 'preview' && expanded ? 'lg:max-w-[920px]' : 'lg:max-w-[520px]';
 
 	return (
-		<div className={STORY_STAGE_FRAME_CLASS}>
+		<div className={`${STORY_STAGE_FRAME_CLASS} ${frameWidthClass}`}>
 			{useAnimatedBg ? (
 				<AnimatedPickBackground />
 			) : (
@@ -451,6 +452,7 @@ export default function StoryUploadPage() {
 	const [previewConfirmed, setPreviewConfirmed] = useState(false);
 	const [engineStatus, setEngineStatus] = useState('idle');
 	const [storyBackdropUrl, setStoryBackdropUrl] = useState('');
+	const [storyPreviewExpanded, setStoryPreviewExpanded] = useState(false);
 
 	const outputProfile = getOutputProfile(sourceResolution);
 	const storyStep = result ? (showPreview ? 'preview' : previewConfirmed ? 'done' : 'preview') : sourceFile ? 'process' : 'pick';
@@ -573,6 +575,7 @@ export default function StoryUploadPage() {
 		setElapsedSeconds(0);
 		setShowPreview(false);
 		setPreviewConfirmed(false);
+		setStoryPreviewExpanded(false);
 		setVipOnlyStory(false);
 		uploadTokenRef.current = '';
 		setPhase('idle');
@@ -876,7 +879,7 @@ export default function StoryUploadPage() {
 
 			<div className="relative w-full h-[100dvh]">
 				<div className={STORY_STAGE_VIEWPORT_CLASS}>
-					<StoryStageShell backgroundImageUrl={activeShellBackgroundUrl} variant={shellVariant}>
+					<StoryStageShell backgroundImageUrl={activeShellBackgroundUrl} variant={shellVariant} expanded={storyPreviewExpanded}>
 						{storyStep !== 'preview' && (
 							<StoryStageHeader
 								steps={storySteps}
@@ -1027,6 +1030,8 @@ export default function StoryUploadPage() {
 										onClose={resetStoryFlow}
 										onDismiss={() => { resetStoryFlow(); navigate(returnPath); }}
 										onConfirm={handlePublish}
+										landscapeExpanded={storyPreviewExpanded}
+										onLandscapeExpandedChange={setStoryPreviewExpanded}
 									/>
 								</motion.section>
 							)}

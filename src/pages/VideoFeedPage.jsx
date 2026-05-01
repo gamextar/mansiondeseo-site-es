@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X, Crown } from 'lucide-react';
+import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X, Crown, Maximize2, Minimize2 } from 'lucide-react';
 import { getStories, recordStoryView, getPublicSettings, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
@@ -260,11 +260,14 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [videoResetToken, setVideoResetToken] = useState(0);
   const [videoFitMode, setVideoFitMode] = useState('contain');
+  const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
+  const [landscapeExpanded, setLandscapeExpanded] = useState(false);
   const limitDaily = Number(limit?.dailyLimit ?? 10);
   const limitViewed = Number(limit?.viewedToday ?? limitDaily);
   const limitLabel = limitDaily > 0 ? `${Math.min(limitViewed, limitDaily)}/${limitDaily}` : '0';
   const blockedVideoScale = Math.max(videoScale, 1.08);
   const videoObjectClass = videoFitMode === 'cover' ? 'object-cover' : 'object-contain';
+  const frameWidthClass = landscapeExpanded ? 'lg:max-w-[820px] xl:max-w-[920px]' : 'lg:max-w-[520px]';
 
   // Once src is set, never clear it — clearing causes browser to reload the video
   // which produces the black flash/glitch at boundaries. Matches original behavior.
@@ -278,13 +281,18 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     revealSentRef.current = false;
     setIsVideoReady(false);
     setVideoFitMode('contain');
+    setIsLandscapeVideo(false);
+    setLandscapeExpanded(false);
   }, [activeSrc]);
 
   const handleLoadedMetadata = useCallback((event) => {
     const video = event.currentTarget;
     const width = Number(video.videoWidth || 0);
     const height = Number(video.videoHeight || 0);
-    setVideoFitMode(width > 0 && height > 0 && height >= width ? 'cover' : 'contain');
+    const landscape = width > 0 && height > 0 && width > height;
+    setIsLandscapeVideo(landscape);
+    setVideoFitMode(landscape ? 'contain' : 'cover');
+    if (!landscape) setLandscapeExpanded(false);
   }, []);
 
   const notifyRevealReady = useCallback(() => {
@@ -544,7 +552,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     <div className="relative w-full h-full bg-black flex items-center justify-center snap-start snap-always">
       <div
         data-story-card-frame="true"
-        className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden"
+        className={`relative h-full w-full transition-[max-width] duration-300 ease-out lg:mx-auto lg:my-4 lg:h-[calc(100%-32px)] lg:rounded-2xl lg:overflow-hidden ${frameWidthClass}`}
       >
         {/* eslint-disable-next-line */}
         <video
@@ -599,6 +607,18 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
         />
         <div className="absolute inset-x-0 top-0 hidden h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none lg:block lg:rounded-t-2xl" />
 
+        {isLandscapeVideo && !isLimitBlocked && (
+          <button
+            type="button"
+            onClick={() => setLandscapeExpanded((value) => !value)}
+            className="absolute left-4 top-4 z-30 hidden h-12 items-center gap-2 rounded-full border border-white/12 bg-black/42 px-4 text-sm font-semibold text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-black/60 lg:flex"
+            aria-label={landscapeExpanded ? 'Reducir historia' : 'Expandir historia'}
+          >
+            {landscapeExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            <span>{landscapeExpanded ? 'Reducir' : 'Expandir'}</span>
+          </button>
+        )}
+
         {isLimitBlocked && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/28 px-6 text-center">
             <button
@@ -647,7 +667,10 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       </div>
 
       {!isLimitBlocked && (
-        <div className="hidden lg:flex absolute flex-col items-center gap-5 z-20" style={{ right: 'calc(50% - 350px)', bottom: '60px' }}>
+        <div
+          className="absolute z-20 hidden flex-col items-center gap-5 transition-[right] duration-300 ease-out lg:flex"
+          style={{ right: landscapeExpanded ? 'max(16px, calc(50% - 550px))' : 'calc(50% - 350px)', bottom: '60px' }}
+        >
           <DesktopActionButtons story={story} onLike={onLike} navigate={navigate} onGift={onGift} isOwnStory={isOwnStory} />
         </div>
       )}

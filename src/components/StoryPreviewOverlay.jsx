@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Heart, Send, Gift, Lock, Volume2, VolumeX, X } from 'lucide-react';
+import { Heart, Send, Gift, Lock, Maximize2, Minimize2, Volume2, VolumeX, X } from 'lucide-react';
 import AvatarImg from './AvatarImg';
 
 const CLOSE_BTN_CLASS = 'absolute z-30 flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60';
@@ -22,12 +22,16 @@ export default function StoryPreviewOverlay({
   onVipOnlyChange,
   avatarSize = 52,
   navBottomOffset = 0,
+  landscapeExpanded = false,
+  onLandscapeChange,
+  onLandscapeExpandedChange,
 }) {
   const videoRef = useRef(null);
   const progressRef = useRef(null);
   const rafRef = useRef(null);
   const [isMuted, setIsMuted] = useState(true);
   const [videoFitMode, setVideoFitMode] = useState('contain');
+  const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
   const actionBottom = typeof navBottomOffset === 'number'
     ? navBottomOffset + 16
     : `calc(${navBottomOffset} + 16px)`;
@@ -36,13 +40,18 @@ export default function StoryPreviewOverlay({
     : `calc(${navBottomOffset} + 8px)`;
   const showVipOnlyToggle = Boolean(!uploading && onConfirm && canRestrictVipOnly && onVipOnlyChange);
   const videoObjectClass = videoFitMode === 'cover' ? 'object-cover' : 'object-contain';
+  const showLandscapeExpand = Boolean(isLandscapeVideo && onLandscapeExpandedChange && !uploading);
 
   const handleLoadedMetadata = useCallback((event) => {
     const video = event.currentTarget;
     const width = Number(video.videoWidth || 0);
     const height = Number(video.videoHeight || 0);
-    setVideoFitMode(width > 0 && height > 0 && height >= width ? 'cover' : 'contain');
-  }, []);
+    const landscape = width > 0 && height > 0 && width > height;
+    setIsLandscapeVideo(landscape);
+    setVideoFitMode(landscape ? 'contain' : 'cover');
+    onLandscapeChange?.(landscape);
+    if (!landscape) onLandscapeExpandedChange?.(false);
+  }, [onLandscapeChange, onLandscapeExpandedChange]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -57,6 +66,9 @@ export default function StoryPreviewOverlay({
     };
 
     setVideoFitMode('contain');
+    setIsLandscapeVideo(false);
+    onLandscapeChange?.(false);
+    onLandscapeExpandedChange?.(false);
     video.currentTime = 0;
     video.pause();
     video.addEventListener('canplay', startPlayback);
@@ -76,7 +88,7 @@ export default function StoryPreviewOverlay({
       video.removeEventListener('canplay', startPlayback);
       cancelAnimationFrame(rafRef.current);
     };
-  }, [videoUrl]);
+  }, [onLandscapeChange, onLandscapeExpandedChange, videoUrl]);
 
   return (
     <>
@@ -103,6 +115,19 @@ export default function StoryPreviewOverlay({
             aria-label="Cerrar"
           >
             <X className="h-7 w-7 text-white" />
+          </button>
+        )}
+
+        {showLandscapeExpand && (
+          <button
+            type="button"
+            onClick={() => onLandscapeExpandedChange(!landscapeExpanded)}
+            className="absolute left-4 z-30 hidden h-12 items-center gap-2 rounded-full border border-white/12 bg-black/42 px-4 text-sm font-semibold text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-black/60 lg:flex"
+            style={{ top: 'max(env(safe-area-inset-top, 12px), 12px)' }}
+            aria-label={landscapeExpanded ? 'Reducir historia' : 'Expandir historia'}
+          >
+            {landscapeExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            <span>{landscapeExpanded ? 'Reducir' : 'Expandir'}</span>
           </button>
         )}
 

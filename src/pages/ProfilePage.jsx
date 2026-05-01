@@ -125,6 +125,7 @@ export default function ProfilePage() {
   const lbPinchRef = useRef({ startDist: 0, startZoom: 1, active: false });
   const lbDragRef = useRef({ startX: 0, startY: 0, startPanX: 0, startPanY: 0, active: false });
   const [showStoryPreview, setShowStoryPreview] = useState(false);
+  const [storyPreviewExpanded, setStoryPreviewExpanded] = useState(false);
   const lbLastTapRef = useRef(0);
 
   const closeLightbox = useCallback(() => {
@@ -1359,12 +1360,17 @@ export default function ProfilePage() {
 
       {showStoryPreview && user?.active_story_url && (
         <div className="fixed inset-0 z-50 bg-black lg:left-64 xl:left-72 lg:bg-mansion-base">
-          <div className="relative w-full h-full lg:h-[calc(100%-32px)] lg:max-w-[520px] lg:mx-auto lg:my-4 lg:rounded-2xl lg:overflow-hidden">
+          <div className={`relative h-full w-full transition-[max-width] duration-300 ease-out lg:mx-auto lg:my-4 lg:h-[calc(100%-32px)] lg:rounded-2xl lg:overflow-hidden ${storyPreviewExpanded ? 'lg:max-w-[920px]' : 'lg:max-w-[520px]'}`}>
             <StoryPreviewOverlay
               videoUrl={user.active_story_url}
               user={user}
               navBottomOffset={navBottomOffset}
-              onDismiss={() => setShowStoryPreview(false)}
+              landscapeExpanded={storyPreviewExpanded}
+              onLandscapeExpandedChange={setStoryPreviewExpanded}
+              onDismiss={() => {
+                setStoryPreviewExpanded(false);
+                setShowStoryPreview(false);
+              }}
             />
           </div>
         </div>
