@@ -259,10 +259,12 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [videoResetToken, setVideoResetToken] = useState(0);
+  const [videoFitMode, setVideoFitMode] = useState('contain');
   const limitDaily = Number(limit?.dailyLimit ?? 10);
   const limitViewed = Number(limit?.viewedToday ?? limitDaily);
   const limitLabel = limitDaily > 0 ? `${Math.min(limitViewed, limitDaily)}/${limitDaily}` : '0';
   const blockedVideoScale = Math.max(videoScale, 1.08);
+  const videoObjectClass = videoFitMode === 'cover' ? 'object-cover' : 'object-contain';
 
   // Once src is set, never clear it — clearing causes browser to reload the video
   // which produces the black flash/glitch at boundaries. Matches original behavior.
@@ -275,7 +277,15 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   useEffect(() => {
     revealSentRef.current = false;
     setIsVideoReady(false);
+    setVideoFitMode('contain');
   }, [activeSrc]);
+
+  const handleLoadedMetadata = useCallback((event) => {
+    const video = event.currentTarget;
+    const width = Number(video.videoWidth || 0);
+    const height = Number(video.videoHeight || 0);
+    setVideoFitMode(width > 0 && height > 0 && height >= width ? 'cover' : 'contain');
+  }, []);
 
   const notifyRevealReady = useCallback(() => {
     if (forcePaused || !isActive || !onRevealReady || revealSentRef.current) return;
@@ -541,7 +551,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           key={`${activeSrc || 'empty-video'}-${videoResetToken}`}
           ref={videoRef}
           src={activeSrc}
-          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[1400ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+          className={`absolute inset-0 w-full h-full ${videoObjectClass} transition-opacity duration-[1400ms] ease-[cubic-bezier(0.22,1,0.36,1)]`}
           style={{
             WebkitTransform: `translateZ(0) scale(${isLimitBlocked ? blockedVideoScale : videoScale})`,
             transform: `translateZ(0) scale(${isLimitBlocked ? blockedVideoScale : videoScale})`,
@@ -556,6 +566,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
           preload={isActive && !forcePaused ? 'auto' : 'metadata'}
           onEnded={handleVideoEnd}
           onClick={togglePlay}
+          onLoadedMetadata={handleLoadedMetadata}
         />
 
         <div

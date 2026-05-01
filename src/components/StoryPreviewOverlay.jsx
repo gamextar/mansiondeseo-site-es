@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Heart, Send, Gift, Lock, Volume2, VolumeX, X } from 'lucide-react';
 import AvatarImg from './AvatarImg';
@@ -27,6 +27,7 @@ export default function StoryPreviewOverlay({
   const progressRef = useRef(null);
   const rafRef = useRef(null);
   const [isMuted, setIsMuted] = useState(true);
+  const [videoFitMode, setVideoFitMode] = useState('contain');
   const actionBottom = typeof navBottomOffset === 'number'
     ? navBottomOffset + 16
     : `calc(${navBottomOffset} + 16px)`;
@@ -34,6 +35,14 @@ export default function StoryPreviewOverlay({
     ? navBottomOffset + 8
     : `calc(${navBottomOffset} + 8px)`;
   const showVipOnlyToggle = Boolean(!uploading && onConfirm && canRestrictVipOnly && onVipOnlyChange);
+  const videoObjectClass = videoFitMode === 'cover' ? 'object-cover' : 'object-contain';
+
+  const handleLoadedMetadata = useCallback((event) => {
+    const video = event.currentTarget;
+    const width = Number(video.videoWidth || 0);
+    const height = Number(video.videoHeight || 0);
+    setVideoFitMode(width > 0 && height > 0 && height >= width ? 'cover' : 'contain');
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -47,6 +56,7 @@ export default function StoryPreviewOverlay({
       video.play().catch(() => {});
     };
 
+    setVideoFitMode('contain');
     video.currentTime = 0;
     video.pause();
     video.addEventListener('canplay', startPlayback);
@@ -73,12 +83,13 @@ export default function StoryPreviewOverlay({
       <video
         ref={videoRef}
         src={videoUrl}
-        className="absolute inset-0 z-[1] h-full w-full object-cover"
+        className={`absolute inset-0 z-[1] h-full w-full ${videoObjectClass}`}
         style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
         loop
         playsInline
         preload="auto"
         muted={isMuted}
+        onLoadedMetadata={handleLoadedMetadata}
       />
 
       <div className="absolute inset-0 z-20">
