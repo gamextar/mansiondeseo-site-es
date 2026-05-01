@@ -92,6 +92,7 @@ const STORY_RAIL_FALLBACK_GAP_MOBILE = 6;
 const STORY_RAIL_FALLBACK_GAP_DESKTOP = 7;
 const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
 const FREE_VIDEO_STORY_DAILY_LIMIT = 10;
+const FAKE_STORY_ROTATION_POOL_SIZE = 54;
 const FREE_CHAT_RECIPIENT_LIMIT = 5;
 const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
 const DEFAULT_REALTIMEKIT_PRESET_NAME = 'group_call_host';
@@ -312,6 +313,12 @@ function compareStoryRows(a, b) {
   const bFake = Number(b?.fake || 0);
   if (aFake !== bFake) return aFake - bFake;
   if (aFake === 1) {
+    const aPosition = Number(a?.rotation_position ?? a?.position);
+    const bPosition = Number(b?.rotation_position ?? b?.position);
+    if (Number.isFinite(aPosition) || Number.isFinite(bPosition)) {
+      const positionCompare = (Number.isFinite(aPosition) ? aPosition : 999999) - (Number.isFinite(bPosition) ? bPosition : 999999);
+      if (positionCompare !== 0) return positionCompare;
+    }
     const activeCompare = String(b?.last_active || '').localeCompare(String(a?.last_active || ''));
     if (activeCompare !== 0) return activeCompare;
     const visitsCompare = Number(b?.visits_total || 0) - Number(a?.visits_total || 0);
@@ -848,6 +855,7 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM story_likes WHERE story_id IN (SELECT id FROM stories WHERE user_id = ?)').bind(userId),
     env.DB.prepare('DELETE FROM story_daily_views WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM story_daily_views WHERE story_id IN (SELECT id FROM stories WHERE user_id = ?)').bind(userId),
+    env.DB.prepare('DELETE FROM fake_story_rotation WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM stories WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM hidden_conversations WHERE user_id = ? OR partner_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM user_blocks WHERE blocker_id = ? OR blocked_id = ?').bind(userId, userId),
@@ -1084,6 +1092,12 @@ async function ensureUserBrowseIndexes(env) {
       ).run(),
       env.DB.prepare(
         "CREATE INDEX IF NOT EXISTS idx_users_feed_active_role_fake_last ON users(role, COALESCE(fake, 0), last_active DESC, id DESC) WHERE status = 'verified' AND COALESCE(account_status, 'active') = 'active'"
+      ).run(),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS idx_users_feed_active_fake_id ON users(COALESCE(fake, 0), id) WHERE status = 'verified' AND COALESCE(account_status, 'active') = 'active'"
+      ).run(),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS idx_users_feed_active_fake_priority_last ON users(COALESCE(fake, 0), feed_priority DESC, last_active DESC, id DESC) WHERE status = 'verified' AND COALESCE(account_status, 'active') = 'active'"
       ).run(),
     ]).catch((err) => {
       _userBrowseIndexesReady = null;
@@ -6538,6 +6552,9 @@ async function rotateFakeOnlineUsers(env, {
   excludeRecentMinutes: requestedExcludeRecentMinutes,
   source = 'manual',
 } = {}) {
+  await ensureUsersFakeColumn(env);
+  await ensureUsersFeedPriorityColumn(env);
+  await ensureUserBrowseIndexes(env);
   await ensureStoriesTable(env);
 
   const settings = await cached('settings', 300_000, () => loadSettings(env));
@@ -6635,6 +6652,11 @@ async function rotateFakeOnlineUsers(env, {
     await env.DB.batch(updates.slice(i, i + 50));
   }
 
+  const storyRotation = await rebuildFakeStoryRotation(env, {
+    count: Math.max(FAKE_STORY_ROTATION_POOL_SIZE, count),
+    preferredUserIds: selected.map((user) => user.id),
+    source,
+  });
   const feedCacheVersion = await bumpFeedCacheVersion(env);
   const activeStoryUsers = selected.filter((user) => Number(user.has_story || 0) === 1).length;
   const activeFeaturedUsers = selected.filter((user) => Number(user.feed_priority || 0) > 0).length;
@@ -6649,6 +6671,7 @@ async function rotateFakeOnlineUsers(env, {
     excludeRecentMinutes,
     activeStoryUsers,
     activeFeaturedUsers,
+    fakeStoryRotation: storyRotation,
     feedCacheVersion,
     users: selected.slice(0, 20).map((user) => ({
       id: user.id,
@@ -7438,6 +7461,7 @@ async function handleAdminUpdateUser(request, env, userId) {
   await env.DB.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...vals).run();
   _fullUserCache.delete(userId);
   _viewerCache.delete(userId);
+  await syncFakeStoryRotationForUser(env, userId);
   invalidateFeedBrowseCache();
 
   const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
@@ -8181,6 +8205,30 @@ async function ensureStoriesTable(env) {
           )
         `).run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_story_daily_views_user_date ON story_daily_views(user_id, date_utc)').run(),
+        env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS fake_story_rotation (
+            story_id          TEXT PRIMARY KEY,
+            user_id           TEXT NOT NULL,
+            video_url         TEXT NOT NULL,
+            caption           TEXT NOT NULL DEFAULT '',
+            vip_only          INTEGER NOT NULL DEFAULT 0,
+            likes             INTEGER NOT NULL DEFAULT 0,
+            comments          INTEGER NOT NULL DEFAULT 0,
+            created_at        TEXT NOT NULL DEFAULT '',
+            username          TEXT NOT NULL DEFAULT '',
+            avatar_url        TEXT NOT NULL DEFAULT '',
+            avatar_crop       TEXT NOT NULL DEFAULT '',
+            role              TEXT NOT NULL DEFAULT '',
+            fake              INTEGER NOT NULL DEFAULT 1,
+            last_active       TEXT NOT NULL DEFAULT '',
+            visits_total      INTEGER NOT NULL DEFAULT 0,
+            rotation_position INTEGER NOT NULL DEFAULT 0,
+            rotated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        `).run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_role_position ON fake_story_rotation(role, rotation_position)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_position ON fake_story_rotation(rotation_position)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_user ON fake_story_rotation(user_id)').run(),
       ]);
     })().catch((err) => {
       _storiesTableReady = null;
@@ -8188,6 +8236,318 @@ async function ensureStoriesTable(env) {
     });
   }
   return _storiesTableReady;
+}
+
+function getStoryFeedSelectClause({ includeLiked = false, fromRotation = false } = {}) {
+  if (fromRotation) {
+    return `
+      SELECT story_id AS id, user_id, video_url, caption, COALESCE(vip_only, 0) AS vip_only,
+             likes, comments, created_at, username, avatar_url, avatar_crop, role,
+             COALESCE(fake, 1) AS fake, last_active, visits_total, rotation_position,
+             0 AS liked
+    `;
+  }
+
+  return `
+    SELECT s.id, s.user_id, s.video_url, COALESCE(s.caption, '') AS caption,
+           COALESCE(s.vip_only, 0) AS vip_only, COALESCE(s.likes, 0) AS likes,
+           COALESCE(s.comments, 0) AS comments, s.created_at,
+           u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
+           u.last_active, COALESCE(ps.visits_total, 0) AS visits_total,
+           ${includeLiked ? 'CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END' : '0'} AS liked
+  `;
+}
+
+function bindRoleFilter(parts, bindings, roleValues, column = 'u.role') {
+  if (!Array.isArray(roleValues) || roleValues.length === 0) return;
+  parts.push(` AND ${column} IN (${roleValues.map(() => '?').join(', ')})`);
+  bindings.push(...roleValues);
+}
+
+function uniqueStoryRows(rows = [], limit = Infinity) {
+  const seenStoryIds = new Set();
+  const seenUserIds = new Set();
+  const output = [];
+  for (const row of rows || []) {
+    const storyId = String(row?.id || row?.story_id || '').trim();
+    const userId = String(row?.user_id || '').trim();
+    if (!storyId || !userId) continue;
+    if (seenStoryIds.has(storyId) || seenUserIds.has(userId)) continue;
+    seenStoryIds.add(storyId);
+    seenUserIds.add(userId);
+    output.push(row);
+    if (output.length >= limit) break;
+  }
+  return output;
+}
+
+async function selectFakeStoryRowsForUsers(env, userIds = [], limit = FAKE_STORY_ROTATION_POOL_SIZE) {
+  const ids = [...new Set((userIds || []).map((value) => String(value || '').trim()).filter(Boolean))].slice(0, 200);
+  if (ids.length === 0) return [];
+
+  const placeholders = ids.map(() => '?').join(', ');
+  const { results } = await env.DB.prepare(`
+    ${getStoryFeedSelectClause()}
+    FROM users u
+    JOIN stories s ON s.user_id = u.id
+    LEFT JOIN profile_stats ps ON ps.user_id = u.id
+    WHERE u.id IN (${placeholders})
+      AND COALESCE(u.fake, 0) = 1
+      AND u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
+      AND s.active = 1
+    ORDER BY s.created_at DESC, s.id DESC
+  `).bind(...ids).all();
+
+  const byUserId = new Map();
+  for (const row of results || []) {
+    const userId = String(row?.user_id || '');
+    if (!userId || byUserId.has(userId)) continue;
+    byUserId.set(userId, row);
+  }
+
+  return ids.map((id) => byUserId.get(id)).filter(Boolean).slice(0, limit);
+}
+
+async function selectFillFakeStoryRows(env, { excludeUserIds = [], limit = FAKE_STORY_ROTATION_POOL_SIZE } = {}) {
+  const safeLimit = parseIntegerSetting(limit, FAKE_STORY_ROTATION_POOL_SIZE, 1, 200);
+  const excluded = [...new Set((excludeUserIds || []).map((value) => String(value || '').trim()).filter(Boolean))].slice(0, 200);
+  const excludedClause = excluded.length > 0
+    ? `AND u.id NOT IN (${excluded.map(() => '?').join(', ')})`
+    : '';
+  const bindings = [...excluded, Math.max(safeLimit * 3, safeLimit)];
+  const { results } = await env.DB.prepare(`
+    ${getStoryFeedSelectClause()}
+    FROM users u
+    JOIN stories s ON s.user_id = u.id
+    LEFT JOIN profile_stats ps ON ps.user_id = u.id
+    WHERE COALESCE(u.fake, 0) = 1
+      AND u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
+      AND s.active = 1
+      ${excludedClause}
+    ORDER BY COALESCE(u.feed_priority, 0) DESC, u.last_active DESC, COALESCE(ps.visits_total, 0) DESC, RANDOM()
+    LIMIT ?
+  `).bind(...bindings).all();
+
+  return uniqueStoryRows(results || [], safeLimit);
+}
+
+function buildFakeStoryRotationInsert(env, row, position, rotatedAt) {
+  return env.DB.prepare(`
+    INSERT INTO fake_story_rotation (
+      story_id, user_id, video_url, caption, vip_only, likes, comments, created_at,
+      username, avatar_url, avatar_crop, role, fake, last_active, visits_total,
+      rotation_position, rotated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+    ON CONFLICT(story_id) DO UPDATE SET
+      user_id = excluded.user_id,
+      video_url = excluded.video_url,
+      caption = excluded.caption,
+      vip_only = excluded.vip_only,
+      likes = excluded.likes,
+      comments = excluded.comments,
+      created_at = excluded.created_at,
+      username = excluded.username,
+      avatar_url = excluded.avatar_url,
+      avatar_crop = excluded.avatar_crop,
+      role = excluded.role,
+      fake = 1,
+      last_active = excluded.last_active,
+      visits_total = excluded.visits_total,
+      rotation_position = excluded.rotation_position,
+      rotated_at = excluded.rotated_at
+  `).bind(
+    row.id,
+    row.user_id,
+    row.video_url || '',
+    row.caption || '',
+    Number(row.vip_only || 0),
+    Number(row.likes || 0),
+    Number(row.comments || 0),
+    row.created_at || '',
+    row.username || '',
+    row.avatar_url || '',
+    typeof row.avatar_crop === 'string' ? row.avatar_crop : JSON.stringify(row.avatar_crop || null),
+    row.role || '',
+    row.last_active || '',
+    Number(row.visits_total || 0),
+    position,
+    rotatedAt
+  );
+}
+
+async function rebuildFakeStoryRotation(env, {
+  count = FAKE_STORY_ROTATION_POOL_SIZE,
+  preferredUserIds = [],
+  source = 'unknown',
+} = {}) {
+  await ensureStoriesTable(env);
+
+  const poolSize = parseIntegerSetting(count, FAKE_STORY_ROTATION_POOL_SIZE, 1, 200);
+  const preferredRows = await selectFakeStoryRowsForUsers(env, preferredUserIds, poolSize);
+  const fillRows = preferredRows.length < poolSize
+    ? await selectFillFakeStoryRows(env, {
+        excludeUserIds: preferredRows.map((row) => row.user_id),
+        limit: poolSize - preferredRows.length,
+      })
+    : [];
+
+  const rows = uniqueStoryRows([...preferredRows, ...fillRows], poolSize);
+  const rotatedAt = formatSqlDateFromMs(Date.now());
+
+  const statements = [env.DB.prepare('DELETE FROM fake_story_rotation')];
+  rows.forEach((row, index) => {
+    statements.push(buildFakeStoryRotationInsert(env, row, index + 1, rotatedAt));
+  });
+
+  for (let i = 0; i < statements.length; i += 50) {
+    await env.DB.batch(statements.slice(i, i + 50));
+  }
+
+  _cache.delete('fake-story-rotation-empty');
+  console.log(`🔧 Fake story rotation (${source}) — ${rows.length}/${poolSize} stories`);
+  return {
+    requested: poolSize,
+    rotated: rows.length,
+    preferred: preferredRows.length,
+  };
+}
+
+async function syncFakeStoryRotationForUser(env, userId) {
+  const normalizedUserId = String(userId || '').trim();
+  if (!normalizedUserId) return;
+  await ensureStoriesTable(env);
+
+  const current = await env.DB.prepare(
+    'SELECT story_id, rotation_position, rotated_at FROM fake_story_rotation WHERE user_id = ? LIMIT 1'
+  ).bind(normalizedUserId).first();
+  if (!current) return;
+
+  const [row] = await selectFakeStoryRowsForUsers(env, [normalizedUserId], 1);
+  if (!row) {
+    await env.DB.prepare('DELETE FROM fake_story_rotation WHERE user_id = ?').bind(normalizedUserId).run();
+    invalidateFeedBrowseCache();
+    return;
+  }
+
+  await buildFakeStoryRotationInsert(env, row, Number(current.rotation_position || 999999), current.rotated_at || formatSqlDateFromMs(Date.now())).run();
+  invalidateFeedBrowseCache();
+}
+
+async function loadRealStoryRowsForFeed(env, { roleValues = [], roleBuckets = [], limit = 25 } = {}) {
+  const bindings = [];
+  let query = `
+    /* stories:materialized:real */
+    ${getStoryFeedSelectClause()}
+    FROM users u
+    JOIN stories s ON s.user_id = u.id
+    LEFT JOIN profile_stats ps ON ps.user_id = u.id
+    WHERE COALESCE(u.fake, 0) = 0
+      AND u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
+      AND s.active = 1
+  `;
+  const parts = [query];
+  bindRoleFilter(parts, bindings, roleValues, 'u.role');
+  query = parts.join('\n');
+  query += `
+    ORDER BY s.created_at DESC, u.last_active DESC, s.id DESC
+  `;
+  return fetchRowsPerRoleBucket(env, query, bindings, roleBuckets, limit);
+}
+
+async function loadFakeStoryRotationRows(env, { roleValues = [], limit = 25 } = {}) {
+  const safeLimit = parseIntegerSetting(limit, 25, 0, 500);
+  if (safeLimit <= 0) return [];
+  const bindings = [];
+  const parts = [`
+    /* stories:materialized:fake-rotation */
+    ${getStoryFeedSelectClause({ fromRotation: true })}
+    FROM fake_story_rotation
+    WHERE 1 = 1
+  `];
+  bindRoleFilter(parts, bindings, roleValues, 'role');
+  parts.push(`
+    ORDER BY rotation_position ASC, rotated_at DESC, story_id DESC
+    LIMIT ?
+  `);
+  bindings.push(safeLimit);
+
+  const { results } = await env.DB.prepare(parts.join('\n')).bind(...bindings).all();
+  return results || [];
+}
+
+async function loadFocusedStoryRow(env, focusUserId) {
+  const userId = String(focusUserId || '').trim();
+  if (!userId) return null;
+  return env.DB.prepare(`
+    /* stories:materialized:focus */
+    ${getStoryFeedSelectClause()}
+    FROM stories s
+    JOIN users u ON u.id = s.user_id
+    LEFT JOIN profile_stats ps ON ps.user_id = u.id
+    WHERE s.active = 1
+      AND s.user_id = ?
+      AND u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
+    ORDER BY s.created_at DESC, s.id DESC
+    LIMIT 1
+  `).bind(userId).first();
+}
+
+async function loadMaterializedStoryRows(env, {
+  roleValues = [],
+  roleBuckets = [],
+  limit = 25,
+  focusUserId = '',
+} = {}) {
+  await ensureStoriesTable(env);
+
+  const safeLimit = parseIntegerSetting(limit, 25, 1, 500);
+  const [realRows, focusRow] = await Promise.all([
+    loadRealStoryRowsForFeed(env, { roleValues, roleBuckets, limit: safeLimit }),
+    focusUserId ? loadFocusedStoryRow(env, focusUserId) : Promise.resolve(null),
+  ]);
+  const realCount = Array.isArray(realRows) ? realRows.length : 0;
+  const needsFocusedFakeWindow = focusRow && Number(focusRow.fake || 0) === 1;
+  const fakeLimit = needsFocusedFakeWindow
+    ? Math.min(FAKE_STORY_ROTATION_POOL_SIZE, safeLimit)
+    : Math.max(0, safeLimit - realCount + 5);
+
+  let fakeRows = await loadFakeStoryRotationRows(env, { roleValues, limit: fakeLimit });
+  if (fakeLimit > 0 && fakeRows.length === 0) {
+    const emptyRecently = isFreshCached('fake-story-rotation-empty');
+    if (!emptyRecently) {
+      const rotation = await rebuildFakeStoryRotation(env, { count: FAKE_STORY_ROTATION_POOL_SIZE, source: 'stories-fallback' });
+      if (rotation.rotated === 0) {
+        _cache.set('fake-story-rotation-empty', { val: true, exp: Date.now() + 300_000 });
+      }
+      fakeRows = await loadFakeStoryRotationRows(env, { roleValues, limit: fakeLimit });
+    }
+  }
+
+  const merged = focusRow ? [focusRow, ...(realRows || []), ...fakeRows] : [...(realRows || []), ...fakeRows];
+  return uniqueStoryRows(merged, safeLimit + (focusRow ? 1 : 0));
+}
+
+async function attachStoryLikedStatus(env, rows, viewerId) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const userId = String(viewerId || '').trim();
+  if (!userId || safeRows.length === 0) {
+    return safeRows.map((row) => ({ ...row, liked: 0 }));
+  }
+
+  const storyIds = [...new Set(safeRows.map((row) => String(row?.id || '').trim()).filter(Boolean))].slice(0, 200);
+  if (storyIds.length === 0) return safeRows.map((row) => ({ ...row, liked: 0 }));
+
+  const { results } = await env.DB.prepare(`
+    /* stories:likes:selected */
+    SELECT story_id FROM story_likes
+    WHERE user_id = ? AND story_id IN (${storyIds.map(() => '?').join(', ')})
+  `).bind(userId, ...storyIds).all();
+  const likedIds = new Set((results || []).map((row) => String(row.story_id || '')));
+  return safeRows.map((row) => ({ ...row, liked: likedIds.has(String(row?.id || '')) ? 1 : 0 }));
 }
 
 function getStoryDailyLimit(settings) {
@@ -8275,66 +8635,92 @@ async function loadStoriesPayload(request, env, options = {}) {
   const roleBuckets = getRoleBucketsForFilters(roleFilters);
   const roleValues = [...new Set(roleFilters.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])))];
 
-  const bindings = [];
-  const appendStoryVisibilityFilters = (parts, values, { includeLiked = false } = {}) => {
-    parts.push(`
-      FROM stories s
-      JOIN users u ON u.id = s.user_id
-      LEFT JOIN profile_stats ps ON ps.user_id = u.id
-      ${includeLiked ? 'LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?' : ''}
-      WHERE s.active = 1
-        AND u.status = 'verified'
-        AND COALESCE(u.account_status, 'active') = 'active'
-    `);
-    if (includeLiked) values.push(viewerId || '');
-    if (roleValues.length > 0) {
-      parts.push(` AND u.role IN (${roleValues.map(() => '?').join(', ')})`);
-      values.push(...roleValues);
-    }
-    if (!isRailSurface && !viewerCanWatchAllStories) {
-      parts.push(' AND (COALESCE(s.vip_only, 0) = 0 OR s.user_id = ?)');
-      values.push(viewerId || '');
-    }
-    if (focusUserId) {
-      parts.push(' AND (s.user_id != ? OR ? = \'\' OR s.user_id = ?)');
-      values.push(viewerId || '', viewerId || '', focusUserId);
-    } else if (!isRailSurface && viewerId) {
-      parts.push(' AND s.user_id != ?');
-      values.push(viewerId);
-    }
-  };
-
   const includeLiked = !isRailSurface;
-  let query = `
-    SELECT s.id, s.user_id, s.video_url, s.caption, COALESCE(s.vip_only, 0) AS vip_only,
-           s.likes, s.comments, s.created_at,
-           u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
-           u.last_active, COALESCE(ps.visits_total, 0) AS visits_total,
-           ${includeLiked ? 'CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END' : '0'} as liked
-  `;
-  const queryParts = [query];
-  appendStoryVisibilityFilters(queryParts, bindings, { includeLiked });
-  query = queryParts.join('\n');
-  query += `
-    ORDER BY
-      COALESCE(u.fake, 0) ASC,
-      CASE WHEN COALESCE(u.fake, 0) = 1 THEN u.last_active ELSE s.created_at END DESC,
-      CASE WHEN COALESCE(u.fake, 0) = 1 THEN COALESCE(ps.visits_total, 0) ELSE 0 END DESC,
-      CASE WHEN COALESCE(u.fake, 0) = 1 THEN s.created_at ELSE u.last_active END DESC,
-      s.id DESC
-  `;
-
   const allowFocusWindow = focusUserId && effectivePage === 1;
+  const visibilityWindowLimit = !isRailSurface && !viewerCanWatchAllStories
+    ? offset + (effectiveLimit * 3) + 1
+    : offset + effectiveLimit + 1;
   const storyWindowLimit = Math.max(
-    offset + effectiveLimit + 1,
+    visibilityWindowLimit,
     allowFocusWindow ? 400 : effectiveLimit
   );
-  const canCacheStoryRows = isRailSurface && !focusUserId && effectivePage === 1;
+  const useMaterializedRows = effectivePage === 1;
   const storyRowsCacheKey = `story-rows:${surface || 'rail'}:${roleValues.length ? roleValues.slice().sort().join(',') : 'all'}:${storyWindowLimit}`;
-  const storyRows = canCacheStoryRows
-    ? await cached(storyRowsCacheKey, 120_000, () => fetchRowsPerRoleBucket(env, query, bindings, roleBuckets, storyWindowLimit))
-    : await fetchRowsPerRoleBucket(env, query, bindings, roleBuckets, storyWindowLimit);
-  const orderedRows = interleaveStoryRows(storyRows, roleBuckets, storyWindowLimit);
+  const canCacheStoryRows = useMaterializedRows && !focusUserId;
+
+  let orderedRows;
+  let rowsNeedLikedSync = false;
+
+  if (useMaterializedRows) {
+    const storyRows = canCacheStoryRows
+      ? await cached(storyRowsCacheKey, 120_000, () => loadMaterializedStoryRows(env, {
+          roleValues,
+          roleBuckets,
+          limit: storyWindowLimit,
+        }))
+      : await loadMaterializedStoryRows(env, {
+          roleValues,
+          roleBuckets,
+          limit: storyWindowLimit,
+          focusUserId,
+        });
+
+    orderedRows = interleaveStoryRows(storyRows, roleBuckets, storyWindowLimit);
+    if (!isRailSurface) {
+      if (!viewerCanWatchAllStories) {
+        orderedRows = orderedRows.filter((row) => Number(row?.vip_only || 0) !== 1 || String(row?.user_id || '') === String(viewerId || ''));
+      }
+      if (!focusUserId && viewerId) {
+        orderedRows = orderedRows.filter((row) => String(row?.user_id || '') !== String(viewerId));
+      }
+    }
+    rowsNeedLikedSync = includeLiked;
+  } else {
+    const bindings = [];
+    const appendStoryVisibilityFilters = (parts, values, { includeLiked: shouldIncludeLiked = false } = {}) => {
+      parts.push(`
+        FROM stories s
+        JOIN users u ON u.id = s.user_id
+        LEFT JOIN profile_stats ps ON ps.user_id = u.id
+        ${shouldIncludeLiked ? 'LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?' : ''}
+        WHERE s.active = 1
+          AND u.status = 'verified'
+          AND COALESCE(u.account_status, 'active') = 'active'
+      `);
+      if (shouldIncludeLiked) values.push(viewerId || '');
+      bindRoleFilter(parts, values, roleValues, 'u.role');
+      if (!isRailSurface && !viewerCanWatchAllStories) {
+        parts.push(' AND (COALESCE(s.vip_only, 0) = 0 OR s.user_id = ?)');
+        values.push(viewerId || '');
+      }
+      if (focusUserId) {
+        parts.push(' AND (s.user_id != ? OR ? = \'\' OR s.user_id = ?)');
+        values.push(viewerId || '', viewerId || '', focusUserId);
+      } else if (!isRailSurface && viewerId) {
+        parts.push(' AND s.user_id != ?');
+        values.push(viewerId);
+      }
+    };
+
+    let query = `
+      /* stories:legacy-window */
+      ${getStoryFeedSelectClause({ includeLiked })}
+    `;
+    const queryParts = [query];
+    appendStoryVisibilityFilters(queryParts, bindings, { includeLiked });
+    query = queryParts.join('\n');
+    query += `
+      ORDER BY
+        COALESCE(u.fake, 0) ASC,
+        CASE WHEN COALESCE(u.fake, 0) = 1 THEN u.last_active ELSE s.created_at END DESC,
+        CASE WHEN COALESCE(u.fake, 0) = 1 THEN COALESCE(ps.visits_total, 0) ELSE 0 END DESC,
+        CASE WHEN COALESCE(u.fake, 0) = 1 THEN s.created_at ELSE u.last_active END DESC,
+        s.id DESC
+    `;
+
+    const storyRows = await fetchRowsPerRoleBucket(env, query, bindings, roleBuckets, storyWindowLimit);
+    orderedRows = interleaveStoryRows(storyRows, roleBuckets, storyWindowLimit);
+  }
 
   if (allowFocusWindow) {
     const targetIndex = orderedRows.findIndex((row) => String(row.user_id) === focusUserId);
@@ -8343,9 +8729,11 @@ async function loadStoriesPayload(request, env, options = {}) {
     }
   }
 
-  const stories = orderedRows
-    .slice(offset, offset + effectiveLimit)
-    .map((row) => mapStoryRowForResponse(row, env, viewerId || '', viewerCanWatchAllStories));
+  const pageRows = orderedRows.slice(offset, offset + effectiveLimit);
+  const responseRows = rowsNeedLikedSync
+    ? await attachStoryLikedStatus(env, pageRows, viewerId)
+    : pageRows;
+  const stories = responseRows.map((row) => mapStoryRowForResponse(row, env, viewerId || '', viewerCanWatchAllStories));
 
   return {
     stories,
@@ -8487,6 +8875,8 @@ async function handleToggleStoryLike(request, env, storyId) {
     }
   }
 
+  await env.DB.prepare('UPDATE fake_story_rotation SET likes = ? WHERE story_id = ?').bind(newLikes, storyId).run();
+
   return json({ liked, likes: newLikes });
 }
 
@@ -8525,6 +8915,7 @@ async function handleSyncStoryLikes(request, env) {
 
     let liked = !!existing;
     let likes = Number(story.likes || 0);
+    let likesChanged = false;
 
     if (desiredLiked && !existing) {
       await env.DB.prepare('INSERT OR IGNORE INTO story_likes (user_id, story_id) VALUES (?, ?)')
@@ -8532,6 +8923,7 @@ async function handleSyncStoryLikes(request, env) {
       await env.DB.prepare('UPDATE stories SET likes = likes + 1 WHERE id = ?').bind(storyId).run();
       liked = true;
       likes += 1;
+      likesChanged = true;
 
       if (story.user_id !== auth.sub) {
         try {
@@ -8551,8 +8943,12 @@ async function handleSyncStoryLikes(request, env) {
       await env.DB.prepare('UPDATE stories SET likes = MAX(0, likes - 1) WHERE id = ?').bind(storyId).run();
       liked = false;
       likes = Math.max(0, likes - 1);
+      likesChanged = true;
     }
 
+    if (likesChanged) {
+      await env.DB.prepare('UPDATE fake_story_rotation SET likes = ? WHERE story_id = ?').bind(likes, storyId).run();
+    }
     updates.push({ story_id: storyId, liked, likes });
   }
 
@@ -8653,7 +9049,7 @@ async function handleAdminUploadStory(request, env) {
   if (!userId) return error('user_id requerido', 400);
 
   // Verify target user exists
-  const targetUser = await env.DB.prepare('SELECT id, premium, premium_until FROM users WHERE id = ?').bind(userId).first();
+  const targetUser = await env.DB.prepare('SELECT id, premium, premium_until, COALESCE(fake, 0) AS fake FROM users WHERE id = ?').bind(userId).first();
   if (!targetUser) return error('Usuario no encontrado', 404);
   if (vipOnly && !isPremiumActive(targetUser)) {
     return error('Solo usuarios VIP pueden publicar historias solo VIP', 403);
@@ -8689,6 +9085,7 @@ async function handleAdminUploadStory(request, env) {
       const oldKey = extractMediaKey(old.video_url, env);
       await env.IMAGES.delete(oldKey);
     } catch {}
+    await env.DB.prepare('DELETE FROM fake_story_rotation WHERE story_id = ?').bind(old.id).run();
     await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(old.id).run();
   }
 
@@ -8697,11 +9094,18 @@ async function handleAdminUploadStory(request, env) {
     INSERT INTO stories (id, user_id, video_url, caption, vip_only) VALUES (?, ?, ?, ?, ?)
   `).bind(storyId, userId, videoUrl, caption, vipOnly ? 1 : 0).run();
 
+  if (Number(targetUser.fake || 0) === 1) {
+    await rebuildFakeStoryRotation(env, { count: FAKE_STORY_ROTATION_POOL_SIZE, preferredUserIds: [userId], source: 'admin-upload-story' });
+  }
+  await bumpFeedCacheVersion(env);
+
   return json({ id: storyId, video_url: videoUrl, user_id: userId, caption, vip_only: vipOnly }, 201);
 }
 
 // ── Admin: DELETE /api/admin/stories/:id ───────────────
 async function handleDeleteOwnStory(request, env, storyId) {
+  await ensureStoriesTable(env);
+
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
@@ -8715,6 +9119,7 @@ async function handleDeleteOwnStory(request, env, storyId) {
   if (!story) return error('Historia no encontrada', 404);
   if (story.user_id !== auth.sub) return error('No puedes borrar historias de otros usuarios', 403);
 
+  const rotationDelete = await env.DB.prepare('DELETE FROM fake_story_rotation WHERE story_id = ?').bind(story.id).run();
   await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(story.id).run();
 
   // Best-effort R2 delete
@@ -8725,10 +9130,17 @@ async function handleDeleteOwnStory(request, env, storyId) {
     // R2 delete is best-effort
   }
 
+  if (Number(rotationDelete?.meta?.changes || 0) > 0) {
+    await rebuildFakeStoryRotation(env, { count: FAKE_STORY_ROTATION_POOL_SIZE, source: 'delete-story' });
+  }
+  await bumpFeedCacheVersion(env);
+
   return json({ deleted: true, story_id: story.id });
 }
 
 async function handleAdminDeleteStory(request, env, storyId) {
+  await ensureStoriesTable(env);
+
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -8738,6 +9150,7 @@ async function handleAdminDeleteStory(request, env, storyId) {
   const story = await env.DB.prepare('SELECT id, video_url FROM stories WHERE id = ?').bind(storyId).first();
   if (!story) return error('Historia no encontrada', 404);
 
+  const rotationDelete = await env.DB.prepare('DELETE FROM fake_story_rotation WHERE story_id = ?').bind(storyId).run();
   await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(storyId).run();
 
   // Best-effort R2 delete
@@ -8747,6 +9160,11 @@ async function handleAdminDeleteStory(request, env, storyId) {
   } catch {
     // R2 delete is best-effort
   }
+
+  if (Number(rotationDelete?.meta?.changes || 0) > 0) {
+    await rebuildFakeStoryRotation(env, { count: FAKE_STORY_ROTATION_POOL_SIZE, source: 'admin-delete-story' });
+  }
+  await bumpFeedCacheVersion(env);
 
   return json({ deleted: true, story_id: storyId });
 }
@@ -8773,6 +9191,8 @@ async function handleAdminUpdateStory(request, env, storyId) {
   }
 
   await env.DB.prepare('UPDATE stories SET vip_only = ? WHERE id = ?').bind(vipOnly ? 1 : 0, storyId).run();
+  await syncFakeStoryRotationForUser(env, story.user_id);
+  await bumpFeedCacheVersion(env);
   return json({ id: storyId, user_id: story.user_id, vip_only: vipOnly });
 }
 
@@ -8822,6 +9242,7 @@ async function handleUploadStory(request, env) {
       const oldKey = extractMediaKey(old.video_url, env);
       await env.IMAGES.delete(oldKey);
     } catch {}
+    await env.DB.prepare('DELETE FROM fake_story_rotation WHERE story_id = ?').bind(old.id).run();
     await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(old.id).run();
   }
 
@@ -8829,6 +9250,8 @@ async function handleUploadStory(request, env) {
   await env.DB.prepare(`
     INSERT INTO stories (id, user_id, video_url, caption, vip_only) VALUES (?, ?, ?, ?, ?)
   `).bind(storyId, auth.sub, videoUrl, caption, vipOnly ? 1 : 0).run();
+
+  await bumpFeedCacheVersion(env);
 
   return json({ id: storyId, video_url: videoUrl, caption, vip_only: vipOnly }, 201);
 }
