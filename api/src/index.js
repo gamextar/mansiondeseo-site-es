@@ -8746,6 +8746,10 @@ async function loadStoriesPayload(request, env, options = {}) {
     orderedRows = interleaveStoryRows(storyRows, roleBuckets, storyWindowLimit);
   }
 
+  if (!focusUserId && viewerId) {
+    orderedRows = orderedRows.filter((row) => String(row?.user_id || '') !== String(viewerId));
+  }
+
   if (allowFocusWindow) {
     const targetIndex = orderedRows.findIndex((row) => String(row.user_id) === focusUserId);
     if (targetIndex >= 0) {
