@@ -8181,51 +8181,54 @@ async function ensureStoriesTable(env) {
         }
       }
 
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS story_likes (
+          user_id   TEXT NOT NULL,
+          story_id  TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (user_id, story_id)
+        )
+      `).run();
+
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS story_daily_views (
+          user_id   TEXT NOT NULL,
+          story_id  TEXT NOT NULL,
+          date_utc  TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (user_id, story_id, date_utc)
+        )
+      `).run();
+
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS fake_story_rotation (
+          story_id          TEXT PRIMARY KEY,
+          user_id           TEXT NOT NULL,
+          video_url         TEXT NOT NULL,
+          caption           TEXT NOT NULL DEFAULT '',
+          vip_only          INTEGER NOT NULL DEFAULT 0,
+          likes             INTEGER NOT NULL DEFAULT 0,
+          comments          INTEGER NOT NULL DEFAULT 0,
+          created_at        TEXT NOT NULL DEFAULT '',
+          username          TEXT NOT NULL DEFAULT '',
+          avatar_url        TEXT NOT NULL DEFAULT '',
+          avatar_crop       TEXT NOT NULL DEFAULT '',
+          role              TEXT NOT NULL DEFAULT '',
+          fake              INTEGER NOT NULL DEFAULT 1,
+          last_active       TEXT NOT NULL DEFAULT '',
+          visits_total      INTEGER NOT NULL DEFAULT 0,
+          rotation_position INTEGER NOT NULL DEFAULT 0,
+          rotated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `).run();
+
       await Promise.all([
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_active ON stories(active, created_at)').run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_active_created_id ON stories(active, created_at DESC, id DESC)').run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_active_user_created ON stories(active, user_id, created_at DESC, id DESC)').run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_vip_only ON stories(vip_only, active, created_at)').run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_stories_user_created ON stories(user_id, created_at DESC)').run(),
-        env.DB.prepare(`
-          CREATE TABLE IF NOT EXISTS story_likes (
-            user_id   TEXT NOT NULL,
-            story_id  TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            PRIMARY KEY (user_id, story_id)
-          )
-        `).run(),
-        env.DB.prepare(`
-          CREATE TABLE IF NOT EXISTS story_daily_views (
-            user_id   TEXT NOT NULL,
-            story_id  TEXT NOT NULL,
-            date_utc  TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            PRIMARY KEY (user_id, story_id, date_utc)
-          )
-        `).run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_story_daily_views_user_date ON story_daily_views(user_id, date_utc)').run(),
-        env.DB.prepare(`
-          CREATE TABLE IF NOT EXISTS fake_story_rotation (
-            story_id          TEXT PRIMARY KEY,
-            user_id           TEXT NOT NULL,
-            video_url         TEXT NOT NULL,
-            caption           TEXT NOT NULL DEFAULT '',
-            vip_only          INTEGER NOT NULL DEFAULT 0,
-            likes             INTEGER NOT NULL DEFAULT 0,
-            comments          INTEGER NOT NULL DEFAULT 0,
-            created_at        TEXT NOT NULL DEFAULT '',
-            username          TEXT NOT NULL DEFAULT '',
-            avatar_url        TEXT NOT NULL DEFAULT '',
-            avatar_crop       TEXT NOT NULL DEFAULT '',
-            role              TEXT NOT NULL DEFAULT '',
-            fake              INTEGER NOT NULL DEFAULT 1,
-            last_active       TEXT NOT NULL DEFAULT '',
-            visits_total      INTEGER NOT NULL DEFAULT 0,
-            rotation_position INTEGER NOT NULL DEFAULT 0,
-            rotated_at        TEXT NOT NULL DEFAULT (datetime('now'))
-          )
-        `).run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_role_position ON fake_story_rotation(role, rotation_position)').run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_position ON fake_story_rotation(rotation_position)').run(),
         env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_user ON fake_story_rotation(user_id)').run(),
