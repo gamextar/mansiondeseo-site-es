@@ -311,10 +311,18 @@ function compareStoryRows(a, b) {
   const aFake = Number(a?.fake || 0);
   const bFake = Number(b?.fake || 0);
   if (aFake !== bFake) return aFake - bFake;
+  if (aFake === 1) {
+    const activeCompare = String(b?.last_active || '').localeCompare(String(a?.last_active || ''));
+    if (activeCompare !== 0) return activeCompare;
+    const visitsCompare = Number(b?.visits_total || 0) - Number(a?.visits_total || 0);
+    if (visitsCompare !== 0) return visitsCompare;
+  }
   const createdCompare = String(b?.created_at || '').localeCompare(String(a?.created_at || ''));
   if (createdCompare !== 0) return createdCompare;
   const activeCompare = String(b?.last_active || '').localeCompare(String(a?.last_active || ''));
   if (activeCompare !== 0) return activeCompare;
+  const visitsCompare = Number(b?.visits_total || 0) - Number(a?.visits_total || 0);
+  if (visitsCompare !== 0) return visitsCompare;
   return String(b?.id || '').localeCompare(String(a?.id || ''));
 }
 
@@ -8292,6 +8300,7 @@ async function loadStoriesPayload(request, env, options = {}) {
     parts.push(`
       FROM stories s
       JOIN users u ON u.id = s.user_id
+      LEFT JOIN profile_stats ps ON ps.user_id = u.id
       ${includeLiked ? 'LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?' : ''}
       WHERE s.active = 1
         AND u.status = 'verified'
@@ -8318,7 +8327,7 @@ async function loadStoriesPayload(request, env, options = {}) {
            END AS restricted,
            s.likes, s.comments, s.created_at,
            u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
-           u.last_active,
+           u.last_active, COALESCE(ps.visits_total, 0) AS visits_total,
            CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END as liked
   `;
   const queryParts = [query];
@@ -8326,7 +8335,12 @@ async function loadStoriesPayload(request, env, options = {}) {
   appendStoryVisibilityFilters(queryParts, bindings, { includeLiked: true });
   query = queryParts.join('\n');
   query += `
-    ORDER BY COALESCE(u.fake, 0) ASC, s.created_at DESC, u.last_active DESC, s.id DESC
+    ORDER BY
+      COALESCE(u.fake, 0) ASC,
+      CASE WHEN COALESCE(u.fake, 0) = 1 THEN u.last_active ELSE s.created_at END DESC,
+      CASE WHEN COALESCE(u.fake, 0) = 1 THEN COALESCE(ps.visits_total, 0) ELSE 0 END DESC,
+      CASE WHEN COALESCE(u.fake, 0) = 1 THEN s.created_at ELSE u.last_active END DESC,
+      s.id DESC
   `;
 
   const allowFocusWindow = focusUserId && effectivePage === 1;
