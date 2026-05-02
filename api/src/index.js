@@ -857,6 +857,7 @@ async function deleteUserCompletely(env, user) {
   await ensureAccountDeletionRequestsTable(env);
   await ensurePhotoVerificationRequestsTable(env);
   await ensureStoriesTable(env);
+  await ensureFakeStoryCandidatePool(env);
   await ensureErrorLogsTable(env);
   await ensureSubscriptionPaymentLogsTable(env);
   await ensureChatRecipientLimitTable(env);
@@ -874,6 +875,7 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM story_daily_views WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM story_daily_views WHERE story_id IN (SELECT id FROM stories WHERE user_id = ?)').bind(userId),
     env.DB.prepare('DELETE FROM fake_story_rotation WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM fake_story_candidates WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM synthetic_visit_candidates WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM stories WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM hidden_conversations WHERE user_id = ? OR partner_id = ?').bind(userId, userId),
@@ -9081,6 +9083,7 @@ async function handlePaymentResultReport(request, env) {
 // ── Stories ─────────────────────────────────────────────
 
 let _storiesTableReady = null;
+let _fakeStoryCandidatePoolReady = null;
 async function ensureStoriesTable(env) {
   if (!_storiesTableReady) {
     _storiesTableReady = (async () => {
@@ -9169,6 +9172,47 @@ async function ensureStoriesTable(env) {
   return _storiesTableReady;
 }
 
+async function ensureFakeStoryCandidatePool(env) {
+  await ensureStoriesTable(env);
+  if (!_fakeStoryCandidatePoolReady) {
+    _fakeStoryCandidatePoolReady = (async () => {
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS fake_story_candidates (
+          story_id          TEXT PRIMARY KEY,
+          user_id           TEXT NOT NULL,
+          video_url         TEXT NOT NULL,
+          caption           TEXT NOT NULL DEFAULT '',
+          vip_only          INTEGER NOT NULL DEFAULT 0,
+          likes             INTEGER NOT NULL DEFAULT 0,
+          comments          INTEGER NOT NULL DEFAULT 0,
+          created_at        TEXT NOT NULL DEFAULT '',
+          username          TEXT NOT NULL DEFAULT '',
+          avatar_url        TEXT NOT NULL DEFAULT '',
+          avatar_crop       TEXT NOT NULL DEFAULT '',
+          role              TEXT NOT NULL DEFAULT '',
+          fake              INTEGER NOT NULL DEFAULT 1,
+          last_active       TEXT NOT NULL DEFAULT '',
+          visits_total      INTEGER NOT NULL DEFAULT 0,
+          feed_priority     INTEGER NOT NULL DEFAULT 0,
+          rotation_position INTEGER NOT NULL DEFAULT 0,
+          rotated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `).run();
+
+      await Promise.all([
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_candidates_position ON fake_story_candidates(rotation_position)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_candidates_position_full ON fake_story_candidates(rotation_position, rotated_at DESC, story_id DESC)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_candidates_role_position ON fake_story_candidates(role, rotation_position)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fake_story_candidates_user ON fake_story_candidates(user_id)').run(),
+      ]);
+    })().catch((err) => {
+      _fakeStoryCandidatePoolReady = null;
+      throw err;
+    });
+  }
+  return _fakeStoryCandidatePoolReady;
+}
+
 function getStoryFeedSelectClause({ includeLiked = false, fromRotation = false } = {}) {
   if (fromRotation) {
     return `
@@ -9254,37 +9298,48 @@ async function selectFillFakeStoryRows(env, { excludeUserIds = [], limit = FAKE_
   const safeLimit = parseIntegerSetting(limit, FAKE_STORY_ROTATION_POOL_SIZE, 1, 200);
   const excluded = [...new Set((excludeUserIds || []).map((value) => String(value || '').trim()).filter(Boolean))].slice(0, 200);
   const excludedClause = excluded.length > 0
-    ? `AND u.id NOT IN (${excluded.map(() => '?').join(', ')})`
+    ? `AND user_id NOT IN (${excluded.map(() => '?').join(', ')})`
     : '';
-  const candidateLimit = Math.min(2000, Math.max(safeLimit * 30, 500));
-  const bindings = [...excluded, candidateLimit, Math.max(safeLimit * 2, safeLimit)];
-  const { results } = await env.DB.prepare(`
-    WITH candidate_users AS (
-      SELECT u.id, ABS(RANDOM()) AS random_rank
-      FROM users u
-      WHERE COALESCE(u.fake, 0) = 1
-        AND u.status = 'verified'
-        AND COALESCE(u.account_status, 'active') = 'active'
-        AND EXISTS (
-          SELECT 1 FROM stories story_probe
-          WHERE story_probe.user_id = u.id
-            AND story_probe.active = 1
-        )
-        ${excludedClause}
-      ORDER BY COALESCE(u.feed_priority, 0) DESC, random_rank ASC
-      LIMIT ?
-    )
-    ${getStoryFeedSelectClause()}
-    FROM candidate_users cu
-    JOIN users u ON u.id = cu.id
-    JOIN stories s ON s.user_id = u.id
-    LEFT JOIN profile_stats ps ON ps.user_id = u.id
-    WHERE s.active = 1
-    ORDER BY COALESCE(u.feed_priority, 0) DESC, cu.random_rank ASC, s.created_at DESC, s.id DESC
-    LIMIT ?
-  `).bind(...bindings).all();
 
-  return uniqueStoryRows(results || [], safeLimit);
+  await ensureFakeStoryCandidatePool(env);
+  let maxRow = await env.DB.prepare('SELECT COALESCE(MAX(rotation_position), 0) AS max_position FROM fake_story_candidates').first();
+  let maxPosition = Number(maxRow?.max_position || 0);
+  if (maxPosition <= 0 && !isFreshCached('fake-story-candidates-empty')) {
+    const rebuilt = await rebuildFakeStoryCandidatePool(env, { source: 'rotation-fill-empty' });
+    if (rebuilt.total === 0) {
+      _cache.set('fake-story-candidates-empty', { val: true, exp: Date.now() + 300_000 });
+      return [];
+    }
+    maxRow = await env.DB.prepare('SELECT COALESCE(MAX(rotation_position), 0) AS max_position FROM fake_story_candidates').first();
+    maxPosition = Number(maxRow?.max_position || 0);
+  }
+  if (maxPosition <= 0) return [];
+
+  const windowKey = Math.floor(Date.now() / (15 * 60_000));
+  const startPosition = (hashStringToUint32(`${windowKey}:${safeLimit}:${excluded.join('|')}`) % maxPosition) + 1;
+  const selectRows = async ({ operator, position, currentExcluded = [] }) => {
+    const allExcluded = [...new Set([...excluded, ...currentExcluded])].slice(0, 200);
+    const allExcludedClause = allExcluded.length > 0
+      ? `AND user_id NOT IN (${allExcluded.map(() => '?').join(', ')})`
+      : '';
+    const { results } = await env.DB.prepare(`
+      ${getStoryFeedSelectClause({ fromRotation: true })}
+      FROM fake_story_candidates
+      WHERE rotation_position ${operator} ?
+        ${allExcludedClause}
+      ORDER BY rotation_position ASC, rotated_at DESC, story_id DESC
+      LIMIT ?
+    `).bind(position, ...allExcluded, safeLimit).all();
+    return results || [];
+  };
+
+  const firstRows = await selectRows({ operator: '>=', position: startPosition });
+  const firstUserIds = firstRows.map((row) => row.user_id);
+  const wrapRows = firstRows.length < safeLimit
+    ? await selectRows({ operator: '<', position: startPosition, currentExcluded: firstUserIds })
+    : [];
+
+  return uniqueStoryRows([...firstRows, ...wrapRows], safeLimit);
 }
 
 async function selectExistingFakeStoryRotationRows(env, { excludeUserIds = [], limit = FAKE_STORY_ROTATION_POOL_SIZE } = {}) {
@@ -9347,6 +9402,123 @@ function buildFakeStoryRotationInsert(env, row, position, rotatedAt) {
     position,
     rotatedAt
   );
+}
+
+function buildFakeStoryCandidateInsert(env, row, position, rotatedAt) {
+  return env.DB.prepare(`
+    INSERT INTO fake_story_candidates (
+      story_id, user_id, video_url, caption, vip_only, likes, comments, created_at,
+      username, avatar_url, avatar_crop, role, fake, last_active, visits_total,
+      feed_priority, rotation_position, rotated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+    ON CONFLICT(story_id) DO UPDATE SET
+      user_id = excluded.user_id,
+      video_url = excluded.video_url,
+      caption = excluded.caption,
+      vip_only = excluded.vip_only,
+      likes = excluded.likes,
+      comments = excluded.comments,
+      created_at = excluded.created_at,
+      username = excluded.username,
+      avatar_url = excluded.avatar_url,
+      avatar_crop = excluded.avatar_crop,
+      role = excluded.role,
+      fake = 1,
+      last_active = excluded.last_active,
+      visits_total = excluded.visits_total,
+      feed_priority = excluded.feed_priority,
+      rotation_position = excluded.rotation_position,
+      rotated_at = excluded.rotated_at
+  `).bind(
+    row.id,
+    row.user_id,
+    row.video_url || '',
+    row.caption || '',
+    Number(row.vip_only || 0),
+    Number(row.likes || 0),
+    Number(row.comments || 0),
+    row.created_at || '',
+    row.username || '',
+    row.avatar_url || '',
+    typeof row.avatar_crop === 'string' ? row.avatar_crop : JSON.stringify(row.avatar_crop || null),
+    row.role || '',
+    row.last_active || '',
+    Number(row.visits_total || 0),
+    Number(row.feed_priority || 0),
+    position,
+    rotatedAt
+  );
+}
+
+async function rebuildFakeStoryCandidatePool(env, { source = 'unknown' } = {}) {
+  await ensureFakeStoryCandidatePool(env);
+
+  const { results } = await env.DB.prepare(`
+    SELECT s.id, s.user_id, s.video_url, COALESCE(s.caption, '') AS caption,
+           COALESCE(s.vip_only, 0) AS vip_only, COALESCE(s.likes, 0) AS likes,
+           COALESCE(s.comments, 0) AS comments, s.created_at,
+           u.username, u.avatar_url, u.avatar_crop, u.role, 1 AS fake,
+           u.last_active, 0 AS visits_total, COALESCE(u.feed_priority, 0) AS feed_priority
+    FROM stories s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.active = 1
+      AND COALESCE(u.fake, 0) = 1
+      AND u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
+    ORDER BY COALESCE(u.feed_priority, 0) DESC, s.created_at DESC, s.id DESC
+  `).all();
+
+  const rows = uniqueStoryRows(results || [], 2000);
+  const rotatedAt = formatSqlDateFromMs(Date.now());
+  const seed = hashStringToUint32(`candidate-pool:${source}:${rotatedAt}:${rows.length}`);
+  const shuffledRows = shuffleStoryRows(rows, seed);
+  const statements = [env.DB.prepare('DELETE FROM fake_story_candidates')];
+  shuffledRows.forEach((row, index) => {
+    statements.push(buildFakeStoryCandidateInsert(env, row, index + 1, rotatedAt));
+  });
+
+  for (let i = 0; i < statements.length; i += 50) {
+    await env.DB.batch(statements.slice(i, i + 50));
+  }
+
+  _cache.delete('fake-story-candidates-empty');
+  console.log(`🔧 Fake story candidate pool (${source}) — ${shuffledRows.length} stories`);
+  return { total: shuffledRows.length, rotatedAt };
+}
+
+async function syncFakeStoryCandidateForUser(env, userId) {
+  const normalizedUserId = String(userId || '').trim();
+  if (!normalizedUserId) return;
+  await ensureFakeStoryCandidatePool(env);
+
+  await env.DB.prepare('DELETE FROM fake_story_candidates WHERE user_id = ?').bind(normalizedUserId).run();
+
+  const row = await env.DB.prepare(`
+    SELECT s.id, s.user_id, s.video_url, COALESCE(s.caption, '') AS caption,
+           COALESCE(s.vip_only, 0) AS vip_only, COALESCE(s.likes, 0) AS likes,
+           COALESCE(s.comments, 0) AS comments, s.created_at,
+           u.username, u.avatar_url, u.avatar_crop, u.role, 1 AS fake,
+           u.last_active, 0 AS visits_total, COALESCE(u.feed_priority, 0) AS feed_priority
+    FROM stories s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.user_id = ?
+      AND s.active = 1
+      AND COALESCE(u.fake, 0) = 1
+      AND u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
+    ORDER BY s.created_at DESC, s.id DESC
+    LIMIT 1
+  `).bind(normalizedUserId).first();
+
+  if (!row) return;
+
+  const maxRow = await env.DB.prepare('SELECT COALESCE(MAX(rotation_position), 0) AS max_position FROM fake_story_candidates').first();
+  await buildFakeStoryCandidateInsert(
+    env,
+    row,
+    Number(maxRow?.max_position || 0) + 1,
+    formatSqlDateFromMs(Date.now())
+  ).run();
 }
 
 async function rebuildFakeStoryRotation(env, {
@@ -9881,7 +10053,10 @@ async function handleToggleStoryLike(request, env, storyId) {
     }
   }
 
-  await env.DB.prepare('UPDATE fake_story_rotation SET likes = ? WHERE story_id = ?').bind(newLikes, storyId).run();
+  await Promise.all([
+    env.DB.prepare('UPDATE fake_story_rotation SET likes = ? WHERE story_id = ?').bind(newLikes, storyId).run(),
+    env.DB.prepare('UPDATE fake_story_candidates SET likes = ? WHERE story_id = ?').bind(newLikes, storyId).run().catch(() => {}),
+  ]);
 
   return json({ liked, likes: newLikes });
 }
@@ -9953,7 +10128,10 @@ async function handleSyncStoryLikes(request, env) {
     }
 
     if (likesChanged) {
-      await env.DB.prepare('UPDATE fake_story_rotation SET likes = ? WHERE story_id = ?').bind(likes, storyId).run();
+      await Promise.all([
+        env.DB.prepare('UPDATE fake_story_rotation SET likes = ? WHERE story_id = ?').bind(likes, storyId).run(),
+        env.DB.prepare('UPDATE fake_story_candidates SET likes = ? WHERE story_id = ?').bind(likes, storyId).run().catch(() => {}),
+      ]);
     }
     updates.push({ story_id: storyId, liked, likes });
   }
@@ -10092,6 +10270,7 @@ async function handleAdminUploadStory(request, env) {
       await env.IMAGES.delete(oldKey);
     } catch {}
     await env.DB.prepare('DELETE FROM fake_story_rotation WHERE story_id = ?').bind(old.id).run();
+    await env.DB.prepare('DELETE FROM fake_story_candidates WHERE story_id = ?').bind(old.id).run().catch(() => {});
     await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(old.id).run();
   }
 
@@ -10101,6 +10280,7 @@ async function handleAdminUploadStory(request, env) {
   `).bind(storyId, userId, videoUrl, caption, vipOnly ? 1 : 0).run();
 
   if (Number(targetUser.fake || 0) === 1) {
+    await syncFakeStoryCandidateForUser(env, userId);
     await rebuildFakeStoryRotation(env, { count: FAKE_STORY_ROTATION_POOL_SIZE, preferredUserIds: [userId], source: 'admin-upload-story' });
   }
   await bumpFeedCacheVersion(env);
@@ -10126,6 +10306,7 @@ async function handleDeleteOwnStory(request, env, storyId) {
   if (story.user_id !== auth.sub) return error('No puedes borrar historias de otros usuarios', 403);
 
   const rotationDelete = await env.DB.prepare('DELETE FROM fake_story_rotation WHERE story_id = ?').bind(story.id).run();
+  await env.DB.prepare('DELETE FROM fake_story_candidates WHERE story_id = ?').bind(story.id).run().catch(() => {});
   await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(story.id).run();
 
   // Best-effort R2 delete
@@ -10157,6 +10338,7 @@ async function handleAdminDeleteStory(request, env, storyId) {
   if (!story) return error('Historia no encontrada', 404);
 
   const rotationDelete = await env.DB.prepare('DELETE FROM fake_story_rotation WHERE story_id = ?').bind(storyId).run();
+  await env.DB.prepare('DELETE FROM fake_story_candidates WHERE story_id = ?').bind(storyId).run().catch(() => {});
   await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(storyId).run();
 
   // Best-effort R2 delete
@@ -10197,6 +10379,7 @@ async function handleAdminUpdateStory(request, env, storyId) {
   }
 
   await env.DB.prepare('UPDATE stories SET vip_only = ? WHERE id = ?').bind(vipOnly ? 1 : 0, storyId).run();
+  await syncFakeStoryCandidateForUser(env, story.user_id);
   await syncFakeStoryRotationForUser(env, story.user_id);
   await bumpFeedCacheVersion(env);
   return json({ id: storyId, user_id: story.user_id, vip_only: vipOnly });
@@ -10249,6 +10432,7 @@ async function handleUploadStory(request, env) {
       await env.IMAGES.delete(oldKey);
     } catch {}
     await env.DB.prepare('DELETE FROM fake_story_rotation WHERE story_id = ?').bind(old.id).run();
+    await env.DB.prepare('DELETE FROM fake_story_candidates WHERE story_id = ?').bind(old.id).run().catch(() => {});
     await env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(old.id).run();
   }
 

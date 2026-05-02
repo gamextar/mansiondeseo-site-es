@@ -328,6 +328,55 @@ CREATE TABLE IF NOT EXISTS story_daily_views (
 
 CREATE INDEX IF NOT EXISTS idx_story_daily_views_user_date ON story_daily_views(user_id, date_utc);
 
+CREATE TABLE IF NOT EXISTS fake_story_rotation (
+  story_id          TEXT PRIMARY KEY,
+  user_id           TEXT NOT NULL,
+  video_url         TEXT NOT NULL,
+  caption           TEXT NOT NULL DEFAULT '',
+  vip_only          INTEGER NOT NULL DEFAULT 0,
+  likes             INTEGER NOT NULL DEFAULT 0,
+  comments          INTEGER NOT NULL DEFAULT 0,
+  created_at        TEXT NOT NULL DEFAULT '',
+  username          TEXT NOT NULL DEFAULT '',
+  avatar_url        TEXT NOT NULL DEFAULT '',
+  avatar_crop       TEXT NOT NULL DEFAULT '',
+  role              TEXT NOT NULL DEFAULT '',
+  fake              INTEGER NOT NULL DEFAULT 1,
+  last_active       TEXT NOT NULL DEFAULT '',
+  visits_total      INTEGER NOT NULL DEFAULT 0,
+  rotation_position INTEGER NOT NULL DEFAULT 0,
+  rotated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_position_full ON fake_story_rotation(rotation_position, rotated_at DESC, story_id DESC);
+CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_role_position_full ON fake_story_rotation(role, rotation_position, rotated_at DESC, story_id DESC);
+CREATE INDEX IF NOT EXISTS idx_fake_story_rotation_user ON fake_story_rotation(user_id);
+
+CREATE TABLE IF NOT EXISTS fake_story_candidates (
+  story_id          TEXT PRIMARY KEY,
+  user_id           TEXT NOT NULL,
+  video_url         TEXT NOT NULL,
+  caption           TEXT NOT NULL DEFAULT '',
+  vip_only          INTEGER NOT NULL DEFAULT 0,
+  likes             INTEGER NOT NULL DEFAULT 0,
+  comments          INTEGER NOT NULL DEFAULT 0,
+  created_at        TEXT NOT NULL DEFAULT '',
+  username          TEXT NOT NULL DEFAULT '',
+  avatar_url        TEXT NOT NULL DEFAULT '',
+  avatar_crop       TEXT NOT NULL DEFAULT '',
+  role              TEXT NOT NULL DEFAULT '',
+  fake              INTEGER NOT NULL DEFAULT 1,
+  last_active       TEXT NOT NULL DEFAULT '',
+  visits_total      INTEGER NOT NULL DEFAULT 0,
+  feed_priority     INTEGER NOT NULL DEFAULT 0,
+  rotation_position INTEGER NOT NULL DEFAULT 0,
+  rotated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_fake_story_candidates_position_full ON fake_story_candidates(rotation_position, rotated_at DESC, story_id DESC);
+CREATE INDEX IF NOT EXISTS idx_fake_story_candidates_role_position ON fake_story_candidates(role, rotation_position);
+CREATE INDEX IF NOT EXISTS idx_fake_story_candidates_user ON fake_story_candidates(user_id);
+
 -- SEO city stats
 CREATE TABLE IF NOT EXISTS seo_city_stats (
   city_slug           TEXT NOT NULL,
