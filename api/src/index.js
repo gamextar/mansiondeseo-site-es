@@ -1914,6 +1914,7 @@ async function ensureProfileVisitStructures(env) {
           user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
           visits_total INTEGER NOT NULL DEFAULT 0,
           followers_total INTEGER NOT NULL DEFAULT 0,
+          following_total INTEGER NOT NULL DEFAULT 0,
           updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
       `).run();
@@ -1929,6 +1930,14 @@ async function ensureProfileVisitStructures(env) {
       `).run();
       try {
         await env.DB.prepare('ALTER TABLE profile_stats ADD COLUMN followers_total INTEGER NOT NULL DEFAULT 0').run();
+      } catch (error) {
+        const message = String(error?.message || error || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw error;
+        }
+      }
+      try {
+        await env.DB.prepare('ALTER TABLE profile_stats ADD COLUMN following_total INTEGER NOT NULL DEFAULT 0').run();
       } catch (error) {
         const message = String(error?.message || error || '').toLowerCase();
         if (!message.includes('duplicate column name') && !message.includes('already exists')) {
@@ -2011,8 +2020,8 @@ async function incrementProfileFollowerStat(env, userId, increment = 1) {
   const initialAmount = Math.max(0, amount);
   await ensureProfileVisitStructures(env);
   await env.DB.prepare(`
-    INSERT INTO profile_stats (user_id, visits_total, followers_total, updated_at)
-    VALUES (?, 0, ?, datetime('now'))
+    INSERT INTO profile_stats (user_id, visits_total, followers_total, following_total, updated_at)
+    VALUES (?, 0, ?, 0, datetime('now'))
     ON CONFLICT(user_id) DO UPDATE SET
       followers_total = MAX(0, profile_stats.followers_total + excluded.followers_total),
       updated_at = datetime('now')
@@ -2021,6 +2030,28 @@ async function incrementProfileFollowerStat(env, userId, increment = 1) {
     await env.DB.prepare(`
       UPDATE profile_stats
       SET followers_total = MAX(0, followers_total + ?),
+          updated_at = datetime('now')
+      WHERE user_id = ?
+    `).bind(amount, userId).run();
+  }
+}
+
+async function incrementProfileFollowingStat(env, userId, increment = 1) {
+  const amount = Math.trunc(Number(increment) || 0);
+  if (!amount) return;
+  const initialAmount = Math.max(0, amount);
+  await ensureProfileVisitStructures(env);
+  await env.DB.prepare(`
+    INSERT INTO profile_stats (user_id, visits_total, followers_total, following_total, updated_at)
+    VALUES (?, 0, 0, ?, datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET
+      following_total = MAX(0, profile_stats.following_total + excluded.following_total),
+      updated_at = datetime('now')
+  `).bind(userId, initialAmount).run();
+  if (amount !== initialAmount) {
+    await env.DB.prepare(`
+      UPDATE profile_stats
+      SET following_total = MAX(0, following_total + ?),
           updated_at = datetime('now')
       WHERE user_id = ?
     `).bind(amount, userId).run();
@@ -6548,13 +6579,19 @@ async function handleToggleFavorite(request, env, targetId) {
   if (existing) {
     await env.DB.prepare('DELETE FROM favorites WHERE user_id = ? AND target_id = ?')
       .bind(auth.sub, targetId).run();
-    await incrementProfileFollowerStat(env, targetId, -1);
+    await Promise.all([
+      incrementProfileFollowerStat(env, targetId, -1),
+      incrementProfileFollowingStat(env, auth.sub, -1),
+    ]);
     const statRow = await env.DB.prepare('SELECT followers_total FROM profile_stats WHERE user_id = ?').bind(targetId).first();
     return json({ favorited: false, followers_total: Number(statRow?.followers_total || 0) });
   } else {
     await env.DB.prepare('INSERT INTO favorites (user_id, target_id) VALUES (?, ?)')
       .bind(auth.sub, targetId).run();
-    await incrementProfileFollowerStat(env, targetId, 1);
+    await Promise.all([
+      incrementProfileFollowerStat(env, targetId, 1),
+      incrementProfileFollowingStat(env, auth.sub, 1),
+    ]);
     const statRow = await env.DB.prepare('SELECT followers_total FROM profile_stats WHERE user_id = ?').bind(targetId).first();
     return json({ favorited: true, followers_total: Number(statRow?.followers_total || 0) });
   }
@@ -6593,22 +6630,12 @@ async function handleGetFavorites(request, env) {
     : 'following';
   const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 100));
 
-  const [followingCountRow, followersCountRow] = await Promise.all([
-    env.DB.prepare(`
-      SELECT COUNT(*) as count
-      FROM favorites f
-      JOIN users u ON u.id = f.target_id
-      WHERE f.user_id = ?
-        AND u.status = 'verified'
-        AND COALESCE(u.account_status, 'active') = 'active'
-    `).bind(auth.sub).first(),
-    env.DB.prepare('SELECT COALESCE(followers_total, 0) as count FROM profile_stats WHERE user_id = ?')
-      .bind(auth.sub)
-      .first(),
-  ]);
+  const profileStatRow = await env.DB.prepare(
+    'SELECT COALESCE(followers_total, 0) AS followers_total, COALESCE(following_total, 0) AS following_total FROM profile_stats WHERE user_id = ?'
+  ).bind(auth.sub).first();
 
-  const followingCount = Number(followingCountRow?.count || 0);
-  const followersCount = Number(followersCountRow?.count || 0);
+  const followingCount = Number(profileStatRow?.following_total || 0);
+  const followersCount = Number(profileStatRow?.followers_total || 0);
 
   const query = tab === 'followers'
     ? `
