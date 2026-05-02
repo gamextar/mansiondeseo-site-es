@@ -6824,7 +6824,6 @@ async function rotateFakeOnlineUsers(env, {
   await ensureUsersFakeColumn(env);
   await ensureUsersFeedPriorityColumn(env);
   await ensureUserBrowseIndexes(env);
-  await ensureStoriesTable(env);
 
   const settings = await cached('settings', 300_000, () => loadSettings(env));
   const count = parseIntegerSetting(requestedCount, 36, 1, 200);
@@ -6857,10 +6856,7 @@ async function rotateFakeOnlineUsers(env, {
         u.username,
         u.role,
         COALESCE(u.feed_priority, 0) AS feed_priority,
-        u.last_active,
-        CASE WHEN EXISTS (
-          SELECT 1 FROM stories s WHERE s.user_id = u.id AND s.active = 1
-        ) THEN 1 ELSE 0 END AS has_story
+        u.last_active
       FROM users u
       WHERE COALESCE(u.fake, 0) = 1
         AND u.status = 'verified'
@@ -6868,7 +6864,7 @@ async function rotateFakeOnlineUsers(env, {
         ${featuredClause}
         ${recentClause}
         ${excludedClause}
-      ORDER BY feed_priority DESC, has_story DESC, RANDOM()
+      ORDER BY feed_priority DESC, RANDOM()
       LIMIT ?
     `).bind(...bindings).all();
     return results || [];
@@ -6902,9 +6898,11 @@ async function rotateFakeOnlineUsers(env, {
       updated: 0,
       windowMinutes,
       excludeRecentMinutes,
-      activeStoryUsers: 0,
+      activeStoryUsers: null,
       activeFeaturedUsers: 0,
       feedCacheVersion: null,
+      fakeStoryRotation: null,
+      storyRotationSkipped: true,
       users: [],
     };
   }
@@ -6921,16 +6919,10 @@ async function rotateFakeOnlineUsers(env, {
     await env.DB.batch(updates.slice(i, i + 50));
   }
 
-  const storyRotation = await rebuildFakeStoryRotation(env, {
-    count: Math.max(FAKE_STORY_ROTATION_POOL_SIZE, count),
-    preferredUserIds: selected.map((user) => user.id),
-    source,
-  });
   const feedCacheVersion = await bumpFeedCacheVersion(env);
-  const activeStoryUsers = selected.filter((user) => Number(user.has_story || 0) === 1).length;
   const activeFeaturedUsers = selected.filter((user) => Number(user.feed_priority || 0) > 0).length;
 
-  console.log(`🔧 Fake online rotation (${source}) — ${selected.length}/${count} usuarios en ${windowMinutes} min`);
+  console.log(`🔧 Fake online rotation (${source}) — ${selected.length}/${count} usuarios last_active en ${windowMinutes} min`);
 
   return {
     success: true,
@@ -6938,16 +6930,16 @@ async function rotateFakeOnlineUsers(env, {
     updated: selected.length,
     windowMinutes,
     excludeRecentMinutes,
-    activeStoryUsers,
+    activeStoryUsers: null,
     activeFeaturedUsers,
-    fakeStoryRotation: storyRotation,
+    fakeStoryRotation: null,
+    storyRotationSkipped: true,
     feedCacheVersion,
     users: selected.slice(0, 20).map((user) => ({
       id: user.id,
       username: user.username || '',
       role: user.role || '',
       feed_priority: Math.max(0, Number(user.feed_priority || 0)),
-      has_story: Number(user.has_story || 0) === 1,
       last_active: user.rotated_last_active || '',
     })),
   };
@@ -6959,7 +6951,7 @@ async function runScheduledFakeOnlineRotation(env, controller = {}) {
     source: `cron:${controller.cron || 'hourly'}`,
   });
   console.log(
-    `⏱️ Fake online cron finalizado — ${result.updated}/${result.requested} actualizados, ${result.activeFeaturedUsers} destacados`
+    `⏱️ Fake online cron finalizado — ${result.updated}/${result.requested} last_active actualizados, ${result.activeFeaturedUsers} destacados`
   );
   return result;
 }
