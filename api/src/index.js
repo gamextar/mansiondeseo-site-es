@@ -881,6 +881,7 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM conversation_state WHERE user_id = ? OR partner_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM favorites WHERE user_id = ? OR target_id = ?').bind(userId, userId),
+    env.DB.prepare('DELETE FROM profile_recent_visitors WHERE visitor_id = ? OR visited_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM profile_visits WHERE visitor_id = ? OR visited_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM user_gifts WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM verification_tokens WHERE user_id = ? OR email = ?').bind(userId, user.email),
@@ -1916,6 +1917,16 @@ async function ensureProfileVisitStructures(env) {
           updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
       `).run();
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS profile_recent_visitors (
+          visited_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          visitor_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          last_visited_at TEXT NOT NULL DEFAULT (datetime('now')),
+          synthetic INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (visited_id, visitor_id)
+        )
+      `).run();
       try {
         await env.DB.prepare('ALTER TABLE profile_stats ADD COLUMN followers_total INTEGER NOT NULL DEFAULT 0').run();
       } catch (error) {
@@ -1930,6 +1941,12 @@ async function ensureProfileVisitStructures(env) {
         ).run(),
         env.DB.prepare(
           'CREATE INDEX IF NOT EXISTS idx_profile_visits_visitor_visited_created ON profile_visits(visitor_id, visited_id, created_at DESC)'
+        ).run(),
+        env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_profile_recent_visitors_visited_last ON profile_recent_visitors(visited_id, last_visited_at DESC)'
+        ).run(),
+        env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_profile_recent_visitors_visitor ON profile_recent_visitors(visitor_id)'
         ).run(),
         env.DB.prepare(
           'CREATE INDEX IF NOT EXISTS idx_profile_stats_visits_total ON profile_stats(visits_total DESC, updated_at DESC)'
@@ -1962,6 +1979,30 @@ async function incrementProfileVisitStat(env, userId, increment = 1) {
       visits_total = profile_stats.visits_total + excluded.visits_total,
       updated_at = datetime('now')
   `).bind(userId, amount).run();
+}
+
+async function upsertRecentProfileVisitor(env, { visitorId, visitedId, synthetic = false, visitedAt = null } = {}) {
+  const safeVisitorId = String(visitorId || '').trim();
+  const safeVisitedId = String(visitedId || '').trim();
+  if (!safeVisitorId || !safeVisitedId) return;
+  await ensureProfileVisitStructures(env);
+  const timestamp = visitedAt || formatSqlDateFromMs(Date.now());
+  await env.DB.prepare(`
+    INSERT INTO profile_recent_visitors (visited_id, visitor_id, last_visited_at, synthetic, updated_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(visited_id, visitor_id) DO UPDATE SET
+      last_visited_at = CASE
+        WHEN excluded.last_visited_at >= profile_recent_visitors.last_visited_at
+        THEN excluded.last_visited_at
+        ELSE profile_recent_visitors.last_visited_at
+      END,
+      synthetic = CASE
+        WHEN excluded.last_visited_at >= profile_recent_visitors.last_visited_at
+        THEN excluded.synthetic
+        ELSE profile_recent_visitors.synthetic
+      END,
+      updated_at = datetime('now')
+  `).bind(safeVisitedId, safeVisitorId, timestamp, synthetic ? 1 : 0).run();
 }
 
 async function incrementProfileFollowerStat(env, userId, increment = 1) {
@@ -2123,10 +2164,10 @@ async function selectSyntheticVisitCandidate(env, visitedUser, { allowRebuild = 
 
   const recentRows = await env.DB.prepare(`
     SELECT visitor_id
-    FROM profile_visits
+    FROM profile_recent_visitors
     WHERE visited_id = ?
-      AND created_at >= datetime('now', ?)
-    ORDER BY created_at DESC
+      AND last_visited_at >= datetime('now', ?)
+    ORDER BY last_visited_at DESC
     LIMIT 250
   `).bind(visitedUser.id, '-24 hours').all().catch(() => ({ results: [] }));
   const recentVisitors = new Set((recentRows?.results || [])
@@ -2151,9 +2192,9 @@ async function maybeAddSyntheticDashboardVisit(env, user) {
   const cooldownWindow = `-${SYNTHETIC_VISIT_COOLDOWN_MINUTES} minutes`;
   const recentVisit = await env.DB.prepare(`
     SELECT 1
-    FROM profile_visits
+    FROM profile_recent_visitors
     WHERE visited_id = ?
-      AND created_at >= datetime('now', ?)
+      AND last_visited_at >= datetime('now', ?)
     LIMIT 1
   `).bind(user.id, cooldownWindow).first();
   if (recentVisit) return false;
@@ -2166,14 +2207,17 @@ async function maybeAddSyntheticDashboardVisit(env, user) {
     SELECT ?, ?, ?, 1
     WHERE NOT EXISTS (
       SELECT 1
-      FROM profile_visits
+      FROM profile_recent_visitors
       WHERE visited_id = ?
-        AND created_at >= datetime('now', ?)
+        AND last_visited_at >= datetime('now', ?)
     )
   `).bind(generateId(), visitorId, user.id, user.id, cooldownWindow).run();
 
   if (Number(visitInsert?.meta?.changes || 0) <= 0) return false;
-  await incrementProfileVisitStat(env, user.id, 1);
+  await Promise.all([
+    upsertRecentProfileVisitor(env, { visitorId, visitedId: user.id, synthetic: true }),
+    incrementProfileVisitStat(env, user.id, 1),
+  ]);
   return true;
 }
 
@@ -4164,12 +4208,13 @@ async function handleOwnProfileDashboard(request, env, ctx) {
     env.DB.prepare('SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first(),
     env.DB.prepare(
       `SELECT u.id, u.username, u.avatar_url, u.avatar_thumb_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, u.role, u.premium, u.last_active,
-              MAX(pv.created_at) as visited_at
-       FROM profile_visits pv
-       JOIN users u ON u.id = pv.visitor_id
-       WHERE pv.visited_id = ?
-       GROUP BY pv.visitor_id
-       ORDER BY visited_at DESC
+              prv.last_visited_at as visited_at
+       FROM profile_recent_visitors prv
+       JOIN users u ON u.id = prv.visitor_id
+       WHERE prv.visited_id = ?
+         AND u.status = 'verified'
+         AND COALESCE(u.account_status, 'active') = 'active'
+       ORDER BY prv.last_visited_at DESC
        LIMIT 10`
     ).bind(auth.sub).all(),
     env.DB.prepare(
@@ -4521,14 +4566,17 @@ async function handleProfileDetail(request, env, userId) {
          SELECT ?, ?, ?
          WHERE NOT EXISTS (
            SELECT 1
-           FROM profile_visits
+           FROM profile_recent_visitors
            WHERE visitor_id = ?
              AND visited_id = ?
-             AND created_at >= datetime('now', ?)
+             AND last_visited_at >= datetime('now', ?)
          )`
       ).bind(crypto.randomUUID(), auth.sub, userId, auth.sub, userId, dedupeWindow).run();
       if (Number(visitInsert?.meta?.changes || 0) > 0) {
-        await incrementProfileVisitStat(env, userId, 1);
+        await Promise.all([
+          upsertRecentProfileVisitor(env, { visitorId: auth.sub, visitedId: userId }),
+          incrementProfileVisitStat(env, userId, 1),
+        ]);
         visitsTotal += 1;
       }
     } catch {
@@ -5992,14 +6040,13 @@ async function handleGetVisits(request, env) {
 
   const { results } = await env.DB.prepare(
     `SELECT u.id, u.username, u.avatar_url, u.avatar_thumb_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, u.role, u.premium, u.last_active,
-            MAX(pv.created_at) as visited_at
-     FROM profile_visits pv
-     JOIN users u ON u.id = pv.visitor_id
-     WHERE pv.visited_id = ?
+            prv.last_visited_at as visited_at
+     FROM profile_recent_visitors prv
+     JOIN users u ON u.id = prv.visitor_id
+     WHERE prv.visited_id = ?
        AND u.status = 'verified'
        AND COALESCE(u.account_status, 'active') = 'active'
-     GROUP BY pv.visitor_id
-     ORDER BY visited_at DESC
+     ORDER BY prv.last_visited_at DESC
      LIMIT 10`
   ).bind(auth.sub).all();
 
