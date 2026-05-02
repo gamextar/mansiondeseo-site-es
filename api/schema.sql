@@ -217,7 +217,6 @@ CREATE TABLE IF NOT EXISTS profile_visits (
 CREATE INDEX IF NOT EXISTS idx_visits_visited ON profile_visits(visited_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_profile_visits_visited_created ON profile_visits(visited_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_profile_visits_visitor_visited_created ON profile_visits(visitor_id, visited_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_profile_visits_visited_synthetic_created ON profile_visits(visited_id, synthetic, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS synthetic_visit_candidates (
   user_id           TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

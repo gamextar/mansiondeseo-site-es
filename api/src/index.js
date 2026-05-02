@@ -1871,23 +1871,12 @@ async function ensureProfileVisitStructures(env) {
           throw error;
         }
       }
-      try {
-        await env.DB.prepare('ALTER TABLE profile_visits ADD COLUMN synthetic INTEGER NOT NULL DEFAULT 0').run();
-      } catch (error) {
-        const message = String(error?.message || error || '').toLowerCase();
-        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
-          throw error;
-        }
-      }
       await Promise.all([
         env.DB.prepare(
           'CREATE INDEX IF NOT EXISTS idx_profile_visits_visited_created ON profile_visits(visited_id, created_at DESC)'
         ).run(),
         env.DB.prepare(
           'CREATE INDEX IF NOT EXISTS idx_profile_visits_visitor_visited_created ON profile_visits(visitor_id, visited_id, created_at DESC)'
-        ).run(),
-        env.DB.prepare(
-          'CREATE INDEX IF NOT EXISTS idx_profile_visits_visited_synthetic_created ON profile_visits(visited_id, synthetic, created_at DESC)'
         ).run(),
         env.DB.prepare(
           'CREATE INDEX IF NOT EXISTS idx_profile_stats_visits_total ON profile_stats(visits_total DESC, updated_at DESC)'
@@ -1948,6 +1937,14 @@ async function ensureSyntheticVisitStructures(env) {
   await ensureProfileVisitStructures(env);
   if (!_syntheticVisitStructuresReady) {
     _syntheticVisitStructuresReady = (async () => {
+      try {
+        await env.DB.prepare('ALTER TABLE profile_visits ADD COLUMN synthetic INTEGER NOT NULL DEFAULT 0').run();
+      } catch (error) {
+        const message = String(error?.message || error || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw error;
+        }
+      }
       await env.DB.prepare(`
         CREATE TABLE IF NOT EXISTS synthetic_visit_candidates (
           user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -4087,7 +4084,7 @@ async function handleAppBootstrap(request, env) {
 
 // ── GET /api/me/dashboard ──────────────────────────────
 
-async function handleOwnProfileDashboard(request, env) {
+async function handleOwnProfileDashboard(request, env, ctx) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
 
@@ -4096,10 +4093,13 @@ async function handleOwnProfileDashboard(request, env) {
   const dbUser = cachedUser || await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first();
   if (!dbUser) return error('Usuario no encontrado', 404);
 
-  try {
-    await maybeAddSyntheticDashboardVisit(env, dbUser);
-  } catch (err) {
+  const syntheticVisitTask = maybeAddSyntheticDashboardVisit(env, { ...dbUser }).catch((err) => {
     console.error('[synthetic_visits] dashboard visit failed:', err?.message || err);
+  });
+  if (ctx?.waitUntil) {
+    ctx.waitUntil(syntheticVisitTask);
+  } else {
+    syntheticVisitTask.catch(() => {});
   }
 
   const [activeStory, visitRows, giftRows, visitStatRow] = await Promise.all([
@@ -10297,7 +10297,7 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/auth/me' && method === 'GET') return handleMe(request, env);
   if (path === '/api/auth/logout' && method === 'POST') return handleLogout(request, env);
   if (path === '/api/app/bootstrap' && method === 'GET') return handleAppBootstrap(request, env);
-  if (path === '/api/me/dashboard' && method === 'GET') return handleOwnProfileDashboard(request, env);
+  if (path === '/api/me/dashboard' && method === 'GET') return handleOwnProfileDashboard(request, env, ctx);
   if (path === '/api/account/delete/request' && method === 'POST') return handleRequestAccountDeletion(request, env);
   if (path === '/api/account/delete/confirm' && method === 'POST') return handleConfirmAccountDeletion(request, env);
   if (path === '/api/account/email-change/request' && method === 'POST') return handleRequestEmailChange(request, env);
