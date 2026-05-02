@@ -89,7 +89,6 @@ const PHOTO_VERIFICATION_STATUSES = ['code_issued', 'pending', 'approved', 'reje
 const FEED_PROFILE_LIMIT = 42;
 const FEED_SNAPSHOT_LIMIT = 180;
 const FEED_SNAPSHOT_TTL_MS = 300_000;
-const FEED_QUERY_EXPANSION_FACTOR = 4;
 const PROFILE_SNAPSHOT_FEED_MAX_WINDOW = 5000;
 const FEED_PROXIMITY_CITY_BOOST = 22;
 const FEED_PROXIMITY_REGION_BOOST = 10;
@@ -1160,6 +1159,12 @@ async function ensureUserBrowseIndexes(env) {
       ).run(),
       env.DB.prepare(
         "CREATE INDEX IF NOT EXISTS idx_users_feed_active_role_fake_last ON users(role, COALESCE(fake, 0), last_active DESC, id DESC) WHERE status = 'verified' AND COALESCE(account_status, 'active') = 'active'"
+      ).run(),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS idx_users_feed_active_fake_last_role ON users(COALESCE(fake, 0), last_active DESC, id DESC, role) WHERE status = 'verified' AND COALESCE(account_status, 'active') = 'active'"
+      ).run(),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS idx_users_feed_active_country_fake_last_role ON users(country, COALESCE(fake, 0), last_active DESC, id DESC, role) WHERE status = 'verified' AND COALESCE(account_status, 'active') = 'active'"
       ).run(),
       env.DB.prepare(
         "CREATE INDEX IF NOT EXISTS idx_users_feed_active_fake_id ON users(COALESCE(fake, 0), id) WHERE status = 'verified' AND COALESCE(account_status, 'active') = 'active'"
@@ -4287,9 +4292,8 @@ async function handleProfiles(request, env) {
       u.marital_status,
       u.sexual_orientation,
       u.last_active,
-      COALESCE(ps.followers_total, 0) AS followers_total
+      0 AS followers_total
     FROM users u
-    LEFT JOIN profile_stats ps ON ps.user_id = u.id
     WHERE u.status = 'verified'
       AND COALESCE(u.account_status, 'active') = 'active'
   `;
@@ -4305,12 +4309,9 @@ async function handleProfiles(request, env) {
     filterParts = filter.split(',').map(f => f.trim()).filter(f => roleFilters.includes(f));
   }
   const roleBuckets = getRoleBucketsForFilters(filterParts);
-  if (filterParts.length === 1) {
-    const roleValues = filterParts[0] === 'pareja' ? PAIR_ROLE_IDS : [filterParts[0]];
-    query += ` AND role IN (${roleValues.map(f => `'${f}'`).join(',')})`;
-  } else if (filterParts.length > 1) {
-    const roleValues = [...new Set(filterParts.flatMap((f) => (f === 'pareja' ? PAIR_ROLE_IDS : [f])))];
-    query += ` AND role IN (${roleValues.map(f => `'${f}'`).join(',')})`;
+  const requestedRoleValues = [...new Set(filterParts.flatMap((f) => (f === 'pareja' ? PAIR_ROLE_IDS : [f])).filter((role) => SEEKING_ROLE_IDS.includes(role)))];
+  if (requestedRoleValues.length > 0 && roleBuckets.length <= 1) {
+    query += ` AND u.role IN (${requestedRoleValues.map(f => `'${f}'`).join(',')})`;
   }
   if (search) {
     query += ` AND (u.username LIKE ? OR u.city LIKE ? OR u.locality LIKE ? OR u.bio LIKE ?)`;
@@ -4347,9 +4348,8 @@ async function handleProfiles(request, env) {
   const snapshotStartedAt = Date.now();
   const buildSnapshotFeedData = async () => {
     const realSnapshotLimit = Math.min(snapshotWindowLimit, 1000);
-    const roleValues = [...new Set(filterParts.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])).filter((role) => SEEKING_ROLE_IDS.includes(role)))];
     const fakeRowsPromise = loadFakeProfileRowsFromSnapshots(env, {
-      roleValues,
+      roleValues: requestedRoleValues,
       country: settings.feedFilterByCountry ? country : '',
       search,
       limit: snapshotWindowLimit,
