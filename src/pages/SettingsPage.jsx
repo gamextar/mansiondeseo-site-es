@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Save, Sliders, Eye, EyeOff, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail, Activity, Ban, Video } from 'lucide-react';
-import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, adminRotateFakeOnline, uploadImage } from '../lib/api';
+import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, adminRotateFakeOnline, adminGetProfileSnapshots, adminRebuildProfileSnapshots, uploadImage } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
 import { estimateRealtimeLoad, getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
@@ -40,6 +40,13 @@ function normalizeMessageLimitWindowHours(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 12;
   return Math.max(1, Math.min(168, Math.round(numeric)));
+}
+
+function formatSnapshotBytes(value) {
+  const bytes = Number(value || 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function renderConfiguredIcon(value, fallback) {
@@ -191,6 +198,10 @@ export default function SettingsPage() {
   const [fakeOnlineExcludeMinutes, setFakeOnlineExcludeMinutes] = useState(60);
   const [fakeOnlineRunning, setFakeOnlineRunning] = useState(false);
   const [fakeOnlineResult, setFakeOnlineResult] = useState(null);
+  const [profileSnapshotLoading, setProfileSnapshotLoading] = useState(false);
+  const [profileSnapshotRunning, setProfileSnapshotRunning] = useState(false);
+  const [profileSnapshotManifest, setProfileSnapshotManifest] = useState(null);
+  const [profileSnapshotError, setProfileSnapshotError] = useState('');
   const realtimeEstimate = estimateRealtimeLoad(realtimeDebugSummary);
   const mediaAutoTimerRef = useRef(null);
   const lastMediaAutoKeyRef = useRef('');
@@ -344,6 +355,14 @@ export default function SettingsPage() {
       .catch(() => navigate('/inicio'))
       .finally(() => setLoading(false));
     adminGetGifts().then(data => setGifts(data.gifts || [])).catch(() => {});
+    setProfileSnapshotLoading(true);
+    adminGetProfileSnapshots()
+      .then((data) => {
+        setProfileSnapshotManifest(data?.manifest || null);
+        setProfileSnapshotError('');
+      })
+      .catch((err) => setProfileSnapshotError(err?.message || 'No se pudo cargar el snapshot de perfiles'))
+      .finally(() => setProfileSnapshotLoading(false));
   }, [user, navigate]);
 
   useEffect(() => subscribeApiDebug((nextSummary) => {
@@ -427,6 +446,19 @@ export default function SettingsPage() {
       });
     } finally {
       setFakeOnlineRunning(false);
+    }
+  };
+
+  const handleRebuildProfileSnapshots = async () => {
+    setProfileSnapshotRunning(true);
+    setProfileSnapshotError('');
+    try {
+      const data = await adminRebuildProfileSnapshots();
+      setProfileSnapshotManifest(data?.manifest || null);
+    } catch (err) {
+      setProfileSnapshotError(err?.message || 'No se pudo regenerar el snapshot de perfiles');
+    } finally {
+      setProfileSnapshotRunning(false);
     }
   };
 
@@ -708,6 +740,13 @@ export default function SettingsPage() {
       setter: setGalleryPlaceholderSuperHotImg,
     },
   ];
+  const profileSnapshotBuckets = ['hombre', 'mujer', 'pareja', 'trans'].map((bucket) => ({
+    key: bucket,
+    label: bucket === 'hombre' ? 'Hombres' : bucket === 'mujer' ? 'Mujeres' : bucket === 'pareja' ? 'Parejas' : 'Trans',
+    ...(profileSnapshotManifest?.fakes?.[bucket] || {}),
+  }));
+  const profileSnapshotTotal = Number(profileSnapshotManifest?.total_count || 0);
+  const profileSnapshotBytes = Number(profileSnapshotManifest?.total_bytes || 0);
 
   if (loading) {
     return (
@@ -1885,6 +1924,57 @@ export default function SettingsPage() {
                       {fakeOnlineResult.updated} fake online actualizados · {fakeOnlineResult.activeFeaturedUsers ?? 0} destacados · ventana {fakeOnlineResult.windowMinutes} min
                     </p>
                   )}
+                </div>
+              ) : null}
+            </div>
+            <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-gold/20 space-y-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Snapshots de perfiles fake</h3>
+                  <p className="text-[11px] text-text-dim">Regenera los JSON estáticos de R2 cuando edites o borres usuarios fake. El Radar usa estos archivos para evitar lecturas grandes en D1.</p>
+                </div>
+                <button
+                  onClick={handleRebuildProfileSnapshots}
+                  disabled={profileSnapshotRunning}
+                  className="px-4 py-2 rounded-xl bg-mansion-gold/15 border border-mansion-gold/30 text-mansion-gold text-sm font-semibold hover:bg-mansion-gold/20 transition-colors disabled:opacity-60"
+                >
+                  {profileSnapshotRunning ? 'Generando...' : 'Regenerar'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Total</p>
+                  <p className="mt-1 text-lg font-semibold text-text-primary">{profileSnapshotLoading ? '...' : profileSnapshotTotal}</p>
+                </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Tamaño raw</p>
+                  <p className="mt-1 text-lg font-semibold text-text-primary">{profileSnapshotLoading ? '...' : formatSnapshotBytes(profileSnapshotBytes)}</p>
+                </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Versión</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-text-primary">{profileSnapshotManifest?.version || 'sin generar'}</p>
+                </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Actualizado</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-text-primary">{profileSnapshotManifest?.updated_at || '-'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {profileSnapshotBuckets.map((bucket) => (
+                  <div key={bucket.key} className="rounded-xl border border-mansion-border/20 bg-mansion-base/40 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-text-dim">{bucket.label}</p>
+                    <p className="mt-1 text-sm font-semibold text-text-primary">
+                      {Number(bucket.count || 0)} perfiles · {formatSnapshotBytes(bucket.bytes)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {profileSnapshotError ? (
+                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-300">
+                  {profileSnapshotError}
                 </div>
               ) : null}
             </div>

@@ -31,6 +31,9 @@ const STORY_SNAPSHOT_SHARED_LIMIT = 60;
 const STORY_SNAPSHOT_BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
 const STORY_SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const STORY_PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
+const PROFILE_FAKE_ONLINE_ROTATION_MS = 5 * 60_000;
+const PROFILE_FAKE_ONLINE_RATE = 0.42;
+const PROFILE_FAKE_ONLINE_PRIORITY_RATE = 0.58;
 export const STORY_FEED_CACHE_INVALIDATED_EVENT = 'mansion-story-feed-cache-invalidated';
 const sharedGetCache = new Map();
 let avatarUploadCacheSeq = 0;
@@ -939,6 +942,35 @@ export async function logout() {
 
 // ── Profiles ────────────────────────────────────────────
 
+function hashProfileOnlineSeed(value = '') {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+export function applyClientFakeOnline(profilesResponse) {
+  if (!profilesResponse || !Array.isArray(profilesResponse.profiles)) return profilesResponse;
+  const viewerId = String(getStoredUser()?.id || 'anon');
+  const windowKey = Math.floor(Date.now() / PROFILE_FAKE_ONLINE_ROTATION_MS);
+  return {
+    ...profilesResponse,
+    profiles: profilesResponse.profiles.map((profile) => {
+      if (!profile?.fake) return profile;
+      const feedPriority = Math.max(0, Number(profile.feed_priority || 0));
+      const onlineRate = feedPriority > 0 ? PROFILE_FAKE_ONLINE_PRIORITY_RATE : PROFILE_FAKE_ONLINE_RATE;
+      const hash = hashProfileOnlineSeed(`${viewerId}:${windowKey}:${profile.id || profile.name || ''}`);
+      const online = (hash / 4294967296) < onlineRate;
+      return {
+        ...profile,
+        online,
+      };
+    }),
+  };
+}
+
 export async function getProfiles({ filter, q, fresh = false, cursor, pageSize } = {}) {
   const params = new URLSearchParams();
   if (filter && filter !== 'all') params.set('filter', filter);
@@ -949,9 +981,9 @@ export async function getProfiles({ filter, q, fresh = false, cursor, pageSize }
   const qs = params.toString();
   const path = `/profiles${qs ? `?${qs}` : ''}`;
   // Search queries and forced refreshes bypass cache.
-  if (q || fresh) return apiFetch(path);
+  if (q || fresh) return apiFetch(path).then(applyClientFakeOnline);
   const cacheKey = `profiles:${filter || 'all'}:${cursor || 0}:${pageSize || 0}`;
-  return sharedGet(cacheKey, () => apiFetch(path), { ttlMs: 5 * 60_000 });
+  return sharedGet(cacheKey, () => apiFetch(path).then(applyClientFakeOnline), { ttlMs: 5 * 60_000 });
 }
 
 export async function getProfilesVersion() {
@@ -1529,6 +1561,20 @@ export async function adminRotateFakeOnline({ count = 36, windowMinutes = 55, ex
       window_minutes: windowMinutes,
       exclude_recent_minutes: excludeRecentMinutes,
     }),
+  });
+  markFeedDirty();
+  return result;
+}
+
+export async function adminGetProfileSnapshots({ fresh = false } = {}) {
+  const qs = fresh ? '?fresh=1' : '';
+  return apiFetch(`/admin/profiles/snapshots${qs}`);
+}
+
+export async function adminRebuildProfileSnapshots() {
+  const result = await apiFetch('/admin/profiles/snapshots/rebuild', {
+    method: 'POST',
+    body: '{}',
   });
   markFeedDirty();
   return result;

@@ -7,7 +7,7 @@ import { useAuth } from '../lib/authContext';
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } };
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
-import { STORY_FEED_CACHE_INVALIDATED_EVENT, getProfiles, getProfilesVersion, getStories, getStorySnapshotFeed, getToken } from '../lib/api';
+import { STORY_FEED_CACHE_INVALIDATED_EVENT, applyClientFakeOnline, getProfiles, getProfilesVersion, getStories, getStorySnapshotFeed, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
@@ -145,13 +145,13 @@ function getCachedFeed() {
     // Only reuse cache when it represents the first page/block.
     if (currentCursor > 0 || blockCursor > 0 || pageCursor > 0) return null;
     if (Array.isArray(parsed?.profiles)) {
-      return {
+      return applyClientFakeOnline({
         ...parsed,
         settings: {},
-      };
+      });
     }
     if (Array.isArray(parsed)) {
-      return { profiles: parsed, viewerPremium: false, settings: {}, timestamp: 0 };
+      return applyClientFakeOnline({ profiles: parsed, viewerPremium: false, settings: {}, timestamp: 0 });
     }
     return null;
   } catch { return null; }
