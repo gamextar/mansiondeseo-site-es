@@ -4331,20 +4331,8 @@ async function handleProfiles(request, env) {
   );
   const feedSnapshotCacheKey = `feed-snapshot:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}:${viewerCanWatchAllStories ? 'vip' : 'free'}:${geoKey}:window:${snapshotWindowLimit}`;
   const snapshotCacheHit = !fresh && isFreshCached(feedSnapshotCacheKey);
-  const storyCacheHit = isFreshCached('active_story_users') || isFreshCached('active_story_users_real');
+  const storyCacheHit = isFreshCached(STORY_SNAPSHOT_MANIFEST_KEY);
   const countCacheHit = false;
-  const getRealStoryRows = () => cached(
-    'active_story_users_real',
-    30_000,
-    () => env.DB.prepare(`
-      SELECT s.user_id, s.video_url, COALESCE(s.vip_only, 0) AS vip_only
-      FROM stories s
-      JOIN users u ON u.id = s.user_id
-      WHERE s.active = 1
-        AND COALESCE(u.fake, 0) = 0
-      ORDER BY s.created_at DESC
-    `).all().then(r => r.results).catch(() => [])
-  );
   const snapshotStartedAt = Date.now();
   const buildSnapshotFeedData = async () => {
     const realSnapshotLimit = Math.min(snapshotWindowLimit, 1000);
@@ -4360,7 +4348,7 @@ async function handleProfiles(request, env) {
     const [realRows, fakeRows, realStoryRows] = await Promise.all([
       fetchRowsPerRoleBucket(env, realSnapshotQuery, params, roleBuckets, realSnapshotLimit),
       fakeRowsPromise,
-      getRealStoryRows(),
+      loadRealStoryRowsFromSnapshot(env, { roleValues: requestedRoleValues, fresh }),
     ]);
     const snapshotRows = fakeRows === null ? realRows : [...realRows, ...fakeRows];
     if (fakeRows === null) {
@@ -9705,6 +9693,31 @@ async function loadFakeProfileRowsFromSnapshots(env, {
     rotation_position: index + 1,
     last_active: formatSqlDateFromMs(now - (index * 60_000)),
   }));
+}
+
+async function loadRealStoryRowsFromSnapshot(env, { roleValues = [], fresh = false } = {}) {
+  const manifest = await readStorySnapshotJson(env, STORY_SNAPSHOT_MANIFEST_KEY, {
+    ttlMs: 30_000,
+    bypassCache: fresh,
+  }).catch(() => null);
+  const key = manifest?.real?.key;
+  if (!key) {
+    console.warn('real story snapshot unavailable; skipping D1 story lookup for profile feed');
+    return [];
+  }
+
+  const snapshot = await readStorySnapshotJson(env, key, { bypassCache: fresh }).catch(() => null);
+  const roleSet = new Set((Array.isArray(roleValues) ? roleValues : [])
+    .map((role) => String(role || '').trim())
+    .filter(Boolean));
+  return uniqueStoryRows(Array.isArray(snapshot?.stories) ? snapshot.stories : [])
+    .filter((row) => Number(row?.fake || 0) === 0)
+    .filter((row) => roleSet.size === 0 || roleSet.has(String(row?.role || '')))
+    .map((row) => ({
+      user_id: String(row?.user_id || ''),
+      video_url: row?.video_url || '',
+      vip_only: Number(row?.vip_only || 0),
+    }));
 }
 
 function getStorySnapshotBucketsForRoles(roleValues = []) {
