@@ -21,6 +21,14 @@ const CLIENT_CACHE_VERSION_KEY = 'mansion_client_cache_version';
 const CLIENT_CACHE_VERSION = 'media-paths-v7-avatar-race-fix';
 const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
+const STORY_SNAPSHOT_CACHE_PREFIX = 'mansion_story_snapshot:';
+const STORY_SNAPSHOT_MANIFEST_TTL_MS = 10 * 60_000;
+const STORY_SNAPSHOT_ASSET_TTL_MS = 24 * 60 * 60_000;
+const STORY_SNAPSHOT_FAKE_ROTATION_MS = 15 * 60_000;
+const STORY_SNAPSHOT_FAKE_LIMIT = 10;
+const STORY_SNAPSHOT_BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
+const STORY_SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
+const STORY_PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 export const STORY_FEED_CACHE_INVALIDATED_EVENT = 'mansion-story-feed-cache-invalidated';
 const sharedGetCache = new Map();
 let avatarUploadCacheSeq = 0;
@@ -1684,6 +1692,252 @@ export async function reportClientError(payload = {}) {
 
 // ── Stories ─────────────────────────────────────────────
 
+function readStorySnapshotStorage(key, ttlMs) {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const timestamp = Number(parsed?.timestamp || 0);
+    if (ttlMs > 0 && (!timestamp || Date.now() - timestamp > ttlMs)) return null;
+    return parsed?.value || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStorySnapshotStorage(key, value) {
+  if (typeof localStorage === 'undefined' || !value) return;
+  try {
+    localStorage.setItem(key, JSON.stringify({ value, timestamp: Date.now() }));
+  } catch {
+    // Snapshot cache is an optimization only.
+  }
+}
+
+function getStorySnapshotFilename(ref) {
+  const raw = typeof ref === 'string'
+    ? ref
+    : (ref?.key || ref?.url || '');
+  const value = String(raw || '').trim();
+  if (!value) return '';
+
+  try {
+    const parsed = value.startsWith('http://') || value.startsWith('https://')
+      ? new URL(value)
+      : null;
+    const pathname = parsed ? parsed.pathname : value;
+    return pathname.split('/').filter(Boolean).pop() || '';
+  } catch {
+    return value.split('/').filter(Boolean).pop() || '';
+  }
+}
+
+function isAllowedStorySnapshotFilename(filename) {
+  return /^(manifest\.json|real\.v[a-z0-9_-]+\.json|fakes-(hombre|mujer|pareja|trans)\.v[a-z0-9_-]+\.json)$/i
+    .test(String(filename || ''));
+}
+
+async function fetchStorySnapshotJson(filename, { fresh = false, ttlMs = STORY_SNAPSHOT_ASSET_TTL_MS } = {}) {
+  const safeFilename = getStorySnapshotFilename(filename);
+  if (!isAllowedStorySnapshotFilename(safeFilename)) return null;
+
+  const cacheKey = `${STORY_SNAPSHOT_CACHE_PREFIX}${safeFilename}`;
+  if (!fresh) {
+    const cached = readStorySnapshotStorage(cacheKey, ttlMs);
+    if (cached) return cached;
+  }
+
+  const qs = fresh ? '?fresh=1' : '';
+  const res = await fetch(`${API_BASE}/story-snapshots/${encodeURIComponent(safeFilename)}${qs}`, {
+    cache: fresh ? 'reload' : 'default',
+  });
+  if (!res.ok) throw new Error('No se pudo cargar el snapshot de stories');
+
+  const data = await res.json();
+  writeStorySnapshotStorage(cacheKey, data);
+  return data;
+}
+
+function safeParseStorySnapshotCrop(value) {
+  if (!value) return null;
+  if (typeof value === 'object') return value;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeStorySnapshotRow(row) {
+  const id = String(row?.id || row?.story_id || '').trim();
+  const userId = String(row?.user_id || '').trim();
+  if (!id || !userId) return null;
+
+  return {
+    id,
+    user_id: userId,
+    video_url: row?.video_url || '',
+    caption: row?.caption || '',
+    vip_only: Number(row?.vip_only || 0) === 1,
+    restricted: false,
+    likes: Number(row?.likes || 0),
+    liked: !!row?.liked,
+    comments: Number(row?.comments || 0),
+    created_at: row?.created_at || '',
+    username: row?.username || '',
+    avatar_url: row?.avatar_url || '',
+    avatar_crop: safeParseStorySnapshotCrop(row?.avatar_crop),
+    role: row?.role || '',
+    fake: Number(row?.fake || 0) === 1,
+    last_active: row?.last_active || '',
+    visits_total: Number(row?.visits_total || 0),
+    rotation_position: Number(row?.rotation_position || 0),
+  };
+}
+
+function uniqueStorySnapshotRows(rows = [], limit = Infinity) {
+  const seenStoryIds = new Set();
+  const seenUserIds = new Set();
+  const output = [];
+  for (const rawRow of rows || []) {
+    const row = normalizeStorySnapshotRow(rawRow);
+    if (!row) continue;
+    if (seenStoryIds.has(row.id) || seenUserIds.has(row.user_id)) continue;
+    seenStoryIds.add(row.id);
+    seenUserIds.add(row.user_id);
+    output.push(row);
+    if (output.length >= limit) break;
+  }
+  return output;
+}
+
+function hashStorySnapshotSeed(value = '') {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function createStorySnapshotRandom(seedValue) {
+  let state = Number(seedValue || 1) >>> 0;
+  return () => {
+    state = (Math.imul(1664525, state) + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+function shuffleStorySnapshotRows(rows = [], seedValue = Date.now()) {
+  const output = [...rows];
+  const random = createStorySnapshotRandom(seedValue);
+  for (let index = output.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [output[index], output[swapIndex]] = [output[swapIndex], output[index]];
+  }
+  return output;
+}
+
+function parseStoryRoleArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return value.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
+function getStoryRoleBucket(role) {
+  return STORY_PAIR_ROLE_IDS.includes(role) ? 'pareja' : role;
+}
+
+function getViewerStoryRoleValues(viewer) {
+  const seeking = parseStoryRoleArray(viewer?.seeking)
+    .map((role) => String(role || '').trim())
+    .filter((role) => STORY_SEEKING_ROLE_IDS.includes(role));
+  const filteredSeeking = seeking.length > 0 && seeking.length < STORY_SEEKING_ROLE_IDS.length
+    ? seeking
+    : [];
+  return [...new Set(filteredSeeking.flatMap((role) => (role === 'pareja' ? STORY_PAIR_ROLE_IDS : [role])))];
+}
+
+function getStorySnapshotBucketsForRoleValues(roleValues = []) {
+  if (!Array.isArray(roleValues) || roleValues.length === 0) return STORY_SNAPSHOT_BUCKETS;
+  const buckets = [...new Set(roleValues.map(getStoryRoleBucket).filter((bucket) => STORY_SNAPSHOT_BUCKETS.includes(bucket)))];
+  return buckets.length > 0 ? buckets : STORY_SNAPSHOT_BUCKETS;
+}
+
+function storyMatchesRoleValues(story, roleValues = []) {
+  if (!Array.isArray(roleValues) || roleValues.length === 0) return true;
+  return roleValues.includes(String(story?.role || ''));
+}
+
+function getStorySnapshotFakeWindowKey(now = Date.now()) {
+  return Math.floor(now / STORY_SNAPSHOT_FAKE_ROTATION_MS);
+}
+
+export async function getStorySnapshotRail({ limit = 25, viewer = null, fresh = false } = {}) {
+  const safeLimit = Math.max(1, Math.min(200, Number(limit) || 25));
+  const viewerId = String(viewer?.id || viewer?.user_id || '').trim();
+  const roleValues = getViewerStoryRoleValues(viewer);
+  const roleKey = roleValues.length ? roleValues.slice().sort().join(',') : 'all';
+  const fakeWindowKey = getStorySnapshotFakeWindowKey();
+
+  const manifest = await fetchStorySnapshotJson('manifest.json', {
+    fresh,
+    ttlMs: STORY_SNAPSHOT_MANIFEST_TTL_MS,
+  });
+  if (!manifest?.real?.key && !manifest?.fakes) return null;
+
+  let realRows = [];
+  const realFilename = getStorySnapshotFilename(manifest?.real);
+  if (realFilename) {
+    const realSnapshot = await fetchStorySnapshotJson(realFilename, { ttlMs: STORY_SNAPSHOT_ASSET_TTL_MS });
+    realRows = uniqueStorySnapshotRows(
+      (realSnapshot?.stories || [])
+        .filter((story) => storyMatchesRoleValues(story, roleValues))
+        .filter((story) => !viewerId || String(story?.user_id || '') !== viewerId),
+      safeLimit
+    );
+  }
+
+  const fakeLimit = Math.max(0, Math.min(STORY_SNAPSHOT_FAKE_LIMIT, safeLimit - realRows.length));
+  let fakeRows = [];
+  if (fakeLimit > 0) {
+    const buckets = getStorySnapshotBucketsForRoleValues(roleValues);
+    const fakeSnapshots = await Promise.all(buckets.map(async (bucket) => {
+      const filename = getStorySnapshotFilename(manifest?.fakes?.[bucket]);
+      if (!filename) return [];
+      const snapshot = await fetchStorySnapshotJson(filename, { ttlMs: STORY_SNAPSHOT_ASSET_TTL_MS });
+      return Array.isArray(snapshot?.stories) ? snapshot.stories : [];
+    }));
+    const fakePool = uniqueStorySnapshotRows(
+      fakeSnapshots.flat()
+        .filter((story) => storyMatchesRoleValues(story, roleValues))
+        .filter((story) => !viewerId || String(story?.user_id || '') !== viewerId),
+      1000
+    );
+    const seed = hashStorySnapshotSeed(`${viewerId || 'anon'}:${manifest.version || ''}:${roleKey}:${fakeWindowKey}:${fakePool.length}`);
+    fakeRows = uniqueStorySnapshotRows(shuffleStorySnapshotRows(fakePool, seed), fakeLimit);
+  }
+
+  const stories = uniqueStorySnapshotRows([...realRows, ...fakeRows], safeLimit);
+  if (stories.length === 0) return null;
+
+  return {
+    stories,
+    snapshot: true,
+    snapshotVersion: manifest.version || '',
+    fakeWindowKey,
+  };
+}
+
 export async function getStories({ page = 1, limit = 25, focusUserId = '', surface = '', fresh = false } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (focusUserId) params.set('focus_user_id', focusUserId);
@@ -1733,6 +1987,7 @@ function invalidateStoryFeedCache() {
     localStorage.removeItem('mansion_feed');
     localStorage.removeItem('vf_stories');
     removeMatchingStorageKeys(localStorage, (key) => key.startsWith('mansion_home_stories:'));
+    removeMatchingStorageKeys(localStorage, (key) => key.startsWith(STORY_SNAPSHOT_CACHE_PREFIX));
     removeMatchingStorageKeys(sessionStorage, (key) => key.startsWith('mansion_home_stories:'));
   } catch {}
   if (typeof window !== 'undefined') {
