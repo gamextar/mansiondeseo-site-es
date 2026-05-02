@@ -21,6 +21,7 @@
     "migrate:media-domains": "node scripts/migrate-media-domains.mjs",
     "cleanup:women-photo-01": "node scripts/remove-women-photo-01.mjs",
     "cleanup:role-photo-01": "node scripts/remove-women-photo-01.mjs",
+    "stories:snapshots": "node scripts/rebuild-story-snapshots.mjs",
     "deploy:shared": "node scripts/deploy-shared.mjs",
     "mirror:country": "node scripts/sync-country-mirror.mjs",
     "postbuild": "node scripts/install-static-home.mjs && node scripts/generate-static-seo-pages.mjs"
