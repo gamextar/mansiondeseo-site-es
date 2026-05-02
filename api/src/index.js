@@ -26,6 +26,7 @@ function invalidateFeedBrowseCache() {
       String(key).startsWith('count:profiles:') ||
       String(key).startsWith('feed-snapshot:') ||
       String(key).startsWith('story-rows:') ||
+      String(key).startsWith('story-snapshot:') ||
       String(key) === 'active_story_users'
     ) {
       _cache.delete(key);
@@ -97,6 +98,11 @@ const STORY_RAIL_FALLBACK_GAP_DESKTOP = 7;
 const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
 const FREE_VIDEO_STORY_DAILY_LIMIT = 10;
 const FAKE_STORY_ROTATION_POOL_SIZE = 54;
+const STORY_SNAPSHOT_PREFIX = 'story-snapshots';
+const STORY_SNAPSHOT_MANIFEST_KEY = `${STORY_SNAPSHOT_PREFIX}/manifest.json`;
+const STORY_SNAPSHOT_BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
+const STORY_SNAPSHOT_FAKE_LIMIT_PER_BUCKET = 100;
+const STORY_SNAPSHOT_REAL_LIMIT = 300;
 const STORY_ROWS_CACHE_TTL_MS = 5 * 60_000;
 const FREE_CHAT_RECIPIENT_LIMIT = 5;
 const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
@@ -9213,6 +9219,254 @@ async function ensureFakeStoryCandidatePool(env) {
   return _fakeStoryCandidatePoolReady;
 }
 
+function getStorySnapshotVersion() {
+  return Date.now().toString(36);
+}
+
+function getStorySnapshotKey(kind, version, bucket = '') {
+  const safeVersion = String(version || getStorySnapshotVersion()).replace(/[^a-z0-9_-]/gi, '');
+  const safeBucket = String(bucket || '').replace(/[^a-z0-9_-]/gi, '');
+  if (kind === 'real') return `${STORY_SNAPSHOT_PREFIX}/real.v${safeVersion}.json`;
+  if (kind === 'fake' && safeBucket) return `${STORY_SNAPSHOT_PREFIX}/fakes-${safeBucket}.v${safeVersion}.json`;
+  return `${STORY_SNAPSHOT_PREFIX}/${kind || 'snapshot'}.v${safeVersion}.json`;
+}
+
+function getStorySnapshotPublicUrl(env, key) {
+  return buildPublicMediaUrl(key, env);
+}
+
+function mapStorySnapshotRow(row, env, { position = 0 } = {}) {
+  const fake = Number(row?.fake || 0) === 1 ? 1 : 0;
+  return {
+    id: String(row?.id || row?.story_id || ''),
+    user_id: String(row?.user_id || ''),
+    video_url: normalizeStoryVideoUrl(row?.video_url || '', env),
+    caption: row?.caption || '',
+    vip_only: Number(row?.vip_only || 0),
+    likes: Number(row?.likes || 0),
+    comments: Number(row?.comments || 0),
+    created_at: row?.created_at || '',
+    username: row?.username || '',
+    avatar_url: row?.avatar_url || '',
+    avatar_crop: typeof row?.avatar_crop === 'string' ? row.avatar_crop : JSON.stringify(row?.avatar_crop || null),
+    role: row?.role || '',
+    fake,
+    last_active: row?.last_active || '',
+    visits_total: Number(row?.visits_total || 0),
+    rotation_position: Number(row?.rotation_position || position || 0),
+    liked: 0,
+  };
+}
+
+async function putStorySnapshotJson(env, key, payload, { cacheControl = 'public, max-age=31536000, immutable' } = {}) {
+  const body = JSON.stringify(payload);
+  await env.IMAGES.put(key, body, {
+    httpMetadata: {
+      contentType: 'application/json; charset=utf-8',
+      cacheControl,
+    },
+  });
+  _cache.delete(`story-snapshot:${key}`);
+  try {
+    const cache = globalThis.caches?.default;
+    const publicUrl = getStorySnapshotPublicUrl(env, key);
+    if (cache && publicUrl) await cache.delete(new Request(publicUrl));
+  } catch {}
+}
+
+async function readStorySnapshotJson(env, key, { ttlMs = STORY_ROWS_CACHE_TTL_MS, bypassCache = false } = {}) {
+  const normalizedKey = String(key || '').trim();
+  if (!normalizedKey) return null;
+  const memoryKey = `story-snapshot:${normalizedKey}`;
+  if (!bypassCache) {
+    const entry = _cache.get(memoryKey);
+    if (entry && Date.now() < entry.exp) return entry.val;
+  }
+
+  const publicUrl = getStorySnapshotPublicUrl(env, normalizedKey);
+  const edgeCache = !bypassCache ? globalThis.caches?.default : null;
+  const request = publicUrl ? new Request(publicUrl) : null;
+  if (edgeCache && request) {
+    try {
+      const cachedResponse = await edgeCache.match(request);
+      if (cachedResponse) {
+        const data = await cachedResponse.clone().json();
+        _cache.set(memoryKey, { val: data, exp: Date.now() + ttlMs });
+        return data;
+      }
+    } catch {}
+  }
+
+  const object = await env.IMAGES.get(normalizedKey);
+  if (!object) return null;
+  const text = await object.text();
+  const data = JSON.parse(text);
+  _cache.set(memoryKey, { val: data, exp: Date.now() + ttlMs });
+
+  if (edgeCache && request) {
+    try {
+      const headers = new Headers({
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': object.httpMetadata?.cacheControl || 'public, max-age=60, stale-while-revalidate=300',
+      });
+      await edgeCache.put(request, new Response(text, { status: 200, headers }));
+    } catch {}
+  }
+
+  return data;
+}
+
+async function buildStorySnapshotRows(env, { fake = false } = {}) {
+  const fakeValue = fake ? 1 : 0;
+  const limit = fake ? 2000 : STORY_SNAPSHOT_REAL_LIMIT;
+  const { results } = await env.DB.prepare(`
+    SELECT s.id, s.user_id, s.video_url, COALESCE(s.caption, '') AS caption,
+           COALESCE(s.vip_only, 0) AS vip_only, COALESCE(s.likes, 0) AS likes,
+           COALESCE(s.comments, 0) AS comments, s.created_at,
+           u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
+           u.last_active, 0 AS visits_total, COALESCE(u.feed_priority, 0) AS feed_priority
+    FROM stories s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.active = 1
+      AND COALESCE(s.vip_only, 0) = 0
+      AND COALESCE(u.fake, 0) = ?
+      AND u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
+    ORDER BY ${fake ? "COALESCE(u.feed_priority, 0) DESC, s.created_at DESC, s.id DESC" : "s.created_at DESC, u.last_active DESC, s.id DESC"}
+    LIMIT ?
+  `).bind(fakeValue, limit).all();
+
+  return uniqueStoryRows(results || [], limit);
+}
+
+async function rebuildStorySnapshots(env, { includeReal = true, includeFakes = true, source = 'unknown' } = {}) {
+  await ensureStoriesTable(env);
+  const version = getStorySnapshotVersion();
+  const updatedAt = formatSqlDateFromMs(Date.now());
+  const manifest = {
+    schema: 1,
+    version,
+    updated_at: updatedAt,
+    source,
+    real: null,
+    fakes: {},
+  };
+
+  if (includeReal) {
+    const realRows = (await buildStorySnapshotRows(env, { fake: false }))
+      .map((row, index) => mapStorySnapshotRow(row, env, { position: index + 1 }));
+    const realKey = getStorySnapshotKey('real', version);
+    await putStorySnapshotJson(env, realKey, {
+      schema: 1,
+      kind: 'real',
+      version,
+      updated_at: updatedAt,
+      count: realRows.length,
+      stories: realRows,
+    });
+    manifest.real = {
+      key: realKey,
+      url: getStorySnapshotPublicUrl(env, realKey),
+      count: realRows.length,
+    };
+  }
+
+  if (includeFakes) {
+    const fakeRows = await buildStorySnapshotRows(env, { fake: true });
+    const bucketMap = new Map(STORY_SNAPSHOT_BUCKETS.map((bucket) => [bucket, []]));
+    for (const row of fakeRows) {
+      const bucket = getRoleBucketKey(row.role);
+      if (!bucketMap.has(bucket)) bucketMap.set(bucket, []);
+      bucketMap.get(bucket).push(row);
+    }
+
+    for (const bucket of STORY_SNAPSHOT_BUCKETS) {
+      const rows = uniqueStoryRows(bucketMap.get(bucket) || [], 2000);
+      const priorityRows = rows.filter((row) => Number(row.feed_priority || 0) > 0);
+      const normalRows = rows.filter((row) => Number(row.feed_priority || 0) <= 0);
+      const seed = hashStringToUint32(`fake-snapshot:${bucket}:${version}:${rows.length}`);
+      const selectedRows = uniqueStoryRows([
+        ...shuffleStoryRows(priorityRows, seed),
+        ...shuffleStoryRows(normalRows, seed ^ 0xa5a5a5a5),
+      ], STORY_SNAPSHOT_FAKE_LIMIT_PER_BUCKET)
+        .map((row, index) => mapStorySnapshotRow(row, env, { position: index + 1 }));
+      const fakeKey = getStorySnapshotKey('fake', version, bucket);
+      await putStorySnapshotJson(env, fakeKey, {
+        schema: 1,
+        kind: 'fake',
+        bucket,
+        version,
+        updated_at: updatedAt,
+        count: selectedRows.length,
+        stories: selectedRows,
+      });
+      manifest.fakes[bucket] = {
+        key: fakeKey,
+        url: getStorySnapshotPublicUrl(env, fakeKey),
+        count: selectedRows.length,
+      };
+    }
+  }
+
+  const previousManifest = await readStorySnapshotJson(env, STORY_SNAPSHOT_MANIFEST_KEY, { bypassCache: true }).catch(() => null);
+  const nextManifest = {
+    ...previousManifest,
+    ...manifest,
+    real: manifest.real || previousManifest?.real || null,
+    fakes: {
+      ...(previousManifest?.fakes || {}),
+      ...(manifest.fakes || {}),
+    },
+  };
+  await putStorySnapshotJson(env, STORY_SNAPSHOT_MANIFEST_KEY, nextManifest, {
+    cacheControl: 'public, max-age=15, stale-while-revalidate=300',
+  });
+  invalidateFeedBrowseCache();
+  console.log(`🔧 Story snapshots (${source}) — real ${nextManifest.real?.count ?? 0}, fakes ${Object.values(nextManifest.fakes || {}).reduce((sum, item) => sum + Number(item?.count || 0), 0)}`);
+  return nextManifest;
+}
+
+function getStorySnapshotBucketsForRoles(roleValues = []) {
+  if (!Array.isArray(roleValues) || roleValues.length === 0) return STORY_SNAPSHOT_BUCKETS;
+  const buckets = [...new Set(roleValues.map((role) => getRoleBucketKey(role)).filter(Boolean))];
+  return buckets.length > 0 ? buckets : STORY_SNAPSHOT_BUCKETS;
+}
+
+async function loadStoryRowsFromSnapshots(env, {
+  roleValues = [],
+  limit = 25,
+  viewerId = '',
+  fresh = false,
+} = {}) {
+  const safeLimit = parseIntegerSetting(limit, 25, 1, 500);
+  const manifest = await readStorySnapshotJson(env, STORY_SNAPSHOT_MANIFEST_KEY, {
+    ttlMs: 30_000,
+    bypassCache: fresh,
+  }).catch(() => null);
+  if (!manifest?.real?.key && !manifest?.fakes) return null;
+
+  const roleSet = new Set(Array.isArray(roleValues) ? roleValues : []);
+  const filterByRole = (row) => roleSet.size === 0 || roleSet.has(String(row?.role || ''));
+  const realSnapshot = manifest?.real?.key
+    ? await readStorySnapshotJson(env, manifest.real.key, { bypassCache: fresh }).catch(() => null)
+    : null;
+  const realRows = uniqueStoryRows((realSnapshot?.stories || []).filter(filterByRole), safeLimit);
+  const fakeLimit = Math.max(0, Math.min(10, safeLimit - realRows.length));
+  if (fakeLimit <= 0) return realRows;
+
+  const buckets = getStorySnapshotBucketsForRoles(roleValues);
+  const fakeSnapshots = await Promise.all(buckets.map(async (bucket) => {
+    const key = manifest?.fakes?.[bucket]?.key;
+    if (!key) return [];
+    const snapshot = await readStorySnapshotJson(env, key, { bypassCache: fresh }).catch(() => null);
+    return Array.isArray(snapshot?.stories) ? snapshot.stories : [];
+  }));
+  const fakeRows = uniqueStoryRows(fakeSnapshots.flat().filter(filterByRole), 1000);
+  const seed = hashStringToUint32(`${viewerId || 'anon'}:${manifest.version || ''}:${Math.floor(Date.now() / (15 * 60_000))}:${fakeRows.length}`);
+  const selectedFakes = uniqueStoryRows(shuffleStoryRows(fakeRows, seed), fakeLimit);
+  return uniqueStoryRows([...realRows, ...selectedFakes], safeLimit);
+}
+
 function getStoryFeedSelectClause({ includeLiked = false, fromRotation = false } = {}) {
   if (fromRotation) {
     return `
@@ -9503,6 +9757,7 @@ async function syncFakeStoryCandidateForUser(env, userId) {
     JOIN users u ON u.id = s.user_id
     WHERE s.user_id = ?
       AND s.active = 1
+      AND COALESCE(s.vip_only, 0) = 0
       AND COALESCE(u.fake, 0) = 1
       AND u.status = 'verified'
       AND COALESCE(u.account_status, 'active') = 'active'
@@ -9816,7 +10071,19 @@ async function loadStoriesPayload(request, env, options = {}) {
   let orderedRows;
   let rowsNeedLikedSync = false;
 
-  if (useMaterializedRows) {
+  const snapshotRows = useMaterializedRows && isRailSurface && !focusUserId
+    ? await loadStoryRowsFromSnapshots(env, {
+        roleValues,
+        limit: storyWindowLimit,
+        viewerId: viewerId || '',
+        fresh,
+      })
+    : null;
+
+  if (Array.isArray(snapshotRows)) {
+    orderedRows = snapshotRows;
+    rowsNeedLikedSync = false;
+  } else if (useMaterializedRows) {
     let storyRows;
     if (canCacheStoryRows) {
       storyRows = await cached(storyRowsCacheKey, STORY_ROWS_CACHE_TTL_MS, () => loadMaterializedStoryRows(env, {
@@ -10282,6 +10549,9 @@ async function handleAdminUploadStory(request, env) {
   if (Number(targetUser.fake || 0) === 1) {
     await syncFakeStoryCandidateForUser(env, userId);
     await rebuildFakeStoryRotation(env, { count: FAKE_STORY_ROTATION_POOL_SIZE, preferredUserIds: [userId], source: 'admin-upload-story' });
+    await rebuildStorySnapshots(env, { includeReal: false, includeFakes: true, source: 'admin-upload-story' });
+  } else {
+    await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'admin-upload-story-real' });
   }
   await bumpFeedCacheVersion(env);
 
@@ -10319,6 +10589,9 @@ async function handleDeleteOwnStory(request, env, storyId) {
 
   if (Number(rotationDelete?.meta?.changes || 0) > 0) {
     await rebuildFakeStoryRotation(env, { count: FAKE_STORY_ROTATION_POOL_SIZE, source: 'delete-story' });
+    await rebuildStorySnapshots(env, { includeReal: false, includeFakes: true, source: 'delete-fake-story' });
+  } else {
+    await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'delete-real-story' });
   }
   await bumpFeedCacheVersion(env);
 
@@ -10334,7 +10607,12 @@ async function handleAdminDeleteStory(request, env, storyId) {
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
 
 
-  const story = await env.DB.prepare('SELECT id, video_url FROM stories WHERE id = ?').bind(storyId).first();
+  const story = await env.DB.prepare(`
+    SELECT s.id, s.video_url, s.user_id, COALESCE(u.fake, 0) AS fake
+    FROM stories s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.id = ?
+  `).bind(storyId).first();
   if (!story) return error('Historia no encontrada', 404);
 
   const rotationDelete = await env.DB.prepare('DELETE FROM fake_story_rotation WHERE story_id = ?').bind(storyId).run();
@@ -10352,6 +10630,11 @@ async function handleAdminDeleteStory(request, env, storyId) {
   if (Number(rotationDelete?.meta?.changes || 0) > 0) {
     await rebuildFakeStoryRotation(env, { count: FAKE_STORY_ROTATION_POOL_SIZE, source: 'admin-delete-story' });
   }
+  await rebuildStorySnapshots(env, {
+    includeReal: Number(story.fake || 0) !== 1,
+    includeFakes: Number(story.fake || 0) === 1,
+    source: 'admin-delete-story',
+  });
   await bumpFeedCacheVersion(env);
 
   return json({ deleted: true, story_id: storyId });
@@ -10368,7 +10651,7 @@ async function handleAdminUpdateStory(request, env, storyId) {
   const body = await request.json().catch(() => ({}));
   const vipOnly = parseBooleanSetting(body?.vip_only, false);
   const story = await env.DB.prepare(`
-    SELECT s.id, s.user_id, u.premium, u.premium_until
+    SELECT s.id, s.user_id, u.premium, u.premium_until, COALESCE(u.fake, 0) AS fake
     FROM stories s
     JOIN users u ON u.id = s.user_id
     WHERE s.id = ?
@@ -10381,8 +10664,33 @@ async function handleAdminUpdateStory(request, env, storyId) {
   await env.DB.prepare('UPDATE stories SET vip_only = ? WHERE id = ?').bind(vipOnly ? 1 : 0, storyId).run();
   await syncFakeStoryCandidateForUser(env, story.user_id);
   await syncFakeStoryRotationForUser(env, story.user_id);
+  await rebuildStorySnapshots(env, {
+    includeReal: Number(story.fake || 0) !== 1,
+    includeFakes: Number(story.fake || 0) === 1,
+    source: 'admin-update-story',
+  });
   await bumpFeedCacheVersion(env);
   return json({ id: storyId, user_id: story.user_id, vip_only: vipOnly });
+}
+
+async function handleAdminRebuildStorySnapshots(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const body = await request.json().catch(() => ({}));
+  const includeReal = body.include_real !== false;
+  const includeFakes = body.include_fakes !== false;
+  const manifest = await rebuildStorySnapshots(env, {
+    includeReal,
+    includeFakes,
+    source: 'admin-rebuild-story-snapshots',
+  });
+  return json({
+    success: true,
+    manifest,
+  });
 }
 
 // POST /api/stories — authenticated user uploads their own story
@@ -10441,6 +10749,7 @@ async function handleUploadStory(request, env) {
     INSERT INTO stories (id, user_id, video_url, caption, vip_only) VALUES (?, ?, ?, ?, ?)
   `).bind(storyId, auth.sub, videoUrl, caption, vipOnly ? 1 : 0).run();
 
+  await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'user-upload-story' });
   await bumpFeedCacheVersion(env);
 
   return json({ id: storyId, video_url: videoUrl, caption, vip_only: vipOnly }, 201);
@@ -10626,6 +10935,7 @@ async function handleRequest(request, env, ctx) {
   if (userStoryMatch && method === 'DELETE') return handleDeleteOwnStory(request, env, userStoryMatch[1]);
   if (path === '/api/admin/upload-story' && method === 'POST') return handleAdminUploadStory(request, env);
   const adminStoryMatch = path.match(/^\/api\/admin\/stories\/([a-f0-9-]+)$/);
+  if (path === '/api/admin/stories/snapshots/rebuild' && method === 'POST') return handleAdminRebuildStorySnapshots(request, env);
   if (adminStoryMatch && method === 'PATCH') return handleAdminUpdateStory(request, env, adminStoryMatch[1]);
   if (adminStoryMatch && method === 'DELETE') return handleAdminDeleteStory(request, env, adminStoryMatch[1]);
 
