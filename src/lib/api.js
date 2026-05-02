@@ -1554,6 +1554,23 @@ export async function adminResetAllCoins() {
   return apiFetch('/admin/reset-all-coins', { method: 'POST', body: '{}' });
 }
 
+export async function adminGetStorySnapshots({ fresh = false } = {}) {
+  const qs = fresh ? '?fresh=1' : '';
+  return apiFetch(`/admin/stories/snapshots${qs}`);
+}
+
+export async function adminRebuildStorySnapshots({ includeReal = true, includeFakes = true } = {}) {
+  const result = await apiFetch('/admin/stories/snapshots/rebuild', {
+    method: 'POST',
+    body: JSON.stringify({
+      include_real: includeReal,
+      include_fakes: includeFakes,
+    }),
+  });
+  invalidateStoryFeedCache();
+  return result;
+}
+
 export async function adminGetProfileSnapshots({ fresh = false } = {}) {
   const qs = fresh ? '?fresh=1' : '';
   return apiFetch(`/admin/profiles/snapshots${qs}`);

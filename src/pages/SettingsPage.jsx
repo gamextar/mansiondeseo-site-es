@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Save, Sliders, Eye, EyeOff, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail, Activity, Ban, Video } from 'lucide-react';
-import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, adminGetProfileSnapshots, adminRebuildProfileSnapshots, uploadImage } from '../lib/api';
+import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, adminGetStorySnapshots, adminRebuildStorySnapshots, adminGetProfileSnapshots, adminRebuildProfileSnapshots, uploadImage } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
 import { estimateRealtimeLoad, getRealtimeDebugSummary, resetRealtimeDebug, subscribeRealtimeDebug } from '../lib/realtimeDebug';
@@ -194,6 +194,10 @@ export default function SettingsPage() {
   const [bootDebugFlags, setBootDebugFlagsState] = useState(() => getBootDebugFlags());
   const [swResetting, setSwResetting] = useState(false);
   const [swResetStatus, setSwResetStatus] = useState('');
+  const [storySnapshotLoading, setStorySnapshotLoading] = useState(false);
+  const [storySnapshotRunning, setStorySnapshotRunning] = useState(false);
+  const [storySnapshotManifest, setStorySnapshotManifest] = useState(null);
+  const [storySnapshotError, setStorySnapshotError] = useState('');
   const [profileSnapshotLoading, setProfileSnapshotLoading] = useState(false);
   const [profileSnapshotRunning, setProfileSnapshotRunning] = useState(false);
   const [profileSnapshotManifest, setProfileSnapshotManifest] = useState(null);
@@ -351,6 +355,14 @@ export default function SettingsPage() {
       .catch(() => navigate('/inicio'))
       .finally(() => setLoading(false));
     adminGetGifts().then(data => setGifts(data.gifts || [])).catch(() => {});
+    setStorySnapshotLoading(true);
+    adminGetStorySnapshots()
+      .then((data) => {
+        setStorySnapshotManifest(data?.manifest || null);
+        setStorySnapshotError('');
+      })
+      .catch((err) => setStorySnapshotError(err?.message || 'No se pudo cargar el snapshot de stories'))
+      .finally(() => setStorySnapshotLoading(false));
     setProfileSnapshotLoading(true);
     adminGetProfileSnapshots()
       .then((data) => {
@@ -422,6 +434,19 @@ export default function SettingsPage() {
     } catch {
       setSwResetStatus('No pude limpiar el service worker en esta prueba.');
       setSwResetting(false);
+    }
+  };
+
+  const handleRebuildStorySnapshots = async () => {
+    setStorySnapshotRunning(true);
+    setStorySnapshotError('');
+    try {
+      const data = await adminRebuildStorySnapshots({ includeReal: true, includeFakes: true });
+      setStorySnapshotManifest(data?.manifest || null);
+    } catch (err) {
+      setStorySnapshotError(err?.message || 'No se pudo regenerar el snapshot de stories');
+    } finally {
+      setStorySnapshotRunning(false);
     }
   };
 
@@ -717,6 +742,13 @@ export default function SettingsPage() {
       setter: setGalleryPlaceholderSuperHotImg,
     },
   ];
+  const storySnapshotBuckets = ['hombre', 'mujer', 'pareja', 'trans'].map((bucket) => ({
+    key: bucket,
+    label: bucket === 'hombre' ? 'Hombres' : bucket === 'mujer' ? 'Mujeres' : bucket === 'pareja' ? 'Parejas' : 'Trans',
+    ...(storySnapshotManifest?.fakes?.[bucket] || {}),
+  }));
+  const storySnapshotFakeTotal = storySnapshotBuckets.reduce((sum, bucket) => sum + Number(bucket.count || 0), 0);
+  const storySnapshotRealTotal = Number(storySnapshotManifest?.real?.count || 0);
   const profileSnapshotBuckets = ['hombre', 'mujer', 'pareja', 'trans'].map((bucket) => ({
     key: bucket,
     label: bucket === 'hombre' ? 'Hombres' : bucket === 'mujer' ? 'Mujeres' : bucket === 'pareja' ? 'Parejas' : 'Trans',
@@ -1870,6 +1902,55 @@ export default function SettingsPage() {
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-gold/20 space-y-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Snapshots de stories</h3>
+                  <p className="text-[11px] text-text-dim">Regenera los JSON estáticos de stories reales y fake cuando borres usuarios o hagas cambios masivos. El borrado desde Admin ya los actualiza automáticamente.</p>
+                </div>
+                <button
+                  onClick={handleRebuildStorySnapshots}
+                  disabled={storySnapshotRunning}
+                  className="px-4 py-2 rounded-xl bg-mansion-gold/15 border border-mansion-gold/30 text-mansion-gold text-sm font-semibold hover:bg-mansion-gold/20 transition-colors disabled:opacity-60"
+                >
+                  {storySnapshotRunning ? 'Generando...' : 'Regenerar'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Reales</p>
+                  <p className="mt-1 text-lg font-semibold text-text-primary">{storySnapshotLoading ? '...' : storySnapshotRealTotal}</p>
+                </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Fakes</p>
+                  <p className="mt-1 text-lg font-semibold text-text-primary">{storySnapshotLoading ? '...' : storySnapshotFakeTotal}</p>
+                </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Versión</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-text-primary">{storySnapshotManifest?.version || 'sin generar'}</p>
+                </div>
+                <div className="rounded-xl bg-mansion-base/60 border border-mansion-border/20 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Actualizado</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-text-primary">{storySnapshotManifest?.updated_at || '-'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {storySnapshotBuckets.map((bucket) => (
+                  <div key={bucket.key} className="rounded-xl border border-mansion-border/20 bg-mansion-base/40 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-text-dim">{bucket.label}</p>
+                    <p className="mt-1 text-sm font-semibold text-text-primary">{Number(bucket.count || 0)} stories</p>
+                  </div>
+                ))}
+              </div>
+
+              {storySnapshotError ? (
+                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-300">
+                  {storySnapshotError}
+                </div>
+              ) : null}
             </div>
             <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-gold/20 space-y-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">

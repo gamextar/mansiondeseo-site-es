@@ -902,6 +902,10 @@ async function deleteUserCompletely(env, user) {
   _viewerCache.delete(userId);
   _accountStatusCache.delete(userId);
   invalidateFeedBrowseCache();
+  return {
+    deletedStories: storyRows.length,
+    fake: Number(user.fake || 0) === 1,
+  };
 }
 
 async function ensureProfileReportsTable(env) {
@@ -7910,10 +7914,20 @@ async function handleAdminDeleteUser(request, env, userId) {
 
   if (userId === auth.sub) return error('No puedes eliminarte a ti mismo', 400);
 
-  const user = await env.DB.prepare('SELECT id, email, username, avatar_url, avatar_thumb_url, photo_thumbs, photos FROM users WHERE id = ?').bind(userId).first();
+  const user = await env.DB.prepare('SELECT id, email, username, avatar_url, avatar_thumb_url, photo_thumbs, photos, COALESCE(fake, 0) AS fake FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
 
-  await deleteUserCompletely(env, user);
+  const deletion = await deleteUserCompletely(env, user);
+  if (deletion.fake) {
+    await rebuildProfileSnapshots(env, { source: 'admin-delete-user' });
+  }
+  if (deletion.deletedStories > 0) {
+    await rebuildStorySnapshots(env, {
+      includeReal: !deletion.fake,
+      includeFakes: deletion.fake,
+      source: 'admin-delete-user',
+    });
+  }
   await bumpFeedCacheVersion(env);
 
   console.log(`🗑️ Admin eliminó usuario ${userId} (${user.email})`);
@@ -7931,6 +7945,9 @@ async function handleAdminBulkDeleteUsers(request, env) {
   if (userIds.length === 0) return error('Debes enviar al menos un user_id', 400);
   if (userIds.length > 100) return error('Máximo 100 usuarios por borrado masivo', 400);
 
+  let deletedFakeUser = false;
+  let deletedFakeStories = false;
+  let deletedRealStories = false;
   const results = [];
   for (const userId of userIds) {
     if (userId === auth.sub) {
@@ -7938,20 +7955,35 @@ async function handleAdminBulkDeleteUsers(request, env) {
       continue;
     }
 
-    const user = await env.DB.prepare('SELECT id, email, username, avatar_url, avatar_thumb_url, photo_thumbs, photos FROM users WHERE id = ?').bind(userId).first();
+    const user = await env.DB.prepare('SELECT id, email, username, avatar_url, avatar_thumb_url, photo_thumbs, photos, COALESCE(fake, 0) AS fake FROM users WHERE id = ?').bind(userId).first();
     if (!user) {
       results.push({ user_id: userId, deleted: false, reason: 'not_found' });
       continue;
     }
 
     try {
-      await deleteUserCompletely(env, user);
+      const deletion = await deleteUserCompletely(env, user);
+      deletedFakeUser ||= deletion.fake;
+      if (deletion.deletedStories > 0) {
+        if (deletion.fake) deletedFakeStories = true;
+        else deletedRealStories = true;
+      }
       results.push({ user_id: userId, email: user.email, username: user.username, deleted: true });
     } catch (err) {
       results.push({ user_id: userId, email: user.email, username: user.username, deleted: false, reason: 'delete_failed', error: String(err?.message || err) });
     }
   }
   if (results.some((item) => item.deleted)) {
+    if (deletedFakeUser) {
+      await rebuildProfileSnapshots(env, { source: 'admin-bulk-delete-users' });
+    }
+    if (deletedFakeStories || deletedRealStories) {
+      await rebuildStorySnapshots(env, {
+        includeReal: deletedRealStories,
+        includeFakes: deletedFakeStories,
+        source: 'admin-bulk-delete-users',
+      });
+    }
     await bumpFeedCacheVersion(env);
   }
 
@@ -10896,6 +10928,22 @@ async function handleAdminRebuildStorySnapshots(request, env) {
   });
 }
 
+async function handleAdminGetStorySnapshots(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const fresh = new URL(request.url).searchParams.get('fresh') === '1';
+  const manifest = await readStorySnapshotJson(env, STORY_SNAPSHOT_MANIFEST_KEY, {
+    bypassCache: fresh,
+  }).catch(() => null);
+  return json({
+    success: true,
+    manifest,
+  });
+}
+
 async function handleAdminGetProfileSnapshots(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
@@ -11171,6 +11219,7 @@ async function handleRequest(request, env, ctx) {
   if (userStoryMatch && method === 'DELETE') return handleDeleteOwnStory(request, env, userStoryMatch[1]);
   if (path === '/api/admin/upload-story' && method === 'POST') return handleAdminUploadStory(request, env);
   const adminStoryMatch = path.match(/^\/api\/admin\/stories\/([a-f0-9-]+)$/);
+  if (path === '/api/admin/stories/snapshots' && method === 'GET') return handleAdminGetStorySnapshots(request, env);
   if (path === '/api/admin/stories/snapshots/rebuild' && method === 'POST') return handleAdminRebuildStorySnapshots(request, env);
   if (adminStoryMatch && method === 'PATCH') return handleAdminUpdateStory(request, env, adminStoryMatch[1]);
   if (adminStoryMatch && method === 'DELETE') return handleAdminDeleteStory(request, env, adminStoryMatch[1]);
