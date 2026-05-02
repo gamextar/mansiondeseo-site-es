@@ -860,7 +860,7 @@ async function deleteUserCompletely(env, user) {
   await ensureChatRecipientLimitTable(env);
   await ensureVideoCallSessionsTable(env);
   const storyRowsResult = await env.DB.prepare(
-    'SELECT id, video_url FROM stories WHERE user_id = ?'
+    'SELECT id, video_url, COALESCE(vip_only, 0) AS vip_only FROM stories WHERE user_id = ?'
   ).bind(userId).all();
   const storyRows = storyRowsResult.results || [];
 
@@ -904,7 +904,51 @@ async function deleteUserCompletely(env, user) {
   invalidateFeedBrowseCache();
   return {
     deletedStories: storyRows.length,
+    deletedPublicStories: storyRows.filter((row) => Number(row?.vip_only || 0) === 0).length,
     fake: Number(user.fake || 0) === 1,
+  };
+}
+
+async function getUserActiveStoryCount(env, userId) {
+  return getActiveStoryCountForUsers(env, [userId]);
+}
+
+async function getActiveStoryCountForUsers(env, userIds = []) {
+  const ids = [...new Set((Array.isArray(userIds) ? userIds : [userIds])
+    .map((id) => String(id || '').trim())
+    .filter(Boolean))];
+  if (!ids.length) return 0;
+  await ensureStoriesTable(env);
+  const placeholders = ids.map(() => '?').join(', ');
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS total FROM stories WHERE active = 1 AND COALESCE(vip_only, 0) = 0 AND user_id IN (${placeholders})`
+  ).bind(...ids).first().catch(() => null);
+  return Number(row?.total || 0);
+}
+
+async function refreshStaticSnapshotsForUserChange(env, beforeUser, afterUser = null, { source = 'user-change' } = {}) {
+  const userId = beforeUser?.id || afterUser?.id;
+  if (!userId) return { profileSnapshots: false, storySnapshots: false };
+
+  const wasFake = Number(beforeUser?.fake || 0) === 1;
+  const isFake = afterUser ? Number(afterUser.fake || 0) === 1 : wasFake;
+  const activeStoryCount = await getUserActiveStoryCount(env, userId);
+
+  if (wasFake || isFake) {
+    await rebuildProfileSnapshots(env, { source });
+  }
+
+  if (activeStoryCount > 0) {
+    await rebuildStorySnapshots(env, {
+      includeReal: !wasFake || !isFake,
+      includeFakes: wasFake || isFake,
+      source,
+    });
+  }
+
+  return {
+    profileSnapshots: wasFake || isFake,
+    storySnapshots: activeStoryCount > 0,
   };
 }
 
@@ -3014,7 +3058,16 @@ async function handleRegister(request, env, ctx) {
       _viewerCache.delete(id);
       _accountStatusCache.delete(id);
     });
-    invalidateFeedBrowseCache();
+    const conflictingFakeStoryCount = await getActiveStoryCountForUsers(env, conflictingFakeIds);
+    await rebuildProfileSnapshots(env, { source: 'register-fake-username-conflict' });
+    if (conflictingFakeStoryCount > 0) {
+      await rebuildStorySnapshots(env, {
+        includeReal: false,
+        includeFakes: true,
+        source: 'register-fake-username-conflict',
+      });
+    }
+    await bumpFeedCacheVersion(env);
   }
 
   // Check duplicate email
@@ -3875,7 +3928,7 @@ async function handleConfirmAccountDeletion(request, env) {
   if (!record) return error('Código inválido o expirado', 401);
 
   const user = await env.DB.prepare(
-    'SELECT id, email, username FROM users WHERE id = ?'
+    "SELECT id, email, username, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
   ).bind(auth.sub).first();
   if (!user) return error('Usuario no encontrado', 404);
 
@@ -3893,6 +3946,10 @@ async function handleConfirmAccountDeletion(request, env) {
   _fullUserCache.delete(auth.sub);
   _viewerCache.delete(auth.sub);
   _accountStatusCache.delete(auth.sub);
+  await refreshStaticSnapshotsForUserChange(env, user, {
+    ...user,
+    account_status: 'under_review',
+  }, { source: 'account-delete-under-review' });
   await bumpFeedCacheVersion(env);
 
   console.log(`🕵️ Usuario solicitó eliminación y quedó en revisión ${auth.sub} (${user.email})`);
@@ -7622,7 +7679,9 @@ async function handleAdminUpdateUser(request, env, userId) {
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
 
-  const user = await env.DB.prepare('SELECT id, username, avatar_url, avatar_thumb_url, avatar_crop, photos, photo_thumbs FROM users WHERE id = ?').bind(userId).first();
+  const user = await env.DB.prepare(
+    "SELECT id, username, avatar_url, avatar_thumb_url, avatar_crop, photos, photo_thumbs, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+  ).bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
 
   const body = await request.json();
@@ -7698,10 +7757,38 @@ async function handleAdminUpdateUser(request, env, userId) {
   await env.DB.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...vals).run();
   _fullUserCache.delete(userId);
   _viewerCache.delete(userId);
+  _accountStatusCache.delete(userId);
   await syncFakeStoryRotationForUser(env, userId);
-  invalidateFeedBrowseCache();
 
   const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  const feedRelevantFields = [
+    'username',
+    'premium',
+    'premium_until',
+    'verified',
+    'ghost_mode',
+    'fake',
+    'feed_priority',
+    'duplicate_flag',
+    'marital_status',
+    'sexual_orientation',
+    'status',
+    'account_status',
+    'avatar_url',
+    'avatar_thumb_url',
+    'avatar_crop',
+    'photos',
+  ];
+  const shouldRefreshStaticFeed = feedRelevantFields.some((key) => (
+    Object.prototype.hasOwnProperty.call(body, key)
+  ));
+  if (shouldRefreshStaticFeed) {
+    await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'admin-update-user' });
+    await bumpFeedCacheVersion(env);
+  } else {
+    invalidateFeedBrowseCache();
+  }
+
   const { password_hash, ...safe } = updated;
   return json({
     user: {
@@ -7921,7 +8008,7 @@ async function handleAdminDeleteUser(request, env, userId) {
   if (deletion.fake) {
     await rebuildProfileSnapshots(env, { source: 'admin-delete-user' });
   }
-  if (deletion.deletedStories > 0) {
+  if (deletion.deletedPublicStories > 0) {
     await rebuildStorySnapshots(env, {
       includeReal: !deletion.fake,
       includeFakes: deletion.fake,
@@ -7964,7 +8051,7 @@ async function handleAdminBulkDeleteUsers(request, env) {
     try {
       const deletion = await deleteUserCompletely(env, user);
       deletedFakeUser ||= deletion.fake;
-      if (deletion.deletedStories > 0) {
+      if (deletion.deletedPublicStories > 0) {
         if (deletion.fake) deletedFakeStories = true;
         else deletedRealStories = true;
       }
