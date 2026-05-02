@@ -6199,6 +6199,7 @@ async function loadSettings(env) {
     feedCardsPerPageMobile: parseNumberSetting(settings.feed_cards_per_page_mobile, settings.feed_cards_per_page || 12),
     feedMaxPages: parseNumberSetting(settings.feed_max_pages, 10),
     feedPrefetchPages: parseNumberSetting(settings.feed_prefetch_pages, 6),
+    fakeProfileOnlinePercent: parseIntegerSetting(settings.fake_profile_online_percent, 42, 0, 100),
     feedCacheVersion: String(settings.feed_cache_version || '0'),
     homeStoryCountMobile: parseNumberSetting(settings.home_story_count_mobile, 15),
     homeStoryCountDesktop: parseNumberSetting(settings.home_story_count_desktop, 30),
@@ -6331,6 +6332,7 @@ function getPublicSettingsPayload(settings) {
     feedCardsPerPageMobile: settings.feedCardsPerPageMobile,
     feedMaxPages: settings.feedMaxPages,
     feedPrefetchPages: settings.feedPrefetchPages,
+    fakeProfileOnlinePercent: settings.fakeProfileOnlinePercent,
     feedCacheVersion: settings.feedCacheVersion,
     freeVideoStoryLimit: settings.freeVideoStoryLimit,
     homeStoryCountMobile: settings.homeStoryCountMobile,
@@ -6453,6 +6455,7 @@ async function handleUpdateSettings(request, env) {
     'feed_cards_per_page_mobile',
     'feed_max_pages',
     'feed_prefetch_pages',
+    'fake_profile_online_percent',
     'free_video_story_daily_limit',
     'home_story_count_mobile',
     'home_story_count_desktop',
@@ -6475,6 +6478,7 @@ async function handleUpdateSettings(request, env) {
     'profile_blur_thumb_multiplier',
     'profile_blur_lightbox_multiplier',
     'free_visible_photos',
+    'fake_profile_online_percent',
   ].some((key) => body[key] !== undefined);
   if (shouldBumpFeedCacheVersion) await bumpFeedCacheVersion(env);
   // Invalidate settings cache so new values take effect immediately

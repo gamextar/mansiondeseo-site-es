@@ -106,6 +106,7 @@ export default function SettingsPage() {
   const [feedCardsPerPageMobile, setFeedCardsPerPageMobile] = useState(12);
   const [feedMaxPages, setFeedMaxPages] = useState(10);
   const [feedPrefetchPages, setFeedPrefetchPages] = useState(6);
+  const [fakeProfileOnlinePercent, setFakeProfileOnlinePercent] = useState(42);
 
   // Coin packs
   const [coinPack1Coins, setCoinPack1Coins] = useState('1000');
@@ -288,6 +289,7 @@ export default function SettingsPage() {
         setFeedCardsPerPageMobile(s.feedCardsPerPageMobile ?? s.feedCardsPerPage ?? 12);
         setFeedMaxPages(s.feedMaxPages ?? 10);
         setFeedPrefetchPages(s.feedPrefetchPages ?? 6);
+        setFakeProfileOnlinePercent(s.fakeProfileOnlinePercent ?? 42);
         setVipPriceMonthly(s.vipPriceMonthly);
         setVipPrice3Months(s.vipPrice3Months);
         setVipPrice6Months(s.vipPrice6Months);
@@ -489,6 +491,7 @@ export default function SettingsPage() {
         feed_cards_per_page_mobile: feedCardsPerPageMobile,
         feed_max_pages: feedMaxPages,
         feed_prefetch_pages: feedPrefetchPages,
+        fake_profile_online_percent: fakeProfileOnlinePercent,
         vip_price_monthly: vipPriceMonthly,
         vip_price_3months: vipPrice3Months,
         vip_price_6months: vipPrice6Months,
@@ -577,6 +580,7 @@ export default function SettingsPage() {
       setFeedCardsPerPageMobile(s.feedCardsPerPageMobile ?? s.feedCardsPerPage ?? 12);
       setFeedMaxPages(s.feedMaxPages ?? 10);
       setFeedPrefetchPages(s.feedPrefetchPages ?? 6);
+      setFakeProfileOnlinePercent(s.fakeProfileOnlinePercent ?? 42);
       setVipPriceMonthly(s.vipPriceMonthly);
       setVipPrice3Months(s.vipPrice3Months);
       setVipPrice6Months(s.vipPrice6Months);
@@ -1532,6 +1536,19 @@ export default function SettingsPage() {
               <div className="rounded-xl border border-white/5 bg-mansion-elevated/30 px-3 py-2 text-[11px] text-text-dim">
                 Filtro por país:
                 <span className="ml-2 font-semibold text-mansion-gold">{feedFilterByCountry ? 'Activo' : 'Desactivado'}</span>
+              </div>
+
+              <div className="rounded-xl border border-white/5 bg-mansion-elevated/40 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">Online fake</p>
+                    <p className="text-[11px] text-text-dim">Porcentaje aproximado de perfiles fake que se muestran online. Rota en cliente cada 5 minutos.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Counter value={fakeProfileOnlinePercent} onChange={setFakeProfileOnlinePercent} min={0} max={100} step={5} />
+                    <span className="text-sm font-semibold text-mansion-gold">%</span>
+                  </div>
+                </div>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">

@@ -32,8 +32,7 @@ const STORY_SNAPSHOT_BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
 const STORY_SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const STORY_PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const PROFILE_FAKE_ONLINE_ROTATION_MS = 5 * 60_000;
-const PROFILE_FAKE_ONLINE_RATE = 0.42;
-const PROFILE_FAKE_ONLINE_PRIORITY_RATE = 0.58;
+const PROFILE_FAKE_ONLINE_PERCENT_DEFAULT = 42;
 export const STORY_FEED_CACHE_INVALIDATED_EVENT = 'mansion-story-feed-cache-invalidated';
 const sharedGetCache = new Map();
 let avatarUploadCacheSeq = 0;
@@ -955,12 +954,14 @@ export function applyClientFakeOnline(profilesResponse) {
   if (!profilesResponse || !Array.isArray(profilesResponse.profiles)) return profilesResponse;
   const viewerId = String(getStoredUser()?.id || 'anon');
   const windowKey = Math.floor(Date.now() / PROFILE_FAKE_ONLINE_ROTATION_MS);
+  const fakeOnlinePercent = Number(profilesResponse?.settings?.fakeProfileOnlinePercent);
+  const onlineRate = Math.max(0, Math.min(100, Number.isFinite(fakeOnlinePercent)
+    ? fakeOnlinePercent
+    : PROFILE_FAKE_ONLINE_PERCENT_DEFAULT)) / 100;
   return {
     ...profilesResponse,
     profiles: profilesResponse.profiles.map((profile) => {
       if (!profile?.fake) return profile;
-      const feedPriority = Math.max(0, Number(profile.feed_priority || 0));
-      const onlineRate = feedPriority > 0 ? PROFILE_FAKE_ONLINE_PRIORITY_RATE : PROFILE_FAKE_ONLINE_RATE;
       const hash = hashProfileOnlineSeed(`${viewerId}:${windowKey}:${profile.id || profile.name || ''}`);
       const online = (hash / 4294967296) < onlineRate;
       return {

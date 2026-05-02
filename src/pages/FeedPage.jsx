@@ -147,7 +147,9 @@ function getCachedFeed() {
     if (Array.isArray(parsed?.profiles)) {
       return applyClientFakeOnline({
         ...parsed,
-        settings: {},
+        settings: {
+          fakeProfileOnlinePercent: parsed?.settings?.fakeProfileOnlinePercent,
+        },
       });
     }
     if (Array.isArray(parsed)) {
@@ -166,7 +168,9 @@ function setCachedFeed(data) {
       feedCacheVersion,
       profiles: data.profiles || [],
       viewerPremium: data.viewerPremium || false,
-      settings: {},
+      settings: {
+        fakeProfileOnlinePercent: data.settings?.fakeProfileOnlinePercent,
+      },
       totalProfiles: Number(data.totalProfiles) || 0,
       currentCursor: Number(data.currentCursor) || 0,
       blockCursor: Number(data.blockCursor ?? data.currentCursor) || 0,
