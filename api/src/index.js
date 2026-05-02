@@ -9797,8 +9797,10 @@ async function loadStoryRowsFromSnapshots(env, {
   limit = 25,
   viewerId = '',
   fresh = false,
+  maxFakeRows = 10,
 } = {}) {
   const safeLimit = parseIntegerSetting(limit, 25, 1, 500);
+  const safeMaxFakeRows = parseIntegerSetting(maxFakeRows, 10, 0, 500);
   const manifest = await readStorySnapshotJson(env, STORY_SNAPSHOT_MANIFEST_KEY, {
     ttlMs: 30_000,
     bypassCache: fresh,
@@ -9811,7 +9813,7 @@ async function loadStoryRowsFromSnapshots(env, {
     ? await readStorySnapshotJson(env, manifest.real.key, { bypassCache: fresh }).catch(() => null)
     : null;
   const realRows = uniqueStoryRows((realSnapshot?.stories || []).filter(filterByRole), safeLimit);
-  const fakeLimit = Math.max(0, Math.min(10, safeLimit - realRows.length));
+  const fakeLimit = Math.max(0, Math.min(safeMaxFakeRows, safeLimit - realRows.length));
   if (fakeLimit <= 0) return realRows;
 
   const buckets = getStorySnapshotBucketsForRoles(roleValues);
@@ -10431,18 +10433,22 @@ async function loadStoriesPayload(request, env, options = {}) {
   let orderedRows;
   let rowsNeedLikedSync = false;
 
-  const snapshotRows = useMaterializedRows && isRailSurface && !focusUserId
+  const snapshotRows = useMaterializedRows && !focusUserId
     ? await loadStoryRowsFromSnapshots(env, {
         roleValues,
         limit: storyWindowLimit,
         viewerId: viewerId || '',
         fresh,
+        maxFakeRows: isRailSurface ? 10 : storyWindowLimit,
       })
     : null;
 
   if (Array.isArray(snapshotRows)) {
-    orderedRows = snapshotRows;
-    rowsNeedLikedSync = false;
+    orderedRows = interleaveStoryRows(snapshotRows, roleBuckets, storyWindowLimit);
+    if (!isRailSurface && !viewerCanWatchAllStories) {
+      orderedRows = orderedRows.filter((row) => Number(row?.vip_only || 0) !== 1 || String(row?.user_id || '') === String(viewerId || ''));
+    }
+    rowsNeedLikedSync = includeLiked;
   } else if (useMaterializedRows) {
     let storyRows;
     if (canCacheStoryRows) {
