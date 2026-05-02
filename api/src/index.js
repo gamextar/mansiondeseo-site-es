@@ -936,9 +936,7 @@ async function refreshStaticSnapshotsForUserChange(env, beforeUser, afterUser = 
   const isFake = afterUser ? Number(afterUser.fake || 0) === 1 : wasFake;
   const activeStoryCount = await getUserActiveStoryCount(env, userId);
 
-  if (wasFake || isFake) {
-    await rebuildProfileSnapshots(env, { source });
-  }
+  await rebuildProfileSnapshots(env, { source });
 
   if (activeStoryCount > 0) {
     await rebuildStorySnapshots(env, {
@@ -949,9 +947,14 @@ async function refreshStaticSnapshotsForUserChange(env, beforeUser, afterUser = 
   }
 
   return {
-    profileSnapshots: wasFake || isFake,
+    profileSnapshots: true,
     storySnapshots: activeStoryCount > 0,
   };
+}
+
+async function refreshProfileSnapshotsAndBumpFeed(env, { source = 'profile-snapshot-refresh' } = {}) {
+  await rebuildProfileSnapshots(env, { source });
+  await bumpFeedCacheVersion(env);
 }
 
 async function ensureProfileReportsTable(env) {
@@ -3276,6 +3279,10 @@ async function handleVerifyCode(request, env) {
     return error('Código inválido o expirado', 401);
   }
 
+  const beforeUser = await env.DB.prepare(
+    "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+  ).bind(record.user_id).first();
+
   // Verify the user
   await Promise.all([ensureUsersLastIpColumn(env), ensureUsersDeviceColumns(env)]);
   const ipVer = request.headers.get('CF-Connecting-IP') || '';
@@ -3285,6 +3292,8 @@ async function handleVerifyCode(request, env) {
 
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
   if (!user) return error('Usuario no encontrado', 404);
+  await refreshStaticSnapshotsForUserChange(env, beforeUser || user, user, { source: 'email-verify-code' });
+  await bumpFeedCacheVersion(env);
 
   // Mark token as used only after the account verification update succeeds.
   await env.DB.prepare('UPDATE verification_tokens SET used = 1 WHERE id = ?')
@@ -3663,12 +3672,15 @@ async function handleVerifyToken(request, env) {
 
   let user;
   if (record.user_id) {
-    user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
+    const beforeUser = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
+    user = beforeUser;
     await Promise.all([ensureUsersLastIpColumn(env), ensureUsersDeviceColumns(env)]);
     const ipMagic = request.headers.get('CF-Connecting-IP') || '';
     const deviceMagic = detectRequestDevice(request);
     await env.DB.prepare("UPDATE users SET status = 'verified', online = 1, last_active = datetime('now'), last_ip = ?, last_device = ? WHERE id = ?")
       .bind(ipMagic, deviceMagic, user.id).run();
+    user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
+    await refreshStaticSnapshotsForUserChange(env, beforeUser, user, { source: 'email-verify-link' });
   } else {
     // New user via magic link — create minimal account
     const userId = generateId();
@@ -3680,7 +3692,9 @@ async function handleVerifyToken(request, env) {
       VALUES (?, ?, ?, 'hombre', 'mujer', ?, ?, ?, 'verified')
     `).bind(userId, record.email, record.email.split('@')[0], country, deviceMagic, deviceMagic).run();
     user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+    await refreshStaticSnapshotsForUserChange(env, null, user, { source: 'magic-link-create-user' });
   }
+  await bumpFeedCacheVersion(env);
 
   const jwt = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
 
@@ -3914,6 +3928,7 @@ async function handleAdminReviewPhotoVerification(request, env, requestId) {
   if (nextStatus === 'approved' && !record.photo_key) {
     return error('No se puede aprobar una solicitud sin foto', 400);
   }
+  const beforeUser = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first();
 
   await env.DB.batch([
     env.DB.prepare(`
@@ -3927,12 +3942,13 @@ async function handleAdminReviewPhotoVerification(request, env, requestId) {
 
   _fullUserCache.delete(record.user_id);
   _viewerCache.delete(record.user_id);
-  invalidateFeedBrowseCache();
 
   const [updatedVerification, updatedUser] = await Promise.all([
     env.DB.prepare('SELECT * FROM photo_verification_requests WHERE id = ?').bind(requestId).first(),
     env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(record.user_id).first(),
   ]);
+  await refreshStaticSnapshotsForUserChange(env, beforeUser, updatedUser, { source: 'photo-verification-review' });
+  await bumpFeedCacheVersion(env);
 
   return json({
     verification: serializePhotoVerification(updatedVerification, { admin: true }),
@@ -4329,9 +4345,6 @@ async function handleProfiles(request, env) {
   const formatMs = (value) => Number.isFinite(value) ? Math.max(0, Math.round(value * 10) / 10) : 0;
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
-  await ensureUserBrowseIndexes(env);
-  await ensureProfileVisitStructures(env);
-  await ensureStoriesTable(env);
 
   const url = new URL(request.url);
   const includeTimingDetails = url.searchParams.get('timings') === '1';
@@ -4360,40 +4373,6 @@ async function handleProfiles(request, env) {
   const viewerInterests = safeParseJSON(viewer?.interests, []);
   const viewerInterestsKey = normalizeViewerInterestsKey(viewerInterests);
 
-  // Build profiles query (don't exclude current user — cache is shared, filter later)
-  let query = `
-    SELECT
-      u.id,
-      u.username,
-      u.age,
-      u.birthdate,
-      u.city,
-      u.locality,
-      u.role,
-      u.interests,
-      u.bio,
-      u.avatar_url,
-      u.avatar_thumb_url,
-      u.photo_thumbs,
-      u.avatar_crop,
-      u.photos,
-      u.verified,
-      u.premium,
-      u.premium_until,
-      u.ghost_mode,
-      u.fake,
-      COALESCE(u.feed_priority, 0) AS feed_priority,
-      u.marital_status,
-      u.sexual_orientation,
-      u.last_active,
-      0 AS followers_total
-    FROM users u
-    WHERE u.status = 'verified'
-      AND COALESCE(u.account_status, 'active') = 'active'
-  `;
-  const params = [];
-  if (settings.feedFilterByCountry && country) { query += ` AND u.country = ?`; params.push(country); }
-
   // Role filter: use server-side seeking, fall back to frontend filter param
   const roleFilters = SEEKING_ROLE_IDS;
   let filterParts;
@@ -4404,14 +4383,6 @@ async function handleProfiles(request, env) {
   }
   const roleBuckets = getRoleBucketsForFilters(filterParts);
   const requestedRoleValues = [...new Set(filterParts.flatMap((f) => (f === 'pareja' ? PAIR_ROLE_IDS : [f])).filter((role) => SEEKING_ROLE_IDS.includes(role)))];
-  if (requestedRoleValues.length > 0 && roleBuckets.length <= 1) {
-    query += ` AND u.role IN (${requestedRoleValues.map(f => `'${f}'`).join(',')})`;
-  }
-  if (search) {
-    query += ` AND (u.username LIKE ? OR u.city LIKE ? OR u.locality LIKE ? OR u.bio LIKE ?)`;
-    const term = `%${search}%`;
-    params.push(term, term, term, term);
-  }
 
   // Cache key for profiles query (shared across all users)
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
@@ -4429,7 +4400,14 @@ async function handleProfiles(request, env) {
   const countCacheHit = false;
   const snapshotStartedAt = Date.now();
   const buildSnapshotFeedData = async () => {
-    const realSnapshotLimit = Math.min(snapshotWindowLimit, 1000);
+    const realSnapshotLimit = snapshotWindowLimit;
+    const realRowsPromise = loadRealProfileRowsFromSnapshots(env, {
+      roleValues: requestedRoleValues,
+      country: settings.feedFilterByCountry ? country : '',
+      search,
+      limit: realSnapshotLimit,
+      fresh,
+    });
     const fakeRowsPromise = loadFakeProfileRowsFromSnapshots(env, {
       roleValues: requestedRoleValues,
       country: settings.feedFilterByCountry ? country : '',
@@ -4438,15 +4416,20 @@ async function handleProfiles(request, env) {
       viewerId: auth.sub,
       fresh,
     });
-    const realSnapshotQuery = `${query} AND COALESCE(u.fake, 0) = 0 ORDER BY last_active DESC, u.id DESC`;
     const [realRows, fakeRows, realStoryRows] = await Promise.all([
-      fetchRowsPerRoleBucket(env, realSnapshotQuery, params, roleBuckets, realSnapshotLimit),
+      realRowsPromise,
       fakeRowsPromise,
       loadRealStoryRowsFromSnapshot(env, { roleValues: requestedRoleValues, fresh }),
     ]);
-    const snapshotRows = fakeRows === null ? realRows : [...realRows, ...fakeRows];
+    const snapshotRows = [
+      ...(realRows || []),
+      ...(fakeRows || []),
+    ];
+    if (realRows === null) {
+      console.warn('real profile snapshots unavailable; returning fake profiles only');
+    }
     if (fakeRows === null) {
-      console.warn('profile snapshots unavailable; returning real profiles only to avoid D1 fake scan');
+      console.warn('fake profile snapshots unavailable; returning real profiles only');
     }
     const activeStoryUserIds = new Set((realStoryRows || []).map(r => String(r.user_id)));
     const activeStoryUrlMap = new Map();
@@ -5658,7 +5641,9 @@ async function handleUpload(request, env) {
   }
 
   const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
-  const user = await env.DB.prepare('SELECT username, photos, avatar_url, avatar_thumb_url, photo_thumbs FROM users WHERE id = ?').bind(auth.sub).first();
+  const user = await env.DB.prepare(
+    "SELECT id, username, photos, avatar_url, avatar_thumb_url, photo_thumbs, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+  ).bind(auth.sub).first();
   if (!user) return error('Usuario no encontrado', 404);
   const galleryPhotos = normalizeGalleryPhotos(safeParseJSON(user.photos, []), user.avatar_url);
   const photoThumbs = normalizePhotoThumbs(user.photo_thumbs, galleryPhotos);
@@ -5694,6 +5679,11 @@ async function handleUpload(request, env) {
     _viewerCache.delete(auth.sub);
 
     await deleteR2KeysBestEffort(env, [previousAvatarKey, previousAvatarThumbKey].filter((oldKey) => oldKey && oldKey !== key));
+    const updated = await env.DB.prepare(
+      "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+    ).bind(auth.sub).first();
+    await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-avatar-upload' });
+    await bumpFeedCacheVersion(env);
 
     return json({ url: publicUrl, key, avatar_url: publicUrl, avatar_thumb_url: '', photos: galleryPhotos }, 201);
   }
@@ -5709,6 +5699,11 @@ async function handleUpload(request, env) {
     if (previousAvatarThumbKey && previousAvatarThumbKey !== key) {
       await deleteR2KeysBestEffort(env, [previousAvatarThumbKey]);
     }
+    const updated = await env.DB.prepare(
+      "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+    ).bind(auth.sub).first();
+    await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-avatar-thumb-upload' });
+    await bumpFeedCacheVersion(env);
 
     return json({ url: publicUrl, key, avatar_url: user.avatar_url || '', avatar_thumb_url: publicUrl, photos: galleryPhotos }, 201);
   }
@@ -5721,6 +5716,11 @@ async function handleUpload(request, env) {
     `).bind(JSON.stringify(nextPhotos), JSON.stringify(nextPhotoThumbs), auth.sub).run();
     _fullUserCache.delete(auth.sub);
     _viewerCache.delete(auth.sub);
+    const updated = await env.DB.prepare(
+      "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+    ).bind(auth.sub).first();
+    await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-gallery-upload' });
+    await bumpFeedCacheVersion(env);
 
     return json({ url: publicUrl, key, avatar_url: user.avatar_url || '', photos: nextPhotos, photo_thumbs: nextPhotoThumbs }, 201);
   }
@@ -5737,6 +5737,11 @@ async function handleUpload(request, env) {
     if (previousThumbKey && previousThumbKey !== key) {
       await deleteR2KeysBestEffort(env, [previousThumbKey]);
     }
+    const updated = await env.DB.prepare(
+      "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+    ).bind(auth.sub).first();
+    await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-gallery-thumb-upload' });
+    await bumpFeedCacheVersion(env);
 
     return json({
       url: publicUrl,
@@ -5823,7 +5828,9 @@ async function handleDeletePhoto(request, env) {
   if (!url || typeof url !== 'string') return error('URL requerida', 400);
 
   // Get user's current photos
-  const user = await env.DB.prepare('SELECT photos, avatar_url, photo_thumbs FROM users WHERE id = ?').bind(auth.sub).first();
+  const user = await env.DB.prepare(
+    "SELECT id, photos, avatar_url, photo_thumbs, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+  ).bind(auth.sub).first();
   if (!user) return error('Usuario no encontrado', 404);
   if (user.avatar_url === url) return error('La foto de perfil se gestiona por separado', 400);
 
@@ -5848,6 +5855,11 @@ async function handleDeletePhoto(request, env) {
   } catch {
     // R2 delete is best-effort
   }
+  const updated = await env.DB.prepare(
+    "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+  ).bind(auth.sub).first();
+  await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-gallery-delete' });
+  await bumpFeedCacheVersion(env);
 
   return json({ photos, photo_thumbs: normalizePhotoThumbs(photoThumbs, photos), avatar_url: user.avatar_url || '' });
 }
@@ -5876,7 +5888,9 @@ async function handleUpdateProfile(request, env) {
 
   await ensureUsersMessageBlockRolesColumn(env);
   const allowedFields = ['username', 'role', 'seeking', 'interests', 'message_block_roles', 'age', 'birthdate', 'city', 'locality', 'marital_status', 'sexual_orientation', 'bio', 'avatar_url', 'avatar_thumb_url', 'avatar_crop', 'premium'];
-  const currentUser = await env.DB.prepare('SELECT premium, premium_until, avatar_url, avatar_thumb_url, photos, photo_thumbs FROM users WHERE id = ?').bind(auth.sub).first();
+  const currentUser = await env.DB.prepare(
+    "SELECT id, premium, premium_until, avatar_url, avatar_thumb_url, photos, photo_thumbs, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+  ).bind(auth.sub).first();
   if (!currentUser) return error('Usuario no encontrado', 404);
   const currentGalleryPhotos = normalizeGalleryPhotos(safeParseJSON(currentUser.photos, []), currentUser.avatar_url);
   const currentPhotoThumbs = normalizePhotoThumbs(currentUser.photo_thumbs, currentGalleryPhotos);
@@ -5969,6 +5983,28 @@ async function handleUpdateProfile(request, env) {
   if (user) {
     setCachedViewer(auth.sub, user);
     setCachedFullUser(auth.sub, user);
+  }
+  const feedRelevantFields = [
+    'username',
+    'role',
+    'interests',
+    'age',
+    'birthdate',
+    'city',
+    'locality',
+    'marital_status',
+    'sexual_orientation',
+    'bio',
+    'avatar_url',
+    'avatar_thumb_url',
+    'avatar_crop',
+    'photos',
+    'premium',
+    'ghost_mode',
+  ];
+  if (feedRelevantFields.some((field) => updates.some((update) => update.startsWith(`${field} =`)))) {
+    await refreshStaticSnapshotsForUserChange(env, currentUser, user, { source: 'profile-update' });
+    await bumpFeedCacheVersion(env);
   }
   return json({ user: sanitizeUser(user, env) });
 }
@@ -6922,6 +6958,9 @@ async function handleAdminRemoveAllVip(request, env) {
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
 
   const { meta } = await env.DB.prepare('UPDATE users SET premium = 0, premium_until = NULL, ghost_mode = 0 WHERE premium = 1 OR premium_until IS NOT NULL').run();
+  if (Number(meta?.changes || 0) > 0) {
+    await refreshProfileSnapshotsAndBumpFeed(env, { source: 'admin-remove-all-vip' });
+  }
   console.log(`🔧 Admin removió VIP de todos los usuarios — ${meta.changes} afectados`);
   return json({ success: true, affected: meta.changes });
 }
@@ -7877,7 +7916,7 @@ async function handleAdminUploadGalleryThumb(request, env, userId) {
   }
 
   const user = await env.DB.prepare(
-    'SELECT id, username, avatar_url, avatar_thumb_url, avatar_crop, photos, photo_thumbs FROM users WHERE id = ?'
+    "SELECT id, username, avatar_url, avatar_thumb_url, avatar_crop, photos, photo_thumbs, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
   ).bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
 
@@ -7908,9 +7947,10 @@ async function handleAdminUploadGalleryThumb(request, env, userId) {
 
   _fullUserCache.delete(userId);
   _viewerCache.delete(userId);
-  invalidateFeedBrowseCache();
 
   const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'admin-gallery-thumb-upload' });
+  await bumpFeedCacheVersion(env);
   const { password_hash, ...safe } = updated;
   const updatedPhotos = normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url);
 
@@ -7960,7 +8000,7 @@ async function handleAdminUploadAvatarThumb(request, env, userId) {
   }
 
   const user = await env.DB.prepare(
-    'SELECT id, username, avatar_url, avatar_thumb_url FROM users WHERE id = ?'
+    "SELECT id, username, avatar_url, avatar_thumb_url, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
   ).bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
   if (!user.avatar_url || !isTrustedMediaUrl(user.avatar_url, env)) return error('Avatar inválido', 400);
@@ -7986,9 +8026,10 @@ async function handleAdminUploadAvatarThumb(request, env, userId) {
 
   _fullUserCache.delete(userId);
   _viewerCache.delete(userId);
-  invalidateFeedBrowseCache();
 
   const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'admin-avatar-thumb-upload' });
+  await bumpFeedCacheVersion(env);
   return json({ avatar_thumb_url: publicUrl, user: sanitizeUser(updated, env) }, 201);
 }
 
@@ -8002,7 +8043,7 @@ async function handleAdminDeleteGalleryPhoto(request, env, userId) {
   if (!url || typeof url !== 'string') return error('URL requerida', 400);
 
   const user = await env.DB.prepare(
-    'SELECT id, avatar_url, photo_thumbs, photos FROM users WHERE id = ?'
+    "SELECT id, avatar_url, photo_thumbs, photos, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
   ).bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
   if (user.avatar_url === url) return error('La foto de perfil se gestiona por separado', 400);
@@ -8027,9 +8068,10 @@ async function handleAdminDeleteGalleryPhoto(request, env, userId) {
 
   _fullUserCache.delete(userId);
   _viewerCache.delete(userId);
-  invalidateFeedBrowseCache();
 
   const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'admin-gallery-delete' });
+  await bumpFeedCacheVersion(env);
   return json({ photos, photo_thumbs: nextPhotoThumbs, user: sanitizeUser(updated, env) });
 }
 
@@ -8046,9 +8088,7 @@ async function handleAdminDeleteUser(request, env, userId) {
   if (!user) return error('Usuario no encontrado', 404);
 
   const deletion = await deleteUserCompletely(env, user);
-  if (deletion.fake) {
-    await rebuildProfileSnapshots(env, { source: 'admin-delete-user' });
-  }
+  await rebuildProfileSnapshots(env, { source: 'admin-delete-user' });
   if (deletion.deletedPublicStories > 0) {
     await rebuildStorySnapshots(env, {
       includeReal: !deletion.fake,
@@ -8073,7 +8113,6 @@ async function handleAdminBulkDeleteUsers(request, env) {
   if (userIds.length === 0) return error('Debes enviar al menos un user_id', 400);
   if (userIds.length > 100) return error('Máximo 100 usuarios por borrado masivo', 400);
 
-  let deletedFakeUser = false;
   let deletedFakeStories = false;
   let deletedRealStories = false;
   const results = [];
@@ -8091,7 +8130,6 @@ async function handleAdminBulkDeleteUsers(request, env) {
 
     try {
       const deletion = await deleteUserCompletely(env, user);
-      deletedFakeUser ||= deletion.fake;
       if (deletion.deletedPublicStories > 0) {
         if (deletion.fake) deletedFakeStories = true;
         else deletedRealStories = true;
@@ -8102,9 +8140,7 @@ async function handleAdminBulkDeleteUsers(request, env) {
     }
   }
   if (results.some((item) => item.deleted)) {
-    if (deletedFakeUser) {
-      await rebuildProfileSnapshots(env, { source: 'admin-bulk-delete-users' });
-    }
+    await rebuildProfileSnapshots(env, { source: 'admin-bulk-delete-users' });
     if (deletedFakeStories || deletedRealStories) {
       await rebuildStorySnapshots(env, {
         includeReal: deletedRealStories,
@@ -8560,6 +8596,7 @@ async function handleUalaPaymentConfirm(auth, env, paymentId, externalRef) {
     const newUntil = activatePremium(current?.premium_until, planId);
     await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, auth.sub).run();
     await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(paymentId), auth.sub, planId || '', data.amount || 0).run();
+    await refreshProfileSnapshotsAndBumpFeed(env, { source: 'uala-confirm-premium' });
     await updateSubscriptionPaymentLog(env, {
       userId: auth.sub,
       planId,
@@ -8637,6 +8674,7 @@ async function handleUalaApproved(request, env) {
       const newUntil = activatePremium(current?.premium_until, planId);
       await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, userId).run();
       await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(uuid), userId, planId, amount || 0).run();
+      await refreshProfileSnapshotsAndBumpFeed(env, { source: 'uala-webhook-premium' });
       await updateSubscriptionPaymentLog(env, {
         userId,
         planId,
@@ -8868,6 +8906,7 @@ async function handlePaymentApproved(request, env) {
       const newUntil = activatePremium(current?.premium_until, plan_id);
       await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, user_id).run();
       await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(payment_id), user_id, plan_id || '', amount || 0).run();
+      await refreshProfileSnapshotsAndBumpFeed(env, { source: 'mercadopago-webhook-premium' });
       await updateSubscriptionPaymentLog(env, {
         userId: user_id,
         planId: plan_id,
@@ -9022,6 +9061,7 @@ async function handlePaymentConfirm(request, env) {
     const newUntil = activatePremium(current?.premium_until, planId);
     await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, auth.sub).run();
     await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(payment_id), auth.sub, planId || '', data.amount || 0).run();
+    await refreshProfileSnapshotsAndBumpFeed(env, { source: 'mercadopago-confirm-premium' });
     await updateSubscriptionPaymentLog(env, {
       userId: auth.sub,
       planId,
@@ -9489,6 +9529,7 @@ function getProfileSnapshotKey(kind, version, bucket = '') {
   const safeVersion = String(version || getProfileSnapshotVersion()).replace(/[^a-z0-9_-]/gi, '');
   const safeBucket = String(bucket || '').replace(/[^a-z0-9_-]/gi, '');
   if (kind === 'fake' && safeBucket) return `${PROFILE_SNAPSHOT_PREFIX}/fakes-${safeBucket}.v${safeVersion}.json`;
+  if (kind === 'real' && safeBucket) return `${PROFILE_SNAPSHOT_PREFIX}/reals-${safeBucket}.v${safeVersion}.json`;
   return `${PROFILE_SNAPSHOT_PREFIX}/${kind || 'snapshot'}.v${safeVersion}.json`;
 }
 
@@ -9527,7 +9568,7 @@ function mapProfileSnapshotRow(row, env, { position = 0 } = {}) {
     premium: Number(row?.premium || 0) ? 1 : 0,
     premium_until: row?.premium_until || null,
     ghost_mode: Number(row?.ghost_mode || 0) ? 1 : 0,
-    fake: 1,
+    fake: Number(row?.fake || 0) ? 1 : 0,
     feed_priority: Math.max(0, Number(row?.feed_priority || 0)),
     marital_status: row?.marital_status || '',
     sexual_orientation: row?.sexual_orientation || '',
@@ -9624,6 +9665,7 @@ async function buildFakeProfileSnapshotRows(env) {
       u.marital_status,
       u.sexual_orientation,
       u.last_active,
+      1 AS fake,
       COALESCE(ps.followers_total, 0) AS followers_total,
       (
         SELECT s.video_url
@@ -9651,17 +9693,81 @@ async function buildFakeProfileSnapshotRows(env) {
   });
 }
 
+async function buildRealProfileSnapshotRows(env) {
+  const { results } = await env.DB.prepare(`
+    SELECT
+      u.id,
+      u.username,
+      u.age,
+      u.birthdate,
+      u.country,
+      u.city,
+      u.locality,
+      u.role,
+      u.interests,
+      u.bio,
+      u.avatar_url,
+      u.avatar_thumb_url,
+      u.photo_thumbs,
+      u.avatar_crop,
+      u.photos,
+      u.verified,
+      u.premium,
+      u.premium_until,
+      u.ghost_mode,
+      COALESCE(u.feed_priority, 0) AS feed_priority,
+      u.marital_status,
+      u.sexual_orientation,
+      u.last_active,
+      0 AS fake,
+      COALESCE(ps.followers_total, 0) AS followers_total,
+      (
+        SELECT s.video_url
+        FROM stories s
+        WHERE s.user_id = u.id
+          AND s.active = 1
+          AND COALESCE(s.vip_only, 0) = 0
+        ORDER BY s.created_at DESC, s.id DESC
+        LIMIT 1
+      ) AS active_story_url
+    FROM users u
+    LEFT JOIN profile_stats ps ON ps.user_id = u.id
+    WHERE COALESCE(u.fake, 0) = 0
+      AND u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
+    ORDER BY u.last_active DESC, u.id DESC
+  `).all();
+
+  const seen = new Set();
+  return (results || []).filter((row) => {
+    const id = String(row?.id || '');
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
 async function rebuildProfileSnapshots(env, { source = 'unknown' } = {}) {
   await ensureStoriesTable(env);
   const version = getProfileSnapshotVersion();
   const updatedAt = formatSqlDateFromMs(Date.now());
-  const rows = await buildFakeProfileSnapshotRows(env);
-  const bucketMap = new Map(PROFILE_SNAPSHOT_BUCKETS.map((bucket) => [bucket, []]));
+  const [realRows, fakeRows] = await Promise.all([
+    buildRealProfileSnapshotRows(env),
+    buildFakeProfileSnapshotRows(env),
+  ]);
+  const realBucketMap = new Map(PROFILE_SNAPSHOT_BUCKETS.map((bucket) => [bucket, []]));
+  const fakeBucketMap = new Map(PROFILE_SNAPSHOT_BUCKETS.map((bucket) => [bucket, []]));
 
-  for (const row of rows) {
+  for (const row of realRows) {
     const bucket = getRoleBucketKey(row.role);
-    if (!bucketMap.has(bucket)) bucketMap.set(bucket, []);
-    bucketMap.get(bucket).push(row);
+    if (!realBucketMap.has(bucket)) realBucketMap.set(bucket, []);
+    realBucketMap.get(bucket).push(row);
+  }
+
+  for (const row of fakeRows) {
+    const bucket = getRoleBucketKey(row.role);
+    if (!fakeBucketMap.has(bucket)) fakeBucketMap.set(bucket, []);
+    fakeBucketMap.get(bucket).push(row);
   }
 
   const manifest = {
@@ -9671,11 +9777,36 @@ async function rebuildProfileSnapshots(env, { source = 'unknown' } = {}) {
     source,
     total_count: 0,
     total_bytes: 0,
+    real_count: realRows.length,
+    fake_count: fakeRows.length,
+    real: {},
     fakes: {},
   };
 
   for (const bucket of PROFILE_SNAPSHOT_BUCKETS) {
-    const bucketRows = bucketMap.get(bucket) || [];
+    const realBucketRows = realBucketMap.get(bucket) || [];
+    const realSelectedRows = realBucketRows.map((row, index) => mapProfileSnapshotRow(row, env, { position: index + 1 }));
+    const realKey = getProfileSnapshotKey('real', version, bucket);
+    const realPayload = {
+      schema: 1,
+      kind: 'real-profiles',
+      bucket,
+      version,
+      updated_at: updatedAt,
+      count: realSelectedRows.length,
+      profiles: realSelectedRows,
+    };
+    const realBytes = await putProfileSnapshotJson(env, realKey, realPayload);
+    manifest.total_count += realSelectedRows.length;
+    manifest.total_bytes += realBytes;
+    manifest.real[bucket] = {
+      key: realKey,
+      url: getProfileSnapshotPublicUrl(env, realKey),
+      count: realSelectedRows.length,
+      bytes: realBytes,
+    };
+
+    const bucketRows = fakeBucketMap.get(bucket) || [];
     const priorityRows = bucketRows.filter((row) => Number(row.feed_priority || 0) > 0);
     const normalRows = bucketRows.filter((row) => Number(row.feed_priority || 0) <= 0);
     const seed = hashStringToUint32(`fake-profile-snapshot:${bucket}:${version}:${bucketRows.length}`);
@@ -9708,7 +9839,7 @@ async function rebuildProfileSnapshots(env, { source = 'unknown' } = {}) {
     cacheControl: 'public, max-age=15, stale-while-revalidate=300',
   });
   invalidateFeedBrowseCache();
-  console.log(`🔧 Profile snapshots (${source}) — fakes ${manifest.total_count}, bytes ${manifest.total_bytes}`);
+  console.log(`🔧 Profile snapshots (${source}) — real ${manifest.real_count}, fakes ${manifest.fake_count}, bytes ${manifest.total_bytes}`);
   return manifest;
 }
 
@@ -9732,7 +9863,8 @@ function profileSnapshotMatchesSearch(row, searchTerm) {
   ].some((value) => normalizeProfileSnapshotSearch(value).includes(searchTerm));
 }
 
-async function loadFakeProfileRowsFromSnapshots(env, {
+async function loadProfileRowsFromSnapshots(env, {
+  kind = 'fake',
   roleValues = [],
   country = '',
   search = '',
@@ -9745,7 +9877,8 @@ async function loadFakeProfileRowsFromSnapshots(env, {
     ttlMs: 30_000,
     bypassCache: fresh,
   }).catch(() => null);
-  if (!manifest?.fakes || Object.keys(manifest.fakes).length === 0) return null;
+  const manifestGroup = kind === 'real' ? manifest?.real : manifest?.fakes;
+  if (!manifestGroup || Object.keys(manifestGroup).length === 0) return null;
 
   const expandedRoles = [...new Set((Array.isArray(roleValues) ? roleValues : [])
     .flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role]))
@@ -9755,7 +9888,7 @@ async function loadFakeProfileRowsFromSnapshots(env, {
   const searchTerm = normalizeProfileSnapshotSearch(search);
   const buckets = getProfileSnapshotBucketsForRoles(expandedRoles);
   const snapshots = await Promise.all(buckets.map(async (bucket) => {
-    const key = manifest?.fakes?.[bucket]?.key;
+    const key = manifestGroup?.[bucket]?.key;
     if (!key) return [];
     const snapshot = await readProfileSnapshotJson(env, key, { bypassCache: fresh }).catch(() => null);
     return Array.isArray(snapshot?.profiles) ? snapshot.profiles : [];
@@ -9774,6 +9907,13 @@ async function loadFakeProfileRowsFromSnapshots(env, {
 
   const priorityRows = rows.filter((row) => Number(row.feed_priority || 0) > 0);
   const normalRows = rows.filter((row) => Number(row.feed_priority || 0) <= 0);
+  if (kind === 'real') {
+    return [
+      ...priorityRows.sort((a, b) => String(b?.last_active || '').localeCompare(String(a?.last_active || ''))),
+      ...normalRows.sort((a, b) => String(b?.last_active || '').localeCompare(String(a?.last_active || ''))),
+    ].slice(0, safeLimit);
+  }
+
   const windowKey = Math.floor(Date.now() / PROFILE_SNAPSHOT_FAKE_ROTATION_MS);
   const roleKey = expandedRoles.length ? expandedRoles.sort().join(',') : 'all';
   const seed = hashStringToUint32(`${viewerId || 'anon'}:${manifest.version || ''}:${roleKey}:${normalizedCountry}:${searchTerm}:${windowKey}:${rows.length}`);
@@ -9787,6 +9927,14 @@ async function loadFakeProfileRowsFromSnapshots(env, {
     rotation_position: index + 1,
     last_active: formatSqlDateFromMs(now - (index * 60_000)),
   }));
+}
+
+async function loadRealProfileRowsFromSnapshots(env, options = {}) {
+  return loadProfileRowsFromSnapshots(env, { ...options, kind: 'real' });
+}
+
+async function loadFakeProfileRowsFromSnapshots(env, options = {}) {
+  return loadProfileRowsFromSnapshots(env, { ...options, kind: 'fake' });
 }
 
 async function loadRealStoryRowsFromSnapshot(env, { roleValues = [], fresh = false } = {}) {
