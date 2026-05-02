@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS users (
   marital_status     TEXT,
   sexual_orientation TEXT,
   message_block_roles TEXT,
-  duplicate_flag     INTEGER NOT NULL DEFAULT 0
+  duplicate_flag     INTEGER NOT NULL DEFAULT 0,
+  dashboard_seen_at  TEXT DEFAULT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -209,12 +210,24 @@ CREATE TABLE IF NOT EXISTS profile_visits (
   id         TEXT PRIMARY KEY,
   visitor_id TEXT NOT NULL REFERENCES users(id),
   visited_id TEXT NOT NULL REFERENCES users(id),
+  synthetic INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_visits_visited ON profile_visits(visited_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_profile_visits_visited_created ON profile_visits(visited_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_profile_visits_visitor_visited_created ON profile_visits(visitor_id, visited_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_profile_visits_visited_synthetic_created ON profile_visits(visited_id, synthetic, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS synthetic_visit_candidates (
+  user_id           TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  role              TEXT NOT NULL DEFAULT '',
+  rotation_position INTEGER NOT NULL DEFAULT 0,
+  rotated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_synthetic_visit_candidates_role_position ON synthetic_visit_candidates(role, rotation_position);
+CREATE INDEX IF NOT EXISTS idx_synthetic_visit_candidates_position ON synthetic_visit_candidates(rotation_position);
 
 CREATE TABLE IF NOT EXISTS profile_stats (
   user_id         TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

@@ -68,8 +68,11 @@ let _userBlocksReady = null;
 let _profileReportsReady = null;
 let _userLastIpColumnReady = null;
 let _userDeviceColumnsReady = null;
+let _userDashboardSeenColumnReady = null;
 let _accountDeletionRequestsReady = null;
 let _profileVisitStructuresReady = null;
+let _syntheticVisitStructuresReady = null;
+let _syntheticVisitPoolRefreshPromise = null;
 let _errorLogsReady = null;
 let _subscriptionPaymentLogsReady = null;
 let _photoVerificationRequestsReady = null;
@@ -97,6 +100,9 @@ const FAKE_STORY_ROTATION_POOL_SIZE = 54;
 const STORY_ROWS_CACHE_TTL_MS = 5 * 60_000;
 const FREE_CHAT_RECIPIENT_LIMIT = 5;
 const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
+const SYNTHETIC_VISIT_COOLDOWN_MINUTES = 15;
+const SYNTHETIC_VISIT_MIN_ACCOUNT_AGE_MINUTES = 15;
+const SYNTHETIC_VISIT_CANDIDATES_PER_ROLE = 80;
 const DEFAULT_REALTIMEKIT_PRESET_NAME = 'group_call_host';
 const USERNAME_MAX_LENGTH = 18;
 const BIO_MAX_LENGTH = 300;
@@ -154,6 +160,14 @@ function parseIntegerSetting(value, fallback, min = 0, max = Number.MAX_SAFE_INT
 
 function formatSqlDateFromMs(ms) {
   return new Date(ms).toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
+}
+
+function parseSqlDateMs(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return NaN;
+  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+  const hasTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(normalized);
+  return new Date(hasTimezone ? normalized : `${normalized}Z`).getTime();
 }
 
 function getCryptoRandomFloat() {
@@ -837,6 +851,7 @@ async function ensureAccountDeletionRequestsTable(env) {
 async function deleteUserCompletely(env, user) {
   const userId = user.id;
   await ensureProfileVisitStructures(env);
+  await ensureSyntheticVisitStructures(env);
   await ensureUserBlocksTable(env);
   await ensureProfileReportsTable(env);
   await ensureAccountDeletionRequestsTable(env);
@@ -859,6 +874,7 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM story_daily_views WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM story_daily_views WHERE story_id IN (SELECT id FROM stories WHERE user_id = ?)').bind(userId),
     env.DB.prepare('DELETE FROM fake_story_rotation WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM synthetic_visit_candidates WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM stories WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM hidden_conversations WHERE user_id = ? OR partner_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM user_blocks WHERE blocker_id = ? OR blocked_id = ?').bind(userId, userId),
@@ -1391,6 +1407,28 @@ async function ensureUsersDeviceColumns(env) {
   return _userDeviceColumnsReady;
 }
 
+async function ensureUsersDashboardSeenColumn(env) {
+  if (!_userDashboardSeenColumnReady) {
+    _userDashboardSeenColumnReady = (async () => {
+      try {
+        await env.DB.prepare(
+          'ALTER TABLE users ADD COLUMN dashboard_seen_at TEXT DEFAULT NULL'
+        ).run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+    })().catch((err) => {
+      _userDashboardSeenColumnReady = null;
+      throw err;
+    });
+  }
+
+  return _userDashboardSeenColumnReady;
+}
+
 async function ensurePhotoVerificationRequestsTable(env) {
   if (!_photoVerificationRequestsReady) {
     _photoVerificationRequestsReady = (async () => {
@@ -1810,6 +1848,14 @@ async function ensureProfileVisitStructures(env) {
   if (!_profileVisitStructuresReady) {
     _profileVisitStructuresReady = (async () => {
       await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS profile_visits (
+          id         TEXT PRIMARY KEY,
+          visitor_id TEXT NOT NULL REFERENCES users(id),
+          visited_id TEXT NOT NULL REFERENCES users(id),
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `).run();
+      await env.DB.prepare(`
         CREATE TABLE IF NOT EXISTS profile_stats (
           user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
           visits_total INTEGER NOT NULL DEFAULT 0,
@@ -1825,12 +1871,23 @@ async function ensureProfileVisitStructures(env) {
           throw error;
         }
       }
+      try {
+        await env.DB.prepare('ALTER TABLE profile_visits ADD COLUMN synthetic INTEGER NOT NULL DEFAULT 0').run();
+      } catch (error) {
+        const message = String(error?.message || error || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw error;
+        }
+      }
       await Promise.all([
         env.DB.prepare(
           'CREATE INDEX IF NOT EXISTS idx_profile_visits_visited_created ON profile_visits(visited_id, created_at DESC)'
         ).run(),
         env.DB.prepare(
           'CREATE INDEX IF NOT EXISTS idx_profile_visits_visitor_visited_created ON profile_visits(visitor_id, visited_id, created_at DESC)'
+        ).run(),
+        env.DB.prepare(
+          'CREATE INDEX IF NOT EXISTS idx_profile_visits_visited_synthetic_created ON profile_visits(visited_id, synthetic, created_at DESC)'
         ).run(),
         env.DB.prepare(
           'CREATE INDEX IF NOT EXISTS idx_profile_stats_visits_total ON profile_stats(visits_total DESC, updated_at DESC)'
@@ -1885,6 +1942,197 @@ async function incrementProfileFollowerStat(env, userId, increment = 1) {
       WHERE user_id = ?
     `).bind(amount, userId).run();
   }
+}
+
+async function ensureSyntheticVisitStructures(env) {
+  await ensureProfileVisitStructures(env);
+  if (!_syntheticVisitStructuresReady) {
+    _syntheticVisitStructuresReady = (async () => {
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS synthetic_visit_candidates (
+          user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          role TEXT NOT NULL DEFAULT '',
+          rotation_position INTEGER NOT NULL DEFAULT 0,
+          rotated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `).run();
+      await Promise.all([
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_synthetic_visit_candidates_role_position ON synthetic_visit_candidates(role, rotation_position)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_synthetic_visit_candidates_position ON synthetic_visit_candidates(rotation_position)').run(),
+      ]);
+    })().catch((err) => {
+      _syntheticVisitStructuresReady = null;
+      throw err;
+    });
+  }
+  return _syntheticVisitStructuresReady;
+}
+
+function getSyntheticVisitRoleValues(user) {
+  const seeking = normalizeRoleArray(safeParseJSON(user?.seeking, []), SEEKING_ROLE_IDS, []);
+  const roles = seeking.length > 0 ? seeking : SEEKING_ROLE_IDS;
+  return [...new Set(roles.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])))]
+    .filter((role) => REGISTER_ROLE_IDS.includes(role));
+}
+
+function isSyntheticVisitEligibleUser(user) {
+  if (!user?.id) return false;
+  if (Number(user.fake || 0) === 1) return false;
+  if (user.status !== 'verified') return false;
+  if (String(user.account_status || 'active') !== 'active') return false;
+
+  const createdAt = String(user.created_at || '').trim();
+  if (!createdAt) return true;
+  const createdMs = parseSqlDateMs(createdAt);
+  if (!Number.isFinite(createdMs)) return true;
+  return Date.now() - createdMs >= SYNTHETIC_VISIT_MIN_ACCOUNT_AGE_MINUTES * 60_000;
+}
+
+async function hasSyntheticDashboardGracePeriodPassed(env, user) {
+  await ensureUsersDashboardSeenColumn(env);
+  const seenAt = String(user?.dashboard_seen_at || '').trim();
+  if (!seenAt) {
+    const nowSql = formatSqlDateFromMs(Date.now());
+    await env.DB.prepare(`
+      UPDATE users
+      SET dashboard_seen_at = COALESCE(dashboard_seen_at, ?)
+      WHERE id = ?
+    `).bind(nowSql, user.id).run();
+    user.dashboard_seen_at = nowSql;
+    setCachedFullUser(user.id, user);
+    return false;
+  }
+
+  const seenMs = parseSqlDateMs(seenAt);
+  if (!Number.isFinite(seenMs)) return true;
+  return Date.now() - seenMs >= SYNTHETIC_VISIT_MIN_ACCOUNT_AGE_MINUTES * 60_000;
+}
+
+async function rebuildSyntheticVisitCandidates(env, { perRoleLimit = SYNTHETIC_VISIT_CANDIDATES_PER_ROLE } = {}) {
+  if (_syntheticVisitPoolRefreshPromise) return _syntheticVisitPoolRefreshPromise;
+
+  _syntheticVisitPoolRefreshPromise = (async () => {
+    await ensureSyntheticVisitStructures(env);
+    const safeLimit = parseIntegerSetting(perRoleLimit, SYNTHETIC_VISIT_CANDIDATES_PER_ROLE, 10, 250);
+    const rows = [];
+    for (const role of REGISTER_ROLE_IDS) {
+      const { results } = await env.DB.prepare(`
+        SELECT u.id, u.role
+        FROM users u
+        WHERE COALESCE(u.fake, 0) = 1
+          AND u.status = 'verified'
+          AND COALESCE(u.account_status, 'active') = 'active'
+          AND u.role = ?
+        ORDER BY u.last_active DESC, u.id DESC
+        LIMIT ?
+      `).bind(role, safeLimit).all();
+      rows.push(...(results || []));
+    }
+
+    const rotatedAt = formatSqlDateFromMs(Date.now());
+    const statements = [env.DB.prepare('DELETE FROM synthetic_visit_candidates')];
+    rows.forEach((row, index) => {
+      statements.push(env.DB.prepare(`
+        INSERT INTO synthetic_visit_candidates (user_id, role, rotation_position, rotated_at)
+        VALUES (?, ?, ?, ?)
+      `).bind(row.id, row.role || '', index, rotatedAt));
+    });
+    for (let index = 0; index < statements.length; index += 50) {
+      await env.DB.batch(statements.slice(index, index + 50));
+    }
+    return { total: rows.length, rotatedAt };
+  })().finally(() => {
+    _syntheticVisitPoolRefreshPromise = null;
+  });
+
+  return _syntheticVisitPoolRefreshPromise;
+}
+
+async function selectSyntheticVisitCandidate(env, visitedUser, { allowRebuild = true } = {}) {
+  await ensureSyntheticVisitStructures(env);
+  const roleValues = getSyntheticVisitRoleValues(visitedUser);
+  if (roleValues.length === 0) return null;
+
+  const windowKey = Math.floor(Date.now() / (SYNTHETIC_VISIT_COOLDOWN_MINUTES * 60_000));
+  const seed = hashStringToUint32(`${visitedUser.id}:${windowKey}`);
+  const maxPosition = Math.max(1, SYNTHETIC_VISIT_CANDIDATES_PER_ROLE * REGISTER_ROLE_IDS.length);
+  const startPosition = seed % maxPosition;
+  const rolePlaceholders = roleValues.map(() => '?').join(', ');
+  const baseBindings = [...roleValues, visitedUser.id, visitedUser.id, '-24 hours'];
+  const selectClause = `
+    SELECT c.user_id
+    FROM synthetic_visit_candidates c
+    JOIN users u ON u.id = c.user_id
+    WHERE c.role IN (${rolePlaceholders})
+      AND c.user_id != ?
+      AND COALESCE(u.fake, 0) = 1
+      AND u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM profile_visits pv
+        WHERE pv.visitor_id = c.user_id
+          AND pv.visited_id = ?
+          AND pv.created_at >= datetime('now', ?)
+      )
+  `;
+
+  let row = await env.DB.prepare(`
+    ${selectClause}
+      AND c.rotation_position >= ?
+    ORDER BY c.rotation_position ASC
+    LIMIT 1
+  `).bind(...baseBindings, startPosition).first();
+
+  if (!row) {
+    row = await env.DB.prepare(`
+      ${selectClause}
+    ORDER BY c.rotation_position ASC
+    LIMIT 1
+    `).bind(...baseBindings).first();
+  }
+
+  if (!row && allowRebuild) {
+    await rebuildSyntheticVisitCandidates(env);
+    return selectSyntheticVisitCandidate(env, visitedUser, { allowRebuild: false });
+  }
+
+  return row?.user_id || null;
+}
+
+async function maybeAddSyntheticDashboardVisit(env, user) {
+  if (!isSyntheticVisitEligibleUser(user)) return false;
+  const gracePeriodPassed = await hasSyntheticDashboardGracePeriodPassed(env, user);
+  if (!gracePeriodPassed) return false;
+  await ensureSyntheticVisitStructures(env);
+
+  const cooldownWindow = `-${SYNTHETIC_VISIT_COOLDOWN_MINUTES} minutes`;
+  const recentVisit = await env.DB.prepare(`
+    SELECT 1
+    FROM profile_visits
+    WHERE visited_id = ?
+      AND created_at >= datetime('now', ?)
+    LIMIT 1
+  `).bind(user.id, cooldownWindow).first();
+  if (recentVisit) return false;
+
+  const visitorId = await selectSyntheticVisitCandidate(env, user);
+  if (!visitorId) return false;
+
+  const visitInsert = await env.DB.prepare(`
+    INSERT INTO profile_visits (id, visitor_id, visited_id, synthetic)
+    SELECT ?, ?, ?, 1
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM profile_visits
+      WHERE visited_id = ?
+        AND created_at >= datetime('now', ?)
+    )
+  `).bind(generateId(), visitorId, user.id, user.id, cooldownWindow).run();
+
+  if (Number(visitInsert?.meta?.changes || 0) <= 0) return false;
+  await incrementProfileVisitStat(env, user.id, 1);
+  return true;
 }
 
 function normalizeGalleryPhotos(rawPhotos, avatarUrl = '') {
@@ -3845,8 +4093,16 @@ async function handleOwnProfileDashboard(request, env) {
 
   await ensureProfileVisitStructures(env);
   const cachedUser = getCachedFullUser(auth.sub);
-  const [dbUser, activeStory, visitRows, giftRows, visitStatRow] = await Promise.all([
-    cachedUser ? Promise.resolve(cachedUser) : env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first(),
+  const dbUser = cachedUser || await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!dbUser) return error('Usuario no encontrado', 404);
+
+  try {
+    await maybeAddSyntheticDashboardVisit(env, dbUser);
+  } catch (err) {
+    console.error('[synthetic_visits] dashboard visit failed:', err?.message || err);
+  }
+
+  const [activeStory, visitRows, giftRows, visitStatRow] = await Promise.all([
     env.DB.prepare('SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first(),
     env.DB.prepare(
       `SELECT u.id, u.username, u.avatar_url, u.avatar_thumb_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, u.role, u.premium, u.last_active,
@@ -3871,8 +4127,6 @@ async function handleOwnProfileDashboard(request, env) {
     ).bind(auth.sub).all(),
     env.DB.prepare('SELECT visits_total, followers_total FROM profile_stats WHERE user_id = ?').bind(auth.sub).first(),
   ]);
-
-  if (!dbUser) return error('Usuario no encontrado', 404);
 
   const user = sanitizeUser(dbUser, env);
   user.visits_total = Number(visitStatRow?.visits_total || 0);
