@@ -24,6 +24,7 @@ export default function PagoExitosoPage() {
   const paymentId = params.get('payment_id') || params.get('uuid') || '';
   const status = params.get('status') || (gateway === 'uala' ? 'approved' : '');
   const externalRef = params.get('external_reference') || '';
+  const paymentLogId = params.get('payment_log_id') || '';
 
   // Detectar si es compra de monedas desde el external_reference (formato: userId--planId)
   const planId = externalRef.split('--')[1] || '';
@@ -45,13 +46,16 @@ export default function PagoExitosoPage() {
           if (data?.user) setUser(data.user);
         }
         setConfirmed(true);
+        try {
+          sessionStorage.removeItem('mansion_last_vip_payment_log_id');
+        } catch {}
       } catch (err) {
         console.error('Error confirmando pago:', err);
         setConfirmed(true);
       }
     }
     confirm();
-  }, [externalRef, gateway, paymentId, setUser]);
+  }, [externalRef, gateway, paymentId, paymentLogId, setUser]);
 
   // ── Coin purchase success ──
   if (isCoinPurchase) {

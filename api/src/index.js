@@ -71,6 +71,7 @@ let _userDeviceColumnsReady = null;
 let _accountDeletionRequestsReady = null;
 let _profileVisitStructuresReady = null;
 let _errorLogsReady = null;
+let _subscriptionPaymentLogsReady = null;
 let _photoVerificationRequestsReady = null;
 let _chatRecipientLimitsReady = null;
 let _videoCallSessionsReady = null;
@@ -842,6 +843,7 @@ async function deleteUserCompletely(env, user) {
   await ensurePhotoVerificationRequestsTable(env);
   await ensureStoriesTable(env);
   await ensureErrorLogsTable(env);
+  await ensureSubscriptionPaymentLogsTable(env);
   await ensureChatRecipientLimitTable(env);
   await ensureVideoCallSessionsTable(env);
   const storyRowsResult = await env.DB.prepare(
@@ -870,6 +872,7 @@ async function deleteUserCompletely(env, user) {
     env.DB.prepare('DELETE FROM photo_verification_requests WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM account_deletion_requests WHERE user_id = ? OR email = ?').bind(userId, user.email),
     env.DB.prepare('DELETE FROM processed_payments WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM subscription_payment_logs WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM message_limits WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM chat_recipient_limits WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId),
     env.DB.prepare('DELETE FROM video_call_sessions WHERE initiator_id = ? OR receiver_id = ?').bind(userId, userId),
@@ -1958,6 +1961,7 @@ function normalizeMetricRoute(path) {
   if (/^\/api\/verification\/photo-otp\/photo\/[a-f0-9-]+$/.test(path)) return '/api/verification/photo-otp/photo/:id';
   if (/^\/api\/admin\/users\/[a-f0-9-]+$/.test(path)) return '/api/admin/users/:id';
   if (/^\/api\/admin\/error-logs\/[a-f0-9-]+$/.test(path)) return '/api/admin/error-logs/:id';
+  if (/^\/api\/admin\/subscription-payment-logs$/.test(path)) return '/api/admin/subscription-payment-logs';
   return path;
 }
 
@@ -7037,6 +7041,99 @@ async function handleAdminGetErrorLogs(request, env) {
   });
 }
 
+async function handleAdminGetSubscriptionPaymentLogs(request, env) {
+  await ensureSubscriptionPaymentLogsTable(env);
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const url = new URL(request.url);
+  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
+  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '25', 10)));
+  const q = String(url.searchParams.get('q') || '').trim();
+  const gateway = String(url.searchParams.get('gateway') || '').trim().toLowerCase();
+  const status = String(url.searchParams.get('status') || '').trim().toLowerCase();
+  const offset = (page - 1) * limit;
+
+  let baseQuery = `
+    FROM subscription_payment_logs spl
+    LEFT JOIN users u ON u.id = spl.user_id
+  `;
+  const filters = [];
+  const bindings = [];
+
+  if (gateway === 'mercadopago' || gateway === 'uala_bis') {
+    filters.push('spl.gateway = ?');
+    bindings.push(gateway);
+  }
+
+  if (status === 'abandoned') {
+    filters.push(`spl.status IN ('started', 'gateway_request', 'checkout_created', 'pending') AND spl.created_at < datetime('now', '-60 minutes')`);
+  } else if (status === 'active') {
+    filters.push(`spl.status IN ('started', 'gateway_request', 'checkout_created', 'pending') AND spl.created_at >= datetime('now', '-60 minutes')`);
+  } else if (status === 'approved') {
+    filters.push("spl.status = 'approved'");
+  } else if (status === 'failed') {
+    filters.push(`spl.status IN ('gateway_error', 'failed_return', 'cancelled', 'rejected', 'failure', 'failed', 'confirm_error', 'activation_error', 'ownership_error')`);
+  }
+
+  if (q) {
+    filters.push(`(
+      u.username LIKE ?
+      OR u.email LIKE ?
+      OR spl.user_id LIKE ?
+      OR spl.plan_id LIKE ?
+      OR spl.payment_id LIKE ?
+      OR spl.preference_id LIKE ?
+      OR spl.external_reference LIKE ?
+      OR spl.source_path LIKE ?
+    )`);
+    const term = `%${q}%`;
+    bindings.push(term, term, term, term, term, term, term, term);
+  }
+
+  if (filters.length > 0) {
+    baseQuery += ` WHERE ${filters.join(' AND ')}`;
+  }
+
+  const countQuery = `SELECT COUNT(*) AS total ${baseQuery}`;
+  const dataQuery = `
+    SELECT
+      spl.*,
+      u.username,
+      u.email,
+      CASE
+        WHEN spl.status IN ('started', 'gateway_request', 'checkout_created', 'pending')
+          AND spl.created_at < datetime('now', '-60 minutes')
+        THEN 'abandoned'
+        ELSE spl.status
+      END AS computed_status
+    ${baseQuery}
+    ORDER BY spl.created_at DESC, spl.id DESC
+    LIMIT ? OFFSET ?
+  `;
+
+  const countStmt = bindings.length
+    ? env.DB.prepare(countQuery).bind(...bindings)
+    : env.DB.prepare(countQuery);
+  const dataStmt = bindings.length
+    ? env.DB.prepare(dataQuery).bind(...bindings, limit, offset)
+    : env.DB.prepare(dataQuery).bind(limit, offset);
+  const [countRow, dataRows] = await Promise.all([countStmt.first(), dataStmt.all()]);
+
+  return json({
+    logs: (dataRows.results || []).map((row) => ({
+      ...row,
+      amount: Number(row.amount || 0),
+      metadata: safeParseJSON(row.metadata, {}),
+    })),
+    total: Number(countRow?.total || 0),
+    page,
+    pages: Math.max(1, Math.ceil(Number(countRow?.total || 0) / limit)),
+  });
+}
+
 async function handleAdminGetFakeInbox(request, env) {
   await ensureMessageConversationIdColumn(env);
   const auth = await authenticate(request, env);
@@ -7754,6 +7851,212 @@ async function bridgeHmacVerify(secret, message, expectedHex) {
   return diff === 0;
 }
 
+function isVipSubscriptionPlan(planId) {
+  const id = String(planId || '').trim();
+  return !!id && !id.startsWith('coins_');
+}
+
+function normalizePaymentStatus(value, fallback = 'started') {
+  const status = String(value || fallback).trim().toLowerCase().replace(/[^a-z0-9_:-]/g, '_');
+  return status || fallback;
+}
+
+async function ensureSubscriptionPaymentLogsTable(env) {
+  if (!_subscriptionPaymentLogsReady) {
+    _subscriptionPaymentLogsReady = (async () => {
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS subscription_payment_logs (
+          id                 TEXT PRIMARY KEY,
+          user_id            TEXT NOT NULL,
+          plan_id            TEXT NOT NULL,
+          amount             REAL NOT NULL DEFAULT 0,
+          gateway            TEXT NOT NULL DEFAULT '',
+          source             TEXT NOT NULL DEFAULT '',
+          source_path        TEXT NOT NULL DEFAULT '',
+          referrer           TEXT NOT NULL DEFAULT '',
+          payment_id         TEXT NOT NULL DEFAULT '',
+          preference_id      TEXT NOT NULL DEFAULT '',
+          external_reference TEXT NOT NULL DEFAULT '',
+          redirect_url       TEXT NOT NULL DEFAULT '',
+          status             TEXT NOT NULL DEFAULT 'started',
+          gateway_status     TEXT NOT NULL DEFAULT '',
+          result_message     TEXT NOT NULL DEFAULT '',
+          metadata           TEXT NOT NULL DEFAULT '{}',
+          ip                 TEXT NOT NULL DEFAULT '',
+          user_agent         TEXT NOT NULL DEFAULT '',
+          created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+          completed_at       TEXT
+        )
+      `).run();
+
+      await Promise.all([
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_subscription_payment_logs_created ON subscription_payment_logs(created_at DESC)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_subscription_payment_logs_user_created ON subscription_payment_logs(user_id, created_at DESC)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_subscription_payment_logs_status_created ON subscription_payment_logs(status, created_at DESC)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_subscription_payment_logs_gateway_created ON subscription_payment_logs(gateway, created_at DESC)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_subscription_payment_logs_payment_id ON subscription_payment_logs(payment_id)').run(),
+        env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_subscription_payment_logs_external_ref ON subscription_payment_logs(external_reference)').run(),
+      ]);
+    })().catch((err) => {
+      _subscriptionPaymentLogsReady = null;
+      throw err;
+    });
+  }
+
+  return _subscriptionPaymentLogsReady;
+}
+
+async function createSubscriptionPaymentLog(env, request, auth, {
+  planId,
+  amount,
+  gateway,
+  source = '',
+  sourcePath = '',
+  status = 'started',
+  externalReference = '',
+  metadata = {},
+} = {}) {
+  if (!isVipSubscriptionPlan(planId)) return '';
+  try {
+    await ensureSubscriptionPaymentLogsTable(env);
+    const context = getRequestLogContext(request);
+    const id = generateId();
+    await env.DB.prepare(`
+      INSERT INTO subscription_payment_logs (
+        id, user_id, plan_id, amount, gateway, source, source_path, referrer,
+        external_reference, status, metadata, ip, user_agent
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      id,
+      auth.sub,
+      String(planId || ''),
+      Number(amount || 0),
+      String(gateway || ''),
+      truncateLogValue(source || 'vip_page', 120),
+      truncateLogValue(sourcePath || '', 300),
+      truncateLogValue(request.headers.get('Referer') || '', 500),
+      truncateLogValue(externalReference || '', 300),
+      normalizePaymentStatus(status),
+      safeSerializeLogMeta(metadata, 4000),
+      context.ip,
+      context.userAgent,
+    ).run();
+    return id;
+  } catch (err) {
+    console.error('[subscription_payment_logs] create failed:', err?.message || err);
+    return '';
+  }
+}
+
+async function findSubscriptionPaymentLogId(env, {
+  id = '',
+  userId = '',
+  planId = '',
+  gateway = '',
+  paymentId = '',
+  externalReference = '',
+} = {}) {
+  await ensureSubscriptionPaymentLogsTable(env);
+  if (id) {
+    const row = await env.DB.prepare('SELECT id FROM subscription_payment_logs WHERE id = ? LIMIT 1').bind(String(id)).first();
+    if (row?.id) return row.id;
+  }
+  if (paymentId) {
+    const row = await env.DB.prepare('SELECT id FROM subscription_payment_logs WHERE payment_id = ? ORDER BY created_at DESC LIMIT 1').bind(String(paymentId)).first();
+    if (row?.id) return row.id;
+  }
+  if (externalReference) {
+    const row = await env.DB.prepare('SELECT id FROM subscription_payment_logs WHERE external_reference = ? ORDER BY created_at DESC LIMIT 1').bind(String(externalReference)).first();
+    if (row?.id) return row.id;
+  }
+  if (userId && planId) {
+    const bindings = [String(userId), String(planId)];
+    let query = `
+      SELECT id FROM subscription_payment_logs
+      WHERE user_id = ? AND plan_id = ?
+    `;
+    if (gateway) {
+      query += ' AND gateway = ?';
+      bindings.push(String(gateway));
+    }
+    query += `
+      ORDER BY
+        CASE WHEN status IN ('started', 'gateway_request', 'checkout_created', 'pending') THEN 0 ELSE 1 END,
+        created_at DESC
+      LIMIT 1
+    `;
+    const row = await env.DB.prepare(query).bind(...bindings).first();
+    if (row?.id) return row.id;
+  }
+  return '';
+}
+
+async function updateSubscriptionPaymentLog(env, {
+  id = '',
+  userId = '',
+  planId = '',
+  gateway = '',
+  amount,
+  paymentId = '',
+  preferenceId = '',
+  externalReference = '',
+  redirectUrl = '',
+  status = '',
+  gatewayStatus = '',
+  resultMessage = '',
+  metadata,
+  completed = false,
+} = {}) {
+  if (!isVipSubscriptionPlan(planId) && !id && !paymentId && !externalReference) return '';
+  try {
+    await ensureSubscriptionPaymentLogsTable(env);
+    let logId = await findSubscriptionPaymentLogId(env, { id, userId, planId, gateway, paymentId, externalReference });
+    if (!logId && userId && isVipSubscriptionPlan(planId)) {
+      logId = generateId();
+      await env.DB.prepare(`
+        INSERT INTO subscription_payment_logs (id, user_id, plan_id, amount, gateway, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      `).bind(logId, String(userId), String(planId), Number(amount || 0), String(gateway || ''), 'external_event').run();
+    }
+    if (!logId) return '';
+
+    const updates = ['updated_at = datetime(\'now\')'];
+    const bindings = [];
+    const setText = (column, value, max = 500) => {
+      if (value === undefined || value === null || value === '') return;
+      updates.push(`${column} = ?`);
+      bindings.push(truncateLogValue(value, max));
+    };
+    if (amount !== undefined && amount !== null && Number.isFinite(Number(amount))) {
+      updates.push('amount = ?');
+      bindings.push(Number(amount));
+    }
+    setText('gateway', gateway, 80);
+    setText('payment_id', paymentId, 220);
+    setText('preference_id', preferenceId, 220);
+    setText('external_reference', externalReference, 300);
+    setText('redirect_url', redirectUrl, 1000);
+    setText('status', status ? normalizePaymentStatus(status) : '', 80);
+    setText('gateway_status', gatewayStatus, 120);
+    setText('result_message', resultMessage, 1200);
+    if (metadata !== undefined) {
+      updates.push('metadata = ?');
+      bindings.push(safeSerializeLogMeta(metadata, 4000));
+    }
+    if (completed) {
+      updates.push('completed_at = COALESCE(completed_at, datetime(\'now\'))');
+    }
+    bindings.push(logId);
+
+    await env.DB.prepare(`UPDATE subscription_payment_logs SET ${updates.join(', ')} WHERE id = ?`).bind(...bindings).run();
+    return logId;
+  } catch (err) {
+    console.error('[subscription_payment_logs] update failed:', err?.message || err);
+    return '';
+  }
+}
+
 // ══════════════════════════════════════════════════════════
 // UALÁ BIS — Payment Gateway
 // ══════════════════════════════════════════════════════════
@@ -7762,8 +8065,17 @@ async function bridgeHmacVerify(secret, message, expectedHex) {
 // Todas las operaciones de Ualá Bis pasan por el bridge de UnicoApps
 // para que el merchant visible sea UnicoApps, no Mansión Deseo.
 
-async function handleUalaPaymentCreate(request, auth, env, settings, plan_id, numericAmount) {
+async function handleUalaPaymentCreate(request, auth, env, settings, plan_id, numericAmount, paymentLogId = '') {
   if (!env.PAYMENT_BRIDGE_URL || !env.BRIDGE_SECRET) {
+    await updateSubscriptionPaymentLog(env, {
+      id: paymentLogId,
+      userId: auth.sub,
+      planId: plan_id,
+      gateway: 'uala_bis',
+      status: 'gateway_error',
+      resultMessage: 'Servicio de pagos no configurado',
+      completed: true,
+    });
     return error('Servicio de pagos no configurado', 500);
   }
 
@@ -7779,9 +8091,20 @@ async function handleUalaPaymentCreate(request, auth, env, settings, plan_id, nu
     payment_title: isCoinPurchase ? settings.paymentTitleCoins : settings.paymentTitleVip,
     payment_descriptor: isCoinPurchase ? settings.paymentDescriptorCoins : settings.paymentDescriptorVip,
     gateway: 'uala_bis',
-    callback_success: `${baseUrl}/pago-exitoso?gateway=uala&external_reference=${encodeURIComponent(externalRef)}`,
-    callback_fail: `${baseUrl}/pago-fallido?gateway=uala`,
+    callback_success: `${baseUrl}/pago-exitoso?gateway=uala&payment_log_id=${encodeURIComponent(paymentLogId || '')}&external_reference=${encodeURIComponent(externalRef)}`,
+    callback_fail: `${baseUrl}/pago-fallido?gateway=uala&payment_log_id=${encodeURIComponent(paymentLogId || '')}&external_reference=${encodeURIComponent(externalRef)}`,
     approved_callback_url: `${workerUrl}/api/payment/uala-approved`,
+  });
+
+  await updateSubscriptionPaymentLog(env, {
+    id: paymentLogId,
+    userId: auth.sub,
+    planId: plan_id,
+    amount: numericAmount,
+    gateway: 'uala_bis',
+    externalReference: externalRef,
+    status: 'gateway_request',
+    metadata: { bridge: 'uala/create-checkout' },
   });
 
   const timestamp = String(Math.floor(Date.now() / 1000));
@@ -7801,6 +8124,17 @@ async function handleUalaPaymentCreate(request, auth, env, settings, plan_id, nu
     if (!bridgeRes.ok) {
       const errText = await bridgeRes.text();
       console.error('Bridge Ualá error:', bridgeRes.status, 'headers:', JSON.stringify(Object.fromEntries(bridgeRes.headers)), 'body:', errText.substring(0, 500));
+      await updateSubscriptionPaymentLog(env, {
+        id: paymentLogId,
+        userId: auth.sub,
+        planId: plan_id,
+        gateway: 'uala_bis',
+        externalReference: externalRef,
+        status: 'gateway_error',
+        gatewayStatus: String(bridgeRes.status),
+        resultMessage: errText.substring(0, 500),
+        completed: true,
+      });
       try {
         const errJson = JSON.parse(errText);
         return error(errJson.error || `bridge ${bridgeRes.status}`, 502);
@@ -7811,12 +8145,37 @@ async function handleUalaPaymentCreate(request, auth, env, settings, plan_id, nu
     bridgeData = await bridgeRes.json();
   } catch (err) {
     console.error('Bridge Ualá fetch error:', err.message);
+    await updateSubscriptionPaymentLog(env, {
+      id: paymentLogId,
+      userId: auth.sub,
+      planId: plan_id,
+      gateway: 'uala_bis',
+      externalReference: externalRef,
+      status: 'gateway_error',
+      resultMessage: err.message || 'fetch error',
+      completed: true,
+    });
     return error('Servicio de pagos no disponible', 502);
   }
+
+  await updateSubscriptionPaymentLog(env, {
+    id: paymentLogId,
+    userId: auth.sub,
+    planId: plan_id,
+    amount: numericAmount,
+    gateway: 'uala_bis',
+    paymentId: bridgeData.checkout_id || '',
+    externalReference: externalRef,
+    redirectUrl: bridgeData.redirect_url || '',
+    status: 'checkout_created',
+    gatewayStatus: 'created',
+    metadata: { bridge: 'uala/create-checkout' },
+  });
 
   return json({
     redirect_url: bridgeData.redirect_url,
     checkout_id: bridgeData.checkout_id,
+    payment_log_id: paymentLogId,
   });
 }
 
@@ -7843,18 +8202,53 @@ async function handleUalaPaymentConfirm(auth, env, paymentId, externalRef) {
     const data = await bridgeRes.json();
 
     if (data.status !== 'APPROVED' && !data.is_approved) {
+      const ref = externalRef || '';
+      const [refUserId, planId] = ref.split('--');
+      await updateSubscriptionPaymentLog(env, {
+        userId: refUserId || auth.sub,
+        planId,
+        gateway: 'uala_bis',
+        paymentId,
+        externalReference: externalRef || '',
+        status: 'pending',
+        gatewayStatus: data.status || '',
+        resultMessage: `status: ${data.status}`,
+      });
       return json({ premium: false, reason: `status: ${data.status}` });
     }
 
     const ref = externalRef || '';
     const [refUserId, planId] = ref.split('--');
     if (refUserId !== auth.sub) {
+      await updateSubscriptionPaymentLog(env, {
+        userId: refUserId || auth.sub,
+        planId,
+        gateway: 'uala_bis',
+        paymentId,
+        externalReference: externalRef || '',
+        status: 'ownership_error',
+        resultMessage: 'El pago no pertenece a este usuario',
+        completed: true,
+      });
       return error('El pago no pertenece a este usuario', 403);
     }
 
     const existing = await env.DB.prepare('SELECT 1 FROM processed_payments WHERE payment_id = ?').bind(String(paymentId)).first();
     if (existing) {
       const isCoin = planId && planId.includes('coins_');
+      if (!isCoin) {
+        await updateSubscriptionPaymentLog(env, {
+          userId: auth.sub,
+          planId,
+          gateway: 'uala_bis',
+          paymentId,
+          externalReference: externalRef || '',
+          status: 'approved',
+          gatewayStatus: data.status || 'APPROVED',
+          resultMessage: 'Pago ya procesado',
+          completed: true,
+        });
+      }
       return json({ premium: !isCoin, coins: !!isCoin, already_processed: true });
     }
 
@@ -7871,10 +8265,33 @@ async function handleUalaPaymentConfirm(auth, env, paymentId, externalRef) {
     const newUntil = activatePremium(current?.premium_until, planId);
     await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, auth.sub).run();
     await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(paymentId), auth.sub, planId || '', data.amount || 0).run();
+    await updateSubscriptionPaymentLog(env, {
+      userId: auth.sub,
+      planId,
+      amount: data.amount || 0,
+      gateway: 'uala_bis',
+      paymentId,
+      externalReference: externalRef || '',
+      status: 'approved',
+      gatewayStatus: data.status || 'APPROVED',
+      resultMessage: `Premium confirmado hasta ${newUntil}`,
+      metadata: { premium_until: newUntil, source: 'confirm' },
+      completed: true,
+    });
     console.log(`✅ [Ualá Bridge] Premium confirmado — user: ${auth.sub} | uuid: ${paymentId} | plan: ${planId} | hasta: ${newUntil}`);
     return json({ premium: true, premium_until: newUntil });
   } catch (err) {
     console.error('Ualá Bridge confirm error:', err.message);
+    await updateSubscriptionPaymentLog(env, {
+      userId: auth.sub,
+      planId: (externalRef || '').split('--')[1] || '',
+      gateway: 'uala_bis',
+      paymentId,
+      externalReference: externalRef || '',
+      status: 'confirm_error',
+      resultMessage: err.message || 'Error verificando pago',
+      completed: true,
+    });
     return error('Error verificando pago', 502);
   }
 }
@@ -7925,6 +8342,19 @@ async function handleUalaApproved(request, env) {
       const newUntil = activatePremium(current?.premium_until, planId);
       await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, userId).run();
       await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(uuid), userId, planId, amount || 0).run();
+      await updateSubscriptionPaymentLog(env, {
+        userId,
+        planId,
+        amount: amount || 0,
+        gateway: 'uala_bis',
+        paymentId: uuid,
+        externalReference: `${userId}--${planId}`,
+        status: 'approved',
+        gatewayStatus: 'APPROVED',
+        resultMessage: `Premium activado hasta ${newUntil}`,
+        metadata: { premium_until: newUntil, source: 'webhook' },
+        completed: true,
+      });
       console.log(`✅ [Ualá Bridge] Premium activado vía webhook — user: ${userId} | uuid: ${uuid} | plan: ${planId} | hasta: ${newUntil}`);
     }
   } catch (err) {
@@ -7941,9 +8371,9 @@ async function handlePaymentCreate(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autenticado', 401);
 
-  let plan_id, amount;
+  let plan_id, amount, source, source_path;
   try {
-    ({ plan_id, amount } = await request.json());
+    ({ plan_id, amount, source, source_path } = await request.json());
   } catch {
     return error('JSON inválido');
   }
@@ -7953,24 +8383,56 @@ async function handlePaymentCreate(request, env) {
   if (isNaN(numericAmount) || numericAmount <= 0) return error('amount inválido');
 
   const settings = await loadSettings(env);
+  const isCoinPurchase = plan_id && plan_id.startsWith('coins_');
+  const paymentGateway = settings.paymentGateway === 'uala_bis' ? 'uala_bis' : 'mercadopago';
+  const paymentLogId = !isCoinPurchase
+    ? await createSubscriptionPaymentLog(env, request, auth, {
+        planId: plan_id,
+        amount: numericAmount,
+        gateway: paymentGateway,
+        source: source || (source_path ? 'vip_entry' : 'vip_page'),
+        sourcePath: source_path || '',
+        status: 'started',
+        metadata: { action: 'payment_create_clicked' },
+      })
+    : '';
 
   // Route to active payment gateway
   if (settings.paymentGateway === 'uala_bis') {
-    return handleUalaPaymentCreate(request, auth, env, settings, plan_id, numericAmount);
+    return handleUalaPaymentCreate(request, auth, env, settings, plan_id, numericAmount, paymentLogId);
   }
 
   // ── MercadoPago via Bridge (default) ──
   if (!env.PAYMENT_BRIDGE_URL || !env.BRIDGE_SECRET) {
+    await updateSubscriptionPaymentLog(env, {
+      id: paymentLogId,
+      userId: auth.sub,
+      planId: plan_id,
+      gateway: 'mercadopago',
+      status: 'gateway_error',
+      resultMessage: 'Servicio de pagos no configurado',
+      completed: true,
+    });
     return error('Servicio de pagos no configurado', 500);
   }
 
-  const isCoinPurchase = plan_id && plan_id.startsWith('coins_');
   const bodyPayload = JSON.stringify({
     user_id: auth.sub,
     amount: numericAmount,
     plan_id,
     payment_title: isCoinPurchase ? settings.paymentTitleCoins : settings.paymentTitleVip,
     payment_descriptor: isCoinPurchase ? settings.paymentDescriptorCoins : settings.paymentDescriptorVip,
+    payment_log_id: paymentLogId || undefined,
+  });
+
+  await updateSubscriptionPaymentLog(env, {
+    id: paymentLogId,
+    userId: auth.sub,
+    planId: plan_id,
+    amount: numericAmount,
+    gateway: 'mercadopago',
+    status: 'gateway_request',
+    metadata: { bridge: 'mercadopago/create-preference' },
   });
 
   const timestamp = String(Math.floor(Date.now() / 1000));
@@ -7990,6 +8452,16 @@ async function handlePaymentCreate(request, env) {
     if (!bridgeRes.ok) {
       const errText = await bridgeRes.text();
       console.error('Bridge error:', bridgeRes.status, errText);
+      await updateSubscriptionPaymentLog(env, {
+        id: paymentLogId,
+        userId: auth.sub,
+        planId: plan_id,
+        gateway: 'mercadopago',
+        status: 'gateway_error',
+        gatewayStatus: String(bridgeRes.status),
+        resultMessage: errText.substring(0, 500),
+        completed: true,
+      });
       try {
         const errJson = JSON.parse(errText);
         return error(errJson.error || `bridge ${bridgeRes.status}`, 502);
@@ -8000,10 +8472,32 @@ async function handlePaymentCreate(request, env) {
     bridgeData = await bridgeRes.json();
   } catch (err) {
     console.error('Bridge fetch error:', err.message);
+    await updateSubscriptionPaymentLog(env, {
+      id: paymentLogId,
+      userId: auth.sub,
+      planId: plan_id,
+      gateway: 'mercadopago',
+      status: 'gateway_error',
+      resultMessage: err.message || 'fetch error',
+      completed: true,
+    });
     return error('Servicio de pagos no disponible', 502);
   }
 
-  return json({ init_point: bridgeData.init_point, preference_id: bridgeData.preference_id });
+  await updateSubscriptionPaymentLog(env, {
+    id: paymentLogId,
+    userId: auth.sub,
+    planId: plan_id,
+    amount: numericAmount,
+    gateway: 'mercadopago',
+    preferenceId: bridgeData.preference_id || '',
+    redirectUrl: bridgeData.init_point || '',
+    status: 'checkout_created',
+    gatewayStatus: 'created',
+    metadata: { bridge: 'mercadopago/create-preference' },
+  });
+
+  return json({ init_point: bridgeData.init_point, preference_id: bridgeData.preference_id, payment_log_id: paymentLogId });
 }
 
 // ── POST /api/payment/approved ───────────────────────────
@@ -8028,13 +8522,41 @@ async function handlePaymentApproved(request, env) {
   try { body = JSON.parse(rawBody); } catch { return error('JSON inválido'); }
 
   const { user_id, plan_id, payment_id, amount, status } = body;
-  if (!user_id || status !== 'approved') return error('Datos inválidos');
+  if (!user_id || status !== 'approved') {
+    if (user_id && isVipSubscriptionPlan(plan_id)) {
+      await updateSubscriptionPaymentLog(env, {
+        userId: user_id,
+        planId: plan_id,
+        amount: amount || 0,
+        gateway: 'mercadopago',
+        paymentId: payment_id || '',
+        status: status ? 'rejected' : 'webhook_invalid',
+        gatewayStatus: status || '',
+        resultMessage: 'Callback de pago no aprobado o incompleto',
+        completed: true,
+      });
+    }
+    return error('Datos inválidos');
+  }
 
   try {
     // Prevenir re-uso del mismo payment_id
     const existing = await env.DB.prepare('SELECT 1 FROM processed_payments WHERE payment_id = ?').bind(String(payment_id)).first();
     if (existing) {
       console.log(`⚠️ Payment ${payment_id} ya procesado — ignorando`);
+      if (isVipSubscriptionPlan(plan_id)) {
+        await updateSubscriptionPaymentLog(env, {
+          userId: user_id,
+          planId: plan_id,
+          amount: amount || 0,
+          gateway: 'mercadopago',
+          paymentId: payment_id,
+          status: 'approved',
+          gatewayStatus: status,
+          resultMessage: 'Pago ya procesado',
+          completed: true,
+        });
+      }
       return json({ success: true, already_processed: true });
     }
 
@@ -8051,10 +8573,35 @@ async function handlePaymentApproved(request, env) {
       const newUntil = activatePremium(current?.premium_until, plan_id);
       await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, user_id).run();
       await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(payment_id), user_id, plan_id || '', amount || 0).run();
+      await updateSubscriptionPaymentLog(env, {
+        userId: user_id,
+        planId: plan_id,
+        amount: amount || 0,
+        gateway: 'mercadopago',
+        paymentId: payment_id,
+        status: 'approved',
+        gatewayStatus: status,
+        resultMessage: `Premium activado hasta ${newUntil}`,
+        metadata: { premium_until: newUntil, source: 'webhook' },
+        completed: true,
+      });
       console.log(`✅ Premium activado — user: ${user_id} | payment: ${payment_id} | plan: ${plan_id} | hasta: ${newUntil} | +100 coins`);
     }
   } catch (err) {
     console.error('DB error activando premium:', err.message);
+    if (isVipSubscriptionPlan(plan_id)) {
+      await updateSubscriptionPaymentLog(env, {
+        userId: user_id,
+        planId: plan_id,
+        amount: amount || 0,
+        gateway: 'mercadopago',
+        paymentId: payment_id || '',
+        status: 'activation_error',
+        gatewayStatus: status || '',
+        resultMessage: err.message || 'Error al activar suscripción',
+        completed: true,
+      });
+    }
     return error('Error al activar suscripción', 500);
   }
 
@@ -8112,12 +8659,34 @@ async function handlePaymentConfirm(request, env) {
 
     // Verificar que el pago sea approved y pertenezca a este usuario
     if (data.status !== 'approved') {
+      const ref = data.external_reference || '';
+      const [refUserId, planId] = ref.split('--');
+      await updateSubscriptionPaymentLog(env, {
+        userId: refUserId || auth.sub,
+        planId,
+        gateway: 'mercadopago',
+        paymentId: payment_id,
+        externalReference: ref,
+        status: 'pending',
+        gatewayStatus: data.status || '',
+        resultMessage: `status: ${data.status}`,
+      });
       return json({ premium: false, reason: `status: ${data.status}` });
     }
 
     const ref = data.external_reference || '';
     const [refUserId, planId] = ref.split('--');
     if (refUserId !== auth.sub) {
+      await updateSubscriptionPaymentLog(env, {
+        userId: refUserId || auth.sub,
+        planId,
+        gateway: 'mercadopago',
+        paymentId: payment_id,
+        externalReference: ref,
+        status: 'ownership_error',
+        resultMessage: 'El pago no pertenece a este usuario',
+        completed: true,
+      });
       return error('El pago no pertenece a este usuario', 403);
     }
 
@@ -8126,6 +8695,20 @@ async function handlePaymentConfirm(request, env) {
     if (existing) {
       console.log(`⚠️ Payment ${payment_id} ya procesado vía confirm — ignorando`);
       const coinMatch = ref.includes('coins_');
+      if (!coinMatch) {
+        await updateSubscriptionPaymentLog(env, {
+          userId: auth.sub,
+          planId,
+          amount: data.amount || 0,
+          gateway: 'mercadopago',
+          paymentId: payment_id,
+          externalReference: ref,
+          status: 'approved',
+          gatewayStatus: data.status,
+          resultMessage: 'Pago ya procesado',
+          completed: true,
+        });
+      }
       return json({ premium: !coinMatch, coins: coinMatch, already_processed: true });
     }
 
@@ -8144,13 +8727,83 @@ async function handlePaymentConfirm(request, env) {
     const newUntil = activatePremium(current?.premium_until, planId);
     await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, auth.sub).run();
     await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(payment_id), auth.sub, planId || '', data.amount || 0).run();
+    await updateSubscriptionPaymentLog(env, {
+      userId: auth.sub,
+      planId,
+      amount: data.amount || 0,
+      gateway: 'mercadopago',
+      paymentId: payment_id,
+      externalReference: ref,
+      status: 'approved',
+      gatewayStatus: data.status,
+      resultMessage: `Premium confirmado hasta ${newUntil}`,
+      metadata: { premium_until: newUntil, source: 'confirm' },
+      completed: true,
+    });
     console.log(`✅ Premium confirmado vía confirm — user: ${auth.sub} | payment: ${payment_id} | plan: ${planId} | hasta: ${newUntil} | +100 coins`);
 
     return json({ premium: true, premium_until: newUntil });
   } catch (err) {
     console.error('Payment confirm error:', err.message);
+    await updateSubscriptionPaymentLog(env, {
+      userId: auth.sub,
+      gateway: 'mercadopago',
+      paymentId: payment_id,
+      status: 'confirm_error',
+      resultMessage: err.message || 'Error verificando pago',
+      completed: true,
+    });
     return error('Error verificando pago', 502);
   }
+}
+
+async function handlePaymentResultReport(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autenticado', 401);
+
+  const body = await request.json().catch(() => ({}));
+  const logId = String(body.payment_log_id || '').trim();
+  const paymentId = String(body.payment_id || body.uuid || '').trim();
+  const gateway = String(body.gateway || '').trim().toLowerCase();
+  const externalReference = String(body.external_reference || '').trim();
+  const status = normalizePaymentStatus(body.status || 'failed_return');
+  const reason = String(body.reason || '').trim();
+
+  if (!logId && !paymentId && !externalReference) {
+    return error('Identificador de intento requerido', 400);
+  }
+
+  await ensureSubscriptionPaymentLogsTable(env);
+  let row = null;
+  if (logId) {
+    row = await env.DB.prepare('SELECT id, user_id, plan_id FROM subscription_payment_logs WHERE id = ?').bind(logId).first();
+  }
+  if (!row && paymentId) {
+    row = await env.DB.prepare('SELECT id, user_id, plan_id FROM subscription_payment_logs WHERE payment_id = ? ORDER BY created_at DESC LIMIT 1').bind(paymentId).first();
+  }
+  if (!row && externalReference) {
+    row = await env.DB.prepare('SELECT id, user_id, plan_id FROM subscription_payment_logs WHERE external_reference = ? ORDER BY created_at DESC LIMIT 1').bind(externalReference).first();
+  }
+  if (!row || String(row.user_id) !== String(auth.sub)) {
+    return error('Intento de pago no encontrado', 404);
+  }
+
+  const completedStatuses = new Set(['failed_return', 'cancelled', 'rejected', 'failure', 'failed']);
+  await updateSubscriptionPaymentLog(env, {
+    id: row.id,
+    userId: auth.sub,
+    planId: row.plan_id,
+    gateway: gateway === 'uala' ? 'uala_bis' : gateway,
+    paymentId,
+    externalReference,
+    status,
+    gatewayStatus: status,
+    resultMessage: reason || 'El usuario volvió desde una página de pago fallido/cancelado.',
+    metadata: { source: 'client_result_report' },
+    completed: completedStatuses.has(status),
+  });
+
+  return json({ success: true });
 }
 
 // ── Stories ─────────────────────────────────────────────
@@ -9464,6 +10117,7 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/admin/users/ids' && method === 'GET') return handleAdminGetUserIds(request, env);
   if (path === '/api/admin/users/bulk-delete' && method === 'POST') return handleAdminBulkDeleteUsers(request, env);
   if (path === '/api/admin/error-logs' && method === 'GET') return handleAdminGetErrorLogs(request, env);
+  if (path === '/api/admin/subscription-payment-logs' && method === 'GET') return handleAdminGetSubscriptionPaymentLogs(request, env);
   if (path === '/api/admin/fake-inbox' && method === 'GET') return handleAdminGetFakeInbox(request, env);
   if (path === '/api/admin/fake-inbox/conversation' && method === 'GET') return handleAdminGetFakeInboxConversation(request, env);
   if (path === '/api/admin/fake-inbox/reply' && method === 'POST') return handleAdminReplyFakeInbox(request, env);
@@ -9489,6 +10143,7 @@ async function handleRequest(request, env, ctx) {
   // ── Pagos
   if (path === '/api/payment/create' && method === 'POST') return handlePaymentCreate(request, env);
   if (path === '/api/payment/confirm' && method === 'POST') return handlePaymentConfirm(request, env);
+  if (path === '/api/payment/result' && method === 'POST') return handlePaymentResultReport(request, env);
 
   // ── Stories
   if (path === '/api/stories' && method === 'GET') return handleGetStories(request, env);

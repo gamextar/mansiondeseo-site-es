@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Crown, Zap, MessageCircle, Image, EyeOff, Star, ArrowLeft, Loader } from 'lucide-react';
 import { createPayment, getPublicSettings } from '../lib/api';
 import { useAuth } from '../lib/authContext';
@@ -29,6 +29,7 @@ function parseAdminPrice(value) {
 
 export default function VipPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [planes, setPlanes] = useState(DEFAULT_PLANES);
   const [planSeleccionado, setPlanSeleccionado] = useState('premium_3meses');
@@ -65,9 +66,18 @@ export default function VipPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await createPayment({ plan_id: plan.id, amount: plan.amount });
+      const sourcePath = location.state?.from || location.state?.source || `${location.pathname}${location.search}`;
+      const data = await createPayment({
+        plan_id: plan.id,
+        amount: plan.amount,
+        source: user?.premium ? 'vip_extend_page' : 'vip_page',
+        source_path: sourcePath,
+      });
       const url = data?.init_point || data?.redirect_url;
       if (url) {
+        try {
+          if (data?.payment_log_id) sessionStorage.setItem('mansion_last_vip_payment_log_id', data.payment_log_id);
+        } catch {}
         window.location.href = url;
       } else {
         setError('No se pudo iniciar el pago. Intentá de nuevo.');

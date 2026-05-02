@@ -1,5 +1,5 @@
 import { NavLink, Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { Users, Home, Shield, Film, AlertTriangle, Inbox } from 'lucide-react';
+import { Users, Home, Shield, Film, AlertTriangle, Inbox, CreditCard } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../lib/authContext';
 import { useEffect } from 'react';
@@ -20,6 +20,7 @@ export default function AdminLayout() {
   const isUsersActive = location.pathname.startsWith('/admin/usuarios');
   const isFakeInboxActive = location.pathname.startsWith('/admin/bandeja-fake');
   const isErrorsActive = location.pathname.startsWith('/admin/errores');
+  const isPaymentsActive = location.pathname.startsWith('/admin/pagos');
   const isConfigActive = location.pathname.startsWith('/admin/configuracion');
   const isVideoLabActive = location.pathname.startsWith('/admin/video-lab');
   const mobileNavItems = [
@@ -27,6 +28,7 @@ export default function AdminLayout() {
     { to: '/admin/bandeja-fake', label: 'Bandeja', icon: Inbox, active: isFakeInboxActive },
     { to: '/admin/video-lab', label: 'Video', icon: Film, active: isVideoLabActive },
     { to: '/admin/errores', label: 'Errores', icon: AlertTriangle, active: isErrorsActive },
+    { to: '/admin/pagos', label: 'Pagos', icon: CreditCard, active: isPaymentsActive },
     { to: '/admin/configuracion', label: 'Config', icon: Shield, active: isConfigActive },
   ];
 
@@ -122,6 +124,25 @@ export default function AdminLayout() {
               <AlertTriangle className={`w-5 h-5 transition-colors ${isErrorsActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'}`} />
               <span className={`text-sm transition-colors ${isErrorsActive ? 'text-mansion-gold font-semibold' : 'text-text-muted group-hover:text-text-primary'}`}>
                 Errores
+              </span>
+            </div>
+          </NavLink>
+
+          <NavLink
+            to="/admin/pagos"
+            className="relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all group"
+          >
+            {isPaymentsActive && (
+              <motion.div
+                layoutId="admin-sidebar-active"
+                className="absolute inset-0 bg-mansion-gold/10 border border-mansion-gold/20 rounded-xl"
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              />
+            )}
+            <div className="relative z-10 flex items-center gap-3 w-full">
+              <CreditCard className={`w-5 h-5 transition-colors ${isPaymentsActive ? 'text-mansion-gold' : 'text-text-muted group-hover:text-text-primary'}`} />
+              <span className={`text-sm transition-colors ${isPaymentsActive ? 'text-mansion-gold font-semibold' : 'text-text-muted group-hover:text-text-primary'}`}>
+                Pagos VIP
               </span>
             </div>
           </NavLink>

@@ -1,13 +1,37 @@
+import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { XCircle, RefreshCw } from 'lucide-react';
+import { reportPaymentResult } from '../lib/api';
 
 export default function PagoFallidoPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
+  const gateway = params.get('gateway') || 'mercadopago';
+  const paymentId = params.get('payment_id') || params.get('uuid') || '';
+  const paymentLogId = params.get('payment_log_id') || (() => {
+    try { return sessionStorage.getItem('mansion_last_vip_payment_log_id') || ''; } catch { return ''; }
+  })();
   const externalRef = params.get('external_reference') || '';
   const planId = externalRef.split('--')[1] || '';
   const isCoinPurchase = planId.startsWith('coins_');
+
+  useEffect(() => {
+    if (isCoinPurchase) return;
+    if (!paymentLogId && !paymentId && !externalRef) return;
+    reportPaymentResult({
+      payment_log_id: paymentLogId,
+      payment_id: paymentId,
+      gateway,
+      external_reference: externalRef,
+      status: 'failed_return',
+      reason: 'El usuario volvió desde la página de pago fallido/cancelado.',
+    })
+      .then(() => {
+        try { sessionStorage.removeItem('mansion_last_vip_payment_log_id'); } catch {}
+      })
+      .catch(() => {});
+  }, [externalRef, gateway, isCoinPurchase, paymentId, paymentLogId]);
 
   return (
     <div className="min-h-screen bg-mansion-base flex flex-col items-center justify-center p-6 text-center">

@@ -1463,10 +1463,10 @@ export async function adminAddCoins(userId, amount) {
 
 // ── Pagos ───────────────────────────────────────────────
 
-export async function createPayment({ plan_id, amount }) {
+export async function createPayment({ plan_id, amount, source = '', source_path = '' }) {
   return apiFetch('/payment/create', {
     method: 'POST',
-    body: JSON.stringify({ plan_id, amount }),
+    body: JSON.stringify({ plan_id, amount, source, source_path }),
   });
 }
 
@@ -1494,6 +1494,13 @@ export async function confirmPayment(payment_id, { gateway, external_reference }
   return data;
 }
 
+export async function reportPaymentResult({ payment_log_id, payment_id, uuid, gateway, external_reference, status, reason } = {}) {
+  return apiFetch('/payment/result', {
+    method: 'POST',
+    body: JSON.stringify({ payment_log_id, payment_id, uuid, gateway, external_reference, status, reason }),
+  });
+}
+
 // ── Admin ─────────────────────────────────────────────
 
 export async function adminRemoveAllVip() {
@@ -1515,6 +1522,14 @@ export async function adminRotateFakeOnline({ count = 36, windowMinutes = 55, ex
   });
   markFeedDirty();
   return result;
+}
+
+export async function adminGetSubscriptionPaymentLogs({ page = 1, limit = 25, q = '', status = '', gateway = '' } = {}) {
+  const params = new URLSearchParams({ page, limit });
+  if (q) params.set('q', q);
+  if (status) params.set('status', status);
+  if (gateway) params.set('gateway', gateway);
+  return apiFetch(`/admin/subscription-payment-logs?${params}`);
 }
 
 // ── Admin: Users ────────────────────────────────────────
