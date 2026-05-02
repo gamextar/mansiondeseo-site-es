@@ -101,7 +101,6 @@ const FAKE_STORY_ROTATION_POOL_SIZE = 54;
 const STORY_SNAPSHOT_PREFIX = 'story-snapshots';
 const STORY_SNAPSHOT_MANIFEST_KEY = `${STORY_SNAPSHOT_PREFIX}/manifest.json`;
 const STORY_SNAPSHOT_BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
-const STORY_SNAPSHOT_FAKE_LIMIT_PER_BUCKET = 100;
 const STORY_SNAPSHOT_REAL_LIMIT = 300;
 const STORY_ROWS_CACHE_TTL_MS = 5 * 60_000;
 const FREE_CHAT_RECIPIENT_LIMIT = 5;
@@ -9349,7 +9348,8 @@ async function handleStorySnapshotAsset(request, env, requestedKey) {
 
 async function buildStorySnapshotRows(env, { fake = false } = {}) {
   const fakeValue = fake ? 1 : 0;
-  const limit = fake ? 2000 : STORY_SNAPSHOT_REAL_LIMIT;
+  const limitClause = fake ? '' : 'LIMIT ?';
+  const bindings = fake ? [fakeValue] : [fakeValue, STORY_SNAPSHOT_REAL_LIMIT];
   const { results } = await env.DB.prepare(`
     SELECT s.id, s.user_id, s.video_url, COALESCE(s.caption, '') AS caption,
            COALESCE(s.vip_only, 0) AS vip_only, COALESCE(s.likes, 0) AS likes,
@@ -9364,10 +9364,10 @@ async function buildStorySnapshotRows(env, { fake = false } = {}) {
       AND u.status = 'verified'
       AND COALESCE(u.account_status, 'active') = 'active'
     ORDER BY ${fake ? "COALESCE(u.feed_priority, 0) DESC, s.created_at DESC, s.id DESC" : "s.created_at DESC, u.last_active DESC, s.id DESC"}
-    LIMIT ?
-  `).bind(fakeValue, limit).all();
+    ${limitClause}
+  `).bind(...bindings).all();
 
-  return uniqueStoryRows(results || [], limit);
+  return uniqueStoryRows(results || [], fake ? Infinity : STORY_SNAPSHOT_REAL_LIMIT);
 }
 
 async function rebuildStorySnapshots(env, { includeReal = true, includeFakes = true, source = 'unknown' } = {}) {
@@ -9412,14 +9412,14 @@ async function rebuildStorySnapshots(env, { includeReal = true, includeFakes = t
     }
 
     for (const bucket of STORY_SNAPSHOT_BUCKETS) {
-      const rows = uniqueStoryRows(bucketMap.get(bucket) || [], 2000);
+      const rows = uniqueStoryRows(bucketMap.get(bucket) || []);
       const priorityRows = rows.filter((row) => Number(row.feed_priority || 0) > 0);
       const normalRows = rows.filter((row) => Number(row.feed_priority || 0) <= 0);
       const seed = hashStringToUint32(`fake-snapshot:${bucket}:${version}:${rows.length}`);
       const selectedRows = uniqueStoryRows([
         ...shuffleStoryRows(priorityRows, seed),
         ...shuffleStoryRows(normalRows, seed ^ 0xa5a5a5a5),
-      ], STORY_SNAPSHOT_FAKE_LIMIT_PER_BUCKET)
+      ])
         .map((row, index) => mapStorySnapshotRow(row, env, { position: index + 1 }));
       const fakeKey = getStorySnapshotKey('fake', version, bucket);
       await putStorySnapshotJson(env, fakeKey, {

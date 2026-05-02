@@ -10,7 +10,6 @@ const R2_BUCKET = process.env.STORY_SNAPSHOT_BUCKET || 'mansion-deseo-images';
 const MEDIA_BASE = (process.env.R2_PUBLIC_URL || 'https://media.mansiondeseo.com').replace(/\/$/, '');
 const PREFIX = 'story-snapshots';
 const BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
-const FAKE_LIMIT_PER_BUCKET = 100;
 const REAL_LIMIT = 300;
 
 function run(command, args, { input, silent = false } = {}) {
@@ -173,8 +172,7 @@ try {
     ${baseSql}
       AND COALESCE(u.fake, 0) = 1
     ORDER BY COALESCE(u.feed_priority, 0) DESC, s.created_at DESC, s.id DESC
-    LIMIT 2000
-  `), 2000);
+  `));
 
   const manifest = {
     schema: 1,
@@ -197,7 +195,7 @@ try {
     const selectedRows = uniqueByUser([
       ...shuffleRows(priorityRows, seed),
       ...shuffleRows(normalRows, seed ^ 0xa5a5a5a5),
-    ], FAKE_LIMIT_PER_BUCKET).map((row, index) => mapRow(row, index + 1));
+    ]).map((row, index) => mapRow(row, index + 1));
     const key = `${PREFIX}/fakes-${bucket}.v${version}.json`;
     putObject(key, {
       schema: 1,
