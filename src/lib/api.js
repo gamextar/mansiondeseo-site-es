@@ -25,7 +25,7 @@ const STORY_SNAPSHOT_CACHE_PREFIX = 'mansion_story_snapshot:';
 const STORY_SNAPSHOT_SELECTION_CACHE_PREFIX = 'mansion_story_snapshot_feed:';
 const STORY_SNAPSHOT_MANIFEST_TTL_MS = 10 * 60_000;
 const STORY_SNAPSHOT_ASSET_TTL_MS = 24 * 60 * 60_000;
-const STORY_SNAPSHOT_FAKE_ROTATION_MS = 15 * 60_000;
+const STORY_SNAPSHOT_FAKE_ROTATION_MS = 5 * 60_000;
 const STORY_SNAPSHOT_FAKE_LIMIT = 10;
 const STORY_SNAPSHOT_SHARED_LIMIT = 60;
 const STORY_SNAPSHOT_BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
@@ -1952,8 +1952,7 @@ async function loadSharedStorySnapshotFeed({ viewer = null, fresh = false } = {}
     const fakePool = uniqueStorySnapshotRows(
       fakeSnapshots.flat()
         .filter((story) => storyMatchesRoleValues(story, roleValues))
-        .filter((story) => !viewerId || String(story?.user_id || '') !== viewerId),
-      1000
+        .filter((story) => !viewerId || String(story?.user_id || '') !== viewerId)
     );
     const seed = hashStorySnapshotSeed(`${viewerId || 'anon'}:${manifest.version || ''}:${roleKey}:${fakeWindowKey}:${fakePool.length}`);
     fakeRows = uniqueStorySnapshotRows(shuffleStorySnapshotRows(fakePool, seed), fakeLimit);

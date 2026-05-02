@@ -102,6 +102,7 @@ const STORY_SNAPSHOT_PREFIX = 'story-snapshots';
 const STORY_SNAPSHOT_MANIFEST_KEY = `${STORY_SNAPSHOT_PREFIX}/manifest.json`;
 const STORY_SNAPSHOT_BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
 const STORY_SNAPSHOT_REAL_LIMIT = 300;
+const STORY_SNAPSHOT_FAKE_ROTATION_MS = 5 * 60_000;
 const STORY_ROWS_CACHE_TTL_MS = 5 * 60_000;
 const FREE_CHAT_RECIPIENT_LIMIT = 5;
 const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
@@ -9492,8 +9493,8 @@ async function loadStoryRowsFromSnapshots(env, {
     const snapshot = await readStorySnapshotJson(env, key, { bypassCache: fresh }).catch(() => null);
     return Array.isArray(snapshot?.stories) ? snapshot.stories : [];
   }));
-  const fakeRows = uniqueStoryRows(fakeSnapshots.flat().filter(filterByRole), 1000);
-  const seed = hashStringToUint32(`${viewerId || 'anon'}:${manifest.version || ''}:${Math.floor(Date.now() / (15 * 60_000))}:${fakeRows.length}`);
+  const fakeRows = uniqueStoryRows(fakeSnapshots.flat().filter(filterByRole));
+  const seed = hashStringToUint32(`${viewerId || 'anon'}:${manifest.version || ''}:${Math.floor(Date.now() / STORY_SNAPSHOT_FAKE_ROTATION_MS)}:${fakeRows.length}`);
   const selectedFakes = uniqueStoryRows(shuffleStoryRows(fakeRows, seed), fakeLimit);
   return uniqueStoryRows([...realRows, ...selectedFakes], safeLimit);
 }
