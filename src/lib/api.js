@@ -1553,19 +1553,6 @@ export async function adminResetAllCoins() {
   return apiFetch('/admin/reset-all-coins', { method: 'POST', body: '{}' });
 }
 
-export async function adminRotateFakeOnline({ count = 36, windowMinutes = 55, excludeRecentMinutes = 60 } = {}) {
-  const result = await apiFetch('/admin/rotate-fake-online', {
-    method: 'POST',
-    body: JSON.stringify({
-      count,
-      window_minutes: windowMinutes,
-      exclude_recent_minutes: excludeRecentMinutes,
-    }),
-  });
-  markFeedDirty();
-  return result;
-}
-
 export async function adminGetProfileSnapshots({ fresh = false } = {}) {
   const qs = fresh ? '?fresh=1' : '';
   return apiFetch(`/admin/profiles/snapshots${qs}`);

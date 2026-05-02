@@ -182,24 +182,6 @@ function parseSqlDateMs(value) {
   return new Date(hasTimezone ? normalized : `${normalized}Z`).getTime();
 }
 
-function getCryptoRandomFloat() {
-  const values = new Uint32Array(1);
-  crypto.getRandomValues(values);
-  return values[0] / 0x100000000;
-}
-
-function buildStaggeredMinuteOffsets(count, windowMinutes) {
-  const total = Math.max(0, Number(count) || 0);
-  if (total === 0) return [];
-  const safeWindow = Math.max(1, Number(windowMinutes) || 1);
-  const step = safeWindow / total;
-  return Array.from({ length: total }, (_, index) => {
-    const jitterCap = Math.min(Math.max(step * 0.65, 0.2), 3);
-    const offset = (index * step) + (getCryptoRandomFloat() * jitterCap);
-    return Math.min(safeWindow - 0.1, Math.max(0, offset));
-  });
-}
-
 function parseBooleanSetting(value, fallback = false) {
   if (value === undefined || value === null || value === '') return fallback;
   return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
@@ -6851,165 +6833,6 @@ async function handleAdminResetAllCoins(request, env) {
   return json({ success: true, affected: meta.changes });
 }
 
-async function rotateFakeOnlineUsers(env, {
-  count: requestedCount,
-  windowMinutes: requestedWindowMinutes,
-  excludeRecentMinutes: requestedExcludeRecentMinutes,
-  source = 'manual',
-} = {}) {
-  await ensureUsersFakeColumn(env);
-  await ensureUsersFeedPriorityColumn(env);
-  await ensureUserBrowseIndexes(env);
-
-  const settings = await cached('settings', 300_000, () => loadSettings(env));
-  const count = parseIntegerSetting(requestedCount, 36, 1, 200);
-  const windowMinutes = parseIntegerSetting(requestedWindowMinutes, 55, 5, 240);
-  const excludeRecentMinutes = parseIntegerSetting(
-    requestedExcludeRecentMinutes,
-    settings.onlineThresholdMinutes || 60,
-    0,
-    240
-  );
-
-  const selectFakeCandidates = async ({ limit, excludeRecent = false, excludedIds = [], featuredOnly = false } = {}) => {
-    const recentClause = excludeRecent && excludeRecentMinutes > 0
-      ? "AND (u.last_active IS NULL OR u.last_active < datetime('now', ?))"
-      : '';
-    const featuredClause = featuredOnly
-      ? 'AND COALESCE(u.feed_priority, 0) > 0'
-      : '';
-    const excludedClause = excludedIds.length > 0
-      ? `AND u.id NOT IN (${excludedIds.map(() => '?').join(', ')})`
-      : '';
-    const bindings = [];
-    if (recentClause) bindings.push(`-${excludeRecentMinutes} minutes`);
-    bindings.push(...excludedIds);
-    bindings.push(limit);
-
-    const { results } = await env.DB.prepare(`
-      SELECT
-        u.id,
-        u.username,
-        u.role,
-        COALESCE(u.feed_priority, 0) AS feed_priority,
-        u.last_active
-      FROM users u
-      WHERE COALESCE(u.fake, 0) = 1
-        AND u.status = 'verified'
-        AND COALESCE(u.account_status, 'active') = 'active'
-        ${featuredClause}
-        ${recentClause}
-        ${excludedClause}
-      ORDER BY feed_priority DESC, RANDOM()
-      LIMIT ?
-    `).bind(...bindings).all();
-    return results || [];
-  };
-
-  const selected = [];
-  const appendCandidates = async (options) => {
-    if (selected.length >= count) return;
-    const fill = await selectFakeCandidates({
-      ...options,
-      limit: count - selected.length,
-      excludedIds: selected.map((user) => user.id),
-    });
-    selected.push(...fill);
-  };
-
-  // The feed ranks feed_priority before recency, so rotate featured fakes first.
-  await appendCandidates({ featuredOnly: true, excludeRecent: true });
-  await appendCandidates({ featuredOnly: true, excludeRecent: false });
-  await appendCandidates({ featuredOnly: false, excludeRecent: true });
-  await appendCandidates({ featuredOnly: false, excludeRecent: false });
-
-  if (selected.length > count) {
-    selected.length = count;
-  }
-
-  if (selected.length === 0) {
-    return {
-      success: true,
-      requested: count,
-      updated: 0,
-      windowMinutes,
-      excludeRecentMinutes,
-      activeStoryUsers: null,
-      activeFeaturedUsers: 0,
-      feedCacheVersion: null,
-      fakeStoryRotation: null,
-      storyRotationSkipped: true,
-      users: [],
-    };
-  }
-
-  const now = Date.now();
-  const offsets = buildStaggeredMinuteOffsets(selected.length, windowMinutes);
-  const updates = selected.map((user, index) => {
-    const lastActive = formatSqlDateFromMs(now - Math.round(offsets[index] * 60_000));
-    user.rotated_last_active = lastActive;
-    return env.DB.prepare('UPDATE users SET last_active = ? WHERE id = ?').bind(lastActive, user.id);
-  });
-
-  for (let i = 0; i < updates.length; i += 50) {
-    await env.DB.batch(updates.slice(i, i + 50));
-  }
-
-  const feedCacheVersion = await bumpFeedCacheVersion(env);
-  const activeFeaturedUsers = selected.filter((user) => Number(user.feed_priority || 0) > 0).length;
-
-  console.log(`🔧 Fake online rotation (${source}) — ${selected.length}/${count} usuarios last_active en ${windowMinutes} min`);
-
-  return {
-    success: true,
-    requested: count,
-    updated: selected.length,
-    windowMinutes,
-    excludeRecentMinutes,
-    activeStoryUsers: null,
-    activeFeaturedUsers,
-    fakeStoryRotation: null,
-    storyRotationSkipped: true,
-    feedCacheVersion,
-    users: selected.slice(0, 20).map((user) => ({
-      id: user.id,
-      username: user.username || '',
-      role: user.role || '',
-      feed_priority: Math.max(0, Number(user.feed_priority || 0)),
-      last_active: user.rotated_last_active || '',
-    })),
-  };
-}
-
-async function runScheduledFakeOnlineRotation(env, controller = {}) {
-  const result = await rotateFakeOnlineUsers(env, {
-    count: 36,
-    source: `cron:${controller.cron || 'hourly'}`,
-  });
-  console.log(
-    `⏱️ Fake online cron finalizado — ${result.updated}/${result.requested} last_active actualizados, ${result.activeFeaturedUsers} destacados`
-  );
-  return result;
-}
-
-// ── Admin: POST /api/admin/rotate-fake-online ───────────
-async function handleAdminRotateFakeOnline(request, env) {
-  const auth = await authenticate(request, env);
-  if (!auth) return error('No autorizado', 401);
-  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
-  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
-
-  const body = await request.json().catch(() => ({}));
-  const result = await rotateFakeOnlineUsers(env, {
-    count: body.count,
-    windowMinutes: body.window_minutes ?? body.windowMinutes,
-    excludeRecentMinutes: body.exclude_recent_minutes ?? body.excludeRecentMinutes,
-    source: 'admin',
-  });
-
-  return json(result);
-}
-
 // ── Admin: GET /api/admin/users ─────────────────────────
 async function handleAdminGetUsers(request, env) {
   const auth = await authenticate(request, env);
@@ -11294,7 +11117,6 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/admin/coins' && method === 'POST') return handleAdminAddCoins(request, env);
   if (path === '/api/admin/remove-all-vip' && method === 'POST') return handleAdminRemoveAllVip(request, env);
   if (path === '/api/admin/reset-all-coins' && method === 'POST') return handleAdminResetAllCoins(request, env);
-  if (path === '/api/admin/rotate-fake-online' && method === 'POST') return handleAdminRotateFakeOnline(request, env);
   if (path === '/api/admin/profiles/snapshots' && method === 'GET') return handleAdminGetProfileSnapshots(request, env);
   if (path === '/api/admin/profiles/snapshots/rebuild' && method === 'POST') return handleAdminRebuildProfileSnapshots(request, env);
   if (path === '/api/admin/chat-cleanup' && method === 'POST') return handleAdminChatCleanup(request, env);
@@ -11429,32 +11251,5 @@ export default {
       }
       return errRes;
     }
-  },
-  async scheduled(controller, env, ctx) {
-    ctx.waitUntil((async () => {
-      try {
-        await runScheduledFakeOnlineRotation(env, controller);
-      } catch (err) {
-        console.error('[cron] fake online rotation failed:', err?.message || err, err?.stack || '');
-        await persistErrorLog(env, {
-          source: 'worker',
-          level: 'error',
-          message: truncateLogValue(err?.message || 'Scheduled fake online rotation failed', 1200),
-          stack: truncateLogValue(err?.stack || '', 12000),
-          route: 'scheduled:fake-online-rotation',
-          method: 'CRON',
-          statusCode: 500,
-          userId: null,
-          requestId: `cron:${controller?.scheduledTime || Date.now()}`,
-          ip: '',
-          userAgent: '',
-          meta: {
-            kind: 'scheduled_exception',
-            cron: controller?.cron || '',
-            scheduledTime: controller?.scheduledTime || null,
-          },
-        });
-      }
-    })());
   },
 };
