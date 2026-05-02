@@ -2103,51 +2103,43 @@ async function selectSyntheticVisitCandidate(env, visitedUser, { allowRebuild = 
   const roleValues = getSyntheticVisitRoleValues(visitedUser);
   if (roleValues.length === 0) return null;
 
-  const windowKey = Math.floor(Date.now() / (SYNTHETIC_VISIT_COOLDOWN_MINUTES * 60_000));
-  const seed = hashStringToUint32(`${visitedUser.id}:${windowKey}`);
-  const maxPosition = Math.max(1, SYNTHETIC_VISIT_CANDIDATES_PER_ROLE * REGISTER_ROLE_IDS.length);
-  const startPosition = seed % maxPosition;
-  const rolePlaceholders = roleValues.map(() => '?').join(', ');
-  const baseBindings = [...roleValues, visitedUser.id, visitedUser.id, '-24 hours'];
-  const selectClause = `
-    SELECT c.user_id
-    FROM synthetic_visit_candidates c
-    JOIN users u ON u.id = c.user_id
-    WHERE c.role IN (${rolePlaceholders})
-      AND c.user_id != ?
-      AND COALESCE(u.fake, 0) = 1
-      AND u.status = 'verified'
-      AND COALESCE(u.account_status, 'active') = 'active'
-      AND NOT EXISTS (
-        SELECT 1
-        FROM profile_visits pv
-        WHERE pv.visitor_id = c.user_id
-          AND pv.visited_id = ?
-          AND pv.created_at >= datetime('now', ?)
-      )
-  `;
+  const candidateLimit = Math.min(
+    PROFILE_SNAPSHOT_FEED_MAX_WINDOW,
+    Math.max(120, SYNTHETIC_VISIT_CANDIDATES_PER_ROLE * Math.max(1, roleValues.length) * 2),
+  );
+  const candidates = await loadFakeProfileRowsFromSnapshots(env, {
+    roleValues,
+    limit: candidateLimit,
+    viewerId: visitedUser.id,
+  }).catch(() => null);
 
-  let row = await env.DB.prepare(`
-    ${selectClause}
-      AND c.rotation_position >= ?
-    ORDER BY c.rotation_position ASC
-    LIMIT 1
-  `).bind(...baseBindings, startPosition).first();
-
-  if (!row) {
-    row = await env.DB.prepare(`
-      ${selectClause}
-    ORDER BY c.rotation_position ASC
-    LIMIT 1
-    `).bind(...baseBindings).first();
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    if (allowRebuild) {
+      await rebuildProfileSnapshots(env, { source: 'synthetic-visits-missing-profile-snapshots' }).catch(() => null);
+      return selectSyntheticVisitCandidate(env, visitedUser, { allowRebuild: false });
+    }
+    return null;
   }
 
-  if (!row && allowRebuild) {
-    await rebuildSyntheticVisitCandidates(env);
-    return selectSyntheticVisitCandidate(env, visitedUser, { allowRebuild: false });
-  }
+  const recentRows = await env.DB.prepare(`
+    SELECT visitor_id
+    FROM profile_visits
+    WHERE visited_id = ?
+      AND created_at >= datetime('now', ?)
+    ORDER BY created_at DESC
+    LIMIT 250
+  `).bind(visitedUser.id, '-24 hours').all().catch(() => ({ results: [] }));
+  const recentVisitors = new Set((recentRows?.results || [])
+    .map((row) => String(row?.visitor_id || ''))
+    .filter(Boolean));
 
-  return row?.user_id || null;
+  const visitedUserId = String(visitedUser.id || '');
+  const candidate = candidates.find((row) => {
+    const id = String(row?.id || '');
+    return id && id !== visitedUserId && !recentVisitors.has(id);
+  });
+
+  return candidate?.id || null;
 }
 
 async function maybeAddSyntheticDashboardVisit(env, user) {
