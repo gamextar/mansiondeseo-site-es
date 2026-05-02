@@ -4023,7 +4023,9 @@ async function handleProfiles(request, env) {
     30_000,
     () => env.DB.prepare('SELECT user_id, video_url, COALESCE(vip_only, 0) AS vip_only FROM stories WHERE active = 1 ORDER BY created_at DESC').all().then(r => r.results).catch(() => [])
   );
-  const countQuery = query.replace(/SELECT[\s\S]+?FROM users u/, 'SELECT COUNT(*) AS total FROM users u');
+  const countQuery = query
+    .replace(/SELECT[\s\S]+?FROM users u/, 'SELECT COUNT(*) AS total FROM users u')
+    .replace(/\s+LEFT JOIN profile_stats ps ON ps\.user_id = u\.id\s+/g, '\n');
   const snapshotStartedAt = Date.now();
   const feedSnapshotDataPromise = (canUseFeedSnapshot
     ? cached(feedSnapshotCacheKey, FEED_SNAPSHOT_TTL_MS, async () => {
