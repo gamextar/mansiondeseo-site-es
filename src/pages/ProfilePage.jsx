@@ -73,18 +73,6 @@ function detectStandaloneMobile() {
   return Boolean(standalone && isMobile);
 }
 
-function timeAgo(dateStr) {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr + 'Z').getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Justo ahora';
-  if (mins < 60) return `Hace ${mins} min`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `Hace ${hrs}h`;
-  const days = Math.floor(hrs / 24);
-  return `Hace ${days}d`;
-}
-
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { setRegistered, setUser, user, siteSettings } = useAuth();
@@ -881,43 +869,6 @@ export default function ProfilePage() {
                     <p className="text-text-dim">de {g.sender_name}</p>
                   </div>
                 </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── Recent Visitors (mobile only) ── */}
-        {visitors.length > 0 && (
-          <motion.div variants={fadeUp} className="mb-6 lg:hidden">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-3">
-              Visitas recientes
-            </h3>
-            <div className="space-y-1.5">
-              {visitors.map((v, i) => (
-                <motion.button
-                  key={v.id}
-                  initial={{ opacity: 0, x: -12 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  onClick={() => navigate(`/perfiles/${v.id}`, { state: { preview: { id: v.id, name: v.name, age: v.age, city: v.city, province: v.province, locality: v.locality, role: v.role, photos: [], avatar_url: v.avatar_url, avatar_crop: v.avatar_crop || null, online: v.online, premium: v.premium } } })}
-                  className="w-full flex items-center gap-3 p-3 rounded-2xl bg-mansion-card/30 hover:bg-mansion-card/60 transition-all group"
-                >
-                  <div className="w-10 h-10 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0">
-                    {v.avatar_url ? (
-                      <AvatarImg src={v.avatar_url} crop={v.avatar_crop} alt={v.name} className="w-full h-full" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-text-dim">
-                        <Camera className="w-4 h-4" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 text-left min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">{v.name}</p>
-                    <p className="text-xs text-text-dim truncate">Te visitó {timeAgo(v.visited_at).toLowerCase()}</p>
-                  </div>
-                  {v.online && <span className="w-2.5 h-2.5 rounded-full bg-green-400 flex-shrink-0 animate-pulse-slow" />}
-                  <ChevronRight className="w-4 h-4 text-text-dim flex-shrink-0" />
-                </motion.button>
               ))}
             </div>
           </motion.div>
