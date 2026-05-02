@@ -341,7 +341,7 @@ export default function DashboardPage() {
             <Sparkles className="h-3.5 w-3.5" />
             Inicio
           </div>
-          <div className="grid gap-3 lg:mt-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
+          <div className="grid gap-3 lg:mt-5">
             <div>
               <h1 className="font-display text-[1.9rem] font-semibold leading-[1.03] text-text-primary sm:text-6xl">
                 Bienvenido a la Mansión..
@@ -349,9 +349,6 @@ export default function DashboardPage() {
               <p className="mt-2 max-w-2xl text-sm leading-6 text-text-muted lg:mt-4">
                 Tu actividad reciente, señales importantes y perfiles guardados en un solo lugar.
               </p>
-            </div>
-            <div className="hidden border-l border-mansion-gold/25 pl-5 text-sm leading-6 text-text-muted lg:block">
-              <span className="text-mansion-gold">Actividad privada.</span> Métricas claras para volver rápido a lo que importa.
             </div>
           </div>
         </motion.header>

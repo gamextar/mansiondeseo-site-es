@@ -8321,20 +8321,51 @@ async function selectFillFakeStoryRows(env, { excludeUserIds = [], limit = FAKE_
   const excludedClause = excluded.length > 0
     ? `AND u.id NOT IN (${excluded.map(() => '?').join(', ')})`
     : '';
-  const bindings = [...excluded, Math.max(safeLimit * 3, safeLimit)];
+  const candidateLimit = Math.min(2000, Math.max(safeLimit * 30, 500));
+  const bindings = [...excluded, candidateLimit, Math.max(safeLimit * 2, safeLimit)];
   const { results } = await env.DB.prepare(`
+    WITH candidate_users AS (
+      SELECT u.id
+      FROM users u
+      WHERE COALESCE(u.fake, 0) = 1
+        AND u.status = 'verified'
+        AND COALESCE(u.account_status, 'active') = 'active'
+        AND EXISTS (
+          SELECT 1 FROM stories story_probe
+          WHERE story_probe.user_id = u.id
+            AND story_probe.active = 1
+        )
+        ${excludedClause}
+      ORDER BY COALESCE(u.feed_priority, 0) DESC, u.last_active DESC, u.id DESC
+      LIMIT ?
+    )
     ${getStoryFeedSelectClause()}
-    FROM users u
+    FROM candidate_users cu
+    JOIN users u ON u.id = cu.id
     JOIN stories s ON s.user_id = u.id
     LEFT JOIN profile_stats ps ON ps.user_id = u.id
-    WHERE COALESCE(u.fake, 0) = 1
-      AND u.status = 'verified'
-      AND COALESCE(u.account_status, 'active') = 'active'
-      AND s.active = 1
-      ${excludedClause}
-    ORDER BY COALESCE(u.feed_priority, 0) DESC, u.last_active DESC, COALESCE(ps.visits_total, 0) DESC, RANDOM()
+    WHERE s.active = 1
+    ORDER BY COALESCE(u.feed_priority, 0) DESC, u.last_active DESC, COALESCE(ps.visits_total, 0) DESC, s.created_at DESC, s.id DESC
     LIMIT ?
   `).bind(...bindings).all();
+
+  return uniqueStoryRows(results || [], safeLimit);
+}
+
+async function selectExistingFakeStoryRotationRows(env, { excludeUserIds = [], limit = FAKE_STORY_ROTATION_POOL_SIZE } = {}) {
+  const safeLimit = parseIntegerSetting(limit, FAKE_STORY_ROTATION_POOL_SIZE, 1, 200);
+  const excluded = [...new Set((excludeUserIds || []).map((value) => String(value || '').trim()).filter(Boolean))].slice(0, 200);
+  const excludedClause = excluded.length > 0
+    ? `AND user_id NOT IN (${excluded.map(() => '?').join(', ')})`
+    : '';
+  const { results } = await env.DB.prepare(`
+    ${getStoryFeedSelectClause({ fromRotation: true })}
+    FROM fake_story_rotation
+    WHERE 1 = 1
+      ${excludedClause}
+    ORDER BY rotation_position ASC, rotated_at DESC, story_id DESC
+    LIMIT ?
+  `).bind(...excluded, safeLimit).all();
 
   return uniqueStoryRows(results || [], safeLimit);
 }
@@ -8392,14 +8423,22 @@ async function rebuildFakeStoryRotation(env, {
 
   const poolSize = parseIntegerSetting(count, FAKE_STORY_ROTATION_POOL_SIZE, 1, 200);
   const preferredRows = await selectFakeStoryRowsForUsers(env, preferredUserIds, poolSize);
-  const fillRows = preferredRows.length < poolSize
-    ? await selectFillFakeStoryRows(env, {
-        excludeUserIds: preferredRows.map((row) => row.user_id),
+  const preferredUserRowIds = preferredRows.map((row) => row.user_id);
+  const existingRows = preferredRows.length < poolSize
+    ? await selectExistingFakeStoryRotationRows(env, {
+        excludeUserIds: preferredUserRowIds,
         limit: poolSize - preferredRows.length,
       })
     : [];
+  const existingUserRowIds = existingRows.map((row) => row.user_id);
+  const fillRows = preferredRows.length + existingRows.length < poolSize
+    ? await selectFillFakeStoryRows(env, {
+        excludeUserIds: [...preferredUserRowIds, ...existingUserRowIds],
+        limit: poolSize - preferredRows.length - existingRows.length,
+      })
+    : [];
 
-  const rows = uniqueStoryRows([...preferredRows, ...fillRows], poolSize);
+  const rows = uniqueStoryRows([...preferredRows, ...existingRows, ...fillRows], poolSize);
   const rotatedAt = formatSqlDateFromMs(Date.now());
 
   const statements = [env.DB.prepare('DELETE FROM fake_story_rotation')];
@@ -8417,6 +8456,7 @@ async function rebuildFakeStoryRotation(env, {
     requested: poolSize,
     rotated: rows.length,
     preferred: preferredRows.length,
+    reused: existingRows.length,
   };
 }
 
