@@ -90,6 +90,7 @@ const FEED_PROFILE_LIMIT = 42;
 const FEED_SNAPSHOT_LIMIT = 180;
 const FEED_SNAPSHOT_TTL_MS = 300_000;
 const FEED_QUERY_EXPANSION_FACTOR = 4;
+const PROFILE_SNAPSHOT_FEED_MAX_WINDOW = 5000;
 const FEED_PROXIMITY_CITY_BOOST = 22;
 const FEED_PROXIMITY_REGION_BOOST = 10;
 const STORY_CIRCLE_FALLBACK_SIZE = 88;
@@ -4321,22 +4322,16 @@ async function handleProfiles(request, env) {
   const seekingKey = filterParts.length ? filterParts.sort().join(',') : 'all';
   const countryKey = settings.feedFilterByCountry ? country : 'all-countries';
   const geoKey = viewerGeo.cacheKey || 'no-geo';
-  const profilesCacheKey = `profiles:${seekingKey}:${countryKey}:${search}`;
-  const feedSnapshotCacheKey = `feed-snapshot:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}:${viewerCanWatchAllStories ? 'vip' : 'free'}:${geoKey}`;
   const windowLimit = cursor + reqPageSize;
   const pageWindowLimit = windowLimit + 1;
-  const dbLimit = roleBuckets.length > 1
-    ? Math.max(pageWindowLimit * FEED_QUERY_EXPANSION_FACTOR, reqPageSize * FEED_QUERY_EXPANSION_FACTOR)
-    : pageWindowLimit;
-  const canUseFeedSnapshot = !fresh && windowLimit <= FEED_SNAPSHOT_LIMIT;
-  const snapshotCacheHit = canUseFeedSnapshot && isFreshCached(feedSnapshotCacheKey);
-  const storyCacheHit = isFreshCached('active_story_users') || isFreshCached('active_story_users_real');
-  const countCacheHit = isFreshCached(`count:${profilesCacheKey}`);
-  const getAllStoryRows = () => cached(
-    'active_story_users',
-    30_000,
-    () => env.DB.prepare('SELECT user_id, video_url, COALESCE(vip_only, 0) AS vip_only FROM stories WHERE active = 1 ORDER BY created_at DESC').all().then(r => r.results).catch(() => [])
+  const snapshotWindowLimit = Math.min(
+    PROFILE_SNAPSHOT_FEED_MAX_WINDOW,
+    Math.max(pageWindowLimit, FEED_SNAPSHOT_LIMIT + 1),
   );
+  const feedSnapshotCacheKey = `feed-snapshot:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}:${viewerCanWatchAllStories ? 'vip' : 'free'}:${geoKey}:window:${snapshotWindowLimit}`;
+  const snapshotCacheHit = !fresh && isFreshCached(feedSnapshotCacheKey);
+  const storyCacheHit = isFreshCached('active_story_users') || isFreshCached('active_story_users_real');
+  const countCacheHit = false;
   const getRealStoryRows = () => cached(
     'active_story_users_real',
     30_000,
@@ -4349,79 +4344,47 @@ async function handleProfiles(request, env) {
       ORDER BY s.created_at DESC
     `).all().then(r => r.results).catch(() => [])
   );
-  const countQuery = query
-    .replace(/SELECT[\s\S]+?FROM users u/, 'SELECT COUNT(*) AS total FROM users u')
-    .replace(/\s+LEFT JOIN profile_stats ps ON ps\.user_id = u\.id\s+/g, '\n');
   const snapshotStartedAt = Date.now();
-  const feedSnapshotDataPromise = (canUseFeedSnapshot
-    ? cached(feedSnapshotCacheKey, FEED_SNAPSHOT_TTL_MS, async () => {
-        const snapshotWindowLimit = FEED_SNAPSHOT_LIMIT + 1;
-        const snapshotDbLimit = roleBuckets.length > 1
-          ? Math.max(
-              snapshotWindowLimit * FEED_QUERY_EXPANSION_FACTOR,
-              FEED_SNAPSHOT_LIMIT * FEED_QUERY_EXPANSION_FACTOR,
-            )
-          : snapshotWindowLimit;
-        const roleValues = [...new Set(filterParts.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])).filter((role) => SEEKING_ROLE_IDS.includes(role)))];
-        const fakeSnapshotLimit = Math.max(snapshotWindowLimit, Math.min(1000, snapshotDbLimit));
-        const fakeRowsPromise = loadFakeProfileRowsFromSnapshots(env, {
-          roleValues,
-          country: settings.feedFilterByCountry ? country : '',
-          search,
-          limit: fakeSnapshotLimit,
-          viewerId: auth.sub,
-          fresh,
-        });
-        const realSnapshotQuery = `${query} AND COALESCE(u.fake, 0) = 0 ORDER BY last_active DESC, u.id DESC`;
-        const [realRows, fakeRows, realStoryRows] = await Promise.all([
-          fetchRowsPerRoleBucket(env, realSnapshotQuery, params, roleBuckets, snapshotDbLimit),
-          fakeRowsPromise,
-          getRealStoryRows(),
-        ]);
-        const storyRows = fakeRows === null ? await getAllStoryRows() : realStoryRows;
-        const snapshotRows = fakeRows === null
-          ? await fetchRowsPerRoleBucket(env, `${query} ORDER BY last_active DESC, u.id DESC`, params, roleBuckets, snapshotDbLimit)
-          : [...realRows, ...fakeRows];
-        const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
-        const activeStoryUrlMap = new Map();
-        for (const row of (storyRows || [])) {
-          const userId = String(row.user_id);
-          if (!viewerCanWatchAllStories && Number(row.vip_only || 0) === 1) continue;
-          if (!activeStoryUrlMap.has(userId) && row.video_url) {
-            activeStoryUrlMap.set(userId, normalizeStoryVideoUrl(row.video_url, env));
-          }
-        }
-        const baseProfiles = buildFeedBaseProfiles(snapshotRows, env, activeStoryUserIds, activeStoryUrlMap);
-        const orderedProfiles = orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, snapshotWindowLimit, viewerGeo);
-        return {
-          orderedProfiles,
-          totalProfiles: orderedProfiles.length,
-        };
-      })
-    : Promise.all([
-        fetchRowsPerRoleBucket(env, `${query} ORDER BY last_active DESC, u.id DESC`, params, roleBuckets, dbLimit),
-        getAllStoryRows(),
-      ]).then(([results, storyRows]) => {
-        const activeStoryUserIds = new Set((storyRows || []).map(r => String(r.user_id)));
-        const activeStoryUrlMap = new Map();
-        for (const row of (storyRows || [])) {
-          const userId = String(row.user_id);
-          if (!viewerCanWatchAllStories && Number(row.vip_only || 0) === 1) continue;
-          if (!activeStoryUrlMap.has(userId) && row.video_url) {
-            activeStoryUrlMap.set(userId, normalizeStoryVideoUrl(row.video_url, env));
-          }
-        }
-        const baseProfiles = buildFeedBaseProfiles(
-          (results || []).filter((u) => u.id !== auth.sub),
-          env,
-          activeStoryUserIds,
-          activeStoryUrlMap,
-        );
-        return {
-          orderedProfiles: orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, pageWindowLimit, viewerGeo),
-          totalProfiles: null,
-        };
-      }))
+  const buildSnapshotFeedData = async () => {
+    const realSnapshotLimit = Math.min(snapshotWindowLimit, 1000);
+    const roleValues = [...new Set(filterParts.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])).filter((role) => SEEKING_ROLE_IDS.includes(role)))];
+    const fakeRowsPromise = loadFakeProfileRowsFromSnapshots(env, {
+      roleValues,
+      country: settings.feedFilterByCountry ? country : '',
+      search,
+      limit: snapshotWindowLimit,
+      viewerId: auth.sub,
+      fresh,
+    });
+    const realSnapshotQuery = `${query} AND COALESCE(u.fake, 0) = 0 ORDER BY last_active DESC, u.id DESC`;
+    const [realRows, fakeRows, realStoryRows] = await Promise.all([
+      fetchRowsPerRoleBucket(env, realSnapshotQuery, params, roleBuckets, realSnapshotLimit),
+      fakeRowsPromise,
+      getRealStoryRows(),
+    ]);
+    const snapshotRows = fakeRows === null ? realRows : [...realRows, ...fakeRows];
+    if (fakeRows === null) {
+      console.warn('profile snapshots unavailable; returning real profiles only to avoid D1 fake scan');
+    }
+    const activeStoryUserIds = new Set((realStoryRows || []).map(r => String(r.user_id)));
+    const activeStoryUrlMap = new Map();
+    for (const row of (realStoryRows || [])) {
+      const userId = String(row.user_id);
+      if (!viewerCanWatchAllStories && Number(row.vip_only || 0) === 1) continue;
+      if (!activeStoryUrlMap.has(userId) && row.video_url) {
+        activeStoryUrlMap.set(userId, normalizeStoryVideoUrl(row.video_url, env));
+      }
+    }
+    const baseProfiles = buildFeedBaseProfiles(snapshotRows, env, activeStoryUserIds, activeStoryUrlMap);
+    const orderedProfiles = orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, snapshotWindowLimit, viewerGeo);
+    return {
+      orderedProfiles,
+      totalProfiles: orderedProfiles.length,
+    };
+  };
+  const feedSnapshotDataPromise = (fresh
+    ? buildSnapshotFeedData()
+    : cached(feedSnapshotCacheKey, FEED_SNAPSHOT_TTL_MS, buildSnapshotFeedData))
     .finally(() => {
       markTiming('snapshotMs', snapshotStartedAt);
     });
@@ -4440,11 +4403,7 @@ async function handleProfiles(request, env) {
       markTiming('favoritesMs', favoritesStartedAt);
     });
   const countStartedAt = Date.now();
-  const countPromise = (
-    canUseFeedSnapshot
-      ? Promise.resolve(null)
-      : cached(`count:${profilesCacheKey}`, 600_000, () => env.DB.prepare(countQuery).bind(...params).first())
-  ).finally(() => {
+  const countPromise = Promise.resolve(null).finally(() => {
     markTiming('countMs', countStartedAt);
   });
   const [{ orderedProfiles: orderedBaseProfiles, totalProfiles: snapshotTotalProfiles }, [viewerFavoritesRowSet, favoritedByRowSet], countRow] = await Promise.all([
@@ -4491,7 +4450,7 @@ async function handleProfiles(request, env) {
     ].join(', '),
     'X-Profiles-Cache': [
       `viewer:${viewerCacheHit ? 'hit' : 'miss'}`,
-      `snapshot:${snapshotCacheHit ? 'hit' : (canUseFeedSnapshot ? 'miss' : 'bypass')}`,
+      `snapshot:${snapshotCacheHit ? 'hit' : 'miss'}`,
       `stories:${storyCacheHit ? 'hit' : 'miss'}`,
       `count:${countCacheHit ? 'hit' : 'miss'}`,
     ].join(', '),
@@ -4513,7 +4472,7 @@ async function handleProfiles(request, env) {
       totalMs,
       cache: {
         viewer: viewerCacheHit ? 'hit' : 'miss',
-        snapshot: snapshotCacheHit ? 'hit' : (canUseFeedSnapshot ? 'miss' : 'bypass'),
+        snapshot: snapshotCacheHit ? 'hit' : 'miss',
         stories: storyCacheHit ? 'hit' : 'miss',
         count: countCacheHit ? 'hit' : 'miss',
       },
@@ -9699,7 +9658,7 @@ async function loadFakeProfileRowsFromSnapshots(env, {
   viewerId = '',
   fresh = false,
 } = {}) {
-  const safeLimit = parseIntegerSetting(limit, FEED_PROFILE_LIMIT, 1, 1000);
+  const safeLimit = parseIntegerSetting(limit, FEED_PROFILE_LIMIT, 1, PROFILE_SNAPSHOT_FEED_MAX_WINDOW);
   const manifest = await readProfileSnapshotJson(env, PROFILE_SNAPSHOT_MANIFEST_KEY, {
     ttlMs: 30_000,
     bypassCache: fresh,
