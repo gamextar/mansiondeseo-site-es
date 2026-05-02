@@ -57,6 +57,7 @@ let _conversationStateReady = null;
 let _messageConversationIdReady = null;
 let _messageAttachmentColumnsReady = null;
 let _userBrowseIndexesReady = null;
+let _userLookupIndexesReady = null;
 let _userFakeColumnReady = null;
 let _userFeedPriorityColumnReady = null;
 let _userDuplicateFlagColumnReady = null;
@@ -1180,6 +1181,27 @@ async function ensureUserBrowseIndexes(env) {
   }
 
   return _userBrowseIndexesReady;
+}
+
+async function ensureUserLookupIndexes(env) {
+  if (!_userLookupIndexesReady) {
+    _userLookupIndexesReady = Promise.all([
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS idx_users_username_lower_verified_real ON users(LOWER(username)) WHERE status = 'verified' AND COALESCE(fake, 0) = 0"
+      ).run(),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS idx_users_username_lower_verified_fake ON users(LOWER(username)) WHERE status = 'verified' AND COALESCE(fake, 0) = 1"
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_users_username_lower ON users(LOWER(username))'
+      ).run(),
+    ]).catch((err) => {
+      _userLookupIndexesReady = null;
+      throw err;
+    });
+  }
+
+  return _userLookupIndexesReady;
 }
 
 async function ensureUsersFakeColumn(env) {
@@ -3039,6 +3061,7 @@ async function handleRegister(request, env, ctx) {
   await Promise.all([
     ensureUsersMessageBlockRolesColumn(env),
     ensureUsersDeviceColumns(env),
+    ensureUserLookupIndexes(env),
   ]);
   const requestDevice = detectRequestDevice(request);
   const cfCity = String(request.cf?.city || '').trim();
@@ -3098,17 +3121,19 @@ async function handleRegister(request, env, ctx) {
     return error('El nombre de usuario solo puede contener letras, números, puntos y guiones bajos');
   }
 
+  const usernameLookupValue = usernameValue.toLowerCase();
+
   // Check duplicate username against real verified users; fake matches are allowed
   const conflictingRealUsername = await env.DB.prepare(
-    "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 0 LIMIT 1"
-  ).bind(usernameValue).first();
+    "SELECT id FROM users WHERE LOWER(username) = ? AND status = 'verified' AND COALESCE(fake, 0) = 0 LIMIT 1"
+  ).bind(usernameLookupValue).first();
   if (conflictingRealUsername) {
     return error('Este nombre de usuario ya está en uso. Elegí otro.', 409);
   }
 
   const conflictingFakeUsernames = await env.DB.prepare(
-    "SELECT id, COALESCE(feed_priority, 0) AS feed_priority FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 1"
-  ).bind(usernameValue).all();
+    "SELECT id, COALESCE(feed_priority, 0) AS feed_priority FROM users WHERE LOWER(username) = ? AND status = 'verified' AND COALESCE(fake, 0) = 1"
+  ).bind(usernameLookupValue).all();
 
   const conflictingFakeIds = (conflictingFakeUsernames?.results || [])
     .map((row) => row?.id)
@@ -3538,10 +3563,11 @@ async function handleCheckUsername(request, env) {
     return json({ exists: false, invalid: true });
   }
 
+  await ensureUserLookupIndexes(env);
   const existing = await env.DB.prepare(
-    "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND status = 'verified' AND COALESCE(fake, 0) = 0"
+    "SELECT id FROM users WHERE LOWER(username) = ? AND status = 'verified' AND COALESCE(fake, 0) = 0"
   )
-    .bind(usernameValue).first();
+    .bind(usernameValue.toLowerCase()).first();
 
   return json({ exists: !!existing });
 }
@@ -5898,9 +5924,10 @@ async function handleUpdateProfile(request, env) {
         if (!/^[a-zA-Z0-9._]+$/.test(nextUsername)) {
           return error('El nombre de usuario solo puede contener letras, números, puntos y guiones bajos', 400);
         }
+        await ensureUserLookupIndexes(env);
         const existingUsername = await env.DB.prepare(
-          "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ? AND status = 'verified' AND COALESCE(fake, 0) = 0 LIMIT 1"
-        ).bind(nextUsername, auth.sub).first();
+          "SELECT id FROM users WHERE LOWER(username) = ? AND id != ? AND status = 'verified' AND COALESCE(fake, 0) = 0 LIMIT 1"
+        ).bind(nextUsername.toLowerCase(), auth.sub).first();
         if (existingUsername) return error('Este nombre de usuario ya está en uso. Elegí otro.', 409);
         updates.push(`${field} = ?`);
         values.push(nextUsername);
@@ -7720,9 +7747,10 @@ async function handleAdminUpdateUser(request, env, userId) {
     if (!/^[a-zA-Z0-9._]+$/.test(nextUsername)) {
       return error('El nombre de usuario solo puede contener letras, números, puntos y guiones bajos', 400);
     }
+    await ensureUserLookupIndexes(env);
     const existingUsername = await env.DB.prepare(
-      'SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ? LIMIT 1'
-    ).bind(nextUsername, userId).first();
+      'SELECT id FROM users WHERE LOWER(username) = ? AND id != ? LIMIT 1'
+    ).bind(nextUsername.toLowerCase(), userId).first();
     if (existingUsername) return error('Este nombre de usuario ya está en uso.', 409);
     updates.push('username = ?');
     vals.push(nextUsername);
