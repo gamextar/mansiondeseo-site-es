@@ -9212,6 +9212,16 @@ function uniqueStoryRows(rows = [], limit = Infinity) {
   return output;
 }
 
+function shuffleStoryRows(rows = [], seedValue = Date.now()) {
+  const output = [...(rows || [])];
+  const random = createSeededRandom(seedValue);
+  for (let index = output.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [output[index], output[swapIndex]] = [output[swapIndex], output[index]];
+  }
+  return output;
+}
+
 async function selectFakeStoryRowsForUsers(env, userIds = [], limit = FAKE_STORY_ROTATION_POOL_SIZE) {
   const ids = [...new Set((userIds || []).map((value) => String(value || '').trim()).filter(Boolean))].slice(0, 200);
   if (ids.length === 0) return [];
@@ -9250,7 +9260,7 @@ async function selectFillFakeStoryRows(env, { excludeUserIds = [], limit = FAKE_
   const bindings = [...excluded, candidateLimit, Math.max(safeLimit * 2, safeLimit)];
   const { results } = await env.DB.prepare(`
     WITH candidate_users AS (
-      SELECT u.id
+      SELECT u.id, ABS(RANDOM()) AS random_rank
       FROM users u
       WHERE COALESCE(u.fake, 0) = 1
         AND u.status = 'verified'
@@ -9261,7 +9271,7 @@ async function selectFillFakeStoryRows(env, { excludeUserIds = [], limit = FAKE_
             AND story_probe.active = 1
         )
         ${excludedClause}
-      ORDER BY COALESCE(u.feed_priority, 0) DESC, u.last_active DESC, u.id DESC
+      ORDER BY COALESCE(u.feed_priority, 0) DESC, random_rank ASC
       LIMIT ?
     )
     ${getStoryFeedSelectClause()}
@@ -9270,7 +9280,7 @@ async function selectFillFakeStoryRows(env, { excludeUserIds = [], limit = FAKE_
     JOIN stories s ON s.user_id = u.id
     LEFT JOIN profile_stats ps ON ps.user_id = u.id
     WHERE s.active = 1
-    ORDER BY COALESCE(u.feed_priority, 0) DESC, u.last_active DESC, COALESCE(ps.visits_total, 0) DESC, s.created_at DESC, s.id DESC
+    ORDER BY COALESCE(u.feed_priority, 0) DESC, cu.random_rank ASC, s.created_at DESC, s.id DESC
     LIMIT ?
   `).bind(...bindings).all();
 
@@ -9349,25 +9359,27 @@ async function rebuildFakeStoryRotation(env, {
   const poolSize = parseIntegerSetting(count, FAKE_STORY_ROTATION_POOL_SIZE, 1, 200);
   const preferredRows = await selectFakeStoryRowsForUsers(env, preferredUserIds, poolSize);
   const preferredUserRowIds = preferredRows.map((row) => row.user_id);
-  const existingRows = preferredRows.length < poolSize
-    ? await selectExistingFakeStoryRotationRows(env, {
+  const fillRows = preferredRows.length < poolSize
+    ? await selectFillFakeStoryRows(env, {
         excludeUserIds: preferredUserRowIds,
         limit: poolSize - preferredRows.length,
       })
     : [];
-  const existingUserRowIds = existingRows.map((row) => row.user_id);
-  const fillRows = preferredRows.length + existingRows.length < poolSize
-    ? await selectFillFakeStoryRows(env, {
-        excludeUserIds: [...preferredUserRowIds, ...existingUserRowIds],
-        limit: poolSize - preferredRows.length - existingRows.length,
+  const fillUserRowIds = fillRows.map((row) => row.user_id);
+  const existingRows = preferredRows.length + fillRows.length < poolSize
+    ? await selectExistingFakeStoryRotationRows(env, {
+        excludeUserIds: [...preferredUserRowIds, ...fillUserRowIds],
+        limit: poolSize - preferredRows.length - fillRows.length,
       })
     : [];
 
-  const rows = uniqueStoryRows([...preferredRows, ...existingRows, ...fillRows], poolSize);
+  const rows = uniqueStoryRows([...preferredRows, ...fillRows, ...existingRows], poolSize);
   const rotatedAt = formatSqlDateFromMs(Date.now());
+  const rotationSeed = hashStringToUint32(`${source}:${rotatedAt}:${rows.map((row) => row.id || row.story_id).join('|')}`);
+  const rotatedRows = shuffleStoryRows(rows, rotationSeed);
 
   const statements = [env.DB.prepare('DELETE FROM fake_story_rotation')];
-  rows.forEach((row, index) => {
+  rotatedRows.forEach((row, index) => {
     statements.push(buildFakeStoryRotationInsert(env, row, index + 1, rotatedAt));
   });
 
@@ -9376,11 +9388,12 @@ async function rebuildFakeStoryRotation(env, {
   }
 
   _cache.delete('fake-story-rotation-empty');
-  console.log(`🔧 Fake story rotation (${source}) — ${rows.length}/${poolSize} stories`);
+  console.log(`🔧 Fake story rotation (${source}) — ${rotatedRows.length}/${poolSize} stories`);
   return {
     requested: poolSize,
-    rotated: rows.length,
+    rotated: rotatedRows.length,
     preferred: preferredRows.length,
+    filled: fillRows.length,
     reused: existingRows.length,
   };
 }
