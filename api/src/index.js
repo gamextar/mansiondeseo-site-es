@@ -7499,7 +7499,7 @@ async function handleAdminUpdateUser(request, env, userId) {
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
 
-  const user = await env.DB.prepare('SELECT id, avatar_url, avatar_thumb_url, avatar_crop, photos, photo_thumbs FROM users WHERE id = ?').bind(userId).first();
+  const user = await env.DB.prepare('SELECT id, username, avatar_url, avatar_thumb_url, avatar_crop, photos, photo_thumbs FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
 
   const body = await request.json();
@@ -7516,6 +7516,22 @@ async function handleAdminUpdateUser(request, env, userId) {
 
   if (body.premium !== undefined) { updates.push('premium = ?'); vals.push(body.premium ? 1 : 0); }
   if (body.premium_until !== undefined) { updates.push('premium_until = ?'); vals.push(body.premium_until || null); }
+  if (body.username !== undefined) {
+    const nextUsername = String(body.username || '').trim();
+    if (!nextUsername) return error('Nombre de usuario requerido', 400);
+    if (nextUsername.length > USERNAME_MAX_LENGTH) {
+      return error(`El nombre de usuario no puede tener más de ${USERNAME_MAX_LENGTH} caracteres`, 400);
+    }
+    if (!/^[a-zA-Z0-9._]+$/.test(nextUsername)) {
+      return error('El nombre de usuario solo puede contener letras, números, puntos y guiones bajos', 400);
+    }
+    const existingUsername = await env.DB.prepare(
+      'SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ? LIMIT 1'
+    ).bind(nextUsername, userId).first();
+    if (existingUsername) return error('Este nombre de usuario ya está en uso.', 409);
+    updates.push('username = ?');
+    vals.push(nextUsername);
+  }
   if (body.is_admin !== undefined) {
     if (userId === auth.sub) return error('No puedes cambiar tu propio rol de admin', 400);
     updates.push('is_admin = ?'); vals.push(body.is_admin ? 1 : 0);

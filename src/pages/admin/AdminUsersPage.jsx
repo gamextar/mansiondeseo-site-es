@@ -9,6 +9,7 @@ import { optimizeAvatarThumbnailFromUrl, optimizeGalleryThumbnailFromUrl } from 
 const ADMIN_SELECTED_GALLERY_THUMB_BATCH_LIMIT = 20;
 const ADMIN_GALLERY_THUMB_USER_BATCH_LIMIT = 20;
 const ADMIN_AVATAR_THUMB_BATCH_LIMIT = 20;
+const ADMIN_USERNAME_MAX_LENGTH = 18;
 
 function timeAgo(dateStr) {
   if (!dateStr) return 'Nunca';
@@ -130,6 +131,7 @@ export default function AdminUsersPage() {
   const [searchInput, setSearchInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [usernameDraft, setUsernameDraft] = useState('');
   const [selectedLoading, setSelectedLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
@@ -196,6 +198,40 @@ export default function AdminUsersPage() {
       if (selected?.id === userId) setSelected(s => ({ ...s, ...data.user }));
     } catch (err) {
       alert(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUsernameSave = async (event) => {
+    event.preventDefault();
+    if (!selected?.id || actionLoading) return;
+    const nextUsername = usernameDraft.trim();
+    if (!nextUsername) {
+      alert('El nombre de usuario no puede estar vacío.');
+      return;
+    }
+    if (nextUsername.length > ADMIN_USERNAME_MAX_LENGTH) {
+      alert(`El nombre de usuario no puede tener más de ${ADMIN_USERNAME_MAX_LENGTH} caracteres.`);
+      return;
+    }
+    if (!/^[a-zA-Z0-9._]+$/.test(nextUsername)) {
+      alert('Solo se permiten letras, números, puntos y guiones bajos.');
+      return;
+    }
+    if (nextUsername.toLowerCase() === String(selected.username || '').toLowerCase()) {
+      setUsernameDraft(selected.username || '');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const data = await adminUpdateUser(selected.id, { username: nextUsername });
+      setUsers((prev) => prev.map((user) => (user.id === selected.id ? { ...user, ...data.user } : user)));
+      setSelected((prev) => (prev ? { ...prev, ...data.user } : prev));
+      setUsernameDraft(data.user.username || nextUsername);
+    } catch (err) {
+      alert(err.message || 'No se pudo cambiar el nombre de usuario');
     } finally {
       setActionLoading(false);
     }
@@ -274,6 +310,7 @@ export default function AdminUsersPage() {
 
   const openUserModal = useCallback(async (user) => {
     setSelected({ ...user, photos: Array.isArray(user.photos) ? user.photos : [] });
+    setUsernameDraft(user.username || '');
     setSelectedLoading(true);
     setGalleryEditing(false);
     setStoryCaption('');
@@ -281,6 +318,7 @@ export default function AdminUsersPage() {
     try {
       const data = await adminGetUser(user.id);
       setSelected(data.user);
+      setUsernameDraft(data.user?.username || '');
     } catch (err) {
       alert(err.message || 'Error al cargar el detalle del usuario');
     } finally {
@@ -290,6 +328,7 @@ export default function AdminUsersPage() {
 
   const closeUserModal = useCallback(() => {
     setSelected(null);
+    setUsernameDraft('');
     setSelectedLoading(false);
     setGalleryEditing(false);
     setGallerySaving(false);
@@ -1203,6 +1242,36 @@ export default function AdminUsersPage() {
                   <p className="text-text-muted text-[10px]">{timeAgo(selected.last_active)}</p>
                 </div>
               </div>
+
+              <form
+                onSubmit={handleUsernameSave}
+                className="rounded-2xl border border-mansion-border/20 bg-mansion-elevated/60 p-3"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <label className="min-w-0 flex-1">
+                    <span className="text-[10px] uppercase tracking-wider text-text-dim">Nombre de usuario</span>
+                    <input
+                      value={usernameDraft}
+                      onChange={(event) => setUsernameDraft(event.target.value)}
+                      maxLength={ADMIN_USERNAME_MAX_LENGTH}
+                      disabled={actionLoading}
+                      className="mt-1 w-full rounded-xl border border-mansion-border/25 bg-black/20 px-3 py-2 text-sm font-semibold text-text-primary outline-none transition-colors placeholder:text-text-dim focus:border-mansion-gold/45 disabled:opacity-60"
+                      placeholder="usuario"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={actionLoading || usernameDraft.trim().toLowerCase() === String(selected.username || '').toLowerCase()}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-mansion-gold/25 bg-mansion-gold/10 px-4 py-2 text-xs font-semibold text-mansion-gold transition-colors hover:bg-mansion-gold/15 disabled:opacity-50"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Guardar
+                  </button>
+                </div>
+                <p className="mt-2 text-[11px] text-text-dim">
+                  Máximo {ADMIN_USERNAME_MAX_LENGTH} caracteres. Letras, números, puntos y guiones bajos.
+                </p>
+              </form>
 
               {/* Status badges */}
               <div className="flex flex-wrap gap-1.5">
