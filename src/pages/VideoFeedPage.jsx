@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X, Crown, Maximize2, Minimize2 } from 'lucide-react';
-import { getStories, recordStoryView, getPublicSettings, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { getStories, getStorySnapshotFeed, recordStoryView, getPublicSettings, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
@@ -1270,17 +1270,43 @@ export default function VideoFeedPage() {
   }, [isStandaloneMobileApp, standaloneMobileRoute]);
 
   const refreshStories = useCallback(async () => {
-    const data = await getStories({ focusUserId: requestedStoryUserId || '' });
-    const baseStories = mergeSeedStory(data.stories || [], requestedStorySeed);
+    let baseStories = [];
+    let loadedFromSnapshot = false;
+
+    try {
+      const snapshotData = await getStorySnapshotFeed({
+        limit: 60,
+        viewer: { id: user?.id || '', seeking: user?.seeking || [] },
+      });
+      if (Array.isArray(snapshotData?.stories) && snapshotData.stories.length > 0) {
+        baseStories = snapshotData.stories;
+        loadedFromSnapshot = true;
+      }
+    } catch {
+      // Fall back to the API path below; snapshots are the fast path.
+    }
+
+    let mergedStories = mergeSeedStory(baseStories, requestedStorySeed);
+    const hasRequestedStory = !requestedStoryUserId || findStoryIndexByUser(mergedStories, requestedStoryUserId) >= 0;
+
+    if (!loadedFromSnapshot || !hasRequestedStory) {
+      try {
+        const data = await getStories({ focusUserId: requestedStoryUserId || '' });
+        if (data.videoLimit) setStoryViewLimit(data.videoLimit);
+        mergedStories = mergeSeedStory(data.stories || [], requestedStorySeed);
+      } catch (err) {
+        if (!loadedFromSnapshot) throw err;
+      }
+    }
+
     const orderedStories = requestedStoryUserId
-      ? rotateStoriesToUser(baseStories, requestedStoryUserId)
-      : baseStories;
+      ? rotateStoriesToUser(mergedStories, requestedStoryUserId)
+      : mergedStories;
     const fresh = applyPendingStoryLikeState(orderedStories, getPendingStoryLikes());
     apiRespondedRef.current = true;
-    if (data.videoLimit) setStoryViewLimit(data.videoLimit);
     setStories(fresh);
     return fresh;
-  }, [requestedStorySeed, requestedStoryUserId]);
+  }, [requestedStorySeed, requestedStoryUserId, user?.id, user?.seeking]);
   useEffect(() => {
     let cancelled = false;
 

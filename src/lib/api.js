@@ -22,10 +22,12 @@ const CLIENT_CACHE_VERSION = 'media-paths-v7-avatar-race-fix';
 const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const STORY_SNAPSHOT_CACHE_PREFIX = 'mansion_story_snapshot:';
+const STORY_SNAPSHOT_SELECTION_CACHE_PREFIX = 'mansion_story_snapshot_feed:';
 const STORY_SNAPSHOT_MANIFEST_TTL_MS = 10 * 60_000;
 const STORY_SNAPSHOT_ASSET_TTL_MS = 24 * 60 * 60_000;
 const STORY_SNAPSHOT_FAKE_ROTATION_MS = 15 * 60_000;
 const STORY_SNAPSHOT_FAKE_LIMIT = 10;
+const STORY_SNAPSHOT_SHARED_LIMIT = 60;
 const STORY_SNAPSHOT_BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
 const STORY_SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const STORY_PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
@@ -1882,8 +1884,20 @@ function getStorySnapshotFakeWindowKey(now = Date.now()) {
   return Math.floor(now / STORY_SNAPSHOT_FAKE_ROTATION_MS);
 }
 
-export async function getStorySnapshotRail({ limit = 25, viewer = null, fresh = false } = {}) {
-  const safeLimit = Math.max(1, Math.min(200, Number(limit) || 25));
+function getStorySnapshotSelectionCacheKey({ viewerId = '', roleKey = 'all', version = '', fakeWindowKey = '' } = {}) {
+  const safeViewer = String(viewerId || 'anon').replace(/[^a-z0-9_-]/gi, '');
+  const safeRole = String(roleKey || 'all').replace(/[^a-z0-9_,.-]/gi, '');
+  const safeVersion = String(version || '').replace(/[^a-z0-9_-]/gi, '');
+  const safeWindow = String(fakeWindowKey || '').replace(/[^a-z0-9_-]/gi, '');
+  return `${STORY_SNAPSHOT_SELECTION_CACHE_PREFIX}${safeViewer}:${safeRole}:${safeVersion}:${safeWindow}`;
+}
+
+function getStorySnapshotSelectionTtlMs(now = Date.now()) {
+  const nextWindowAt = (getStorySnapshotFakeWindowKey(now) + 1) * STORY_SNAPSHOT_FAKE_ROTATION_MS;
+  return Math.max(30_000, nextWindowAt - now);
+}
+
+async function loadSharedStorySnapshotFeed({ viewer = null, fresh = false } = {}) {
   const viewerId = String(viewer?.id || viewer?.user_id || '').trim();
   const roleValues = getViewerStoryRoleValues(viewer);
   const roleKey = roleValues.length ? roleValues.slice().sort().join(',') : 'all';
@@ -1895,6 +1909,24 @@ export async function getStorySnapshotRail({ limit = 25, viewer = null, fresh = 
   });
   if (!manifest?.real?.key && !manifest?.fakes) return null;
 
+  const selectionCacheKey = getStorySnapshotSelectionCacheKey({
+    viewerId,
+    roleKey,
+    version: manifest.version || '',
+    fakeWindowKey,
+  });
+  if (!fresh) {
+    const cachedSelection = readStorySnapshotStorage(selectionCacheKey, getStorySnapshotSelectionTtlMs());
+    if (Array.isArray(cachedSelection?.stories) && cachedSelection.stories.length > 0) {
+      return {
+        ...cachedSelection,
+        snapshot: true,
+        fromLocalSelectionCache: true,
+      };
+    }
+  }
+
+  const sharedLimit = STORY_SNAPSHOT_SHARED_LIMIT;
   let realRows = [];
   const realFilename = getStorySnapshotFilename(manifest?.real);
   if (realFilename) {
@@ -1903,11 +1935,11 @@ export async function getStorySnapshotRail({ limit = 25, viewer = null, fresh = 
       (realSnapshot?.stories || [])
         .filter((story) => storyMatchesRoleValues(story, roleValues))
         .filter((story) => !viewerId || String(story?.user_id || '') !== viewerId),
-      safeLimit
+      sharedLimit
     );
   }
 
-  const fakeLimit = Math.max(0, Math.min(STORY_SNAPSHOT_FAKE_LIMIT, safeLimit - realRows.length));
+  const fakeLimit = Math.max(0, Math.min(STORY_SNAPSHOT_FAKE_LIMIT, sharedLimit - realRows.length));
   let fakeRows = [];
   if (fakeLimit > 0) {
     const buckets = getStorySnapshotBucketsForRoleValues(roleValues);
@@ -1927,15 +1959,31 @@ export async function getStorySnapshotRail({ limit = 25, viewer = null, fresh = 
     fakeRows = uniqueStorySnapshotRows(shuffleStorySnapshotRows(fakePool, seed), fakeLimit);
   }
 
-  const stories = uniqueStorySnapshotRows([...realRows, ...fakeRows], safeLimit);
+  const stories = uniqueStorySnapshotRows([...realRows, ...fakeRows], sharedLimit);
   if (stories.length === 0) return null;
 
-  return {
+  const payload = {
     stories,
     snapshot: true,
     snapshotVersion: manifest.version || '',
     fakeWindowKey,
   };
+  writeStorySnapshotStorage(selectionCacheKey, payload);
+  return payload;
+}
+
+export async function getStorySnapshotFeed({ limit = STORY_SNAPSHOT_SHARED_LIMIT, viewer = null, fresh = false } = {}) {
+  const safeLimit = Math.max(1, Math.min(200, Number(limit) || STORY_SNAPSHOT_SHARED_LIMIT));
+  const payload = await loadSharedStorySnapshotFeed({ viewer, fresh });
+  if (!payload?.stories?.length) return null;
+  return {
+    ...payload,
+    stories: payload.stories.slice(0, safeLimit),
+  };
+}
+
+export async function getStorySnapshotRail(options = {}) {
+  return getStorySnapshotFeed(options);
 }
 
 export async function getStories({ page = 1, limit = 25, focusUserId = '', surface = '', fresh = false } = {}) {
@@ -1988,6 +2036,7 @@ function invalidateStoryFeedCache() {
     localStorage.removeItem('vf_stories');
     removeMatchingStorageKeys(localStorage, (key) => key.startsWith('mansion_home_stories:'));
     removeMatchingStorageKeys(localStorage, (key) => key.startsWith(STORY_SNAPSHOT_CACHE_PREFIX));
+    removeMatchingStorageKeys(localStorage, (key) => key.startsWith(STORY_SNAPSHOT_SELECTION_CACHE_PREFIX));
     removeMatchingStorageKeys(sessionStorage, (key) => key.startsWith('mansion_home_stories:'));
   } catch {}
   if (typeof window !== 'undefined') {
