@@ -937,8 +937,10 @@ async function refreshStaticSnapshotsForUserChange(env, beforeUser, afterUser = 
   const wasFake = Number(beforeUser?.fake || 0) === 1;
   const isFake = afterUser ? Number(afterUser.fake || 0) === 1 : wasFake;
   const activeStoryCount = await getUserActiveStoryCount(env, userId);
+  const includeReal = !wasFake || !isFake;
+  const includeFakes = wasFake || isFake;
 
-  await rebuildProfileSnapshots(env, { source });
+  await rebuildProfileSnapshots(env, { includeReal, includeFakes, source });
 
   if (activeStoryCount > 0) {
     await rebuildStorySnapshots(env, {
@@ -954,8 +956,12 @@ async function refreshStaticSnapshotsForUserChange(env, beforeUser, afterUser = 
   };
 }
 
-async function refreshProfileSnapshotsAndBumpFeed(env, { source = 'profile-snapshot-refresh' } = {}) {
-  await rebuildProfileSnapshots(env, { source });
+async function refreshProfileSnapshotsAndBumpFeed(env, {
+  includeReal = true,
+  includeFakes = true,
+  source = 'profile-snapshot-refresh',
+} = {}) {
+  await rebuildProfileSnapshots(env, { includeReal, includeFakes, source });
   await bumpFeedCacheVersion(env);
 }
 
@@ -2214,7 +2220,11 @@ async function selectSyntheticVisitCandidate(env, visitedUser, { allowRebuild = 
 
   if (!Array.isArray(candidates) || candidates.length === 0) {
     if (allowRebuild) {
-      await rebuildProfileSnapshots(env, { source: 'synthetic-visits-missing-profile-snapshots' }).catch(() => null);
+      await rebuildProfileSnapshots(env, {
+        includeReal: false,
+        includeFakes: true,
+        source: 'synthetic-visits-missing-profile-snapshots',
+      }).catch(() => null);
       return selectSyntheticVisitCandidate(env, visitedUser, { allowRebuild: false });
     }
     return null;
@@ -3175,7 +3185,11 @@ async function handleRegister(request, env, ctx) {
       _accountStatusCache.delete(id);
     });
     const conflictingFakeStoryCount = await getActiveStoryCountForUsers(env, conflictingFakeIds);
-    await rebuildProfileSnapshots(env, { source: 'register-fake-username-conflict' });
+    await rebuildProfileSnapshots(env, {
+      includeReal: false,
+      includeFakes: true,
+      source: 'register-fake-username-conflict',
+    });
     if (conflictingFakeStoryCount > 0) {
       await rebuildStorySnapshots(env, {
         includeReal: false,
@@ -8121,7 +8135,11 @@ async function handleAdminDeleteUser(request, env, userId) {
   if (!user) return error('Usuario no encontrado', 404);
 
   const deletion = await deleteUserCompletely(env, user);
-  await rebuildProfileSnapshots(env, { source: 'admin-delete-user' });
+  await rebuildProfileSnapshots(env, {
+    includeReal: !deletion.fake,
+    includeFakes: deletion.fake,
+    source: 'admin-delete-user',
+  });
   if (deletion.deletedPublicStories > 0) {
     await rebuildStorySnapshots(env, {
       includeReal: !deletion.fake,
@@ -8148,6 +8166,8 @@ async function handleAdminBulkDeleteUsers(request, env) {
 
   let deletedFakeStories = false;
   let deletedRealStories = false;
+  let deletedFakeProfiles = false;
+  let deletedRealProfiles = false;
   const results = [];
   for (const userId of userIds) {
     if (userId === auth.sub) {
@@ -8163,6 +8183,8 @@ async function handleAdminBulkDeleteUsers(request, env) {
 
     try {
       const deletion = await deleteUserCompletely(env, user);
+      if (deletion.fake) deletedFakeProfiles = true;
+      else deletedRealProfiles = true;
       if (deletion.deletedPublicStories > 0) {
         if (deletion.fake) deletedFakeStories = true;
         else deletedRealStories = true;
@@ -8173,7 +8195,11 @@ async function handleAdminBulkDeleteUsers(request, env) {
     }
   }
   if (results.some((item) => item.deleted)) {
-    await rebuildProfileSnapshots(env, { source: 'admin-bulk-delete-users' });
+    await rebuildProfileSnapshots(env, {
+      includeReal: deletedRealProfiles,
+      includeFakes: deletedFakeProfiles,
+      source: 'admin-bulk-delete-users',
+    });
     if (deletedFakeStories || deletedRealStories) {
       await rebuildStorySnapshots(env, {
         includeReal: deletedRealStories,
@@ -8629,7 +8655,11 @@ async function handleUalaPaymentConfirm(auth, env, paymentId, externalRef) {
     const newUntil = activatePremium(current?.premium_until, planId);
     await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, auth.sub).run();
     await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(paymentId), auth.sub, planId || '', data.amount || 0).run();
-    await refreshProfileSnapshotsAndBumpFeed(env, { source: 'uala-confirm-premium' });
+    await refreshProfileSnapshotsAndBumpFeed(env, {
+      includeReal: true,
+      includeFakes: false,
+      source: 'uala-confirm-premium',
+    });
     await updateSubscriptionPaymentLog(env, {
       userId: auth.sub,
       planId,
@@ -8707,7 +8737,11 @@ async function handleUalaApproved(request, env) {
       const newUntil = activatePremium(current?.premium_until, planId);
       await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, userId).run();
       await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(uuid), userId, planId, amount || 0).run();
-      await refreshProfileSnapshotsAndBumpFeed(env, { source: 'uala-webhook-premium' });
+      await refreshProfileSnapshotsAndBumpFeed(env, {
+        includeReal: true,
+        includeFakes: false,
+        source: 'uala-webhook-premium',
+      });
       await updateSubscriptionPaymentLog(env, {
         userId,
         planId,
@@ -8939,7 +8973,11 @@ async function handlePaymentApproved(request, env) {
       const newUntil = activatePremium(current?.premium_until, plan_id);
       await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, user_id).run();
       await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(payment_id), user_id, plan_id || '', amount || 0).run();
-      await refreshProfileSnapshotsAndBumpFeed(env, { source: 'mercadopago-webhook-premium' });
+      await refreshProfileSnapshotsAndBumpFeed(env, {
+        includeReal: true,
+        includeFakes: false,
+        source: 'mercadopago-webhook-premium',
+      });
       await updateSubscriptionPaymentLog(env, {
         userId: user_id,
         planId: plan_id,
@@ -9094,7 +9132,11 @@ async function handlePaymentConfirm(request, env) {
     const newUntil = activatePremium(current?.premium_until, planId);
     await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, auth.sub).run();
     await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(String(payment_id), auth.sub, planId || '', data.amount || 0).run();
-    await refreshProfileSnapshotsAndBumpFeed(env, { source: 'mercadopago-confirm-premium' });
+    await refreshProfileSnapshotsAndBumpFeed(env, {
+      includeReal: true,
+      includeFakes: false,
+      source: 'mercadopago-confirm-premium',
+    });
     await updateSubscriptionPaymentLog(env, {
       userId: auth.sub,
       planId,
@@ -9630,6 +9672,10 @@ async function putProfileSnapshotJson(env, key, payload, { cacheControl = 'publi
   return new TextEncoder().encode(body).byteLength;
 }
 
+function sumProfileSnapshotManifestField(group = {}, field = 'count') {
+  return Object.values(group || {}).reduce((sum, item) => sum + Number(item?.[field] || 0), 0);
+}
+
 async function readProfileSnapshotJson(env, key, { ttlMs = 10 * 60_000, bypassCache = false } = {}) {
   const normalizedKey = String(key || '').trim();
   if (!normalizedKey) return null;
@@ -9674,6 +9720,23 @@ async function readProfileSnapshotJson(env, key, { ttlMs = 10 * 60_000, bypassCa
 
 async function buildFakeProfileSnapshotRows(env) {
   const { results } = await env.DB.prepare(`
+    WITH latest_public_story AS (
+      SELECT user_id, video_url
+      FROM (
+        SELECT
+          s.user_id,
+          s.video_url,
+          ROW_NUMBER() OVER (PARTITION BY s.user_id ORDER BY s.created_at DESC, s.id DESC) AS row_number
+        FROM stories s
+        JOIN users story_user ON story_user.id = s.user_id
+        WHERE s.active = 1
+          AND COALESCE(s.vip_only, 0) = 0
+          AND COALESCE(story_user.fake, 0) = 1
+          AND story_user.status = 'verified'
+          AND COALESCE(story_user.account_status, 'active') = 'active'
+      )
+      WHERE row_number = 1
+    )
     SELECT
       u.id,
       u.username,
@@ -9700,17 +9763,10 @@ async function buildFakeProfileSnapshotRows(env) {
       u.last_active,
       1 AS fake,
       COALESCE(ps.followers_total, 0) AS followers_total,
-      (
-        SELECT s.video_url
-        FROM stories s
-        WHERE s.user_id = u.id
-          AND s.active = 1
-          AND COALESCE(s.vip_only, 0) = 0
-        ORDER BY s.created_at DESC, s.id DESC
-        LIMIT 1
-      ) AS active_story_url
+      lps.video_url AS active_story_url
     FROM users u
     LEFT JOIN profile_stats ps ON ps.user_id = u.id
+    LEFT JOIN latest_public_story lps ON lps.user_id = u.id
     WHERE COALESCE(u.fake, 0) = 1
       AND u.status = 'verified'
       AND COALESCE(u.account_status, 'active') = 'active'
@@ -9728,6 +9784,23 @@ async function buildFakeProfileSnapshotRows(env) {
 
 async function buildRealProfileSnapshotRows(env) {
   const { results } = await env.DB.prepare(`
+    WITH latest_public_story AS (
+      SELECT user_id, video_url
+      FROM (
+        SELECT
+          s.user_id,
+          s.video_url,
+          ROW_NUMBER() OVER (PARTITION BY s.user_id ORDER BY s.created_at DESC, s.id DESC) AS row_number
+        FROM stories s
+        JOIN users story_user ON story_user.id = s.user_id
+        WHERE s.active = 1
+          AND COALESCE(s.vip_only, 0) = 0
+          AND COALESCE(story_user.fake, 0) = 0
+          AND story_user.status = 'verified'
+          AND COALESCE(story_user.account_status, 'active') = 'active'
+      )
+      WHERE row_number = 1
+    )
     SELECT
       u.id,
       u.username,
@@ -9754,17 +9827,10 @@ async function buildRealProfileSnapshotRows(env) {
       u.last_active,
       0 AS fake,
       COALESCE(ps.followers_total, 0) AS followers_total,
-      (
-        SELECT s.video_url
-        FROM stories s
-        WHERE s.user_id = u.id
-          AND s.active = 1
-          AND COALESCE(s.vip_only, 0) = 0
-        ORDER BY s.created_at DESC, s.id DESC
-        LIMIT 1
-      ) AS active_story_url
+      lps.video_url AS active_story_url
     FROM users u
     LEFT JOIN profile_stats ps ON ps.user_id = u.id
+    LEFT JOIN latest_public_story lps ON lps.user_id = u.id
     WHERE COALESCE(u.fake, 0) = 0
       AND u.status = 'verified'
       AND COALESCE(u.account_status, 'active') = 'active'
@@ -9780,27 +9846,56 @@ async function buildRealProfileSnapshotRows(env) {
   });
 }
 
-async function rebuildProfileSnapshots(env, { source = 'unknown' } = {}) {
+async function rebuildProfileSnapshots(env, {
+  includeReal = true,
+  includeFakes = true,
+  source = 'unknown',
+} = {}) {
   await ensureStoriesTable(env);
+  const rebuildReal = includeReal !== false;
+  const rebuildFakes = includeFakes !== false;
+  const previousManifest = await readProfileSnapshotJson(env, PROFILE_SNAPSHOT_MANIFEST_KEY, {
+    bypassCache: true,
+  }).catch(() => null);
+
+  if (!rebuildReal && !rebuildFakes) {
+    return previousManifest || {
+      schema: 1,
+      version: '',
+      updated_at: '',
+      source,
+      total_count: 0,
+      total_bytes: 0,
+      real_count: 0,
+      fake_count: 0,
+      real: {},
+      fakes: {},
+    };
+  }
+
   const version = getProfileSnapshotVersion();
   const updatedAt = formatSqlDateFromMs(Date.now());
   const [realRows, fakeRows] = await Promise.all([
-    buildRealProfileSnapshotRows(env),
-    buildFakeProfileSnapshotRows(env),
+    rebuildReal ? buildRealProfileSnapshotRows(env) : Promise.resolve(null),
+    rebuildFakes ? buildFakeProfileSnapshotRows(env) : Promise.resolve(null),
   ]);
   const realBucketMap = new Map(PROFILE_SNAPSHOT_BUCKETS.map((bucket) => [bucket, []]));
   const fakeBucketMap = new Map(PROFILE_SNAPSHOT_BUCKETS.map((bucket) => [bucket, []]));
 
-  for (const row of realRows) {
-    const bucket = getRoleBucketKey(row.role);
-    if (!realBucketMap.has(bucket)) realBucketMap.set(bucket, []);
-    realBucketMap.get(bucket).push(row);
+  if (rebuildReal) {
+    for (const row of realRows || []) {
+      const bucket = getRoleBucketKey(row.role);
+      if (!realBucketMap.has(bucket)) realBucketMap.set(bucket, []);
+      realBucketMap.get(bucket).push(row);
+    }
   }
 
-  for (const row of fakeRows) {
-    const bucket = getRoleBucketKey(row.role);
-    if (!fakeBucketMap.has(bucket)) fakeBucketMap.set(bucket, []);
-    fakeBucketMap.get(bucket).push(row);
+  if (rebuildFakes) {
+    for (const row of fakeRows || []) {
+      const bucket = getRoleBucketKey(row.role);
+      if (!fakeBucketMap.has(bucket)) fakeBucketMap.set(bucket, []);
+      fakeBucketMap.get(bucket).push(row);
+    }
   }
 
   const manifest = {
@@ -9810,69 +9905,79 @@ async function rebuildProfileSnapshots(env, { source = 'unknown' } = {}) {
     source,
     total_count: 0,
     total_bytes: 0,
-    real_count: realRows.length,
-    fake_count: fakeRows.length,
-    real: {},
-    fakes: {},
+    real_count: 0,
+    fake_count: 0,
+    real: rebuildReal ? {} : { ...(previousManifest?.real || {}) },
+    fakes: rebuildFakes ? {} : { ...(previousManifest?.fakes || {}) },
   };
 
-  for (const bucket of PROFILE_SNAPSHOT_BUCKETS) {
-    const realBucketRows = realBucketMap.get(bucket) || [];
-    const realSelectedRows = realBucketRows.map((row, index) => mapProfileSnapshotRow(row, env, { position: index + 1 }));
-    const realKey = getProfileSnapshotKey('real', version, bucket);
-    const realPayload = {
-      schema: 1,
-      kind: 'real-profiles',
-      bucket,
-      version,
-      updated_at: updatedAt,
-      count: realSelectedRows.length,
-      profiles: realSelectedRows,
-    };
-    const realBytes = await putProfileSnapshotJson(env, realKey, realPayload);
-    manifest.total_count += realSelectedRows.length;
-    manifest.total_bytes += realBytes;
-    manifest.real[bucket] = {
-      key: realKey,
-      url: getProfileSnapshotPublicUrl(env, realKey),
-      count: realSelectedRows.length,
-      bytes: realBytes,
-    };
-
-    const bucketRows = fakeBucketMap.get(bucket) || [];
-    const priorityRows = bucketRows.filter((row) => Number(row.feed_priority || 0) > 0);
-    const normalRows = bucketRows.filter((row) => Number(row.feed_priority || 0) <= 0);
-    const seed = hashStringToUint32(`fake-profile-snapshot:${bucket}:${version}:${bucketRows.length}`);
-    const selectedRows = [
-      ...shuffleStoryRows(priorityRows, seed),
-      ...shuffleStoryRows(normalRows, seed ^ 0xa5a5a5a5),
-    ].map((row, index) => mapProfileSnapshotRow(row, env, { position: index + 1 }));
-    const key = getProfileSnapshotKey('fake', version, bucket);
-    const payload = {
-      schema: 1,
-      kind: 'fake-profiles',
-      bucket,
-      version,
-      updated_at: updatedAt,
-      count: selectedRows.length,
-      profiles: selectedRows,
-    };
-    const bytes = await putProfileSnapshotJson(env, key, payload);
-    manifest.total_count += selectedRows.length;
-    manifest.total_bytes += bytes;
-    manifest.fakes[bucket] = {
-      key,
-      url: getProfileSnapshotPublicUrl(env, key),
-      count: selectedRows.length,
-      bytes,
-    };
+  if (rebuildReal) {
+    for (const bucket of PROFILE_SNAPSHOT_BUCKETS) {
+      const realBucketRows = realBucketMap.get(bucket) || [];
+      const realSelectedRows = realBucketRows.map((row, index) => mapProfileSnapshotRow(row, env, { position: index + 1 }));
+      const realKey = getProfileSnapshotKey('real', version, bucket);
+      const realPayload = {
+        schema: 1,
+        kind: 'real-profiles',
+        bucket,
+        version,
+        updated_at: updatedAt,
+        count: realSelectedRows.length,
+        profiles: realSelectedRows,
+      };
+      const realBytes = await putProfileSnapshotJson(env, realKey, realPayload);
+      manifest.real[bucket] = {
+        key: realKey,
+        url: getProfileSnapshotPublicUrl(env, realKey),
+        count: realSelectedRows.length,
+        bytes: realBytes,
+      };
+    }
   }
+
+  if (rebuildFakes) {
+    for (const bucket of PROFILE_SNAPSHOT_BUCKETS) {
+      const bucketRows = fakeBucketMap.get(bucket) || [];
+      const priorityRows = bucketRows.filter((row) => Number(row.feed_priority || 0) > 0);
+      const normalRows = bucketRows.filter((row) => Number(row.feed_priority || 0) <= 0);
+      const seed = hashStringToUint32(`fake-profile-snapshot:${bucket}:${version}:${bucketRows.length}`);
+      const selectedRows = [
+        ...shuffleStoryRows(priorityRows, seed),
+        ...shuffleStoryRows(normalRows, seed ^ 0xa5a5a5a5),
+      ].map((row, index) => mapProfileSnapshotRow(row, env, { position: index + 1 }));
+      const key = getProfileSnapshotKey('fake', version, bucket);
+      const payload = {
+        schema: 1,
+        kind: 'fake-profiles',
+        bucket,
+        version,
+        updated_at: updatedAt,
+        count: selectedRows.length,
+        profiles: selectedRows,
+      };
+      const bytes = await putProfileSnapshotJson(env, key, payload);
+      manifest.fakes[bucket] = {
+        key,
+        url: getProfileSnapshotPublicUrl(env, key),
+        count: selectedRows.length,
+        bytes,
+      };
+    }
+  }
+
+  manifest.real_count = sumProfileSnapshotManifestField(manifest.real, 'count');
+  manifest.fake_count = sumProfileSnapshotManifestField(manifest.fakes, 'count');
+  manifest.total_count = manifest.real_count + manifest.fake_count;
+  manifest.total_bytes = (
+    sumProfileSnapshotManifestField(manifest.real, 'bytes') +
+    sumProfileSnapshotManifestField(manifest.fakes, 'bytes')
+  );
 
   await putProfileSnapshotJson(env, PROFILE_SNAPSHOT_MANIFEST_KEY, manifest, {
     cacheControl: 'public, max-age=15, stale-while-revalidate=300',
   });
   invalidateFeedBrowseCache();
-  console.log(`🔧 Profile snapshots (${source}) — real ${manifest.real_count}, fakes ${manifest.fake_count}, bytes ${manifest.total_bytes}`);
+  console.log(`🔧 Profile snapshots (${source}) — real ${manifest.real_count}${rebuildReal ? '' : ' kept'}, fakes ${manifest.fake_count}${rebuildFakes ? '' : ' kept'}, bytes ${manifest.total_bytes}`);
   return manifest;
 }
 
@@ -9920,6 +10025,7 @@ async function loadProfileRowsFromSnapshots(env, {
   const normalizedCountry = String(country || '').trim().toUpperCase();
   const searchTerm = normalizeProfileSnapshotSearch(search);
   const buckets = getProfileSnapshotBucketsForRoles(expandedRoles);
+  const snapshotSeedKey = buckets.map((bucket) => manifestGroup?.[bucket]?.key || '').join('|') || manifest?.version || '';
   const snapshots = await Promise.all(buckets.map(async (bucket) => {
     const key = manifestGroup?.[bucket]?.key;
     if (!key) return [];
@@ -9949,7 +10055,7 @@ async function loadProfileRowsFromSnapshots(env, {
 
   const windowKey = Math.floor(Date.now() / PROFILE_SNAPSHOT_FAKE_ROTATION_MS);
   const roleKey = expandedRoles.length ? expandedRoles.sort().join(',') : 'all';
-  const seed = hashStringToUint32(`${viewerId || 'anon'}:${manifest.version || ''}:${roleKey}:${normalizedCountry}:${searchTerm}:${windowKey}:${rows.length}`);
+  const seed = hashStringToUint32(`${viewerId || 'anon'}:${snapshotSeedKey}:${roleKey}:${normalizedCountry}:${searchTerm}:${windowKey}:${rows.length}`);
   const selected = [
     ...shuffleStoryRows(priorityRows, seed),
     ...shuffleStoryRows(normalRows, seed ^ 0x9e3779b9),
