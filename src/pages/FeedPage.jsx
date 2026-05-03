@@ -19,7 +19,7 @@ const FEED_CACHE_VERSION = 2;
 const FEED_GLOBAL_VERSION_KEY = 'mansion_feed_cache_version';
 const HOME_STORIES_CACHE_PREFIX = 'mansion_home_stories:';
 const HOME_STORIES_CACHE_VERSION = 1;
-const HOME_STORIES_CACHE_TTL_MS = 10 * 60_000;
+const HOME_STORIES_CACHE_TTL_MS = 5 * 60_000;
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
 const DEFAULT_CARDS_PER_PAGE = 12;
@@ -93,6 +93,13 @@ function filterViewerStories(stories = [], viewerId = '') {
   const list = Array.isArray(stories) ? stories : [];
   if (!currentUserId) return list;
   return list.filter((story) => String(story?.user_id || '') !== currentUserId);
+}
+
+function getHomeStoriesSignature(stories = []) {
+  return (Array.isArray(stories) ? stories : [])
+    .map((story) => String(story?.story_id || story?.active_story_id || story?.id || story?.user_id || '').trim())
+    .filter(Boolean)
+    .join('|');
 }
 
 function getGridColumns() {
@@ -276,7 +283,7 @@ export default function FeedPage({ initialData }) {
   const loadIdRef = useRef(0);  // monotonic counter to discard stale responses
   const homeStoriesLoadIdRef = useRef(0);
   const homeStoriesInitialLoadRef = useRef(false);
-  const lastHomeStoriesRefreshRef = useRef(0);
+  const lastHomeStoriesRefreshRef = useRef(homeStories.length > 0 ? Date.now() : 0);
   const prefetchedBlocksRef = useRef(new Map());
   const prefetchInFlightRef = useRef(new Map());
   const storiesScrollRef = useRef(null);
@@ -307,6 +314,7 @@ export default function FeedPage({ initialData }) {
   const settingsRef = useRef(settings);
   const profilesLengthRef = useRef(profiles.length);
   const homeStoriesLengthRef = useRef(homeStories.length);
+  const homeStoriesSignatureRef = useRef(getHomeStoriesSignature(homeStories));
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -323,7 +331,8 @@ export default function FeedPage({ initialData }) {
 
   useEffect(() => {
     homeStoriesLengthRef.current = homeStories.length;
-  }, [homeStories.length]);
+    homeStoriesSignatureRef.current = getHomeStoriesSignature(homeStories);
+  }, [homeStories]);
 
 
 
@@ -426,6 +435,25 @@ export default function FeedPage({ initialData }) {
       ? null
       : getCachedHomeStoriesEntry(user?.id, isDesktopViewport, resolvedLimit);
 
+    const applyHomeStories = (stories, { timestamp = Date.now() } = {}) => {
+      const nextStories = filterViewerStories(stories, user?.id);
+      const nextRailStories = mapStoriesToRailProfiles(nextStories).slice(0, resolvedLimit);
+      const nextSignature = getHomeStoriesSignature(nextRailStories);
+      if (nextSignature !== homeStoriesSignatureRef.current || nextRailStories.length !== homeStoriesLengthRef.current) {
+        setHomeStories(nextRailStories);
+        homeStoriesSignatureRef.current = nextSignature;
+        homeStoriesLengthRef.current = nextRailStories.length;
+      }
+      if (syncBootstrap) setBootstrapStories(nextStories);
+      lastHomeStoriesRefreshRef.current = timestamp || Date.now();
+      return nextStories;
+    };
+
+    if (cachedEntry?.isFresh && cachedEntry?.stories?.length) {
+      const cachedStories = applyHomeStories(cachedEntry.stories, { timestamp: cachedEntry.timestamp });
+      if (cachedStories.length > 0) return cachedStories;
+    }
+
     try {
       const snapshotData = await getStorySnapshotFeed({
         limit: resolvedLimit,
@@ -437,10 +465,7 @@ export default function FeedPage({ initialData }) {
       const snapshotStories = filterViewerStories(snapshotData?.stories, user?.id);
       if (snapshotStories.length > 0) {
         setCachedHomeStories(user?.id, isDesktopViewport, snapshotStories, resolvedLimit);
-        setHomeStories(mapStoriesToRailProfiles(snapshotStories).slice(0, resolvedLimit));
-        if (syncBootstrap) setBootstrapStories(snapshotStories);
-        lastHomeStoriesRefreshRef.current = Date.now();
-        return snapshotStories;
+        return applyHomeStories(snapshotStories);
       }
     } catch {
       // Fall through to the API path; snapshots are an optimization.
@@ -450,10 +475,7 @@ export default function FeedPage({ initialData }) {
     if (cachedEntry?.stories?.length) {
       const cachedStories = filterViewerStories(cachedEntry.stories, user?.id);
       if (cachedStories.length > 0) {
-        setHomeStories(mapStoriesToRailProfiles(cachedStories).slice(0, resolvedLimit));
-        if (syncBootstrap) setBootstrapStories(cachedStories);
-        lastHomeStoriesRefreshRef.current = cachedEntry.timestamp || Date.now();
-        return cachedStories;
+        return applyHomeStories(cachedStories, { timestamp: cachedEntry.timestamp });
       }
     }
 
@@ -463,10 +485,7 @@ export default function FeedPage({ initialData }) {
 
       const nextStories = filterViewerStories(data?.stories, user?.id);
       setCachedHomeStories(user?.id, isDesktopViewport, nextStories, resolvedLimit);
-      setHomeStories(mapStoriesToRailProfiles(nextStories).slice(0, resolvedLimit));
-      if (syncBootstrap) setBootstrapStories(nextStories);
-      lastHomeStoriesRefreshRef.current = Date.now();
-      return nextStories;
+      return applyHomeStories(nextStories);
     } catch {
       if (myId !== homeStoriesLoadIdRef.current) return null;
       if (homeStoriesLengthRef.current === 0) {
@@ -474,7 +493,7 @@ export default function FeedPage({ initialData }) {
           getCachedHomeStoriesEntry(user?.id, isDesktopViewport, resolvedLimit, { allowStale: true })?.stories || [],
           user?.id
         );
-        setHomeStories(mapStoriesToRailProfiles(cachedStories).slice(0, resolvedLimit));
+        applyHomeStories(cachedStories);
       }
       return null;
     }
