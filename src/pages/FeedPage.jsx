@@ -29,6 +29,7 @@ const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const VIEWED_STORIES_APPLY_DELAY_MS = 520;
 const STORY_RAIL_REFRESH_INTERVAL_MS = 5 * 60_000;
 const STORY_RAIL_FOCUS_REFRESH_MIN_MS = 5 * 60_000;
+const VIDEO_FEED_ACTIVE_STORY_SEED_KEY = 'vf_active_story_seed';
 const STORIES_RAIL_TRANSITION = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
 const STORY_CIRCLE_FALLBACK_SIZE = 88;
 const STORY_CIRCLE_FALLBACK_BORDER_PERCENT = 4;
@@ -93,6 +94,14 @@ function filterViewerStories(stories = [], viewerId = '') {
   const list = Array.isArray(stories) ? stories : [];
   if (!currentUserId) return list;
   return list.filter((story) => String(story?.user_id || '') !== currentUserId);
+}
+
+function getRailStoryId(story) {
+  const userId = String(story?.user_id || '').trim();
+  const storyId = String(story?.story_id || story?.active_story_id || '').trim();
+  if (storyId) return storyId;
+  const rawId = String(story?.id || '').trim();
+  return rawId && rawId !== userId ? rawId : '';
 }
 
 function getHomeStoriesSignature(stories = []) {
@@ -1127,13 +1136,13 @@ export default function FeedPage({ initialData }) {
     const story = typeof storyOrUserId === 'object' && storyOrUserId !== null
       ? storyOrUserId
       : { user_id: storyOrUserId };
-    const storyId = String(story.story_id || story.id || '').trim();
     const userId = String(story.user_id || story.id || '').trim();
+    const storyId = getRailStoryId({ ...story, user_id: userId });
     const videoUrl = String(story.video_url || story.active_story_url || '').trim();
     const storySeed = userId && videoUrl
       ? {
           id: storyId || userId,
-          story_id: storyId || userId,
+          story_id: storyId,
           user_id: userId,
           video_url: videoUrl,
           caption: story.caption || '',
@@ -1153,6 +1162,13 @@ export default function FeedPage({ initialData }) {
       sessionStorage.removeItem(VIDEO_FEED_INDEX_KEY);
       if (storyId || userId || videoUrl) {
         sessionStorage.setItem(VIDEO_FEED_ACTIVE_STORY_KEY, JSON.stringify({ storyId, userId, videoUrl, source: 'rail' }));
+      }
+      if (storySeed) {
+        sessionStorage.setItem(VIDEO_FEED_ACTIVE_STORY_SEED_KEY, JSON.stringify({
+          source: 'rail',
+          timestamp: Date.now(),
+          story: storySeed,
+        }));
       }
     } catch {}
 
