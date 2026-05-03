@@ -1301,7 +1301,7 @@ async function refreshStaticSnapshotsForUserChange(env, beforeUser, afterUser = 
   }
 
   if (activeStoryCount > 0) {
-    const includeRealStories = includeReal;
+    const includeRealStories = includeReal && !realFeedItemsReady;
     if (includeRealStories || includeFakes) {
       await rebuildStorySnapshots(env, {
         includeReal: includeRealStories,
@@ -1313,7 +1313,7 @@ async function refreshStaticSnapshotsForUserChange(env, beforeUser, afterUser = 
 
   return {
     profileSnapshots: includeRealSnapshots || includeFakes,
-    storySnapshots: activeStoryCount > 0 && (includeReal || includeFakes),
+    storySnapshots: activeStoryCount > 0 && ((!realFeedItemsReady && includeReal) || includeFakes),
     realFeedItems: includeReal && realFeedItemsReady,
   };
 }
@@ -8515,11 +8515,13 @@ async function handleAdminDeleteUser(request, env, userId) {
     });
   }
   if (deletion.deletedPublicStories > 0) {
-    await rebuildStorySnapshots(env, {
-      includeReal: !deletion.fake,
-      includeFakes: deletion.fake,
-      source: 'admin-delete-user',
-    });
+    if (deletion.fake || !realFeedItemsReady) {
+      await rebuildStorySnapshots(env, {
+        includeReal: !deletion.fake,
+        includeFakes: deletion.fake,
+        source: 'admin-delete-user',
+      });
+    }
   }
   await bumpFeedCacheVersion(env);
 
@@ -8591,9 +8593,9 @@ async function handleAdminBulkDeleteUsers(request, env) {
         source: 'admin-bulk-delete-users',
       });
     }
-    if (deletedFakeStories || deletedRealStories) {
+    if (deletedFakeStories || (deletedRealStories && !realFeedItemsReady)) {
       await rebuildStorySnapshots(env, {
-        includeReal: deletedRealStories,
+        includeReal: deletedRealStories && !realFeedItemsReady,
         includeFakes: deletedFakeStories,
         source: 'admin-bulk-delete-users',
       });
@@ -11191,7 +11193,7 @@ async function loadStoriesPayload(request, env, options = {}) {
         viewerId: viewerId || '',
         focusUserId,
         fresh,
-        maxFakeRows: isRailSurface ? 10 : storyWindowLimit,
+        maxFakeRows: storyWindowLimit,
       })
     : null;
 
@@ -11677,8 +11679,9 @@ async function handleAdminUploadStory(request, env) {
   } else {
     if (await areRealFeedItemsReady(env)) {
       await syncRealStoryFeedItemsForUser(env, userId);
+    } else {
+      await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'admin-upload-story-real' });
     }
-    await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'admin-upload-story-real' });
   }
   await bumpFeedCacheVersion(env);
 
@@ -11720,8 +11723,9 @@ async function handleDeleteOwnStory(request, env, storyId) {
   } else {
     if (await areRealFeedItemsReady(env)) {
       await syncRealStoryFeedItemsForUser(env, auth.sub);
+    } else {
+      await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'delete-real-story' });
     }
-    await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'delete-real-story' });
   }
   await bumpFeedCacheVersion(env);
 
@@ -11769,12 +11773,13 @@ async function handleAdminDeleteStory(request, env, storyId) {
   } else {
     if (await areRealFeedItemsReady(env)) {
       await syncRealStoryFeedItemsForUser(env, story.user_id);
+    } else {
+      await rebuildStorySnapshots(env, {
+        includeReal: true,
+        includeFakes: false,
+        source: 'admin-delete-story',
+      });
     }
-    await rebuildStorySnapshots(env, {
-      includeReal: true,
-      includeFakes: false,
-      source: 'admin-delete-story',
-    });
   }
   await bumpFeedCacheVersion(env);
 
@@ -11814,12 +11819,13 @@ async function handleAdminUpdateStory(request, env, storyId) {
   } else {
     if (await areRealFeedItemsReady(env)) {
       await syncRealStoryFeedItemForStory(env, storyId);
+    } else {
+      await rebuildStorySnapshots(env, {
+        includeReal: true,
+        includeFakes: false,
+        source: 'admin-update-story',
+      });
     }
-    await rebuildStorySnapshots(env, {
-      includeReal: true,
-      includeFakes: false,
-      source: 'admin-update-story',
-    });
   }
   await bumpFeedCacheVersion(env);
   return json({ id: storyId, user_id: story.user_id, vip_only: vipOnly });
@@ -11992,8 +11998,9 @@ async function handleUploadStory(request, env) {
 
   if (await areRealFeedItemsReady(env)) {
     await syncRealStoryFeedItemsForUser(env, auth.sub);
+  } else {
+    await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'user-upload-story' });
   }
-  await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'user-upload-story' });
   await bumpFeedCacheVersion(env);
 
   return json({ id: storyId, video_url: videoUrl, caption, vip_only: vipOnly }, 201);

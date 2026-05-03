@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId, useMe
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X, Crown, Maximize2, Minimize2 } from 'lucide-react';
-import { getStories, getStorySnapshotFeed, recordStoryView, getPublicSettings, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { getStories, recordStoryView, getPublicSettings, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
@@ -1277,42 +1277,25 @@ export default function VideoFeedPage() {
   }, [isStandaloneMobileApp, standaloneMobileRoute]);
 
   const refreshStories = useCallback(async () => {
-    let baseStories = [];
-    let loadedFromSnapshot = false;
-
     try {
-      const snapshotData = await getStorySnapshotFeed({
+      const data = await getStories({
         limit: 60,
-        viewer: { id: user?.id || '', seeking: user?.seeking || [] },
+        focusUserId: requestedStoryUserId || '',
+        surface: 'video',
       });
-      if (Array.isArray(snapshotData?.stories) && snapshotData.stories.length > 0) {
-        baseStories = snapshotData.stories;
-        loadedFromSnapshot = true;
-      }
-    } catch {
-      // Fall back to the API path below; snapshots are the fast path.
+      if (data.videoLimit) setStoryViewLimit(data.videoLimit);
+      const mergedStories = mergeSeedStory(data.stories || [], requestedStorySeed);
+
+      const orderedStories = requestedStoryUserId
+        ? rotateStoriesToUser(mergedStories, requestedStoryUserId)
+        : mergedStories;
+      const fresh = applyPendingStoryLikeState(orderedStories, getPendingStoryLikes());
+      apiRespondedRef.current = true;
+      setStories(fresh);
+      return fresh;
+    } catch (err) {
+      throw err;
     }
-
-    let mergedStories = mergeSeedStory(baseStories, requestedStorySeed);
-    const hasRequestedStory = !requestedStoryUserId || findStoryIndexByUser(mergedStories, requestedStoryUserId) >= 0;
-
-    if (!loadedFromSnapshot || !hasRequestedStory) {
-      try {
-        const data = await getStories({ focusUserId: requestedStoryUserId || '' });
-        if (data.videoLimit) setStoryViewLimit(data.videoLimit);
-        mergedStories = mergeSeedStory(data.stories || [], requestedStorySeed);
-      } catch (err) {
-        if (!loadedFromSnapshot) throw err;
-      }
-    }
-
-    const orderedStories = requestedStoryUserId
-      ? rotateStoriesToUser(mergedStories, requestedStoryUserId)
-      : mergedStories;
-    const fresh = applyPendingStoryLikeState(orderedStories, getPendingStoryLikes());
-    apiRespondedRef.current = true;
-    setStories(fresh);
-    return fresh;
   }, [requestedStorySeed, requestedStoryUserId, user?.id, user?.seeking]);
   useEffect(() => {
     let cancelled = false;

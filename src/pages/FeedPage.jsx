@@ -7,7 +7,7 @@ import { useAuth } from '../lib/authContext';
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } };
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
-import { STORY_FEED_CACHE_INVALIDATED_EVENT, applyClientFakeOnline, getProfiles, getProfilesVersion, getStories, getStorySnapshotFeed, getToken } from '../lib/api';
+import { STORY_FEED_CACHE_INVALIDATED_EVENT, applyClientFakeOnline, getProfiles, getProfilesVersion, getStories, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
@@ -488,23 +488,6 @@ export default function FeedPage({ initialData }) {
     if (cachedEntry?.isFresh && cachedEntry?.stories?.length) {
       const cachedStories = applyHomeStories(cachedEntry.stories, { timestamp: cachedEntry.timestamp });
       if (cachedStories.length > 0) return cachedStories;
-    }
-
-    try {
-      const snapshotData = await getStorySnapshotFeed({
-        limit: resolvedLimit,
-        viewer: { id: user?.id || '', seeking: viewerSeeking, roleValues: viewerSeeking },
-        fresh,
-      });
-      if (myId !== homeStoriesLoadIdRef.current) return null;
-
-      const snapshotStories = filterViewerStories(snapshotData?.stories, user?.id);
-      if (snapshotStories.length > 0) {
-        setCachedHomeStories(user?.id, isDesktopViewport, snapshotStories, resolvedLimit, roleKey);
-        return applyHomeStories(snapshotStories);
-      }
-    } catch {
-      // Fall through to the API path; snapshots are an optimization.
     }
 
     if (myId !== homeStoriesLoadIdRef.current) return null;
