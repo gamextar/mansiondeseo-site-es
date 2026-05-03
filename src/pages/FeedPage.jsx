@@ -291,6 +291,8 @@ export default function FeedPage({ initialData }) {
     frameId: null,
     velocity: 0,
   });
+  const storiesSuppressClickRef = useRef(false);
+  const storiesSuppressClickTimerRef = useRef(null);
   const storiesBounceFrameRef = useRef(null);
   const storiesEdgeOffsetRef = useRef(0);
   const pendingViewedTimerRef = useRef(null);
@@ -606,6 +608,10 @@ export default function FeedPage({ initialData }) {
     if (mobileNavVisibilityTimerRef.current) {
       window.clearTimeout(mobileNavVisibilityTimerRef.current);
       mobileNavVisibilityTimerRef.current = null;
+    }
+    if (storiesSuppressClickTimerRef.current) {
+      window.clearTimeout(storiesSuppressClickTimerRef.current);
+      storiesSuppressClickTimerRef.current = null;
     }
   }, []);
 
@@ -1356,6 +1362,15 @@ export default function FeedPage({ initialData }) {
     }
     storiesMomentumRef.current.velocity = drag.moved ? drag.velocity : 0;
     if (drag.moved) {
+      storiesSuppressClickRef.current = true;
+      if (storiesSuppressClickTimerRef.current) {
+        window.clearTimeout(storiesSuppressClickTimerRef.current);
+      }
+      storiesSuppressClickTimerRef.current = window.setTimeout(() => {
+        storiesSuppressClickRef.current = false;
+        storiesDragRef.current.moved = false;
+        storiesSuppressClickTimerRef.current = null;
+      }, 180);
       startStoriesMomentum();
     } else {
       storiesMomentumRef.current.velocity = 0;
@@ -1369,16 +1384,26 @@ export default function FeedPage({ initialData }) {
 
   const handleStoriesClickCapture = useCallback((event) => {
     if (!desktopStoryRailEnhanced) return;
-    if (!storiesDragRef.current.moved) return;
+    if (!storiesSuppressClickRef.current && !storiesDragRef.current.moved) return;
     event.preventDefault();
     event.stopPropagation();
+    storiesSuppressClickRef.current = false;
     storiesDragRef.current.moved = false;
+    if (storiesSuppressClickTimerRef.current) {
+      window.clearTimeout(storiesSuppressClickTimerRef.current);
+      storiesSuppressClickTimerRef.current = null;
+    }
   }, [desktopStoryRailEnhanced]);
 
   useEffect(() => {
     if (desktopStoryRailEnhanced) return;
     stopStoriesMomentum();
     stopStoriesBounce();
+    if (storiesSuppressClickTimerRef.current) {
+      window.clearTimeout(storiesSuppressClickTimerRef.current);
+      storiesSuppressClickTimerRef.current = null;
+    }
+    storiesSuppressClickRef.current = false;
     storiesEdgeOffsetRef.current = 0;
     storiesDragRef.current.active = false;
     storiesDragRef.current.captured = false;
@@ -1391,6 +1416,10 @@ export default function FeedPage({ initialData }) {
   }, [desktopStoryRailEnhanced, storyCircleGap, syncStoriesRailTransform]);
 
   useEffect(() => () => {
+    if (storiesSuppressClickTimerRef.current) {
+      window.clearTimeout(storiesSuppressClickTimerRef.current);
+      storiesSuppressClickTimerRef.current = null;
+    }
     stopStoriesMomentum();
     stopStoriesBounce();
   }, [stopStoriesBounce, stopStoriesMomentum]);
