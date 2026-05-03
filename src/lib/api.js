@@ -499,7 +499,6 @@ function clearSiteStorageKeys(storage) {
     'conversations',
     'unreadCount',
     'vf_active_story',
-    'vf_active_story_seed',
     'vf_idx',
     'vf_prefetched',
     'vf_stories',
@@ -2041,14 +2040,13 @@ export async function getStorySnapshotRail(options = {}) {
   return getStorySnapshotFeed(options);
 }
 
-export async function getStories({ page = 1, limit = 25, focusUserId = '', focusStoryId = '', surface = '', fresh = false } = {}) {
+export async function getStories({ page = 1, limit = 25, focusUserId = '', surface = '', fresh = false } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (focusUserId) params.set('focus_user_id', focusUserId);
-  if (focusStoryId) params.set('focus_story_id', focusStoryId);
   if (surface) params.set('surface', surface);
   if (fresh) params.set('fresh', '1');
   const path = `/stories?${params}`;
-  if (focusUserId || focusStoryId || fresh) {
+  if (focusUserId || fresh) {
     // Reopening the same story reuses the same focus_user_id, and rail
     // background refreshes need the latest ordering.
     // Bypass shared cache/promise reuse on these paths to avoid stale modal/rail state.
@@ -2087,7 +2085,6 @@ function invalidateStoryFeedCache() {
     sessionStorage.setItem('mansion_feed_dirty', '1');
     sessionStorage.setItem('mansion_feed_force_refresh', '1');
     sessionStorage.removeItem('vf_idx');
-    sessionStorage.removeItem('vf_active_story_seed');
     sessionStorage.removeItem('appBootstrap');
     localStorage.removeItem('mansion_feed');
     localStorage.removeItem('vf_stories');

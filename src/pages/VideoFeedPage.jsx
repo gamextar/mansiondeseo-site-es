@@ -30,8 +30,6 @@ const VIEWED_STORY_SYNC_DELAY_MS = 320;
 const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
-const VIDEO_FEED_ACTIVE_STORY_SEED_KEY = 'vf_active_story_seed';
-const VIDEO_FEED_RAIL_SEED_TTL_MS = 2 * 60_000;
 const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 68;
 const VIDEO_FEED_RAIL_SOURCE = 'rail';
 
@@ -53,20 +51,11 @@ function getExpandedStorySideOffset(aspectRatio = 16 / 9) {
 
 function getStoryIdentity(story) {
   if (!story) return null;
+  const storyId = String(story.story_id || story.id || '').trim();
   const userId = String(story.user_id || '').trim();
-  const storyId = getPersistedStoryId(story);
   const videoUrl = String(story.video_url || '').trim();
   if (!storyId && !userId && !videoUrl) return null;
   return { storyId, userId, videoUrl };
-}
-
-function getPersistedStoryId(story) {
-  if (!story) return '';
-  const userId = String(story.user_id || '').trim();
-  const storyId = String(story.story_id || story.active_story_id || '').trim();
-  if (storyId) return storyId;
-  const rawId = String(story.id || '').trim();
-  return rawId && rawId !== userId ? rawId : '';
 }
 
 function readSavedVideoFeedStory() {
@@ -94,7 +83,7 @@ function findSavedStoryIndex(stories, savedStory) {
   const requireExactMatch = savedStory.source === VIDEO_FEED_RAIL_SOURCE;
 
   if (savedStoryId) {
-    const byStoryId = stories.findIndex((story) => getPersistedStoryId(story) === savedStoryId);
+    const byStoryId = stories.findIndex((story) => String(story?.story_id || story?.id || '').trim() === savedStoryId);
     if (byStoryId >= 0) {
       if (!requireExactMatch || !savedVideoUrl || String(stories[byStoryId]?.video_url || '').trim() === savedVideoUrl) return byStoryId;
     }
@@ -134,10 +123,9 @@ function normalizeStorySeed(seed) {
   const userId = String(seed.user_id || seed.id || '').trim();
   const videoUrl = String(seed.video_url || '').trim();
   if (!userId || !videoUrl) return null;
-  const storyId = getPersistedStoryId({ ...seed, user_id: userId });
   return {
-    id: storyId || userId,
-    story_id: storyId,
+    id: String(seed.story_id || seed.id || userId),
+    story_id: String(seed.story_id || seed.id || userId),
     user_id: userId,
     video_url: videoUrl,
     caption: String(seed.caption || ''),
@@ -153,28 +141,14 @@ function normalizeStorySeed(seed) {
   };
 }
 
-function readSavedVideoFeedStorySeed() {
-  try {
-    const raw = sessionStorage.getItem(VIDEO_FEED_ACTIVE_STORY_SEED_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || parsed.source !== VIDEO_FEED_RAIL_SOURCE) return null;
-    const timestamp = Number(parsed.timestamp || 0);
-    if (!timestamp || Date.now() - timestamp > VIDEO_FEED_RAIL_SEED_TTL_MS) return null;
-    return parsed.story || null;
-  } catch {
-    return null;
-  }
-}
-
 function mergeSeedStory(stories, seedStory) {
   const list = Array.isArray(stories) ? stories : [];
   if (!seedStory) return list;
-  const seedStoryId = getPersistedStoryId(seedStory);
+  const seedStoryId = String(seedStory.story_id || seedStory.id || '').trim();
   const seedUserId = String(seedStory.user_id || '').trim();
   const seedVideoUrl = String(seedStory.video_url || '').trim();
   const existingIndex = list.findIndex((story) => {
-    const storyId = getPersistedStoryId(story);
+    const storyId = String(story?.story_id || story?.id || '').trim();
     const userId = String(story?.user_id || '').trim();
     const videoUrl = String(story?.video_url || '').trim();
     if (seedStoryId && storyId && seedStoryId === storyId) return true;
@@ -823,12 +797,10 @@ function MobileOverlayButton({ onPress, scrollContainerRef, className = '', styl
 
 function MobileActionButtons({ story, onLike, onToggleMute, isMuted, navigate, scrollContainerRef, onGift, isOwnStory = false }) {
   const [burstTrigger, setBurstTrigger] = useState(0);
-  const storyId = getPersistedStoryId(story);
 
   const handleHeart = () => {
-    if (!storyId) return;
     setBurstTrigger(t => t + 1);
-    onLike(storyId);
+    onLike(story.id);
   };
 
   return (
@@ -919,12 +891,10 @@ function MobileStoryOverlay({ story, onLike, onToggleMute, isMuted, navigate, na
 
 function DesktopActionButtons({ story, onLike, navigate, onGift, isOwnStory = false }) {
   const [burstTrigger, setBurstTrigger] = useState(0);
-  const storyId = getPersistedStoryId(story);
 
   const handleHeart = () => {
-    if (!storyId) return;
     setBurstTrigger(t => t + 1);
-    onLike(storyId);
+    onLike(story.id);
   };
 
   return (
@@ -1025,9 +995,8 @@ export default function VideoFeedPage() {
   const lastScrollAtRef = useRef(0);
   const lastDesktopWheelAtRef = useRef(0);
 
-  const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || readSavedVideoFeedStorySeed());
-  const requestedStoryUserId = location.state?.storyUserId || requestedStorySeed?.user_id || null;
-  const requestedStoryId = getPersistedStoryId(requestedStorySeed);
+  const requestedStoryUserId = location.state?.storyUserId || null;
+  const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
   const backgroundLocation = location.state?.backgroundLocation || null;
   const initial = applyPendingStoryLikeState(mergeSeedStory([], requestedStorySeed), getPendingStoryLikes());
@@ -1095,7 +1064,7 @@ export default function VideoFeedPage() {
     setDesktopStoryExpandedAspect(normalizeLandscapeAspectRatio(aspectRatio));
   }, []);
   const isStoryBlockedByLimit = useCallback((story) => {
-    const storyId = getPersistedStoryId(story);
+    const storyId = String(story?.story_id || story?.id || '').trim();
     if (!storyId || user?.premium) return false;
     if (storyLimitBlock?.storyId && String(storyLimitBlock.storyId) === storyId) return true;
     if (!backendLimitActive || backendRemaining === null || backendRemaining > 0) return false;
@@ -1181,7 +1150,7 @@ export default function VideoFeedPage() {
   const activeStory = isDesktopViewport
     ? stories[desktopActiveIdx - 1] || stories[0] || null
     : infiniteStories[mobileOverlayIdx] || stories[0] || null;
-  const activeStoryId = getPersistedStoryId(activeStory);
+  const activeStoryId = String(activeStory?.story_id || activeStory?.id || '').trim();
   const activeStoryLimitBlocked = Boolean(activeStoryId && isStoryBlockedByLimit(activeStory));
 
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
@@ -1318,13 +1287,11 @@ export default function VideoFeedPage() {
     }
 
     let mergedStories = mergeSeedStory(baseStories, requestedStorySeed);
-    const hasRequestedStory = (!requestedStoryUserId && !requestedStoryId)
-      || (requestedStoryId && mergedStories.some((story) => getPersistedStoryId(story) === requestedStoryId))
-      || findStoryIndexByUser(mergedStories, requestedStoryUserId) >= 0;
+    const hasRequestedStory = !requestedStoryUserId || findStoryIndexByUser(mergedStories, requestedStoryUserId) >= 0;
 
     if (!loadedFromSnapshot || !hasRequestedStory) {
       try {
-        const data = await getStories({ focusUserId: requestedStoryUserId || '', focusStoryId: requestedStoryId || '' });
+        const data = await getStories({ focusUserId: requestedStoryUserId || '' });
         if (data.videoLimit) setStoryViewLimit(data.videoLimit);
         mergedStories = mergeSeedStory(data.stories || [], requestedStorySeed);
       } catch (err) {
@@ -1339,7 +1306,7 @@ export default function VideoFeedPage() {
     apiRespondedRef.current = true;
     setStories(fresh);
     return fresh;
-  }, [requestedStoryId, requestedStorySeed, requestedStoryUserId, user?.id, user?.seeking]);
+  }, [requestedStorySeed, requestedStoryUserId, user?.id, user?.seeking]);
   useEffect(() => {
     let cancelled = false;
 
@@ -1406,7 +1373,7 @@ export default function VideoFeedPage() {
   useEffect(() => {
     if (!activeStory?.user_id) return undefined;
 
-    const storyId = getPersistedStoryId(activeStory);
+    const storyId = String(activeStory.story_id || activeStory.id || '').trim();
     const storyUserId = activeStory.user_id;
     const markAllowedStoryViewed = () => {
       if (isOverlayPreview) {

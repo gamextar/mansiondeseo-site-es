@@ -10006,7 +10006,6 @@ async function loadStoryRowsFromSnapshots(env, {
   limit = 25,
   viewerId = '',
   focusUserId = '',
-  focusStoryId = '',
   fresh = false,
   maxFakeRows = 10,
 } = {}) {
@@ -10040,15 +10039,8 @@ async function loadStoryRowsFromSnapshots(env, {
   let rows = uniqueStoryRows([...realRows, ...selectedFakes], safeLimit);
 
   const requestedUserId = String(focusUserId || '').trim();
-  const requestedStoryId = String(focusStoryId || '').trim();
-  if ((requestedStoryId || requestedUserId) && !rows.some((row) => (
-    (requestedStoryId && String(row?.id || row?.story_id || '') === requestedStoryId)
-    || (requestedUserId && String(row?.user_id || '') === requestedUserId)
-  ))) {
-    const focusedSnapshotRow = [...realRows, ...fakeRows].find((row) => (
-      (requestedStoryId && String(row?.id || row?.story_id || '') === requestedStoryId)
-      || (requestedUserId && String(row?.user_id || '') === requestedUserId)
-    ));
+  if (requestedUserId && !rows.some((row) => String(row?.user_id || '') === requestedUserId)) {
+    const focusedSnapshotRow = [...realRows, ...fakeRows].find((row) => String(row?.user_id || '') === requestedUserId);
     if (focusedSnapshotRow) {
       rows = uniqueStoryRows([focusedSnapshotRow, ...rows], safeLimit + 1);
     }
@@ -10465,12 +10457,9 @@ async function loadRealStoryRowsForFeed(env, { roleValues = [], roleBuckets = []
   return results || [];
 }
 
-async function loadFocusedStoryRow(env, { focusUserId = '', focusStoryId = '' } = {}) {
+async function loadFocusedStoryRow(env, focusUserId) {
   const userId = String(focusUserId || '').trim();
-  const storyId = String(focusStoryId || '').trim();
-  if (!userId && !storyId) return null;
-  const focusWhere = storyId ? 's.id = ?' : 's.user_id = ?';
-  const focusValue = storyId || userId;
+  if (!userId) return null;
   return env.DB.prepare(`
     /* stories:materialized:focus */
     ${getStoryFeedSelectClause()}
@@ -10478,12 +10467,12 @@ async function loadFocusedStoryRow(env, { focusUserId = '', focusStoryId = '' } 
     JOIN users u ON u.id = s.user_id
     LEFT JOIN profile_stats ps ON ps.user_id = u.id
     WHERE s.active = 1
-      AND ${focusWhere}
+      AND s.user_id = ?
       AND u.status = 'verified'
       AND COALESCE(u.account_status, 'active') = 'active'
     ORDER BY s.created_at DESC, s.id DESC
     LIMIT 1
-  `).bind(focusValue).first();
+  `).bind(userId).first();
 }
 
 async function loadMaterializedStoryRows(env, {
@@ -10491,7 +10480,6 @@ async function loadMaterializedStoryRows(env, {
   roleBuckets = [],
   limit = 25,
   focusUserId = '',
-  focusStoryId = '',
   splitRealRowsByRole = false,
 } = {}) {
   await ensureStoriesTable(env);
@@ -10499,7 +10487,7 @@ async function loadMaterializedStoryRows(env, {
   const safeLimit = parseIntegerSetting(limit, 25, 1, 500);
   const [realRows, focusRow] = await Promise.all([
     loadRealStoryRowsForFeed(env, { roleValues, roleBuckets, limit: safeLimit, splitByRole: splitRealRowsByRole }),
-    (focusUserId || focusStoryId) ? loadFocusedStoryRow(env, { focusUserId, focusStoryId }) : Promise.resolve(null),
+    focusUserId ? loadFocusedStoryRow(env, focusUserId) : Promise.resolve(null),
   ]);
 
   const merged = focusRow ? [focusRow, ...(realRows || [])] : [...(realRows || [])];
@@ -10575,7 +10563,6 @@ async function loadStoriesPayload(request, env, options = {}) {
   const page = Math.max(1, parseInt(String(options.page ?? url.searchParams.get('page') ?? '1'), 10));
   const requestedLimit = Math.min(200, Math.max(1, parseInt(String(options.limit ?? url.searchParams.get('limit') ?? '20'), 10)));
   const focusUserId = String(options.focusUserId ?? url.searchParams.get('focus_user_id') ?? '').trim();
-  const focusStoryId = String(options.focusStoryId ?? url.searchParams.get('focus_story_id') ?? '').trim();
   const surface = String(options.surface ?? url.searchParams.get('surface') ?? 'video').trim().toLowerCase();
   const fresh = Boolean(options.fresh) || url.searchParams.get('fresh') === '1';
   const isRailSurface = surface === 'rail' || surface === 'home' || surface === 'feed';
@@ -10613,7 +10600,7 @@ async function loadStoriesPayload(request, env, options = {}) {
   const roleValues = [...new Set(roleFilters.flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role])))];
 
   const includeLiked = !isRailSurface;
-  const allowFocusWindow = (focusUserId || focusStoryId) && effectivePage === 1;
+  const allowFocusWindow = focusUserId && effectivePage === 1;
   const visibilityWindowLimit = !isRailSurface && !viewerCanWatchAllStories
     ? offset + (effectiveLimit * 3) + 1
     : offset + effectiveLimit + 1;
@@ -10623,7 +10610,7 @@ async function loadStoriesPayload(request, env, options = {}) {
   );
   const useMaterializedRows = effectivePage === 1;
   const storyRowsCacheKey = `story-rows:${surface || 'rail'}:${roleValues.length ? roleValues.slice().sort().join(',') : 'all'}:${storyWindowLimit}`;
-  const canCacheStoryRows = useMaterializedRows && !focusUserId && !focusStoryId && !fresh;
+  const canCacheStoryRows = useMaterializedRows && !focusUserId && !fresh;
 
   let orderedRows;
   let rowsNeedLikedSync = false;
@@ -10634,7 +10621,6 @@ async function loadStoriesPayload(request, env, options = {}) {
         limit: storyWindowLimit,
         viewerId: viewerId || '',
         focusUserId,
-        focusStoryId,
         fresh,
         maxFakeRows: isRailSurface ? 10 : storyWindowLimit,
       })
@@ -10642,11 +10628,8 @@ async function loadStoriesPayload(request, env, options = {}) {
 
   if (Array.isArray(snapshotRows)) {
     orderedRows = interleaveStoryRows(snapshotRows, roleBuckets, storyWindowLimit);
-    if ((focusUserId || focusStoryId) && !orderedRows.some((row) => (
-      (focusStoryId && String(row?.id || row?.story_id || '') === focusStoryId)
-      || (focusUserId && String(row?.user_id || '') === focusUserId)
-    ))) {
-      const focusRow = await loadFocusedStoryRow(env, { focusUserId, focusStoryId });
+    if (focusUserId && !orderedRows.some((row) => String(row?.user_id || '') === focusUserId)) {
+      const focusRow = await loadFocusedStoryRow(env, focusUserId);
       if (focusRow) orderedRows = uniqueStoryRows([focusRow, ...orderedRows], storyWindowLimit + 1);
     }
     if (!isRailSurface && !viewerCanWatchAllStories) {
@@ -10669,10 +10652,9 @@ async function loadStoriesPayload(request, env, options = {}) {
         roleBuckets,
         limit: storyWindowLimit,
         focusUserId,
-        focusStoryId,
         splitRealRowsByRole: !isRailSurface,
       });
-      if (fresh && !focusUserId && !focusStoryId) {
+      if (fresh && !focusUserId) {
         _cache.set(storyRowsCacheKey, { val: storyRows, exp: Date.now() + STORY_ROWS_CACHE_TTL_MS });
       }
     }
@@ -10705,10 +10687,7 @@ async function loadStoriesPayload(request, env, options = {}) {
         parts.push(' AND (COALESCE(s.vip_only, 0) = 0 OR s.user_id = ?)');
         values.push(viewerId || '');
       }
-      if (focusStoryId) {
-        parts.push(' AND s.id = ?');
-        values.push(focusStoryId);
-      } else if (focusUserId) {
+      if (focusUserId) {
         parts.push(' AND (s.user_id != ? OR ? = \'\' OR s.user_id = ?)');
         values.push(viewerId || '', viewerId || '', focusUserId);
       } else if (!isRailSurface && viewerId) {
@@ -10742,10 +10721,7 @@ async function loadStoriesPayload(request, env, options = {}) {
   }
 
   if (allowFocusWindow) {
-    const targetIndex = orderedRows.findIndex((row) => (
-      (focusStoryId && String(row?.id || row?.story_id || '') === focusStoryId)
-      || (focusUserId && String(row.user_id) === focusUserId)
-    ));
+    const targetIndex = orderedRows.findIndex((row) => String(row.user_id) === focusUserId);
     if (targetIndex >= 0) {
       offset = Math.max(0, targetIndex - Math.floor(effectiveLimit / 2));
     }
