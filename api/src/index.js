@@ -28,6 +28,7 @@ function invalidateFeedBrowseCache() {
       String(key).startsWith('story-rows:') ||
       String(key).startsWith('story-snapshot:') ||
       String(key).startsWith('profile-snapshot:') ||
+      String(key).startsWith('admin-users-count:') ||
       String(key) === 'active_story_users' ||
       String(key) === 'active_story_users_real'
     ) {
@@ -111,6 +112,7 @@ const PROFILE_SNAPSHOT_PREFIX = 'profile-snapshots';
 const PROFILE_SNAPSHOT_MANIFEST_KEY = `${PROFILE_SNAPSHOT_PREFIX}/manifest.json`;
 const PROFILE_SNAPSHOT_BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
 const PROFILE_SNAPSHOT_FAKE_ROTATION_MS = 5 * 60_000;
+const ADMIN_USERS_COUNT_TTL_MS = 120_000;
 const FREE_CHAT_RECIPIENT_LIMIT = 5;
 const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
 const SYNTHETIC_VISIT_COOLDOWN_MINUTES = 15;
@@ -6421,7 +6423,7 @@ async function handleGeoDefaults(request) {
 // ── GET /api/settings/public ─────────────────────────────
 // Returns non-sensitive settings (VIP prices, blur, etc.)
 async function handleGetPublicSettings(request, env) {
-  const settings = await loadSettings(env);
+  const settings = await cached('settings', 300_000, () => loadSettings(env));
   return json({ settings: getPublicSettingsPayload(settings) }, 200, {
     'Cache-Control': 'no-store, max-age=0',
   });
@@ -6518,7 +6520,7 @@ async function handleGetSettings(request, env) {
   // Check admin
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
-  const settings = await loadSettings(env);
+  const settings = await cached('settings', 300_000, () => loadSettings(env));
   return json({ settings });
 }
 
@@ -6625,7 +6627,7 @@ async function handleUpdateSettings(request, env) {
   // Invalidate settings cache so new values take effect immediately
   _cache.delete('settings');
   invalidateFeedBrowseCache();
-  const settings = await loadSettings(env);
+  const settings = await cached('settings', 300_000, () => loadSettings(env));
   return json({ settings });
 }
 
@@ -7086,14 +7088,18 @@ async function handleAdminGetUsers(request, env) {
     ORDER BY pu.created_at DESC, pu.id DESC
   `;
 
-  const countStmt = bindings.length
-    ? env.DB.prepare(countQuery).bind(...bindings)
-    : env.DB.prepare(countQuery);
+  const countCacheKey = `admin-users-count:${hashStringToUint32(JSON.stringify([countQuery, bindings]))}`;
+  const countPromise = cached(countCacheKey, ADMIN_USERS_COUNT_TTL_MS, async () => {
+    const row = bindings.length
+      ? await env.DB.prepare(countQuery).bind(...bindings).first()
+      : await env.DB.prepare(countQuery).first();
+    return { total: Number(row?.total || 0) };
+  });
   const dataStmt = bindings.length
     ? env.DB.prepare(dataQuery).bind(...bindings, limit, offset)
     : env.DB.prepare(dataQuery).bind(limit, offset);
 
-  const [countRes, dataRes] = await Promise.all([countStmt.first(), dataStmt.all()]);
+  const [countRes, dataRes] = await Promise.all([countPromise, dataStmt.all()]);
 
   return json({
     users: dataRes.results.map(u => {
@@ -8715,7 +8721,7 @@ async function handlePaymentCreate(request, env) {
   const numericAmount = parseFloat(amount);
   if (isNaN(numericAmount) || numericAmount <= 0) return error('amount inválido');
 
-  const settings = await loadSettings(env);
+  const settings = await cached('settings', 300_000, () => loadSettings(env));
   const isCoinPurchase = plan_id && plan_id.startsWith('coins_');
   const paymentGateway = settings.paymentGateway === 'uala_bis' ? 'uala_bis' : 'mercadopago';
   const paymentLogId = !isCoinPurchase
