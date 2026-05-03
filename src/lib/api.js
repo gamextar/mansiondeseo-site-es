@@ -26,6 +26,7 @@ const STORY_SNAPSHOT_SELECTION_CACHE_PREFIX = 'mansion_story_snapshot_feed_v4:';
 const STORY_SNAPSHOT_MANIFEST_TTL_MS = 10 * 60_000;
 const STORY_SNAPSHOT_ASSET_TTL_MS = 24 * 60 * 60_000;
 const STORY_SNAPSHOT_FAKE_ROTATION_MS = 5 * 60_000;
+const STORY_SNAPSHOT_FAKE_REFRESH_COUNT = 5;
 const STORY_SNAPSHOT_SHARED_LIMIT = 15;
 const STORY_SNAPSHOT_BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
 const STORY_SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
@@ -1963,9 +1964,69 @@ function getStorySnapshotSelectionCacheKey({ viewerId = '', roleKey = 'all', ver
   return `${STORY_SNAPSHOT_SELECTION_CACHE_PREFIX}${safeViewer}:${safeRole}:${safeVersion}:${safeWindow}`;
 }
 
+function getStorySnapshotSelectionStateKey({ viewerId = '', roleKey = 'all', version = '' } = {}) {
+  const safeViewer = String(viewerId || 'anon').replace(/[^a-z0-9_-]/gi, '');
+  const safeRole = String(roleKey || 'all').replace(/[^a-z0-9_,.-]/gi, '');
+  const safeVersion = String(version || '').replace(/[^a-z0-9_-]/gi, '');
+  return `${STORY_SNAPSHOT_SELECTION_CACHE_PREFIX}state:${safeViewer}:${safeRole}:${safeVersion}`;
+}
+
 function getStorySnapshotSelectionTtlMs(now = Date.now()) {
   const nextWindowAt = (getStorySnapshotFakeWindowKey(now) + 1) * STORY_SNAPSHOT_FAKE_ROTATION_MS;
   return Math.max(30_000, nextWindowAt - now);
+}
+
+function selectRollingStorySnapshotFakes({ fakePool = [], fakeLimit = 0, previousStories = [], seed = Date.now() } = {}) {
+  const safeLimit = Math.max(0, Number(fakeLimit) || 0);
+  if (safeLimit <= 0) return [];
+
+  const pool = uniqueStorySnapshotRows(fakePool);
+  if (pool.length <= safeLimit) return pool.slice(0, safeLimit);
+
+  const previousRows = uniqueStorySnapshotRows(
+    (Array.isArray(previousStories) ? previousStories : [])
+      .filter((story) => Number(story?.fake || 0) === 1)
+  );
+  if (previousRows.length === 0) {
+    return uniqueStorySnapshotRows(shuffleStorySnapshotRows(pool, seed), safeLimit);
+  }
+
+  const poolById = new Map(pool.map((row) => [String(row.id), row]));
+  const previousIds = new Set(previousRows.map((row) => String(row.id)));
+  const currentPreviousRows = previousRows
+    .map((row) => poolById.get(String(row.id)))
+    .filter(Boolean);
+
+  const replaceCount = Math.min(STORY_SNAPSHOT_FAKE_REFRESH_COUNT, safeLimit);
+  const keepCount = Math.min(currentPreviousRows.length, Math.max(0, safeLimit - replaceCount));
+  const keepRows = uniqueStorySnapshotRows(currentPreviousRows, keepCount);
+  const keepIds = new Set(keepRows.map((row) => String(row.id)));
+
+  const needed = Math.max(0, safeLimit - keepRows.length);
+  const freshCandidates = pool.filter((row) => !keepIds.has(String(row.id)) && !previousIds.has(String(row.id)));
+  const fallbackCandidates = pool.filter((row) => !keepIds.has(String(row.id)));
+  const replacementSource = freshCandidates.length >= needed ? freshCandidates : fallbackCandidates;
+  const replacements = uniqueStorySnapshotRows(shuffleStorySnapshotRows(replacementSource, seed), needed);
+
+  return uniqueStorySnapshotRows([...keepRows, ...replacements], safeLimit);
+}
+
+function orderRollingStorySnapshotRows({ desiredRows = [], previousStories = [], seed = Date.now(), limit = STORY_SNAPSHOT_SHARED_LIMIT } = {}) {
+  const safeLimit = Math.max(1, Number(limit) || STORY_SNAPSHOT_SHARED_LIMIT);
+  const desired = uniqueStorySnapshotRows(desiredRows, safeLimit);
+  if (desired.length === 0) return [];
+
+  const desiredById = new Map(desired.map((row) => [String(row.id), row]));
+  const previousOrdered = uniqueStorySnapshotRows(previousStories)
+    .map((row) => desiredById.get(String(row.id)))
+    .filter(Boolean);
+  const placedIds = new Set(previousOrdered.map((row) => String(row.id)));
+  const missingRows = desired.filter((row) => !placedIds.has(String(row.id)));
+
+  return uniqueStorySnapshotRows([
+    ...previousOrdered,
+    ...shuffleStorySnapshotRows(missingRows, seed),
+  ], safeLimit);
 }
 
 async function loadSharedStorySnapshotFeed({ viewer = null, fresh = false } = {}) {
@@ -1986,6 +2047,11 @@ async function loadSharedStorySnapshotFeed({ viewer = null, fresh = false } = {}
     version: manifest.version || '',
     fakeWindowKey,
   });
+  const selectionStateKey = getStorySnapshotSelectionStateKey({
+    viewerId,
+    roleKey,
+    version: manifest.version || '',
+  });
   if (!fresh) {
     const cachedSelection = readStorySnapshotStorage(selectionCacheKey, getStorySnapshotSelectionTtlMs());
     if (Array.isArray(cachedSelection?.stories) && cachedSelection.stories.length > 0) {
@@ -1996,6 +2062,7 @@ async function loadSharedStorySnapshotFeed({ viewer = null, fresh = false } = {}
       };
     }
   }
+  const previousSelection = readStorySnapshotStorage(selectionStateKey, 7 * 24 * 60 * 60_000);
 
   const sharedLimit = STORY_SNAPSHOT_SHARED_LIMIT;
   let realRows = [];
@@ -2026,12 +2093,22 @@ async function loadSharedStorySnapshotFeed({ viewer = null, fresh = false } = {}
         .filter((story) => !viewerId || String(story?.user_id || '') !== viewerId)
     );
     const seed = hashStorySnapshotSeed(`${viewerId || 'anon'}:${manifest.version || ''}:${roleKey}:${fakeWindowKey}:${fakePool.length}`);
-    fakeRows = uniqueStorySnapshotRows(shuffleStorySnapshotRows(fakePool, seed), fakeLimit);
+    fakeRows = selectRollingStorySnapshotFakes({
+      fakePool,
+      fakeLimit,
+      previousStories: previousSelection?.stories || [],
+      seed,
+    });
   }
 
   const mixedRows = [...realRows, ...fakeRows];
   const mixSeed = hashStorySnapshotSeed(`${viewerId || 'anon'}:${manifest.version || ''}:${roleKey}:${fakeWindowKey}:mix:${realRows.length}:${fakeRows.length}`);
-  const stories = uniqueStorySnapshotRows(shuffleStorySnapshotRows(mixedRows, mixSeed), sharedLimit);
+  const stories = orderRollingStorySnapshotRows({
+    desiredRows: mixedRows,
+    previousStories: previousSelection?.stories || [],
+    seed: mixSeed,
+    limit: sharedLimit,
+  });
   if (stories.length === 0) return null;
 
   const payload = {
@@ -2041,6 +2118,7 @@ async function loadSharedStorySnapshotFeed({ viewer = null, fresh = false } = {}
     fakeWindowKey,
   };
   writeStorySnapshotStorage(selectionCacheKey, payload);
+  writeStorySnapshotStorage(selectionStateKey, payload);
   return payload;
 }
 
