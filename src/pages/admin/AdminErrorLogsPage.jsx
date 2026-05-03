@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Copy, RefreshCw, Search, Trash2 } from 'lucide-react';
-import { adminDeleteErrorLog, adminGetErrorLogs } from '../../lib/api';
+import { adminDeleteAllErrorLogs, adminDeleteErrorLog, adminGetErrorLogs } from '../../lib/api';
 
 function formatDateTime(value) {
   if (!value) return 'Sin fecha';
@@ -37,6 +37,8 @@ export default function AdminErrorLogsPage() {
   const [levelFilter, setLevelFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState('');
+  const [deletingAll, setDeletingAll] = useState(false);
+  const hasActiveFilters = !!query || sourceFilter !== 'all' || levelFilter !== 'all';
 
   const fetchLogs = useCallback(async (nextPage = page, nextQuery = query, nextSource = sourceFilter, nextLevel = levelFilter) => {
     setLoading(true);
@@ -87,6 +89,26 @@ export default function AdminErrorLogsPage() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (deletingAll) return;
+    const warning = hasActiveFilters
+      ? '¿Borrar todos los errores del registro completo? Esto no borra solo los filtros actuales y no se puede deshacer.'
+      : '¿Borrar todos los errores del registro? Esta acción no se puede deshacer.';
+    if (!confirm(warning)) return;
+    setDeletingAll(true);
+    try {
+      await adminDeleteAllErrorLogs();
+      setLogs([]);
+      setPage(1);
+      setPages(1);
+      setTotal(0);
+    } catch (err) {
+      alert(err.message || 'No se pudieron borrar los errores');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const handleCopy = async (entry) => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(entry, null, 2));
@@ -110,8 +132,19 @@ export default function AdminErrorLogsPage() {
               </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-mansion-border/20 bg-black/20 px-4 py-3 text-sm text-text-muted">
-            {total} registros
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="rounded-2xl border border-mansion-border/20 bg-black/20 px-4 py-3 text-sm text-text-muted">
+              {total} registros
+            </div>
+            <button
+              type="button"
+              onClick={handleDeleteAll}
+              disabled={loading || deletingAll || (!hasActiveFilters && total <= 0)}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-xs font-semibold text-red-300 transition-colors hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              {deletingAll ? 'Borrando...' : 'Borrar todo'}
+            </button>
           </div>
         </div>
 

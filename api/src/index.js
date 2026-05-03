@@ -7656,6 +7656,20 @@ async function handleAdminDeleteErrorLog(request, env, logId) {
   return json({ deleted: true, id: logId });
 }
 
+async function handleAdminDeleteAllErrorLogs(request, env) {
+  await ensureErrorLogsTable(env);
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const result = await env.DB.prepare('DELETE FROM error_logs').run();
+  return json({
+    deleted: true,
+    count: Number(result?.meta?.changes || 0),
+  });
+}
+
 // ── Admin: GET /api/admin/users/:id ─────────────────────
 async function handleAdminGetUser(request, env, userId) {
   await ensureUsersMessageBlockRolesColumn(env);
@@ -11483,6 +11497,7 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/admin/users/ids' && method === 'GET') return handleAdminGetUserIds(request, env);
   if (path === '/api/admin/users/bulk-delete' && method === 'POST') return handleAdminBulkDeleteUsers(request, env);
   if (path === '/api/admin/error-logs' && method === 'GET') return handleAdminGetErrorLogs(request, env);
+  if (path === '/api/admin/error-logs' && method === 'DELETE') return handleAdminDeleteAllErrorLogs(request, env);
   if (path === '/api/admin/subscription-payment-logs' && method === 'GET') return handleAdminGetSubscriptionPaymentLogs(request, env);
   if (path === '/api/admin/fake-inbox' && method === 'GET') return handleAdminGetFakeInbox(request, env);
   if (path === '/api/admin/fake-inbox/conversation' && method === 'GET') return handleAdminGetFakeInboxConversation(request, env);

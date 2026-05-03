@@ -1705,6 +1705,10 @@ export async function adminDeleteErrorLog(logId) {
   return apiFetch(`/admin/error-logs/${logId}`, { method: 'DELETE' });
 }
 
+export async function adminDeleteAllErrorLogs() {
+  return apiFetch('/admin/error-logs', { method: 'DELETE' });
+}
+
 export async function adminGetFakeInbox({ page = 1, limit = 20, q = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (q) params.set('q', q);
