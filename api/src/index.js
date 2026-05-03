@@ -4234,20 +4234,6 @@ async function handleAppBootstrap(request, env) {
     const auth = await authenticate(request, env);
     if (!auth) return error('No autorizado', 401);
 
-    const settings = await settingsPromise;
-    const storyLimit = Math.max(
-      1,
-      Math.min(
-        50,
-        Math.round(
-          Math.max(
-            Number(settings?.homeStoryCountDesktop ?? 30) || 30,
-            Number(settings?.homeStoryCountMobile ?? 15) || 15
-          )
-        )
-      )
-    );
-
     // authenticate already fetched SELECT * and cached it — reuse to avoid a second D1 round-trip
     const cachedUser = getCachedFullUser(auth.sub);
     const [dbUser, activeStory, unreadRow] = await Promise.all([
@@ -4258,15 +4244,6 @@ async function handleAppBootstrap(request, env) {
       ).bind(auth.sub).first(),
     ]);
     if (!dbUser) return error('Usuario no encontrado', 404);
-    const storyPayload = await loadStoriesPayload(request, env, {
-      settings,
-      page: 1,
-      limit: storyLimit,
-      surface: 'rail',
-      viewerId: auth.sub,
-      viewer: dbUser,
-      includeVideoLimit: false,
-    });
     user = sanitizeUser(dbUser, env);
     user.has_active_story = !!activeStory;
     if (activeStory) {
@@ -4274,7 +4251,6 @@ async function handleAppBootstrap(request, env) {
       user.active_story_url = normalizeStoryVideoUrl(activeStory.video_url, env);
     }
     unread = Number(unreadRow?.unread || 0);
-    stories = storyPayload.stories;
   }
 
   const settings = await settingsPromise;
