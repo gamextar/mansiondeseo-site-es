@@ -14,6 +14,11 @@ zone_name = "mansiondeseo.com"
 pattern = "www.mansiondeseo.com/api/*"
 zone_name = "mansiondeseo.com"
 
+# ── Cron Triggers ─────────────────────────────────────
+# Keep this explicit so `wrangler triggers deploy` clears legacy schedules.
+[triggers]
+crons = []
+
 # ── Observability (Workers Logs) ─────────────────────
 [observability]
 enabled = true
