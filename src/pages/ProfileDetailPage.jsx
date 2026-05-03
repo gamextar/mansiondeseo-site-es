@@ -363,6 +363,20 @@ export default function ProfileDetailPage({ initialData }) {
     const nextPriority = currentPriority > 0 ? 0 : 100;
 
     setTogglingPriority(true);
+    setProfile((prev) => {
+      if (!prev) return prev;
+      const nextProfile = {
+        ...prev,
+        feed_priority: nextPriority,
+      };
+      writeProfileDetailCache(id, {
+        profile: nextProfile,
+        viewerPremium,
+        viewerIsAdmin: canAdminPrioritize,
+        settings,
+      });
+      return nextProfile;
+    });
     try {
       const data = await adminUpdateUser(profile.id, { feed_priority: nextPriority });
       setProfile((prev) => {
@@ -385,6 +399,20 @@ export default function ProfileDetailPage({ initialData }) {
         sessionStorage.setItem('mansion_feed_force_refresh', '1');
       } catch {}
     } catch (err) {
+      setProfile((prev) => {
+        if (!prev) return prev;
+        const nextProfile = {
+          ...prev,
+          feed_priority: currentPriority,
+        };
+        writeProfileDetailCache(id, {
+          profile: nextProfile,
+          viewerPremium,
+          viewerIsAdmin: canAdminPrioritize,
+          settings,
+        });
+        return nextProfile;
+      });
       alert(err.message || 'Error al actualizar prioridad');
     } finally {
       setTogglingPriority(false);

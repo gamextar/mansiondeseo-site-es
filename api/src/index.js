@@ -10533,22 +10533,18 @@ async function loadActiveStoryRowsFromSnapshots(env, { roleValues = [], fresh = 
     .filter(Boolean));
   const filterByRole = (row) => roleSet.size === 0 || roleSet.has(String(row?.role || ''));
 
-  const realSnapshotPromise = manifest?.real?.key
-    ? readStorySnapshotJson(env, manifest.real.key, { bypassCache: fresh }).catch(() => null)
-    : Promise.resolve(null);
   const buckets = getStorySnapshotBucketsForRoles(roleValues);
   const fakeSnapshotPromises = buckets.map(async (bucket) => {
     const key = manifest?.fakes?.[bucket]?.key;
     if (!key) return null;
     return readStorySnapshotJson(env, key, { bypassCache: fresh }).catch(() => null);
   });
-  const [realFeedRows, realSnapshot, ...fakeSnapshots] = await Promise.all([
+  const [realFeedRows, ...fakeSnapshots] = await Promise.all([
     realFeedRowsPromise,
-    realSnapshotPromise,
     ...fakeSnapshotPromises,
   ]);
   return uniqueStoryRows([
-    ...(Array.isArray(realFeedRows) ? realFeedRows : (Array.isArray(realSnapshot?.stories) ? realSnapshot.stories : [])),
+    ...(Array.isArray(realFeedRows) ? realFeedRows : []),
     ...fakeSnapshots.flatMap((snapshot) => (
       Array.isArray(snapshot?.stories) ? snapshot.stories : []
     )),
@@ -10584,15 +10580,10 @@ async function loadStoryRowsFromSnapshots(env, {
 
   const roleSet = new Set(Array.isArray(roleValues) ? roleValues : []);
   const filterByRole = (row) => roleSet.size === 0 || roleSet.has(String(row?.role || ''));
-  const [realFeedRows, realSnapshot] = await Promise.all([
+  const [realFeedRows] = await Promise.all([
     loadRealStoryRowsFromFeedItems(env, { roleValues, limit: safeLimit, fresh }).catch(() => null),
-    manifest?.real?.key
-      ? readStorySnapshotJson(env, manifest.real.key, { bypassCache: fresh }).catch(() => null)
-      : Promise.resolve(null),
   ]);
-  const realRowsSource = Array.isArray(realFeedRows)
-    ? realFeedRows
-    : (Array.isArray(realSnapshot?.stories) ? realSnapshot.stories : []);
+  const realRowsSource = Array.isArray(realFeedRows) ? realFeedRows : [];
   const realRows = uniqueStoryRows(realRowsSource.filter(filterByRole), safeLimit);
   const fakeLimit = Math.max(0, Math.min(safeMaxFakeRows, safeLimit - realRows.length));
   if (fakeLimit <= 0) return realRows;
@@ -11180,8 +11171,6 @@ async function loadStoriesPayload(request, env, options = {}) {
     allowFocusWindow ? 400 : effectiveLimit
   );
   const useMaterializedRows = effectivePage === 1;
-  const storyRowsCacheKey = `story-rows:${surface || 'rail'}:${roleValues.length ? roleValues.slice().sort().join(',') : 'all'}:${storyWindowLimit}`;
-  const canCacheStoryRows = useMaterializedRows && !focusUserId && !fresh;
 
   let orderedRows;
   let rowsNeedLikedSync = false;
@@ -11207,84 +11196,8 @@ async function loadStoriesPayload(request, env, options = {}) {
       orderedRows = orderedRows.filter((row) => Number(row?.vip_only || 0) !== 1 || String(row?.user_id || '') === String(viewerId || ''));
     }
     rowsNeedLikedSync = includeLiked;
-  } else if (useMaterializedRows) {
-    let storyRows;
-    if (canCacheStoryRows) {
-      storyRows = await cached(storyRowsCacheKey, STORY_ROWS_CACHE_TTL_MS, () => loadMaterializedStoryRows(env, {
-        roleValues,
-        roleBuckets,
-        limit: storyWindowLimit,
-        splitRealRowsByRole: !isRailSurface,
-      }));
-    } else {
-      if (fresh) _cache.delete(storyRowsCacheKey);
-      storyRows = await loadMaterializedStoryRows(env, {
-        roleValues,
-        roleBuckets,
-        limit: storyWindowLimit,
-        focusUserId,
-        splitRealRowsByRole: !isRailSurface,
-      });
-      if (fresh && !focusUserId) {
-        _cache.set(storyRowsCacheKey, { val: storyRows, exp: Date.now() + STORY_ROWS_CACHE_TTL_MS });
-      }
-    }
-
-    orderedRows = interleaveStoryRows(storyRows, roleBuckets, storyWindowLimit);
-    if (!isRailSurface) {
-      if (!viewerCanWatchAllStories) {
-        orderedRows = orderedRows.filter((row) => Number(row?.vip_only || 0) !== 1 || String(row?.user_id || '') === String(viewerId || ''));
-      }
-      if (!focusUserId && viewerId) {
-        orderedRows = orderedRows.filter((row) => String(row?.user_id || '') !== String(viewerId));
-      }
-    }
-    rowsNeedLikedSync = includeLiked;
   } else {
-    const bindings = [];
-    const appendStoryVisibilityFilters = (parts, values, { includeLiked: shouldIncludeLiked = false } = {}) => {
-      parts.push(`
-        FROM stories s
-        JOIN users u ON u.id = s.user_id
-        LEFT JOIN profile_stats ps ON ps.user_id = u.id
-        ${shouldIncludeLiked ? 'LEFT JOIN story_likes sl ON sl.story_id = s.id AND sl.user_id = ?' : ''}
-        WHERE s.active = 1
-          AND u.status = 'verified'
-          AND COALESCE(u.account_status, 'active') = 'active'
-      `);
-      if (shouldIncludeLiked) values.push(viewerId || '');
-      bindRoleFilter(parts, values, roleValues, 'u.role');
-      if (!isRailSurface && !viewerCanWatchAllStories) {
-        parts.push(' AND (COALESCE(s.vip_only, 0) = 0 OR s.user_id = ?)');
-        values.push(viewerId || '');
-      }
-      if (focusUserId) {
-        parts.push(' AND (s.user_id != ? OR ? = \'\' OR s.user_id = ?)');
-        values.push(viewerId || '', viewerId || '', focusUserId);
-      } else if (!isRailSurface && viewerId) {
-        parts.push(' AND s.user_id != ?');
-        values.push(viewerId);
-      }
-    };
-
-    let query = `
-      /* stories:legacy-window */
-      ${getStoryFeedSelectClause({ includeLiked })}
-    `;
-    const queryParts = [query];
-    appendStoryVisibilityFilters(queryParts, bindings, { includeLiked });
-    query = queryParts.join('\n');
-    query += `
-      ORDER BY
-        COALESCE(u.fake, 0) ASC,
-        CASE WHEN COALESCE(u.fake, 0) = 1 THEN u.last_active ELSE s.created_at END DESC,
-        CASE WHEN COALESCE(u.fake, 0) = 1 THEN COALESCE(ps.visits_total, 0) ELSE 0 END DESC,
-        CASE WHEN COALESCE(u.fake, 0) = 1 THEN s.created_at ELSE u.last_active END DESC,
-        s.id DESC
-    `;
-
-    const storyRows = await fetchRowsPerRoleBucket(env, query, bindings, roleBuckets, storyWindowLimit);
-    orderedRows = interleaveStoryRows(storyRows, roleBuckets, storyWindowLimit);
+    orderedRows = [];
   }
 
   if (!focusUserId && viewerId) {
