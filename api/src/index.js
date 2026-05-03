@@ -2847,6 +2847,19 @@ function corsHeaders(env, request) {
   };
 }
 
+function withCorsHeaders(response, env, request) {
+  if (response.status === 101) return response;
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(corsHeaders(env, request))) {
+    headers.set(key, value);
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 function handleOptions(env, request) {
   return new Response(null, { status: 204, headers: corsHeaders(env, request) });
 }
@@ -11560,12 +11573,7 @@ export default {
       if (response.status === 101) {
         return response;
       }
-      // Add CORS headers to all other responses
-      const cors = corsHeaders(env, request);
-      for (const [key, value] of Object.entries(cors)) {
-        response.headers.set(key, value);
-      }
-      return response;
+      return withCorsHeaders(response, env, request);
     } catch (err) {
       recordRouteMetric(env, request, new Response(null, { status: 500 }), Date.now() - startedAt);
       console.error('Worker error:', err.message, err.stack);
@@ -11588,12 +11596,7 @@ export default {
       })().catch((logErr) => {
         console.error('[error_logs] failed to persist unhandled exception', logErr?.message || logErr);
       }));
-      const errRes = json({ error: 'Error interno del servidor' }, 500);
-      const cors = corsHeaders(env, request);
-      for (const [key, value] of Object.entries(cors)) {
-        errRes.headers.set(key, value);
-      }
-      return errRes;
+      return withCorsHeaders(json({ error: 'Error interno del servidor' }, 500), env, request);
     }
   },
 };
