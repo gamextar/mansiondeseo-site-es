@@ -749,6 +749,7 @@ export default function SettingsPage() {
   }));
   const storySnapshotFakeTotal = storySnapshotBuckets.reduce((sum, bucket) => sum + Number(bucket.count || 0), 0);
   const storySnapshotRealTotal = Number(storySnapshotManifest?.real?.count || 0);
+  const storySnapshotFakeDirty = !!storySnapshotManifest?.fake_dirty;
   const profileSnapshotBuckets = ['hombre', 'mujer', 'pareja', 'trans'].map((bucket) => ({
     key: bucket,
     label: bucket === 'hombre' ? 'Hombres' : bucket === 'mujer' ? 'Mujeres' : bucket === 'pareja' ? 'Parejas' : 'Trans',
@@ -756,6 +757,7 @@ export default function SettingsPage() {
   }));
   const profileSnapshotTotal = Number(profileSnapshotManifest?.total_count || 0);
   const profileSnapshotBytes = Number(profileSnapshotManifest?.total_bytes || 0);
+  const profileSnapshotFakeDirty = !!profileSnapshotManifest?.fake_dirty;
 
   if (loading) {
     return (
@@ -1907,15 +1909,22 @@ export default function SettingsPage() {
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Snapshots de stories</h3>
-                  <p className="text-[11px] text-text-dim">Regenera los JSON estáticos de stories reales y fake cuando borres usuarios o hagas cambios masivos. El borrado desde Admin ya los actualiza automáticamente.</p>
+                  <p className="text-[11px] text-text-dim">Regenera los JSON estáticos de stories reales y fake cuando borres usuarios o hagas cambios masivos. Los cambios de prioridad fake quedan pendientes hasta regenerar.</p>
                 </div>
-                <button
-                  onClick={handleRebuildStorySnapshots}
-                  disabled={storySnapshotRunning}
-                  className="px-4 py-2 rounded-xl bg-mansion-gold/15 border border-mansion-gold/30 text-mansion-gold text-sm font-semibold hover:bg-mansion-gold/20 transition-colors disabled:opacity-60"
-                >
-                  {storySnapshotRunning ? 'Generando...' : 'Regenerar'}
-                </button>
+                <div className="flex items-center gap-2">
+                  {storySnapshotFakeDirty ? (
+                    <span className="rounded-full border border-yellow-400/25 bg-yellow-400/10 px-3 py-1 text-[11px] font-semibold text-yellow-300">
+                      Pendiente
+                    </span>
+                  ) : null}
+                  <button
+                    onClick={handleRebuildStorySnapshots}
+                    disabled={storySnapshotRunning}
+                    className="px-4 py-2 rounded-xl bg-mansion-gold/15 border border-mansion-gold/30 text-mansion-gold text-sm font-semibold hover:bg-mansion-gold/20 transition-colors disabled:opacity-60"
+                  >
+                    {storySnapshotRunning ? 'Generando...' : 'Regenerar'}
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1956,15 +1965,22 @@ export default function SettingsPage() {
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Snapshots de perfiles fake</h3>
-                  <p className="text-[11px] text-text-dim">Regenera los JSON estáticos de R2 cuando edites o borres usuarios fake. El Radar usa estos archivos para evitar lecturas grandes en D1.</p>
+                  <p className="text-[11px] text-text-dim">Regenera los JSON estáticos de R2 cuando edites o borres usuarios fake. Los cambios de prioridad fake quedan pendientes hasta regenerar.</p>
                 </div>
-                <button
-                  onClick={handleRebuildProfileSnapshots}
-                  disabled={profileSnapshotRunning}
-                  className="px-4 py-2 rounded-xl bg-mansion-gold/15 border border-mansion-gold/30 text-mansion-gold text-sm font-semibold hover:bg-mansion-gold/20 transition-colors disabled:opacity-60"
-                >
-                  {profileSnapshotRunning ? 'Generando...' : 'Regenerar'}
-                </button>
+                <div className="flex items-center gap-2">
+                  {profileSnapshotFakeDirty ? (
+                    <span className="rounded-full border border-yellow-400/25 bg-yellow-400/10 px-3 py-1 text-[11px] font-semibold text-yellow-300">
+                      Pendiente
+                    </span>
+                  ) : null}
+                  <button
+                    onClick={handleRebuildProfileSnapshots}
+                    disabled={profileSnapshotRunning}
+                    className="px-4 py-2 rounded-xl bg-mansion-gold/15 border border-mansion-gold/30 text-mansion-gold text-sm font-semibold hover:bg-mansion-gold/20 transition-colors disabled:opacity-60"
+                  >
+                    {profileSnapshotRunning ? 'Generando...' : 'Regenerar'}
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

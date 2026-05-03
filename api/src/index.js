@@ -50,6 +50,43 @@ async function bumpFeedCacheVersion(env) {
   return nextVersion;
 }
 
+async function deleteSiteSetting(env, key) {
+  await env.DB.prepare('DELETE FROM site_settings WHERE key = ?').bind(key).run();
+  _cache.delete('settings');
+}
+
+async function getSiteSettingValue(env, key) {
+  const row = await env.DB.prepare('SELECT value FROM site_settings WHERE key = ?')
+    .bind(key)
+    .first()
+    .catch(() => null);
+  return String(row?.value || '');
+}
+
+async function markFakeSnapshotsDirty(env, { profiles = false, stories = false } = {}) {
+  const dirtyAt = formatSqlDateFromMs(Date.now());
+  const statements = [];
+  if (profiles) {
+    statements.push(env.DB.prepare(`
+      INSERT INTO site_settings (key, value)
+      VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).bind(FAKE_PROFILE_SNAPSHOTS_DIRTY_KEY, dirtyAt));
+  }
+  if (stories) {
+    statements.push(env.DB.prepare(`
+      INSERT INTO site_settings (key, value)
+      VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).bind(FAKE_STORY_SNAPSHOTS_DIRTY_KEY, dirtyAt));
+  }
+  if (statements.length > 0) {
+    await env.DB.batch(statements);
+    _cache.delete('settings');
+  }
+  return dirtyAt;
+}
+
 const _routeMetrics = new Map();
 let _metricsWindowStartedAt = Date.now();
 let _metricsRequestCount = 0;
@@ -115,6 +152,8 @@ const PROFILE_SNAPSHOT_MANIFEST_KEY = `${PROFILE_SNAPSHOT_PREFIX}/manifest.json`
 const PROFILE_SNAPSHOT_BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
 const PROFILE_SNAPSHOT_FAKE_ROTATION_MS = 5 * 60_000;
 const REAL_FEED_ITEMS_READY_KEY = 'real_feed_items_ready';
+const FAKE_PROFILE_SNAPSHOTS_DIRTY_KEY = 'fake_profile_snapshots_dirty_at';
+const FAKE_STORY_SNAPSHOTS_DIRTY_KEY = 'fake_story_snapshots_dirty_at';
 const ADMIN_USERS_COUNT_TTL_MS = 120_000;
 const FREE_CHAT_RECIPIENT_LIMIT = 5;
 const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
@@ -8235,14 +8274,6 @@ async function handleAdminUpdateUser(request, env, userId, ctx) {
 
   if (updates.length === 0) return error('Nada que actualizar');
 
-  vals.push(userId);
-  await env.DB.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...vals).run();
-  _fullUserCache.delete(userId);
-  _viewerCache.delete(userId);
-  _accountStatusCache.delete(userId);
-  await syncFakeStoryRotationForUser(env, userId);
-
-  const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
   const feedRelevantFields = [
     'username',
     'premium',
@@ -8261,21 +8292,42 @@ async function handleAdminUpdateUser(request, env, userId, ctx) {
     'avatar_crop',
     'photos',
   ];
-  const shouldRefreshStaticFeed = feedRelevantFields.some((key) => (
+  const changedFeedFields = feedRelevantFields.filter((key) => (
     Object.prototype.hasOwnProperty.call(body, key)
   ));
+  const wasFakeUser = Number(user.fake || 0) === 1;
+  const fakePriorityOnlyUpdate = wasFakeUser
+    && changedFeedFields.length === 1
+    && changedFeedFields[0] === 'feed_priority';
+
+  vals.push(userId);
+  await env.DB.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...vals).run();
+  _fullUserCache.delete(userId);
+  _viewerCache.delete(userId);
+  _accountStatusCache.delete(userId);
+  if ((wasFakeUser || body.fake !== undefined) && !fakePriorityOnlyUpdate) {
+    await syncFakeStoryRotationForUser(env, userId);
+  }
+
+  const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  const shouldRefreshStaticFeed = changedFeedFields.length > 0;
   if (shouldRefreshStaticFeed) {
-    const refreshTask = (async () => {
-      await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'admin-update-user' });
-      await bumpFeedCacheVersion(env);
-    })();
-    if (ctx?.waitUntil) {
+    if (fakePriorityOnlyUpdate) {
+      await markFakeSnapshotsDirty(env, { profiles: true, stories: true });
       invalidateFeedBrowseCache();
-      ctx.waitUntil(refreshTask.catch((err) => {
-        console.error('[admin-update-user] deferred feed refresh failed:', err?.message || err);
-      }));
     } else {
-      await refreshTask;
+      const refreshTask = (async () => {
+        await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'admin-update-user' });
+        await bumpFeedCacheVersion(env);
+      })();
+      if (ctx?.waitUntil) {
+        invalidateFeedBrowseCache();
+        ctx.waitUntil(refreshTask.catch((err) => {
+          console.error('[admin-update-user] deferred feed refresh failed:', err?.message || err);
+        }));
+      } else {
+        await refreshTask;
+      }
     }
   } else {
     invalidateFeedBrowseCache();
@@ -9984,6 +10036,9 @@ async function rebuildStorySnapshots(env, { includeReal = true, includeFakes = t
   await putStorySnapshotJson(env, STORY_SNAPSHOT_MANIFEST_KEY, nextManifest, {
     cacheControl: 'public, max-age=15, stale-while-revalidate=300',
   });
+  if (includeFakes) {
+    await deleteSiteSetting(env, FAKE_STORY_SNAPSHOTS_DIRTY_KEY);
+  }
   invalidateFeedBrowseCache();
   console.log(`🔧 Story snapshots (${source}) — real ${nextManifest.real?.count ?? 0}, fakes ${Object.values(nextManifest.fakes || {}).reduce((sum, item) => sum + Number(item?.count || 0), 0)}`);
   return nextManifest;
@@ -10332,6 +10387,9 @@ async function rebuildProfileSnapshots(env, {
   await putProfileSnapshotJson(env, PROFILE_SNAPSHOT_MANIFEST_KEY, manifest, {
     cacheControl: 'public, max-age=15, stale-while-revalidate=300',
   });
+  if (rebuildFakes) {
+    await deleteSiteSetting(env, FAKE_PROFILE_SNAPSHOTS_DIRTY_KEY);
+  }
   invalidateFeedBrowseCache();
   console.log(`🔧 Profile snapshots (${source}) — real ${manifest.real_count}${rebuildReal ? '' : ' kept'}, fakes ${manifest.fake_count}${rebuildFakes ? '' : ' kept'}, bytes ${manifest.total_bytes}`);
   return manifest;
@@ -11760,7 +11818,11 @@ async function handleAdminRebuildStorySnapshots(request, env) {
   });
   return json({
     success: true,
-    manifest,
+    manifest: {
+      ...manifest,
+      fake_dirty: includeFakes ? false : !!(await getSiteSettingValue(env, FAKE_STORY_SNAPSHOTS_DIRTY_KEY)),
+      fake_dirty_at: includeFakes ? '' : await getSiteSettingValue(env, FAKE_STORY_SNAPSHOTS_DIRTY_KEY),
+    },
   });
 }
 
@@ -11774,9 +11836,17 @@ async function handleAdminGetStorySnapshots(request, env) {
   const manifest = await readStorySnapshotJson(env, STORY_SNAPSHOT_MANIFEST_KEY, {
     bypassCache: fresh,
   }).catch(() => null);
+  const fakeDirtyAt = await getSiteSettingValue(env, FAKE_STORY_SNAPSHOTS_DIRTY_KEY);
   return json({
     success: true,
-    manifest,
+    manifest: manifest ? {
+      ...manifest,
+      fake_dirty: !!fakeDirtyAt,
+      fake_dirty_at: fakeDirtyAt,
+    } : {
+      fake_dirty: !!fakeDirtyAt,
+      fake_dirty_at: fakeDirtyAt,
+    },
   });
 }
 
@@ -11790,9 +11860,17 @@ async function handleAdminGetProfileSnapshots(request, env) {
   const manifest = await readProfileSnapshotJson(env, PROFILE_SNAPSHOT_MANIFEST_KEY, {
     bypassCache: fresh,
   }).catch(() => null);
+  const fakeDirtyAt = await getSiteSettingValue(env, FAKE_PROFILE_SNAPSHOTS_DIRTY_KEY);
   return json({
     success: true,
-    manifest,
+    manifest: manifest ? {
+      ...manifest,
+      fake_dirty: !!fakeDirtyAt,
+      fake_dirty_at: fakeDirtyAt,
+    } : {
+      fake_dirty: !!fakeDirtyAt,
+      fake_dirty_at: fakeDirtyAt,
+    },
   });
 }
 
@@ -11808,7 +11886,11 @@ async function handleAdminRebuildProfileSnapshots(request, env) {
   await bumpFeedCacheVersion(env);
   return json({
     success: true,
-    manifest,
+    manifest: {
+      ...manifest,
+      fake_dirty: false,
+      fake_dirty_at: '',
+    },
   });
 }
 
