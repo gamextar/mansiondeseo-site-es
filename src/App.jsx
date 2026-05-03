@@ -919,7 +919,7 @@ function AppLayout() {
             path="/videos"
             element={
               <RequireRegistration>
-                <VideoFeedPage />
+                <VideoFeedPage key={`videos:${location.key || location.pathname}`} />
               </RequireRegistration>
             }
           />
@@ -1084,7 +1084,7 @@ function AppLayout() {
                 className="absolute inset-0 pointer-events-auto"
               >
                 <Routes>
-                  <Route path="/videos" element={<VideoFeedPage />} />
+                  <Route path="/videos" element={<VideoFeedPage key={`videos-overlay:${location.key || location.pathname}`} />} />
                 </Routes>
               </motion.div>
             </motion.div>

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X, Crown, Maximize2, Minimize2 } from 'lucide-react';
@@ -995,8 +995,11 @@ export default function VideoFeedPage() {
   const lastScrollAtRef = useRef(0);
   const lastDesktopWheelAtRef = useRef(0);
 
-  const requestedStoryUserId = location.state?.storyUserId || null;
-  const requestedStorySeed = normalizeStorySeed(location.state?.storySeed || null);
+  const requestedStorySeed = useMemo(
+    () => normalizeStorySeed(location.state?.storySeed || null),
+    [location.key]
+  );
+  const requestedStoryUserId = location.state?.storyUserId || requestedStorySeed?.user_id || null;
   const isOverlayPreview = location.state?.modal === 'videos' && !!location.state?.backgroundLocation;
   const backgroundLocation = location.state?.backgroundLocation || null;
   const initial = applyPendingStoryLikeState(mergeSeedStory([], requestedStorySeed), getPendingStoryLikes());
@@ -1111,6 +1114,10 @@ export default function VideoFeedPage() {
   }, [backgroundLocation, flushPendingViewedStories, isOverlayPreview, navigate]);
   const closeToHomeFeed = useCallback(() => {
     flushPendingViewedStories();
+    try {
+      sessionStorage.removeItem(VIDEO_FEED_INDEX_KEY);
+      sessionStorage.removeItem(VIDEO_FEED_ACTIVE_STORY_KEY);
+    } catch {}
     navigate('/radar', { replace: true });
   }, [flushPendingViewedStories, navigate]);
   const handleOverlayBackdropPointerDown = useCallback((event) => {
