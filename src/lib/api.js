@@ -22,12 +22,11 @@ const CLIENT_CACHE_VERSION = 'media-paths-v7-avatar-race-fix';
 const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const STORY_SNAPSHOT_CACHE_PREFIX = 'mansion_story_snapshot:';
-const STORY_SNAPSHOT_SELECTION_CACHE_PREFIX = 'mansion_story_snapshot_feed:';
+const STORY_SNAPSHOT_SELECTION_CACHE_PREFIX = 'mansion_story_snapshot_feed_v2:';
 const STORY_SNAPSHOT_MANIFEST_TTL_MS = 10 * 60_000;
 const STORY_SNAPSHOT_ASSET_TTL_MS = 24 * 60 * 60_000;
 const STORY_SNAPSHOT_FAKE_ROTATION_MS = 5 * 60_000;
-const STORY_SNAPSHOT_FAKE_LIMIT = 10;
-const STORY_SNAPSHOT_SHARED_LIMIT = 60;
+const STORY_SNAPSHOT_SHARED_LIMIT = 15;
 const STORY_SNAPSHOT_BUCKETS = ['hombre', 'mujer', 'pareja', 'trans'];
 const STORY_SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const STORY_PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
@@ -1994,7 +1993,7 @@ async function loadSharedStorySnapshotFeed({ viewer = null, fresh = false } = {}
     );
   }
 
-  const fakeLimit = Math.max(0, Math.min(STORY_SNAPSHOT_FAKE_LIMIT, sharedLimit - realRows.length));
+  const fakeLimit = Math.max(0, sharedLimit - realRows.length);
   let fakeRows = [];
   if (fakeLimit > 0) {
     const buckets = getStorySnapshotBucketsForRoleValues(roleValues);
@@ -2013,7 +2012,9 @@ async function loadSharedStorySnapshotFeed({ viewer = null, fresh = false } = {}
     fakeRows = uniqueStorySnapshotRows(shuffleStorySnapshotRows(fakePool, seed), fakeLimit);
   }
 
-  const stories = uniqueStorySnapshotRows([...realRows, ...fakeRows], sharedLimit);
+  const mixedRows = [...realRows, ...fakeRows];
+  const mixSeed = hashStorySnapshotSeed(`${viewerId || 'anon'}:${manifest.version || ''}:${roleKey}:${fakeWindowKey}:mix:${realRows.length}:${fakeRows.length}`);
+  const stories = uniqueStorySnapshotRows(shuffleStorySnapshotRows(mixedRows, mixSeed), sharedLimit);
   if (stories.length === 0) return null;
 
   const payload = {

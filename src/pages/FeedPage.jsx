@@ -18,7 +18,7 @@ const FEED_CACHE_KEY = 'mansion_feed';
 const FEED_CACHE_VERSION = 2;
 const FEED_GLOBAL_VERSION_KEY = 'mansion_feed_cache_version';
 const HOME_STORIES_CACHE_PREFIX = 'mansion_home_stories:';
-const HOME_STORIES_CACHE_VERSION = 1;
+const HOME_STORIES_CACHE_VERSION = 2;
 const HOME_STORIES_CACHE_TTL_MS = 5 * 60_000;
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
@@ -38,6 +38,7 @@ const STORY_RAIL_FALLBACK_GAP_DESKTOP = 7;
 const STORY_RAIL_FALLBACK_OWN_EXTRA_GAP = 1;
 const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
+const STORY_RAIL_FIXED_LIMIT = 15;
 
 function coerceSettingNumber(value, fallback) {
   const parsed = Number(value ?? fallback);
@@ -53,14 +54,7 @@ function detectStandaloneMobile() {
 }
 
 function getInitialStoryLimit(settings, isDesktopViewport) {
-  return Math.max(
-    1,
-    Math.round(
-      isDesktopViewport
-        ? (settings?.homeStoryCountDesktop ?? 30)
-        : (settings?.homeStoryCountMobile ?? 15)
-    )
-  );
+  return STORY_RAIL_FIXED_LIMIT;
 }
 
 function mapStoriesToRailProfiles(stories = []) {
