@@ -1585,6 +1585,20 @@ export async function adminRebuildProfileSnapshots() {
   return result;
 }
 
+export async function adminGetFeedItems() {
+  return apiFetch('/admin/feed-items');
+}
+
+export async function adminRebuildFeedItems() {
+  const result = await apiFetch('/admin/feed-items/rebuild', {
+    method: 'POST',
+    body: '{}',
+  });
+  markFeedDirty();
+  invalidateStoryFeedCache();
+  return result;
+}
+
 export async function adminGetSubscriptionPaymentLogs({ page = 1, limit = 25, q = '', status = '', gateway = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (q) params.set('q', q);
