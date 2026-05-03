@@ -9978,6 +9978,7 @@ async function loadStoryRowsFromSnapshots(env, {
   roleValues = [],
   limit = 25,
   viewerId = '',
+  focusUserId = '',
   fresh = false,
   maxFakeRows = 10,
 } = {}) {
@@ -10008,7 +10009,17 @@ async function loadStoryRowsFromSnapshots(env, {
   const fakeRows = uniqueStoryRows(fakeSnapshots.flat().filter(filterByRole));
   const seed = hashStringToUint32(`${viewerId || 'anon'}:${manifest.version || ''}:${Math.floor(Date.now() / STORY_SNAPSHOT_FAKE_ROTATION_MS)}:${fakeRows.length}`);
   const selectedFakes = uniqueStoryRows(shuffleStoryRows(fakeRows, seed), fakeLimit);
-  return uniqueStoryRows([...realRows, ...selectedFakes], safeLimit);
+  let rows = uniqueStoryRows([...realRows, ...selectedFakes], safeLimit);
+
+  const requestedUserId = String(focusUserId || '').trim();
+  if (requestedUserId && !rows.some((row) => String(row?.user_id || '') === requestedUserId)) {
+    const focusedSnapshotRow = [...realRows, ...fakeRows].find((row) => String(row?.user_id || '') === requestedUserId);
+    if (focusedSnapshotRow) {
+      rows = uniqueStoryRows([focusedSnapshotRow, ...rows], safeLimit + 1);
+    }
+  }
+
+  return rows;
 }
 
 function getStoryFeedSelectClause({ includeLiked = false, fromRotation = false } = {}) {
@@ -10419,27 +10430,6 @@ async function loadRealStoryRowsForFeed(env, { roleValues = [], roleBuckets = []
   return results || [];
 }
 
-async function loadFakeStoryRotationRows(env, { roleValues = [], limit = 25 } = {}) {
-  const safeLimit = parseIntegerSetting(limit, 25, 0, 500);
-  if (safeLimit <= 0) return [];
-  const bindings = [];
-  const parts = [`
-    /* stories:materialized:fake-rotation */
-    ${getStoryFeedSelectClause({ fromRotation: true })}
-    FROM fake_story_rotation
-    WHERE 1 = 1
-  `];
-  bindRoleFilter(parts, bindings, roleValues, 'role');
-  parts.push(`
-    ORDER BY rotation_position ASC, rotated_at DESC, story_id DESC
-    LIMIT ?
-  `);
-  bindings.push(safeLimit);
-
-  const { results } = await env.DB.prepare(parts.join('\n')).bind(...bindings).all();
-  return results || [];
-}
-
 async function loadFocusedStoryRow(env, focusUserId) {
   const userId = String(focusUserId || '').trim();
   if (!userId) return null;
@@ -10472,25 +10462,8 @@ async function loadMaterializedStoryRows(env, {
     loadRealStoryRowsForFeed(env, { roleValues, roleBuckets, limit: safeLimit, splitByRole: splitRealRowsByRole }),
     focusUserId ? loadFocusedStoryRow(env, focusUserId) : Promise.resolve(null),
   ]);
-  const realCount = Array.isArray(realRows) ? realRows.length : 0;
-  const needsFocusedFakeWindow = focusRow && Number(focusRow.fake || 0) === 1;
-  const fakeLimit = needsFocusedFakeWindow
-    ? Math.min(FAKE_STORY_ROTATION_POOL_SIZE, safeLimit)
-    : Math.max(0, safeLimit - realCount + 5);
 
-  let fakeRows = await loadFakeStoryRotationRows(env, { roleValues, limit: fakeLimit });
-  if (fakeLimit > 0 && fakeRows.length === 0) {
-    const emptyRecently = isFreshCached('fake-story-rotation-empty');
-    if (!emptyRecently) {
-      const rotation = await rebuildFakeStoryRotation(env, { count: FAKE_STORY_ROTATION_POOL_SIZE, source: 'stories-fallback' });
-      if (rotation.rotated === 0) {
-        _cache.set('fake-story-rotation-empty', { val: true, exp: Date.now() + 300_000 });
-      }
-      fakeRows = await loadFakeStoryRotationRows(env, { roleValues, limit: fakeLimit });
-    }
-  }
-
-  const merged = focusRow ? [focusRow, ...(realRows || []), ...fakeRows] : [...(realRows || []), ...fakeRows];
+  const merged = focusRow ? [focusRow, ...(realRows || [])] : [...(realRows || [])];
   return uniqueStoryRows(merged, safeLimit + (focusRow ? 1 : 0));
 }
 
@@ -10615,11 +10588,12 @@ async function loadStoriesPayload(request, env, options = {}) {
   let orderedRows;
   let rowsNeedLikedSync = false;
 
-  const snapshotRows = useMaterializedRows && !focusUserId
+  const snapshotRows = useMaterializedRows
     ? await loadStoryRowsFromSnapshots(env, {
         roleValues,
         limit: storyWindowLimit,
         viewerId: viewerId || '',
+        focusUserId,
         fresh,
         maxFakeRows: isRailSurface ? 10 : storyWindowLimit,
       })
@@ -10627,6 +10601,10 @@ async function loadStoriesPayload(request, env, options = {}) {
 
   if (Array.isArray(snapshotRows)) {
     orderedRows = interleaveStoryRows(snapshotRows, roleBuckets, storyWindowLimit);
+    if (focusUserId && !orderedRows.some((row) => String(row?.user_id || '') === focusUserId)) {
+      const focusRow = await loadFocusedStoryRow(env, focusUserId);
+      if (focusRow) orderedRows = uniqueStoryRows([focusRow, ...orderedRows], storyWindowLimit + 1);
+    }
     if (!isRailSurface && !viewerCanWatchAllStories) {
       orderedRows = orderedRows.filter((row) => Number(row?.vip_only || 0) !== 1 || String(row?.user_id || '') === String(viewerId || ''));
     }
