@@ -69,13 +69,6 @@ function roleBucket(role) {
   return PAIR_ROLES.includes(role) ? 'pareja' : role;
 }
 
-function normalizeMediaUrl(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  if (/^https?:\/\//i.test(raw)) return raw;
-  return `${MEDIA_BASE}/${raw.replace(/^\/+/, '')}`;
-}
-
 function stringifyJsonValue(value, fallback) {
   if (typeof value === 'string') return value || fallback;
   try {
@@ -96,7 +89,6 @@ function rowText(row, key) {
 }
 
 function mapRow(row, position) {
-  const activeStoryUrl = normalizeMediaUrl(rowText(row, 'active_story_url'));
   return {
     id: rowText(row, 'id'),
     username: rowText(row, 'username'),
@@ -123,8 +115,8 @@ function mapRow(row, position) {
     sexual_orientation: rowText(row, 'sexual_orientation'),
     last_active: rowText(row, 'last_active'),
     followers_total: Number(row.followers_total || 0),
-    has_active_story: activeStoryUrl ? 1 : 0,
-    active_story_url: activeStoryUrl,
+    has_active_story: 0,
+    active_story_url: '',
     rotation_position: position,
   };
 }
@@ -169,16 +161,7 @@ try {
       hex(COALESCE(u.marital_status, '')) AS marital_status_hex,
       hex(COALESCE(u.sexual_orientation, '')) AS sexual_orientation_hex,
       hex(COALESCE(u.last_active, '')) AS last_active_hex,
-      COALESCE(ps.followers_total, 0) AS followers_total,
-      hex(COALESCE((
-        SELECT s.video_url
-        FROM stories s
-        WHERE s.user_id = u.id
-          AND s.active = 1
-          AND COALESCE(s.vip_only, 0) = 0
-        ORDER BY s.created_at DESC, s.id DESC
-        LIMIT 1
-      ), '')) AS active_story_url_hex
+      COALESCE(ps.followers_total, 0) AS followers_total
     FROM users u
     LEFT JOIN profile_stats ps ON ps.user_id = u.id
     WHERE COALESCE(u.fake, 0) = 1

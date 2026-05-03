@@ -4421,10 +4421,10 @@ async function handleProfiles(request, env) {
       viewerId: auth.sub,
       fresh,
     });
-    const [realRows, fakeRows, realStoryRows] = await Promise.all([
+    const [realRows, fakeRows, activeStoryRows] = await Promise.all([
       realRowsPromise,
       fakeRowsPromise,
-      loadRealStoryRowsFromSnapshot(env, { roleValues: requestedRoleValues, fresh }),
+      loadActiveStoryRowsFromSnapshots(env, { roleValues: requestedRoleValues, fresh }),
     ]);
     const snapshotRows = [
       ...(realRows || []),
@@ -4436,9 +4436,9 @@ async function handleProfiles(request, env) {
     if (fakeRows === null) {
       console.warn('fake profile snapshots unavailable; returning real profiles only');
     }
-    const activeStoryUserIds = new Set((realStoryRows || []).map(r => String(r.user_id)));
+    const activeStoryUserIds = new Set((activeStoryRows || []).map(r => String(r.user_id)));
     const activeStoryUrlMap = new Map();
-    for (const row of (realStoryRows || [])) {
+    for (const row of (activeStoryRows || [])) {
       const userId = String(row.user_id);
       if (!viewerCanWatchAllStories && Number(row.vip_only || 0) === 1) continue;
       if (!activeStoryUrlMap.has(userId) && row.video_url) {
@@ -9696,23 +9696,6 @@ async function readProfileSnapshotJson(env, key, { ttlMs = 10 * 60_000, bypassCa
 
 async function buildFakeProfileSnapshotRows(env) {
   const { results } = await env.DB.prepare(`
-    WITH latest_public_story AS (
-      SELECT user_id, video_url
-      FROM (
-        SELECT
-          s.user_id,
-          s.video_url,
-          ROW_NUMBER() OVER (PARTITION BY s.user_id ORDER BY s.created_at DESC, s.id DESC) AS row_number
-        FROM stories s
-        JOIN users story_user ON story_user.id = s.user_id
-        WHERE s.active = 1
-          AND COALESCE(s.vip_only, 0) = 0
-          AND COALESCE(story_user.fake, 0) = 1
-          AND story_user.status = 'verified'
-          AND COALESCE(story_user.account_status, 'active') = 'active'
-      )
-      WHERE row_number = 1
-    )
     SELECT
       u.id,
       u.username,
@@ -9739,10 +9722,9 @@ async function buildFakeProfileSnapshotRows(env) {
       u.last_active,
       1 AS fake,
       COALESCE(ps.followers_total, 0) AS followers_total,
-      lps.video_url AS active_story_url
+      '' AS active_story_url
     FROM users u
     LEFT JOIN profile_stats ps ON ps.user_id = u.id
-    LEFT JOIN latest_public_story lps ON lps.user_id = u.id
     WHERE COALESCE(u.fake, 0) = 1
       AND u.status = 'verified'
       AND COALESCE(u.account_status, 'active') = 'active'
@@ -9760,23 +9742,6 @@ async function buildFakeProfileSnapshotRows(env) {
 
 async function buildRealProfileSnapshotRows(env) {
   const { results } = await env.DB.prepare(`
-    WITH latest_public_story AS (
-      SELECT user_id, video_url
-      FROM (
-        SELECT
-          s.user_id,
-          s.video_url,
-          ROW_NUMBER() OVER (PARTITION BY s.user_id ORDER BY s.created_at DESC, s.id DESC) AS row_number
-        FROM stories s
-        JOIN users story_user ON story_user.id = s.user_id
-        WHERE s.active = 1
-          AND COALESCE(s.vip_only, 0) = 0
-          AND COALESCE(story_user.fake, 0) = 0
-          AND story_user.status = 'verified'
-          AND COALESCE(story_user.account_status, 'active') = 'active'
-      )
-      WHERE row_number = 1
-    )
     SELECT
       u.id,
       u.username,
@@ -9803,10 +9768,9 @@ async function buildRealProfileSnapshotRows(env) {
       u.last_active,
       0 AS fake,
       COALESCE(ps.followers_total, 0) AS followers_total,
-      lps.video_url AS active_story_url
+      '' AS active_story_url
     FROM users u
     LEFT JOIN profile_stats ps ON ps.user_id = u.id
-    LEFT JOIN latest_public_story lps ON lps.user_id = u.id
     WHERE COALESCE(u.fake, 0) = 0
       AND u.status = 'verified'
       AND COALESCE(u.account_status, 'active') = 'active'
@@ -9827,7 +9791,6 @@ async function rebuildProfileSnapshots(env, {
   includeFakes = true,
   source = 'unknown',
 } = {}) {
-  await ensureStoriesTable(env);
   const rebuildReal = includeReal !== false;
   const rebuildFakes = includeFakes !== false;
   const previousManifest = await readProfileSnapshotJson(env, PROFILE_SNAPSHOT_MANIFEST_KEY, {
@@ -10052,29 +10015,44 @@ async function loadFakeProfileRowsFromSnapshots(env, options = {}) {
   return loadProfileRowsFromSnapshots(env, { ...options, kind: 'fake' });
 }
 
-async function loadRealStoryRowsFromSnapshot(env, { roleValues = [], fresh = false } = {}) {
+async function loadActiveStoryRowsFromSnapshots(env, { roleValues = [], fresh = false } = {}) {
   const manifest = await readStorySnapshotJson(env, STORY_SNAPSHOT_MANIFEST_KEY, {
     ttlMs: 30_000,
     bypassCache: fresh,
   }).catch(() => null);
-  const key = manifest?.real?.key;
-  if (!key) {
-    console.warn('real story snapshot unavailable; skipping D1 story lookup for profile feed');
+  if (!manifest?.real?.key && !manifest?.fakes) {
+    console.warn('story snapshots unavailable; skipping D1 story lookup for profile feed');
     return [];
   }
 
-  const snapshot = await readStorySnapshotJson(env, key, { bypassCache: fresh }).catch(() => null);
   const roleSet = new Set((Array.isArray(roleValues) ? roleValues : [])
     .map((role) => String(role || '').trim())
     .filter(Boolean));
-  return uniqueStoryRows(Array.isArray(snapshot?.stories) ? snapshot.stories : [])
-    .filter((row) => Number(row?.fake || 0) === 0)
-    .filter((row) => roleSet.size === 0 || roleSet.has(String(row?.role || '')))
-    .map((row) => ({
-      user_id: String(row?.user_id || ''),
-      video_url: row?.video_url || '',
-      vip_only: Number(row?.vip_only || 0),
-    }));
+  const filterByRole = (row) => roleSet.size === 0 || roleSet.has(String(row?.role || ''));
+
+  const realSnapshotPromise = manifest?.real?.key
+    ? readStorySnapshotJson(env, manifest.real.key, { bypassCache: fresh }).catch(() => null)
+    : Promise.resolve(null);
+  const buckets = getStorySnapshotBucketsForRoles(roleValues);
+  const fakeSnapshotPromises = buckets.map(async (bucket) => {
+    const key = manifest?.fakes?.[bucket]?.key;
+    if (!key) return null;
+    return readStorySnapshotJson(env, key, { bypassCache: fresh }).catch(() => null);
+  });
+  const [realSnapshot, ...fakeSnapshots] = await Promise.all([
+    realSnapshotPromise,
+    ...fakeSnapshotPromises,
+  ]);
+  return uniqueStoryRows([
+    ...(Array.isArray(realSnapshot?.stories) ? realSnapshot.stories : []),
+    ...fakeSnapshots.flatMap((snapshot) => (
+      Array.isArray(snapshot?.stories) ? snapshot.stories : []
+    )),
+  ].filter(filterByRole)).map((row) => ({
+    user_id: String(row?.user_id || ''),
+    video_url: row?.video_url || '',
+    vip_only: Number(row?.vip_only || 0),
+  }));
 }
 
 function getStorySnapshotBucketsForRoles(roleValues = []) {
