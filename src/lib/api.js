@@ -22,7 +22,7 @@ const CLIENT_CACHE_VERSION = 'media-paths-v7-avatar-race-fix';
 const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const STORY_SNAPSHOT_CACHE_PREFIX = 'mansion_story_snapshot:';
-const STORY_SNAPSHOT_SELECTION_CACHE_PREFIX = 'mansion_story_snapshot_feed_v2:';
+const STORY_SNAPSHOT_SELECTION_CACHE_PREFIX = 'mansion_story_snapshot_feed_v3:';
 const STORY_SNAPSHOT_MANIFEST_TTL_MS = 10 * 60_000;
 const STORY_SNAPSHOT_ASSET_TTL_MS = 24 * 60 * 60_000;
 const STORY_SNAPSHOT_FAKE_ROTATION_MS = 5 * 60_000;
@@ -1909,18 +1909,35 @@ function parseStoryRoleArray(value) {
   return [];
 }
 
+function normalizeStoryRoleValues(value) {
+  const roles = parseStoryRoleArray(value)
+    .map((role) => String(role || '').trim())
+    .filter((role) => STORY_SEEKING_ROLE_IDS.includes(role));
+  if (roles.length === 0 || roles.length >= STORY_SEEKING_ROLE_IDS.length) return [];
+  return [...new Set(roles.flatMap((role) => (role === 'pareja' ? STORY_PAIR_ROLE_IDS : [role])))];
+}
+
+function readStoredViewerSeeking() {
+  const storedSeeking = getStoredUser()?.seeking;
+  const storedRoles = normalizeStoryRoleValues(storedSeeking);
+  if (storedRoles.length > 0) return storedRoles;
+
+  try {
+    const storedFilter = localStorage.getItem('mansion_feed_filter') || '';
+    if (storedFilter && storedFilter !== 'all') return normalizeStoryRoleValues(storedFilter);
+  } catch {}
+
+  return [];
+}
+
 function getStoryRoleBucket(role) {
   return STORY_PAIR_ROLE_IDS.includes(role) ? 'pareja' : role;
 }
 
 function getViewerStoryRoleValues(viewer) {
-  const seeking = parseStoryRoleArray(viewer?.seeking)
-    .map((role) => String(role || '').trim())
-    .filter((role) => STORY_SEEKING_ROLE_IDS.includes(role));
-  const filteredSeeking = seeking.length > 0 && seeking.length < STORY_SEEKING_ROLE_IDS.length
-    ? seeking
-    : [];
-  return [...new Set(filteredSeeking.flatMap((role) => (role === 'pareja' ? STORY_PAIR_ROLE_IDS : [role])))];
+  const explicitRoles = normalizeStoryRoleValues(viewer?.roleValues || viewer?.seeking);
+  if (explicitRoles.length > 0) return explicitRoles;
+  return viewer?.id ? readStoredViewerSeeking() : [];
 }
 
 function getStorySnapshotBucketsForRoleValues(roleValues = []) {

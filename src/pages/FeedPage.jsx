@@ -18,7 +18,7 @@ const FEED_CACHE_KEY = 'mansion_feed';
 const FEED_CACHE_VERSION = 2;
 const FEED_GLOBAL_VERSION_KEY = 'mansion_feed_cache_version';
 const HOME_STORIES_CACHE_PREFIX = 'mansion_home_stories:';
-const HOME_STORIES_CACHE_VERSION = 2;
+const HOME_STORIES_CACHE_VERSION = 3;
 const HOME_STORIES_CACHE_TTL_MS = 5 * 60_000;
 const HOME_FEED_FOCUS_EVENT = 'mansion-home-feed-focus';
 const HOME_FEED_RESET_EVENT = 'mansion-home-feed-reset';
@@ -184,13 +184,51 @@ function setCachedFeed(data) {
   } catch {}
 }
 
-function getHomeStoriesCacheKey(userId, isDesktopViewport) {
-  return `${HOME_STORIES_CACHE_PREFIX}${userId || 'viewer'}:${isDesktopViewport ? 'desktop' : 'mobile'}`;
+function getHomeStoriesRoleCacheKey(seeking = []) {
+  const values = Array.isArray(seeking)
+    ? seeking
+    : (typeof seeking === 'string' && seeking !== 'all' ? seeking.split(',') : []);
+  const roles = values
+    .map((role) => String(role || '').trim())
+    .filter(Boolean)
+    .sort();
+  return roles.length ? roles.join(',') : 'all';
 }
 
-function getCachedHomeStoriesEntry(userId, isDesktopViewport, limit, { allowStale = false } = {}) {
+function parseHomeStoriesSeeking(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value !== 'string' || !value || value === 'all') return [];
   try {
-    const raw = localStorage.getItem(getHomeStoriesCacheKey(userId, isDesktopViewport));
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.filter(Boolean);
+  } catch {}
+  return value.split(',').map((role) => role.trim()).filter(Boolean);
+}
+
+function getHomeStoriesViewerSeeking(user) {
+  const directSeeking = parseHomeStoriesSeeking(user?.seeking);
+  if (directSeeking.length > 0) return directSeeking;
+
+  try {
+    const stored = JSON.parse(localStorage.getItem('mansion_user') || 'null');
+    const storedSeeking = parseHomeStoriesSeeking(stored?.seeking);
+    if (storedSeeking.length > 0) return storedSeeking;
+  } catch {}
+
+  try {
+    return parseHomeStoriesSeeking(localStorage.getItem('mansion_feed_filter') || '');
+  } catch {
+    return [];
+  }
+}
+
+function getHomeStoriesCacheKey(userId, isDesktopViewport, roleKey = 'all') {
+  return `${HOME_STORIES_CACHE_PREFIX}${userId || 'viewer'}:${isDesktopViewport ? 'desktop' : 'mobile'}:${roleKey || 'all'}`;
+}
+
+function getCachedHomeStoriesEntry(userId, isDesktopViewport, limit, { allowStale = false, roleKey = 'all' } = {}) {
+  try {
+    const raw = localStorage.getItem(getHomeStoriesCacheKey(userId, isDesktopViewport, roleKey));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (Number(parsed?.version || 0) !== HOME_STORIES_CACHE_VERSION) return null;
@@ -211,13 +249,13 @@ function getCachedHomeStoriesEntry(userId, isDesktopViewport, limit, { allowStal
   }
 }
 
-function getCachedHomeStories(userId, isDesktopViewport, limit) {
-  return getCachedHomeStoriesEntry(userId, isDesktopViewport, limit)?.stories || [];
+function getCachedHomeStories(userId, isDesktopViewport, limit, roleKey = 'all') {
+  return getCachedHomeStoriesEntry(userId, isDesktopViewport, limit, { roleKey })?.stories || [];
 }
 
-function setCachedHomeStories(userId, isDesktopViewport, stories, limit) {
+function setCachedHomeStories(userId, isDesktopViewport, stories, limit, roleKey = 'all') {
   try {
-    localStorage.setItem(getHomeStoriesCacheKey(userId, isDesktopViewport), JSON.stringify({
+    localStorage.setItem(getHomeStoriesCacheKey(userId, isDesktopViewport, roleKey), JSON.stringify({
       version: HOME_STORIES_CACHE_VERSION,
       timestamp: Date.now(),
       stories: (Array.isArray(stories) ? stories : []).slice(0, Math.max(1, Number(limit) || 25)),
@@ -251,7 +289,9 @@ export default function FeedPage({ initialData }) {
     const bootstrapProfiles = mapStoriesToRailProfiles(filterViewerStories(bootstrapStories, user?.id));
     if (bootstrapProfiles.length > 0) return bootstrapProfiles;
     const initialLimit = getInitialStoryLimit(siteSettings, isDesktopViewport);
-    return mapStoriesToRailProfiles(filterViewerStories(getCachedHomeStories(user?.id, isDesktopViewport, initialLimit), user?.id));
+    const initialSeeking = getHomeStoriesViewerSeeking(user);
+    const initialRoleKey = getHomeStoriesRoleCacheKey(initialSeeking);
+    return mapStoriesToRailProfiles(filterViewerStories(getCachedHomeStories(user?.id, isDesktopViewport, initialLimit, initialRoleKey), user?.id));
   });
   const [showStoriesSection, setShowStoriesSection] = useState(true);
   const [showGridSection, setShowGridSection] = useState(true);
@@ -425,9 +465,11 @@ export default function FeedPage({ initialData }) {
   const loadHomeStories = useCallback(async ({ syncBootstrap = false, fresh = false } = {}) => {
     const myId = ++homeStoriesLoadIdRef.current;
     const resolvedLimit = getInitialStoryLimit(settingsRef.current, isDesktopViewport);
+    const viewerSeeking = getHomeStoriesViewerSeeking(user);
+    const roleKey = getHomeStoriesRoleCacheKey(viewerSeeking);
     const cachedEntry = fresh
       ? null
-      : getCachedHomeStoriesEntry(user?.id, isDesktopViewport, resolvedLimit);
+      : getCachedHomeStoriesEntry(user?.id, isDesktopViewport, resolvedLimit, { roleKey });
 
     const applyHomeStories = (stories, { timestamp = Date.now() } = {}) => {
       const nextStories = filterViewerStories(stories, user?.id);
@@ -451,14 +493,14 @@ export default function FeedPage({ initialData }) {
     try {
       const snapshotData = await getStorySnapshotFeed({
         limit: resolvedLimit,
-        viewer: { id: user?.id || '', seeking: user?.seeking || [] },
+        viewer: { id: user?.id || '', seeking: viewerSeeking, roleValues: viewerSeeking },
         fresh,
       });
       if (myId !== homeStoriesLoadIdRef.current) return null;
 
       const snapshotStories = filterViewerStories(snapshotData?.stories, user?.id);
       if (snapshotStories.length > 0) {
-        setCachedHomeStories(user?.id, isDesktopViewport, snapshotStories, resolvedLimit);
+        setCachedHomeStories(user?.id, isDesktopViewport, snapshotStories, resolvedLimit, roleKey);
         return applyHomeStories(snapshotStories);
       }
     } catch {
@@ -478,13 +520,13 @@ export default function FeedPage({ initialData }) {
       if (myId !== homeStoriesLoadIdRef.current) return null;
 
       const nextStories = filterViewerStories(data?.stories, user?.id);
-      setCachedHomeStories(user?.id, isDesktopViewport, nextStories, resolvedLimit);
+      setCachedHomeStories(user?.id, isDesktopViewport, nextStories, resolvedLimit, roleKey);
       return applyHomeStories(nextStories);
     } catch {
       if (myId !== homeStoriesLoadIdRef.current) return null;
       if (homeStoriesLengthRef.current === 0) {
         const cachedStories = filterViewerStories(
-          getCachedHomeStoriesEntry(user?.id, isDesktopViewport, resolvedLimit, { allowStale: true })?.stories || [],
+          getCachedHomeStoriesEntry(user?.id, isDesktopViewport, resolvedLimit, { allowStale: true, roleKey })?.stories || [],
           user?.id
         );
         applyHomeStories(cachedStories);
