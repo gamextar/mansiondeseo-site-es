@@ -1301,7 +1301,7 @@ async function refreshStaticSnapshotsForUserChange(env, beforeUser, afterUser = 
   }
 
   if (activeStoryCount > 0) {
-    const includeRealStories = includeReal && !realFeedItemsReady;
+    const includeRealStories = includeReal;
     if (includeRealStories || includeFakes) {
       await rebuildStorySnapshots(env, {
         includeReal: includeRealStories,
@@ -1313,7 +1313,7 @@ async function refreshStaticSnapshotsForUserChange(env, beforeUser, afterUser = 
 
   return {
     profileSnapshots: includeRealSnapshots || includeFakes,
-    storySnapshots: activeStoryCount > 0 && ((!realFeedItemsReady && includeReal) || includeFakes),
+    storySnapshots: activeStoryCount > 0 && (includeReal || includeFakes),
     realFeedItems: includeReal && realFeedItemsReady,
   };
 }
@@ -8515,13 +8515,11 @@ async function handleAdminDeleteUser(request, env, userId) {
     });
   }
   if (deletion.deletedPublicStories > 0) {
-    if (deletion.fake || !realFeedItemsReady) {
-      await rebuildStorySnapshots(env, {
-        includeReal: !deletion.fake,
-        includeFakes: deletion.fake,
-        source: 'admin-delete-user',
-      });
-    }
+    await rebuildStorySnapshots(env, {
+      includeReal: !deletion.fake,
+      includeFakes: deletion.fake,
+      source: 'admin-delete-user',
+    });
   }
   await bumpFeedCacheVersion(env);
 
@@ -8593,9 +8591,9 @@ async function handleAdminBulkDeleteUsers(request, env) {
         source: 'admin-bulk-delete-users',
       });
     }
-    if (deletedFakeStories || (deletedRealStories && !realFeedItemsReady)) {
+    if (deletedFakeStories || deletedRealStories) {
       await rebuildStorySnapshots(env, {
-        includeReal: deletedRealStories && !realFeedItemsReady,
+        includeReal: deletedRealStories,
         includeFakes: deletedFakeStories,
         source: 'admin-bulk-delete-users',
       });
@@ -11676,9 +11674,10 @@ async function handleAdminUploadStory(request, env) {
     await syncFakeStoryCandidateForUser(env, userId);
     await rebuildFakeStoryRotation(env, { count: FAKE_STORY_ROTATION_POOL_SIZE, preferredUserIds: [userId], source: 'admin-upload-story' });
     await rebuildStorySnapshots(env, { includeReal: false, includeFakes: true, source: 'admin-upload-story' });
-  } else if (await areRealFeedItemsReady(env)) {
-    await syncRealStoryFeedItemsForUser(env, userId);
   } else {
+    if (await areRealFeedItemsReady(env)) {
+      await syncRealStoryFeedItemsForUser(env, userId);
+    }
     await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'admin-upload-story-real' });
   }
   await bumpFeedCacheVersion(env);
@@ -11721,9 +11720,8 @@ async function handleDeleteOwnStory(request, env, storyId) {
   } else {
     if (await areRealFeedItemsReady(env)) {
       await syncRealStoryFeedItemsForUser(env, auth.sub);
-    } else {
-      await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'delete-real-story' });
     }
+    await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'delete-real-story' });
   }
   await bumpFeedCacheVersion(env);
 
@@ -11768,9 +11766,10 @@ async function handleAdminDeleteStory(request, env, storyId) {
       includeFakes: true,
       source: 'admin-delete-story',
     });
-  } else if (await areRealFeedItemsReady(env)) {
-    await syncRealStoryFeedItemsForUser(env, story.user_id);
   } else {
+    if (await areRealFeedItemsReady(env)) {
+      await syncRealStoryFeedItemsForUser(env, story.user_id);
+    }
     await rebuildStorySnapshots(env, {
       includeReal: true,
       includeFakes: false,
@@ -11812,9 +11811,10 @@ async function handleAdminUpdateStory(request, env, storyId) {
       includeFakes: true,
       source: 'admin-update-story',
     });
-  } else if (await areRealFeedItemsReady(env)) {
-    await syncRealStoryFeedItemForStory(env, storyId);
   } else {
+    if (await areRealFeedItemsReady(env)) {
+      await syncRealStoryFeedItemForStory(env, storyId);
+    }
     await rebuildStorySnapshots(env, {
       includeReal: true,
       includeFakes: false,
@@ -11992,9 +11992,8 @@ async function handleUploadStory(request, env) {
 
   if (await areRealFeedItemsReady(env)) {
     await syncRealStoryFeedItemsForUser(env, auth.sub);
-  } else {
-    await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'user-upload-story' });
   }
+  await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'user-upload-story' });
   await bumpFeedCacheVersion(env);
 
   return json({ id: storyId, video_url: videoUrl, caption, vip_only: vipOnly }, 201);
