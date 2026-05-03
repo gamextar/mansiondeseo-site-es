@@ -120,7 +120,7 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [query, setQuery] = useState('');
-  const [fakeFilter, setFakeFilter] = useState('all');
+  const [fakeFilter, setFakeFilter] = useState('0');
   const [duplicateFilter, setDuplicateFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
