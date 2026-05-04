@@ -38,6 +38,12 @@ function invalidateFeedBrowseCache() {
   }
 }
 
+function invalidateAdminUsersCountCache() {
+  for (const key of _cache.keys()) {
+    if (String(key).startsWith('admin-users-count:')) _cache.delete(key);
+  }
+}
+
 async function bumpFeedCacheVersion(env) {
   const nextVersion = String(Date.now());
   await env.DB.prepare(`
@@ -97,6 +103,7 @@ let _messageConversationIdReady = null;
 let _messageAttachmentColumnsReady = null;
 let _userBrowseIndexesReady = null;
 let _userLookupIndexesReady = null;
+let _adminUserSearchIndexesReady = null;
 let _userFakeColumnReady = null;
 let _userFeedPriorityColumnReady = null;
 let _userDuplicateFlagColumnReady = null;
@@ -1625,6 +1632,42 @@ async function ensureUserLookupIndexes(env) {
   }
 
   return _userLookupIndexesReady;
+}
+
+async function ensureAdminUserSearchIndexes(env) {
+  if (!_adminUserSearchIndexesReady) {
+    _adminUserSearchIndexesReady = Promise.all([
+      ensureUserLookupIndexes(env),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users(LOWER(email))'
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_users_created_id ON users(created_at DESC, id DESC)'
+      ).run(),
+    ]).catch((err) => {
+      _adminUserSearchIndexesReady = null;
+      throw err;
+    });
+  }
+
+  return _adminUserSearchIndexesReady;
+}
+
+function appendAdminUserSearchFilter(filters, bindings, q) {
+  const needle = String(q || '').trim().toLowerCase();
+  if (!needle) return false;
+  const prefixEnd = `${needle}~`;
+  filters.push(`(
+    id = ? OR (id >= ? AND id < ?)
+    OR LOWER(email) = ? OR (LOWER(email) >= ? AND LOWER(email) < ?)
+    OR LOWER(username) = ? OR (LOWER(username) >= ? AND LOWER(username) < ?)
+  )`);
+  bindings.push(
+    needle, needle, prefixEnd,
+    needle, needle, prefixEnd,
+    needle, needle, prefixEnd,
+  );
+  return true;
 }
 
 async function ensureUsersFakeColumn(env) {
@@ -7406,6 +7449,7 @@ async function handleAdminGetUsers(request, env) {
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+  await ensureAdminUserSearchIndexes(env);
 
   const url = new URL(request.url);
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
@@ -7425,10 +7469,7 @@ async function handleAdminGetUsers(request, env) {
   const filters = [];
   const bindings = [];
 
-  if (q) {
-    filters.push('(email LIKE ? OR username LIKE ? OR id = ?)');
-    bindings.push(`%${q}%`, `%${q}%`, q);
-  }
+  const hasSearch = appendAdminUserSearchFilter(filters, bindings, q);
 
   if (fakeFilter === '1' || fakeFilter === '0') {
     filters.push('fake = ?');
@@ -7509,21 +7550,32 @@ async function handleAdminGetUsers(request, env) {
     ORDER BY pu.created_at DESC, pu.id DESC
   `;
 
-  const countCacheKey = `admin-users-count:${hashStringToUint32(JSON.stringify([countQuery, bindings]))}`;
-  const countPromise = cached(countCacheKey, ADMIN_USERS_COUNT_TTL_MS, async () => {
-    const row = bindings.length
-      ? await env.DB.prepare(countQuery).bind(...bindings).first()
-      : await env.DB.prepare(countQuery).first();
-    return { total: Number(row?.total || 0) };
-  });
+  const countPromise = hasSearch
+    ? Promise.resolve(null)
+    : cached(`admin-users-count:${hashStringToUint32(JSON.stringify([countQuery, bindings]))}`, ADMIN_USERS_COUNT_TTL_MS, async () => {
+      const row = bindings.length
+        ? await env.DB.prepare(countQuery).bind(...bindings).first()
+        : await env.DB.prepare(countQuery).first();
+      return { total: Number(row?.total || 0) };
+    });
+  const fetchLimit = hasSearch ? limit + 1 : limit;
   const dataStmt = bindings.length
-    ? env.DB.prepare(dataQuery).bind(...bindings, limit, offset)
-    : env.DB.prepare(dataQuery).bind(limit, offset);
+    ? env.DB.prepare(dataQuery).bind(...bindings, fetchLimit, offset)
+    : env.DB.prepare(dataQuery).bind(fetchLimit, offset);
 
   const [countRes, dataRes] = await Promise.all([countPromise, dataStmt.all()]);
+  const rawUsers = dataRes.results || [];
+  const hasMore = hasSearch && rawUsers.length > limit;
+  const pageUsers = hasSearch ? rawUsers.slice(0, limit) : rawUsers;
+  const total = hasSearch
+    ? offset + pageUsers.length + (hasMore ? 1 : 0)
+    : Number(countRes?.total || 0);
+  const pages = hasSearch
+    ? (hasMore ? page + 1 : Math.max(1, page))
+    : Math.ceil(total / limit);
 
   return json({
-    users: dataRes.results.map(u => {
+    users: pageUsers.map(u => {
       return {
         ...u,
         age: getPublicAge(u),
@@ -7557,9 +7609,11 @@ async function handleAdminGetUsers(request, env) {
         photo_thumbs: {},
       };
     }),
-    total: countRes.total,
+    total,
     page,
-    pages: Math.ceil(countRes.total / limit),
+    pages,
+    has_more: hasMore,
+    approximate_total: hasSearch,
   });
 }
 
@@ -7572,6 +7626,7 @@ async function handleAdminGetUserIds(request, env) {
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+  await ensureAdminUserSearchIndexes(env);
 
   const url = new URL(request.url);
   const q = (url.searchParams.get('q') || '').trim();
@@ -7588,10 +7643,7 @@ async function handleAdminGetUserIds(request, env) {
   const filters = [];
   const bindings = [];
 
-  if (q) {
-    filters.push('(email LIKE ? OR username LIKE ? OR id = ?)');
-    bindings.push(`%${q}%`, `%${q}%`, q);
-  }
+  appendAdminUserSearchFilter(filters, bindings, q);
 
   if (fakeFilter === '1' || fakeFilter === '0') {
     filters.push('fake = ?');
@@ -8553,32 +8605,39 @@ async function handleAdminDeleteUser(request, env, userId) {
 
   const deletion = await deleteUserCompletely(env, user);
   const realFeedItemsReady = !deletion.fake ? await areRealFeedItemsReady(env) : false;
-  if (!deletion.fake && realFeedItemsReady) {
+  let changedLiveFeed = false;
+  if (deletion.fake) {
+    await markFakeSnapshotsDirty(env, {
+      profiles: true,
+      stories: deletion.deletedPublicStories > 0,
+    });
+  } else if (realFeedItemsReady) {
     await ensureFeedItemTables(env);
     await Promise.all([
       env.DB.prepare('DELETE FROM profile_feed_items WHERE user_id = ?').bind(userId).run(),
       env.DB.prepare('DELETE FROM story_feed_items WHERE user_id = ?').bind(userId).run(),
     ]);
+    changedLiveFeed = true;
   } else {
     await rebuildProfileSnapshots(env, {
-      includeReal: !deletion.fake,
-      includeFakes: deletion.fake,
+      includeReal: true,
+      includeFakes: false,
       source: 'admin-delete-user',
     });
-  }
-  if (deletion.deletedPublicStories > 0) {
-    if (deletion.fake || !realFeedItemsReady) {
+    changedLiveFeed = true;
+    if (deletion.deletedPublicStories > 0) {
       await rebuildStorySnapshots(env, {
-        includeReal: !deletion.fake,
-        includeFakes: deletion.fake,
+        includeReal: true,
+        includeFakes: false,
         source: 'admin-delete-user',
       });
     }
   }
-  await bumpFeedCacheVersion(env);
+  if (changedLiveFeed) await bumpFeedCacheVersion(env);
+  else invalidateAdminUsersCountCache();
 
   console.log(`🗑️ Admin eliminó usuario ${userId} (${user.email})`);
-  return json({ success: true });
+  return json({ success: true, fake_snapshots_dirty: !!deletion.fake });
 }
 
 async function handleAdminBulkDeleteUsers(request, env) {
@@ -8624,6 +8683,7 @@ async function handleAdminBulkDeleteUsers(request, env) {
   }
   if (results.some((item) => item.deleted)) {
     const realFeedItemsReady = deletedRealProfiles ? await areRealFeedItemsReady(env) : false;
+    let changedLiveFeed = false;
     if (deletedRealProfiles && realFeedItemsReady) {
       await ensureFeedItemTables(env);
       const deletedRealIds = results
@@ -8637,28 +8697,39 @@ async function handleAdminBulkDeleteUsers(request, env) {
           env.DB.prepare(`DELETE FROM story_feed_items WHERE user_id IN (${placeholders})`).bind(...deletedRealIds).run(),
         ]);
       }
+      changedLiveFeed = true;
     }
-    if ((deletedRealProfiles && !realFeedItemsReady) || deletedFakeProfiles) {
+    if (deletedRealProfiles && !realFeedItemsReady) {
       await rebuildProfileSnapshots(env, {
-        includeReal: deletedRealProfiles && !realFeedItemsReady,
-        includeFakes: deletedFakeProfiles,
+        includeReal: true,
+        includeFakes: false,
         source: 'admin-bulk-delete-users',
       });
+      changedLiveFeed = true;
     }
-    if (deletedFakeStories || (deletedRealStories && !realFeedItemsReady)) {
+    if (deletedRealStories && !realFeedItemsReady) {
       await rebuildStorySnapshots(env, {
-        includeReal: deletedRealStories && !realFeedItemsReady,
-        includeFakes: deletedFakeStories,
+        includeReal: true,
+        includeFakes: false,
         source: 'admin-bulk-delete-users',
       });
+      changedLiveFeed = true;
     }
-    await bumpFeedCacheVersion(env);
+    if (deletedFakeProfiles || deletedFakeStories) {
+      await markFakeSnapshotsDirty(env, {
+        profiles: deletedFakeProfiles,
+        stories: deletedFakeStories,
+      });
+    }
+    if (changedLiveFeed) await bumpFeedCacheVersion(env);
+    else invalidateAdminUsersCountCache();
   }
 
   return json({
     success: true,
     deleted: results.filter((item) => item.deleted).length,
     skipped: results.filter((item) => !item.deleted).length,
+    fake_snapshots_dirty: deletedFakeProfiles || deletedFakeStories,
     results,
   });
 }
