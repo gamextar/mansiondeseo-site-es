@@ -1644,6 +1644,15 @@ async function ensureAdminUserSearchIndexes(env) {
       env.DB.prepare(
         'CREATE INDEX IF NOT EXISTS idx_users_created_id ON users(created_at DESC, id DESC)'
       ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_users_admin_fake_created ON users(fake, created_at DESC, id DESC)'
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_users_admin_email_lower_fake_created ON users(LOWER(email), fake, created_at DESC, id DESC)'
+      ).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_users_admin_username_lower_fake_created ON users(LOWER(username), fake, created_at DESC, id DESC)'
+      ).run(),
     ]).catch((err) => {
       _adminUserSearchIndexesReady = null;
       throw err;
@@ -1653,20 +1662,31 @@ async function ensureAdminUserSearchIndexes(env) {
   return _adminUserSearchIndexesReady;
 }
 
-function appendAdminUserSearchFilter(filters, bindings, q) {
-  const needle = String(q || '').trim().toLowerCase();
-  if (!needle) return false;
+function bindAdminPrefixSearch(filters, bindings, expression, needle) {
   const prefixEnd = `${needle}~`;
-  filters.push(`(
-    id = ? OR (id >= ? AND id < ?)
-    OR LOWER(email) = ? OR (LOWER(email) >= ? AND LOWER(email) < ?)
-    OR LOWER(username) = ? OR (LOWER(username) >= ? AND LOWER(username) < ?)
-  )`);
-  bindings.push(
-    needle, needle, prefixEnd,
-    needle, needle, prefixEnd,
-    needle, needle, prefixEnd,
-  );
+  filters.push(`(${expression} = ? OR (${expression} >= ? AND ${expression} < ?))`);
+  bindings.push(needle, needle, prefixEnd);
+}
+
+function appendAdminUserSearchFilter(filters, bindings, q) {
+  const rawNeedle = String(q || '').trim();
+  if (!rawNeedle) return false;
+  const explicitMatch = rawNeedle.match(/^(id|email|user|username):(.+)$/i);
+  const explicitType = explicitMatch?.[1]?.toLowerCase() || '';
+  const needle = String(explicitMatch?.[2] || rawNeedle).trim().toLowerCase();
+  if (!needle) return false;
+
+  if (explicitType === 'id' || (!explicitType && needle.includes('-'))) {
+    bindAdminPrefixSearch(filters, bindings, 'id', needle);
+    return true;
+  }
+
+  if (explicitType === 'email' || (!explicitType && needle.includes('@'))) {
+    bindAdminPrefixSearch(filters, bindings, 'LOWER(email)', needle);
+    return true;
+  }
+
+  bindAdminPrefixSearch(filters, bindings, 'LOWER(username)', needle);
   return true;
 }
 
