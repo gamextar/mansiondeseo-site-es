@@ -7,9 +7,9 @@ import { getGalleryPhotoThumbnail } from '../../lib/profileMedia';
 import { optimizeAvatarThumbnailFromUrl, optimizeGalleryThumbnailFromUrl } from '../../lib/imageOptimize';
 
 const ADMIN_SELECTED_GALLERY_THUMB_BATCH_LIMIT = 20;
-const ADMIN_GALLERY_THUMB_USER_BATCH_LIMIT = 50;
-const ADMIN_AVATAR_THUMB_BATCH_LIMIT = 50;
-const ADMIN_USERS_PAGE_LIMIT = 50;
+const ADMIN_GALLERY_THUMB_USER_BATCH_LIMIT = 20;
+const ADMIN_AVATAR_THUMB_BATCH_LIMIT = 20;
+const ADMIN_USERS_PAGE_LIMIT = 20;
 const ADMIN_USERNAME_MAX_LENGTH = 18;
 
 function timeAgo(dateStr) {
