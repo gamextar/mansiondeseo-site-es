@@ -143,14 +143,18 @@ export default function AdminPaymentLogsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [gatewayFilter, setGatewayFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [refreshingUala, setRefreshingUala] = useState(false);
 
   const fetchLogs = useCallback(async (
     nextPage = 1,
     nextQuery = query,
     nextStatus = statusFilter,
-    nextGateway = gatewayFilter
+    nextGateway = gatewayFilter,
+    options = {}
   ) => {
-    setLoading(true);
+    const shouldRefreshUala = Boolean(options.refreshUala);
+    if (shouldRefreshUala) setRefreshingUala(true);
+    else setLoading(true);
     try {
       const data = await adminGetSubscriptionPaymentLogs({
         page: nextPage,
@@ -158,6 +162,7 @@ export default function AdminPaymentLogsPage() {
         q: nextQuery,
         status: nextStatus === 'all' ? '' : nextStatus,
         gateway: nextGateway === 'all' ? '' : nextGateway,
+        refresh_uala: shouldRefreshUala,
       });
       setLogs(Array.isArray(data.logs) ? data.logs : []);
       setPage(Number(data.page) || 1);
@@ -166,7 +171,8 @@ export default function AdminPaymentLogsPage() {
     } catch (err) {
       alert(err.message || 'Error al cargar logs de pagos');
     } finally {
-      setLoading(false);
+      if (shouldRefreshUala) setRefreshingUala(false);
+      else setLoading(false);
     }
   }, [gatewayFilter, query, statusFilter]);
 
@@ -224,7 +230,7 @@ export default function AdminPaymentLogsPage() {
         </div>
 
         <div className="rounded-3xl border border-mansion-border/30 bg-mansion-card/50 p-4 backdrop-blur-xl">
-          <form onSubmit={handleSearch} className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_170px_170px_auto_auto]">
+          <form onSubmit={handleSearch} className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_170px_170px_auto_auto_auto]">
             <label className="flex items-center gap-3 rounded-2xl border border-mansion-border/30 bg-black/20 px-4 py-3">
               <Search className="h-4 w-4 text-text-dim" />
               <input
@@ -254,6 +260,17 @@ export default function AdminPaymentLogsPage() {
             <button type="button" onClick={() => fetchLogs(page, query, statusFilter, gatewayFilter)} className="btn-ghost flex items-center justify-center gap-2">
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Recargar
+            </button>
+
+            <button
+              type="button"
+              onClick={() => fetchLogs(page, query, statusFilter, gatewayFilter, { refreshUala: true })}
+              disabled={refreshingUala}
+              className="btn-ghost flex items-center justify-center gap-2 disabled:opacity-60"
+              title="Consulta Ualá para actualizar solo los pagos visibles en curso."
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshingUala ? 'animate-spin' : ''}`} />
+              Consultar Ualá
             </button>
           </form>
         </div>

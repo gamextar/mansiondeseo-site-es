@@ -8151,6 +8151,7 @@ async function handleAdminGetSubscriptionPaymentLogs(request, env) {
   const q = String(url.searchParams.get('q') || '').trim();
   const gateway = String(url.searchParams.get('gateway') || '').trim().toLowerCase();
   const status = String(url.searchParams.get('status') || '').trim().toLowerCase();
+  const refreshUala = ['1', 'true', 'yes'].includes(String(url.searchParams.get('refresh_uala') || '').trim().toLowerCase());
   const offset = (page - 1) * limit;
 
   let baseQuery = `
@@ -8222,7 +8223,9 @@ async function handleAdminGetSubscriptionPaymentLogs(request, env) {
   };
 
   let [countRow, dataRows] = await runLogQuery();
-  const refreshedUalaLogs = await refreshVisibleUalaPaymentLogs(env, dataRows.results || []);
+  const refreshedUalaLogs = refreshUala
+    ? await refreshVisibleUalaPaymentLogs(env, dataRows.results || [])
+    : 0;
   if (refreshedUalaLogs > 0) {
     [countRow, dataRows] = await runLogQuery();
   }

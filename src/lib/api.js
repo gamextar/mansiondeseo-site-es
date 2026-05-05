@@ -1617,11 +1617,12 @@ export async function adminRebuildFeedItems() {
   return result;
 }
 
-export async function adminGetSubscriptionPaymentLogs({ page = 1, limit = 25, q = '', status = '', gateway = '' } = {}) {
+export async function adminGetSubscriptionPaymentLogs({ page = 1, limit = 25, q = '', status = '', gateway = '', refresh_uala = false } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (q) params.set('q', q);
   if (status) params.set('status', status);
   if (gateway) params.set('gateway', gateway);
+  if (refresh_uala) params.set('refresh_uala', '1');
   return apiFetch(`/admin/subscription-payment-logs?${params}`);
 }
 
