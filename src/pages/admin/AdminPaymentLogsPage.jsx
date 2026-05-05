@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Clock3, Copy, CreditCard, RefreshCw, Search, XCircle } from 'lucide-react';
-import { adminGetSubscriptionPaymentLogs } from '../../lib/api';
+import { CheckCircle2, ChevronDown, Clock3, Copy, CreditCard, RefreshCw, Search, Trash2, XCircle } from 'lucide-react';
+import { adminDeleteSubscriptionPaymentLog, adminGetSubscriptionPaymentLogs } from '../../lib/api';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Todos' },
@@ -144,6 +144,8 @@ export default function AdminPaymentLogsPage() {
   const [gatewayFilter, setGatewayFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [refreshingUala, setRefreshingUala] = useState(false);
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const [deletingId, setDeletingId] = useState('');
 
   const fetchLogs = useCallback(async (
     nextPage = 1,
@@ -196,6 +198,36 @@ export default function AdminPaymentLogsPage() {
       await navigator.clipboard.writeText(JSON.stringify(entry, null, 2));
     } catch {
       alert('No se pudo copiar el log');
+    }
+  };
+
+  const toggleExpanded = (id) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDelete = async (entry) => {
+    if (!entry?.id || deletingId) return;
+    const label = entry.username || entry.email || entry.user_id || entry.id;
+    if (!confirm(`¿Borrar este evento de pago VIP?\n\n${label}\n${planLabel(entry.plan_id)} · ${formatCurrency(entry.amount)}\n\nEsto solo elimina el evento del registro, no modifica la suscripción ni el pago procesado.`)) return;
+    setDeletingId(entry.id);
+    try {
+      await adminDeleteSubscriptionPaymentLog(entry.id);
+      setLogs((prev) => prev.filter((item) => item.id !== entry.id));
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(entry.id);
+        return next;
+      });
+      setTotal((prev) => Math.max(0, Number(prev || 0) - 1));
+    } catch (err) {
+      alert(err.message || 'No se pudo borrar el evento');
+    } finally {
+      setDeletingId('');
     }
   };
 
@@ -294,12 +326,13 @@ export default function AdminPaymentLogsPage() {
             const metadata = entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {};
             const userLabel = entry.username || entry.email || entry.user_id || 'Usuario eliminado';
             const ualaNote = getUalaAdminNote(entry);
+            const expanded = expandedIds.has(entry.id);
 
             return (
-              <article key={entry.id} className="rounded-3xl border border-mansion-border/30 bg-mansion-card/45 p-5 backdrop-blur-xl">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0 space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
+              <article key={entry.id} className="rounded-2xl border border-mansion-border/30 bg-mansion-card/45 px-4 py-3 backdrop-blur-xl">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
                       <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${statusMeta.className}`}>
                         <StatusIcon className="h-3.5 w-3.5" />
                         {statusMeta.label}
@@ -307,47 +340,69 @@ export default function AdminPaymentLogsPage() {
                       <span className="rounded-full border border-mansion-border/20 bg-black/25 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-dim">
                         {gatewayLabel(entry.gateway)}
                       </span>
-                      <span className="text-xs text-text-dim">{formatDateTime(entry.created_at)}</span>
+                      <span className="text-[11px] text-text-dim">{formatDateTime(entry.created_at)}</span>
                     </div>
 
-                    <div>
-                      <h2 className="break-words text-base font-semibold text-text-primary">{userLabel}</h2>
-                      <p className="mt-1 text-sm text-text-dim">
-                        {planLabel(entry.plan_id)} · {formatCurrency(entry.amount)} · {sourceLabel(entry.source, entry.source_path)}
-                      </p>
+                    <div className="grid gap-1 lg:grid-cols-[minmax(180px,1.5fr)_minmax(160px,1fr)_minmax(130px,.7fr)_minmax(150px,1fr)] lg:items-center">
+                      <div className="min-w-0">
+                        <h2 className="truncate text-sm font-semibold text-text-primary">{userLabel}</h2>
+                        <p className="truncate text-[11px] text-text-dim">{entry.email || entry.user_id || '-'}</p>
+                      </div>
+                      <p className="truncate text-sm text-text-muted">{planLabel(entry.plan_id)} · {formatCurrency(entry.amount)}</p>
+                      <p className="truncate text-xs text-text-dim">{sourceLabel(entry.source, entry.source_path)}</p>
+                      <p className="truncate font-mono text-[11px] text-text-dim">{entry.payment_id || entry.preference_id || entry.id}</p>
                     </div>
                   </div>
 
-                  <button type="button" onClick={() => handleCopy(entry)} className="btn-ghost flex items-center justify-center gap-2 px-4 py-2.5 text-xs">
-                    <Copy className="h-4 w-4" />
-                    Copiar
-                  </button>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <button type="button" onClick={() => toggleExpanded(entry.id)} className="btn-ghost flex items-center justify-center gap-2 px-3 py-2 text-xs">
+                      <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                      Detalle
+                    </button>
+                    <button type="button" onClick={() => handleCopy(entry)} className="btn-ghost flex items-center justify-center gap-2 px-3 py-2 text-xs">
+                      <Copy className="h-4 w-4" />
+                      Copiar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(entry)}
+                      disabled={deletingId === entry.id}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-500/15 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {deletingId === entry.id ? 'Borrando...' : 'Borrar'}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <Detail label="Usuario" value={entry.username ? `${entry.username} · ${entry.email || '-'}` : entry.email || entry.user_id} />
-                  <Detail label="Origen" value={sourceLabel(entry.source, entry.source_path)} />
-                  <Detail label="Pago" value={entry.payment_id || entry.preference_id || '-'} mono />
-                  <Detail label="Referencia" value={entry.external_reference || '-'} mono />
-                  <Detail label="Estado gateway" value={entry.gateway_status || entry.status || '-'} />
-                  <Detail label="Actualizado" value={formatDateTime(entry.updated_at)} />
-                  <Detail label="Completado" value={formatDateTime(entry.completed_at)} />
-                  <Detail label="Ruta origen" value={entry.source_path || entry.referrer || '-'} />
-                </div>
+                {expanded ? (
+                  <div className="mt-4 border-t border-mansion-border/15 pt-4">
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <Detail label="Usuario" value={entry.username ? `${entry.username} · ${entry.email || '-'}` : entry.email || entry.user_id} />
+                      <Detail label="Origen" value={sourceLabel(entry.source, entry.source_path)} />
+                      <Detail label="Pago" value={entry.payment_id || entry.preference_id || '-'} mono />
+                      <Detail label="Referencia" value={entry.external_reference || '-'} mono />
+                      <Detail label="Estado gateway" value={entry.gateway_status || entry.status || '-'} />
+                      <Detail label="Actualizado" value={formatDateTime(entry.updated_at)} />
+                      <Detail label="Completado" value={formatDateTime(entry.completed_at)} />
+                      <Detail label="Ruta origen" value={entry.source_path || entry.referrer || '-'} />
+                    </div>
 
-                {entry.result_message ? (
-                  <div className="mt-3 rounded-2xl border border-mansion-border/15 bg-black/20 px-3 py-2 text-sm text-text-dim">
-                    {entry.result_message}
+                    {entry.result_message ? (
+                      <div className="mt-3 rounded-2xl border border-mansion-border/15 bg-black/20 px-3 py-2 text-sm text-text-dim">
+                        {entry.result_message}
+                      </div>
+                    ) : null}
+
+                    {ualaNote ? (
+                      <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-sm text-amber-100/80">
+                        {ualaNote}
+                      </div>
+                    ) : null}
+
+                    <JsonBlock value={metadata} />
                   </div>
                 ) : null}
-
-                {ualaNote ? (
-                  <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-sm text-amber-100/80">
-                    {ualaNote}
-                  </div>
-                ) : null}
-
-                <JsonBlock value={metadata} />
               </article>
             );
           })}

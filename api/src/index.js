@@ -8243,6 +8243,23 @@ async function handleAdminGetSubscriptionPaymentLogs(request, env) {
   });
 }
 
+async function handleAdminDeleteSubscriptionPaymentLog(request, env, logId) {
+  await ensureSubscriptionPaymentLogsTable(env);
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const id = String(logId || '').trim();
+  if (!id) return error('Log requerido', 400);
+
+  const existing = await env.DB.prepare('SELECT id FROM subscription_payment_logs WHERE id = ? LIMIT 1').bind(id).first();
+  if (!existing?.id) return error('Evento no encontrado', 404);
+
+  await env.DB.prepare('DELETE FROM subscription_payment_logs WHERE id = ?').bind(id).run();
+  return json({ success: true, id });
+}
+
 async function handleAdminGetFakeInbox(request, env) {
   await ensureMessageConversationIdColumn(env);
   const auth = await authenticate(request, env);
@@ -12740,6 +12757,8 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/admin/error-logs' && method === 'GET') return handleAdminGetErrorLogs(request, env);
   if (path === '/api/admin/error-logs' && method === 'DELETE') return handleAdminDeleteAllErrorLogs(request, env);
   if (path === '/api/admin/subscription-payment-logs' && method === 'GET') return handleAdminGetSubscriptionPaymentLogs(request, env);
+  const adminSubscriptionPaymentLogMatch = path.match(/^\/api\/admin\/subscription-payment-logs\/([a-f0-9-]+)$/);
+  if (adminSubscriptionPaymentLogMatch && method === 'DELETE') return handleAdminDeleteSubscriptionPaymentLog(request, env, adminSubscriptionPaymentLogMatch[1]);
   if (path === '/api/admin/fake-inbox' && method === 'GET') return handleAdminGetFakeInbox(request, env);
   if (path === '/api/admin/fake-inbox/conversation' && method === 'GET') return handleAdminGetFakeInboxConversation(request, env);
   if (path === '/api/admin/fake-inbox/reply' && method === 'POST') return handleAdminReplyFakeInbox(request, env);

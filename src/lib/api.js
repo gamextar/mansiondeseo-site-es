@@ -1626,6 +1626,12 @@ export async function adminGetSubscriptionPaymentLogs({ page = 1, limit = 25, q 
   return apiFetch(`/admin/subscription-payment-logs?${params}`);
 }
 
+export async function adminDeleteSubscriptionPaymentLog(logId) {
+  return apiFetch(`/admin/subscription-payment-logs/${encodeURIComponent(logId)}`, {
+    method: 'DELETE',
+  });
+}
+
 // ── Admin: Users ────────────────────────────────────────
 
 export async function adminGetUsers({ page = 1, limit = 20, q = '', fake = '', role = '', status = '', duplicate = '', created = '', reported = '', featured = '', verification = '' } = {}) {
