@@ -147,6 +147,7 @@ export default function AdminUsersPage() {
   const [avatarThumbProgress, setAvatarThumbProgress] = useState('');
   const [galleryThumbBatchGenerating, setGalleryThumbBatchGenerating] = useState(false);
   const [galleryThumbBatchProgress, setGalleryThumbBatchProgress] = useState('');
+  const [refreshedAvatarThumbUserIds, setRefreshedAvatarThumbUserIds] = useState([]);
   const [refreshedGalleryThumbUserIds, setRefreshedGalleryThumbUserIds] = useState([]);
   const [photoVerificationPreviewUrl, setPhotoVerificationPreviewUrl] = useState('');
   const [photoVerificationRejectReason, setPhotoVerificationRejectReason] = useState('La foto no permite validar el código con claridad.');
@@ -176,7 +177,6 @@ export default function AdminUsersPage() {
       setPage(data.page);
       setPages(data.pages);
       setSelectedIds([]);
-      setRefreshedGalleryThumbUserIds([]);
     } catch {
       // ignore
     } finally {
@@ -561,7 +561,11 @@ export default function AdminUsersPage() {
     }
   };
 
-  const missingAvatarThumbUsers = users.filter((user) => user.avatar_url && !user.avatar_thumb_url);
+  const missingAvatarThumbUsers = users.filter((user) => (
+    user.avatar_url &&
+    !user.avatar_thumb_url &&
+    !refreshedAvatarThumbUserIds.includes(user.id)
+  ));
   const galleryThumbRefreshUsers = users
     .map((user) => {
       const photos = Array.isArray(user.photos) ? user.photos : [];
@@ -584,6 +588,7 @@ export default function AdminUsersPage() {
     let failedCount = 0;
     let generatedCount = 0;
     let fakeSnapshotsDirty = false;
+    const completedUserIds = [];
     setAvatarThumbGenerating(true);
     try {
       for (let i = 0; i < batch.length; i += 1) {
@@ -596,6 +601,7 @@ export default function AdminUsersPage() {
           const data = await adminUploadAvatarThumb(user.id, thumbnailFile);
           if (data?.user) {
             generatedCount += 1;
+            completedUserIds.push(user.id);
             if (data.fake_snapshots_dirty) fakeSnapshotsDirty = true;
             setUsers((prev) => prev.map((item) => (
               item.id === user.id
@@ -610,6 +616,9 @@ export default function AdminUsersPage() {
           failedCount += 1;
           console.warn('Avatar thumbnail batch item failed:', user.username || user.id, err);
         }
+      }
+      if (completedUserIds.length > 0) {
+        setRefreshedAvatarThumbUserIds((prev) => [...new Set([...prev, ...completedUserIds])]);
       }
       if (failedCount > 0 || fakeSnapshotsDirty) {
         const parts = [];

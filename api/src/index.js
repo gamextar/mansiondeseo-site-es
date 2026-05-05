@@ -8554,7 +8554,7 @@ async function handleAdminUploadAvatarThumb(request, env, userId) {
     "SELECT id, username, avatar_url, avatar_thumb_url, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
   ).bind(userId).first();
   if (!user) return error('Usuario no encontrado', 404);
-  if (!user.avatar_url || !isTrustedMediaUrl(user.avatar_url, env)) return error('Avatar inválido', 400);
+  if (!user.avatar_url) return error('Avatar inválido', 400);
 
   const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
   const key = buildProfileMediaKey(user.username, 'avatar_thumb', ext);
