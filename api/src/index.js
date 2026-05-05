@@ -4912,7 +4912,9 @@ async function handleProfiles(request, env) {
       roleValues: requestedRoleValues,
       country: settings.feedFilterByCountry ? country : '',
       search,
-      limit: snapshotWindowLimit,
+      // Keep the fake deck stable across pages. If this limit follows the
+      // current cursor window, mixed role buckets can reshuffle and repeat.
+      limit: PROFILE_SNAPSHOT_FEED_MAX_WINDOW,
       viewerId: auth.sub,
       fresh,
     });
