@@ -101,6 +101,20 @@ function getStatusMeta(entry) {
   };
 }
 
+function getUalaAdminNote(entry) {
+  if (entry.gateway !== 'uala_bis') return '';
+  const metadata = entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {};
+  const verify = metadata.uala_verify && typeof metadata.uala_verify === 'object' ? metadata.uala_verify : {};
+  const rawStatus = String(entry.gateway_status || verify.status || verify.raw?.status || entry.status || '').trim().toUpperCase();
+  if (rawStatus === 'PENDING' || entry.status === 'pending') {
+    return 'Ualá informa PENDING: no hay aprobación ni rechazo. Si el intento ya es antiguo, se considera sin completar; no hay un motivo de tarjeta disponible.';
+  }
+  if (rawStatus.includes('REJECT')) {
+    return 'Ualá informó rechazo de la orden. Si hubiera detalle adicional del proveedor, queda guardado en el JSON del evento.';
+  }
+  return '';
+}
+
 function Detail({ label, value, mono = false }) {
   return (
     <div className="min-w-0 rounded-2xl border border-mansion-border/15 bg-black/20 px-3 py-2">
@@ -262,6 +276,7 @@ export default function AdminPaymentLogsPage() {
             const StatusIcon = statusMeta.icon;
             const metadata = entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {};
             const userLabel = entry.username || entry.email || entry.user_id || 'Usuario eliminado';
+            const ualaNote = getUalaAdminNote(entry);
 
             return (
               <article key={entry.id} className="rounded-3xl border border-mansion-border/30 bg-mansion-card/45 p-5 backdrop-blur-xl">
@@ -306,6 +321,12 @@ export default function AdminPaymentLogsPage() {
                 {entry.result_message ? (
                   <div className="mt-3 rounded-2xl border border-mansion-border/15 bg-black/20 px-3 py-2 text-sm text-text-dim">
                     {entry.result_message}
+                  </div>
+                ) : null}
+
+                {ualaNote ? (
+                  <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-sm text-amber-100/80">
+                    {ualaNote}
                   </div>
                 ) : null}
 

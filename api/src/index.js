@@ -7872,6 +7872,21 @@ function getUalaVerificationMessage(data = {}, fallbackStatus = '') {
   ).trim();
 }
 
+function getUalaPaymentLogMessage(classification = {}, data = {}, row = {}) {
+  const gatewayStatus = String(classification.gatewayStatus || getUalaVerificationStatus(data) || '').trim();
+  const message = getUalaVerificationMessage(data, gatewayStatus);
+  const normalizedStatus = String(classification.status || '').toLowerCase();
+  const normalizedGatewayStatus = gatewayStatus.toLowerCase();
+  if (normalizedStatus === 'pending' || normalizedGatewayStatus === 'pending') {
+    const createdMs = parseSqlTimestampMs(row?.created_at || '');
+    const isOld = createdMs && Date.now() - createdMs >= 60 * 60 * 1000;
+    return isOld
+      ? 'Ualá informa PENDING: no hay aprobación ni rechazo. Por antigüedad, lo tratamos como sin completar/abandonado.'
+      : 'Ualá informa PENDING: todavía no hay aprobación ni rechazo. Puede ser un pago pendiente o un checkout no finalizado.';
+  }
+  return message || (gatewayStatus ? `status: ${gatewayStatus}` : '');
+}
+
 function classifyUalaVerificationStatus(data = {}) {
   const rawStatus = getUalaVerificationStatus(data);
   const normalized = rawStatus.trim().toLowerCase();
@@ -8040,7 +8055,7 @@ async function refreshUalaPaymentLogFromBridge(env, row = {}) {
 
   const data = verification.data || {};
   const classification = classifyUalaVerificationStatus(data);
-  const resultMessage = getUalaVerificationMessage(data, classification.gatewayStatus);
+  const resultMessage = getUalaPaymentLogMessage(classification, data, row);
 
   if (classification.status !== 'approved') {
     await updateSubscriptionPaymentLog(env, {
@@ -9469,7 +9484,7 @@ async function handleUalaPaymentConfirm(auth, env, paymentId, externalRef) {
       const ref = externalRef || '';
       const [refUserId, planId] = ref.split('--');
       const classification = classifyUalaVerificationStatus(data);
-      const resultMessage = getUalaVerificationMessage(data, classification.gatewayStatus);
+      const resultMessage = getUalaPaymentLogMessage(classification, data);
       await updateSubscriptionPaymentLog(env, {
         userId: refUserId || auth.sub,
         planId,
@@ -9674,7 +9689,7 @@ async function handleUalaStatus(request, env) {
   }
 
   const classification = classifyUalaVerificationStatus(body);
-  const resultMessage = getUalaVerificationMessage(body, classification.gatewayStatus);
+  const resultMessage = getUalaPaymentLogMessage(classification, body);
 
   if (classification.status !== 'approved') {
     await updateSubscriptionPaymentLog(env, {
