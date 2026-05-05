@@ -6173,8 +6173,8 @@ async function handleUpload(request, env) {
     const previousAvatarKey = extractMediaKey(user.avatar_url, env);
     const previousAvatarThumbKey = extractMediaKey(user.avatar_thumb_url, env);
     await env.DB.prepare(`
-      UPDATE users SET avatar_url = ?, avatar_thumb_url = '', avatar_crop = NULL WHERE id = ?
-    `).bind(publicUrl, auth.sub).run();
+      UPDATE users SET avatar_url = ?, avatar_thumb_url = ?, avatar_crop = NULL WHERE id = ?
+    `).bind(publicUrl, publicUrl, auth.sub).run();
     _fullUserCache.delete(auth.sub);
     _viewerCache.delete(auth.sub);
 
@@ -6185,18 +6185,19 @@ async function handleUpload(request, env) {
     await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-avatar-upload' });
     await bumpFeedCacheVersion(env);
 
-    return json({ url: publicUrl, key, avatar_url: publicUrl, avatar_thumb_url: '', photos: galleryPhotos }, 201);
+    return json({ url: publicUrl, key, avatar_url: publicUrl, avatar_thumb_url: publicUrl, photos: galleryPhotos }, 201);
   }
 
   if (purpose === 'avatar_thumb') {
     const previousAvatarThumbKey = extractMediaKey(user.avatar_thumb_url, env);
+    const currentAvatarKey = extractMediaKey(user.avatar_url, env);
     await env.DB.prepare(`
       UPDATE users SET avatar_thumb_url = ? WHERE id = ?
     `).bind(publicUrl, auth.sub).run();
     _fullUserCache.delete(auth.sub);
     _viewerCache.delete(auth.sub);
 
-    if (previousAvatarThumbKey && previousAvatarThumbKey !== key) {
+    if (previousAvatarThumbKey && previousAvatarThumbKey !== key && previousAvatarThumbKey !== currentAvatarKey) {
       await deleteR2KeysBestEffort(env, [previousAvatarThumbKey]);
     }
     const updated = await env.DB.prepare(
@@ -8567,10 +8568,11 @@ async function handleAdminUploadAvatarThumb(request, env, userId) {
 
   const publicUrl = buildPublicMediaUrl(key, env);
   const previousThumbKey = extractMediaKey(user.avatar_thumb_url, env);
+  const currentAvatarKey = extractMediaKey(user.avatar_url, env);
   await env.DB.prepare('UPDATE users SET avatar_thumb_url = ? WHERE id = ?')
     .bind(publicUrl, userId).run();
 
-  if (previousThumbKey && previousThumbKey !== key) {
+  if (previousThumbKey && previousThumbKey !== key && previousThumbKey !== currentAvatarKey) {
     await deleteR2KeysBestEffort(env, [previousThumbKey]);
   }
 

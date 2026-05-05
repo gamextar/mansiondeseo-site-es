@@ -1257,17 +1257,32 @@ export async function uploadImage(file, { purpose = 'asset', sourceUrl = '' } = 
 
 export async function uploadAvatar(file, thumbnailFile) {
   const avatarData = await uploadImage(file, { purpose: 'avatar' });
-  if (!thumbnailFile) return avatarData;
-
-  try {
-    const thumbData = await uploadImage(thumbnailFile, { purpose: 'avatar_thumb' });
+  const fallbackThumbUrl = avatarData?.avatar_thumb_url || avatarData?.avatar_url || avatarData?.url || '';
+  if (!thumbnailFile) {
     return {
       ...avatarData,
-      avatar_thumb_url: thumbData?.avatar_thumb_url || thumbData?.url || avatarData?.avatar_thumb_url || '',
+      avatar_thumb_url: fallbackThumbUrl,
+    };
+  }
+
+  try {
+    let thumbData;
+    try {
+      thumbData = await uploadImage(thumbnailFile, { purpose: 'avatar_thumb' });
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      thumbData = await uploadImage(thumbnailFile, { purpose: 'avatar_thumb' });
+    }
+    return {
+      ...avatarData,
+      avatar_thumb_url: thumbData?.avatar_thumb_url || thumbData?.url || fallbackThumbUrl,
     };
   } catch (err) {
     console.warn('Avatar thumbnail upload failed:', err);
-    return avatarData;
+    return {
+      ...avatarData,
+      avatar_thumb_url: fallbackThumbUrl,
+    };
   }
 }
 
