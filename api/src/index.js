@@ -162,6 +162,8 @@ const REAL_FEED_ITEMS_READY_KEY = 'real_feed_items_ready';
 const FAKE_PROFILE_SNAPSHOTS_DIRTY_KEY = 'fake_profile_snapshots_dirty_at';
 const FAKE_STORY_SNAPSHOTS_DIRTY_KEY = 'fake_story_snapshots_dirty_at';
 const ADMIN_USERS_COUNT_TTL_MS = 120_000;
+const ADMIN_UALA_STATUS_REFRESH_COOLDOWN_MS = 2 * 60_000;
+const ADMIN_UALA_STATUS_REFRESH_MAX_LOGS = 25;
 const FREE_CHAT_RECIPIENT_LIMIT = 5;
 const CHAT_RECIPIENT_LIMIT_WINDOW_HOURS = 1;
 const SYNTHETIC_VISIT_COOLDOWN_MINUTES = 15;
@@ -7816,6 +7818,234 @@ async function handleAdminGetErrorLogs(request, env) {
   });
 }
 
+function parseSqlTimestampMs(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return 0;
+  const date = new Date(raw.endsWith('Z') ? raw : `${raw}Z`);
+  const time = date.getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function isOpenSubscriptionPaymentStatus(status = '') {
+  return ['started', 'gateway_request', 'checkout_created', 'pending'].includes(String(status || '').trim().toLowerCase());
+}
+
+function getUalaVerificationStatus(data = {}) {
+  const raw = String(
+    data.status ||
+    data.checkout_status ||
+    data.payment_status ||
+    data.state ||
+    ''
+  ).trim();
+  if (raw) return raw;
+  return isUalaApprovedValue(data.is_approved) ? 'APPROVED' : '';
+}
+
+function isUalaApprovedValue(value) {
+  if (value === true || value === 1) return true;
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'approved';
+}
+
+function getUalaVerificationMessage(data = {}, fallbackStatus = '') {
+  return String(
+    data.reason ||
+    data.status_detail ||
+    data.status_message ||
+    data.message ||
+    data.error ||
+    data.description ||
+    data.detail ||
+    data?.response?.message ||
+    data?.raw?.message ||
+    (fallbackStatus ? `status: ${fallbackStatus}` : '')
+  ).trim();
+}
+
+function classifyUalaVerificationStatus(data = {}) {
+  const rawStatus = getUalaVerificationStatus(data);
+  const normalized = rawStatus.trim().toLowerCase();
+  if (isUalaApprovedValue(data.is_approved) || normalized === 'approved') {
+    return { status: 'approved', gatewayStatus: rawStatus || 'APPROVED', completed: true };
+  }
+  if (normalized.includes('reject') || normalized.includes('denied')) {
+    return { status: 'rejected', gatewayStatus: rawStatus, completed: true };
+  }
+  if (normalized.includes('cancel') || normalized.includes('cancell')) {
+    return { status: 'cancelled', gatewayStatus: rawStatus, completed: true };
+  }
+  if (normalized.includes('fail') || normalized.includes('error')) {
+    return { status: 'failed', gatewayStatus: rawStatus, completed: true };
+  }
+  if (normalized.includes('expir')) {
+    return { status: 'failed', gatewayStatus: rawStatus, completed: true };
+  }
+  return { status: 'pending', gatewayStatus: rawStatus || 'pending', completed: false };
+}
+
+async function verifyUalaCheckoutWithBridge(env, checkoutId) {
+  if (!env.PAYMENT_BRIDGE_URL || !env.BRIDGE_SECRET || !checkoutId) {
+    return {
+      ok: false,
+      gatewayStatus: 'not_configured',
+      resultMessage: 'Servicio de pagos no configurado o checkout faltante',
+    };
+  }
+
+  const bodyPayload = JSON.stringify({ checkout_id: String(checkoutId) });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = await bridgeHmacSign(env.BRIDGE_SECRET, `${timestamp}.${bodyPayload}`);
+
+  try {
+    const bridgeRes = await fetch(`${env.PAYMENT_BRIDGE_URL}/api/uala/verify-checkout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Signature': signature,
+        'X-Timestamp': timestamp,
+      },
+      body: bodyPayload,
+    });
+    if (!bridgeRes.ok) {
+      const errText = await bridgeRes.text();
+      return {
+        ok: false,
+        gatewayStatus: `verify_${bridgeRes.status}`,
+        resultMessage: errText.substring(0, 500) || `bridge ${bridgeRes.status}`,
+      };
+    }
+    return { ok: true, data: await bridgeRes.json() };
+  } catch (err) {
+    return {
+      ok: false,
+      gatewayStatus: 'verify_fetch_error',
+      resultMessage: err?.message || 'Error consultando Ualá',
+    };
+  }
+}
+
+function buildAdminUalaRefreshMetadata(row = {}, data = {}, extra = {}) {
+  const previous = safeParseJSON(row.metadata, {});
+  return {
+    ...(previous && typeof previous === 'object' ? previous : {}),
+    admin_status_check_at: new Date().toISOString(),
+    admin_status_check: extra,
+    uala_verify: data && typeof data === 'object' ? data : {},
+  };
+}
+
+async function refreshUalaPaymentLogFromBridge(env, row = {}) {
+  const checkoutId = String(row.payment_id || row.preference_id || '').trim();
+  if (!checkoutId) return false;
+  if (String(row.gateway || '').trim() !== 'uala_bis') return false;
+  if (!isOpenSubscriptionPaymentStatus(row.status)) return false;
+
+  const metadata = safeParseJSON(row.metadata, {});
+  const lastCheckMs = parseSqlTimestampMs(metadata?.admin_status_check_at || '');
+  if (lastCheckMs && Date.now() - lastCheckMs < ADMIN_UALA_STATUS_REFRESH_COOLDOWN_MS) return false;
+
+  const verification = await verifyUalaCheckoutWithBridge(env, checkoutId);
+  if (!verification.ok) {
+    await updateSubscriptionPaymentLog(env, {
+      id: row.id,
+      userId: row.user_id,
+      planId: row.plan_id,
+      gateway: 'uala_bis',
+      paymentId: checkoutId,
+      externalReference: row.external_reference || '',
+      gatewayStatus: verification.gatewayStatus || '',
+      resultMessage: verification.resultMessage || 'No se pudo consultar Ualá',
+      metadata: buildAdminUalaRefreshMetadata(row, {}, { ok: false, gateway_status: verification.gatewayStatus || '' }),
+    });
+    return true;
+  }
+
+  const data = verification.data || {};
+  const classification = classifyUalaVerificationStatus(data);
+  const resultMessage = getUalaVerificationMessage(data, classification.gatewayStatus);
+
+  if (classification.status !== 'approved') {
+    await updateSubscriptionPaymentLog(env, {
+      id: row.id,
+      userId: row.user_id,
+      planId: row.plan_id,
+      gateway: 'uala_bis',
+      amount: data.amount || row.amount || 0,
+      paymentId: checkoutId,
+      externalReference: row.external_reference || '',
+      status: classification.status,
+      gatewayStatus: classification.gatewayStatus,
+      resultMessage,
+      metadata: buildAdminUalaRefreshMetadata(row, data, { ok: true, source: 'admin_open' }),
+      completed: classification.completed,
+    });
+    return true;
+  }
+
+  const planId = String(row.plan_id || (row.external_reference || '').split('--')[1] || '').trim();
+  const userId = String(row.user_id || (row.external_reference || '').split('--')[0] || '').trim();
+  if (!userId || !isVipSubscriptionPlan(planId)) {
+    await updateSubscriptionPaymentLog(env, {
+      id: row.id,
+      userId,
+      planId,
+      gateway: 'uala_bis',
+      amount: data.amount || row.amount || 0,
+      paymentId: checkoutId,
+      externalReference: row.external_reference || '',
+      status: 'activation_error',
+      gatewayStatus: classification.gatewayStatus,
+      resultMessage: 'Pago aprobado pero faltan datos para activar la suscripción',
+      metadata: buildAdminUalaRefreshMetadata(row, data, { ok: true, source: 'admin_open' }),
+      completed: true,
+    });
+    return true;
+  }
+
+  const existing = await env.DB.prepare('SELECT 1 FROM processed_payments WHERE payment_id = ?').bind(checkoutId).first();
+  if (!existing) {
+    const current = await env.DB.prepare('SELECT premium_until FROM users WHERE id = ?').bind(userId).first();
+    const newUntil = activatePremium(current?.premium_until, planId);
+    await env.DB.prepare('UPDATE users SET premium = 1, premium_until = ?, coins = coins + 100 WHERE id = ?').bind(newUntil, userId).run();
+    await env.DB.prepare('INSERT INTO processed_payments (payment_id, user_id, plan_id, amount) VALUES (?, ?, ?, ?)').bind(checkoutId, userId, planId, data.amount || row.amount || 0).run();
+    await refreshProfileSnapshotsAndBumpFeed(env, {
+      includeReal: true,
+      includeFakes: false,
+      source: 'uala-admin-status-refresh',
+    });
+  }
+
+  await updateSubscriptionPaymentLog(env, {
+    id: row.id,
+    userId,
+    planId,
+    gateway: 'uala_bis',
+    amount: data.amount || row.amount || 0,
+    paymentId: checkoutId,
+    externalReference: row.external_reference || '',
+    status: 'approved',
+    gatewayStatus: classification.gatewayStatus || 'APPROVED',
+    resultMessage: existing ? 'Pago ya procesado' : 'Premium activado al refrescar estado desde admin',
+    metadata: buildAdminUalaRefreshMetadata(row, data, { ok: true, source: 'admin_open', activated: !existing }),
+    completed: true,
+  });
+  return true;
+}
+
+async function refreshVisibleUalaPaymentLogs(env, rows = []) {
+  const candidates = (rows || [])
+    .filter((row) => row && String(row.gateway || '') === 'uala_bis' && isOpenSubscriptionPaymentStatus(row.status))
+    .slice(0, ADMIN_UALA_STATUS_REFRESH_MAX_LOGS);
+  if (candidates.length === 0) return 0;
+
+  const results = await Promise.all(candidates.map((row) => refreshUalaPaymentLogFromBridge(env, row).catch((err) => {
+    console.error('[admin-payment-logs] Ualá status refresh failed:', err?.message || err);
+    return false;
+  })));
+  return results.filter(Boolean).length;
+}
+
 async function handleAdminGetSubscriptionPaymentLogs(request, env) {
   await ensureSubscriptionPaymentLogsTable(env);
   const auth = await authenticate(request, env);
@@ -7889,13 +8119,21 @@ async function handleAdminGetSubscriptionPaymentLogs(request, env) {
     LIMIT ? OFFSET ?
   `;
 
-  const countStmt = bindings.length
-    ? env.DB.prepare(countQuery).bind(...bindings)
-    : env.DB.prepare(countQuery);
-  const dataStmt = bindings.length
-    ? env.DB.prepare(dataQuery).bind(...bindings, limit, offset)
-    : env.DB.prepare(dataQuery).bind(limit, offset);
-  const [countRow, dataRows] = await Promise.all([countStmt.first(), dataStmt.all()]);
+  const runLogQuery = () => {
+    const countStmt = bindings.length
+      ? env.DB.prepare(countQuery).bind(...bindings)
+      : env.DB.prepare(countQuery);
+    const dataStmt = bindings.length
+      ? env.DB.prepare(dataQuery).bind(...bindings, limit, offset)
+      : env.DB.prepare(dataQuery).bind(limit, offset);
+    return Promise.all([countStmt.first(), dataStmt.all()]);
+  };
+
+  let [countRow, dataRows] = await runLogQuery();
+  const refreshedUalaLogs = await refreshVisibleUalaPaymentLogs(env, dataRows.results || []);
+  if (refreshedUalaLogs > 0) {
+    [countRow, dataRows] = await runLogQuery();
+  }
 
   return json({
     logs: (dataRows.results || []).map((row) => ({
@@ -7903,6 +8141,7 @@ async function handleAdminGetSubscriptionPaymentLogs(request, env) {
       amount: Number(row.amount || 0),
       metadata: safeParseJSON(row.metadata, {}),
     })),
+    refreshed_uala_logs: refreshedUalaLogs,
     total: Number(countRow?.total || 0),
     page,
     pages: Math.max(1, Math.ceil(Number(countRow?.total || 0) / limit)),
