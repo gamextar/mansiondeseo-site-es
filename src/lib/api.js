@@ -1559,7 +1559,7 @@ export async function adminGetStorySnapshots({ fresh = false } = {}) {
   return apiFetch(`/admin/stories/snapshots${qs}`);
 }
 
-export async function adminRebuildStorySnapshots({ includeReal = true, includeFakes = true } = {}) {
+export async function adminRebuildStorySnapshots({ includeReal = false, includeFakes = true } = {}) {
   const result = await apiFetch('/admin/stories/snapshots/rebuild', {
     method: 'POST',
     body: JSON.stringify({
@@ -1576,10 +1576,13 @@ export async function adminGetProfileSnapshots({ fresh = false } = {}) {
   return apiFetch(`/admin/profiles/snapshots${qs}`);
 }
 
-export async function adminRebuildProfileSnapshots() {
+export async function adminRebuildProfileSnapshots({ includeReal = false, includeFakes = true } = {}) {
   const result = await apiFetch('/admin/profiles/snapshots/rebuild', {
     method: 'POST',
-    body: '{}',
+    body: JSON.stringify({
+      include_real: includeReal,
+      include_fakes: includeFakes,
+    }),
   });
   markFeedDirty();
   return result;

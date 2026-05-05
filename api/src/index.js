@@ -11880,7 +11880,7 @@ async function handleAdminRebuildStorySnapshots(request, env) {
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
 
   const body = await request.json().catch(() => ({}));
-  const includeReal = body.include_real !== false;
+  const includeReal = body.include_real === true;
   const includeFakes = body.include_fakes !== false;
   const manifest = await rebuildStorySnapshots(env, {
     includeReal,
@@ -11951,7 +11951,12 @@ async function handleAdminRebuildProfileSnapshots(request, env) {
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
 
+  const body = await request.json().catch(() => ({}));
+  const includeReal = body.include_real === true;
+  const includeFakes = body.include_fakes !== false;
   const manifest = await rebuildProfileSnapshots(env, {
+    includeReal,
+    includeFakes,
     source: 'admin-rebuild-profile-snapshots',
   });
   await bumpFeedCacheVersion(env);
@@ -11959,8 +11964,8 @@ async function handleAdminRebuildProfileSnapshots(request, env) {
     success: true,
     manifest: {
       ...manifest,
-      fake_dirty: false,
-      fake_dirty_at: '',
+      fake_dirty: includeFakes ? false : !!(await getSiteSettingValue(env, FAKE_PROFILE_SNAPSHOTS_DIRTY_KEY)),
+      fake_dirty_at: includeFakes ? '' : await getSiteSettingValue(env, FAKE_PROFILE_SNAPSHOTS_DIRTY_KEY),
     },
   });
 }

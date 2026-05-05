@@ -441,7 +441,7 @@ export default function SettingsPage() {
     setStorySnapshotRunning(true);
     setStorySnapshotError('');
     try {
-      const data = await adminRebuildStorySnapshots({ includeReal: true, includeFakes: true });
+      const data = await adminRebuildStorySnapshots({ includeReal: false, includeFakes: true });
       setStorySnapshotManifest(data?.manifest || null);
     } catch (err) {
       setStorySnapshotError(err?.message || 'No se pudo regenerar el snapshot de stories');
@@ -454,7 +454,7 @@ export default function SettingsPage() {
     setProfileSnapshotRunning(true);
     setProfileSnapshotError('');
     try {
-      const data = await adminRebuildProfileSnapshots();
+      const data = await adminRebuildProfileSnapshots({ includeReal: false, includeFakes: true });
       setProfileSnapshotManifest(data?.manifest || null);
     } catch (err) {
       setProfileSnapshotError(err?.message || 'No se pudo regenerar el snapshot de perfiles');
@@ -1908,8 +1908,8 @@ export default function SettingsPage() {
             <div className="bg-mansion-card rounded-2xl p-4 border border-mansion-gold/20 space-y-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Snapshots de stories</h3>
-                  <p className="text-[11px] text-text-dim">Regenera los JSON estáticos de stories reales y fake cuando borres usuarios o hagas cambios masivos. Los cambios de prioridad fake quedan pendientes hasta regenerar.</p>
+                  <h3 className="text-sm font-semibold text-text-primary">Snapshots de stories fake</h3>
+                  <p className="text-[11px] text-text-dim">Regenera los JSON estáticos de stories fake cuando borres usuarios o hagas cambios masivos. Las stories reales viven en feed items.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {storySnapshotFakeDirty ? (
