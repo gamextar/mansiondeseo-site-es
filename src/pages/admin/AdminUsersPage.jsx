@@ -581,28 +581,42 @@ export default function AdminUsersPage() {
   const handleGenerateAvatarThumbBatch = async () => {
     if (avatarThumbGenerating || galleryThumbBatchGenerating || missingAvatarThumbUsers.length === 0) return;
     const batch = missingAvatarThumbUsers.slice(0, ADMIN_AVATAR_THUMB_BATCH_LIMIT);
+    let failedCount = 0;
+    let generatedCount = 0;
+    let fakeSnapshotsDirty = false;
     setAvatarThumbGenerating(true);
     try {
       for (let i = 0; i < batch.length; i += 1) {
         const user = batch[i];
-        setAvatarThumbProgress(`${i + 1}/${batch.length}`);
-        const thumbnailFile = await optimizeAvatarThumbnailFromUrl(resolveMediaUrl(user.avatar_url), {
-          fileName: `avatar-${user.id}`,
-        });
-        const data = await adminUploadAvatarThumb(user.id, thumbnailFile);
-        if (data?.user) {
-          setUsers((prev) => prev.map((item) => (
-            item.id === user.id
-              ? { ...item, avatar_thumb_url: data.user.avatar_thumb_url }
-              : item
-          )));
-          setSelected((prev) => (
-            prev?.id === user.id ? { ...prev, avatar_thumb_url: data.user.avatar_thumb_url } : prev
-          ));
+        setAvatarThumbProgress(`${i + 1}/${batch.length} · ${user.username || user.id}`);
+        try {
+          const thumbnailFile = await optimizeAvatarThumbnailFromUrl(resolveMediaUrl(user.avatar_url), {
+            fileName: `avatar-${user.id}`,
+          });
+          const data = await adminUploadAvatarThumb(user.id, thumbnailFile);
+          if (data?.user) {
+            generatedCount += 1;
+            if (data.fake_snapshots_dirty) fakeSnapshotsDirty = true;
+            setUsers((prev) => prev.map((item) => (
+              item.id === user.id
+                ? { ...item, avatar_thumb_url: data.user.avatar_thumb_url }
+                : item
+            )));
+            setSelected((prev) => (
+              prev?.id === user.id ? { ...prev, avatar_thumb_url: data.user.avatar_thumb_url } : prev
+            ));
+          }
+        } catch (err) {
+          failedCount += 1;
+          console.warn('Avatar thumbnail batch item failed:', user.username || user.id, err);
         }
       }
-    } catch (err) {
-      alert(err.message || 'No se pudieron generar todos los thumbnails de avatar');
+      if (failedCount > 0 || fakeSnapshotsDirty) {
+        const parts = [];
+        if (failedCount > 0) parts.push(`Se generaron ${generatedCount} miniaturas. ${failedCount} no se pudieron procesar.`);
+        if (fakeSnapshotsDirty) parts.push('Los snapshots fake quedaron pendientes: regenerá perfiles fake desde Configuración para reflejarlos en el feed.');
+        alert(parts.join('\n\n'));
+      }
     } finally {
       setAvatarThumbGenerating(false);
       setAvatarThumbProgress('');
@@ -615,6 +629,7 @@ export default function AdminUsersPage() {
     const totalPhotos = batch.reduce((sum, user) => sum + user.pendingPhotos.length, 0);
     let failedCount = 0;
     let processedCount = 0;
+    let fakeSnapshotsDirty = false;
     const completedUserIds = [];
     setGalleryThumbBatchGenerating(true);
     try {
@@ -631,6 +646,7 @@ export default function AdminUsersPage() {
             });
             const data = await adminUploadGalleryThumb(userJob.userId, photo.sourceUrl, thumbnailFile);
             if (data?.user) {
+              if (data.fake_snapshots_dirty) fakeSnapshotsDirty = true;
               setUsers((prev) => prev.map((user) => (
                 user.id === userJob.userId
                   ? { ...user, photos: data.user.photos, photo_thumbs: data.user.photo_thumbs }
@@ -652,8 +668,11 @@ export default function AdminUsersPage() {
       if (completedUserIds.length > 0) {
         setRefreshedGalleryThumbUserIds((prev) => [...new Set([...prev, ...completedUserIds])]);
       }
-      if (failedCount > 0) {
-        alert(`Se generaron ${totalPhotos - failedCount} miniaturas. ${failedCount} no se pudieron procesar.`);
+      if (failedCount > 0 || fakeSnapshotsDirty) {
+        const parts = [];
+        if (failedCount > 0) parts.push(`Se generaron ${totalPhotos - failedCount} miniaturas. ${failedCount} no se pudieron procesar.`);
+        if (fakeSnapshotsDirty) parts.push('Los snapshots fake quedaron pendientes: regenerá perfiles fake desde Configuración para reflejarlos en el feed.');
+        alert(parts.join('\n\n'));
       }
     } finally {
       setGalleryThumbBatchGenerating(false);

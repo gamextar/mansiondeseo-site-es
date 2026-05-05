@@ -1384,6 +1384,20 @@ async function refreshProfileSnapshotsAndBumpFeed(env, {
   await bumpFeedCacheVersion(env);
 }
 
+async function refreshProfileMediaThumbReferences(env, beforeUser, updatedUser, { source = 'profile-media-thumb' } = {}) {
+  const wasFake = Number(beforeUser?.fake || 0) === 1;
+  const isFake = Number(updatedUser?.fake || 0) === 1;
+  if (wasFake || isFake) {
+    await markFakeSnapshotsDirty(env, { profiles: true });
+    invalidateFeedBrowseCache();
+    return { fakeSnapshotsDirty: true };
+  }
+
+  await refreshStaticSnapshotsForUserChange(env, beforeUser, updatedUser, { source });
+  await bumpFeedCacheVersion(env);
+  return { fakeSnapshotsDirty: false };
+}
+
 async function ensureProfileReportsTable(env) {
   if (!_profileReportsReady) {
     _profileReportsReady = Promise.all([
@@ -8485,8 +8499,7 @@ async function handleAdminUploadGalleryThumb(request, env, userId) {
   _viewerCache.delete(userId);
 
   const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
-  await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'admin-gallery-thumb-upload' });
-  await bumpFeedCacheVersion(env);
+  const refreshResult = await refreshProfileMediaThumbReferences(env, user, updated, { source: 'admin-gallery-thumb-upload' });
   const { password_hash, ...safe } = updated;
   const updatedPhotos = normalizeGalleryPhotos(safeParseJSON(safe.photos, []), safe.avatar_url);
 
@@ -8495,6 +8508,7 @@ async function handleAdminUploadGalleryThumb(request, env, userId) {
     source_url: sourceUrl,
     photo_thumb_url: publicUrl,
     photo_thumbs: normalizePhotoThumbs(safe.photo_thumbs, updatedPhotos),
+    fake_snapshots_dirty: refreshResult.fakeSnapshotsDirty,
     user: {
       ...safe,
       age: getPublicAge(safe),
@@ -8564,9 +8578,12 @@ async function handleAdminUploadAvatarThumb(request, env, userId) {
   _viewerCache.delete(userId);
 
   const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
-  await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'admin-avatar-thumb-upload' });
-  await bumpFeedCacheVersion(env);
-  return json({ avatar_thumb_url: publicUrl, user: sanitizeUser(updated, env) }, 201);
+  const refreshResult = await refreshProfileMediaThumbReferences(env, user, updated, { source: 'admin-avatar-thumb-upload' });
+  return json({
+    avatar_thumb_url: publicUrl,
+    fake_snapshots_dirty: refreshResult.fakeSnapshotsDirty,
+    user: sanitizeUser(updated, env),
+  }, 201);
 }
 
 async function handleAdminDeleteGalleryPhoto(request, env, userId) {
