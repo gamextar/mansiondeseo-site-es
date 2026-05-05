@@ -8019,7 +8019,8 @@ async function refreshUalaPaymentLogFromBridge(env, row = {}) {
 
   const metadata = safeParseJSON(row.metadata, {});
   const lastCheckMs = parseSqlTimestampMs(metadata?.admin_status_check_at || '');
-  if (lastCheckMs && Date.now() - lastCheckMs < ADMIN_UALA_STATUS_REFRESH_COOLDOWN_MS) return false;
+  const lastCheckFailed = metadata?.admin_status_check?.ok === false;
+  if (!lastCheckFailed && lastCheckMs && Date.now() - lastCheckMs < ADMIN_UALA_STATUS_REFRESH_COOLDOWN_MS) return false;
 
   const verification = await verifyUalaCheckoutWithBridge(env, checkoutId);
   if (!verification.ok) {
