@@ -34,6 +34,7 @@ export function getPrimaryProfilePhoto(profile) {
 
 export function getPrimaryProfileThumbnail(profile) {
   if (profile?.avatar_thumb_url) return profile.avatar_thumb_url;
+  if (profile?.avatar_url) return profile.avatar_url;
   const galleryPhoto = getGalleryPhotos(profile)[0] || '';
   return galleryPhoto ? getGalleryPhotoThumbnail(profile, galleryPhoto) : getPrimaryProfilePhoto(profile);
 }
