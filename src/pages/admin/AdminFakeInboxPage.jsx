@@ -53,7 +53,7 @@ export default function AdminFakeInboxPage() {
   const [replyText, setReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
 
-  const fetchInbox = useCallback(async (nextPage = page, nextQuery = query) => {
+  const fetchInbox = useCallback(async (nextPage = 1, nextQuery = '') => {
     setLoading(true);
     try {
       const data = await adminGetFakeInbox({ page: nextPage, limit: 20, q: nextQuery });
@@ -66,7 +66,7 @@ export default function AdminFakeInboxPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, query]);
+  }, []);
 
   useEffect(() => {
     fetchInbox(1, query);
