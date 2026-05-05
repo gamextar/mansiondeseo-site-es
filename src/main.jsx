@@ -7,52 +7,14 @@ import {
   applyBottomNavCssVariables,
 } from './lib/bottomNavConfig'
 import { SITE_CONFIG } from './lib/siteConfig'
+import {
+  isRecoverableAssetError,
+  isRecoverableAssetUrl,
+  tryRecoverFromAssetFailure,
+} from './lib/assetRecovery'
 
-const ASSET_RECOVERY_KEY = 'mansion-asset-recovery-reload';
 const SW_MIGRATION_KEY = 'mansion-sw-migration';
 const SW_MIGRATION_VERSION = 'v12-no-html-cache';
-
-function isRecoverableAssetUrl(url) {
-  const value = String(url || '');
-  return /\/assets\/.+\.(js|css)(\?|$)/i.test(value);
-}
-
-function isRecoverableAssetError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '');
-  return (
-    message.includes('Failed to fetch dynamically imported module') ||
-    message.includes('Importing a module script failed') ||
-    message.includes('is not a valid JavaScript MIME type') ||
-    message.includes('non CSS MIME types are not allowed') ||
-    message.includes('Did not parse stylesheet') ||
-    message.includes('ChunkLoadError')
-  );
-}
-
-function tryRecoverFromAssetFailure() {
-  if (typeof window === 'undefined') return false;
-  try {
-    if (sessionStorage.getItem(ASSET_RECOVERY_KEY) === '1') {
-      sessionStorage.removeItem(ASSET_RECOVERY_KEY);
-      return false;
-    }
-    sessionStorage.setItem(ASSET_RECOVERY_KEY, '1');
-  } catch {}
-  void (async () => {
-    try {
-      if ('caches' in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((key) => caches.delete(key)));
-      }
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((registration) => registration.unregister()));
-      }
-    } catch {}
-    window.location.reload();
-  })();
-  return true;
-}
 
 if (typeof window !== 'undefined' && SITE_CONFIG.redirectHosts.includes(window.location.hostname)) {
   const canonicalUrl = `${SITE_CONFIG.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;

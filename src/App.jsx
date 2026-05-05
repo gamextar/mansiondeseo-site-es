@@ -34,6 +34,7 @@ import { AuthContext, useAuth } from './lib/authContext';
 import { preloadVideoFeedChunk, preloadVideoFeedData } from './lib/videoFeedWarmup';
 import { clearBootDebugFlags, getBootDebugFlags, subscribeBootDebugFlags } from './lib/bootDebugPrefs';
 import { lazyWithRetry } from './lib/lazyWithRetry';
+import { isRecoverableAssetError, wasAssetRecoveryTriggeredRecently } from './lib/assetRecovery';
 import { useRobotsMeta } from './lib/seo';
 import { getRouteEnabledSeoLocales, isSeoLocale } from './lib/seoLocales';
 import { isSeoIntentVariant } from './lib/seoVariants';
@@ -1205,6 +1206,12 @@ export default function App() {
     };
 
     const handleWindowError = (event) => {
+      if (
+        isRecoverableAssetError(event.error || event.message) &&
+        wasAssetRecoveryTriggeredRecently()
+      ) {
+        return;
+      }
       sendClientError('window.error', {
         message: event.message || event.error?.message || 'window_error',
         stack: event.error?.stack || '',
@@ -1216,6 +1223,12 @@ export default function App() {
 
     const handleUnhandledRejection = (event) => {
       const reason = event.reason;
+      if (
+        isRecoverableAssetError(reason) &&
+        wasAssetRecoveryTriggeredRecently()
+      ) {
+        return;
+      }
       sendClientError('unhandledrejection', {
         message: typeof reason === 'string' ? reason : reason?.message || 'unhandled_rejection',
         stack: reason?.stack || '',

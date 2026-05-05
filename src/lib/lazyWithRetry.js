@@ -1,35 +1,18 @@
-function shouldReloadForImportError(error) {
-  const message = String(error?.message || error || '');
-  return (
-    message.includes('Failed to fetch dynamically imported module') ||
-    message.includes('Importing a module script failed') ||
-    message.includes('is not a valid JavaScript MIME type') ||
-    message.includes('ChunkLoadError')
-  );
-}
+import { isRecoverableAssetError, tryRecoverFromAssetFailure } from './assetRecovery';
 
-export function lazyWithRetry(importer, key) {
+export function lazyWithRetry(importer) {
   return () =>
     importer()
-      .then((module) => {
-        try {
-          sessionStorage.removeItem(key);
-        } catch {}
-        return module;
-      })
+      .then((module) => module)
       .catch((error) => {
-        if (typeof window === 'undefined' || !shouldReloadForImportError(error)) {
+        if (typeof window === 'undefined' || !isRecoverableAssetError(error)) {
           throw error;
         }
 
-        const alreadyRetried = sessionStorage.getItem(key) === '1';
-        if (alreadyRetried) {
-          sessionStorage.removeItem(key);
-          throw error;
+        if (tryRecoverFromAssetFailure()) {
+          return new Promise(() => {});
         }
 
-        sessionStorage.setItem(key, '1');
-        window.location.reload();
-        return new Promise(() => {});
+        throw error;
       });
 }
