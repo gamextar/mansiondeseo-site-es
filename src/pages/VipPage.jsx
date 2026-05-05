@@ -190,7 +190,7 @@ export default function VipPage() {
         </button>
 
         <p className="text-center text-xs text-gray-600">
-          Pago procesado de forma segura · Podés cancelar cuando quieras
+          Pago procesado de forma segura
         </p>
       </div>
     </div>
