@@ -87,6 +87,7 @@ export default function SettingsPage() {
   const [dailyMessageLimit, setDailyMessageLimit] = useState(5);
   const [messageLimitWindowHours, setMessageLimitWindowHours] = useState(12);
   const [onlineThresholdMinutes, setOnlineThresholdMinutes] = useState(60);
+  const [autoLogoutMinutes, setAutoLogoutMinutes] = useState(60);
 
   // Site
   const [siteCountry, setSiteCountry] = useState('AR');
@@ -276,6 +277,7 @@ export default function SettingsPage() {
         setDailyMessageLimit(s.dailyMessageLimit);
         setMessageLimitWindowHours(s.messageLimitWindowHours ?? 12);
         setOnlineThresholdMinutes(s.onlineThresholdMinutes ?? 60);
+        setAutoLogoutMinutes(s.autoLogoutMinutes ?? 60);
         setSiteCountry(s.siteCountry);
         setSiteLocale(s.siteLocale || 'es-AR');
         setSiteTimezone(s.siteTimezone || 'America/Argentina/Buenos_Aires');
@@ -499,6 +501,7 @@ export default function SettingsPage() {
         daily_message_limit: dailyMessageLimit,
         message_limit_window_hours: committedMessageLimitWindowHours,
         online_threshold_minutes: onlineThresholdMinutes,
+        auto_logout_minutes: autoLogoutMinutes,
         site_country: siteCountry,
         site_locale: siteLocale,
         site_timezone: siteTimezone,
@@ -588,6 +591,7 @@ export default function SettingsPage() {
       setDailyMessageLimit(s.dailyMessageLimit);
       setMessageLimitWindowHours(s.messageLimitWindowHours ?? 12);
       setOnlineThresholdMinutes(s.onlineThresholdMinutes ?? 60);
+      setAutoLogoutMinutes(s.autoLogoutMinutes ?? 60);
       setSiteCountry(s.siteCountry);
       setSiteLocale(s.siteLocale || 'es-AR');
       setSiteTimezone(s.siteTimezone || 'America/Argentina/Buenos_Aires');
@@ -1543,6 +1547,24 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <ToggleSwitch value={hidePasswordRegister} onChange={setHidePasswordRegister} />
+              </div>
+            </div>
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                    <Lock className="w-4 h-4 text-mansion-gold" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">Cierre por privacidad</h3>
+                    <p className="text-[11px] text-text-dim">Minutos de inactividad antes de cerrar la sesión. Usá 0 para desactivar.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <Counter value={autoLogoutMinutes} onChange={setAutoLogoutMinutes} min={0} max={1440} step={5} />
+                  <span className="text-xs text-text-dim">min</span>
+                </div>
               </div>
             </div>
 

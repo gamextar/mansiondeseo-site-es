@@ -9,6 +9,7 @@ import { resolveApiBase } from './siteConfig';
 const API_BASE = resolveApiBase();
 const TOKEN_KEY = 'mansion_token';
 const USER_KEY = 'mansion_user';
+const PRIVACY_LAST_ACTIVITY_KEY = 'mansion_privacy_last_activity_at';
 const AUTH_ME_CACHE_KEY = 'authMe';
 const AUTH_ME_CACHE_TTL_MS = 60 * 60_000;
 const OWN_PROFILE_DASHBOARD_CACHE_KEY = 'ownProfileDashboard';
@@ -430,6 +431,7 @@ export function setToken(token) {
   if (typeof localStorage === 'undefined') return;
   if (token) {
     localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(PRIVACY_LAST_ACTIVITY_KEY, String(Date.now()));
   } else {
     localStorage.removeItem(TOKEN_KEY);
   }
@@ -499,6 +501,7 @@ function clearSiteStorageKeys(storage) {
     OWN_PROFILE_DASHBOARD_CACHE_KEY,
     'conversations',
     'unreadCount',
+    PRIVACY_LAST_ACTIVITY_KEY,
     'vf_active_story',
     'vf_idx',
     'vf_prefetched',
@@ -557,8 +560,27 @@ export function clearAuth() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem('mansion_registered');
+  localStorage.removeItem(PRIVACY_LAST_ACTIVITY_KEY);
   invalidateBootstrapCache();
   invalidateUnreadCountCache();
+  try {
+    window.dispatchEvent(new Event('mansion-auth-expired'));
+  } catch {}
+}
+
+export function expireSessionForPrivacy(reason = 'privacy_timeout') {
+  const token = getToken();
+  if (token && typeof fetch !== 'undefined') {
+    fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      keepalive: true,
+    }).catch(() => {});
+  }
+  try {
+    sessionStorage.setItem('mansion_logout_reason', reason);
+  } catch {}
+  clearAuth();
 }
 
 // ── Fetch wrapper ───────────────────────────────────────

@@ -6770,6 +6770,7 @@ async function loadSettings(env) {
     dailyMessageLimit: parseInt(settings.daily_message_limit || '5', 10),
     messageLimitWindowHours: normalizeMessageLimitWindowHours(settings.message_limit_window_hours),
     freeVideoStoryLimit: parseIntegerSetting(settings.free_video_story_daily_limit, FREE_VIDEO_STORY_DAILY_LIMIT, 0, 500),
+    autoLogoutMinutes: parseIntegerSetting(settings.auto_logout_minutes, 60, 0, 10080),
     siteCountry,
     siteLocale: settings.site_locale || (siteCountry === 'ES' ? 'es-ES' : 'es-AR'),
     siteTimezone: settings.site_timezone || (siteCountry === 'ES' ? 'Europe/Madrid' : 'America/Argentina/Buenos_Aires'),
@@ -7013,6 +7014,7 @@ function getPublicSettingsPayload(settings) {
     encoderPreset: settings.encoderPreset,
     encoderShowProgressHud: settings.encoderShowProgressHud,
     sidebarStoryRingWidth: settings.sidebarStoryRingWidth,
+    autoLogoutMinutes: settings.autoLogoutMinutes,
   };
 }
 
@@ -7045,6 +7047,7 @@ async function handleUpdateSettings(request, env) {
     'gallery_placeholder_super_hot_img',
     'show_vip_button',
     'daily_message_limit', 'message_limit_window_hours', 'site_country', 'site_locale', 'site_timezone', 'site_currency',
+    'auto_logout_minutes',
     'hide_password_register',
     'vip_price_monthly', 'vip_price_3months', 'vip_price_6months',
     'incognito_icon_svg', 'block_user_icon_svg', 'video_call_icon_svg',
