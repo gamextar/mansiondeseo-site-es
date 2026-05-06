@@ -33,6 +33,7 @@ const STORY_SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', '
 const STORY_PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const PROFILE_FAKE_ONLINE_ROTATION_MS = 5 * 60_000;
 const PROFILE_FAKE_ONLINE_PERCENT_DEFAULT = 42;
+const API_GET_TIMEOUT_MS = 45_000;
 export const STORY_FEED_CACHE_INVALIDATED_EVENT = 'mansion-story-feed-cache-invalidated';
 const sharedGetCache = new Map();
 let avatarUploadCacheSeq = 0;
@@ -565,7 +566,12 @@ export function clearAuth() {
 async function apiFetch(path, options = {}) {
   const token = getToken();
   const headers = { ...options.headers };
-  const method = options.method || 'GET';
+  const method = String(options.method || 'GET').toUpperCase();
+  const shouldApplyTimeout = method === 'GET' && !options.signal && typeof AbortController !== 'undefined';
+  const controller = shouldApplyTimeout ? new AbortController() : null;
+  const timeoutId = controller
+    ? globalThis.setTimeout(() => controller.abort(), API_GET_TIMEOUT_MS)
+    : null;
   const debug = getApiDebugController();
   const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const shouldRequestProfileTimings = debug?.isEnabled?.() && method === 'GET' && path.startsWith('/profiles');
@@ -582,10 +588,24 @@ async function apiFetch(path, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
 
-  const res = await fetch(`${API_BASE}${requestPath}`, {
-    ...options,
-    headers,
-  });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${requestPath}`, {
+      ...options,
+      headers,
+      signal: controller?.signal || options.signal,
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      const timeoutError = new Error('Tiempo de espera agotado. Probá recargar la página.');
+      timeoutError.status = 0;
+      timeoutError.code = 'api_timeout';
+      throw timeoutError;
+    }
+    throw err;
+  } finally {
+    if (timeoutId) globalThis.clearTimeout(timeoutId);
+  }
   const finishedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   let timingHeader = res.headers.get('X-Profiles-Timing') || '';
   const cacheHeader = res.headers.get('X-Profiles-Cache') || '';

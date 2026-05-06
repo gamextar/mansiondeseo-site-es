@@ -1408,12 +1408,12 @@ export default function App() {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
       const handleVisibilityChange = () => {
         if (document.visibilityState !== 'visible') return;
-        window.removeEventListener('visibilitychange', handleVisibilityChange);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
         detachVisibilityListener = null;
         runBootstrap();
       };
-      detachVisibilityListener = () => window.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.addEventListener('visibilitychange', handleVisibilityChange);
+      detachVisibilityListener = () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.addEventListener('visibilitychange', handleVisibilityChange);
     } else {
       runBootstrap();
     }
