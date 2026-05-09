@@ -98,6 +98,37 @@
     </style>
     <script>
       (function(){
+        var authPath = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
+        if (authPath === '/login' || authPath === '/recuperar-contrasena') {
+          var authCleanKey = 'mansion-auth-page-sw-clean-v2';
+          Promise.resolve()
+            .then(function(){
+              if (!('serviceWorker' in navigator)) return false;
+              return navigator.serviceWorker.getRegistrations().then(function(registrations){
+                var hasController = !!navigator.serviceWorker.controller;
+                if (!hasController && registrations.length === 0) return false;
+                return Promise.all(registrations.map(function(registration){ return registration.unregister(); }))
+                  .then(function(){ return true; });
+              });
+            })
+            .then(function(cleanedSw){
+              if (!cleanedSw || !('caches' in window)) return cleanedSw;
+              return caches.keys().then(function(keys){
+                return Promise.all(keys.map(function(cacheKey){ return caches.delete(cacheKey); }))
+                  .then(function(){ return cleanedSw; });
+              });
+            })
+            .then(function(cleanedSw){
+              if (!cleanedSw) return;
+              try {
+                if (sessionStorage.getItem(authCleanKey) === '1') return;
+                sessionStorage.setItem(authCleanKey, '1');
+              } catch (_) {}
+              window.location.replace(authPath + window.location.search + window.location.hash);
+            })
+            .catch(function(){});
+        }
+
         var key = 'mansion-html-asset-recovery';
         function isAssetUrl(value) {
           return /\/assets\/.+\.(js|css)(\?|$)/i.test(String(value || ''));

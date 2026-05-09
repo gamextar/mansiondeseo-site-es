@@ -23,7 +23,7 @@ const CLIENT_CACHE_VERSION = 'media-paths-v7-avatar-race-fix';
 const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const STORY_SNAPSHOT_CACHE_PREFIX = 'mansion_story_snapshot:';
-const STORY_SNAPSHOT_SELECTION_CACHE_PREFIX = 'mansion_story_snapshot_feed_v4:';
+const STORY_SNAPSHOT_SELECTION_CACHE_PREFIX = 'mansion_story_snapshot_feed_v6:';
 const STORY_SNAPSHOT_MANIFEST_TTL_MS = 10 * 60_000;
 const STORY_SNAPSHOT_ASSET_TTL_MS = 24 * 60 * 60_000;
 const STORY_SNAPSHOT_FAKE_ROTATION_MS = 5 * 60_000;
@@ -35,6 +35,10 @@ const STORY_PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const PROFILE_FAKE_ONLINE_ROTATION_MS = 5 * 60_000;
 const PROFILE_FAKE_ONLINE_PERCENT_DEFAULT = 42;
 const API_GET_TIMEOUT_MS = 45_000;
+const API_MUTATION_TIMEOUT_MS = 30_000;
+const API_LOGIN_TIMEOUT_MS = 15_000;
+const LOGIN_ENV_RECOVERY_KEY = 'mansion_login_env_recovery';
+const LOGIN_SW_CLEAN_KEY = 'mansion_login_sw_cleaned';
 export const STORY_FEED_CACHE_INVALIDATED_EVENT = 'mansion-story-feed-cache-invalidated';
 const sharedGetCache = new Map();
 let avatarUploadCacheSeq = 0;
@@ -116,6 +120,12 @@ function invalidateFavoritesCache() {
 function invalidateMeCache() {
   sharedGetCache.delete('me');
   sessionCache.delete(AUTH_ME_CACHE_KEY);
+}
+
+function redirectToLogin() {
+  if (typeof window === 'undefined') return;
+  const nextPath = hasEverLoggedIn() ? '/login' : '/';
+  window.location.href = nextPath;
 }
 
 function mergeMeCache(partialUser) {
@@ -568,19 +578,65 @@ export function clearAuth() {
   } catch {}
 }
 
-export function expireSessionForPrivacy(reason = 'privacy_timeout') {
-  const token = getToken();
-  if (token && typeof fetch !== 'undefined') {
-    fetch(`${API_BASE}/auth/logout`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      keepalive: true,
-    }).catch(() => {});
-  }
+export async function recoverLoginEnvironment() {
+  if (typeof window === 'undefined') return false;
   try {
-    sessionStorage.setItem('mansion_logout_reason', reason);
+    const raw = sessionStorage.getItem(LOGIN_ENV_RECOVERY_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Number(parsed?.at || 0) && Date.now() - Number(parsed.at) < 5 * 60_000) {
+      return false;
+    }
+    sessionStorage.setItem(LOGIN_ENV_RECOVERY_KEY, JSON.stringify({ at: Date.now() }));
   } catch {}
+
   clearAuth();
+
+  try {
+    sessionStorage.removeItem('appBootstrap');
+    sessionStorage.removeItem('mansion_bootstrap_last_error');
+    sessionStorage.removeItem('mansion_site_settings');
+  } catch {}
+
+  try {
+    if ('caches' in window) {
+      const keys = await window.caches.keys();
+      await Promise.all(keys.map((key) => window.caches.delete(key)));
+    }
+  } catch {}
+
+  try {
+    if ('serviceWorker' in window.navigator) {
+      const registrations = await window.navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+  } catch {}
+
+  return true;
+}
+
+export async function ensureLoginPageNetworkClean() {
+  if (typeof window === 'undefined') return false;
+  if (!('serviceWorker' in window.navigator)) return false;
+  if (!window.navigator.serviceWorker.controller) return false;
+
+  try {
+    if (sessionStorage.getItem(LOGIN_SW_CLEAN_KEY) === '1') return false;
+    sessionStorage.setItem(LOGIN_SW_CLEAN_KEY, '1');
+  } catch {}
+
+  try {
+    const registrations = await window.navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+  } catch {}
+
+  try {
+    if ('caches' in window) {
+      const keys = await window.caches.keys();
+      await Promise.all(keys.map((key) => window.caches.delete(key)));
+    }
+  } catch {}
+
+  return true;
 }
 
 // ── Fetch wrapper ───────────────────────────────────────
@@ -589,10 +645,11 @@ async function apiFetch(path, options = {}) {
   const token = getToken();
   const headers = { ...options.headers };
   const method = String(options.method || 'GET').toUpperCase();
-  const shouldApplyTimeout = method === 'GET' && !options.signal && typeof AbortController !== 'undefined';
+  const requestTimeoutMs = Number(options.timeoutMs || (method === 'GET' ? API_GET_TIMEOUT_MS : API_MUTATION_TIMEOUT_MS));
+  const shouldApplyTimeout = requestTimeoutMs > 0 && !options.signal && typeof AbortController !== 'undefined';
   const controller = shouldApplyTimeout ? new AbortController() : null;
   const timeoutId = controller
-    ? globalThis.setTimeout(() => controller.abort(), API_GET_TIMEOUT_MS)
+    ? globalThis.setTimeout(() => controller.abort(), requestTimeoutMs)
     : null;
   const debug = getApiDebugController();
   const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -614,6 +671,7 @@ async function apiFetch(path, options = {}) {
   try {
     res = await fetch(`${API_BASE}${requestPath}`, {
       ...options,
+      timeoutMs: undefined,
       headers,
       signal: controller?.signal || options.signal,
     });
@@ -635,7 +693,7 @@ async function apiFetch(path, options = {}) {
   // Handle 401 — token expired
   if (res.status === 401 && token) {
     clearAuth();
-    window.location.href = '/';
+    redirectToLogin();
     throw new Error('Sesión expirada');
   }
 
@@ -687,7 +745,7 @@ async function apiBlob(path, options = {}) {
 
   if (res.status === 401 && token) {
     clearAuth();
-    window.location.href = '/';
+    redirectToLogin();
     throw new Error('Sesión expirada');
   }
 
@@ -771,7 +829,7 @@ async function apiUpload(path, options = {}) {
 
       if (xhr.status === 401 && token) {
         clearAuth();
-        window.location.href = '/';
+        redirectToLogin();
         reject(new Error('Sesión expirada'));
         return;
       }
@@ -839,12 +897,56 @@ export async function resendCode(email) {
 }
 
 export async function login({ email, password }) {
-  const data = await apiFetch('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
+  clearAuth();
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller
+    ? globalThis.setTimeout(() => controller.abort(), API_LOGIN_TIMEOUT_MS)
+    : null;
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      },
+      body: JSON.stringify({ email, password }),
+      cache: 'no-store',
+      credentials: 'omit',
+      signal: controller?.signal,
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      const timeoutError = new Error('Tiempo de espera agotado. Probá recargar la página.');
+      timeoutError.status = 0;
+      timeoutError.code = 'api_timeout';
+      throw timeoutError;
+    }
+    throw err;
+  } finally {
+    if (timeoutId) globalThis.clearTimeout(timeoutId);
+  }
+
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
+  }
+
+  if (!res.ok) {
+    const err = new Error(data.error || 'Error del servidor');
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+
   setToken(data.token);
   setStoredUser(data.user);
+  invalidateBootstrapCache();
+  invalidateMeCache();
+  invalidateOwnProfileDashboardCache();
+  invalidateUnreadCountCache();
   return data;
 }
 
@@ -1129,10 +1231,11 @@ export async function getConversations() {
   }), { ttlMs: 2 * 60_000 });
 }
 
-export async function getMessages(otherUserId, { before, limit } = {}) {
+export async function getMessages(otherUserId, { before, limit, prefetch = false } = {}) {
   const params = new URLSearchParams();
   if (before) params.set('before', before);
   if (limit) params.set('limit', String(limit));
+  if (prefetch) params.set('prefetch', '1');
   const qs = params.toString();
   const path = `/messages/${otherUserId}${qs ? `?${qs}` : ''}`;
 
@@ -1140,7 +1243,8 @@ export async function getMessages(otherUserId, { before, limit } = {}) {
   // identical fetches briefly so they do not fan out into many Worker hits.
   if (!before) {
     const latestLimit = limit || 40;
-    return sharedGet(`messages:${otherUserId}:latest:${latestLimit}`, () => apiFetch(path), { ttlMs: 2_000 });
+    const mode = prefetch ? 'prefetch' : 'read';
+    return sharedGet(`messages:${otherUserId}:latest:${latestLimit}:${mode}`, () => apiFetch(path), { ttlMs: 2_000 });
   }
 
   return apiFetch(path);
@@ -1715,6 +1819,12 @@ export async function adminUpdateUser(userId, fields) {
   });
 }
 
+export async function adminResetUserVideoCallAllowance(userId) {
+  return apiFetch(`/admin/users/${userId}/video-call-allowance`, {
+    method: 'POST',
+  });
+}
+
 export async function adminUploadGalleryThumb(userId, sourceUrl, file) {
   const params = new URLSearchParams({ source_url: sourceUrl });
   return apiUpload(`/admin/users/${userId}/gallery-thumb?${params.toString()}`, {
@@ -2146,9 +2256,32 @@ async function loadSharedStorySnapshotFeed({ viewer = null, fresh = false } = {}
   const previousSelection = readStorySnapshotStorage(selectionStateKey, 7 * 24 * 60 * 60_000);
 
   const sharedLimit = STORY_SNAPSHOT_SHARED_LIMIT;
-  let realRows = [];
+  let liveRealRows = null;
+  try {
+    const params = new URLSearchParams({
+      page: '1',
+      limit: String(sharedLimit),
+      surface: 'rail',
+      real_only: '1',
+      fresh: '1',
+    });
+    const livePayload = await apiFetch(`/stories?${params.toString()}`);
+    liveRealRows = Array.isArray(livePayload?.stories) ? livePayload.stories : [];
+  } catch {
+    liveRealRows = null;
+  }
+
+  let realRows = Array.isArray(liveRealRows)
+    ? uniqueStorySnapshotRows(
+      liveRealRows
+        .filter((story) => storyMatchesRoleValues(story, roleValues))
+        .filter((story) => !viewerId || String(story?.user_id || '') !== viewerId),
+      sharedLimit
+    )
+    : [];
+
   const realFilename = getStorySnapshotFilename(manifest?.real);
-  if (realFilename) {
+  if (!Array.isArray(liveRealRows) && realFilename) {
     const realSnapshot = await fetchStorySnapshotJson(realFilename, { ttlMs: STORY_SNAPSHOT_ASSET_TTL_MS });
     realRows = uniqueStorySnapshotRows(
       (realSnapshot?.stories || [])
@@ -2162,17 +2295,32 @@ async function loadSharedStorySnapshotFeed({ viewer = null, fresh = false } = {}
   let fakeRows = [];
   if (fakeLimit > 0) {
     const buckets = getStorySnapshotBucketsForRoleValues(roleValues);
-    const fakeSnapshots = await Promise.all(buckets.map(async (bucket) => {
+    const loadFakeBucketSnapshots = async (bucketList) => Promise.all(bucketList.map(async (bucket) => {
       const filename = getStorySnapshotFilename(manifest?.fakes?.[bucket]);
       if (!filename) return [];
       const snapshot = await fetchStorySnapshotJson(filename, { ttlMs: STORY_SNAPSHOT_ASSET_TTL_MS });
       return Array.isArray(snapshot?.stories) ? snapshot.stories : [];
     }));
-    const fakePool = uniqueStorySnapshotRows(
-      fakeSnapshots.flat()
+
+    const preferredFakeSnapshots = await loadFakeBucketSnapshots(buckets);
+    const preferredFakePool = uniqueStorySnapshotRows(
+      preferredFakeSnapshots.flat()
         .filter((story) => storyMatchesRoleValues(story, roleValues))
         .filter((story) => !viewerId || String(story?.user_id || '') !== viewerId)
     );
+    let fakePool = preferredFakePool;
+
+    if (roleValues.length > 0 && preferredFakePool.length < fakeLimit) {
+      const bucketSet = new Set(buckets);
+      const fallbackBuckets = STORY_SNAPSHOT_BUCKETS.filter((bucket) => !bucketSet.has(bucket));
+      const fallbackFakeSnapshots = await loadFakeBucketSnapshots(fallbackBuckets);
+      fakePool = uniqueStorySnapshotRows([
+        ...preferredFakePool,
+        ...fallbackFakeSnapshots.flat()
+          .filter((story) => !viewerId || String(story?.user_id || '') !== viewerId),
+      ]);
+    }
+
     const seed = hashStorySnapshotSeed(`${viewerId || 'anon'}:${manifest.version || ''}:${roleKey}:${fakeWindowKey}:${fakePool.length}`);
     fakeRows = selectRollingStorySnapshotFakes({
       fakePool,

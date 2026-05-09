@@ -23,7 +23,7 @@ import FeedShellProbePage from './pages/FeedShellProbePage';
 import ProfileShellProbePage from './pages/ProfileShellProbePage';
 import SafeAreaDebugPage from './pages/SafeAreaDebugPage';
 import ProfilePage from './pages/ProfilePage';
-import { getToken, getStoredUser, setToken, setStoredUser, clearAuth, expireSessionForPrivacy, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, reportClientError } from './lib/api';
+import { STORY_FEED_CACHE_INVALIDATED_EVENT, getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, reportClientError, hasEverLoggedIn } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -38,6 +38,7 @@ import { isRecoverableAssetError, wasAssetRecoveryTriggeredRecently } from './li
 import { useRobotsMeta } from './lib/seo';
 import { getRouteEnabledSeoLocales, isSeoLocale } from './lib/seoLocales';
 import { isSeoIntentVariant } from './lib/seoVariants';
+import { resolveWsBase } from './lib/siteConfig';
 
 const ExplorePage = lazy(lazyWithRetry(() => import('./pages/ExplorePage'), 'mansion-lazy-retry:explore'));
 const DashboardPage = lazy(lazyWithRetry(() => import('./pages/DashboardPage'), 'mansion-lazy-retry:dashboard'));
@@ -67,10 +68,7 @@ const MOBILE_PUBLIC_PROFILE_SCROLL_RETURN_DURATION_MS = 620;
 const MOBILE_PUBLIC_PROFILE_SCROLL_RELEASE_DELAY_MS = 140;
 const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_MAX_PX = 22;
 const MOBILE_PUBLIC_PROFILE_TOP_BOUNCE_RETURN_MS = 620;
-const PRIVACY_LAST_ACTIVITY_KEY = 'mansion_privacy_last_activity_at';
-const PRIVACY_SESSION_EXTEND_EVENT = 'mansion-privacy-session-extend';
-const PRIVACY_WARNING_MIN_MS = 30_000;
-const PRIVACY_WARNING_MAX_MS = 5 * 60_000;
+const STORY_FEED_WS_BASE = resolveWsBase();
 
 // Pages that don't show navbar/bottomnav (full-screen flows)
 const FULLSCREEN_PATHS = ['/bienvenida', '/registro', '/login', '/recuperar-contrasena', '/vip', '/monedas', '/pago-exitoso', '/pago-fallido', '/pago-pendiente', '/pago-monedas-exitoso', '/admin/', '/historia/', '/black-test'];
@@ -81,6 +79,30 @@ function detectStandaloneMobile() {
   const ua = window.navigator.userAgent || '';
   const isMobile = /iphone|ipad|ipod|android/i.test(ua);
   return Boolean(standalone && isMobile);
+}
+
+function removeStoryStorageKeys(storage, shouldRemove) {
+  try {
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index);
+      if (key && shouldRemove(key)) storage.removeItem(key);
+    }
+  } catch {}
+}
+
+function clearStoryRailCaches() {
+  if (typeof window === 'undefined') return;
+  const shouldRemove = (key) => (
+    key.startsWith('mansion_home_stories:') ||
+    key.startsWith('mansion_story_snapshot:') ||
+    key.startsWith('mansion_story_snapshot_feed_')
+  );
+  removeStoryStorageKeys(localStorage, shouldRemove);
+  removeStoryStorageKeys(sessionStorage, shouldRemove);
+  try {
+    sessionStorage.removeItem('vf_idx');
+    localStorage.removeItem('vf_stories');
+  } catch {}
 }
 
 function resetDocumentScroll(scrollTop = 0) {
@@ -170,7 +192,7 @@ function syncViewportTopInsetVar({ forceZero = false } = {}) {
 
 function RequireRegistration({ children }) {
   const { registered } = useAuth();
-  if (!registered) return <Navigate to="/bienvenida" replace />;
+  if (!registered) return <Navigate to={hasEverLoggedIn() ? '/login' : '/bienvenida'} replace />;
   return children;
 }
 
@@ -1122,15 +1144,11 @@ export default function App() {
   const [bootShieldVisible, setBootShieldVisible] = useState(() => debugFlags.bootShield);
   const [snapshotShieldVisible, setSnapshotShieldVisible] = useState(false);
   const [bootstrapError, setBootstrapError] = useState(null);
-  const [privacyLogoutWarningVisible, setPrivacyLogoutWarningVisible] = useState(false);
   const bootstrapStartedRef = useRef(false);
   const reportedClientErrorsRef = useRef(new Set());
-
-  const autoLogoutMinutes = useMemo(() => {
-    const parsed = Number(siteSettings?.autoLogoutMinutes);
-    if (!Number.isFinite(parsed)) return 60;
-    return Math.max(0, Math.min(10080, Math.round(parsed)));
-  }, [siteSettings?.autoLogoutMinutes]);
+  const storyFeedWsRef = useRef(null);
+  const storyFeedReconnectTimerRef = useRef(null);
+  const storyFeedInvalidationTimerRef = useRef(null);
 
   const handleDisableBootDiagnostics = useCallback(() => {
     clearBootDebugFlags();
@@ -1166,23 +1184,13 @@ export default function App() {
     }
   }, []);
 
-  const handlePrivacyLogout = useCallback((reason = 'privacy_timeout') => {
-    expireSessionForPrivacy(reason);
-    setPrivacyLogoutWarningVisible(false);
+  const handlePrivacyLogout = useCallback(() => {
+    clearAuth();
     setRegisteredState(false);
     setUserState(null);
     if (typeof window !== 'undefined') {
-      window.location.replace('/');
+      window.location.replace(hasEverLoggedIn() ? '/login' : '/');
     }
-  }, []);
-
-  const handleKeepPrivacySession = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem(PRIVACY_LAST_ACTIVITY_KEY, String(Date.now()));
-    } catch {}
-    setPrivacyLogoutWarningVisible(false);
-    window.dispatchEvent(new Event(PRIVACY_SESSION_EXTEND_EVENT));
   }, []);
 
   // Listen for auth expiration events dispatched by apiFetch on 401
@@ -1197,107 +1205,102 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
+    if (!registered || !user?.id || !getToken()) return undefined;
 
-    if (!registered || !getToken() || autoLogoutMinutes <= 0) {
-      setPrivacyLogoutWarningVisible(false);
-      return undefined;
-    }
+    let stopped = false;
+    let reconnectDelayMs = 1000;
 
-    const timeoutMs = autoLogoutMinutes * 60_000;
-    const warningLeadMs = Math.min(
-      PRIVACY_WARNING_MAX_MS,
-      Math.max(PRIVACY_WARNING_MIN_MS, Math.floor(timeoutMs * 0.1))
-    );
-    let warningTimer = null;
-    let logoutTimer = null;
-    let lastRecordedAt = 0;
+    const publishStoryInvalidation = (detail = {}) => {
+      clearStoryRailCaches();
+      setBootstrapStories([]);
+      if (detail?.feedCacheVersion) {
+        try {
+          localStorage.setItem('mansion_feed_cache_version', String(detail.feedCacheVersion));
+        } catch {}
+      }
+      if (storyFeedInvalidationTimerRef.current) {
+        window.clearTimeout(storyFeedInvalidationTimerRef.current);
+      }
+      storyFeedInvalidationTimerRef.current = window.setTimeout(() => {
+        storyFeedInvalidationTimerRef.current = null;
+        window.dispatchEvent(new CustomEvent(STORY_FEED_CACHE_INVALIDATED_EVENT, { detail }));
+      }, 100);
+    };
 
-    const readLastActivity = () => {
+    const applyStoryFeedEvent = (data = {}) => {
+      const storyUserId = String(data.userId || data.user_id || '').trim();
+      const action = String(data.action || 'upsert');
+      if (storyUserId && storyUserId === String(user.id)) {
+        const storyId = String(data.storyId || data.story_id || '').trim();
+        const videoUrl = String(data.videoUrl || data.video_url || '').trim();
+        setUser((prev) => prev ? {
+          ...prev,
+          has_active_story: action !== 'delete',
+          active_story_id: action === 'delete' ? null : (storyId || prev.active_story_id || null),
+          active_story_url: action === 'delete' ? null : (videoUrl || prev.active_story_url || null),
+        } : prev);
+      }
+      publishStoryInvalidation(data);
+    };
+
+    const connect = () => {
+      if (stopped) return;
+      const token = getToken();
+      if (!token) return;
+
       try {
-        const stored = Number(localStorage.getItem(PRIVACY_LAST_ACTIVITY_KEY));
-        return Number.isFinite(stored) && stored > 0 ? stored : 0;
+        const ws = new WebSocket(`${STORY_FEED_WS_BASE}/api/story-feed/ws?token=${encodeURIComponent(token)}`);
+        storyFeedWsRef.current = ws;
+
+        ws.onopen = () => {
+          reconnectDelayMs = 1000;
+        };
+        ws.onmessage = (event) => {
+          let data = null;
+          try {
+            data = JSON.parse(event.data);
+          } catch {
+            data = null;
+          }
+          if (data?.type === 'story_feed_updated') {
+            applyStoryFeedEvent(data);
+          }
+        };
+        ws.onerror = () => {
+          try { ws.close(); } catch {}
+        };
+        ws.onclose = () => {
+          if (storyFeedWsRef.current === ws) storyFeedWsRef.current = null;
+          if (stopped) return;
+          const delay = reconnectDelayMs;
+          reconnectDelayMs = Math.min(30_000, Math.round(reconnectDelayMs * 1.8));
+          storyFeedReconnectTimerRef.current = window.setTimeout(connect, delay);
+        };
       } catch {
-        return 0;
+        if (stopped) return;
+        storyFeedReconnectTimerRef.current = window.setTimeout(connect, reconnectDelayMs);
+        reconnectDelayMs = Math.min(30_000, Math.round(reconnectDelayMs * 1.8));
       }
     };
 
-    const writeLastActivity = (timestamp) => {
-      try {
-        localStorage.setItem(PRIVACY_LAST_ACTIVITY_KEY, String(timestamp));
-      } catch {}
-    };
-
-    const clearTimers = () => {
-      if (warningTimer) window.clearTimeout(warningTimer);
-      if (logoutTimer) window.clearTimeout(logoutTimer);
-      warningTimer = null;
-      logoutTimer = null;
-    };
-
-    const scheduleTimers = () => {
-      clearTimers();
-      if (!getToken()) return;
-      const lastActivity = readLastActivity() || Date.now();
-      if (!readLastActivity()) writeLastActivity(lastActivity);
-      const elapsedMs = Date.now() - lastActivity;
-      const remainingMs = timeoutMs - elapsedMs;
-
-      if (remainingMs <= 0) {
-        handlePrivacyLogout('privacy_timeout');
-        return;
-      }
-
-      if (remainingMs <= warningLeadMs) {
-        setPrivacyLogoutWarningVisible(true);
-      } else {
-        warningTimer = window.setTimeout(() => {
-          setPrivacyLogoutWarningVisible(true);
-        }, remainingMs - warningLeadMs);
-      }
-
-      logoutTimer = window.setTimeout(() => {
-        handlePrivacyLogout('privacy_timeout');
-      }, remainingMs);
-    };
-
-    const recordActivity = (force = false) => {
-      const now = Date.now();
-      if (!force && now - lastRecordedAt < 15_000) return;
-      lastRecordedAt = now;
-      writeLastActivity(now);
-      setPrivacyLogoutWarningVisible(false);
-      scheduleTimers();
-    };
-
-    if (!readLastActivity()) writeLastActivity(Date.now());
-    scheduleTimers();
-
-    const activityOptions = { passive: true };
-    const activityEvents = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
-    const handleUserActivity = () => recordActivity(false);
-    activityEvents.forEach((eventName) => window.addEventListener(eventName, handleUserActivity, activityOptions));
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') scheduleTimers();
-    };
-    const handleStorage = (event) => {
-      if (event.key === PRIVACY_LAST_ACTIVITY_KEY) {
-        setPrivacyLogoutWarningVisible(false);
-        scheduleTimers();
-      }
-    };
-    const handleManualExtend = () => recordActivity(true);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener(PRIVACY_SESSION_EXTEND_EVENT, handleManualExtend);
+    connect();
 
     return () => {
-      clearTimers();
-      activityEvents.forEach((eventName) => window.removeEventListener(eventName, handleUserActivity, activityOptions));
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener(PRIVACY_SESSION_EXTEND_EVENT, handleManualExtend);
+      stopped = true;
+      if (storyFeedReconnectTimerRef.current) {
+        window.clearTimeout(storyFeedReconnectTimerRef.current);
+        storyFeedReconnectTimerRef.current = null;
+      }
+      if (storyFeedInvalidationTimerRef.current) {
+        window.clearTimeout(storyFeedInvalidationTimerRef.current);
+        storyFeedInvalidationTimerRef.current = null;
+      }
+      try {
+        storyFeedWsRef.current?.close(1000, 'App story feed closed');
+      } catch {}
+      storyFeedWsRef.current = null;
     };
-  }, [autoLogoutMinutes, handlePrivacyLogout, registered]);
+  }, [registered, setUser, user?.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -1591,33 +1594,6 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => handlePrivacyLogout('bootstrap_error_manual_logout')}
-                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-text-primary transition-colors hover:bg-white/10"
-                >
-                  Cerrar sesión
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        {privacyLogoutWarningVisible && registered && (
-          <div className="fixed inset-0 z-[10040] flex items-center justify-center bg-black/70 px-5 text-text-primary backdrop-blur-sm">
-            <div className="w-full max-w-sm rounded-2xl border border-mansion-gold/20 bg-mansion-card p-5 shadow-2xl shadow-black/50">
-              <p className="text-[10px] uppercase tracking-[0.24em] text-mansion-gold">Privacidad</p>
-              <h2 className="mt-3 text-lg font-semibold text-white">Tu sesión está por cerrarse</h2>
-              <p className="mt-2 text-sm leading-6 text-text-muted">
-                Por privacidad, cerramos la sesión cuando no hay actividad.
-              </p>
-              <div className="mt-5 flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={handleKeepPrivacySession}
-                  className="rounded-xl bg-mansion-gold px-4 py-3 text-sm font-semibold text-black transition-colors hover:bg-mansion-gold/90"
-                >
-                  Mantener sesión
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handlePrivacyLogout('privacy_warning_manual_logout')}
                   className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-text-primary transition-colors hover:bg-white/10"
                 >
                   Cerrar sesión

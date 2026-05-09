@@ -14,7 +14,7 @@ import {
 } from './lib/assetRecovery'
 
 const SW_MIGRATION_KEY = 'mansion-sw-migration';
-const SW_MIGRATION_VERSION = 'v12-no-html-cache';
+const SW_MIGRATION_VERSION = 'v13-auth-recovery';
 
 if (typeof window !== 'undefined' && SITE_CONFIG.redirectHosts.includes(window.location.hostname)) {
   const canonicalUrl = `${SITE_CONFIG.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -90,8 +90,13 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Register service worker for PWA
-if ('serviceWorker' in navigator) {
+// Register service worker for PWA. Keep auth routes outside the PWA control
+// path so login behaves like a plain network form, not like cached app state.
+const normalizedPathnameForServiceWorker =
+  typeof window !== 'undefined'
+    ? ((window.location.pathname || '/').replace(/\/+$/, '') || '/')
+    : '/';
+if ('serviceWorker' in navigator && !['/login', '/recuperar-contrasena'].includes(normalizedPathnameForServiceWorker)) {
   window.addEventListener('load', () => {
     void (async () => {
       try {

@@ -87,7 +87,6 @@ export default function SettingsPage() {
   const [dailyMessageLimit, setDailyMessageLimit] = useState(5);
   const [messageLimitWindowHours, setMessageLimitWindowHours] = useState(12);
   const [onlineThresholdMinutes, setOnlineThresholdMinutes] = useState(60);
-  const [autoLogoutMinutes, setAutoLogoutMinutes] = useState(60);
 
   // Site
   const [siteCountry, setSiteCountry] = useState('AR');
@@ -155,6 +154,7 @@ export default function SettingsPage() {
   const [videoGradientOpacity, setVideoGradientOpacity] = useState(40);
   const [videoAvatarSize, setVideoAvatarSize] = useState(52);
   const [videoLimitBlur, setVideoLimitBlur] = useState(14);
+  const [freeWebcamDailySeconds, setFreeWebcamDailySeconds] = useState(300);
   const [storyMaxDurationSeconds, setStoryMaxDurationSeconds] = useState('15');
 
   // Encoder
@@ -277,7 +277,6 @@ export default function SettingsPage() {
         setDailyMessageLimit(s.dailyMessageLimit);
         setMessageLimitWindowHours(s.messageLimitWindowHours ?? 12);
         setOnlineThresholdMinutes(s.onlineThresholdMinutes ?? 60);
-        setAutoLogoutMinutes(s.autoLogoutMinutes ?? 60);
         setSiteCountry(s.siteCountry);
         setSiteLocale(s.siteLocale || 'es-AR');
         setSiteTimezone(s.siteTimezone || 'America/Argentina/Buenos_Aires');
@@ -341,6 +340,7 @@ export default function SettingsPage() {
         setVideoGradientOpacity(s.videoGradientOpacity ?? 40);
         setVideoAvatarSize(s.videoAvatarSize ?? 52);
         setVideoLimitBlur(s.videoLimitBlur ?? s.blurMobile ?? 14);
+        setFreeWebcamDailySeconds(s.freeWebcamDailySeconds ?? 300);
         setStoryMaxDurationSeconds(String(s.storyMaxDurationSeconds ?? 15));
         setEncoderThreads(String(s.encoderThreads ?? 4));
         setEncoderCrf(s.encoderCrf || '29');
@@ -501,7 +501,6 @@ export default function SettingsPage() {
         daily_message_limit: dailyMessageLimit,
         message_limit_window_hours: committedMessageLimitWindowHours,
         online_threshold_minutes: onlineThresholdMinutes,
-        auto_logout_minutes: autoLogoutMinutes,
         site_country: siteCountry,
         site_locale: siteLocale,
         site_timezone: siteTimezone,
@@ -562,6 +561,7 @@ export default function SettingsPage() {
         video_gradient_opacity: videoGradientOpacity,
         video_avatar_size: videoAvatarSize,
         video_limit_blur: videoLimitBlur,
+        free_webcam_daily_seconds: freeWebcamDailySeconds,
         story_max_duration_seconds: storyMaxDurationSeconds,
         encoder_threads: encoderThreads,
         encoder_crf: encoderCrf,
@@ -591,7 +591,6 @@ export default function SettingsPage() {
       setDailyMessageLimit(s.dailyMessageLimit);
       setMessageLimitWindowHours(s.messageLimitWindowHours ?? 12);
       setOnlineThresholdMinutes(s.onlineThresholdMinutes ?? 60);
-      setAutoLogoutMinutes(s.autoLogoutMinutes ?? 60);
       setSiteCountry(s.siteCountry);
       setSiteLocale(s.siteLocale || 'es-AR');
       setSiteTimezone(s.siteTimezone || 'America/Argentina/Buenos_Aires');
@@ -650,6 +649,7 @@ export default function SettingsPage() {
       setVideoAvatarSize(s.videoAvatarSize ?? 52);
       const nextVideoLimitBlur = s.videoLimitBlur ?? videoLimitBlur;
       setVideoLimitBlur(nextVideoLimitBlur);
+      setFreeWebcamDailySeconds(s.freeWebcamDailySeconds ?? 300);
       setStoryMaxDurationSeconds(String(s.storyMaxDurationSeconds ?? 15));
       setEncoderThreads(String(s.encoderThreads ?? 4));
       setEncoderCrf(s.encoderCrf || '29');
@@ -1547,24 +1547,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <ToggleSwitch value={hidePasswordRegister} onChange={setHidePasswordRegister} />
-              </div>
-            </div>
-
-            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
-                    <Lock className="w-4 h-4 text-mansion-gold" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-text-primary">Cierre por privacidad</h3>
-                    <p className="text-[11px] text-text-dim">Minutos de inactividad antes de cerrar la sesión. Usá 0 para desactivar.</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 self-end sm:self-auto">
-                  <Counter value={autoLogoutMinutes} onChange={setAutoLogoutMinutes} min={0} max={1440} step={5} />
-                  <span className="text-xs text-text-dim">min</span>
-                </div>
               </div>
             </div>
 
@@ -2777,6 +2759,32 @@ export default function SettingsPage() {
                 <span>Sin blur</span>
                 <span className="text-mansion-gold font-medium">{videoLimitBlur}px</span>
                 <span>40px</span>
+              </div>
+            </div>
+
+            <div className="bg-mansion-card rounded-2xl p-4 border border-white/5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-mansion-elevated flex items-center justify-center">
+                    <Video className="w-4 h-4 text-mansion-gold" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">Límite diario de webcam free</h3>
+                    <p className="text-[11px] text-text-dim">Tiempo diario permitido para usuarios no VIP que reciben videollamadas. 0 desactiva el límite.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <Counter value={freeWebcamDailySeconds} onChange={setFreeWebcamDailySeconds} min={0} max={3600} step={30} />
+                  <span className="text-xs text-text-dim">seg</span>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-mansion-gold/15 bg-mansion-gold/5 px-3 py-2">
+                <span className="text-[11px] text-text-dim">Valor actual</span>
+                <span className="text-sm font-semibold text-mansion-gold">
+                  {Number(freeWebcamDailySeconds || 0) === 0
+                    ? 'Sin límite'
+                    : `${Math.round(Number(freeWebcamDailySeconds || 0) / 60 * 10) / 10} min diarios`}
+                </span>
               </div>
             </div>
 

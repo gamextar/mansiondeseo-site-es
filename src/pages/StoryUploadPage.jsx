@@ -6,7 +6,7 @@ import { useAuth } from '../lib/authContext';
 import AvatarImg from '../components/AvatarImg';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
-import { getToken, uploadStory } from '../lib/api';
+import { STORY_FEED_CACHE_INVALIDATED_EVENT, getToken, uploadStory } from '../lib/api';
 import StoryPreviewOverlay from '../components/StoryPreviewOverlay';
 import { removeViewedStoryUser } from '../lib/storyViews';
 
@@ -15,6 +15,8 @@ const LANDSCAPE_HEIGHT = 720;
 const PORTRAIT_WIDTH = 720;
 const PORTRAIT_HEIGHT = 1280;
 const STORY_POSTER_FRAME_TIME_SECONDS = 0;
+const RECENT_STORY_UPLOAD_KEY = 'mansion_recent_story_upload';
+const VIEWED_STORIES_EVENT = 'mansion-viewed-stories-updated';
 const FFMPEG_BASE_URL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
 const ENCODER_DEFAULTS = {
 	crf: '29',
@@ -453,6 +455,7 @@ export default function StoryUploadPage() {
 	const [engineStatus, setEngineStatus] = useState('idle');
 	const [storyBackdropUrl, setStoryBackdropUrl] = useState('');
 	const [storyPreviewExpanded, setStoryPreviewExpanded] = useState(false);
+	const [includeAudio, setIncludeAudio] = useState(true);
 
 	const outputProfile = getOutputProfile(sourceResolution);
 	const storyStep = result ? (showPreview ? 'preview' : previewConfirmed ? 'done' : 'preview') : sourceFile ? 'process' : 'pick';
@@ -576,7 +579,7 @@ export default function StoryUploadPage() {
 		setShowPreview(false);
 		setPreviewConfirmed(false);
 		setStoryPreviewExpanded(false);
-		setVipOnlyStory(false);
+		setIncludeAudio(true);
 		uploadTokenRef.current = '';
 		setPhase('idle');
 		setErrorMessage('');
@@ -641,6 +644,7 @@ export default function StoryUploadPage() {
 				file,
 				duration: metadata.duration,
 				resolution: metadata.resolution,
+				includeAudioTrack: includeAudio,
 				skipSetup: true,
 			});
 		} catch (error) {
@@ -655,7 +659,7 @@ export default function StoryUploadPage() {
 		}
 	};
 
-	const encodeStoryVideo = async ({ file, duration, resolution }) => {
+	const encodeStoryVideo = async ({ file, duration, resolution, includeAudioTrack = includeAudio }) => {
 		const ffmpeg = await ensureEngineLoaded();
 		const inputExtension = file.name.split('.').pop()?.toLowerCase() || 'mp4';
 		const inputFileName = `input.${inputExtension}`;
@@ -677,6 +681,13 @@ export default function StoryUploadPage() {
 			'-vf', `${outputProfile.scaleFilter},setsar=1`,
 			'-movflags', '+faststart',
 		];
+		const audioArgs = includeAudioTrack
+			? [
+				'-c:a', 'aac',
+				'-b:a', encoderParams.audioBitrate,
+				...(encoderParams.audioMono ? ['-ac', '1'] : []),
+			]
+			: ['-an'];
 
 		let exitCode = await ffmpeg.exec([
 			...sharedArgs,
@@ -688,9 +699,7 @@ export default function StoryUploadPage() {
 			'-bufsize', encoderParams.bufsize,
 			'-preset', encoderParams.preset,
 			'-pix_fmt', 'yuv420p',
-			'-c:a', 'aac',
-			'-b:a', encoderParams.audioBitrate,
-			...(encoderParams.audioMono ? ['-ac', '1'] : []),
+			...audioArgs,
 			outputFileName,
 		]);
 
@@ -701,9 +710,7 @@ export default function StoryUploadPage() {
 				'-c:v', 'mpeg4',
 				'-threads', String(encoderThreads),
 				'-q:v', '4',
-				'-c:a', 'aac',
-				'-b:a', encoderParams.audioBitrate,
-				...(encoderParams.audioMono ? ['-ac', '1'] : []),
+				...audioArgs,
 				outputFileName,
 			]);
 		}
@@ -729,7 +736,7 @@ export default function StoryUploadPage() {
 		};
 	};
 
-	const processAndUploadStory = async ({ file = sourceFile, duration = sourceDuration, resolution = sourceResolution, skipSetup = false } = {}) => {
+	const processAndUploadStory = async ({ file = sourceFile, duration = sourceDuration, resolution = sourceResolution, includeAudioTrack = includeAudio, skipSetup = false } = {}) => {
 		if (!file) {
 			setErrorMessage('Primero sube un video.');
 			return;
@@ -747,7 +754,7 @@ export default function StoryUploadPage() {
 			setEncodingProgress(0);
 			setUploadProgress(0);
 
-			const encoded = await encodeStoryVideo({ file, duration, resolution });
+			const encoded = await encodeStoryVideo({ file, duration, resolution, includeAudioTrack });
 			const processingElapsedSeconds = (performance.now() - timerStartRef.current) / 1000;
 			const encodedPosterUrl = await withTimeout(
 				captureVideoPoster(encoded.previewUrl),
@@ -794,14 +801,33 @@ export default function StoryUploadPage() {
 			});
 			setUploadProgress(1);
 			setPhase('done');
-			setUser(prev => ({
-				...prev,
+			const storyPatch = {
 				has_active_story: true,
 				active_story_id: story?.id || null,
 				active_story_url: story?.video_url || null,
+			};
+			setUser(prev => ({
+				...prev,
+				...storyPatch,
 			}));
 			try {
 				removeViewedStoryUser(user?.id, user?.id);
+				sessionStorage.setItem(RECENT_STORY_UPLOAD_KEY, JSON.stringify({
+					user_id: user?.id || '',
+					story_id: story?.id || '',
+					video_url: story?.video_url || '',
+					active_story_id: storyPatch.active_story_id,
+					active_story_url: storyPatch.active_story_url,
+					uploaded_at: Date.now(),
+				}));
+				window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
+				window.dispatchEvent(new CustomEvent(STORY_FEED_CACHE_INVALIDATED_EVENT, {
+					detail: {
+						type: 'story_uploaded',
+						userId: user?.id || '',
+						storyId: story?.id || '',
+					},
+				}));
 			} catch {}
 			encodedFileRef.current = null;
 			navigate(returnPath);
@@ -917,6 +943,20 @@ export default function StoryUploadPage() {
 										Seleccionar video
 										<input type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
 									</label>
+									<button
+										type="button"
+										onClick={() => setIncludeAudio((value) => !value)}
+										aria-pressed={!includeAudio}
+										aria-label={includeAudio ? 'Desactivar audio' : 'Activar audio'}
+										className={`mt-5 inline-flex h-12 items-center gap-3 rounded-full border px-5 text-sm font-semibold transition-colors ${
+											includeAudio
+												? 'border-white/12 bg-white/[0.06] text-white/78 hover:border-white/20 hover:bg-white/[0.1]'
+												: 'border-mansion-gold/40 bg-mansion-gold/12 text-mansion-gold hover:bg-mansion-gold/18'
+										}`}
+									>
+										{includeAudio ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+										<span>{includeAudio ? 'Con audio' : 'Sin audio'}</span>
+									</button>
 									{showProgressHud && engineStatus === 'loading' && (
 										<p className="text-xs text-white/56 mt-4" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7)' }}>Preparando el motor de video para acelerar el siguiente paso...</p>
 									)}

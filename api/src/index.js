@@ -128,6 +128,7 @@ let _subscriptionPaymentLogsReady = null;
 let _photoVerificationRequestsReady = null;
 let _chatRecipientLimitsReady = null;
 let _videoCallSessionsReady = null;
+let _videoCallUsageReady = null;
 let _feedItemTablesReady = null;
 
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
@@ -170,6 +171,7 @@ const SYNTHETIC_VISIT_COOLDOWN_MINUTES = 15;
 const SYNTHETIC_VISIT_MIN_ACCOUNT_AGE_MINUTES = 15;
 const SYNTHETIC_VISIT_CANDIDATES_PER_ROLE = 80;
 const DEFAULT_REALTIMEKIT_PRESET_NAME = 'group_call_host';
+const DEFAULT_FREE_WEBCAM_DAILY_SECONDS = 5 * 60;
 const USERNAME_MAX_LENGTH = 18;
 const BIO_MAX_LENGTH = 300;
 
@@ -338,10 +340,21 @@ function interleaveRoleBuckets(bucketDefs, bucketMap, limit = FEED_PROFILE_LIMIT
 
     if (candidates.length === 0) break;
 
-    let selected = candidates[0];
-    if (totalWeight > 0) {
-      const roll = random() * totalWeight;
-      selected = candidates.find((candidate) => roll <= candidate.totalWeight) || candidates[candidates.length - 1];
+    const priorityCandidates = candidates.filter((candidate) => {
+      const list = bucketMap.get(candidate.bucket.key) || [];
+      const item = list[candidate.cursor];
+      return Math.max(0, Number(item?.feed_priority || 0)) > 0;
+    });
+    const selectableCandidates = priorityCandidates.length > 0 ? priorityCandidates : candidates;
+    const selectableTotalWeight = selectableCandidates.reduce((total, candidate) => total + candidate.weight, 0);
+    let selected = selectableCandidates[0];
+    if (selectableTotalWeight > 0) {
+      let cursorWeight = 0;
+      const roll = random() * selectableTotalWeight;
+      selected = selectableCandidates.find((candidate) => {
+        cursorWeight += candidate.weight;
+        return roll <= cursorWeight;
+      }) || selectableCandidates[selectableCandidates.length - 1];
     }
 
     const list = bucketMap.get(selected.bucket.key) || [];
@@ -365,7 +378,14 @@ function compareFeedBucketProfiles(a, b) {
   if (aFake !== bFake) return aFake - bFake;
   const aPriority = Math.max(0, Number(a.feed_priority || 0));
   const bPriority = Math.max(0, Number(b.feed_priority || 0));
+  const aHasPriority = aPriority > 0;
+  const bHasPriority = bPriority > 0;
+  if (aHasPriority !== bHasPriority) return aHasPriority ? -1 : 1;
   if (bPriority !== aPriority) return bPriority - aPriority;
+  if (aHasPriority && bHasPriority) {
+    const rotationCompare = Number(a._priorityRotationRank || 0) - Number(b._priorityRotationRank || 0);
+    if (rotationCompare !== 0) return rotationCompare;
+  }
   if (b._feedScore !== a._feedScore) return b._feedScore - a._feedScore;
   const activeCompare = String(b.lastActive || '').localeCompare(String(a.lastActive || ''));
   if (activeCompare !== 0) return activeCompare;
@@ -564,7 +584,15 @@ function buildFeedBaseProfiles(rows, env, activeStoryUserIds, activeStoryUrlMap)
   });
 }
 
-function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets, limit = FEED_PROFILE_LIMIT, viewerGeo = null) {
+function orderFeedBaseProfiles(
+  profiles,
+  viewerInterests,
+  settings,
+  roleBuckets,
+  limit = FEED_PROFILE_LIMIT,
+  viewerGeo = null,
+  { priorityRotationSeed = '' } = {},
+) {
   const seenIds = new Set();
   const uniqueProfiles = (profiles || []).filter((profile) => {
     const id = String(profile?.id || '');
@@ -579,11 +607,16 @@ function orderFeedBaseProfiles(profiles, viewerInterests, settings, roleBuckets,
       ? profile._profileInterests.filter((interest) => viewerInterests.includes(interest)).length
       : 0;
     const proximityBoost = computeProximityBoost(profile, viewerGeo);
+    const feedPriority = Math.max(0, Number(profile.feed_priority || 0));
+    const priorityRotationRank = feedPriority > 0
+      ? hashStringToUint32(`${priorityRotationSeed || 'feed-priority'}:${profile.fake ? 'fake' : 'real'}:${profile.id}:${feedPriority}`)
+      : 0;
 
     return {
       ...profile,
       _matchingInterests: matchingInterests,
       _proximityBoost: proximityBoost,
+      _priorityRotationRank: priorityRotationRank,
       _feedScore: computeFeedScore({
         ...profile,
         _matchingInterests: matchingInterests,
@@ -628,13 +661,18 @@ function mapStoryRowForResponse(row, env, viewerId = '', viewerCanWatchAllStorie
     username: row.username,
     avatar_url: row.avatar_url || '',
     avatar_crop: safeParseJSON(row.avatar_crop, null),
+    role: row.role || '',
+    fake: Number(row?.fake || 0) === 1,
+    last_active: row.last_active || '',
+    visits_total: Number(row?.visits_total || 0),
+    rotation_position: Number(row?.rotation_position || 0),
   };
 }
 
 function personalizeFeedProfiles(profiles, authUserId, viewerFavorites, favoritedBySet, viewerIsPremium, settings) {
   return (profiles || [])
     .filter((profile) => profile.id !== authUserId)
-    .map(({ _profileInterests, _matchingInterests, _proximityBoost, _feedScore, _roleId, ...profile }) => {
+    .map(({ _profileInterests, _matchingInterests, _proximityBoost, _priorityRotationRank, _feedScore, _roleId, ...profile }) => {
       const blurred = profile.ghost_mode && !viewerIsPremium && !favoritedBySet.has(profile.id);
       const visiblePhotos = viewerIsPremium
         ? profile.totalPhotos
@@ -2152,9 +2190,14 @@ async function ensureVideoCallSessionsTable(env) {
           status          TEXT NOT NULL DEFAULT 'ringing',
           created_at      TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+          accepted_at     TEXT DEFAULT NULL,
           ended_at        TEXT DEFAULT NULL
         )
       `).run(),
+      env.DB.prepare('ALTER TABLE video_call_sessions ADD COLUMN accepted_at TEXT DEFAULT NULL').run().catch((err) => {
+        const msg = String(err?.message || '');
+        if (!/duplicate column name|already exists/i.test(msg)) throw err;
+      }),
       env.DB.prepare(
         'CREATE INDEX IF NOT EXISTS idx_video_call_sessions_conversation_created ON video_call_sessions(conversation_id, created_at DESC)'
       ).run(),
@@ -2168,6 +2211,29 @@ async function ensureVideoCallSessionsTable(env) {
   }
 
   return _videoCallSessionsReady;
+}
+
+async function ensureVideoCallUsageTable(env) {
+  if (!_videoCallUsageReady) {
+    _videoCallUsageReady = Promise.all([
+      env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS video_call_daily_usage (
+          user_id      TEXT NOT NULL REFERENCES users(id),
+          usage_date   TEXT NOT NULL,
+          seconds_used INTEGER NOT NULL DEFAULT 0,
+          updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (user_id, usage_date)
+        )
+      `).run(),
+      env.DB.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_video_call_daily_usage_date ON video_call_daily_usage(usage_date)'
+      ).run(),
+    ]).catch((err) => {
+      _videoCallUsageReady = null;
+      throw err;
+    });
+  }
+  return _videoCallUsageReady;
 }
 
 function getRealtimeKitConfig(env) {
@@ -2265,6 +2331,15 @@ function buildVideoCallPayload(event, call, extra = {}) {
     createdAt: call.created_at || null,
     endedAt: call.ended_at || null,
   };
+  if (extra.freeVideoCallLimitSeconds != null) {
+    publicCall.freeVideoCallLimitSeconds = extra.freeVideoCallLimitSeconds;
+  }
+  if (extra.freeVideoCallUsedSeconds != null) {
+    publicCall.freeVideoCallUsedSeconds = extra.freeVideoCallUsedSeconds;
+  }
+  if (extra.freeVideoCallRemainingSeconds != null) {
+    publicCall.freeVideoCallRemainingSeconds = extra.freeVideoCallRemainingSeconds;
+  }
 
   return {
     type: 'video_call',
@@ -2275,6 +2350,93 @@ function buildVideoCallPayload(event, call, extra = {}) {
     targetUserId: extra.targetUserId || null,
     actorId: extra.actorId || null,
     call: publicCall,
+  };
+}
+
+function getFreeWebcamDailySeconds(settings = {}) {
+  return parseIntegerSetting(
+    settings.free_webcam_daily_seconds ?? settings.freeWebcamDailySeconds,
+    DEFAULT_FREE_WEBCAM_DAILY_SECONDS,
+    0,
+    24 * 60 * 60,
+  );
+}
+
+function getVideoCallUsageDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date).reduce((acc, part) => {
+    if (part.type !== 'literal') acc[part.type] = part.value;
+    return acc;
+  }, {});
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+async function getVideoCallDailyUsage(env, userId) {
+  if (!userId) return 0;
+  await ensureVideoCallUsageTable(env);
+  const usageDate = getVideoCallUsageDateKey();
+  const row = await env.DB.prepare(
+    'SELECT seconds_used FROM video_call_daily_usage WHERE user_id = ? AND usage_date = ?'
+  ).bind(userId, usageDate).first();
+  return Math.max(0, Number(row?.seconds_used || 0));
+}
+
+async function addVideoCallDailyUsage(env, userId, seconds) {
+  const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+  if (!userId || safeSeconds <= 0) return;
+  await ensureVideoCallUsageTable(env);
+  const usageDate = getVideoCallUsageDateKey();
+  await env.DB.prepare(`
+    INSERT INTO video_call_daily_usage (user_id, usage_date, seconds_used, updated_at)
+    VALUES (?, ?, ?, datetime('now'))
+    ON CONFLICT(user_id, usage_date) DO UPDATE SET
+      seconds_used = MAX(0, video_call_daily_usage.seconds_used + excluded.seconds_used),
+      updated_at = excluded.updated_at
+  `).bind(userId, usageDate, safeSeconds).run();
+}
+
+function secondsBetweenSqlDates(startValue, endValue) {
+  const start = Date.parse(String(startValue || '').replace(' ', 'T') + 'Z');
+  const end = Date.parse(String(endValue || '').replace(' ', 'T') + 'Z');
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  return Math.max(0, Math.floor((end - start) / 1000));
+}
+
+async function maybeRecordReceiverVideoCallUsage(env, call, endedAt) {
+  if (!call || String(call.status || '') !== 'active') return;
+  const receiverId = String(call.receiver_id || '');
+  if (!receiverId) return;
+  const receiver = await env.DB.prepare(
+    'SELECT premium, premium_until FROM users WHERE id = ?'
+  ).bind(receiverId).first();
+  if (!receiver || isPremiumActive(receiver)) return;
+  const startedAt = call.accepted_at || call.updated_at || call.created_at;
+  const secondsUsed = secondsBetweenSqlDates(startedAt, endedAt);
+  const settings = await cached('settings', 300_000, () => loadSettings(env));
+  const limitSeconds = getFreeWebcamDailySeconds(settings);
+  const currentUsedSeconds = limitSeconds > 0 ? await getVideoCallDailyUsage(env, receiverId) : 0;
+  const secondsToRecord = limitSeconds > 0
+    ? Math.min(secondsUsed, Math.max(0, limitSeconds - currentUsedSeconds))
+    : secondsUsed;
+  await addVideoCallDailyUsage(env, receiverId, secondsToRecord);
+}
+
+async function getVideoCallAllowanceSnapshot(env, userId) {
+  if (!userId) return null;
+  await ensureVideoCallUsageTable(env);
+  const settings = await cached('settings', 300_000, () => loadSettings(env));
+  const limitSeconds = getFreeWebcamDailySeconds(settings);
+  const usageDate = getVideoCallUsageDateKey();
+  const usedSeconds = await getVideoCallDailyUsage(env, userId);
+  return {
+    usage_date: usageDate,
+    limit_seconds: limitSeconds,
+    used_seconds: usedSeconds,
+    remaining_seconds: limitSeconds > 0 ? Math.max(0, limitSeconds - usedSeconds) : null,
   };
 }
 
@@ -4103,7 +4265,7 @@ async function handleCheckUsername(request, env) {
 
 // ── POST /api/auth/login ────────────────────────────────
 
-async function handleLogin(request, env) {
+async function handleLogin(request, env, ctx) {
   const { email, password } = await request.json();
 
   if (!email || !password) {
@@ -4134,12 +4296,15 @@ async function handleLogin(request, env) {
     return error('Credenciales inválidas', 401);
   }
 
-  // Update online status + IP
-  await Promise.all([ensureUsersLastIpColumn(env), ensureUsersDeviceColumns(env)]);
   const ipLogin = request.headers.get('CF-Connecting-IP') || '';
   const deviceLogin = detectRequestDevice(request);
-  await env.DB.prepare("UPDATE users SET online = 1, last_active = datetime('now'), last_ip = ?, last_device = ? WHERE id = ?")
-    .bind(ipLogin, deviceLogin, user.id).run();
+  const presenceUpdate = env.DB.prepare("UPDATE users SET online = 1, last_active = datetime('now'), last_ip = ?, last_device = ? WHERE id = ?")
+    .bind(ipLogin, deviceLogin, user.id)
+    .run()
+    .catch((err) => {
+      console.error('Login presence update failed:', err?.message || err);
+    });
+  ctx?.waitUntil?.(presenceUpdate);
 
   const token = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
 
@@ -4896,6 +5061,15 @@ async function handleProfiles(request, env) {
   const countCacheHit = false;
   const snapshotStartedAt = Date.now();
   const buildSnapshotFeedData = async () => {
+    const priorityRotationWindowKey = Math.floor(Date.now() / PROFILE_SNAPSHOT_FAKE_ROTATION_MS);
+    const priorityRotationSeed = [
+      seekingKey,
+      countryKey,
+      search || '',
+      viewerInterestsKey,
+      geoKey,
+      priorityRotationWindowKey,
+    ].join(':');
     const realSnapshotLimit = snapshotWindowLimit;
     const realRowsPromise = loadRealProfileRowsFromFeedItems(env, {
       roleValues: requestedRoleValues,
@@ -4945,7 +5119,9 @@ async function handleProfiles(request, env) {
       }
     }
     const baseProfiles = buildFeedBaseProfiles(snapshotRows, env, activeStoryUserIds, activeStoryUrlMap);
-    const orderedProfiles = orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, snapshotWindowLimit, viewerGeo);
+    const orderedProfiles = orderFeedBaseProfiles(baseProfiles, viewerInterests, settings, roleBuckets, snapshotWindowLimit, viewerGeo, {
+      priorityRotationSeed,
+    });
     return {
       orderedProfiles,
       totalProfiles: orderedProfiles.length,
@@ -5563,10 +5739,11 @@ async function handleJoinVideoCall(request, env, callId) {
   if (!auth) return error('No autorizado', 401);
 
   await ensureVideoCallSessionsTable(env);
+  await ensureVideoCallUsageTable(env);
 
   const call = await env.DB.prepare(`
     SELECT vcs.*, iu.username AS initiator_name, ru.username AS receiver_name,
-           u.id AS user_id, u.username, u.avatar_url, u.avatar_thumb_url
+           u.id AS user_id, u.username, u.avatar_url, u.avatar_thumb_url, u.premium, u.premium_until
     FROM video_call_sessions vcs
     JOIN users iu ON iu.id = vcs.initiator_id
     JOIN users ru ON ru.id = vcs.receiver_id
@@ -5581,6 +5758,30 @@ async function handleJoinVideoCall(request, env, callId) {
     return json({ error: 'La videollamada ya finalizó.', code: 'VIDEO_CALL_ENDED' }, 410);
   }
 
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const settings = await cached('settings', 300_000, () => loadSettings(env));
+  const limitSeconds = getFreeWebcamDailySeconds(settings);
+  const isReceiver = String(auth.sub) === String(call.receiver_id);
+  const isFreeReceiver = isReceiver && !isPremiumActive({ premium: call.premium, premium_until: call.premium_until });
+  let remainingSeconds = null;
+  let usedSeconds = null;
+  if (isFreeReceiver && limitSeconds > 0) {
+    usedSeconds = await getVideoCallDailyUsage(env, auth.sub);
+    const activeElapsedSeconds = call.accepted_at
+      ? secondsBetweenSqlDates(call.accepted_at, now)
+      : 0;
+    remainingSeconds = Math.max(0, limitSeconds - usedSeconds - activeElapsedSeconds);
+    if (remainingSeconds <= 0) {
+      return json({
+        error: 'Llegaste al límite diario de videollamadas. Hacete Miembro VIP para ver webcams ilimitadas.',
+        code: 'VIDEO_CALL_DAILY_LIMIT_REACHED',
+        limitSeconds,
+        usedSeconds,
+        remainingSeconds: 0,
+      }, 403);
+    }
+  }
+
   try {
     const participant = await createRealtimeKitParticipant(env, call.meeting_id, {
       id: call.user_id,
@@ -5588,20 +5789,29 @@ async function handleJoinVideoCall(request, env, callId) {
       avatar_url: call.avatar_url,
       avatar_thumb_url: call.avatar_thumb_url,
     });
-    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
     await env.DB.prepare(
-      "UPDATE video_call_sessions SET status = 'active', updated_at = ? WHERE id = ? AND status != 'ended'"
-    ).bind(now, callId).run();
+      "UPDATE video_call_sessions SET status = 'active', accepted_at = COALESCE(accepted_at, ?), updated_at = ? WHERE id = ? AND status != 'ended'"
+    ).bind(now, now, callId).run();
 
-    const activeCall = { ...call, status: 'active' };
-    const payload = buildVideoCallPayload('accepted', activeCall, { actorId: auth.sub });
+    const activeCall = { ...call, status: 'active', accepted_at: call.accepted_at || now };
+    const payload = buildVideoCallPayload('accepted', activeCall, {
+      actorId: auth.sub,
+      freeVideoCallLimitSeconds: isFreeReceiver ? limitSeconds : null,
+      freeVideoCallUsedSeconds: isFreeReceiver ? usedSeconds : null,
+      freeVideoCallRemainingSeconds: isFreeReceiver ? remainingSeconds : null,
+    });
     await Promise.allSettled([
       notifyChatRoomVideoCall(env, call.initiator_id, call.receiver_id, payload),
       notifyUser(env, call.initiator_id === auth.sub ? call.receiver_id : call.initiator_id, payload),
     ]);
 
     return json({
-      call: payload.call,
+      call: {
+        ...payload.call,
+        freeVideoCallLimitSeconds: isFreeReceiver ? limitSeconds : null,
+        freeVideoCallUsedSeconds: isFreeReceiver ? usedSeconds : null,
+        freeVideoCallRemainingSeconds: isFreeReceiver ? remainingSeconds : null,
+      },
       token: participant.token,
       participantId: participant.id,
     });
@@ -5632,6 +5842,7 @@ async function handleEndVideoCall(request, env, callId) {
 
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
   if (call.status !== 'ended' && call.status !== 'cancelled') {
+    await maybeRecordReceiverVideoCallUsage(env, call, now);
     await env.DB.prepare(
       "UPDATE video_call_sessions SET status = 'ended', ended_at = ?, updated_at = ? WHERE id = ?"
     ).bind(now, now, callId).run();
@@ -5693,6 +5904,7 @@ async function handleGetMessages(request, env, otherUserId) {
   const conversationId = buildConversationId(auth.sub, otherUserId);
   const url = new URL(request.url);
   const before = url.searchParams.get('before');
+  const markRead = url.searchParams.get('prefetch') !== '1' && url.searchParams.get('mark_read') !== '0';
   const rawLimit = Number(url.searchParams.get('limit') || 40);
   const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 40, 1), 100);
   const queryLimit = limit + 1;
@@ -5732,21 +5944,21 @@ async function handleGetMessages(request, env, otherUserId) {
   const hasMore = results.length > limit;
   const windowedResults = hasMore ? results.slice(1) : results;
   const settings = await cached('settings', 300_000, () => loadSettings(env));
-  const visibleUnreadMessageIds = windowedResults
+  const visibleUnreadMessageIds = markRead ? windowedResults
     .filter((m) => (
       String(m.sender_id) === String(otherUserId)
       && String(m.receiver_id) === String(auth.sub)
       && Number(m.is_read || 0) === 0
     ))
     .map((m) => m.id)
-    .filter(Boolean);
-  const stateRow = await env.DB.prepare(
+    .filter(Boolean) : [];
+  const stateRow = markRead ? await env.DB.prepare(
     'SELECT unread_count FROM conversation_state WHERE user_id = ? AND partner_id = ?'
-  ).bind(auth.sub, otherUserId).first();
+  ).bind(auth.sub, otherUserId).first() : null;
   const hadUnreadState = Number(stateRow?.unread_count || 0) > 0;
   let readMessageIds = visibleUnreadMessageIds;
 
-  if (hadUnreadState) {
+  if (markRead && hadUnreadState) {
     const unreadRowsResult = await env.DB.prepare(`
       SELECT id
       FROM messages
@@ -5761,7 +5973,7 @@ async function handleGetMessages(request, env, otherUserId) {
   }
 
   // Mark as read
-  if (readMessageIds.length > 0 || hadUnreadState) {
+  if (markRead && (readMessageIds.length > 0 || hadUnreadState)) {
     if (readMessageIds.length > 0) {
       await env.DB.prepare(`
         UPDATE messages SET is_read = 1
@@ -6004,6 +6216,46 @@ async function notifyUser(env, userId, data) {
   }
 }
 
+const STORY_FEED_NOTIFICATION_CHANNEL = '__story_feed__';
+
+async function notifyStoryFeedUpdated(env, data = {}) {
+  try {
+    const doId = env.USER_NOTIFICATIONS.idFromName(STORY_FEED_NOTIFICATION_CHANNEL);
+    const stub = env.USER_NOTIFICATIONS.get(doId);
+    const payload = {
+      type: 'story_feed_updated',
+      eventId: `${data.action || 'upsert'}:${data.userId || ''}:${data.storyId || ''}:${Date.now()}`,
+      ...data,
+    };
+    const res = await stub.fetch('https://do/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    debugLog(env, '[notifyStoryFeedUpdated] DO response:', res.status);
+  } catch (err) {
+    console.error('[notifyStoryFeedUpdated] error:', err?.message || err);
+  }
+}
+
+async function handleStoryFeedWebSocket(request, env) {
+  const url = new URL(request.url);
+  const token = url.searchParams.get('token');
+  if (!token) return error('Token requerido', 401);
+
+  const payload = await verifyJWT(token, env.JWT_SECRET);
+  if (!payload) return error('Token inválido', 401);
+
+  try {
+    const doId = env.USER_NOTIFICATIONS.idFromName(STORY_FEED_NOTIFICATION_CHANNEL);
+    const stub = env.USER_NOTIFICATIONS.get(doId);
+    return await stub.fetch(request);
+  } catch (err) {
+    console.error('[handleStoryFeedWebSocket] DO error:', err?.message || err);
+    return error('Story feed service unavailable', 503);
+  }
+}
+
 function buildConversationPreview(partner, msg, unread) {
   if (!partner) return null;
 
@@ -6115,7 +6367,14 @@ async function handleAdminChatCleanup(request, env) {
 
 // ── POST /api/upload ────────────────────────────────────
 
-async function handleUpload(request, env) {
+function runMediaFeedRefresh(ctx, task, source = 'media-upload') {
+  const promise = Promise.resolve(task).catch((err) => {
+    console.error(`${source} feed refresh failed:`, err?.message || err);
+  });
+  if (ctx?.waitUntil) ctx.waitUntil(promise);
+}
+
+async function handleUpload(request, env, ctx) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const uploadUrl = new URL(request.url);
@@ -6183,11 +6442,13 @@ async function handleUpload(request, env) {
     _viewerCache.delete(auth.sub);
 
     await deleteR2KeysBestEffort(env, [previousAvatarKey, previousAvatarThumbKey].filter((oldKey) => oldKey && oldKey !== key));
-    const updated = await env.DB.prepare(
-      "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
-    ).bind(auth.sub).first();
-    await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-avatar-upload' });
-    await bumpFeedCacheVersion(env);
+    runMediaFeedRefresh(ctx, (async () => {
+      const updated = await env.DB.prepare(
+        "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+      ).bind(auth.sub).first();
+      await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-avatar-upload' });
+      await bumpFeedCacheVersion(env);
+    })(), 'user-avatar-upload');
 
     return json({ url: publicUrl, key, avatar_url: publicUrl, avatar_thumb_url: publicUrl, photos: galleryPhotos }, 201);
   }
@@ -6204,11 +6465,13 @@ async function handleUpload(request, env) {
     if (previousAvatarThumbKey && previousAvatarThumbKey !== key && previousAvatarThumbKey !== currentAvatarKey) {
       await deleteR2KeysBestEffort(env, [previousAvatarThumbKey]);
     }
-    const updated = await env.DB.prepare(
-      "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
-    ).bind(auth.sub).first();
-    await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-avatar-thumb-upload' });
-    await bumpFeedCacheVersion(env);
+    runMediaFeedRefresh(ctx, (async () => {
+      const updated = await env.DB.prepare(
+        "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+      ).bind(auth.sub).first();
+      await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-avatar-thumb-upload' });
+      await bumpFeedCacheVersion(env);
+    })(), 'user-avatar-thumb-upload');
 
     return json({ url: publicUrl, key, avatar_url: user.avatar_url || '', avatar_thumb_url: publicUrl, photos: galleryPhotos }, 201);
   }
@@ -6221,11 +6484,13 @@ async function handleUpload(request, env) {
     `).bind(JSON.stringify(nextPhotos), JSON.stringify(nextPhotoThumbs), auth.sub).run();
     _fullUserCache.delete(auth.sub);
     _viewerCache.delete(auth.sub);
-    const updated = await env.DB.prepare(
-      "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
-    ).bind(auth.sub).first();
-    await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-gallery-upload' });
-    await bumpFeedCacheVersion(env);
+    runMediaFeedRefresh(ctx, (async () => {
+      const updated = await env.DB.prepare(
+        "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+      ).bind(auth.sub).first();
+      await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-gallery-upload' });
+      await bumpFeedCacheVersion(env);
+    })(), 'user-gallery-upload');
 
     return json({ url: publicUrl, key, avatar_url: user.avatar_url || '', photos: nextPhotos, photo_thumbs: nextPhotoThumbs }, 201);
   }
@@ -6242,11 +6507,13 @@ async function handleUpload(request, env) {
     if (previousThumbKey && previousThumbKey !== key) {
       await deleteR2KeysBestEffort(env, [previousThumbKey]);
     }
-    const updated = await env.DB.prepare(
-      "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
-    ).bind(auth.sub).first();
-    await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-gallery-thumb-upload' });
-    await bumpFeedCacheVersion(env);
+    runMediaFeedRefresh(ctx, (async () => {
+      const updated = await env.DB.prepare(
+        "SELECT id, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
+      ).bind(auth.sub).first();
+      await refreshStaticSnapshotsForUserChange(env, user, updated, { source: 'user-gallery-thumb-upload' });
+      await bumpFeedCacheVersion(env);
+    })(), 'user-gallery-thumb-upload');
 
     return json({
       url: publicUrl,
@@ -6770,6 +7037,7 @@ async function loadSettings(env) {
     dailyMessageLimit: parseInt(settings.daily_message_limit || '5', 10),
     messageLimitWindowHours: normalizeMessageLimitWindowHours(settings.message_limit_window_hours),
     freeVideoStoryLimit: parseIntegerSetting(settings.free_video_story_daily_limit, FREE_VIDEO_STORY_DAILY_LIMIT, 0, 500),
+    freeWebcamDailySeconds: parseIntegerSetting(settings.free_webcam_daily_seconds, DEFAULT_FREE_WEBCAM_DAILY_SECONDS, 0, 24 * 60 * 60),
     autoLogoutMinutes: parseIntegerSetting(settings.auto_logout_minutes, 60, 0, 10080),
     siteCountry,
     siteLocale: settings.site_locale || (siteCountry === 'ES' ? 'es-ES' : 'es-AR'),
@@ -6982,6 +7250,7 @@ function getPublicSettingsPayload(settings) {
     fakeProfileOnlinePercent: settings.fakeProfileOnlinePercent,
     feedCacheVersion: settings.feedCacheVersion,
     freeVideoStoryLimit: settings.freeVideoStoryLimit,
+    freeWebcamDailySeconds: settings.freeWebcamDailySeconds,
     homeStoryCountMobile: settings.homeStoryCountMobile,
     homeStoryCountDesktop: settings.homeStoryCountDesktop,
     storyRailGapMobile: settings.storyRailGapMobile,
@@ -7106,6 +7375,7 @@ async function handleUpdateSettings(request, env) {
     'feed_prefetch_pages',
     'fake_profile_online_percent',
     'free_video_story_daily_limit',
+    'free_webcam_daily_seconds',
     'home_story_count_mobile',
     'home_story_count_desktop',
     'story_rail_gap_mobile',
@@ -8550,6 +8820,7 @@ async function handleAdminGetUser(request, env, userId) {
     "SELECT COUNT(*) AS total FROM profile_reports WHERE reported_id = ? AND status = 'open'"
   ).bind(userId).first();
   const photoVerification = await getLatestPhotoVerification(env, userId);
+  const videoCallAllowance = await getVideoCallAllowanceSnapshot(env, userId);
   const reports = (reportRows.results || []).map((row) => ({
     id: row.id,
     reporter_id: row.reporter_id,
@@ -8585,9 +8856,32 @@ async function handleAdminGetUser(request, env, userId) {
       reports_count: Number(reportCount?.total || 0),
       reports,
       photo_verification: serializePhotoVerification(photoVerification, { admin: true }),
+      video_call_allowance: videoCallAllowance,
       story_id: story?.id || null,
       story_vip_only: Number(story?.vip_only || 0) === 1,
     }
+  });
+}
+
+async function handleAdminResetVideoCallAllowance(request, env, userId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return error('No autorizado', 401);
+  const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
+  if (!adminUser?.is_admin) return error('Acceso denegado', 403);
+
+  const user = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+  if (!user) return error('Usuario no encontrado', 404);
+
+  await ensureVideoCallUsageTable(env);
+  const usageDate = getVideoCallUsageDateKey();
+  await env.DB.prepare(
+    'DELETE FROM video_call_daily_usage WHERE user_id = ? AND usage_date = ?'
+  ).bind(userId, usageDate).run();
+
+  return json({
+    ok: true,
+    user_id: userId,
+    video_call_allowance: await getVideoCallAllowanceSnapshot(env, userId),
   });
 }
 
@@ -11320,6 +11614,32 @@ function uniqueStoryRows(rows = [], limit = Infinity) {
   return output;
 }
 
+async function filterActiveFakeStoryRows(env, rows = []) {
+  const list = Array.isArray(rows) ? rows : [];
+  const fakeUserIds = [...new Set(list
+    .filter((row) => Number(row?.fake || 0) === 1)
+    .map((row) => String(row?.user_id || '').trim())
+    .filter(Boolean))];
+  if (!fakeUserIds.length) return list;
+
+  const placeholders = fakeUserIds.map(() => '?').join(', ');
+  const activeRows = await env.DB.prepare(`
+    SELECT id
+    FROM users
+    WHERE id IN (${placeholders})
+      AND COALESCE(fake, 0) = 1
+      AND status = 'verified'
+      AND COALESCE(account_status, 'active') = 'active'
+  `).bind(...fakeUserIds).all().catch(() => null);
+  if (!Array.isArray(activeRows?.results)) return list;
+
+  const activeFakeUserIds = new Set(activeRows.results.map((row) => String(row?.id || '').trim()).filter(Boolean));
+  return list.filter((row) => (
+    Number(row?.fake || 0) !== 1
+    || activeFakeUserIds.has(String(row?.user_id || '').trim())
+  ));
+}
+
 function shuffleStoryRows(rows = [], seedValue = Date.now()) {
   const output = [...(rows || [])];
   const random = createSeededRandom(seedValue);
@@ -11793,6 +12113,7 @@ async function loadStoriesPayload(request, env, options = {}) {
   const focusUserId = String(options.focusUserId ?? url.searchParams.get('focus_user_id') ?? '').trim();
   const surface = String(options.surface ?? url.searchParams.get('surface') ?? 'video').trim().toLowerCase();
   const fresh = Boolean(options.fresh) || url.searchParams.get('fresh') === '1';
+  const realOnly = parseBooleanSetting(options.realOnly ?? url.searchParams.get('real_only'), false);
   const isRailSurface = surface === 'rail' || surface === 'home' || surface === 'feed';
 
   // Try to get current user for per-user liked status and server-side seeking filter
@@ -11848,7 +12169,7 @@ async function loadStoriesPayload(request, env, options = {}) {
         viewerId: viewerId || '',
         focusUserId,
         fresh,
-        maxFakeRows: storyWindowLimit,
+        maxFakeRows: realOnly ? 0 : storyWindowLimit,
       })
     : null;
 
@@ -11877,7 +12198,8 @@ async function loadStoriesPayload(request, env, options = {}) {
     }
   }
 
-  const pageRows = orderedRows.slice(offset, offset + effectiveLimit);
+  let pageRows = orderedRows.slice(offset, offset + effectiveLimit);
+  pageRows = await filterActiveFakeStoryRows(env, pageRows);
   const responseRows = rowsNeedLikedSync
     ? await attachStoryLikedStatus(env, pageRows, viewerId)
     : pageRows;
@@ -11892,10 +12214,12 @@ async function loadStoriesPayload(request, env, options = {}) {
 // GET /api/stories
 async function handleGetStories(request, env) {
   const payload = await loadStoriesPayload(request, env);
+  const url = new URL(request.url);
+  const noStore = url.searchParams.get('fresh') === '1' || url.searchParams.get('real_only') === '1';
   return json({
     stories: payload.stories,
     videoLimit: payload.videoLimit,
-  });
+  }, 200, noStore ? { 'Cache-Control': 'no-store, max-age=0' } : {});
 }
 
 // POST /api/stories/:id/view — count a non-VIP viewer's daily story access
@@ -12262,9 +12586,18 @@ async function handleAdminUploadStory(request, env) {
       await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'admin-upload-story-real' });
     }
   }
-  await bumpFeedCacheVersion(env);
+  const feedCacheVersion = await bumpFeedCacheVersion(env);
+  await notifyStoryFeedUpdated(env, {
+    action: 'upsert',
+    userId,
+    storyId,
+    videoUrl,
+    vipOnly,
+    fake: Number(targetUser.fake || 0) === 1,
+    feedCacheVersion,
+  });
 
-  return json({ id: storyId, video_url: videoUrl, user_id: userId, caption, vip_only: vipOnly }, 201);
+  return json({ id: storyId, video_url: videoUrl, user_id: userId, caption, vip_only: vipOnly, feed_cache_version: feedCacheVersion }, 201);
 }
 
 // ── Admin: DELETE /api/admin/stories/:id ───────────────
@@ -12306,7 +12639,14 @@ async function handleDeleteOwnStory(request, env, storyId) {
       await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'delete-real-story' });
     }
   }
-  await bumpFeedCacheVersion(env);
+  const feedCacheVersion = await bumpFeedCacheVersion(env);
+  await notifyStoryFeedUpdated(env, {
+    action: 'delete',
+    userId: story.user_id,
+    storyId: story.id,
+    fake: false,
+    feedCacheVersion,
+  });
 
   return json({ deleted: true, story_id: story.id });
 }
@@ -12360,7 +12700,14 @@ async function handleAdminDeleteStory(request, env, storyId) {
       });
     }
   }
-  await bumpFeedCacheVersion(env);
+  const feedCacheVersion = await bumpFeedCacheVersion(env);
+  await notifyStoryFeedUpdated(env, {
+    action: 'delete',
+    userId: story.user_id,
+    storyId,
+    fake: Number(story.fake || 0) === 1,
+    feedCacheVersion,
+  });
 
   return json({ deleted: true, story_id: storyId });
 }
@@ -12406,8 +12753,16 @@ async function handleAdminUpdateStory(request, env, storyId) {
       });
     }
   }
-  await bumpFeedCacheVersion(env);
-  return json({ id: storyId, user_id: story.user_id, vip_only: vipOnly });
+  const feedCacheVersion = await bumpFeedCacheVersion(env);
+  await notifyStoryFeedUpdated(env, {
+    action: 'upsert',
+    userId: story.user_id,
+    storyId,
+    vipOnly,
+    fake: Number(story.fake || 0) === 1,
+    feedCacheVersion,
+  });
+  return json({ id: storyId, user_id: story.user_id, vip_only: vipOnly, feed_cache_version: feedCacheVersion });
 }
 
 async function handleAdminRebuildStorySnapshots(request, env) {
@@ -12609,15 +12964,30 @@ async function handleUploadStory(request, env) {
   } else {
     await rebuildStorySnapshots(env, { includeReal: true, includeFakes: false, source: 'user-upload-story' });
   }
-  await bumpFeedCacheVersion(env);
+  const feedCacheVersion = await bumpFeedCacheVersion(env);
+  await notifyStoryFeedUpdated(env, {
+    action: 'upsert',
+    userId: auth.sub,
+    storyId,
+    videoUrl,
+    vipOnly,
+    fake: false,
+    feedCacheVersion,
+  });
 
-  return json({ id: storyId, video_url: videoUrl, caption, vip_only: vipOnly }, 201);
+  return json({ id: storyId, video_url: videoUrl, caption, vip_only: vipOnly, feed_cache_version: feedCacheVersion }, 201);
 }
 
 async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
+
+  // CORS preflight
+  if (method === 'OPTIONS') return handleOptions(env, request);
+
+  // Login must stay independent from non-critical schema guards/presence writes.
+  if (path === '/api/auth/login' && method === 'POST') return handleLogin(request, env, ctx);
 
   await ensureUsersFakeColumn(env);
   await ensureUsersFeedPriorityColumn(env);
@@ -12630,9 +13000,6 @@ async function handleRequest(request, env, ctx) {
   await ensureUsersPhotoThumbsColumn(env);
   await ensurePhotoVerificationRequestsTable(env);
 
-  // CORS preflight
-  if (method === 'OPTIONS') return handleOptions(env, request);
-
   // ── WebSocket upgrades (before Turnstile check) ──
   const chatWsMatch = path.match(/^\/api\/chat\/ws\/([a-f0-9-]+)$/);
   if (chatWsMatch && request.headers.get('Upgrade') === 'websocket') {
@@ -12640,6 +13007,9 @@ async function handleRequest(request, env, ctx) {
   }
   if (path === '/api/notifications/ws' && request.headers.get('Upgrade') === 'websocket') {
     return handleNotificationWebSocket(request, env);
+  }
+  if (path === '/api/story-feed/ws' && request.headers.get('Upgrade') === 'websocket') {
+    return handleStoryFeedWebSocket(request, env);
   }
 
   // ── Rutas server-to-server — autenticadas con HMAC o verificación API
@@ -12651,7 +13021,7 @@ async function handleRequest(request, env, ctx) {
 
   // ── Auth routes
   if (path === '/api/auth/register' && method === 'POST') return handleRegister(request, env, ctx);
-  if (path === '/api/auth/login' && method === 'POST') return handleLogin(request, env);
+  if (path === '/api/auth/login' && method === 'POST') return handleLogin(request, env, ctx);
   if (path === '/api/auth/verify-code' && method === 'POST') return handleVerifyCode(request, env);
   if (path === '/api/auth/resend-code' && method === 'POST') return handleResendCode(request, env);
   if (path === '/api/auth/check-email' && method === 'POST') return handleCheckEmail(request, env);
@@ -12706,7 +13076,7 @@ async function handleRequest(request, env, ctx) {
   if (videoCallEndMatch && method === 'POST') return handleEndVideoCall(request, env, videoCallEndMatch[1]);
 
   // ── Upload & Photos
-  if (path === '/api/upload' && method === 'POST') return handleUpload(request, env);
+  if (path === '/api/upload' && method === 'POST') return handleUpload(request, env, ctx);
   if (path === '/api/photos' && method === 'DELETE') return handleDeletePhoto(request, env);
   if (path === '/api/image-proxy' && method === 'GET') return handleImageProxy(request, env);
   if (path === '/api/media' && method === 'GET') return handleMediaProxy(request, env);
@@ -12766,6 +13136,7 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/admin/fake-inbox/conversation' && method === 'GET') return handleAdminGetFakeInboxConversation(request, env);
   if (path === '/api/admin/fake-inbox/reply' && method === 'POST') return handleAdminReplyFakeInbox(request, env);
   const adminUserMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)$/);
+  const adminUserVideoAllowanceMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)\/video-call-allowance$/);
   const adminGalleryThumbMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)\/gallery-thumb$/);
   const adminGalleryPhotoMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)\/gallery-photo$/);
   const adminAvatarThumbMatch = path.match(/^\/api\/admin\/users\/([a-f0-9-]+)\/avatar-thumb$/);
@@ -12775,6 +13146,7 @@ async function handleRequest(request, env, ctx) {
   if (adminProfileReportMatch && method === 'PATCH') return handleAdminUpdateProfileReport(request, env, adminProfileReportMatch[1]);
   if (adminPhotoVerificationPhotoMatch && method === 'GET') return handleAdminGetPhotoVerificationPhoto(request, env, adminPhotoVerificationPhotoMatch[1]);
   if (adminPhotoVerificationMatch && method === 'PATCH') return handleAdminReviewPhotoVerification(request, env, adminPhotoVerificationMatch[1]);
+  if (adminUserVideoAllowanceMatch && method === 'POST') return handleAdminResetVideoCallAllowance(request, env, adminUserVideoAllowanceMatch[1]);
   if (adminAvatarThumbMatch && method === 'POST') return handleAdminUploadAvatarThumb(request, env, adminAvatarThumbMatch[1]);
   if (adminGalleryThumbMatch && method === 'POST') return handleAdminUploadGalleryThumb(request, env, adminGalleryThumbMatch[1]);
   if (adminGalleryPhotoMatch && method === 'DELETE') return handleAdminDeleteGalleryPhoto(request, env, adminGalleryPhotoMatch[1]);

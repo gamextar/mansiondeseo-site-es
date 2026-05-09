@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Crown,
   Eye,
   EyeOff,
   Mic,
@@ -9,6 +10,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { RealtimeKitProvider, useRealtimeKitClient, useRealtimeKitSelector } from '@cloudflare/realtimekit-react';
 
 function formatCallChatTime(value) {
@@ -25,6 +27,15 @@ function shouldStartWithAudioEnabled() {
   if (typeof window === 'undefined') return true;
   return !window.matchMedia('(min-width: 1024px)').matches;
 }
+
+function formatRemainingTime(seconds) {
+  const safeSeconds = Math.max(0, Math.ceil(Number(seconds) || 0));
+  const mins = Math.floor(safeSeconds / 60);
+  const secs = safeSeconds % 60;
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+const FREE_VIDEO_CALL_COUNTDOWN_VISIBLE_SECONDS = 30;
 
 function TrackVideo({ track, enabled, muted = false, mirrored = false, className = '' }) {
   const videoRef = useRef(null);
@@ -151,7 +162,7 @@ function CallTextDock() {
   const selfId = useRealtimeKitSelector((meeting) => meeting?.self?.id || '');
   const chat = useRealtimeKitSelector((meeting) => meeting?.chat);
   const messages = useRealtimeKitSelector((meeting) => meeting?.chat?.messages || []);
-  const textMessages = messages.filter((item) => item?.type === 'text').slice(-4);
+  const textMessages = messages.filter((item) => item?.type === 'text').slice(-8);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: 'end' });
@@ -176,10 +187,10 @@ function CallTextDock() {
   };
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black via-black/[0.88] to-transparent px-3 pb-[max(14px,env(safe-area-inset-bottom))] pt-24">
-      <div className="mx-auto flex max-w-4xl flex-col gap-3">
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/78 via-black/[0.42] to-transparent px-3 pb-[max(14px,env(safe-area-inset-bottom))] pt-20 lg:px-6 lg:pt-28">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 lg:max-w-[min(1180px,calc(100vw-3rem))]">
         {textMessages.length > 0 && (
-          <div className="pointer-events-auto max-h-28 space-y-2 overflow-y-auto pr-32 lg:pr-44">
+          <div className="scrollbar-hide pointer-events-auto max-h-28 space-y-2 overflow-y-auto pr-32 lg:max-h-[38vh] lg:pr-44">
             {textMessages.map((item) => {
               const mine = selfId && item.userId === selfId;
               return (
@@ -241,7 +252,7 @@ function CallTextDock() {
   );
 }
 
-function FaceTimeSurface({ partnerName, joining, closing, onLeave }) {
+function FaceTimeSurface({ partnerName, joining, closing, mediaBlocked = false, onLeave }) {
   const self = useRealtimeKitSelector((meeting) => meeting?.self);
   const roomJoined = useRealtimeKitSelector((meeting) => Boolean(meeting?.self?.roomJoined));
   const activeParticipants = useRealtimeKitSelector((meeting) => meeting?.participants?.active?.toArray?.() || []);
@@ -253,6 +264,12 @@ function FaceTimeSurface({ partnerName, joining, closing, onLeave }) {
   const remoteName = getParticipantName(remoteParticipant, partnerName || 'Usuario');
   const selfName = getParticipantName(self, 'Vos');
   const waiting = roomJoined && !remoteParticipant;
+
+  useEffect(() => {
+    if (!mediaBlocked || !self) return;
+    self.disableVideo?.().catch(() => {});
+    self.disableAudio?.().catch(() => {});
+  }, [mediaBlocked, self]);
 
   const handleToggleAudio = useCallback(() => {
     if (!self) return;
@@ -336,13 +353,14 @@ function FaceTimeSurface({ partnerName, joining, closing, onLeave }) {
   );
 }
 
-function MeetingSurface({ authToken, partnerName, closing = false, onLeave, onError }) {
+function MeetingSurface({ authToken, partnerName, closing = false, mediaBlocked = false, onLeave, onError }) {
   const [meeting, initMeeting] = useRealtimeKitClient({ resetOnLeave: true });
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const meetingRef = useRef(null);
   const onLeaveRef = useRef(onLeave);
   const onErrorRef = useRef(onError);
+  const mediaBlockedRef = useRef(mediaBlocked);
 
   useEffect(() => {
     onLeaveRef.current = onLeave;
@@ -351,6 +369,10 @@ function MeetingSurface({ authToken, partnerName, closing = false, onLeave, onEr
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
+
+  useEffect(() => {
+    mediaBlockedRef.current = mediaBlocked;
+  }, [mediaBlocked]);
 
   useEffect(() => {
     let cancelled = false;
@@ -396,7 +418,10 @@ function MeetingSurface({ authToken, partnerName, closing = false, onLeave, onEr
 
   useEffect(() => {
     if (!meeting?.self?.on) return undefined;
-    const handleRoomLeft = () => onLeaveRef.current?.();
+    const handleRoomLeft = () => {
+      if (mediaBlockedRef.current) return;
+      onLeaveRef.current?.();
+    };
     meeting.self.on('roomLeft', handleRoomLeft);
     return () => {
       meeting.self?.removeListener?.('roomLeft', handleRoomLeft);
@@ -425,6 +450,7 @@ function MeetingSurface({ authToken, partnerName, closing = false, onLeave, onEr
           partnerName={partnerName}
           joining={joining}
           closing={closing}
+          mediaBlocked={mediaBlocked}
           onLeave={onLeave}
         />
       )}
@@ -433,9 +459,16 @@ function MeetingSurface({ authToken, partnerName, closing = false, onLeave, onEr
 }
 
 export default function VideoCallModal({ call, partnerName = '', onClose, onError }) {
+  const navigate = useNavigate();
   const [closing, setClosing] = useState(false);
+  const [freeLimitReached, setFreeLimitReached] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState(() => {
+    const value = Number(call?.freeVideoCallRemainingSeconds);
+    return Number.isFinite(value) && value > 0 ? Math.ceil(value) : null;
+  });
   const closeRef = useRef(onClose);
   const errorRef = useRef(onError);
+  const limitCloseRef = useRef(false);
 
   useEffect(() => {
     closeRef.current = onClose;
@@ -444,6 +477,13 @@ export default function VideoCallModal({ call, partnerName = '', onClose, onErro
   useEffect(() => {
     errorRef.current = onError;
   }, [onError]);
+
+  useEffect(() => {
+    const value = Number(call?.freeVideoCallRemainingSeconds);
+    limitCloseRef.current = false;
+    setFreeLimitReached(false);
+    setRemainingSeconds(Number.isFinite(value) && value > 0 ? Math.ceil(value) : null);
+  }, [call?.freeVideoCallRemainingSeconds, call?.id]);
 
   const handleClose = useCallback(async () => {
     if (closing) return;
@@ -456,10 +496,49 @@ export default function VideoCallModal({ call, partnerName = '', onClose, onErro
   }, [closing]);
 
   const handleError = useCallback((err) => {
+    if (freeLimitReached || closing || limitCloseRef.current) return;
     errorRef.current?.(err);
-  }, []);
+  }, [closing, freeLimitReached]);
+
+  const handleVipClick = useCallback((event) => {
+    event.preventDefault();
+    closeRef.current?.().catch(() => {});
+    navigate('/vip');
+  }, [navigate]);
+
+  useEffect(() => {
+    if (remainingSeconds === null) return undefined;
+    if (remainingSeconds <= 0) {
+      if (!limitCloseRef.current) {
+        limitCloseRef.current = true;
+        if (call?.direction === 'outgoing') {
+          errorRef.current?.({ data: { code: 'VIDEO_CALL_FREE_RECEIVER_LIMIT_REACHED' } });
+          handleClose();
+        } else {
+          setFreeLimitReached(true);
+        }
+      }
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      setRemainingSeconds((current) => (
+        current === null ? null : Math.max(0, current - 1)
+      ));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [call?.direction, handleClose, remainingSeconds]);
 
   if (!call?.authToken) return null;
+  const showFreeReceiverAllowance = call?.direction === 'outgoing' && remainingSeconds !== null;
+  const showFreeCountdown = remainingSeconds !== null
+    && (showFreeReceiverAllowance || remainingSeconds <= FREE_VIDEO_CALL_COUNTDOWN_VISIBLE_SECONDS);
+  const countdownLabel = showFreeReceiverAllowance
+    ? `El usuario free tiene ${formatRemainingTime(remainingSeconds)}. La llamada se cortará.`
+    : `Free ${formatRemainingTime(remainingSeconds)}`;
+  const showFreeWarningOverlay = call?.direction !== 'outgoing'
+    && !freeLimitReached
+    && remainingSeconds !== null
+    && remainingSeconds <= FREE_VIDEO_CALL_COUNTDOWN_VISIBLE_SECONDS;
 
   return (
     <div className="fixed inset-0 z-[10020] flex bg-black">
@@ -469,9 +548,16 @@ export default function VideoCallModal({ call, partnerName = '', onClose, onErro
             <p className="truncate text-sm font-semibold text-white lg:text-base">
               {partnerName || call.partnerName || 'Videollamada'}
             </p>
-            <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.18em] text-mansion-gold/90">
-              Mansión Deseo
-            </p>
+            {showFreeCountdown ? (
+              <p className="mt-1 inline-flex max-w-[min(86vw,34rem)] items-center gap-1.5 rounded-full border border-mansion-gold/25 bg-mansion-gold/18 px-2.5 py-1 text-xs font-semibold text-mansion-gold shadow-[0_10px_30px_rgba(0,0,0,0.22)] lg:max-w-[min(58vw,46rem)] lg:gap-2 lg:px-3.5 lg:py-1.5 lg:text-sm">
+                <Crown className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+                <span className="truncate">{countdownLabel}</span>
+              </p>
+            ) : (
+              <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.18em] text-mansion-gold/90">
+                Mansión Deseo
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -490,10 +576,62 @@ export default function VideoCallModal({ call, partnerName = '', onClose, onErro
             authToken={call.authToken}
             partnerName={partnerName || call.partnerName || 'Usuario'}
             closing={closing}
+            mediaBlocked={freeLimitReached}
             onLeave={handleClose}
             onError={handleError}
           />
         </div>
+
+        {showFreeWarningOverlay && (
+          <div className="pointer-events-none absolute inset-0 z-[10060] hidden items-center justify-center px-6 lg:flex">
+            <div className="max-w-md rounded-3xl border border-mansion-gold/30 bg-black/72 px-6 py-5 text-center text-white shadow-2xl backdrop-blur-md">
+              <Crown className="mx-auto h-8 w-8 text-mansion-gold" />
+              <p className="mt-3 text-sm font-semibold uppercase tracking-[0.16em] text-mansion-gold">
+                Webcam free
+              </p>
+              <p className="mt-2 text-2xl font-bold text-white">
+                Te quedan {formatRemainingTime(remainingSeconds)}
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-white/72">
+                Al llegar a cero se bloqueará la videollamada. Hacete VIP para ver webcams sin límite.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {freeLimitReached && (
+          <div className="absolute inset-0 z-[10070] flex items-center justify-center bg-black/58 px-5 text-center text-white backdrop-blur-xl">
+            <div className="max-w-lg rounded-3xl border border-mansion-gold/30 bg-black/78 px-6 py-7 shadow-2xl lg:px-8 lg:py-8">
+              <Crown className="mx-auto h-10 w-10 text-mansion-gold lg:h-12 lg:w-12" />
+              <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-mansion-gold lg:text-sm">
+                Límite diario alcanzado
+              </p>
+              <h3 className="mt-2 font-display text-2xl font-semibold text-white lg:text-3xl">
+                Webcam solo para Miembros VIP
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-white/72 lg:text-base">
+                Llegaste al límite diario de visualización free. Hacete VIP para continuar viendo webcams sin interrupciones.
+              </p>
+              <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+                <a
+                  href="/vip"
+                  onClick={handleVipClick}
+                  className="inline-flex items-center justify-center rounded-2xl bg-mansion-gold px-5 py-3 text-sm font-bold text-black transition-colors hover:bg-mansion-gold-light"
+                >
+                  Hacerme VIP
+                </a>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  disabled={closing}
+                  className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/8 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/12 disabled:opacity-60"
+                >
+                  Cerrar llamada
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1341,8 +1341,19 @@ function StepBasicInfo({ data, onChange, showCountryPicker, allowedCountries, se
 }
 
 function StepPhoto({ photoFile, onPhotoSelect }) {
-  const previewUrl = photoFile ? URL.createObjectURL(photoFile) : null;
+  const [previewUrl, setPreviewUrl] = useState('');
   const [rawFile, setRawFile] = useState(null);
+  const [photoError, setPhotoError] = useState('');
+
+  useEffect(() => {
+    if (!photoFile) {
+      setPreviewUrl('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(photoFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
 
   return (
     <div className="text-center">
@@ -1353,7 +1364,7 @@ function StepPhoto({ photoFile, onPhotoSelect }) {
         Subi al menos una foto, preferentemente algo sensual / sugerente.
       </p>
       <p className="text-text-dim text-xs mb-8">
-        No te preocupes, podras subir fotos explicitas en tu galeria.
+        Selecciona una imagen y toca Usar foto para continuar.
       </p>
 
       <label htmlFor="photo-upload" className="cursor-pointer block">
@@ -1377,20 +1388,44 @@ function StepPhoto({ photoFile, onPhotoSelect }) {
       <input
         id="photo-upload"
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) setRawFile(file);
+          setPhotoError('');
+          if (file) {
+            if (!String(file.type || '').startsWith('image/') && !/\.(heic|heif)$/i.test(file.name || '')) {
+              setPhotoError('El archivo seleccionado no parece ser una imagen.');
+            } else {
+              setRawFile(file);
+            }
+          }
           e.target.value = '';
         }}
       />
+
+      {photoFile && (
+        <p className="mt-4 text-xs font-medium text-green-400">
+          Foto lista. Ya podés completar el registro.
+        </p>
+      )}
+      {!photoFile && !photoError && (
+        <p className="mt-4 text-xs text-text-dim">
+          Si elegís una foto desde el celular, confirmala en la pantalla de recorte.
+        </p>
+      )}
+      {photoError && (
+        <p className="mt-4 text-xs text-mansion-crimson">
+          {photoError}
+        </p>
+      )}
 
       {rawFile && (
         <ImageCropper
           file={rawFile}
           onCrop={(cropped, meta) => {
             onPhotoSelect(cropped, meta);
+            setPhotoError('');
             setRawFile(null);
           }}
           onCancel={() => setRawFile(null)}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, X, Coins, UserCheck, AlertTriangle, Ban, Play, Film, Pencil, Copy, Flag, Star, BadgeCheck, XCircle, MessageCircleOff, Smartphone, Monitor, Tablet, HelpCircle } from 'lucide-react';
-import { adminGetUsers, adminGetUser, adminUpdateUser, adminUploadAvatarThumb, adminUploadGalleryThumb, adminDeleteGalleryPhoto, adminCloseProfileReport, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory, adminReviewPhotoOtpVerification, adminGetPhotoOtpVerificationPhotoBlob } from '../../lib/api';
+import { Search, Crown, Shield, Trash2, ChevronLeft, ChevronRight, X, Coins, UserCheck, AlertTriangle, Ban, Play, Film, Pencil, Copy, Flag, Star, BadgeCheck, XCircle, MessageCircleOff, Smartphone, Monitor, Tablet, HelpCircle, ExternalLink, Video } from 'lucide-react';
+import { adminGetUsers, adminGetUser, adminUpdateUser, adminResetUserVideoCallAllowance, adminUploadAvatarThumb, adminUploadGalleryThumb, adminDeleteGalleryPhoto, adminCloseProfileReport, adminDeleteUser, adminBulkDeleteUsers, adminUploadStoryForUser, adminDeleteStory, adminUpdateStory, adminReviewPhotoOtpVerification, adminGetPhotoOtpVerificationPhotoBlob } from '../../lib/api';
 import AvatarImg from '../../components/AvatarImg';
 import { resolveMediaUrl } from '../../lib/media';
 import { getGalleryPhotoThumbnail } from '../../lib/profileMedia';
@@ -59,6 +59,41 @@ function sexLabel(role) {
     trans: 'Trans',
   };
   return map[role] || role || '—';
+}
+
+function publicProfilePath(userId) {
+  return `/perfiles/${encodeURIComponent(String(userId || ''))}`;
+}
+
+function getUserAge(user) {
+  const storedAge = Number(user?.age);
+  if (Number.isFinite(storedAge) && storedAge > 0) return storedAge;
+
+  const rawBirthdate = String(user?.birthdate || '').trim();
+  if (!rawBirthdate) return null;
+
+  const dateOnly = rawBirthdate.split(/[T\s]/)[0];
+  const birthdate = new Date(`${dateOnly}T00:00:00Z`);
+  if (Number.isNaN(birthdate.getTime())) return null;
+
+  const now = new Date();
+  let age = now.getUTCFullYear() - birthdate.getUTCFullYear();
+  const monthDiff = now.getUTCMonth() - birthdate.getUTCMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < birthdate.getUTCDate())) age -= 1;
+  return age > 0 ? age : null;
+}
+
+function formatUserAge(user) {
+  const age = getUserAge(user);
+  return age ? `${age}` : '—';
+}
+
+function formatSecondsShort(seconds) {
+  const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+  const mins = Math.floor(safeSeconds / 60);
+  const secs = safeSeconds % 60;
+  if (mins <= 0) return `${secs}s`;
+  return `${mins}m ${String(secs).padStart(2, '0')}s`;
 }
 
 function reportReasonLabel(reason) {
@@ -233,6 +268,23 @@ export default function AdminUsersPage() {
       setUsernameDraft(data.user.username || nextUsername);
     } catch (err) {
       alert(err.message || 'No se pudo cambiar el nombre de usuario');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResetVideoAllowance = async () => {
+    if (!selected?.id || actionLoading) return;
+    if (!confirm(`¿Resetear el tiempo diario de webcam free de ${selected.username}?`)) return;
+    setActionLoading(true);
+    try {
+      const data = await adminResetUserVideoCallAllowance(selected.id);
+      setSelected((prev) => (prev ? {
+        ...prev,
+        video_call_allowance: data.video_call_allowance,
+      } : prev));
+    } catch (err) {
+      alert(err.message || 'No se pudo resetear el allowance de video');
     } finally {
       setActionLoading(false);
     }
@@ -1000,6 +1052,7 @@ export default function AdminUsersPage() {
                     </th>
                     <th className="px-4 py-3">Usuario</th>
                     <th className="px-4 py-3 text-center">Sexo</th>
+                    <th className="px-4 py-3 text-center">Edad</th>
                     <th className="px-4 py-3 hidden md:table-cell">Email</th>
                     <th className="px-4 py-3 text-center">VIP</th>
                     <th className="px-4 py-3 text-center">Disp.</th>
@@ -1020,10 +1073,11 @@ export default function AdminUsersPage() {
                         />
                       </td>
                       <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => openUserModal(u)}
-                          className="flex w-full items-center gap-2 rounded-xl text-left transition-colors hover:text-mansion-gold focus:outline-none focus:ring-1 focus:ring-mansion-gold/30"
+                          className="flex min-w-0 flex-1 items-center gap-2 rounded-xl text-left transition-colors hover:text-mansion-gold focus:outline-none focus:ring-1 focus:ring-mansion-gold/30"
                         >
                           <div className="w-8 h-8 rounded-full bg-mansion-elevated overflow-hidden flex-shrink-0 flex items-center justify-center">
                             {u.avatar_url ? (
@@ -1103,6 +1157,17 @@ export default function AdminUsersPage() {
                             <p className="text-[10px] text-text-dim md:hidden truncate">{u.email}</p>
                           </div>
                         </button>
+                          <a
+                            href={publicProfilePath(u.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-mansion-border/20 bg-black/20 text-text-dim transition-colors hover:border-mansion-gold/40 hover:text-mansion-gold"
+                            title={`Abrir perfil público de ${u.username}`}
+                            aria-label={`Abrir perfil público de ${u.username}`}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span
@@ -1113,6 +1178,7 @@ export default function AdminUsersPage() {
                           <span className="hidden sm:inline">{sexLabel(u.role)}</span>
                         </span>
                       </td>
+                      <td className="px-4 py-3 text-center text-xs text-text-muted tabular-nums">{formatUserAge(u)}</td>
                       <td className="px-4 py-3 text-text-muted text-xs hidden md:table-cell truncate max-w-[200px]">{u.email}</td>
                       <td className="px-4 py-3 text-center">
                         {u.premium ? <Crown className="w-4 h-4 text-mansion-gold mx-auto" /> : <span className="text-text-dim text-xs">—</span>}
@@ -1181,9 +1247,21 @@ export default function AdminUsersPage() {
                   <p className="text-[11px] text-text-dim">{selected.email}</p>
                 </div>
               </div>
-              <button onClick={closeUserModal} className="p-2 rounded-lg hover:bg-mansion-elevated text-text-dim transition-colors">
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <a
+                  href={publicProfilePath(selected.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg hover:bg-mansion-elevated text-text-dim hover:text-mansion-gold transition-colors"
+                  title="Abrir perfil público"
+                  aria-label="Abrir perfil público"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+                <button onClick={closeUserModal} className="p-2 rounded-lg hover:bg-mansion-elevated text-text-dim transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Info */}
@@ -1523,6 +1601,22 @@ export default function AdminUsersPage() {
                     <span className="text-xs text-text-primary">Reset Coins</span>
                   </button>
                 </div>
+
+                <button
+                  disabled={actionLoading}
+                  onClick={handleResetVideoAllowance}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-mansion-elevated hover:bg-mansion-gold/10 transition-colors text-left"
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <Video className="w-4 h-4 text-mansion-gold" />
+                    <span className="text-xs text-text-primary">Reset allowance webcam free</span>
+                  </span>
+                  {selected.video_call_allowance && (
+                    <span className="shrink-0 rounded-full border border-mansion-border/20 bg-black/20 px-2 py-0.5 text-[10px] text-text-dim">
+                      {formatSecondsShort(selected.video_call_allowance.used_seconds)} usados hoy
+                    </span>
+                  )}
+                </button>
 
                 {/* Toggle Verified */}
                 <button

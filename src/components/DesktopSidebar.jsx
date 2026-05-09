@@ -69,7 +69,7 @@ export default function DesktopSidebar() {
     await apiLogout();
     setUser(null);
     setRegistered(false);
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 
   return (

@@ -64,6 +64,12 @@ function getVideoCallErrorMessage(error) {
   if (code === 'VIDEO_CALL_ENDED') {
     return 'La videollamada ya finalizó.';
   }
+  if (code === 'VIDEO_CALL_DAILY_LIMIT_REACHED') {
+    return `Llegaste al límite diario de videollamadas. Hacete ${VIP_MEMBER_LABEL} para ver webcams ilimitadas.`;
+  }
+  if (code === 'VIDEO_CALL_FREE_RECEIVER_LIMIT_REACHED') {
+    return `El usuario llegó al límite diario de webcam free. La llamada se cortó.`;
+  }
   return error?.message || 'No se pudo iniciar la videollamada.';
 }
 
@@ -438,6 +444,18 @@ function readChatCache(partnerId) {
   }
 }
 
+function normalizePrefetchedChat(prefetchedChat) {
+  if (!prefetchedChat || typeof prefetchedChat !== 'object') return null;
+  return {
+    ...prefetchedChat,
+    messages: dedupeMessages(normalizeMessages(prefetchedChat.messages || []).filter((message) => !message.isPreview && !message.isSystem)),
+    partner: prefetchedChat.partner || null,
+    apiLimit: prefetchedChat.apiLimit || null,
+    blockState: prefetchedChat.blockState || { blockedByMe: false, blockedMe: false },
+    hasOlderMessages: !!prefetchedChat.hasOlderMessages,
+  };
+}
+
 function writeChatCache(partnerId, payload) {
   if (typeof window === 'undefined') return;
   const key = getChatCacheKey(partnerId);
@@ -557,17 +575,19 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
   const chatImageBlur = normalizeChatImageBlur(siteSettings?.chatImageBlur);
   const partnerId = activeRouteId.startsWith('conv-') ? activeRouteId.replace('conv-', '') : activeRouteId;
   const cachedChat = readChatCache(partnerId);
+  const prefetchedChat = normalizePrefetchedChat(location.state?.prefetchedChat);
+  const initialChat = cachedChat || prefetchedChat;
   const partnerPreview = location.state?.partnerPreview || null;
-  const initialMessages = cachedChat?.messages || [];
+  const initialMessages = initialChat?.messages || [];
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState(initialMessages);
-  const [apiLimit, setApiLimit] = useState(cachedChat?.apiLimit || null);
-  const [blockState, setBlockState] = useState(cachedChat?.blockState || { blockedByMe: false, blockedMe: false });
-  const [partner, setPartner] = useState(cachedChat?.partner || partnerPreview || null);
-  const [loading, setLoading] = useState(!cachedChat && !partnerPreview);
+  const [apiLimit, setApiLimit] = useState(initialChat?.apiLimit || null);
+  const [blockState, setBlockState] = useState(initialChat?.blockState || { blockedByMe: false, blockedMe: false });
+  const [partner, setPartner] = useState(initialChat?.partner || partnerPreview || null);
+  const [loading, setLoading] = useState(!initialChat && !partnerPreview);
   const [blockUpdating, setBlockUpdating] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
-  const [hasOlderMessages, setHasOlderMessages] = useState(cachedChat?.hasOlderMessages || false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(initialChat?.hasOlderMessages || false);
   const [imageUploading, setImageUploading] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [videoCallLoading, setVideoCallLoading] = useState(false);
@@ -761,6 +781,11 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
 
     if (event.event === 'accepted') {
       setIncomingVideoCall((current) => (String(current?.id || '') === callId ? null : current));
+      setActiveVideoCall((current) => (
+        String(current?.id || '') === callId
+          ? { ...current, ...call }
+          : current
+      ));
       return;
     }
 
@@ -1083,7 +1108,7 @@ export default function ChatPage({ conversationId = '', embeddedDesktop = false 
     const user = getStoredUser();
     if (!token || !user) { navigate('/login'); return; }
 
-    const nextCachedChat = readChatCache(partnerId);
+    const nextCachedChat = readChatCache(partnerId) || normalizePrefetchedChat(location.state?.prefetchedChat);
     const nextPartnerPreview = partnerPreview;
     const nextInitialMessages = nextCachedChat?.messages || [];
     cacheMessagesRef.current = nextInitialMessages;

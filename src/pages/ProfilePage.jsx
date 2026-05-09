@@ -315,7 +315,7 @@ export default function ProfilePage() {
     await apiLogout();
     setUser(null);
     setRegistered(false);
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 
   const openDeleteAccountDialog = () => {

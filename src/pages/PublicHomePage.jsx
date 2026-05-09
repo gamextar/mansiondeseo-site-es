@@ -3,7 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { ArrowRight, HeartHandshake, ShieldCheck, Users } from 'lucide-react';
 import { useSeoMeta, useStructuredData } from '../lib/seo';
 import { useAuth } from '../lib/authContext';
-import { login as apiLogin } from '../lib/api';
+import { hasEverLoggedIn, login as apiLogin } from '../lib/api';
 import { SITE_ORIGIN } from '../lib/siteConfig';
 
 const ACTIVE_COUPLES_NOW = '1.248';
@@ -49,6 +49,10 @@ export default function PublicHomePage() {
 
   if (user) {
     return <Navigate to="/inicio" replace />;
+  }
+
+  if (hasEverLoggedIn()) {
+    return <Navigate to="/login" replace />;
   }
 
   const handleLogin = async (event) => {

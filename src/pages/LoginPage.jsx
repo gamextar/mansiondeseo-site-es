@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { login as apiLogin } from '../lib/api';
+import { ensureLoginPageNetworkClean, login as apiLogin, recoverLoginEnvironment } from '../lib/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -13,6 +13,17 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    ensureLoginPageNetworkClean().then((cleaned) => {
+      if (cancelled || !cleaned) return;
+      window.location.replace('/login?auth=clean');
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,8 +36,16 @@ export default function LoginPage() {
       const data = await apiLogin({ email: loginEmail, password: loginPassword });
       setUser(data.user);
       setRegistered(true);
-      navigate('/inicio');
+      window.location.replace('/inicio');
     } catch (err) {
+      if (err?.code === 'api_timeout') {
+        setError('Reiniciando sesión segura...');
+        const recovered = await recoverLoginEnvironment();
+        if (recovered) {
+          window.location.replace('/login?session=recovered');
+          return;
+        }
+      }
       setError(err.message || 'Credenciales inválidas');
     } finally {
       setLoading(false);

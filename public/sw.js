@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mansion-v12';
+const CACHE_NAME = 'mansion-v13';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(Promise.resolve());

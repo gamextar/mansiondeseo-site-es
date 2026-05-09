@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, MessageCircle, Trash2 } from 'lucide-react';
-import { deleteConversation, getConversations, getToken, getStoredUser, invalidateConversationsCache } from '../lib/api';
+import { deleteConversation, getConversations, getMessages, getToken, getStoredUser, invalidateConversationsCache } from '../lib/api';
 import { getBottomNavPagePadding } from '../lib/bottomNavConfig';
 import AvatarImg from '../components/AvatarImg';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
@@ -28,6 +28,13 @@ function timeAgo(dateStr) {
 
 const CONV_CACHE_KEY = 'mansion_conversations';
 const CONV_CACHE_TTL_MS = 2 * 60_000;
+const CHAT_CACHE_PREFIX = 'mansion_chat_';
+const CHAT_CACHE_TTL_MS = 10 * 60_000;
+const CHAT_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+const CHAT_CACHE_MESSAGE_LIMIT = 15;
+const CHAT_PREFETCH_LIMIT = 30;
+const CHAT_IDLE_PREFETCH_COUNT = 4;
+const chatPrefetchPromises = new Map();
 
 function getCachedConversations() {
   try {
@@ -57,6 +64,83 @@ function setCachedConversations(convs) {
 
 function isConversationCacheFresh(timestamp) {
   return timestamp > 0 && Date.now() - timestamp < CONV_CACHE_TTL_MS;
+}
+
+function getChatCacheKey(partnerId) {
+  const viewerId = getStoredUser()?.id;
+  return `${CHAT_CACHE_PREFIX}${viewerId || 'anonymous'}:${partnerId}`;
+}
+
+function getPartnerPreviewFromConversation(conv) {
+  return {
+    id: conv.profileId,
+    name: conv.name,
+    avatar_url: conv.avatar,
+    avatar_crop: conv.avatarCrop,
+    photos: [],
+    online: conv.online,
+  };
+}
+
+function readFreshChatCache(partnerId) {
+  if (typeof window === 'undefined' || !partnerId) return null;
+  const key = getChatCacheKey(partnerId);
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const cachedAt = Number(parsed?.cachedAt || 0);
+    if (!cachedAt || Date.now() - cachedAt > CHAT_CACHE_MAX_AGE_MS) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    if (Date.now() - cachedAt > CHAT_CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writePrefetchedChatCache(conv, data) {
+  if (typeof window === 'undefined' || !conv?.profileId) return null;
+  const payload = {
+    partner: getPartnerPreviewFromConversation(conv),
+    messages: Array.isArray(data?.messages) ? data.messages.slice(-CHAT_CACHE_MESSAGE_LIMIT) : [],
+    apiLimit: null,
+    blockState: { blockedByMe: false, blockedMe: false },
+    hasOlderMessages: !!data?.hasMore,
+    cachedAt: Date.now(),
+  };
+  try {
+    localStorage.setItem(getChatCacheKey(conv.profileId), JSON.stringify(payload));
+  } catch {}
+  return payload;
+}
+
+function prefetchConversationMessages(conv) {
+  if (!conv?.profileId || !getToken()) return Promise.resolve(null);
+  const freshCache = readFreshChatCache(conv.profileId);
+  if (freshCache?.messages?.length) return Promise.resolve(freshCache);
+
+  const key = String(conv.profileId);
+  if (chatPrefetchPromises.has(key)) return chatPrefetchPromises.get(key);
+
+  const request = getMessages(conv.profileId, { limit: CHAT_PREFETCH_LIMIT, prefetch: true })
+    .then((data) => writePrefetchedChatCache(conv, data))
+    .catch(() => null)
+    .finally(() => {
+      window.setTimeout(() => chatPrefetchPromises.delete(key), 1500);
+    });
+
+  chatPrefetchPromises.set(key, request);
+  return request;
+}
+
+function waitForChatPrefetch(promise, timeoutMs = 320) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => window.setTimeout(() => resolve(null), timeoutMs)),
+  ]);
 }
 
 function detectStandaloneMobile() {
@@ -103,25 +187,20 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting, active = fa
     setRevealed(true);
   }, []);
 
-  const handleNavigate = useCallback(() => {
+  const handleNavigate = useCallback(async () => {
     if (isDraggingRef.current || deleting) return;
     if (conv.unread > 0) onRead?.(conv.profileId, conv.unread);
-    const partnerPreview = {
-      id: conv.profileId,
-      name: conv.name,
-      avatar_url: conv.avatar,
-      avatar_crop: conv.avatarCrop,
-      photos: [],
-      online: conv.online,
-    };
+    const partnerPreview = getPartnerPreviewFromConversation(conv);
+    const prefetchedChat = await waitForChatPrefetch(prefetchConversationMessages(conv));
     if (onSelect) {
-      onSelect(conv, { partnerPreview });
+      onSelect(conv, { partnerPreview, prefetchedChat });
       return;
     }
     navigate(`/mensajes/${conv.profileId}`, {
       state: {
         from: '/mensajes',
         partnerPreview,
+        prefetchedChat,
       },
     });
   }, [conv, deleting, navigate, onRead, onSelect]);
@@ -173,6 +252,9 @@ function ConversationRow({ conv, typing, onDelete, onRead, deleting, active = fa
       >
         <button
           type="button"
+          onPointerDown={() => {
+            if (!deleting) prefetchConversationMessages(conv);
+          }}
           onClick={handleNavigate}
           className={`w-full text-left flex items-center gap-3.5 px-3 py-4 rounded-xl transition-all group ${
             active ? 'bg-mansion-card/70' : 'bg-mansion-base hover:bg-mansion-card/50'
@@ -436,6 +518,33 @@ export function ChatConversationsPanel({ embedded = false, activeProfileId = '',
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, fetchConversations, subscribe, applyConversationUpdate, applyLocalConversationPreview]);
+
+  useEffect(() => {
+    if (!conversations.length || !getToken()) return undefined;
+    const conversationsToPrefetch = conversations.slice(0, CHAT_IDLE_PREFETCH_COUNT);
+    let cancelled = false;
+    let timer = 0;
+
+    const run = () => {
+      conversationsToPrefetch.reduce((chain, conv) => (
+        chain.then(() => (cancelled ? null : prefetchConversationMessages(conv)))
+      ), Promise.resolve());
+    };
+
+    if (typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(run, { timeout: 1600 });
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback?.(idleId);
+      };
+    }
+
+    timer = window.setTimeout(run, 600);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [conversations]);
 
   const normalizedQuery = query.trim().toLowerCase();
   const visibleConversations = normalizedQuery

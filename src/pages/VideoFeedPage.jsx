@@ -75,6 +75,14 @@ function readSavedVideoFeedStory() {
   }
 }
 
+function clearSavedVideoFeedStory() {
+  try {
+    sessionStorage.removeItem(VIDEO_FEED_ACTIVE_STORY_KEY);
+  } catch {
+    // sessionStorage can be unavailable in private/locked browser contexts.
+  }
+}
+
 function findSavedStoryIndex(stories, savedStory) {
   if (!Array.isArray(stories) || !savedStory) return -1;
   const savedStoryId = String(savedStory.storyId || '').trim();
@@ -141,20 +149,23 @@ function normalizeStorySeed(seed) {
   };
 }
 
-function mergeSeedStory(stories, seedStory) {
-  const list = Array.isArray(stories) ? stories : [];
-  if (!seedStory) return list;
+function storyMatchesSeed(story, seedStory) {
+  if (!story || !seedStory) return false;
   const seedStoryId = String(seedStory.story_id || seedStory.id || '').trim();
   const seedUserId = String(seedStory.user_id || '').trim();
   const seedVideoUrl = String(seedStory.video_url || '').trim();
-  const existingIndex = list.findIndex((story) => {
-    const storyId = String(story?.story_id || story?.id || '').trim();
-    const userId = String(story?.user_id || '').trim();
-    const videoUrl = String(story?.video_url || '').trim();
-    if (seedStoryId && storyId && seedStoryId === storyId) return true;
-    if (seedUserId && userId && seedUserId === userId && (!seedVideoUrl || !videoUrl || seedVideoUrl === videoUrl)) return true;
-    return false;
-  });
+  const storyId = String(story?.story_id || story?.id || '').trim();
+  const userId = String(story?.user_id || '').trim();
+  const videoUrl = String(story?.video_url || '').trim();
+  if (seedStoryId && storyId && seedStoryId === storyId) return true;
+  return Boolean(seedUserId && userId && seedUserId === userId && seedVideoUrl && videoUrl && seedVideoUrl === videoUrl);
+}
+
+function mergeSeedStory(stories, seedStory) {
+  const list = Array.isArray(stories) ? stories : [];
+  if (!seedStory) return list;
+  const seedUserId = String(seedStory.user_id || '').trim();
+  const existingIndex = list.findIndex((story) => storyMatchesSeed(story, seedStory));
 
   if (existingIndex >= 0) {
     return list.map((story, index) => (
@@ -1284,7 +1295,16 @@ export default function VideoFeedPage() {
         surface: 'video',
       });
       if (data.videoLimit) setStoryViewLimit(data.videoLimit);
-      const mergedStories = mergeSeedStory(data.stories || [], requestedStorySeed);
+      const apiStories = Array.isArray(data.stories) ? data.stories : [];
+      const seedStillAvailable = requestedStorySeed
+        ? apiStories.some((story) => storyMatchesSeed(story, requestedStorySeed))
+        : false;
+      if (requestedStorySeed && !seedStillAvailable && !requestedStorySeed.video_url) {
+        clearSavedVideoFeedStory();
+      }
+      const mergedStories = requestedStorySeed
+        ? mergeSeedStory(apiStories, requestedStorySeed)
+        : apiStories;
 
       const orderedStories = requestedStoryUserId
         ? rotateStoriesToUser(mergedStories, requestedStoryUserId)
@@ -1322,6 +1342,7 @@ export default function VideoFeedPage() {
     const targetIndex = stories.findIndex((story) => String(story.user_id) === String(targetStoryUserId));
     if (targetIndex < 0) {
       if (!apiRespondedRef.current) return;
+      clearSavedVideoFeedStory();
       setActiveDispIdx(1);
       setBoundaryOverlayIdx(null);
       initialStoryUserIdRef.current = null;
@@ -1341,7 +1362,10 @@ export default function VideoFeedPage() {
 
     const targetIndex = findSavedStoryIndex(stories, savedStory);
     if (targetIndex < 0) {
-      if (apiRespondedRef.current) savedStoryRestoredRef.current = true;
+      if (apiRespondedRef.current) {
+        clearSavedVideoFeedStory();
+        savedStoryRestoredRef.current = true;
+      }
       return;
     }
 
@@ -1495,7 +1519,13 @@ export default function VideoFeedPage() {
 
     const savedStory = savedStoryRestoreRef.current;
     const targetIndex = findSavedStoryIndex(stories, savedStory);
-    if (targetIndex < 0) return;
+    if (targetIndex < 0) {
+      if (apiRespondedRef.current) {
+        clearSavedVideoFeedStory();
+        pwaReturnAnchorDoneRef.current = true;
+      }
+      return;
+    }
 
     const nextIndex = targetIndex + 1;
     pwaReturnAnchorDoneRef.current = true;

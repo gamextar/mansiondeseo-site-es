@@ -40,6 +40,7 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
   const wsBackgroundTimerRef = useRef(null);
   const unreadFetchRef = useRef(null);
   const lastUnreadFetchAtRef = useRef(0);
+  const initialUnreadSyncRef = useRef(false);
   const activeChatIdRef = useRef(null);
   const lastSyncedActiveChatRef = useRef(undefined);
 
@@ -328,6 +329,7 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
   useEffect(() => {
     const token = getToken();
     if (!token) {
+      initialUnreadSyncRef.current = false;
       applyUnreadCount(0);
       return;
     }
@@ -351,6 +353,20 @@ export function UnreadProvider({ children, initialUnread = null, bootstrapResolv
       fetchUnread({ force: false }).catch(() => {});
     }
   }, [applyUnreadCount, bootstrapResolved, fetchUnread, initialUnread]);
+
+  // The bootstrap/session cache gives an instant first paint, but it can be stale
+  // after messages arrive while the app was closed. Sync once per app mount.
+  useEffect(() => {
+    if (!bootstrapResolved || initialUnreadSyncRef.current || !getToken()) return undefined;
+    initialUnreadSyncRef.current = true;
+
+    const timer = window.setTimeout(() => {
+      if (!getToken()) return;
+      fetchUnread({ force: true }).catch(() => {});
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [bootstrapResolved, fetchUnread]);
 
   // Focus/visibility lifecycle for unread fallback + optional realtime socket.
   useEffect(() => {

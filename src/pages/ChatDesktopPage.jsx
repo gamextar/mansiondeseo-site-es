@@ -14,12 +14,13 @@ export default function ChatDesktopPage() {
   const navigate = useNavigate();
   const activeProfileId = normalizeRouteId(id);
 
-  const handleSelectConversation = useCallback((conversation, { partnerPreview } = {}) => {
+  const handleSelectConversation = useCallback((conversation, { partnerPreview, prefetchedChat } = {}) => {
     if (!conversation?.profileId) return;
     navigate(`/mensajes/${conversation.profileId}`, {
       state: {
         from: '/mensajes',
         partnerPreview,
+        prefetchedChat,
       },
     });
   }, [navigate]);
