@@ -116,13 +116,61 @@ async function readKeywordFile(filePath) {
     const content = await readFile(absolutePath, 'utf8');
     if (absolutePath.toLowerCase().endsWith('.csv')) return parseCsv(content);
     const parsed = JSON.parse(content);
-    if (Array.isArray(parsed)) return parsed;
-    if (Array.isArray(parsed.keywords)) return parsed.keywords;
-    return [];
+    return flattenKeywordEntries(parsed);
   } catch (error) {
     if (error?.code === 'ENOENT') return [];
     throw error;
   }
+}
+
+function normalizeKeywordEntry(entry, defaults = {}) {
+  const value = typeof entry === 'string' ? { term: entry } : entry || {};
+  return {
+    ...defaults,
+    ...value,
+    category: value.category || defaults.category,
+    category_id: value.category_id || defaults.category_id,
+    subcategory: value.subcategory || defaults.subcategory,
+    subcategory_id: value.subcategory_id || defaults.subcategory_id,
+  };
+}
+
+function flattenKeywordEntries(input, defaults = {}) {
+  if (Array.isArray(input)) return input.map((entry) => normalizeKeywordEntry(entry, defaults));
+  if (!input || typeof input !== 'object') return [];
+
+  const entries = [];
+  if (Array.isArray(input.keywords)) {
+    entries.push(...input.keywords.map((entry) => normalizeKeywordEntry(entry, defaults)));
+  }
+
+  if (Array.isArray(input.categories)) {
+    for (const category of input.categories) {
+      const categoryDefaults = {
+        ...defaults,
+        intent: category.intent || defaults.intent,
+        category: category.label || category.id || defaults.category,
+        category_id: category.id || defaults.category_id,
+      };
+      entries.push(...flattenKeywordEntries({ keywords: category.keywords || [] }, categoryDefaults));
+
+      if (Array.isArray(category.subcategories)) {
+        for (const subcategory of category.subcategories) {
+          entries.push(...flattenKeywordEntries(
+            { keywords: subcategory.keywords || [] },
+            {
+              ...categoryDefaults,
+              intent: subcategory.intent || categoryDefaults.intent,
+              subcategory: subcategory.label || subcategory.id || categoryDefaults.subcategory,
+              subcategory_id: subcategory.id || categoryDefaults.subcategory_id,
+            }
+          ));
+        }
+      }
+    }
+  }
+
+  return entries;
 }
 
 export async function loadIntentKeywordPages(filePath = process.env.SEO_INTENT_KEYWORDS_FILE || DEFAULT_INTENT_KEYWORDS_FILE) {

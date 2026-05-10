@@ -658,6 +658,7 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
   <meta property="og:image" content="${escapeHtml(`${SITE_ORIGIN}/icon-512.png`)}" />
   <meta property="og:url" content="${escapeHtml(page.canonical)}" />
   <meta property="og:locale" content="${escapeHtml(locale.hreflang.replace('-', '_'))}" />
+  ${profileCards[0]?.image_url ? `<link rel="preload" as="image" href="${escapeHtml(profileCards[0].image_url)}" fetchpriority="high" />` : ''}
   <script type="application/ld+json">${escapeJsonScript(structuredData)}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -737,7 +738,7 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
       <div class="profiles">
         ${profileCards.map((card, index) => `<a id="perfil-${index + 1}" class="profile-card" href="/registro/" aria-label="Unirme para ver perfil ${escapeHtml(card.display_label || 'privado')}" style="--profile-bg:${escapeHtml(card.gradient)}">
           <div class="profile-frame">
-            ${card.image_url ? `<img src="${escapeHtml(card.image_url)}" alt="Perfil ${escapeHtml(card.display_label || 'privado')}" class="profile-image" loading="lazy" referrerpolicy="no-referrer">` : `<div class="profile-image" aria-hidden="true"></div>`}
+            ${card.image_url ? `<img src="${escapeHtml(card.image_url)}" alt="Vista privada de perfil ${escapeHtml(card.display_label || 'privado')} en ${escapeHtml(card.location || page.location)}" class="profile-image" width="480" height="480" loading="${index === 0 ? 'eager' : 'lazy'}" decoding="async" fetchpriority="${index === 0 ? 'high' : 'low'}" referrerpolicy="no-referrer">` : `<div class="profile-image" aria-hidden="true"></div>`}
             <div class="profile-overlay"></div>
             ${card.online ? `<div class="online"><span class="online-dot"></span><span>En línea</span></div>` : ''}
             <div class="profile-info">

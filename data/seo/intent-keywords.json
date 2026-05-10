@@ -1,32 +1,71 @@
-[
-  {
-    "term": "cornudos argentina",
-    "intent": "cornudos",
-    "location": "Argentina"
-  },
-  {
-    "term": "parejas swingers buenos aires",
-    "intent": "swingers",
-    "location": "Buenos Aires"
-  },
-  {
-    "term": "cuckold mendoza",
-    "intent": "cuckold",
-    "location": "Mendoza"
-  },
-  {
-    "term": "contactos swinger cordoba",
-    "intent": "swingers",
-    "location": "Córdoba"
-  },
-  {
-    "term": "parejas liberales argentina",
-    "intent": "parejas liberales",
-    "location": "Argentina"
-  },
-  {
-    "term": "trios buenos aires",
-    "intent": "trios",
-    "location": "Buenos Aires"
-  }
-]
+{
+  "schema": 1,
+  "notes": "Agregar keywords dentro de categories[].keywords o categories[].subcategories[].keywords. Puede ser string simple o objeto con term/location/slug/title/description/enabled.",
+  "categories": [
+    {
+      "id": "cornudos",
+      "label": "Cornudos",
+      "intent": "cornudos",
+      "keywords": [
+        {
+          "term": "cornudos argentina",
+          "location": "Argentina"
+        }
+      ]
+    },
+    {
+      "id": "swingers",
+      "label": "Swingers",
+      "intent": "swingers",
+      "subcategories": [
+        {
+          "id": "parejas",
+          "label": "Parejas swingers",
+          "keywords": [
+            {
+              "term": "parejas swingers buenos aires",
+              "location": "Buenos Aires"
+            },
+            {
+              "term": "contactos swinger cordoba",
+              "location": "Córdoba"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cuckold",
+      "label": "Cuckold",
+      "intent": "cuckold",
+      "keywords": [
+        {
+          "term": "cuckold mendoza",
+          "location": "Mendoza"
+        }
+      ]
+    },
+    {
+      "id": "parejas-liberales",
+      "label": "Parejas liberales",
+      "intent": "parejas liberales",
+      "keywords": [
+        {
+          "term": "parejas liberales argentina",
+          "location": "Argentina"
+        }
+      ]
+    },
+    {
+      "id": "trios",
+      "label": "Tríos",
+      "intent": "trios",
+      "keywords": [
+        {
+          "term": "trios buenos aires",
+          "location": "Buenos Aires"
+        }
+      ]
+    }
+  ]
+}

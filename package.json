@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "seo:city-stats": "node scripts/build-seo-city-stats.mjs",
     "seo:gsc": "node scripts/search-console-export.mjs",
+    "seo:audit": "node scripts/audit-intent-landings.mjs",
     "seo:profile-cards": "node scripts/export-seo-profile-cards.mjs",
     "check:media-cache": "node scripts/check-media-cache.mjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
