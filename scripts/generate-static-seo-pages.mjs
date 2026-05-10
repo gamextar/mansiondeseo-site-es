@@ -69,6 +69,14 @@ const ROLE_GROUPS = {
   contactossex: ['mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'hombre'],
 };
 
+const ROLE_LABELS = {
+  hombre: 'Hombre',
+  mujer: 'Mujer',
+  pareja: 'Pareja',
+  pareja_hombres: 'Pareja',
+  pareja_mujeres: 'Pareja',
+};
+
 function escapeHtml(value = '') {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -138,7 +146,10 @@ function buildIntentMeta(page) {
 }
 
 function buildIntentIntro(page) {
-  if (page.intro) return String(page.intro);
+  if (page.intro) {
+    const intro = String(page.intro).replace(/\s+/g, ' ').trim();
+    return intro.length > 360 ? `${intro.slice(0, 357).trim()}...` : intro;
+  }
   const relatedConcepts = [
     'privacidad',
     'perfiles verificados',
@@ -150,12 +161,17 @@ function buildIntentIntro(page) {
     'comunidad adulta',
   ];
   const concepts = shuffleDeterministic(relatedConcepts, hashString(page.slug)).slice(0, 5);
-  return [
-    `Buscar ${page.term} suele mezclar curiosidad, deseo de privacidad y necesidad de encontrar un espacio que no exponga de más. Mansión Deseo está pensada como una entrada selecta para adultos registrados que quieren explorar ${page.intent} con más control, mejores filtros y una experiencia visual cuidada. Esta página resume la intención principal de la búsqueda y la conecta con perfiles privados, actividad local y una navegación simple hacia el registro.`,
-    `La diferencia está en el enfoque: no se trata de mostrar todo en público, sino de dar una señal clara de que existe una comunidad activa en torno a ${page.term}, manteniendo las fotos y los detalles sensibles protegidos hasta que el usuario ingresa. Por eso las vistas previas aparecen con privacidad visual y la interacción completa queda dentro de la plataforma. Conceptos como ${concepts.join(', ')} ayudan a ordenar la experiencia sin convertir la landing en un listado frío.`,
-    `Para Google, la página también necesita resolver una intención concreta y no repetir el mismo bloque en cientos de URLs. Por eso cada término puede usar una combinación propia de título, descripción, perfiles simulados, ubicación y enlaces internos. La idea es que el usuario entienda rápido qué puede encontrar, que la marca transmita seguridad y que el rastreador vea una estructura clara, con contenido contextual y navegación hacia otras búsquedas relacionadas, sin perder elegancia ni confianza.`,
-    `Si estás en ${page.location} o buscás conexiones relacionadas, la propuesta apunta a reducir ruido: perfiles con intención compatible, presentación discreta y una ruta directa para crear cuenta. La landing funciona como una puerta de entrada SEO y, al mismo tiempo, como una primera impresión real de marca: oscura, minimalista y orientada a confianza. Para ver perfiles completos, enviar mensajes o acceder a contenido privado, el siguiente paso es registrarse en Mansión Deseo.`,
-  ].join('\n\n');
+  return `Explorá ${page.term} en Mansión Deseo con perfiles privados, fotos protegidas y acceso completo solo para adultos registrados. La experiencia combina ${concepts.slice(0, 3).join(', ')} y una navegación discreta para encontrar afinidad sin exponer información sensible en público.`;
+}
+
+function roleLabel(role = '') {
+  return ROLE_LABELS[String(role || '').toLowerCase()] || 'Perfil';
+}
+
+function fallbackRoleLabel(key = '') {
+  if (key === 'trios') return 'Perfil';
+  if (key === 'cornudos' || key === 'cuckold' || key === 'swingers' || key === 'parejas') return 'Pareja';
+  return 'Mujer';
 }
 
 function buildIntentProfileCards(page) {
@@ -176,6 +192,7 @@ function buildIntentProfileCards(page) {
     const hueB = 28 + Math.floor(random() * 42);
     return {
       name,
+      display_label: fallbackRoleLabel(key),
       age,
       distance,
       mood,
@@ -221,6 +238,7 @@ function selectLandingProfileCards(page, limit = 12) {
     .slice(0, limit)
     .map(({ card }, index) => ({
       name: card.name,
+      display_label: roleLabel(card.role),
       age: Number.isFinite(Number(card.age)) ? Number(card.age) : '',
       location: card.locality || card.city || card.location || page.location,
       bio: card.bio || 'Perfil privado con acceso completo solo para usuarios registrados.',
@@ -659,9 +677,9 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
     .profile-cta{display:inline-flex;margin-top:10px;border-radius:999px;background:rgba(212,168,83,.92);color:var(--bg);padding:6px 12px;font-size:12px;font-weight:600;opacity:0;transition:opacity .3s}
     .profile-card:hover .profile-cta,.profile-card.is-visible .profile-cta{opacity:1}
     .more{text-align:center;margin-top:30px}
-    .seo-copy{border-top:1px solid rgba(61,26,26,.35);padding:42px 0 10px}
-    .seo-copy-inner{max-width:920px;margin:0 auto;color:rgba(168,144,128,.9);font-size:15px;line-height:1.9;white-space:pre-line;text-align:left}
-    .pills-section{border-top:1px solid rgba(61,26,26,.35);padding:42px 0}
+    .seo-copy{border-top:1px solid rgba(61,26,26,.35);padding:26px 0 4px}
+    .seo-copy-inner{max-width:760px;margin:0 auto;color:rgba(168,144,128,.86);font-size:14px;line-height:1.7;text-align:center}
+    .pills-section{border-top:1px solid rgba(61,26,26,.35);padding:34px 0 42px}
     .pills-title{margin:0 0 20px;text-align:center;font-family:"Playfair Display",Georgia,serif;font-size:22px;font-weight:500}
     .pills{display:flex;flex-wrap:wrap;justify-content:center;gap:9px}
     .seo-pill{border:1px solid rgba(61,26,26,.7);border-radius:999px;padding:10px 16px;color:var(--muted);font-size:14px;transition:all .2s}
@@ -695,13 +713,13 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
 
     <section class="profiles-section page" aria-labelledby="profiles-title">
       <div class="profiles">
-        ${profileCards.map((card) => `<article class="profile-card" data-profile-card tabindex="0" role="button" aria-label="Ver perfil de ${escapeHtml(card.name)}" style="--profile-bg:${escapeHtml(card.gradient)}">
+        ${profileCards.map((card) => `<article class="profile-card" data-profile-card tabindex="0" role="button" aria-label="Ver perfil ${escapeHtml(card.display_label || 'privado')}" style="--profile-bg:${escapeHtml(card.gradient)}">
           <div class="profile-frame">
-            ${card.image_url ? `<img src="${escapeHtml(card.image_url)}" alt="Perfil de ${escapeHtml(card.name)}" class="profile-image" loading="lazy" referrerpolicy="no-referrer">` : `<div class="profile-image" aria-hidden="true"></div>`}
+            ${card.image_url ? `<img src="${escapeHtml(card.image_url)}" alt="Perfil ${escapeHtml(card.display_label || 'privado')}" class="profile-image" loading="lazy" referrerpolicy="no-referrer">` : `<div class="profile-image" aria-hidden="true"></div>`}
             <div class="profile-overlay"></div>
             ${card.online ? `<div class="online"><span class="online-dot"></span><span>En línea</span></div>` : ''}
             <div class="profile-info">
-              <h2 class="profile-name">${escapeHtml(card.name)}${card.age ? `, ${escapeHtml(card.age)}` : ''}</h2>
+              <h2 class="profile-name">${escapeHtml(card.display_label || 'Perfil')}${card.age ? `, ${escapeHtml(card.age)}` : ''}</h2>
               <div class="profile-meta">
                 <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0Z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
                 <span>${escapeHtml(card.location || page.location)}</span>
