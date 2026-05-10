@@ -174,6 +174,13 @@ function fallbackRoleLabel(key = '') {
   return 'Mujer';
 }
 
+function profileItemListName(card, page) {
+  const label = card.display_label || 'Perfil';
+  const age = card.age ? `, ${card.age}` : '';
+  const location = card.location || page.location;
+  return `${label}${age} en ${location}`;
+}
+
 function buildIntentProfileCards(page) {
   const dbCards = selectLandingProfileCards(page, 15);
   if (dbCards.length >= 15) return dbCards;
@@ -616,6 +623,19 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
         { '@type': 'ListItem', position: 3, name: page.titleTerm, item: page.canonical },
       ],
     },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: `Perfiles privados relacionados con ${page.titleTerm}`,
+      itemListOrder: 'https://schema.org/ItemListOrderAscending',
+      numberOfItems: profileCards.length,
+      itemListElement: profileCards.map((card, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: profileItemListName(card, page),
+        url: `${page.canonical}#perfil-${index + 1}`,
+      })),
+    },
   ];
 
   return `<!doctype html>
@@ -715,7 +735,7 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
 
     <section class="profiles-section page" aria-labelledby="profiles-title">
       <div class="profiles">
-        ${profileCards.map((card) => `<a class="profile-card" href="/registro/" aria-label="Unirme para ver perfil ${escapeHtml(card.display_label || 'privado')}" style="--profile-bg:${escapeHtml(card.gradient)}">
+        ${profileCards.map((card, index) => `<a id="perfil-${index + 1}" class="profile-card" href="/registro/" aria-label="Unirme para ver perfil ${escapeHtml(card.display_label || 'privado')}" style="--profile-bg:${escapeHtml(card.gradient)}">
           <div class="profile-frame">
             ${card.image_url ? `<img src="${escapeHtml(card.image_url)}" alt="Perfil ${escapeHtml(card.display_label || 'privado')}" class="profile-image" loading="lazy" referrerpolicy="no-referrer">` : `<div class="profile-image" aria-hidden="true"></div>`}
             <div class="profile-overlay"></div>
