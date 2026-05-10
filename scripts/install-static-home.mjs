@@ -44,6 +44,9 @@ const appRoutes = new Set([
   'videos',
   'vip',
 ]);
+const appRoutesWithoutDeepFallback = new Set([
+  'explorar',
+]);
 
 async function writeAppRoute(route, html) {
   const routeDir = path.join(DIST_DIR, ...route.split('/'));
@@ -79,6 +82,7 @@ function buildRedirects() {
     [...appRoutes]
       .map((route) => String(route || '').split('/')[0])
       .filter(Boolean)
+      .filter((prefix) => !appRoutesWithoutDeepFallback.has(prefix))
       .map((prefix) => `/${prefix}/*`)
   );
   appFallbackPrefixes.add('/mensajes/*');

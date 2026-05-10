@@ -4,6 +4,7 @@ import { buildSeoCanonical } from '../src/lib/seoRouting.js';
 import { getSitemapSeoLocales } from '../src/lib/seoLocales.js';
 import { SEO_BASE_INTENTS, SEO_GEO_INTENT_CONFIGS } from '../src/lib/seoVariants.js';
 import { SITE_ORIGIN } from '../src/lib/siteConfig.js';
+import { loadIntentKeywordPages } from './seo-intent-keywords.mjs';
 
 const urls = [[`${SITE_ORIGIN}/`, 'daily', '1.0']];
 
@@ -26,6 +27,11 @@ for (const locale of getSitemapSeoLocales()) {
       ]);
     }
   }
+}
+
+const intentKeywordPages = await loadIntentKeywordPages();
+for (const page of intentKeywordPages) {
+  urls.push([page.canonical, page.changefreq, page.priority]);
 }
 
 const xml = [

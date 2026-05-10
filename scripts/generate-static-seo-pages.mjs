@@ -6,6 +6,7 @@ import { getSeoIntentPage } from '../src/lib/seoIntentCatalog.js';
 import { getGeoPagesForLocale } from '../src/lib/seoGeoCatalog.js';
 import { SITE_LOCALE, SITE_ORIGIN, formatNumber } from '../src/lib/siteConfig.js';
 import { SEO_BASE_INTENTS, SEO_GEO_INTENT_CONFIGS } from '../src/lib/seoVariants.js';
+import { loadIntentKeywordPages } from './seo-intent-keywords.mjs';
 
 const DIST_DIR = path.resolve('dist');
 const redirectsPath = path.join(DIST_DIR, '_redirects');
@@ -44,6 +45,16 @@ const CANONICAL_REDIRECTS = [
   ['/parejas', '/parejas-liberales/'],
   ['/parejas/', '/parejas-liberales/'],
 ];
+const INTENT_ROUTE_PREFIX = '/explorar';
+const PROFILE_NAMES = {
+  parejas: ['Luz y Nico', 'Mara y Leo', 'Sofi y Fran', 'Vale y Tomi', 'Cami y Agus', 'Flor y Seba'],
+  swingers: ['Maia y Juli', 'Noe y Fer', 'Lola y Santi', 'Romi y Fede', 'Ari y Manu', 'Vero y Dani'],
+  cornudos: ['Clara y Martin', 'Nati y Pablo', 'Mora y Andres', 'Jaz y Lucas', 'Paula y Diego', 'Meli y Gonza'],
+  cuckold: ['Bianca y G', 'Eva y Marco', 'Nina y Raul', 'Lara y Nico', 'Uma y Leo', 'Sasha y Ivan'],
+  trios: ['Alma', 'Renata', 'Bruno', 'Thiago', 'Delfi', 'Mateo'],
+  default: ['Camila', 'Valentina', 'Sofia', 'Lucia', 'Martina', 'Julieta', 'Agustina', 'Florencia'],
+};
+const PROFILE_MOODS = ['Discreta', 'Selectiva', 'Nueva', 'Verificada', 'Activa', 'Afinidad alta'];
 
 function escapeHtml(value = '') {
   return String(value)
@@ -60,6 +71,108 @@ function escapeJsonScript(value) {
 
 function ensureTrailingSlash(value) {
   return value.endsWith('/') ? value : `${value}/`;
+}
+
+function hashString(value = '') {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seededRandom(seed) {
+  let value = seed >>> 0;
+  return () => {
+    value += 0x6D2B79F5;
+    let result = value;
+    result = Math.imul(result ^ (result >>> 15), result | 1);
+    result ^= result + Math.imul(result ^ (result >>> 7), result | 61);
+    return ((result ^ (result >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function pickFrom(list, random) {
+  return list[Math.floor(random() * list.length)] || list[0];
+}
+
+function shuffleDeterministic(items, seed) {
+  const random = seededRandom(seed);
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+  return copy;
+}
+
+function intentKey(value = '') {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized.includes('cuck')) return 'cuckold';
+  if (normalized.includes('cornud')) return 'cornudos';
+  if (normalized.includes('swing')) return 'swingers';
+  if (normalized.includes('trio')) return 'trios';
+  if (normalized.includes('pareja')) return 'parejas';
+  return 'default';
+}
+
+function buildIntentMeta(page) {
+  const title = page.title || `${page.titleTerm} | Mansión Deseo`;
+  const description = page.description || `Explorá ${page.term} en una comunidad privada para adultos registrados, con perfiles discretos, vista protegida y acceso completo solo al crear tu cuenta.`;
+  const headline = page.h1 || `${page.titleTerm}: perfiles privados y encuentros discretos`;
+  return { title, description, headline };
+}
+
+function buildIntentIntro(page) {
+  if (page.intro) return String(page.intro);
+  const relatedConcepts = [
+    'privacidad',
+    'perfiles verificados',
+    'búsqueda por afinidad',
+    'actividad reciente',
+    'mensajes privados',
+    'acceso controlado',
+    'discreción',
+    'comunidad adulta',
+  ];
+  const concepts = shuffleDeterministic(relatedConcepts, hashString(page.slug)).slice(0, 5);
+  return [
+    `Buscar ${page.term} suele mezclar curiosidad, deseo de privacidad y necesidad de encontrar un espacio que no exponga de más. Mansión Deseo está pensada como una entrada selecta para adultos registrados que quieren explorar ${page.intent} con más control, mejores filtros y una experiencia visual cuidada. Esta página resume la intención principal de la búsqueda y la conecta con perfiles privados, actividad local y una navegación simple hacia el registro.`,
+    `La diferencia está en el enfoque: no se trata de mostrar todo en público, sino de dar una señal clara de que existe una comunidad activa en torno a ${page.term}, manteniendo las fotos y los detalles sensibles protegidos hasta que el usuario ingresa. Por eso las vistas previas aparecen con privacidad visual y la interacción completa queda dentro de la plataforma. Conceptos como ${concepts.join(', ')} ayudan a ordenar la experiencia sin convertir la landing en un listado frío.`,
+    `Para Google, la página también necesita resolver una intención concreta y no repetir el mismo bloque en cientos de URLs. Por eso cada término puede usar una combinación propia de título, descripción, perfiles simulados, ubicación y enlaces internos. La idea es que el usuario entienda rápido qué puede encontrar, que la marca transmita seguridad y que el rastreador vea una estructura clara, con contenido contextual y navegación hacia otras búsquedas relacionadas.`,
+    `Si estás en ${page.location} o buscás conexiones relacionadas, la propuesta apunta a reducir ruido: perfiles con intención compatible, presentación discreta y una ruta directa para crear cuenta. La landing funciona como una puerta de entrada SEO y, al mismo tiempo, como una primera impresión real de marca: oscura, minimalista y orientada a confianza. Para ver perfiles completos, enviar mensajes o acceder a contenido privado, el siguiente paso es registrarse en Mansión Deseo.`,
+  ].join('\n\n');
+}
+
+function buildIntentProfileCards(page) {
+  const random = seededRandom(hashString(page.slug));
+  const key = intentKey(`${page.intent} ${page.term}`);
+  const names = PROFILE_NAMES[key] || PROFILE_NAMES.default;
+  return Array.from({ length: 12 }, (_, index) => {
+    const name = `${pickFrom(names, random)}${index >= names.length ? ` ${index + 1}` : ''}`;
+    const age = 24 + Math.floor(random() * 22);
+    const distance = page.location === 'Argentina'
+      ? `${2 + Math.floor(random() * 28)} km`
+      : `${1 + Math.floor(random() * 14)} km`;
+    const mood = pickFrom(PROFILE_MOODS, random);
+    const hueA = 330 + Math.floor(random() * 52);
+    const hueB = 28 + Math.floor(random() * 42);
+    return {
+      name,
+      age,
+      distance,
+      mood,
+      gradient: `linear-gradient(135deg,hsl(${hueA} 48% 24%),hsl(${hueB} 48% 34%))`,
+    };
+  });
+}
+
+function buildIntentCrossLinks(page, intentKeywordPages) {
+  return shuffleDeterministic(
+    intentKeywordPages.filter((item) => item.slug !== page.slug),
+    hashString(`links-${page.slug}`)
+  ).slice(0, 5);
 }
 
 function routePath(variant, citySlug = '') {
@@ -385,6 +498,155 @@ function renderSeoPage(variant, citySlug = '') {
 </html>`;
 }
 
+function renderIntentKeywordPage(page, intentKeywordPages) {
+  const locale = getSeoLocale(DEFAULT_SEO_LOCALE);
+  const { title, description, headline } = buildIntentMeta(page);
+  const intro = buildIntentIntro(page);
+  const profileCards = buildIntentProfileCards(page);
+  const crossLinks = buildIntentCrossLinks(page, intentKeywordPages);
+  const structuredData = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: title,
+      description,
+      url: page.canonical,
+      inLanguage: locale.hreflang,
+      isPartOf: {
+        '@type': 'WebSite',
+        name: 'Mansión Deseo',
+        url: `${SITE_ORIGIN}/`,
+      },
+      about: [
+        { '@type': 'Thing', name: page.term },
+        { '@type': 'Thing', name: page.intent },
+        { '@type': 'Thing', name: page.location },
+      ],
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Mansión Deseo', item: `${SITE_ORIGIN}/` },
+        { '@type': 'ListItem', position: 2, name: 'Explorar', item: `${SITE_ORIGIN}${INTENT_ROUTE_PREFIX}/` },
+        { '@type': 'ListItem', position: 3, name: page.titleTerm, item: page.canonical },
+      ],
+    },
+  ];
+
+  return `<!doctype html>
+<html lang="${escapeHtml(locale.language)}" style="background:#000;color-scheme:dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="${escapeHtml(page.canonical)}" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="color-scheme" content="dark" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Mansión Deseo" />
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:image" content="${escapeHtml(`${SITE_ORIGIN}/icon-512.png`)}" />
+  <meta property="og:url" content="${escapeHtml(page.canonical)}" />
+  <meta property="og:locale" content="${escapeHtml(locale.hreflang.replace('-', '_'))}" />
+  <script type="application/ld+json">${escapeJsonScript(structuredData)}</script>
+  <style>
+    :root{--bg:#000;--ink:#f4f4f4;--muted:rgba(244,244,244,.68);--dim:rgba(244,244,244,.46);--line:rgba(244,244,244,.12);--gold:#c5a059;--panel:#090909;--panel2:#111;--danger:#6f1730}
+    *{box-sizing:border-box}html{background:var(--bg);scroll-behavior:smooth}body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:Inter,Montserrat,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit;text-decoration:none}.page{width:min(1180px,calc(100% - 32px));margin:0 auto}.nav{display:flex;align-items:center;justify-content:space-between;padding:24px 0}.brand{display:flex;align-items:center;gap:12px}.brand-mark{display:grid;place-items:center;width:36px;height:36px;border:1px solid rgba(197,160,89,.34);color:var(--gold);font-family:Georgia,"Times New Roman",serif}.brand strong{font-family:Georgia,"Times New Roman",serif;font-weight:500;font-size:20px}.nav-actions{display:flex;align-items:center;gap:10px}.btn{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:12px 18px;border:1px solid var(--line);font-size:13px;font-weight:600}.btn.gold{border-color:rgba(197,160,89,.62);background:var(--gold);color:#090704}.hero{padding:72px 0 58px;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:42px;align-items:end}.eyebrow{display:inline-flex;color:var(--gold);font-size:12px;letter-spacing:.14em;text-transform:uppercase}.h1{margin:20px 0 0;max-width:860px;font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,8vw,92px);font-weight:400;line-height:.94;letter-spacing:-.035em}.lead{margin:24px 0 0;max-width:760px;color:var(--muted);font-size:18px;line-height:1.75}.hero-card{border:1px solid rgba(197,160,89,.22);background:linear-gradient(180deg,rgba(197,160,89,.08),rgba(255,255,255,.025));padding:24px}.hero-card p{margin:0;color:var(--muted);line-height:1.7}.metric-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px}.metric{border-top:1px solid var(--line);padding-top:14px}.metric strong{display:block;color:var(--ink);font-size:22px;font-family:Georgia,"Times New Roman",serif;font-weight:400}.metric span{display:block;margin-top:4px;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.1em}.intro{padding:30px 0 66px}.intro-text{max-width:920px;color:rgba(244,244,244,.74);font-size:16px;line-height:1.9;white-space:pre-line}.section-head{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:22px}.section-head h2{margin:0;font-family:Georgia,"Times New Roman",serif;font-size:34px;font-weight:400}.section-head p{margin:0;max-width:460px;color:var(--dim);font-size:14px;line-height:1.7}.profiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.profile-card{appearance:none;border:1px solid var(--line);background:var(--panel);color:inherit;text-align:left;padding:0;overflow:hidden;cursor:pointer}.profile-photo{height:210px;background:var(--profile-bg);filter:blur(8px);transform:scale(1.04);transition:filter .3s ease,transform .3s ease}.profile-card:hover .profile-photo,.profile-card:focus-visible .profile-photo,.profile-card.is-visible .profile-photo{filter:blur(0);transform:scale(1)}.profile-body{padding:14px}.profile-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.profile-name{font-weight:600}.profile-age{color:var(--gold);font-size:13px}.profile-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;color:var(--dim);font-size:12px}.privacy-note{margin-top:18px;color:var(--dim);font-size:12px;line-height:1.7}.links-section{padding:76px 0}.links-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.link-card{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));min-height:118px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;transition:border-color .2s ease,transform .2s ease}.link-card:hover{border-color:rgba(197,160,89,.48);transform:translateY(-2px)}.link-card span{color:var(--gold);font-size:11px;letter-spacing:.12em;text-transform:uppercase}.link-card strong{font-family:Georgia,"Times New Roman",serif;font-size:18px;font-weight:400;line-height:1.2}.cta-band{border-top:1px solid var(--line);padding:42px 0 54px;display:flex;align-items:center;justify-content:space-between;gap:20px}.cta-band p{margin:0;color:var(--muted);line-height:1.6}.foot{padding:26px 0 34px;border-top:1px solid var(--line);color:var(--dim);font-size:12px}@media(max-width:980px){.hero{grid-template-columns:1fr;padding-top:48px}.profiles{grid-template-columns:repeat(2,minmax(0,1fr))}.links-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cta-band{align-items:flex-start;flex-direction:column}}@media(max-width:560px){.page{width:min(100% - 24px,520px)}.nav{padding:18px 0}.nav-actions .btn:first-child{display:none}.hero{padding:38px 0 42px}.h1{font-size:42px}.lead{font-size:16px}.hero-card{padding:18px}.profiles{grid-template-columns:1fr 1fr;gap:10px}.profile-photo{height:152px}.profile-body{padding:11px}.links-grid{grid-template-columns:1fr}.section-head{display:block}.section-head p{margin-top:10px}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <nav class="nav" aria-label="Principal">
+      <a class="brand" href="/">
+        <span class="brand-mark">M</span>
+        <strong>Mansión Deseo</strong>
+      </a>
+      <div class="nav-actions">
+        <a class="btn" href="/login/">Entrar</a>
+        <a class="btn gold" href="/registro/">Solicitar acceso</a>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div>
+        <span class="eyebrow">Búsqueda privada · ${escapeHtml(page.location)}</span>
+        <h1 class="h1">${escapeHtml(headline)}</h1>
+        <p class="lead">${escapeHtml(description)}</p>
+      </div>
+      <aside class="hero-card">
+        <p>Vista pública pensada para quienes buscan ${escapeHtml(page.term)} con una experiencia discreta, rápida y protegida.</p>
+        <div class="metric-row">
+          <div class="metric"><strong>12</strong><span>previews</span></div>
+          <div class="metric"><strong>+18</strong><span>privado</span></div>
+          <div class="metric"><strong>VIP</strong><span>opcional</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="intro">
+      <div class="intro-text">${escapeHtml(intro)}</div>
+    </section>
+
+    <section aria-labelledby="profiles-title">
+      <div class="section-head">
+        <h2 id="profiles-title">Perfiles destacados</h2>
+        <p>Las fotos se muestran protegidas en la vista pública. Al interactuar, la imagen se revela suavemente como muestra visual de la experiencia privada.</p>
+      </div>
+      <div class="profiles">
+        ${profileCards.map((card) => `<button class="profile-card" type="button" data-profile-card style="--profile-bg:${escapeHtml(card.gradient)}">
+          <div class="profile-photo" aria-hidden="true"></div>
+          <div class="profile-body">
+            <div class="profile-top">
+              <span class="profile-name">${escapeHtml(card.name)}</span>
+              <span class="profile-age">${card.age}</span>
+            </div>
+            <div class="profile-meta">
+              <span>${escapeHtml(card.distance)}</span>
+              <span>${escapeHtml(card.mood)}</span>
+            </div>
+          </div>
+        </button>`).join('\n        ')}
+      </div>
+      <p class="privacy-note">Previews públicos de estilo editorial. Los perfiles completos, fotos reales, mensajes y filtros avanzados quedan disponibles únicamente dentro de Mansión Deseo para usuarios registrados.</p>
+    </section>
+
+    <section class="links-section" aria-labelledby="related-title">
+      <div class="section-head">
+        <h2 id="related-title">También podés explorar</h2>
+        <p>Navegación cruzada para búsquedas relacionadas y señales internas más claras.</p>
+      </div>
+      <div class="links-grid">
+        ${crossLinks.map((item) => `<a class="link-card" href="${escapeHtml(item.routePath)}">
+          <span>Explorar</span>
+          <strong>${escapeHtml(item.titleTerm)}</strong>
+        </a>`).join('\n        ')}
+      </div>
+    </section>
+
+    <section class="cta-band">
+      <p>Para ver perfiles completos y conectar con usuarios reales, creá una cuenta privada.</p>
+      <a class="btn gold" href="/registro/">Crear cuenta</a>
+    </section>
+
+    <footer class="foot">Mansión Deseo · Comunidad privada para adultos registrados · ${escapeHtml(page.term)}</footer>
+  </main>
+  <script>
+    document.addEventListener('click', function(event) {
+      var card = event.target.closest('[data-profile-card]');
+      if (!card) return;
+      card.classList.toggle('is-visible');
+    });
+  </script>
+</body>
+</html>`;
+}
+
 async function writeSeoPage({ variant, citySlug = '' }) {
   const route = routeKey(variant, citySlug);
   const outputDir = path.join(DIST_DIR, ...route.split('/'));
@@ -392,14 +654,22 @@ async function writeSeoPage({ variant, citySlug = '' }) {
   await writeFile(path.join(outputDir, 'index.html'), renderSeoPage(variant, citySlug), 'utf8');
 }
 
-function shouldDropRedirectLine(line) {
+async function writeIntentKeywordPage(page, intentKeywordPages) {
+  const route = page.routePath.replace(/^\/+|\/+$/g, '');
+  const outputDir = path.join(DIST_DIR, ...route.split('/'));
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(path.join(outputDir, 'index.html'), renderIntentKeywordPage(page, intentKeywordPages), 'utf8');
+}
+
+function shouldDropRedirectLine(line, hasIntentPages = false) {
   const source = line.split(/\s+/)[0] || '';
   const normalized = source.replace(/^\/+/, '');
   const prefix = normalized.split('/')[0].replace(/\*$/, '');
+  if (hasIntentPages && normalized === 'explorar/*') return true;
   return SEO_FALLBACK_PREFIXES.has(prefix);
 }
 
-async function updateRedirects() {
+async function updateRedirects(intentKeywordPages = []) {
   let redirects = '';
   try {
     redirects = await readFile(redirectsPath, 'utf8');
@@ -414,12 +684,17 @@ async function updateRedirects() {
       return `${source} ${target} 301`;
     })
     .filter((line) => !line.startsWith(' /'));
+  const intentRouteRedirects = intentKeywordPages.map((page) => {
+    const target = page.routePath;
+    const source = target.replace(/\/$/, '');
+    return `${source} ${target} 301`;
+  });
 
-  const redirectRules = [...CANONICAL_REDIRECTS.map(([from, to]) => `${from} ${to} 301`), ...canonicalRouteRedirects];
+  const redirectRules = [...CANONICAL_REDIRECTS.map(([from, to]) => `${from} ${to} 301`), ...canonicalRouteRedirects, ...intentRouteRedirects];
   const existingLines = redirects
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line && !redirectRules.includes(line) && !shouldDropRedirectLine(line));
+    .filter((line) => line && !redirectRules.includes(line) && !shouldDropRedirectLine(line, intentKeywordPages.length > 0));
 
   await writeFile(redirectsPath, `${[...redirectRules, ...existingLines].join('\n')}\n`, 'utf8');
 }
@@ -428,7 +703,11 @@ const seoCityStats = JSON.parse(await readFile(seoStatsPath, 'utf8').catch(() =>
 const seoCityStatsBySlug = new Map(
   (Array.isArray(seoCityStats?.cities) ? seoCityStats.cities : []).map((entry) => [entry.city_slug, entry])
 );
+const intentKeywordPages = await loadIntentKeywordPages();
 
-await Promise.all(STATIC_SEO_ROUTES.map(writeSeoPage));
-await updateRedirects();
-console.log(`Generated ${STATIC_SEO_ROUTES.length} static SEO pages`);
+await Promise.all([
+  ...STATIC_SEO_ROUTES.map(writeSeoPage),
+  ...intentKeywordPages.map((page) => writeIntentKeywordPage(page, intentKeywordPages)),
+]);
+await updateRedirects(intentKeywordPages);
+console.log(`Generated ${STATIC_SEO_ROUTES.length} static SEO pages and ${intentKeywordPages.length} intent pages`);

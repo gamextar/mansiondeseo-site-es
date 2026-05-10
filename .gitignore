@@ -10,6 +10,7 @@ data/seo/*
 !data/seo/seo-city-stats.json
 !data/seo/seo-home-stats.json
 !data/seo/seo-city-stats-upsert.sql
+!data/seo/intent-keywords.json
 data/search-console/
 config/google-search-console/*.json
 .wrangler/
