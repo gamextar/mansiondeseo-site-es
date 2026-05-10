@@ -670,25 +670,28 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
     .profile-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(26,10,10,.95) 0%,rgba(26,10,10,.6) 50%,transparent 100%)}
     .online{position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:rgba(26,10,10,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:5px 8px;font-size:11px}
     .online-dot{width:8px;height:8px;border-radius:999px;background:#22c55e;box-shadow:0 0 12px rgba(34,197,94,.75)}
-    .profile-info{position:absolute;left:0;right:0;bottom:0;padding:13px}
+    .profile-info{position:absolute;left:0;right:0;bottom:0;height:92px;padding:13px}
     .profile-name{margin:0 0 4px;font-size:14px;font-weight:600}
     .profile-meta{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:12px}
-    .profile-bio{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:8px 0 0;color:rgba(168,144,128,.84);font-size:12px;line-height:1.35}
-    .profile-cta{display:inline-flex;margin-top:10px;border-radius:999px;background:rgba(212,168,83,.92);color:var(--bg);padding:6px 12px;font-size:12px;font-weight:600}
+    .profile-bio{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;height:32px;margin:8px 0 0;color:rgba(168,144,128,.84);font-size:12px;line-height:1.35}
     .more{text-align:center;margin-top:30px}
     .seo-copy{border-top:1px solid rgba(61,26,26,.35);padding:26px 0 4px}
     .seo-copy-inner{max-width:760px;margin:0 auto;color:rgba(168,144,128,.86);font-size:14px;line-height:1.7;text-align:center}
     .pills-section{border-top:1px solid rgba(61,26,26,.35);padding:34px 0 42px}
-    .pills-title{margin:0 0 20px;text-align:center;font-family:"Playfair Display",Georgia,serif;font-size:22px;font-weight:500}
+    .pills-title{margin:0 0 30px;text-align:center;font-family:"Playfair Display",Georgia,serif;font-size:22px;font-weight:500}
     .pills{display:flex;flex-wrap:wrap;justify-content:center;gap:9px}
-    .seo-pill{border:1px solid rgba(212,168,83,.42);border-radius:999px;background:rgba(212,168,83,.12);padding:10px 16px;color:var(--gold);font-size:14px;font-weight:600;transition:all .2s}
-    .seo-pill:hover{background:var(--gold);border-color:var(--gold);color:var(--bg);box-shadow:0 0 22px rgba(212,168,83,.18);transform:translateY(-1px)}
+    .seo-pill{--pill:212,168,83;border:1px solid rgba(var(--pill),.38);border-radius:999px;background:rgba(var(--pill),.14);padding:10px 16px;color:rgb(var(--pill));font-size:14px;font-weight:600;transition:all .2s}
+    .seo-pill:nth-child(5n+2){--pill:166,48,48}
+    .seo-pill:nth-child(5n+3){--pill:168,144,128}
+    .seo-pill:nth-child(5n+4){--pill:226,188,106}
+    .seo-pill:nth-child(5n+5){--pill:148,92,74}
+    .seo-pill:hover{background:rgba(var(--pill),.28);border-color:rgba(var(--pill),.72);box-shadow:0 0 22px rgba(var(--pill),.18);transform:translateY(-1px)}
     .footer{border-top:1px solid rgba(61,26,26,.35);padding:24px 0;color:var(--muted);font-size:14px}
     .footer-row{display:flex;justify-content:space-between;align-items:center;gap:16px}
     .footer-links{display:flex;gap:16px;flex-wrap:wrap}
     .footer a:hover{color:var(--gold)}
     @media(max-width:1024px){.profiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
-    @media(max-width:760px){.page{width:min(100% - 24px,640px)}.profiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.hero{padding-top:88px}.footer-row{flex-direction:column;text-align:center}.profile-info{padding:11px}.profile-bio{display:none}}
+    @media(max-width:760px){.page{width:min(100% - 24px,640px)}.profiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.hero{padding-top:88px}.footer-row{flex-direction:column;text-align:center}.profile-info{height:84px;padding:11px}.profile-bio{height:30px;font-size:11px;line-height:1.35}}
     @media(max-width:420px){.h1{font-size:31px}.btn{padding:9px 15px}.profile-name{font-size:13px}.online span:last-child{display:none}}
   </style>
 </head>
@@ -712,7 +715,7 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
 
     <section class="profiles-section page" aria-labelledby="profiles-title">
       <div class="profiles">
-        ${profileCards.map((card) => `<article class="profile-card" style="--profile-bg:${escapeHtml(card.gradient)}">
+        ${profileCards.map((card) => `<a class="profile-card" href="/registro/" aria-label="Unirme para ver perfil ${escapeHtml(card.display_label || 'privado')}" style="--profile-bg:${escapeHtml(card.gradient)}">
           <div class="profile-frame">
             ${card.image_url ? `<img src="${escapeHtml(card.image_url)}" alt="Perfil ${escapeHtml(card.display_label || 'privado')}" class="profile-image" loading="lazy" referrerpolicy="no-referrer">` : `<div class="profile-image" aria-hidden="true"></div>`}
             <div class="profile-overlay"></div>
@@ -724,10 +727,9 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
                 <span>${escapeHtml(card.location || page.location)}</span>
               </div>
               <p class="profile-bio">${escapeHtml(card.bio)}</p>
-              <span class="profile-cta">Ver Perfil</span>
             </div>
           </div>
-        </article>`).join('\n        ')}
+        </a>`).join('\n        ')}
       </div>
       <div class="more">
         <a class="btn" href="/registro/">
