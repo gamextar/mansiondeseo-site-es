@@ -11,6 +11,7 @@ import { loadIntentKeywordPages } from './seo-intent-keywords.mjs';
 const DIST_DIR = path.resolve('dist');
 const redirectsPath = path.join(DIST_DIR, '_redirects');
 const seoStatsPath = path.resolve('data/seo/seo-city-stats.json');
+const landingProfileCardsPath = path.resolve('data/seo/landing-profile-cards.json');
 
 const STATIC_SEO_VARIANTS = SEO_BASE_INTENTS.map(([variant]) => variant);
 const GEO_PAGES = getGeoPagesForLocale(DEFAULT_SEO_LOCALE);
@@ -55,6 +56,18 @@ const PROFILE_NAMES = {
   default: ['Camila', 'Valentina', 'Sofia', 'Lucia', 'Martina', 'Julieta', 'Agustina', 'Florencia'],
 };
 const PROFILE_MOODS = ['Discreta', 'Selectiva', 'Nueva', 'Verificada', 'Activa', 'Afinidad alta'];
+const ROLE_GROUPS = {
+  hombre: ['hombre'],
+  mujer: ['mujer'],
+  mujeres: ['mujer'],
+  pareja: ['pareja', 'pareja_hombres', 'pareja_mujeres'],
+  parejas: ['pareja', 'pareja_hombres', 'pareja_mujeres'],
+  swingers: ['pareja', 'pareja_hombres', 'pareja_mujeres', 'mujer'],
+  cornudos: ['pareja', 'pareja_hombres', 'pareja_mujeres', 'hombre', 'mujer'],
+  cuckold: ['pareja', 'pareja_hombres', 'pareja_mujeres', 'hombre', 'mujer'],
+  trios: ['mujer', 'hombre', 'pareja', 'pareja_hombres', 'pareja_mujeres'],
+  contactossex: ['mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'hombre'],
+};
 
 function escapeHtml(value = '') {
   return String(value)
@@ -146,10 +159,13 @@ function buildIntentIntro(page) {
 }
 
 function buildIntentProfileCards(page) {
+  const dbCards = selectLandingProfileCards(page, 15);
+  if (dbCards.length >= 15) return dbCards;
+
   const random = seededRandom(hashString(page.slug));
   const key = intentKey(`${page.intent} ${page.term}`);
   const names = PROFILE_NAMES[key] || PROFILE_NAMES.default;
-  return Array.from({ length: 12 }, (_, index) => {
+  return Array.from({ length: 15 }, (_, index) => {
     const name = `${pickFrom(names, random)}${index >= names.length ? ` ${index + 1}` : ''}`;
     const age = 24 + Math.floor(random() * 22);
     const distance = page.location === 'Argentina'
@@ -163,9 +179,59 @@ function buildIntentProfileCards(page) {
       age,
       distance,
       mood,
+      location: page.location,
+      bio: 'Perfil privado con acceso completo solo para usuarios registrados.',
+      image_url: '',
+      online: random() > 0.55,
       gradient: `linear-gradient(135deg,hsl(${hueA} 48% 24%),hsl(${hueB} 48% 34%))`,
     };
   });
+}
+
+function roleMatchesIntent(card, page) {
+  const key = intentKey(`${page.intent} ${page.term}`);
+  const allowed = ROLE_GROUPS[key] || ROLE_GROUPS[normalizeRoleVariant(page.intent)] || [];
+  return allowed.length === 0 || allowed.includes(String(card?.role || ''));
+}
+
+function locationScore(card, page) {
+  const wanted = String(page.location || '').toLowerCase();
+  if (!wanted || wanted === 'argentina') return 0;
+  const values = [card.location, card.city, card.locality].map((value) => String(value || '').toLowerCase());
+  return values.some((value) => value && (value.includes(wanted) || wanted.includes(value))) ? 2 : 0;
+}
+
+function selectLandingProfileCards(page, limit = 12) {
+  const availableCards = Array.isArray(landingProfileCards?.cards) ? landingProfileCards.cards : [];
+  if (availableCards.length === 0) return [];
+  const seed = hashString(`landing-cards:${page.slug}:${availableCards.length}`);
+  const ranked = availableCards
+    .filter((card) => card?.name && card?.image_url && roleMatchesIntent(card, page))
+    .map((card) => ({
+      card,
+      score: locationScore(card, page) + Math.min(Number(card.feed_priority || 0), 5),
+    }));
+  const fallback = availableCards
+    .filter((card) => card?.name && card?.image_url)
+    .map((card) => ({ card, score: locationScore(card, page) }));
+  const selected = (ranked.length >= limit ? ranked : [...ranked, ...fallback])
+    .sort((left, right) => right.score - left.score)
+    .slice(0, Math.max(limit * 4, limit));
+  return shuffleDeterministic(selected, seed)
+    .slice(0, limit)
+    .map(({ card }, index) => ({
+      name: card.name,
+      age: Number.isFinite(Number(card.age)) ? Number(card.age) : '',
+      location: card.locality || card.city || card.location || page.location,
+      bio: card.bio || 'Perfil privado con acceso completo solo para usuarios registrados.',
+      image_url: card.image_url,
+      online: index % 3 === 0 || Number(card.feed_priority || 0) > 0,
+      verified: Number(card.verified || 0) ? 1 : 0,
+      premium: Number(card.premium || 0) ? 1 : 0,
+      distance: `${2 + ((hashString(`${page.slug}:${card.id || card.name}`) % 28))} km`,
+      mood: Number(card.premium || 0) ? 'VIP' : Number(card.verified || 0) ? 'Verificada' : 'Activa',
+      gradient: 'linear-gradient(135deg,#3d1a1a,#8b2525)',
+    }));
 }
 
 function buildIntentCrossLinks(page, intentKeywordPages) {
@@ -535,7 +601,7 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
   ];
 
   return `<!doctype html>
-<html lang="${escapeHtml(locale.language)}" style="background:#000;color-scheme:dark">
+<html lang="${escapeHtml(locale.language)}" style="background:#1a0a0a;color-scheme:dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -556,86 +622,79 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
   <meta property="og:locale" content="${escapeHtml(locale.hreflang.replace('-', '_'))}" />
   <script type="application/ld+json">${escapeJsonScript(structuredData)}</script>
   <style>
-    :root{--bg:#000;--ink:#f4f4f4;--muted:rgba(244,244,244,.68);--dim:rgba(244,244,244,.46);--line:rgba(244,244,244,.12);--gold:#c5a059;--panel:#090909;--panel2:#111;--danger:#6f1730}
-    *{box-sizing:border-box}html{background:var(--bg);scroll-behavior:smooth}body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:Inter,Montserrat,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit;text-decoration:none}.page{width:min(1180px,calc(100% - 32px));margin:0 auto}.nav{display:flex;align-items:center;justify-content:space-between;padding:24px 0}.brand{display:flex;align-items:center;gap:12px}.brand-mark{display:grid;place-items:center;width:36px;height:36px;border:1px solid rgba(197,160,89,.34);color:var(--gold);font-family:Georgia,"Times New Roman",serif}.brand strong{font-family:Georgia,"Times New Roman",serif;font-weight:500;font-size:20px}.nav-actions{display:flex;align-items:center;gap:10px}.btn{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:12px 18px;border:1px solid var(--line);font-size:13px;font-weight:600}.btn.gold{border-color:rgba(197,160,89,.62);background:var(--gold);color:#090704}.hero{padding:72px 0 58px;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:42px;align-items:end}.eyebrow{display:inline-flex;color:var(--gold);font-size:12px;letter-spacing:.14em;text-transform:uppercase}.h1{margin:20px 0 0;max-width:860px;font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,8vw,92px);font-weight:400;line-height:.94;letter-spacing:-.035em}.lead{margin:24px 0 0;max-width:760px;color:var(--muted);font-size:18px;line-height:1.75}.hero-card{border:1px solid rgba(197,160,89,.22);background:linear-gradient(180deg,rgba(197,160,89,.08),rgba(255,255,255,.025));padding:24px}.hero-card p{margin:0;color:var(--muted);line-height:1.7}.metric-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px}.metric{border-top:1px solid var(--line);padding-top:14px}.metric strong{display:block;color:var(--ink);font-size:22px;font-family:Georgia,"Times New Roman",serif;font-weight:400}.metric span{display:block;margin-top:4px;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.1em}.intro{padding:30px 0 66px}.intro-text{max-width:920px;color:rgba(244,244,244,.74);font-size:16px;line-height:1.9;white-space:pre-line}.section-head{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:22px}.section-head h2{margin:0;font-family:Georgia,"Times New Roman",serif;font-size:34px;font-weight:400}.section-head p{margin:0;max-width:460px;color:var(--dim);font-size:14px;line-height:1.7}.profiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.profile-card{appearance:none;border:1px solid var(--line);background:var(--panel);color:inherit;text-align:left;padding:0;overflow:hidden;cursor:pointer}.profile-photo{height:210px;background:var(--profile-bg);filter:blur(8px);transform:scale(1.04);transition:filter .3s ease,transform .3s ease}.profile-card:hover .profile-photo,.profile-card:focus-visible .profile-photo,.profile-card.is-visible .profile-photo{filter:blur(0);transform:scale(1)}.profile-body{padding:14px}.profile-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.profile-name{font-weight:600}.profile-age{color:var(--gold);font-size:13px}.profile-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;color:var(--dim);font-size:12px}.privacy-note{margin-top:18px;color:var(--dim);font-size:12px;line-height:1.7}.links-section{padding:76px 0}.links-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.link-card{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));min-height:118px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;transition:border-color .2s ease,transform .2s ease}.link-card:hover{border-color:rgba(197,160,89,.48);transform:translateY(-2px)}.link-card span{color:var(--gold);font-size:11px;letter-spacing:.12em;text-transform:uppercase}.link-card strong{font-family:Georgia,"Times New Roman",serif;font-size:18px;font-weight:400;line-height:1.2}.cta-band{border-top:1px solid var(--line);padding:42px 0 54px;display:flex;align-items:center;justify-content:space-between;gap:20px}.cta-band p{margin:0;color:var(--muted);line-height:1.6}.foot{padding:26px 0 34px;border-top:1px solid var(--line);color:var(--dim);font-size:12px}@media(max-width:980px){.hero{grid-template-columns:1fr;padding-top:48px}.profiles{grid-template-columns:repeat(2,minmax(0,1fr))}.links-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cta-band{align-items:flex-start;flex-direction:column}}@media(max-width:560px){.page{width:min(100% - 24px,520px)}.nav{padding:18px 0}.nav-actions .btn:first-child{display:none}.hero{padding:38px 0 42px}.h1{font-size:42px}.lead{font-size:16px}.hero-card{padding:18px}.profiles{grid-template-columns:1fr 1fr;gap:10px}.profile-photo{height:152px}.profile-body{padding:11px}.links-grid{grid-template-columns:1fr}.section-head{display:block}.section-head p{margin-top:10px}}
+    :root{--bg:#1a0a0a;--card:#241010;--border:#3d1a1a;--gold:#d4a853;--gold-hover:#e6bc6a;--red:#8b2525;--muted:#a89080;--text:#f5f0e8}
+    *{box-sizing:border-box}html{background:var(--bg);scroll-behavior:smooth}body{margin:0;min-height:100vh;background:radial-gradient(circle at top,rgba(139,37,37,.18),transparent 34rem),var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}a{color:inherit;text-decoration:none}.page{width:min(1280px,calc(100% - 32px));margin:0 auto}.site-header{position:fixed;top:0;left:0;right:0;z-index:50;border-bottom:1px solid rgba(61,26,26,.5);background:rgba(26,10,10,.8);backdrop-filter:blur(14px)}.nav{height:56px;display:flex;align-items:center;justify-content:space-between}.brand{font-family:"Playfair Display",Georgia,serif;font-size:20px;font-weight:600;color:var(--gold)}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;border:1px solid rgba(61,26,26,.75);padding:10px 18px;font-size:14px;font-weight:600;color:var(--muted);transition:color .2s,border-color .2s,background .2s,box-shadow .2s}.btn:hover{border-color:var(--gold);color:var(--gold)}.btn.gold{border-color:transparent;background:var(--gold);color:var(--bg);box-shadow:0 0 20px rgba(212,168,83,.15)}.btn.gold:hover{background:var(--gold-hover);color:var(--bg);box-shadow:0 0 30px rgba(212,168,83,.25)}.hero{padding:96px 0 30px;text-align:center}.h1{max-width:920px;margin:0 auto 16px;font-family:"Playfair Display",Georgia,serif;font-size:clamp(32px,5vw,58px);line-height:1.08;font-weight:600}.lead{max-width:760px;margin:0 auto 24px;color:var(--muted);font-size:clamp(16px,2vw,19px);line-height:1.65}.profiles-section{padding:32px 0}.profiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}.profile-card{position:relative;display:block;overflow:hidden;border:1px solid rgba(61,26,26,.5);border-radius:14px;background:var(--card);box-shadow:0 0 20px rgba(212,168,83,.12);cursor:pointer;transition:box-shadow .2s,border-color .2s,transform .2s}.profile-card:hover,.profile-card.is-visible{border-color:rgba(212,168,83,.42);box-shadow:0 0 30px rgba(212,168,83,.23);transform:translateY(-2px)}.profile-frame{position:relative;aspect-ratio:3/4;overflow:hidden}.profile-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:var(--profile-bg);filter:blur(12px);transform:scale(1.06);transition:filter .4s ease-out,transform .4s ease-out}.profile-card:hover .profile-image{filter:blur(2px);transform:scale(1.05)}.profile-card.is-visible .profile-image{filter:blur(0);transform:scale(1.02)}.profile-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(26,10,10,.95) 0%,rgba(26,10,10,.6) 48%,transparent 100%)}.online{position:absolute;top:9px;right:9px;display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:rgba(26,10,10,.72);backdrop-filter:blur(8px);padding:5px 8px;font-size:11px}.online-dot{width:7px;height:7px;border-radius:999px;background:#22c55e;box-shadow:0 0 12px rgba(34,197,94,.75)}.profile-info{position:absolute;left:0;right:0;bottom:0;padding:13px}.profile-name{margin:0 0 4px;font-size:14px;font-weight:600}.profile-meta{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:12px}.profile-bio{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:8px 0 0;color:rgba(168,144,128,.84);font-size:12px;line-height:1.35}.profile-cta{display:inline-flex;margin-top:10px;border-radius:999px;background:rgba(212,168,83,.92);color:var(--bg);padding:6px 12px;font-size:12px;font-weight:600;opacity:0;transition:opacity .3s}.profile-card:hover .profile-cta,.profile-card.is-visible .profile-cta{opacity:1}.more{text-align:center;margin-top:30px}.seo-copy{border-top:1px solid rgba(61,26,26,.35);padding:42px 0 10px}.seo-copy-inner{max-width:920px;margin:0 auto;color:rgba(168,144,128,.9);font-size:15px;line-height:1.9;white-space:pre-line;text-align:left}.pills-section{border-top:1px solid rgba(61,26,26,.35);padding:42px 0}.pills-title{margin:0 0 20px;text-align:center;font-family:"Playfair Display",Georgia,serif;font-size:22px;font-weight:500}.pills{display:flex;flex-wrap:wrap;justify-content:center;gap:9px}.seo-pill{border:1px solid rgba(61,26,26,.7);border-radius:999px;padding:10px 16px;color:var(--muted);font-size:14px;transition:all .2s}.seo-pill:hover{background:var(--border);border-color:var(--gold);color:var(--gold)}.footer{border-top:1px solid rgba(61,26,26,.35);padding:24px 0;color:var(--muted);font-size:14px}.footer-row{display:flex;justify-content:space-between;align-items:center;gap:16px}.footer-links{display:flex;gap:16px;flex-wrap:wrap}.footer a:hover{color:var(--gold)}@media(max-width:1024px){.profiles{grid-template-columns:repeat(4,minmax(0,1fr))}}@media(max-width:760px){.page{width:min(100% - 24px,640px)}.profiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.hero{padding-top:88px}.footer-row{flex-direction:column;text-align:center}.profile-info{padding:11px}.profile-bio{display:none}}@media(max-width:420px){.h1{font-size:31px}.btn{padding:9px 15px}.profile-name{font-size:13px}.online span:last-child{display:none}}
   </style>
 </head>
 <body>
-  <main class="page">
-    <nav class="nav" aria-label="Principal">
-      <a class="brand" href="/">
-        <span class="brand-mark">M</span>
-        <strong>Mansión Deseo</strong>
-      </a>
-      <div class="nav-actions">
-        <a class="btn" href="/login/">Entrar</a>
-        <a class="btn gold" href="/registro/">Solicitar acceso</a>
-      </div>
+  <header class="site-header">
+    <nav class="page nav" aria-label="Principal">
+      <a class="brand" href="/">Mansión Deseo</a>
+      <a class="btn gold" href="/registro/">Entrar</a>
     </nav>
+  </header>
 
-    <section class="hero">
-      <div>
-        <span class="eyebrow">Búsqueda privada · ${escapeHtml(page.location)}</span>
-        <h1 class="h1">${escapeHtml(headline)}</h1>
-        <p class="lead">${escapeHtml(description)}</p>
-      </div>
-      <aside class="hero-card">
-        <p>Vista pública pensada para quienes buscan ${escapeHtml(page.term)} con una experiencia discreta, rápida y protegida.</p>
-        <div class="metric-row">
-          <div class="metric"><strong>12</strong><span>previews</span></div>
-          <div class="metric"><strong>+18</strong><span>privado</span></div>
-          <div class="metric"><strong>VIP</strong><span>opcional</span></div>
-        </div>
-      </aside>
+  <main>
+    <section class="hero page">
+      <h1 class="h1">${escapeHtml(headline)}</h1>
+      <p class="lead">${escapeHtml(description)}</p>
+      <a class="btn gold" href="/registro/">
+        Unirse a la Mansión
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </a>
     </section>
 
-    <section class="intro">
-      <div class="intro-text">${escapeHtml(intro)}</div>
-    </section>
-
-    <section aria-labelledby="profiles-title">
-      <div class="section-head">
-        <h2 id="profiles-title">Perfiles destacados</h2>
-        <p>Las fotos se muestran protegidas en la vista pública. Al interactuar, la imagen se revela suavemente como muestra visual de la experiencia privada.</p>
-      </div>
+    <section class="profiles-section page" aria-labelledby="profiles-title">
       <div class="profiles">
-        ${profileCards.map((card) => `<button class="profile-card" type="button" data-profile-card style="--profile-bg:${escapeHtml(card.gradient)}">
-          <div class="profile-photo" aria-hidden="true"></div>
-          <div class="profile-body">
-            <div class="profile-top">
-              <span class="profile-name">${escapeHtml(card.name)}</span>
-              <span class="profile-age">${card.age}</span>
-            </div>
-            <div class="profile-meta">
-              <span>${escapeHtml(card.distance)}</span>
-              <span>${escapeHtml(card.mood)}</span>
+        ${profileCards.map((card) => `<article class="profile-card" data-profile-card style="--profile-bg:${escapeHtml(card.gradient)}">
+          <div class="profile-frame">
+            ${card.image_url ? `<img src="${escapeHtml(card.image_url)}" alt="Perfil de ${escapeHtml(card.name)}" class="profile-image" loading="lazy" referrerpolicy="no-referrer">` : `<div class="profile-image" aria-hidden="true"></div>`}
+            <div class="profile-overlay"></div>
+            ${card.online ? `<div class="online"><span class="online-dot"></span><span>En línea</span></div>` : ''}
+            <div class="profile-info">
+              <h2 class="profile-name">${escapeHtml(card.name)}${card.age ? `, ${escapeHtml(card.age)}` : ''}</h2>
+              <div class="profile-meta">
+                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0Z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                <span>${escapeHtml(card.location || page.location)}</span>
+              </div>
+              <p class="profile-bio">${escapeHtml(card.bio)}</p>
+              <span class="profile-cta">Ver Perfil</span>
             </div>
           </div>
-        </button>`).join('\n        ')}
+        </article>`).join('\n        ')}
       </div>
-      <p class="privacy-note">Previews públicos de estilo editorial. Los perfiles completos, fotos reales, mensajes y filtros avanzados quedan disponibles únicamente dentro de Mansión Deseo para usuarios registrados.</p>
-    </section>
-
-    <section class="links-section" aria-labelledby="related-title">
-      <div class="section-head">
-        <h2 id="related-title">También podés explorar</h2>
-        <p>Navegación cruzada para búsquedas relacionadas y señales internas más claras.</p>
-      </div>
-      <div class="links-grid">
-        ${crossLinks.map((item) => `<a class="link-card" href="${escapeHtml(item.routePath)}">
-          <span>Explorar</span>
-          <strong>${escapeHtml(item.titleTerm)}</strong>
-        </a>`).join('\n        ')}
+      <div class="more">
+        <a class="btn" href="/registro/">
+          Ver más perfiles
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7"/></svg>
+        </a>
       </div>
     </section>
 
-    <section class="cta-band">
-      <p>Para ver perfiles completos y conectar con usuarios reales, creá una cuenta privada.</p>
-      <a class="btn gold" href="/registro/">Crear cuenta</a>
+    <section class="seo-copy page" aria-label="Información sobre ${escapeHtml(page.term)}">
+      <div class="seo-copy-inner">${escapeHtml(intro)}</div>
     </section>
 
-    <footer class="foot">Mansión Deseo · Comunidad privada para adultos registrados · ${escapeHtml(page.term)}</footer>
+    <section class="pills-section page" aria-labelledby="related-title">
+      <h2 class="pills-title" id="related-title">Explora más en la Mansión</h2>
+      <div class="pills">
+        ${crossLinks.map((item) => `<a class="seo-pill" href="${escapeHtml(item.routePath)}">${escapeHtml(item.titleTerm)}</a>`).join('\n        ')}
+      </div>
+    </section>
   </main>
+
+  <footer class="footer">
+    <div class="page footer-row">
+      <div><strong style="color:var(--gold);font-family:Playfair Display,Georgia,serif">Mansión Deseo</strong> · © 2026</div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/terminos/">Términos</a>
+        <a href="/privacidad/">Privacidad</a>
+        <a href="/ayuda/">Ayuda</a>
+        <a href="/registro/">Registro</a>
+      </nav>
+    </div>
+  </footer>
+
   <script>
     document.addEventListener('click', function(event) {
       var card = event.target.closest('[data-profile-card]');
@@ -703,6 +762,7 @@ const seoCityStats = JSON.parse(await readFile(seoStatsPath, 'utf8').catch(() =>
 const seoCityStatsBySlug = new Map(
   (Array.isArray(seoCityStats?.cities) ? seoCityStats.cities : []).map((entry) => [entry.city_slug, entry])
 );
+const landingProfileCards = JSON.parse(await readFile(landingProfileCardsPath, 'utf8').catch(() => '{"cards":[]}'));
 const intentKeywordPages = await loadIntentKeywordPages();
 
 await Promise.all([
