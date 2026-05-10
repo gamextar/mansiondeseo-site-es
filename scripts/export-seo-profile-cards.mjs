@@ -56,7 +56,6 @@ function publicLocation(row) {
 function mapRow(row) {
   const imageUrl = rowText(row, 'avatar_thumb_url') || rowText(row, 'avatar_url');
   return {
-    id: rowText(row, 'id'),
     name: rowText(row, 'username'),
     age: Number.isFinite(Number(row.age)) ? Number(row.age) : null,
     role: rowText(row, 'role'),
@@ -65,13 +64,10 @@ function mapRow(row) {
     locality: rowText(row, 'locality'),
     bio: compactBio(rowText(row, 'bio')) || 'Perfil privado con acceso completo solo para usuarios registrados.',
     image_url: imageUrl,
-    avatar_url: rowText(row, 'avatar_url'),
-    avatar_thumb_url: rowText(row, 'avatar_thumb_url'),
     verified: Number(row.verified || 0) ? 1 : 0,
     premium: Number(row.premium || 0) ? 1 : 0,
     fake: Number(row.fake || 0) ? 1 : 0,
     feed_priority: Math.max(0, Number(row.feed_priority || 0)),
-    last_active: rowText(row, 'last_active'),
   };
 }
 
