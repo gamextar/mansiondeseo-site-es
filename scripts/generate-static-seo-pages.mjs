@@ -621,12 +621,61 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
   <meta property="og:url" content="${escapeHtml(page.canonical)}" />
   <meta property="og:locale" content="${escapeHtml(locale.hreflang.replace('-', '_'))}" />
   <script type="application/ld+json">${escapeJsonScript(structuredData)}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root{--bg:#1a0a0a;--card:#241010;--border:#3d1a1a;--gold:#d4a853;--gold-hover:#e6bc6a;--red:#8b2525;--muted:#a89080;--text:#f5f0e8}
-    *{box-sizing:border-box}html{background:var(--bg);scroll-behavior:smooth}body{margin:0;min-height:100vh;background:radial-gradient(circle at top,rgba(139,37,37,.18),transparent 34rem),var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}a{color:inherit;text-decoration:none}.page{width:min(1280px,calc(100% - 32px));margin:0 auto}.site-header{position:fixed;top:0;left:0;right:0;z-index:50;border-bottom:1px solid rgba(61,26,26,.5);background:rgba(26,10,10,.8);backdrop-filter:blur(14px)}.nav{height:56px;display:flex;align-items:center;justify-content:space-between}.brand{font-family:"Playfair Display",Georgia,serif;font-size:20px;font-weight:600;color:var(--gold)}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;border:1px solid rgba(61,26,26,.75);padding:10px 18px;font-size:14px;font-weight:600;color:var(--muted);transition:color .2s,border-color .2s,background .2s,box-shadow .2s}.btn:hover{border-color:var(--gold);color:var(--gold)}.btn.gold{border-color:transparent;background:var(--gold);color:var(--bg);box-shadow:0 0 20px rgba(212,168,83,.15)}.btn.gold:hover{background:var(--gold-hover);color:var(--bg);box-shadow:0 0 30px rgba(212,168,83,.25)}.hero{padding:96px 0 30px;text-align:center}.h1{max-width:920px;margin:0 auto 16px;font-family:"Playfair Display",Georgia,serif;font-size:clamp(32px,5vw,58px);line-height:1.08;font-weight:600}.lead{max-width:760px;margin:0 auto 24px;color:var(--muted);font-size:clamp(16px,2vw,19px);line-height:1.65}.profiles-section{padding:32px 0}.profiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}.profile-card{position:relative;display:block;overflow:hidden;border:1px solid rgba(61,26,26,.5);border-radius:14px;background:var(--card);box-shadow:0 0 20px rgba(212,168,83,.12);cursor:pointer;transition:box-shadow .2s,border-color .2s,transform .2s}.profile-card:hover,.profile-card.is-visible{border-color:rgba(212,168,83,.42);box-shadow:0 0 30px rgba(212,168,83,.23);transform:translateY(-2px)}.profile-frame{position:relative;aspect-ratio:3/4;overflow:hidden}.profile-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:var(--profile-bg);filter:blur(12px);transform:scale(1.06);transition:filter .4s ease-out,transform .4s ease-out}.profile-card:hover .profile-image{filter:blur(2px);transform:scale(1.05)}.profile-card.is-visible .profile-image{filter:blur(0);transform:scale(1.02)}.profile-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(26,10,10,.95) 0%,rgba(26,10,10,.6) 48%,transparent 100%)}.online{position:absolute;top:9px;right:9px;display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:rgba(26,10,10,.72);backdrop-filter:blur(8px);padding:5px 8px;font-size:11px}.online-dot{width:7px;height:7px;border-radius:999px;background:#22c55e;box-shadow:0 0 12px rgba(34,197,94,.75)}.profile-info{position:absolute;left:0;right:0;bottom:0;padding:13px}.profile-name{margin:0 0 4px;font-size:14px;font-weight:600}.profile-meta{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:12px}.profile-bio{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:8px 0 0;color:rgba(168,144,128,.84);font-size:12px;line-height:1.35}.profile-cta{display:inline-flex;margin-top:10px;border-radius:999px;background:rgba(212,168,83,.92);color:var(--bg);padding:6px 12px;font-size:12px;font-weight:600;opacity:0;transition:opacity .3s}.profile-card:hover .profile-cta,.profile-card.is-visible .profile-cta{opacity:1}.more{text-align:center;margin-top:30px}.seo-copy{border-top:1px solid rgba(61,26,26,.35);padding:42px 0 10px}.seo-copy-inner{max-width:920px;margin:0 auto;color:rgba(168,144,128,.9);font-size:15px;line-height:1.9;white-space:pre-line;text-align:left}.pills-section{border-top:1px solid rgba(61,26,26,.35);padding:42px 0}.pills-title{margin:0 0 20px;text-align:center;font-family:"Playfair Display",Georgia,serif;font-size:22px;font-weight:500}.pills{display:flex;flex-wrap:wrap;justify-content:center;gap:9px}.seo-pill{border:1px solid rgba(61,26,26,.7);border-radius:999px;padding:10px 16px;color:var(--muted);font-size:14px;transition:all .2s}.seo-pill:hover{background:var(--border);border-color:var(--gold);color:var(--gold)}.footer{border-top:1px solid rgba(61,26,26,.35);padding:24px 0;color:var(--muted);font-size:14px}.footer-row{display:flex;justify-content:space-between;align-items:center;gap:16px}.footer-links{display:flex;gap:16px;flex-wrap:wrap}.footer a:hover{color:var(--gold)}@media(max-width:1024px){.profiles{grid-template-columns:repeat(4,minmax(0,1fr))}}@media(max-width:760px){.page{width:min(100% - 24px,640px)}.profiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.hero{padding-top:88px}.footer-row{flex-direction:column;text-align:center}.profile-info{padding:11px}.profile-bio{display:none}}@media(max-width:420px){.h1{font-size:31px}.btn{padding:9px 15px}.profile-name{font-size:13px}.online span:last-child{display:none}}
+    *{box-sizing:border-box}
+    html{background:var(--bg);scroll-behavior:smooth}
+    body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+    a{color:inherit;text-decoration:none}
+    .page{width:min(1280px,calc(100% - 32px));margin:0 auto}
+    .site-header{position:fixed;top:0;left:0;right:0;z-index:50;border-bottom:1px solid rgba(61,26,26,.5);background:rgba(26,10,10,.8);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+    .nav{height:56px;display:flex;align-items:center;justify-content:space-between}
+    .brand{font-family:"Playfair Display",Georgia,serif;font-size:20px;font-weight:600;color:var(--gold)}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;border:1px solid rgba(61,26,26,.75);padding:10px 18px;font-size:14px;font-weight:600;color:var(--muted);transition:color .2s,border-color .2s,background .2s,box-shadow .2s}
+    .btn:hover{border-color:var(--gold);color:var(--gold)}
+    .btn.gold{border-color:transparent;background:var(--gold);color:var(--bg);box-shadow:0 0 20px rgba(212,168,83,.15)}
+    .btn.gold:hover{background:var(--gold-hover);color:var(--bg);box-shadow:0 0 30px rgba(212,168,83,.25)}
+    .hero{padding:96px 0 32px;text-align:center}
+    .h1{max-width:920px;margin:0 auto 16px;font-family:"Playfair Display",Georgia,serif;font-size:clamp(32px,5vw,58px);line-height:1.08;font-weight:600}
+    .lead{max-width:760px;margin:0 auto 24px;color:var(--muted);font-size:clamp(16px,2vw,19px);line-height:1.65}
+    .profiles-section{padding:32px 0}
+    .profiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}
+    .profile-card{position:relative;display:block;overflow:hidden;border:1px solid rgba(61,26,26,.5);border-radius:12px;background:var(--card);box-shadow:0 0 20px rgba(212,168,83,.15);cursor:pointer;transition:box-shadow .2s,border-color .2s,transform .2s}
+    .profile-card:hover,.profile-card.is-visible{border-color:rgba(212,168,83,.45);box-shadow:0 0 30px rgba(212,168,83,.25);transform:translateY(-2px)}
+    .profile-card:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+    .profile-frame{position:relative;aspect-ratio:3/4;overflow:hidden}
+    .profile-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:var(--profile-bg);filter:blur(8px);transform:scale(1.035);transition:filter .4s ease-out,transform .4s ease-out}
+    .profile-card:hover .profile-image,.profile-card.is-visible .profile-image{filter:blur(0);transform:scale(1.05)}
+    .profile-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(26,10,10,.95) 0%,rgba(26,10,10,.6) 50%,transparent 100%)}
+    .online{position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:rgba(26,10,10,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:5px 8px;font-size:11px}
+    .online-dot{width:8px;height:8px;border-radius:999px;background:#22c55e;box-shadow:0 0 12px rgba(34,197,94,.75)}
+    .profile-info{position:absolute;left:0;right:0;bottom:0;padding:13px}
+    .profile-name{margin:0 0 4px;font-size:14px;font-weight:600}
+    .profile-meta{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:12px}
+    .profile-bio{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:8px 0 0;color:rgba(168,144,128,.84);font-size:12px;line-height:1.35}
+    .profile-cta{display:inline-flex;margin-top:10px;border-radius:999px;background:rgba(212,168,83,.92);color:var(--bg);padding:6px 12px;font-size:12px;font-weight:600;opacity:0;transition:opacity .3s}
+    .profile-card:hover .profile-cta,.profile-card.is-visible .profile-cta{opacity:1}
+    .more{text-align:center;margin-top:30px}
+    .seo-copy{border-top:1px solid rgba(61,26,26,.35);padding:42px 0 10px}
+    .seo-copy-inner{max-width:920px;margin:0 auto;color:rgba(168,144,128,.9);font-size:15px;line-height:1.9;white-space:pre-line;text-align:left}
+    .pills-section{border-top:1px solid rgba(61,26,26,.35);padding:42px 0}
+    .pills-title{margin:0 0 20px;text-align:center;font-family:"Playfair Display",Georgia,serif;font-size:22px;font-weight:500}
+    .pills{display:flex;flex-wrap:wrap;justify-content:center;gap:9px}
+    .seo-pill{border:1px solid rgba(61,26,26,.7);border-radius:999px;padding:10px 16px;color:var(--muted);font-size:14px;transition:all .2s}
+    .seo-pill:hover{background:var(--border);border-color:var(--gold);color:var(--gold)}
+    .footer{border-top:1px solid rgba(61,26,26,.35);padding:24px 0;color:var(--muted);font-size:14px}
+    .footer-row{display:flex;justify-content:space-between;align-items:center;gap:16px}
+    .footer-links{display:flex;gap:16px;flex-wrap:wrap}
+    .footer a:hover{color:var(--gold)}
+    @media(max-width:1024px){.profiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+    @media(max-width:760px){.page{width:min(100% - 24px,640px)}.profiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.hero{padding-top:88px}.footer-row{flex-direction:column;text-align:center}.profile-info{padding:11px}.profile-bio{display:none}}
+    @media(max-width:420px){.h1{font-size:31px}.btn{padding:9px 15px}.profile-name{font-size:13px}.online span:last-child{display:none}}
   </style>
 </head>
-<body>
+<body class="font-sans antialiased min-h-screen">
   <header class="site-header">
     <nav class="page nav" aria-label="Principal">
       <a class="brand" href="/">Mansión Deseo</a>
@@ -646,7 +695,7 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
 
     <section class="profiles-section page" aria-labelledby="profiles-title">
       <div class="profiles">
-        ${profileCards.map((card) => `<article class="profile-card" data-profile-card style="--profile-bg:${escapeHtml(card.gradient)}">
+        ${profileCards.map((card) => `<article class="profile-card" data-profile-card tabindex="0" role="button" aria-label="Ver perfil de ${escapeHtml(card.name)}" style="--profile-bg:${escapeHtml(card.gradient)}">
           <div class="profile-frame">
             ${card.image_url ? `<img src="${escapeHtml(card.image_url)}" alt="Perfil de ${escapeHtml(card.name)}" class="profile-image" loading="lazy" referrerpolicy="no-referrer">` : `<div class="profile-image" aria-hidden="true"></div>`}
             <div class="profile-overlay"></div>
@@ -699,7 +748,14 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
     document.addEventListener('click', function(event) {
       var card = event.target.closest('[data-profile-card]');
       if (!card) return;
-      card.classList.toggle('is-visible');
+      card.classList.add('is-visible');
+    });
+    document.addEventListener('keydown', function(event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      var card = event.target.closest('[data-profile-card]');
+      if (!card) return;
+      event.preventDefault();
+      card.classList.add('is-visible');
     });
   </script>
 </body>
