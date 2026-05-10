@@ -9,7 +9,6 @@ const appPath = path.join(appDir, 'index.html');
 const notFoundPath = path.join(DIST_DIR, '404.html');
 const headersPath = path.join(DIST_DIR, '_headers');
 const redirectsPath = path.join(DIST_DIR, '_redirects');
-const sitemapPath = path.join(DIST_DIR, 'sitemap.xml');
 
 const appRoutes = new Set([
   'admin',
@@ -45,18 +44,6 @@ const appRoutes = new Set([
   'videos',
   'vip',
 ]);
-
-async function addSitemapRoutes() {
-  try {
-    const sitemap = await readFile(sitemapPath, 'utf8');
-    for (const match of sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)) {
-      const route = new URL(match[1]).pathname.replace(/^\/+|\/+$/g, '');
-      if (route) appRoutes.add(route);
-    }
-  } catch {
-    // The build can run without a sitemap in local experiments.
-  }
-}
 
 async function writeAppRoute(route, html) {
   const routeDir = path.join(DIST_DIR, ...route.split('/'));
@@ -136,7 +123,6 @@ function buildNotFoundHtml() {
 const appHtml = await readFile(indexPath, 'utf8');
 await mkdir(appDir, { recursive: true });
 await rename(indexPath, appPath);
-await addSitemapRoutes();
 await Promise.all([...appRoutes].map((route) => writeAppRoute(route, appHtml)));
 const prewarmAssetHrefs = collectAppAssetHrefs(appHtml);
 const ogLocale = SITE_LOCALE.replace('-', '_');

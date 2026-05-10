@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "seo:city-stats": "node scripts/build-seo-city-stats.mjs",
+    "seo:gsc": "node scripts/search-console-export.mjs",
     "check:media-cache": "node scripts/check-media-cache.mjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
     "import:placeholders": "node scripts/import-placeholders.mjs",
