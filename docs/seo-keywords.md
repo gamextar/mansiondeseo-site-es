@@ -1,6 +1,10 @@
 # Keywords SEO de intención
 
-El archivo editable es `data/seo/intent-keywords.json`.
+La forma más cómoda es editarlo desde el Admin CP en:
+
+`/admin/configuracion?section=seo`
+
+Ese editor guarda la estructura en `site_settings.seo_intent_keywords_json`. Para builds locales o como fallback, el archivo editable sigue siendo `data/seo/intent-keywords.json`.
 
 La forma recomendada es agrupar por categorías pilar y subcategorías:
 
@@ -61,6 +65,14 @@ Comandos:
 npm run build
 npm run seo:audit
 ```
+
+Si querés que un build lea lo guardado en el Admin CP, usá la URL como fuente:
+
+```bash
+SEO_INTENT_KEYWORDS_FILE="https://mansiondeseo.com/api/seo/intent-keywords" npm run build
+```
+
+Si configurás `SEO_BUILD_TOKEN` en el Worker, agregá `?token=...` a esa URL.
 
 Recomendación editorial:
 

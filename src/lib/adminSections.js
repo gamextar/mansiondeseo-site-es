@@ -11,6 +11,7 @@ import {
   Film,
   Clapperboard,
   Mail,
+  Search,
 } from 'lucide-react';
 
 export const ADMIN_SECTIONS = [
@@ -27,4 +28,5 @@ export const ADMIN_SECTIONS = [
   { key: 'videos', label: 'Videos', icon: Film },
   { key: 'encoder', label: 'Encoder', icon: Clapperboard },
   { key: 'email', label: 'Email (Resend)', icon: Mail },
+  { key: 'seo', label: 'SEO Keywords', icon: Search },
 ];

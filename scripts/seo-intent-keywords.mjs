@@ -111,6 +111,21 @@ function parseCsv(content = '') {
 }
 
 async function readKeywordFile(filePath) {
+  if (/^https?:\/\//i.test(String(filePath || ''))) {
+    const response = await fetch(filePath, {
+      headers: {
+        Accept: 'application/json,text/csv;q=0.9,*/*;q=0.1',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`No se pudo leer keywords SEO desde ${filePath}: HTTP ${response.status}`);
+    }
+    const content = await response.text();
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/csv') || String(filePath).toLowerCase().includes('.csv')) return parseCsv(content);
+    return flattenKeywordEntries(JSON.parse(content));
+  }
+
   try {
     const absolutePath = path.resolve(filePath);
     const content = await readFile(absolutePath, 'utf8');

@@ -243,6 +243,16 @@ function parseBooleanSetting(value, fallback = false) {
   return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
 }
 
+function parseJsonSetting(value, fallback = null) {
+  const raw = String(value || '').trim();
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
 function normalizeEmailAddress(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -7121,6 +7131,7 @@ async function loadSettings(env) {
     storyRailGapMobile: parseNumberSetting(settings.story_rail_gap_mobile, STORY_RAIL_FALLBACK_GAP_MOBILE),
     storyRailGapDesktop: parseNumberSetting(settings.story_rail_gap_desktop, STORY_RAIL_FALLBACK_GAP_DESKTOP),
     storyRailOwnStoryExtraGap: parseNumberSetting(settings.story_rail_own_story_extra_gap, STORY_RAIL_FALLBACK_OWN_EXTRA_GAP),
+    seoIntentKeywords: parseJsonSetting(settings.seo_intent_keywords_json, null),
   };
   // Keep module-level threshold in sync so isOnline() uses the latest value
   _onlineThresholdMs = result.onlineThresholdMinutes * 60_000;
@@ -7188,6 +7199,22 @@ async function handleGeoDefaults(request) {
     city: String(cf.city || '').trim(),
     region: String(cf.region || '').trim(),
   }, 200, {
+    'Cache-Control': 'no-store, max-age=0',
+  });
+}
+
+// ── GET /api/seo/intent-keywords ─────────────────────────
+async function handleGetSeoIntentKeywords(request, env) {
+  const expectedToken = String(env.SEO_BUILD_TOKEN || '').trim();
+  if (expectedToken) {
+    const url = new URL(request.url);
+    const token = String(url.searchParams.get('token') || request.headers.get('x-seo-build-token') || '').trim();
+    if (token !== expectedToken) return error('Acceso denegado', 403);
+  }
+
+  const raw = await getSiteSettingValue(env, 'seo_intent_keywords_json');
+  const parsed = parseJsonSetting(raw, { schema: 1, categories: [] });
+  return json(parsed, 200, {
     'Cache-Control': 'no-store, max-age=0',
   });
 }
@@ -7381,6 +7408,7 @@ async function handleUpdateSettings(request, env) {
     'story_rail_gap_mobile',
     'story_rail_gap_desktop',
     'story_rail_own_story_extra_gap',
+    'seo_intent_keywords_json',
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) {
@@ -13086,6 +13114,7 @@ async function handleRequest(request, env, ctx) {
   if (path === '/api/geo/defaults' && method === 'GET') return handleGeoDefaults(request);
   if (path === '/api/debug/cf-location' && method === 'GET') return handleDebugCfLocation(request);
   if (path === '/api/settings/public' && method === 'GET') return handleGetPublicSettings(request, env);
+  if (path === '/api/seo/intent-keywords' && method === 'GET') return handleGetSeoIntentKeywords(request, env);
   if (path === '/api/settings' && method === 'GET') return handleGetSettings(request, env);
   if (path === '/api/settings' && method === 'PUT') return handleUpdateSettings(request, env);
   if (path === '/api/client-errors' && method === 'POST') return handleClientErrorReport(request, env);

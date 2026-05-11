@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, Sliders, Eye, EyeOff, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail, Activity, Ban, Video } from 'lucide-react';
+import { ArrowLeft, Save, Sliders, Eye, EyeOff, Image, Crown, MessageCircle, Shield, Globe, Lock, DollarSign, Smartphone, Monitor, Smile, Gift, Plus, Trash2, CreditCard, Upload, User, Users, Heart, Navigation, Film, Clapperboard, Mail, Activity, Ban, Video, Search } from 'lucide-react';
 import { getSettings, updateSettings, adminGetGifts, adminCreateGift, adminDeleteGift, adminRemoveAllVip, adminResetAllCoins, adminGetStorySnapshots, adminRebuildStorySnapshots, adminGetProfileSnapshots, adminRebuildProfileSnapshots, uploadImage } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { getApiDebugSummary, resetApiDebugRoute, resetApiDebugSession, setApiDebugEnabled, subscribeApiDebug } from '../lib/api';
@@ -18,6 +18,7 @@ import {
   STANDALONE_BOTTOM_NAV_PAGE_EXTRA_PADDING,
   STANDALONE_BOTTOM_NAV_VISUAL_OFFSET,
 } from '../lib/bottomNavConfig';
+import defaultSeoKeywordsConfig from '../../data/seo/intent-keywords.json';
 
 const STORY_CIRCLE_FALLBACK_SIZE = 88;
 const STORY_CIRCLE_FALLBACK_BORDER_PERCENT = 4;
@@ -54,6 +55,85 @@ function renderConfiguredIcon(value, fallback) {
   if (!source) return fallback;
   if (source.startsWith('<')) return <span className="w-6 h-6" dangerouslySetInnerHTML={{ __html: source }} />;
   return <img src={source} alt="" className="w-6 h-6 object-contain" />;
+}
+
+function slugifyAdminSeo(value = '') {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, ' y ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function createSeoKeyword(seed = {}) {
+  const source = typeof seed === 'string' ? { term: seed } : seed || {};
+  const term = source.term || source.keyword || source.termino || '';
+  return {
+    ...source,
+    term,
+    location: source.location || source.localidad || '',
+    slug: source.slug || '',
+    enabled: source.enabled !== false,
+  };
+}
+
+function createSeoCategory() {
+  const suffix = Date.now().toString(36).slice(-5);
+  return {
+    id: `categoria-${suffix}`,
+    label: 'Nueva categoría',
+    intent: '',
+    keywords: [],
+    subcategories: [],
+  };
+}
+
+function createSeoSubcategory() {
+  const suffix = Date.now().toString(36).slice(-5);
+  return {
+    id: `subcategoria-${suffix}`,
+    label: 'Nueva subcategoría',
+    intent: '',
+    keywords: [],
+  };
+}
+
+function normalizeSeoKeywordConfig(input) {
+  const source = input && typeof input === 'object' ? input : defaultSeoKeywordsConfig;
+  return {
+    schema: Number(source.schema) || 1,
+    notes: source.notes || defaultSeoKeywordsConfig.notes || '',
+    categories: Array.isArray(source.categories)
+      ? source.categories.map((category, categoryIndex) => ({
+          id: String(category.id || slugifyAdminSeo(category.label) || `categoria-${categoryIndex + 1}`),
+          label: String(category.label || category.id || `Categoría ${categoryIndex + 1}`),
+          intent: String(category.intent || ''),
+          keywords: Array.isArray(category.keywords) ? category.keywords.map(createSeoKeyword) : [],
+          subcategories: Array.isArray(category.subcategories)
+            ? category.subcategories.map((subcategory, subcategoryIndex) => ({
+                id: String(subcategory.id || slugifyAdminSeo(subcategory.label) || `subcategoria-${subcategoryIndex + 1}`),
+                label: String(subcategory.label || subcategory.id || `Subcategoría ${subcategoryIndex + 1}`),
+                intent: String(subcategory.intent || ''),
+                keywords: Array.isArray(subcategory.keywords) ? subcategory.keywords.map(createSeoKeyword) : [],
+              }))
+            : [],
+        }))
+      : [],
+  };
+}
+
+function countSeoKeywords(config) {
+  return (config.categories || []).reduce((total, category) => {
+    const own = Array.isArray(category.keywords) ? category.keywords.length : 0;
+    const nested = (category.subcategories || []).reduce((sum, subcategory) => (
+      sum + (Array.isArray(subcategory.keywords) ? subcategory.keywords.length : 0)
+    ), 0);
+    return total + own + nested;
+  }, 0);
 }
 
 export default function SettingsPage() {
@@ -172,6 +252,9 @@ export default function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [mailFrom, setMailFrom] = useState('');
   const [registrationEmailBcc, setRegistrationEmailBcc] = useState('');
+
+  // SEO keywords
+  const [seoKeywordsConfig, setSeoKeywordsConfig] = useState(() => normalizeSeoKeywordConfig(defaultSeoKeywordsConfig));
 
   // Payment display
   const [paymentTitleVip, setPaymentTitleVip] = useState('Servicios Digitales');
@@ -353,6 +436,7 @@ export default function SettingsPage() {
         setResendApiKey(s.resendApiKey || '');
         setMailFrom(s.mailFrom || '');
         setRegistrationEmailBcc(s.registrationEmailBcc ?? 'registro@gamextar.com');
+        setSeoKeywordsConfig(normalizeSeoKeywordConfig(s.seoIntentKeywords || defaultSeoKeywordsConfig));
       })
       .catch(() => navigate('/inicio'))
       .finally(() => setLoading(false));
@@ -485,6 +569,8 @@ export default function SettingsPage() {
     setSaved(false);
     try {
       const committedMessageLimitWindowHours = normalizeMessageLimitWindowHours(messageLimitWindowHours);
+      const normalizedSeoKeywordsConfig = normalizeSeoKeywordConfig(seoKeywordsConfig);
+      setSeoKeywordsConfig(normalizedSeoKeywordsConfig);
       setMessageLimitWindowHours(committedMessageLimitWindowHours);
       const data = await updateSettings({
         blur_mobile: blurMobile,
@@ -574,6 +660,7 @@ export default function SettingsPage() {
         resend_api_key: resendApiKey,
         mail_from: mailFrom,
         registration_email_bcc: registrationEmailBcc,
+        seo_intent_keywords_json: JSON.stringify(normalizedSeoKeywordsConfig),
       });
       const s = data.settings;
       setBlurMobile(s.blurMobile);
@@ -662,6 +749,7 @@ export default function SettingsPage() {
       setResendApiKey(s.resendApiKey || '');
       setMailFrom(s.mailFrom || '');
       setRegistrationEmailBcc(s.registrationEmailBcc ?? 'registro@gamextar.com');
+      setSeoKeywordsConfig(normalizeSeoKeywordConfig(s.seoIntentKeywords || normalizedSeoKeywordsConfig));
       // Propagate to global context so dependent components update live
       const nextSiteSettings = { ...s, videoLimitBlur: nextVideoLimitBlur, chatImageBlur: nextChatImageBlur };
       setSiteSettings(nextSiteSettings);
@@ -683,6 +771,160 @@ export default function SettingsPage() {
 
   const activeSection = searchParams.get('section') || 'fotos';
   const sectionMeta = ADMIN_SECTIONS.find(s => s.key === activeSection) || ADMIN_SECTIONS[0];
+  const seoKeywordTotal = countSeoKeywords(seoKeywordsConfig);
+  const seoCategoryTotal = seoKeywordsConfig.categories?.length || 0;
+
+  const updateSeoCategory = (categoryIndex, patch) => {
+    setSeoKeywordsConfig((current) => ({
+      ...current,
+      categories: (current.categories || []).map((category, index) => (
+        index === categoryIndex ? { ...category, ...patch } : category
+      )),
+    }));
+  };
+
+  const addSeoCategory = () => {
+    setSeoKeywordsConfig((current) => ({
+      ...current,
+      categories: [...(current.categories || []), createSeoCategory()],
+    }));
+  };
+
+  const deleteSeoCategory = (categoryIndex) => {
+    setSeoKeywordsConfig((current) => ({
+      ...current,
+      categories: (current.categories || []).filter((_, index) => index !== categoryIndex),
+    }));
+  };
+
+  const updateSeoKeyword = (categoryIndex, keywordIndex, patch) => {
+    setSeoKeywordsConfig((current) => ({
+      ...current,
+      categories: (current.categories || []).map((category, index) => {
+        if (index !== categoryIndex) return category;
+        return {
+          ...category,
+          keywords: (category.keywords || []).map((keyword, innerIndex) => (
+            innerIndex === keywordIndex ? { ...keyword, ...patch } : keyword
+          )),
+        };
+      }),
+    }));
+  };
+
+  const addSeoKeyword = (categoryIndex) => {
+    setSeoKeywordsConfig((current) => ({
+      ...current,
+      categories: (current.categories || []).map((category, index) => (
+        index === categoryIndex
+          ? { ...category, keywords: [...(category.keywords || []), createSeoKeyword({ location: 'Argentina' })] }
+          : category
+      )),
+    }));
+  };
+
+  const deleteSeoKeyword = (categoryIndex, keywordIndex) => {
+    setSeoKeywordsConfig((current) => ({
+      ...current,
+      categories: (current.categories || []).map((category, index) => (
+        index === categoryIndex
+          ? { ...category, keywords: (category.keywords || []).filter((_, innerIndex) => innerIndex !== keywordIndex) }
+          : category
+      )),
+    }));
+  };
+
+  const updateSeoSubcategory = (categoryIndex, subcategoryIndex, patch) => {
+    setSeoKeywordsConfig((current) => ({
+      ...current,
+      categories: (current.categories || []).map((category, index) => {
+        if (index !== categoryIndex) return category;
+        return {
+          ...category,
+          subcategories: (category.subcategories || []).map((subcategory, innerIndex) => (
+            innerIndex === subcategoryIndex ? { ...subcategory, ...patch } : subcategory
+          )),
+        };
+      }),
+    }));
+  };
+
+  const addSeoSubcategory = (categoryIndex) => {
+    setSeoKeywordsConfig((current) => ({
+      ...current,
+      categories: (current.categories || []).map((category, index) => (
+        index === categoryIndex
+          ? { ...category, subcategories: [...(category.subcategories || []), createSeoSubcategory()] }
+          : category
+      )),
+    }));
+  };
+
+  const deleteSeoSubcategory = (categoryIndex, subcategoryIndex) => {
+    setSeoKeywordsConfig((current) => ({
+      ...current,
+      categories: (current.categories || []).map((category, index) => (
+        index === categoryIndex
+          ? { ...category, subcategories: (category.subcategories || []).filter((_, innerIndex) => innerIndex !== subcategoryIndex) }
+          : category
+      )),
+    }));
+  };
+
+  const updateSeoSubcategoryKeyword = (categoryIndex, subcategoryIndex, keywordIndex, patch) => {
+    setSeoKeywordsConfig((current) => ({
+      ...current,
+      categories: (current.categories || []).map((category, index) => {
+        if (index !== categoryIndex) return category;
+        return {
+          ...category,
+          subcategories: (category.subcategories || []).map((subcategory, innerIndex) => {
+            if (innerIndex !== subcategoryIndex) return subcategory;
+            return {
+              ...subcategory,
+              keywords: (subcategory.keywords || []).map((keyword, keywordInnerIndex) => (
+                keywordInnerIndex === keywordIndex ? { ...keyword, ...patch } : keyword
+              )),
+            };
+          }),
+        };
+      }),
+    }));
+  };
+
+  const addSeoSubcategoryKeyword = (categoryIndex, subcategoryIndex) => {
+    setSeoKeywordsConfig((current) => ({
+      ...current,
+      categories: (current.categories || []).map((category, index) => {
+        if (index !== categoryIndex) return category;
+        return {
+          ...category,
+          subcategories: (category.subcategories || []).map((subcategory, innerIndex) => (
+            innerIndex === subcategoryIndex
+              ? { ...subcategory, keywords: [...(subcategory.keywords || []), createSeoKeyword({ location: 'Argentina' })] }
+              : subcategory
+          )),
+        };
+      }),
+    }));
+  };
+
+  const deleteSeoSubcategoryKeyword = (categoryIndex, subcategoryIndex, keywordIndex) => {
+    setSeoKeywordsConfig((current) => ({
+      ...current,
+      categories: (current.categories || []).map((category, index) => {
+        if (index !== categoryIndex) return category;
+        return {
+          ...category,
+          subcategories: (category.subcategories || []).map((subcategory, innerIndex) => (
+            innerIndex === subcategoryIndex
+              ? { ...subcategory, keywords: (subcategory.keywords || []).filter((_, keywordInnerIndex) => keywordInnerIndex !== keywordIndex) }
+              : subcategory
+          )),
+        };
+      }),
+    }));
+  };
 
   useEffect(() => {
     if (mediaAutoTimerRef.current) {
@@ -728,6 +970,60 @@ export default function SettingsPage() {
       </div>
     );
   };
+
+  const renderSeoKeywordRow = (keyword, onChange, onDelete) => (
+    <div className="grid grid-cols-1 gap-2 rounded-xl border border-white/5 bg-mansion-elevated/60 p-3 sm:grid-cols-[1fr_120px]">
+      <div className="space-y-2">
+        <input
+          type="text"
+          value={keyword.term || ''}
+          onChange={(event) => {
+            const term = event.target.value;
+            onChange({ term, slug: keyword.slug || slugifyAdminSeo(term) });
+          }}
+          placeholder="keyword principal"
+          className="w-full rounded-xl border border-mansion-border/30 bg-mansion-card px-3 py-2 text-sm text-text-primary outline-none focus:border-mansion-gold/50"
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="text"
+            value={keyword.location || ''}
+            onChange={(event) => onChange({ location: event.target.value })}
+            placeholder="Ubicación"
+            className="w-full rounded-xl border border-mansion-border/30 bg-mansion-card px-3 py-2 text-xs text-text-primary outline-none focus:border-mansion-gold/50"
+          />
+          <input
+            type="text"
+            value={keyword.slug || ''}
+            onChange={(event) => onChange({ slug: slugifyAdminSeo(event.target.value) })}
+            placeholder="slug opcional"
+            className="w-full rounded-xl border border-mansion-border/30 bg-mansion-card px-3 py-2 text-xs text-text-primary outline-none focus:border-mansion-gold/50"
+          />
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-2 sm:flex-col sm:items-stretch">
+        <button
+          type="button"
+          onClick={() => onChange({ enabled: keyword.enabled === false })}
+          className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
+            keyword.enabled === false
+              ? 'border-white/10 bg-white/5 text-text-dim'
+              : 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300'
+          }`}
+        >
+          {keyword.enabled === false ? 'Pausada' : 'Activa'}
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="inline-flex items-center justify-center gap-1 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-500/15"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Borrar
+        </button>
+      </div>
+    </div>
+  );
 
   const galleryPlaceholderFields = [
     {
@@ -2948,6 +3244,201 @@ export default function SettingsPage() {
               <p className="text-sm text-text-primary font-mono">
                 {storyMaxDurationSeconds}s max · {encoderThreads} threads · CRF {encoderCrf} · {encoderMaxrate} cap · {encoderBufsize} buf · {encoderPreset} · {encoderAudioBitrate === 'none' ? 'sin audio' : `AAC ${encoderAudioBitrate}${encoderAudioMono ? ' mono' : ''}`} · debug {encoderShowProgressHud ? 'on' : 'off'}
               </p>
+            </div>
+          </div>
+        </section>}
+
+        {/* ── SEO KEYWORDS ── */}
+        {activeSection === 'seo' && <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Search className="w-4 h-4 text-mansion-gold" />
+            <h2 className="text-xs font-bold text-text-primary uppercase tracking-wider">SEO Keywords</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-mansion-gold/20 bg-mansion-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary">Categorías para landings estáticas</h3>
+                  <p className="mt-1 text-[11px] leading-5 text-text-dim">
+                    Guardá acá las categorías, subcategorías y keywords. Para que impacte en las páginas estáticas, el próximo build debe leer esta fuente desde la API o exportarla al JSON del repo.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addSeoCategory}
+                  className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-mansion-gold px-3 py-2 text-xs font-semibold text-black transition-colors hover:bg-mansion-gold/90"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Categoría
+                </button>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-center">
+                <div className="rounded-xl bg-mansion-elevated p-3">
+                  <p className="text-xl font-bold text-mansion-gold">{seoCategoryTotal}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Categorías</p>
+                </div>
+                <div className="rounded-xl bg-mansion-elevated p-3">
+                  <p className="text-xl font-bold text-mansion-gold">{seoKeywordTotal}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Keywords</p>
+                </div>
+              </div>
+            </div>
+
+            {(seoKeywordsConfig.categories || []).map((category, categoryIndex) => (
+              <div key={`${category.id}-${categoryIndex}`} className="rounded-2xl border border-white/5 bg-mansion-card p-4">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-mansion-gold">Categoría pilar</p>
+                    <h3 className="text-sm font-semibold text-text-primary">{category.label || 'Sin nombre'}</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteSeoCategory(categoryIndex)}
+                    className="rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-red-300 transition-colors hover:bg-red-500/15"
+                    aria-label="Borrar categoría"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <input
+                    type="text"
+                    value={category.label || ''}
+                    onChange={(event) => updateSeoCategory(categoryIndex, {
+                      label: event.target.value,
+                      id: category.id || slugifyAdminSeo(event.target.value),
+                    })}
+                    placeholder="Nombre visible"
+                    className="rounded-xl border border-mansion-border/30 bg-mansion-elevated px-3 py-2 text-sm text-text-primary outline-none focus:border-mansion-gold/50"
+                  />
+                  <input
+                    type="text"
+                    value={category.id || ''}
+                    onChange={(event) => updateSeoCategory(categoryIndex, { id: slugifyAdminSeo(event.target.value) })}
+                    placeholder="id"
+                    className="rounded-xl border border-mansion-border/30 bg-mansion-elevated px-3 py-2 text-sm text-text-primary outline-none focus:border-mansion-gold/50"
+                  />
+                  <input
+                    type="text"
+                    value={category.intent || ''}
+                    onChange={(event) => updateSeoCategory(categoryIndex, { intent: event.target.value })}
+                    placeholder="intención base"
+                    className="rounded-xl border border-mansion-border/30 bg-mansion-elevated px-3 py-2 text-sm text-text-primary outline-none focus:border-mansion-gold/50"
+                  />
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-text-muted">Keywords directas</p>
+                    <button
+                      type="button"
+                      onClick={() => addSeoKeyword(categoryIndex)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-text-muted"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Keyword
+                    </button>
+                  </div>
+                  {(category.keywords || []).map((keyword, keywordIndex) => (
+                    <div key={`${keyword.term}-${keywordIndex}`}>
+                      {renderSeoKeywordRow(
+                        keyword,
+                        (patch) => updateSeoKeyword(categoryIndex, keywordIndex, patch),
+                        () => deleteSeoKeyword(categoryIndex, keywordIndex)
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-text-muted">Subcategorías</p>
+                    <button
+                      type="button"
+                      onClick={() => addSeoSubcategory(categoryIndex)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-text-muted"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Subcategoría
+                    </button>
+                  </div>
+
+                  {(category.subcategories || []).map((subcategory, subcategoryIndex) => (
+                    <div key={`${subcategory.id}-${subcategoryIndex}`} className="rounded-2xl border border-white/5 bg-black/15 p-3">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold text-mansion-gold">{subcategory.label || 'Subcategoría'}</p>
+                        <button
+                          type="button"
+                          onClick={() => deleteSeoSubcategory(categoryIndex, subcategoryIndex)}
+                          className="rounded-lg p-1.5 text-red-300 transition-colors hover:bg-red-500/10"
+                          aria-label="Borrar subcategoría"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <input
+                          type="text"
+                          value={subcategory.label || ''}
+                          onChange={(event) => updateSeoSubcategory(categoryIndex, subcategoryIndex, {
+                            label: event.target.value,
+                            id: subcategory.id || slugifyAdminSeo(event.target.value),
+                          })}
+                          placeholder="Nombre"
+                          className="rounded-xl border border-mansion-border/30 bg-mansion-card px-3 py-2 text-xs text-text-primary outline-none focus:border-mansion-gold/50"
+                        />
+                        <input
+                          type="text"
+                          value={subcategory.id || ''}
+                          onChange={(event) => updateSeoSubcategory(categoryIndex, subcategoryIndex, { id: slugifyAdminSeo(event.target.value) })}
+                          placeholder="id"
+                          className="rounded-xl border border-mansion-border/30 bg-mansion-card px-3 py-2 text-xs text-text-primary outline-none focus:border-mansion-gold/50"
+                        />
+                        <input
+                          type="text"
+                          value={subcategory.intent || ''}
+                          onChange={(event) => updateSeoSubcategory(categoryIndex, subcategoryIndex, { intent: event.target.value })}
+                          placeholder="intención"
+                          className="rounded-xl border border-mansion-border/30 bg-mansion-card px-3 py-2 text-xs text-text-primary outline-none focus:border-mansion-gold/50"
+                        />
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[11px] text-text-dim">Keywords</p>
+                          <button
+                            type="button"
+                            onClick={() => addSeoSubcategoryKeyword(categoryIndex, subcategoryIndex)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-text-muted"
+                          >
+                            <Plus className="w-3 h-3" />
+                            Keyword
+                          </button>
+                        </div>
+                        {(subcategory.keywords || []).map((keyword, keywordIndex) => (
+                          <div key={`${keyword.term}-${keywordIndex}`}>
+                            {renderSeoKeywordRow(
+                              keyword,
+                              (patch) => updateSeoSubcategoryKeyword(categoryIndex, subcategoryIndex, keywordIndex, patch),
+                              () => deleteSeoSubcategoryKeyword(categoryIndex, subcategoryIndex, keywordIndex)
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <div className="rounded-2xl border border-white/5 bg-mansion-card p-4">
+              <h3 className="text-sm font-semibold text-text-primary">JSON que usará el generador</h3>
+              <textarea
+                readOnly
+                value={JSON.stringify(normalizeSeoKeywordConfig(seoKeywordsConfig), null, 2)}
+                className="mt-3 h-56 w-full resize-y rounded-xl border border-mansion-border/30 bg-mansion-elevated px-3 py-2 font-mono text-[11px] leading-5 text-text-muted outline-none"
+              />
             </div>
           </div>
         </section>}
