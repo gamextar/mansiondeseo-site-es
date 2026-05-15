@@ -1579,7 +1579,14 @@ export default function App() {
           sessionStorage.setItem('mansion_bootstrap_last_error', JSON.stringify(bootstrapErrorSnapshot));
         } catch {}
         console.warn('[bootstrap] getAppBootstrap failed', bootstrapErrorSnapshot, err);
-        if (getToken()) setBootstrapError(bootstrapErrorSnapshot);
+        const storedUser = getStoredUser();
+        if (getToken() && storedUser?.id) {
+          setUserState((current) => current || storedUser);
+          setRegisteredState(true);
+          setBootstrapError(null);
+        } else if (getToken()) {
+          setBootstrapError(bootstrapErrorSnapshot);
+        }
         setBootstrapUnread(null);
         setBootstrapStories([]);
         setBootstrapResolved(true);
@@ -1606,13 +1613,16 @@ export default function App() {
     };
   }, [debugFlags.skipBootstrap, setUser, siteSettings]);
 
-  const sessionRecovery = bootstrapError || apiRecovery;
-  const sessionRecoveryTitle = bootstrapError
+  const blockingBootstrapError = bootstrapError && !user?.id ? bootstrapError : null;
+  const blockingApiRecovery = apiRecovery && !user?.id ? apiRecovery : null;
+  const sessionRecovery = blockingBootstrapError || blockingApiRecovery;
+  const inlineApiRecovery = !sessionRecovery && apiRecovery && user?.id ? apiRecovery : null;
+  const sessionRecoveryTitle = blockingBootstrapError
     ? 'No pudimos iniciar tu sesión'
     : apiRecovery?.reason === 'slow_request'
       ? 'La app está tardando demasiado'
       : 'No pudimos cargar esta sección';
-  const sessionRecoveryDescription = bootstrapError
+  const sessionRecoveryDescription = blockingBootstrapError
     ? 'Puede haber sido una conexión inestable o una respuesta lenta del servidor. Reintentá para volver a cargar la app.'
     : apiRecovery?.reason === 'slow_request'
       ? 'La conexión con el servidor sigue abierta, pero está demorando más de lo normal. Podés reintentar sin cerrar tu cuenta.'
@@ -1647,6 +1657,32 @@ export default function App() {
                   Reiniciar sesión segura
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {inlineApiRecovery && getToken() && (
+          <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-[10040] mx-auto max-w-md rounded-2xl border border-mansion-gold/25 bg-mansion-card/95 p-4 text-text-primary shadow-2xl shadow-black/40 backdrop-blur">
+            <p className="text-sm font-semibold text-white">
+              {inlineApiRecovery.reason === 'slow_request' ? 'La app está tardando demasiado' : 'No pudimos cargar esta sección'}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-text-muted">
+              Podés seguir usando la app o reintentar la carga.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={handleSessionRetry}
+                className="flex-1 rounded-xl bg-mansion-gold px-3 py-2 text-xs font-semibold text-black transition-colors hover:bg-mansion-gold/90"
+              >
+                Reintentar
+              </button>
+              <button
+                type="button"
+                onClick={() => setApiRecovery(null)}
+                className="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold text-text-muted transition-colors hover:text-white"
+              >
+                Ocultar
+              </button>
             </div>
           </div>
         )}

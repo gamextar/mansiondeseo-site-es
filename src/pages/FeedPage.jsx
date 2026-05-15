@@ -15,7 +15,7 @@ import { getBottomNavPagePadding } from '../lib/bottomNavConfig';
 import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsersKey, isViewedStoryUser, removeViewedStoryUser } from '../lib/storyViews';
 
 const FEED_CACHE_KEY = 'mansion_feed';
-const FEED_CACHE_VERSION = 4;
+const FEED_CACHE_VERSION = 5;
 const FEED_GLOBAL_VERSION_KEY = 'mansion_feed_cache_version';
 const HOME_STORIES_CACHE_PREFIX = 'mansion_home_stories:';
 const HOME_STORIES_CACHE_VERSION = 5;
@@ -264,6 +264,16 @@ function getHomeStoriesViewerSeeking(user) {
   }
 }
 
+function getFeedProfileFilter(user) {
+  try {
+    const storedFilter = parseHomeStoriesSeeking(localStorage.getItem('mansion_feed_filter') || '');
+    if (storedFilter.length > 0) return storedFilter.join(',');
+  } catch {}
+
+  const viewerSeeking = getHomeStoriesViewerSeeking(user);
+  return viewerSeeking.length > 0 ? viewerSeeking.join(',') : '';
+}
+
 function getHomeStoriesCacheKey(userId, isDesktopViewport, roleKey = 'all') {
   return `${HOME_STORIES_CACHE_PREFIX}${userId || 'viewer'}:${isDesktopViewport ? 'desktop' : 'mobile'}:${roleKey || 'all'}`;
 }
@@ -438,18 +448,20 @@ export default function FeedPage({ initialData }) {
 
   const fetchProfilesBlock = useCallback(async ({ forceFresh = false, cursor = 0, pageSize } = {}) => {
     const s = settingsRef.current;
+    const filter = getFeedProfileFilter(user);
     const resolvedCardsPerPage = getFeedCardsPerPage(s, isDesktopViewport);
     const resolvedPageSize = Math.max(
       12,
       Number(pageSize) || resolvedCardsPerPage * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES)
     );
     const data = await getProfiles({
+      filter,
       fresh: forceFresh,
       cursor,
       pageSize: resolvedPageSize,
     });
     return { data, resolvedPageSize };
-  }, [isDesktopViewport]);
+  }, [isDesktopViewport, user]);
 
   const prefetchProfilesBlock = useCallback(({ cursor = 0, pageSize } = {}) => {
     const key = makeFeedBlockKey(cursor, pageSize);

@@ -350,7 +350,11 @@ function isRealFeedProfile(profile) {
   return Number(profile?.fake ? 1 : 0) !== 1;
 }
 
-function boostRealProfilesInEarlyWindow(profiles, limit = FEED_PROFILE_LIMIT) {
+function getFeedProfileBucketKey(profile) {
+  return getRoleBucketKey(profile?._roleId || profile?.role || '');
+}
+
+function boostRealProfilesInEarlyWindow(profiles, limit = FEED_PROFILE_LIMIT, { preserveRoleBuckets = false } = {}) {
   const list = Array.isArray(profiles) ? profiles : [];
   if (list.length <= 1) return list;
 
@@ -363,28 +367,35 @@ function boostRealProfilesInEarlyWindow(profiles, limit = FEED_PROFILE_LIMIT) {
 
   if (currentReal >= targetReal) return list;
 
-  const promoted = restWindow
-    .filter(isRealFeedProfile)
-    .slice(0, targetReal - currentReal);
+  const promoted = restWindow.filter(isRealFeedProfile);
   if (promoted.length === 0) return list;
 
-  const promotedIds = new Set(promoted.map((profile) => String(profile?.id || '')).filter(Boolean));
+  const usedPromotedIds = new Set();
   const displaced = [];
-  let promotedIndex = 0;
   let realCount = currentReal;
 
   const nextFirstWindow = firstWindow.map((profile) => {
-    if (realCount >= targetReal || promotedIndex >= promoted.length || isRealFeedProfile(profile)) {
+    if (realCount >= targetReal || isRealFeedProfile(profile)) {
       return profile;
     }
+
+    const targetBucket = getFeedProfileBucketKey(profile);
+    const replacement = promoted.find((candidate) => {
+      const id = String(candidate?.id || '');
+      if (!id || usedPromotedIds.has(id)) return false;
+      if (!preserveRoleBuckets) return true;
+      return getFeedProfileBucketKey(candidate) === targetBucket;
+    });
+
+    if (!replacement) return profile;
+
     displaced.push(profile);
     realCount += 1;
-    const replacement = promoted[promotedIndex];
-    promotedIndex += 1;
+    usedPromotedIds.add(String(replacement.id || ''));
     return replacement;
   });
 
-  const remainingRest = restWindow.filter((profile) => !promotedIds.has(String(profile?.id || '')));
+  const remainingRest = restWindow.filter((profile) => !usedPromotedIds.has(String(profile?.id || '')));
   return [
     ...nextFirstWindow,
     ...displaced,
@@ -640,7 +651,11 @@ function orderFeedBaseProfiles(
     const list = bucketMap.get(bucket.key) || [];
     list.sort(compareFeedBucketProfiles);
   }
-  return boostRealProfilesInEarlyWindow(interleaveRoleBuckets(roleBuckets, bucketMap, limit), limit).slice(0, limit);
+  return boostRealProfilesInEarlyWindow(
+    interleaveRoleBuckets(roleBuckets, bucketMap, limit),
+    limit,
+    { preserveRoleBuckets: true },
+  ).slice(0, limit);
 }
 
 function mapStoryRowForResponse(row, env, viewerId = '', viewerCanWatchAllStories = false) {
@@ -5029,18 +5044,16 @@ async function handleProfiles(request, env) {
   const country = viewer?.country || '';
   const viewerCanWatchAllStories = Boolean(viewer && isPremiumActive(viewer));
 
-  // Determine role filter: use viewer's seeking from DB, with frontend filter as fallback
+  // Determine role filter: an explicit frontend filter should override stored seeking.
   const viewerSeeking = safeParseJSON(viewer?.seeking, []);
   const viewerInterests = safeParseJSON(viewer?.interests, []);
   const viewerInterestsKey = normalizeViewerInterestsKey(viewerInterests);
 
-  // Role filter: use server-side seeking, fall back to frontend filter param
   const roleFilters = SEEKING_ROLE_IDS;
-  let filterParts;
-  if (viewerSeeking.length > 0 && viewerSeeking.length < SEEKING_ROLE_IDS.length) {
+  const explicitFilterParts = filter.split(',').map(f => f.trim()).filter(f => roleFilters.includes(f));
+  let filterParts = explicitFilterParts;
+  if (filterParts.length === 0 && viewerSeeking.length > 0 && viewerSeeking.length < SEEKING_ROLE_IDS.length) {
     filterParts = viewerSeeking.filter(f => roleFilters.includes(f));
-  } else {
-    filterParts = filter.split(',').map(f => f.trim()).filter(f => roleFilters.includes(f));
   }
   const roleBuckets = getRoleBucketsForFilters(filterParts);
   const requestedRoleValues = [...new Set(filterParts.flatMap((f) => (f === 'pareja' ? PAIR_ROLE_IDS : [f])).filter((role) => SEEKING_ROLE_IDS.includes(role)))];
