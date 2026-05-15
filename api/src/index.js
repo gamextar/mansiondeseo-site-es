@@ -137,6 +137,7 @@ const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const PHOTO_VERIFICATION_STATUSES = ['code_issued', 'pending', 'approved', 'rejected', 'expired'];
 const FEED_PROFILE_LIMIT = 42;
 const FEED_SNAPSHOT_LIMIT = 180;
+const FEED_ORDER_CACHE_VERSION = 'real-role-v2';
 const FEED_SNAPSHOT_TTL_MS = 300_000;
 const PROFILE_SNAPSHOT_FEED_MAX_WINDOW = 5000;
 const FEED_PROXIMITY_CITY_BOOST = 22;
@@ -324,6 +325,14 @@ function interleaveRoleBuckets(bucketDefs, bucketMap, limit = FEED_PROFILE_LIMIT
   }
 
   return output;
+}
+
+function pushItemsIntoRoleBucketMap(items, bucketMap, getRole) {
+  for (const item of (Array.isArray(items) ? items : [])) {
+    const bucketKey = getRoleBucketKey(getRole(item));
+    if (!bucketMap.has(bucketKey)) continue;
+    bucketMap.get(bucketKey).push(item);
+  }
 }
 
 function compareFeedBucketProfiles(a, b) {
@@ -647,15 +656,24 @@ function orderFeedBaseProfiles(
     if (!bucketMap.has(bucketKey)) continue;
     bucketMap.get(bucketKey).push(profile);
   }
+
+  const realBucketMap = new Map(roleBuckets.map((bucket) => [bucket.key, []]));
+  const fakeBucketMap = new Map(roleBuckets.map((bucket) => [bucket.key, []]));
   for (const bucket of roleBuckets) {
     const list = bucketMap.get(bucket.key) || [];
     list.sort(compareFeedBucketProfiles);
+    for (const profile of list) {
+      const targetMap = isRealFeedProfile(profile) ? realBucketMap : fakeBucketMap;
+      targetMap.get(bucket.key).push(profile);
+    }
   }
-  return boostRealProfilesInEarlyWindow(
-    interleaveRoleBuckets(roleBuckets, bucketMap, limit),
-    limit,
-    { preserveRoleBuckets: true },
-  ).slice(0, limit);
+
+  const realProfiles = interleaveRoleBuckets(roleBuckets, realBucketMap, limit);
+  const fakeProfiles = interleaveRoleBuckets(roleBuckets, fakeBucketMap, Math.max(0, limit - realProfiles.length));
+  return [
+    ...realProfiles,
+    ...fakeProfiles,
+  ].slice(0, limit);
 }
 
 function mapStoryRowForResponse(row, env, viewerId = '', viewerCanWatchAllStories = false) {
@@ -5068,7 +5086,7 @@ async function handleProfiles(request, env) {
     PROFILE_SNAPSHOT_FEED_MAX_WINDOW,
     Math.max(pageWindowLimit, FEED_SNAPSHOT_LIMIT + 1),
   );
-  const feedSnapshotCacheKey = `feed-snapshot:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}:${viewerCanWatchAllStories ? 'vip' : 'free'}:${geoKey}:window:${snapshotWindowLimit}`;
+  const feedSnapshotCacheKey = `feed-snapshot:${FEED_ORDER_CACHE_VERSION}:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}:${viewerCanWatchAllStories ? 'vip' : 'free'}:${geoKey}:window:${snapshotWindowLimit}`;
   const snapshotCacheHit = !fresh && isFreshCached(feedSnapshotCacheKey);
   const storyCacheHit = isFreshCached(STORY_SNAPSHOT_MANIFEST_KEY);
   const countCacheHit = false;
@@ -5086,6 +5104,7 @@ async function handleProfiles(request, env) {
     const realSnapshotLimit = snapshotWindowLimit;
     const realRowsPromise = loadRealProfileRowsFromFeedItems(env, {
       roleValues: requestedRoleValues,
+      roleBuckets,
       country: settings.feedFilterByCountry ? country : '',
       search,
       limit: realSnapshotLimit,
@@ -11394,10 +11413,17 @@ async function loadProfileRowsFromSnapshots(env, {
   const priorityRows = rows.filter((row) => Number(row.feed_priority || 0) > 0);
   const normalRows = rows.filter((row) => Number(row.feed_priority || 0) <= 0);
   if (kind === 'real') {
-    return [
+    const sortedRows = [
       ...priorityRows.sort((a, b) => String(b?.last_active || '').localeCompare(String(a?.last_active || ''))),
       ...normalRows.sort((a, b) => String(b?.last_active || '').localeCompare(String(a?.last_active || ''))),
-    ].slice(0, safeLimit);
+    ];
+    const roleBucketDefs = getRoleBucketsForFilters(expandedRoles);
+    if (roleBucketDefs.length > 1) {
+      const bucketMap = new Map(roleBucketDefs.map((bucket) => [bucket.key, []]));
+      pushItemsIntoRoleBucketMap(sortedRows, bucketMap, (row) => row?.role || '');
+      return interleaveRoleBuckets(roleBucketDefs, bucketMap, safeLimit).slice(0, safeLimit);
+    }
+    return sortedRows.slice(0, safeLimit);
   }
 
   const windowKey = Math.floor(Date.now() / PROFILE_SNAPSHOT_FAKE_ROTATION_MS);
@@ -11417,6 +11443,7 @@ async function loadProfileRowsFromSnapshots(env, {
 
 async function loadRealProfileRowsFromFeedItems(env, {
   roleValues = [],
+  roleBuckets = [],
   country = '',
   search = '',
   limit = FEED_PROFILE_LIMIT,
@@ -11431,31 +11458,56 @@ async function loadRealProfileRowsFromFeedItems(env, {
     .filter((role) => SEEKING_ROLE_IDS.includes(role)))];
   const normalizedCountry = String(country || '').trim().toUpperCase();
   const searchTerm = normalizeProfileSnapshotSearch(search);
-  const bindings = [];
-  const parts = [`
+  const baseBindings = [];
+  const baseParts = [`
     SELECT card_json
     FROM profile_feed_items
     WHERE fake = 0
       AND active = 1
   `];
-  if (expandedRoles.length > 0) {
-    parts.push(`AND role IN (${expandedRoles.map(() => '?').join(', ')})`);
-    bindings.push(...expandedRoles);
-  }
   if (normalizedCountry) {
-    parts.push('AND country = ?');
-    bindings.push(normalizedCountry);
+    baseParts.push('AND country = ?');
+    baseBindings.push(normalizedCountry);
   }
   if (searchTerm) {
-    parts.push('AND search_text LIKE ?');
-    bindings.push(`%${searchTerm}%`);
+    baseParts.push('AND search_text LIKE ?');
+    baseBindings.push(`%${searchTerm}%`);
   }
-  parts.push('ORDER BY feed_priority DESC, last_active DESC, user_id DESC LIMIT ?');
-  bindings.push(safeLimit);
 
-  const { results } = await env.DB.prepare(parts.join('\n')).bind(...bindings).all();
-  return (results || [])
-    .map((row) => safeParseJSON(row?.card_json, null))
+  const runQueryForRoles = async (roles = []) => {
+    const roleSet = [...new Set((Array.isArray(roles) ? roles : [])
+      .flatMap((role) => (role === 'pareja' ? PAIR_ROLE_IDS : [role]))
+      .filter((role) => SEEKING_ROLE_IDS.includes(role)))];
+    const parts = [...baseParts];
+    const bindings = [...baseBindings];
+    if (roleSet.length > 0) {
+      parts.push(`AND role IN (${roleSet.map(() => '?').join(', ')})`);
+      bindings.push(...roleSet);
+    }
+    parts.push('ORDER BY feed_priority DESC, last_active DESC, user_id DESC LIMIT ?');
+    bindings.push(safeLimit);
+    const { results } = await env.DB.prepare(parts.join('\n')).bind(...bindings).all();
+    return results || [];
+  };
+
+  const safeRoleBuckets = Array.isArray(roleBuckets)
+    ? roleBuckets.filter((bucket) => Array.isArray(bucket?.roles) && bucket.roles.length > 0)
+    : [];
+  const rows = safeRoleBuckets.length > 1
+    ? (await Promise.all(safeRoleBuckets.map((bucket) => runQueryForRoles(bucket.roles)))).flat()
+    : await runQueryForRoles(expandedRoles);
+
+  const seen = new Set();
+  return rows
+    .filter((row) => {
+      const card = safeParseJSON(row?.card_json, null);
+      const id = String(card?.id || '');
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      row._parsed_card_json = card;
+      return true;
+    })
+    .map((row) => row._parsed_card_json)
     .filter(Boolean);
 }
 
