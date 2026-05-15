@@ -666,9 +666,9 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
                 <Crown className="h-10 w-10" />
               </span>
               <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-mansion-gold/95">Límite diario</span>
-              <span className="mt-2 font-display text-2xl font-bold leading-tight text-white">Límite de videos Free alcanzado</span>
+              <span className="mt-2 font-display text-2xl font-bold leading-tight text-white">Llegaste al límite de videos diario.</span>
               <span className="mt-3 text-sm leading-relaxed text-white/76">
-                Ya viste {limitLabel} videos hoy. Hazte VIP para seguir mirando sin límite.
+                Hacete VIP para seguir mirando sin límite.
               </span>
             </button>
           </div>
@@ -1391,7 +1391,7 @@ export default function VideoFeedPage() {
       setStoryLimitBlock({
         storyId,
         limit: storyViewLimit || { dailyLimit: backendDailyLimit, viewedToday: backendViewedToday, remaining: 0 },
-        message: 'Alcanzaste el límite diario de videos.',
+        message: 'Llegaste al límite de videos diario. Hacete VIP para seguir mirando sin límite.',
       });
       return undefined;
     }
@@ -1421,7 +1421,7 @@ export default function VideoFeedPage() {
             setStoryLimitBlock({
               storyId,
               limit: nextLimit,
-              message: err?.message || 'Alcanzaste el límite diario de stories.',
+              message: err?.message || 'Llegaste al límite de videos diario. Hacete VIP para seguir mirando sin límite.',
             });
           }
           return;
