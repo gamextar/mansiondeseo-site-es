@@ -137,7 +137,7 @@ const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const PHOTO_VERIFICATION_STATUSES = ['code_issued', 'pending', 'approved', 'rejected', 'expired'];
 const FEED_PROFILE_LIMIT = 42;
 const FEED_SNAPSHOT_LIMIT = 180;
-const FEED_ORDER_CACHE_VERSION = 'real-first-v2';
+const FEED_ORDER_CACHE_VERSION = 'real-first-v3';
 const FEED_SNAPSHOT_TTL_MS = 300_000;
 const PROFILE_SNAPSHOT_FEED_MAX_WINDOW = 5000;
 const FEED_PROXIMITY_CITY_BOOST = 22;
@@ -5037,20 +5037,19 @@ async function handleProfiles(request, env) {
       priorityRotationWindowKey,
     ].join(':');
     const realSnapshotLimit = PROFILE_SNAPSHOT_FEED_MAX_WINDOW;
-    const realFeedRowsPromise = loadRealProfileRowsFromFeedItems(env, {
+    const realRowsPromise = loadRealProfileRowsFromFeedItems(env, {
       roleValues: requestedRoleValues,
       country: settings.feedFilterByCountry ? country : '',
       search,
       limit: realSnapshotLimit,
       fresh,
-    }).catch(() => null);
-    const realSnapshotRowsPromise = loadRealProfileRowsFromSnapshots(env, {
+    }).then((rows) => (Array.isArray(rows) ? rows : loadRealProfileRowsFromSnapshots(env, {
       roleValues: requestedRoleValues,
       country: settings.feedFilterByCountry ? country : '',
       search,
       limit: realSnapshotLimit,
       fresh,
-    }).catch(() => null);
+    })));
     const fakeRowsPromise = loadFakeProfileRowsFromSnapshots(env, {
       roleValues: requestedRoleValues,
       country: settings.feedFilterByCountry ? country : '',
@@ -5061,21 +5060,16 @@ async function handleProfiles(request, env) {
       viewerId: auth.sub,
       fresh,
     });
-    const [realFeedRows, realSnapshotRows, fakeRows, activeStoryRows] = await Promise.all([
-      realFeedRowsPromise,
-      realSnapshotRowsPromise,
+    const [realRows, fakeRows, activeStoryRows] = await Promise.all([
+      realRowsPromise,
       fakeRowsPromise,
       loadActiveStoryRowsFromSnapshots(env, { roleValues: requestedRoleValues, fresh }),
     ]);
-    const realRows = uniqueProfileRows([
-      ...(Array.isArray(realFeedRows) ? realFeedRows : []),
-      ...(Array.isArray(realSnapshotRows) ? realSnapshotRows : []),
-    ], realSnapshotLimit);
     const snapshotRows = [
       ...(realRows || []),
       ...(fakeRows || []),
     ];
-    if (!Array.isArray(realFeedRows) && !Array.isArray(realSnapshotRows)) {
+    if (realRows === null) {
       console.warn('real profile snapshots unavailable; returning fake profiles only');
     }
     if (fakeRows === null) {
@@ -11305,19 +11299,6 @@ function profileSnapshotMatchesSearch(row, searchTerm) {
     row?.locality,
     row?.bio,
   ].some((value) => normalizeProfileSnapshotSearch(value).includes(searchTerm));
-}
-
-function uniqueProfileRows(rows = [], limit = Infinity) {
-  const seen = new Set();
-  const output = [];
-  for (const row of (Array.isArray(rows) ? rows : [])) {
-    const id = String(row?.id || row?.user_id || '').trim();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    output.push(row);
-    if (output.length >= limit) break;
-  }
-  return output;
 }
 
 async function loadProfileRowsFromSnapshots(env, {
