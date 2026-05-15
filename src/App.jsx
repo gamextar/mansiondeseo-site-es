@@ -23,7 +23,7 @@ import FeedShellProbePage from './pages/FeedShellProbePage';
 import ProfileShellProbePage from './pages/ProfileShellProbePage';
 import SafeAreaDebugPage from './pages/SafeAreaDebugPage';
 import ProfilePage from './pages/ProfilePage';
-import { STORY_FEED_CACHE_INVALIDATED_EVENT, getToken, getStoredUser, setToken, setStoredUser, clearAuth, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, reportClientError, hasEverLoggedIn } from './lib/api';
+import { STORY_FEED_CACHE_INVALIDATED_EVENT, getToken, getStoredUser, setToken, setStoredUser, clearAuth, clearAppBootstrapCache, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, reportClientError, hasEverLoggedIn } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -192,7 +192,7 @@ function syncViewportTopInsetVar({ forceZero = false } = {}) {
 
 function RequireRegistration({ children }) {
   const { registered } = useAuth();
-  if (!registered) return <Navigate to={hasEverLoggedIn() ? '/login' : '/bienvenida'} replace />;
+  if (!registered || !getToken()) return <Navigate to={hasEverLoggedIn() ? '/login' : '/bienvenida'} replace />;
   return children;
 }
 
@@ -1128,9 +1128,7 @@ function AppLayout() {
 export default function App() {
   const { verified, verify } = useAgeVerified();
   const [debugFlags, setDebugFlags] = useState(() => getBootDebugFlags());
-  const [registered, setRegisteredState] = useState(
-    () => !!getToken() || localStorage.getItem('mansion_registered') === 'true'
-  );
+  const [registered, setRegisteredState] = useState(() => !!getToken());
   const [user, setUserState] = useState(() => getStoredUser());
   const [bootstrapUnread, setBootstrapUnread] = useState(null);
   const [bootstrapResolved, setBootstrapResolved] = useState(() => !getToken());
@@ -1198,6 +1196,10 @@ export default function App() {
     const handleAuthExpired = () => {
       setRegisteredState(false);
       setUserState(null);
+      setBootstrapUnread(null);
+      setBootstrapStories([]);
+      setBootstrapError(null);
+      setBootstrapResolved(true);
     };
     window.addEventListener('mansion-auth-expired', handleAuthExpired);
     return () => window.removeEventListener('mansion-auth-expired', handleAuthExpired);
@@ -1310,10 +1312,20 @@ export default function App() {
       'ResizeObserver loop completed with undelivered notifications',
     ];
 
+    const isIgnoredClientError = (message, payload = {}) => {
+      if (ignoredMessages.some((entry) => message.includes(entry))) return true;
+
+      const stack = String(payload.stack || '');
+      return (
+        message.includes('EmptyRanges') &&
+        (stack.includes('played') || stack.includes('syncControl') || String(payload.filename || '') === 'undefined')
+      );
+    };
+
     const sendClientError = (kind, payload = {}) => {
       const message = String(payload.message || payload.reason || '').trim();
       if (!message) return;
-      if (ignoredMessages.some((entry) => message.includes(entry))) return;
+      if (isIgnoredClientError(message, payload)) return;
 
       const route = `${window.location.pathname}${window.location.search}`;
       const fingerprint = [
@@ -1581,10 +1593,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    try {
-                      sessionStorage.removeItem('appBootstrap');
-                      sessionStorage.removeItem('mansion_bootstrap_last_error');
-                    } catch {}
+                    clearAppBootstrapCache();
                     window.location.reload();
                   }}
                   className="rounded-xl bg-mansion-gold px-4 py-3 text-sm font-semibold text-black transition-colors hover:bg-mansion-gold/90"

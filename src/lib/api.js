@@ -92,6 +92,14 @@ function invalidateBootstrapCache() {
   sessionCache.delete('appBootstrap');
 }
 
+export function clearAppBootstrapCache({ includeSettings = false } = {}) {
+  invalidateBootstrapCache();
+  try {
+    sessionStorage.removeItem('mansion_bootstrap_last_error');
+    if (includeSettings) sessionStorage.removeItem('mansion_site_settings');
+  } catch {}
+}
+
 function cacheOwnProfileDashboard(data) {
   if (!data || typeof data !== 'object') return;
   sessionCache.set(OWN_PROFILE_DASHBOARD_CACHE_KEY, data);
