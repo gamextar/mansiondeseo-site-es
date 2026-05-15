@@ -137,7 +137,7 @@ const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const PHOTO_VERIFICATION_STATUSES = ['code_issued', 'pending', 'approved', 'rejected', 'expired'];
 const FEED_PROFILE_LIMIT = 42;
 const FEED_SNAPSHOT_LIMIT = 180;
-const FEED_ORDER_CACHE_VERSION = 'real-first-v3';
+const FEED_ORDER_CACHE_VERSION = 'real-fake-v1';
 const FEED_SNAPSHOT_TTL_MS = 300_000;
 const PROFILE_SNAPSHOT_FEED_MAX_WINDOW = 5000;
 const FEED_PROXIMITY_CITY_BOOST = 22;
@@ -345,6 +345,37 @@ function compareFeedBucketProfiles(a, b) {
   return String(b.id || '').localeCompare(String(a.id || ''));
 }
 
+function isFakeFeedProfile(profile) {
+  return Number(profile?.fake || 0) === 1;
+}
+
+function interleaveRealAndFakeProfiles(realProfiles = [], fakeProfiles = [], limit = FEED_PROFILE_LIMIT) {
+  const output = [];
+  let realIndex = 0;
+  let fakeIndex = 0;
+
+  while (output.length < limit) {
+    let added = false;
+
+    if (realIndex < realProfiles.length) {
+      output.push(realProfiles[realIndex]);
+      realIndex += 1;
+      added = true;
+      if (output.length >= limit) break;
+    }
+
+    if (fakeIndex < fakeProfiles.length) {
+      output.push(fakeProfiles[fakeIndex]);
+      fakeIndex += 1;
+      added = true;
+    }
+
+    if (!added) break;
+  }
+
+  return output.slice(0, limit);
+}
+
 function compareStoryRows(a, b) {
   const aFake = Number(a?.fake || 0);
   const bFake = Number(b?.fake || 0);
@@ -520,7 +551,7 @@ function buildFeedBaseProfiles(rows, env, activeStoryUserIds, activeStoryUrlMap)
       premium: profileIsPremium,
       premium_until: u.premium_until || null,
       ghost_mode: hasGhostMode,
-      fake: !!u.fake,
+      fake: isFakeFeedProfile(u),
       feed_priority: Math.max(0, Number(u.feed_priority || 0)),
       marital_status: u.marital_status || '',
       sexual_orientation: u.sexual_orientation || '',
@@ -580,7 +611,11 @@ function orderFeedBaseProfiles(
 
   if (roleBuckets.length <= 1) {
     scoredProfiles.sort(compareFeedBucketProfiles);
-    return scoredProfiles.slice(0, limit);
+    return interleaveRealAndFakeProfiles(
+      scoredProfiles.filter((profile) => !isFakeFeedProfile(profile)),
+      scoredProfiles.filter(isFakeFeedProfile),
+      limit,
+    );
   }
 
   const bucketMap = new Map(roleBuckets.map((bucket) => [bucket.key, []]));
@@ -595,18 +630,14 @@ function orderFeedBaseProfiles(
     const list = bucketMap.get(bucket.key) || [];
     list.sort(compareFeedBucketProfiles);
     for (const profile of list) {
-      const targetMap = Number(profile.fake ? 1 : 0) === 1 ? fakeBucketMap : realBucketMap;
+      const targetMap = isFakeFeedProfile(profile) ? fakeBucketMap : realBucketMap;
       targetMap.get(bucket.key).push(profile);
     }
   }
 
   const realProfiles = interleaveRoleBuckets(roleBuckets, realBucketMap, limit);
-  if (realProfiles.length >= limit) return realProfiles.slice(0, limit);
-
-  return [
-    ...realProfiles,
-    ...interleaveRoleBuckets(roleBuckets, fakeBucketMap, limit - realProfiles.length),
-  ].slice(0, limit);
+  const fakeProfiles = interleaveRoleBuckets(roleBuckets, fakeBucketMap, limit);
+  return interleaveRealAndFakeProfiles(realProfiles, fakeProfiles, limit);
 }
 
 function mapStoryRowForResponse(row, env, viewerId = '', viewerCanWatchAllStories = false) {
