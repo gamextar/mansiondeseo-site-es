@@ -1166,7 +1166,7 @@ export async function getAppBootstrap() {
   }
 
   return sharedGet('bootstrap', async () => {
-    const data = await apiFetch('/app/bootstrap', { suppressRecoveryEvent: true });
+    const data = await apiFetch('/app/bootstrap');
     if (data?.user) cacheMeResponse({ user: data.user });
     if (typeof data?.unread === 'number') setUnreadCountCache({ unread: data.unread });
     sessionCache.set('appBootstrap', data);
