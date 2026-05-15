@@ -23,7 +23,7 @@ import FeedShellProbePage from './pages/FeedShellProbePage';
 import ProfileShellProbePage from './pages/ProfileShellProbePage';
 import SafeAreaDebugPage from './pages/SafeAreaDebugPage';
 import ProfilePage from './pages/ProfilePage';
-import { STORY_FEED_CACHE_INVALIDATED_EVENT, getToken, getStoredUser, setToken, setStoredUser, clearAuth, clearAppBootstrapCache, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, reportClientError, hasEverLoggedIn } from './lib/api';
+import { STORY_FEED_CACHE_INVALIDATED_EVENT, API_RECOVERY_EVENT, API_RECOVERY_CLEAR_EVENT, getToken, getStoredUser, setToken, setStoredUser, clearAuth, clearAppBootstrapCache, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, reportClientError, hasEverLoggedIn, recoverLoginEnvironment } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -1142,6 +1142,7 @@ export default function App() {
   const [bootShieldVisible, setBootShieldVisible] = useState(() => debugFlags.bootShield);
   const [snapshotShieldVisible, setSnapshotShieldVisible] = useState(false);
   const [bootstrapError, setBootstrapError] = useState(null);
+  const [apiRecovery, setApiRecovery] = useState(null);
   const bootstrapStartedRef = useRef(false);
   const reportedClientErrorsRef = useRef(new Set());
   const storyFeedWsRef = useRef(null);
@@ -1182,12 +1183,15 @@ export default function App() {
     }
   }, []);
 
-  const handlePrivacyLogout = useCallback(() => {
-    clearAuth();
-    setRegisteredState(false);
-    setUserState(null);
+  const handleSessionRetry = useCallback(() => {
+    clearAppBootstrapCache();
+    if (typeof window !== 'undefined') window.location.reload();
+  }, []);
+
+  const handleSecureSessionReset = useCallback(async () => {
+    await recoverLoginEnvironment();
     if (typeof window !== 'undefined') {
-      window.location.replace(hasEverLoggedIn() ? '/login' : '/');
+      window.location.replace('/login?session=recovered');
     }
   }, []);
 
@@ -1199,10 +1203,36 @@ export default function App() {
       setBootstrapUnread(null);
       setBootstrapStories([]);
       setBootstrapError(null);
+      setApiRecovery(null);
       setBootstrapResolved(true);
     };
     window.addEventListener('mansion-auth-expired', handleAuthExpired);
     return () => window.removeEventListener('mansion-auth-expired', handleAuthExpired);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const handleRecoveryNeeded = (event) => {
+      if (!getToken()) return;
+      setApiRecovery(event.detail || { reason: 'api_recovery_needed' });
+    };
+
+    const handleRecoveryCleared = (event) => {
+      const requestId = event.detail?.requestId;
+      setApiRecovery((current) => {
+        if (!current) return null;
+        if (requestId && current.requestId && current.requestId !== requestId) return current;
+        return null;
+      });
+    };
+
+    window.addEventListener(API_RECOVERY_EVENT, handleRecoveryNeeded);
+    window.addEventListener(API_RECOVERY_CLEAR_EVENT, handleRecoveryCleared);
+    return () => {
+      window.removeEventListener(API_RECOVERY_EVENT, handleRecoveryNeeded);
+      window.removeEventListener(API_RECOVERY_CLEAR_EVENT, handleRecoveryCleared);
+    };
   }, []);
 
   useEffect(() => {
@@ -1576,36 +1606,45 @@ export default function App() {
     };
   }, [debugFlags.skipBootstrap, setUser, siteSettings]);
 
+  const sessionRecovery = bootstrapError || apiRecovery;
+  const sessionRecoveryTitle = bootstrapError
+    ? 'No pudimos iniciar tu sesión'
+    : apiRecovery?.reason === 'slow_request'
+      ? 'La app está tardando demasiado'
+      : 'No pudimos cargar esta sección';
+  const sessionRecoveryDescription = bootstrapError
+    ? 'Puede haber sido una conexión inestable o una respuesta lenta del servidor. Reintentá para volver a cargar la app.'
+    : apiRecovery?.reason === 'slow_request'
+      ? 'La conexión con el servidor sigue abierta, pero está demorando más de lo normal. Podés reintentar sin cerrar tu cuenta.'
+      : 'Parece que la conexión con la base de datos o la sesión quedó trabada. Reintentá y, si sigue igual, reiniciá la sesión segura.';
+
   return (
     <BrowserRouter>
       <AuthContext.Provider value={{ registered, setRegistered, user, setUser, siteSettings, setSiteSettings, bootstrapStories, setBootstrapStories }}>
       <UnreadProvider initialUnread={bootstrapUnread} bootstrapResolved={bootstrapResolved}>
       <div className="relative min-h-screen">
-        {bootstrapError && getToken() && (
+        {sessionRecovery && getToken() && (
           <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-mansion-base px-5 text-text-primary">
             <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-mansion-card p-5 shadow-2xl shadow-black/50">
               <p className="text-[10px] uppercase tracking-[0.24em] text-mansion-gold">Sesión</p>
-              <h1 className="mt-3 text-xl font-semibold text-white">No pudimos iniciar tu sesión</h1>
+              <h1 className="mt-3 text-xl font-semibold text-white">{sessionRecoveryTitle}</h1>
               <p className="mt-3 text-sm leading-6 text-text-muted">
-                Puede haber sido una conexión inestable o una respuesta lenta del servidor. Reintentá para volver a cargar la app.
+                {sessionRecoveryDescription}
               </p>
               <div className="mt-5 flex flex-col gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    clearAppBootstrapCache();
-                    window.location.reload();
-                  }}
+                  onClick={handleSessionRetry}
                   className="rounded-xl bg-mansion-gold px-4 py-3 text-sm font-semibold text-black transition-colors hover:bg-mansion-gold/90"
                 >
                   Reintentar
                 </button>
                 <button
                   type="button"
-                  onClick={() => handlePrivacyLogout('bootstrap_error_manual_logout')}
+                  onClick={handleSecureSessionReset}
                   className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-text-primary transition-colors hover:bg-white/10"
                 >
-                  Cerrar sesión
+                  Reiniciar sesión segura
                 </button>
               </div>
             </div>

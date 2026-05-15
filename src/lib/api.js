@@ -41,8 +41,11 @@ const API_REGISTER_TIMEOUT_MS = 75_000;
 const LOGIN_ENV_RECOVERY_KEY = 'mansion_login_env_recovery';
 const LOGIN_SW_CLEAN_KEY = 'mansion_login_sw_cleaned';
 export const STORY_FEED_CACHE_INVALIDATED_EVENT = 'mansion-story-feed-cache-invalidated';
+export const API_RECOVERY_EVENT = 'mansion-api-recovery-needed';
+export const API_RECOVERY_CLEAR_EVENT = 'mansion-api-recovery-cleared';
 const sharedGetCache = new Map();
 let avatarUploadCacheSeq = 0;
+let apiRequestSeq = 0;
 const sessionCache = {
   get(key, ttlMs = 0) {
     try {
@@ -135,6 +138,38 @@ function redirectToLogin() {
   if (typeof window === 'undefined') return;
   const nextPath = hasEverLoggedIn() ? '/login' : '/';
   window.location.href = nextPath;
+}
+
+function shouldEmitApiRecovery(path, token, options = {}) {
+  if (!token || options.suppressRecoveryEvent) return false;
+  const normalizedPath = String(path || '');
+  return !normalizedPath.startsWith('/client-errors');
+}
+
+function emitApiRecoveryNeeded(detail = {}) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(API_RECOVERY_EVENT, {
+      detail: {
+        at: new Date().toISOString(),
+        online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+        route: `${window.location.pathname}${window.location.search}`,
+        ...detail,
+      },
+    }));
+  } catch {}
+}
+
+function emitApiRecoveryCleared(detail = {}) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(API_RECOVERY_CLEAR_EVENT, {
+      detail: {
+        at: new Date().toISOString(),
+        ...detail,
+      },
+    }));
+  } catch {}
 }
 
 function mergeMeCache(partialUser) {
@@ -657,8 +692,26 @@ async function apiFetch(path, options = {}) {
   const requestTimeoutMs = Number(options.timeoutMs || (method === 'GET' ? API_GET_TIMEOUT_MS : API_MUTATION_TIMEOUT_MS));
   const shouldApplyTimeout = requestTimeoutMs > 0 && !options.signal && typeof AbortController !== 'undefined';
   const controller = shouldApplyTimeout ? new AbortController() : null;
+  const requestId = `api:${Date.now()}:${apiRequestSeq += 1}`;
+  const canEmitRecovery = shouldEmitApiRecovery(path, token, options);
+  let recoveryNoticeShown = false;
+  let requestFailed = false;
   const timeoutId = controller
     ? globalThis.setTimeout(() => controller.abort(), requestTimeoutMs)
+    : null;
+  const recoveryDelayMs = Math.min(25_000, Math.max(12_000, requestTimeoutMs - 5_000));
+  const recoveryTimerId = canEmitRecovery && requestTimeoutMs > recoveryDelayMs
+    ? globalThis.setTimeout(() => {
+      recoveryNoticeShown = true;
+      emitApiRecoveryNeeded({
+        requestId,
+        reason: 'slow_request',
+        method,
+        path,
+        timeoutMs: requestTimeoutMs,
+        message: 'La conexión con el servidor está tardando más de lo esperado.',
+      });
+    }, recoveryDelayMs)
     : null;
   const debug = getApiDebugController();
   const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -685,15 +738,38 @@ async function apiFetch(path, options = {}) {
       signal: controller?.signal || options.signal,
     });
   } catch (err) {
+    requestFailed = true;
     if (err?.name === 'AbortError') {
       const timeoutError = new Error('Tiempo de espera agotado. Probá recargar la página.');
       timeoutError.status = 0;
       timeoutError.code = 'api_timeout';
+      if (canEmitRecovery) {
+        recoveryNoticeShown = true;
+        emitApiRecoveryNeeded({
+          requestId,
+          reason: 'timeout',
+          method,
+          path,
+          timeoutMs: requestTimeoutMs,
+          message: timeoutError.message,
+        });
+      }
       throw timeoutError;
+    }
+    if (canEmitRecovery) {
+      recoveryNoticeShown = true;
+      emitApiRecoveryNeeded({
+        requestId,
+        reason: 'network_error',
+        method,
+        path,
+        message: err?.message || 'Error de red',
+      });
     }
     throw err;
   } finally {
     if (timeoutId) globalThis.clearTimeout(timeoutId);
+    if (recoveryTimerId) globalThis.clearTimeout(recoveryTimerId);
   }
   const finishedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   let timingHeader = res.headers.get('X-Profiles-Timing') || '';
@@ -736,7 +812,25 @@ async function apiFetch(path, options = {}) {
     const err = new Error(data.error || 'Error del servidor');
     err.status = res.status;
     err.data = data;
+    requestFailed = true;
+    if (canEmitRecovery && res.status >= 500) {
+      recoveryNoticeShown = true;
+      emitApiRecoveryNeeded({
+        requestId,
+        reason: 'server_error',
+        method,
+        path,
+        status: res.status,
+        message: err.message,
+      });
+    } else if (recoveryNoticeShown) {
+      emitApiRecoveryCleared({ requestId });
+    }
     throw err;
+  }
+
+  if (recoveryNoticeShown && !requestFailed) {
+    emitApiRecoveryCleared({ requestId });
   }
 
   return data;
