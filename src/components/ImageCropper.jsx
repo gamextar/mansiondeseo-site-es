@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { Check, X } from 'lucide-react';
 import { buildOptimizedImageName, exportCanvasImage } from '../lib/imageOptimize';
 
-const CIRCLE_SIZE = 280;
+const DEFAULT_CIRCLE_SIZE = 280;
 const OUTPUT_SIZE = 1080;
 const THUMB_SIZE = 480;
 const EXPORT_QUALITY = 0.88;
 const THUMB_QUALITY = 0.78;
+
+function getResponsiveCropSize() {
+	if (typeof window === 'undefined') return DEFAULT_CIRCLE_SIZE;
+	const viewportWidth = window.innerWidth || 390;
+	const viewportHeight = window.innerHeight || 780;
+	const widthBound = viewportWidth - 88;
+	const heightBound = Math.floor(viewportHeight * 0.36);
+	return Math.max(220, Math.min(DEFAULT_CIRCLE_SIZE, widthBound, heightBound));
+}
 
 function loadImage(src) {
 	return new Promise((resolve, reject) => {
@@ -18,8 +28,8 @@ function loadImage(src) {
 	});
 }
 
-async function cropCircle(file, image, zoom, offsetX, offsetY, containerW, containerH) {
-	const radius = CIRCLE_SIZE / 2;
+async function cropCircle(file, image, zoom, offsetX, offsetY, containerW, containerH, circleSize) {
+	const radius = circleSize / 2;
 	const centerX = containerW / 2;
 	const centerY = containerH / 2;
 
@@ -31,7 +41,7 @@ async function cropCircle(file, image, zoom, offsetX, offsetY, containerW, conta
 
 	const srcX = (centerX - radius - imgX) / scale;
 	const srcY = (centerY - radius - imgY) / scale;
-	const srcSize = CIRCLE_SIZE / scale;
+	const srcSize = circleSize / scale;
 
 	const canvas = document.createElement('canvas');
 	canvas.width = OUTPUT_SIZE;
@@ -59,8 +69,8 @@ async function cropCircle(file, image, zoom, offsetX, offsetY, containerW, conta
 	};
 }
 
-function clampOffset(ox, oy, zoom, imgW, imgH, containerW, containerH) {
-	const radius = CIRCLE_SIZE / 2;
+function clampOffset(ox, oy, zoom, imgW, imgH, containerW, containerH, circleSize) {
+	const radius = circleSize / 2;
 	const totalScale = Math.max(containerW / imgW, containerH / imgH) * zoom;
 	const drawW = imgW * totalScale;
 	const drawH = imgH * totalScale;
@@ -81,6 +91,7 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 	const [offset, setOffset] = useState({ x: 0, y: 0 });
 	const [processing, setProcessing] = useState(false);
 	const [error, setError] = useState('');
+	const [circleSize, setCircleSize] = useState(() => getResponsiveCropSize());
 
 	const containerRef = useRef(null);
 	const dragging = useRef(false);
@@ -98,18 +109,30 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 		return () => URL.revokeObjectURL(url);
 	}, [file]);
 
+	useEffect(() => {
+		const handleResize = () => setCircleSize(getResponsiveCropSize());
+		handleResize();
+		window.addEventListener('resize', handleResize);
+		window.addEventListener('orientationchange', handleResize);
+		return () => {
+			window.removeEventListener('resize', handleResize);
+			window.removeEventListener('orientationchange', handleResize);
+		};
+	}, []);
+
 	// If no file provided, render nothing (prevents crash from legacy positionOnly usage)
 	if (!file) return null;
 
-	const containerW = CIRCLE_SIZE + 40;
-	const containerH = CIRCLE_SIZE + 40;
+	const framePadding = circleSize < DEFAULT_CIRCLE_SIZE ? 24 : 40;
+	const containerW = circleSize + framePadding;
+	const containerH = circleSize + framePadding;
 
 	const clamp = useCallback(
 		(ox, oy, z) => {
 			if (!imgNatural) return { x: ox, y: oy };
-			return clampOffset(ox, oy, z, imgNatural.w, imgNatural.h, containerW, containerH);
+			return clampOffset(ox, oy, z, imgNatural.w, imgNatural.h, containerW, containerH, circleSize);
 		},
-		[imgNatural, containerW, containerH],
+		[imgNatural, containerW, containerH, circleSize],
 	);
 
 	useEffect(() => {
@@ -190,7 +213,7 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 			const objectUrl = URL.createObjectURL(file);
 			const image = await loadImage(objectUrl);
 			URL.revokeObjectURL(objectUrl);
-			const { file: cropped, thumbnailFile } = await cropCircle(file, image, zoom, offset.x, offset.y, containerW, containerH);
+			const { file: cropped, thumbnailFile } = await cropCircle(file, image, zoom, offset.x, offset.y, containerW, containerH, circleSize);
 			onCrop(cropped, { thumbnailFile });
 		} catch (err) {
 			setError(err.message || 'No se pudo recortar la imagen.');
@@ -199,19 +222,20 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 		}
 	};
 
-	return (
-		<div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm">
+	const modal = (
+		<div className="fixed inset-0 z-[10000] overflow-y-auto overflow-x-hidden bg-black/85 px-3 py-[calc(env(safe-area-inset-top)+12px)] pb-[calc(env(safe-area-inset-bottom)+16px)] backdrop-blur-sm">
+			<div className="flex min-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-28px)] items-start justify-center sm:items-center">
 			<motion.div
 				initial={{ opacity: 0, scale: 0.96, y: 12 }}
 				animate={{ opacity: 1, scale: 1, y: 0 }}
 				exit={{ opacity: 0, scale: 0.96, y: 12 }}
 				transition={{ duration: 0.2, ease: 'easeOut' }}
-				className="w-full max-w-md rounded-[2rem] border border-white/10 bg-mansion-card p-5 shadow-2xl"
+				className="w-full max-w-[28rem] overflow-hidden rounded-[1.5rem] border border-white/10 bg-mansion-card shadow-2xl sm:rounded-[2rem]"
 			>
-				<div className="flex items-start justify-between gap-4">
+				<div className="flex items-start justify-between gap-4 p-4 pb-0 sm:p-5 sm:pb-0">
 					<div>
-						<h3 className="font-display text-xl text-text-primary">Ajusta tu foto</h3>
-						<p className="mt-1 text-sm text-text-muted">Arrastrá la imagen para centrarla.</p>
+						<h3 className="font-display text-lg text-text-primary sm:text-xl">Ajusta tu foto</h3>
+						<p className="mt-1 text-xs text-text-muted sm:text-sm">Arrastrá la imagen para centrarla.</p>
 					</div>
 					<button
 						type="button"
@@ -223,10 +247,10 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 					</button>
 				</div>
 
-				<div className="mt-5 flex justify-center">
+				<div className="mt-4 flex justify-center px-4 sm:mt-5 sm:px-5">
 					<div
 						ref={containerRef}
-						className="relative cursor-grab overflow-hidden rounded-2xl bg-black/60 select-none active:cursor-grabbing"
+						className="relative max-w-full cursor-grab overflow-hidden rounded-2xl bg-black/60 select-none active:cursor-grabbing"
 						style={{ width: containerW, height: containerH, touchAction: 'none' }}
 						onPointerDown={onPointerDown}
 						onPointerMove={onPointerMove}
@@ -259,7 +283,7 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 									<circle
 										cx={containerW / 2}
 										cy={containerH / 2}
-										r={CIRCLE_SIZE / 2}
+										r={circleSize / 2}
 										fill="black"
 									/>
 								</mask>
@@ -273,7 +297,7 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 							<circle
 								cx={containerW / 2}
 								cy={containerH / 2}
-								r={CIRCLE_SIZE / 2}
+								r={circleSize / 2}
 								fill="none"
 								stroke="rgba(212,175,55,0.6)"
 								strokeWidth="2"
@@ -282,7 +306,7 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 					</div>
 				</div>
 
-				<div className="mt-5">
+				<div className="mt-4 px-4 sm:mt-5 sm:px-5">
 					<div className="mb-2 flex items-center justify-between text-xs text-text-dim">
 						<span>Zoom</span>
 						<span>{zoom.toFixed(1)}x</span>
@@ -299,16 +323,16 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 				</div>
 
 				{error && (
-					<div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+					<div className="mx-4 mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300 sm:mx-5">
 						{error}
 					</div>
 				)}
 
-				<div className="mt-5 flex gap-3">
+				<div className="sticky bottom-0 mt-4 grid grid-cols-2 gap-3 border-t border-white/5 bg-mansion-card/95 p-4 backdrop-blur sm:mt-5 sm:p-5">
 					<button
 						type="button"
 						onClick={onCancel}
-						className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 font-medium text-text-primary transition-colors hover:bg-white/10"
+						className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm font-medium text-text-primary transition-colors hover:bg-white/10 sm:px-4 sm:text-base"
 					>
 						Cancelar
 					</button>
@@ -316,13 +340,17 @@ export default function ImageCropper({ file, onCrop, onCancel }) {
 						type="button"
 						onClick={handleConfirm}
 						disabled={processing}
-						className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-mansion-gold px-4 py-3 font-semibold text-mansion-base transition-colors hover:bg-mansion-gold-light disabled:opacity-60"
+						className="inline-flex items-center justify-center gap-2 rounded-2xl bg-mansion-gold px-3 py-3 text-sm font-semibold text-mansion-base transition-colors hover:bg-mansion-gold-light disabled:opacity-60 sm:px-4 sm:text-base"
 					>
 						<Check className="h-4 w-4" />
 						{processing ? 'Recortando...' : 'Usar foto'}
 					</button>
 				</div>
 			</motion.div>
+			</div>
 		</div>
 	);
+
+	if (typeof document === 'undefined') return modal;
+	return createPortal(modal, document.body);
 }
