@@ -33,6 +33,22 @@ const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
 const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 68;
 const VIDEO_FEED_RAIL_SOURCE = 'rail';
 
+function releaseVideoElement(video) {
+  if (!video) return;
+  try {
+    video.pause();
+  } catch {}
+  try {
+    video.removeAttribute('src');
+    video.load();
+  } catch {}
+}
+
+function releaseStoryVideosInDocument() {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll('video[data-story-video="true"]').forEach(releaseVideoElement);
+}
+
 function normalizeLandscapeAspectRatio(value) {
   const ratio = Number(value);
   if (!Number.isFinite(ratio) || ratio <= 1) return 16 / 9;
@@ -275,6 +291,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
   const userPausedRef = useRef(false);
   const resumeAfterAppFocusRef = useRef(false);
   const recoveryTimerRef = useRef(null);
+  const playIconTimerRef = useRef(null);
   const playAttemptIdRef = useRef(0);
   const lastRecoveryAtRef = useRef(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -296,13 +313,48 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     : undefined;
   const expandedSideOffset = getExpandedStorySideOffset(videoAspectRatio);
 
-  // Once src is set, never clear it — clearing causes browser to reload the video
-  // which produces the black flash/glitch at boundaries. Matches original behavior.
+  // Keep src while the card is in the active preload window to avoid black flashes
+  // at story boundaries, but release it once the card moves away or unmounts.
   const loadedSrcRef = useRef(undefined);
   if (shouldLoad && videoSrc) {
     loadedSrcRef.current = videoSrc;
   }
   const activeSrc = loadedSrcRef.current ? resolveMediaUrl(loadedSrcRef.current) : loadedSrcRef.current;
+
+  const clearRecoveryTimer = useCallback(() => {
+    if (recoveryTimerRef.current) {
+      window.clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = null;
+    }
+  }, []);
+
+  const clearPlayIconTimer = useCallback(() => {
+    if (playIconTimerRef.current) {
+      window.clearTimeout(playIconTimerRef.current);
+      playIconTimerRef.current = null;
+    }
+  }, []);
+
+  const releaseCardVideo = useCallback((updateRenderState = true) => {
+    clearRecoveryTimer();
+    clearPlayIconTimer();
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+
+    releaseVideoElement(videoRef.current);
+    loadedSrcRef.current = undefined;
+    resumeAfterAppFocusRef.current = false;
+    userPausedRef.current = false;
+    revealSentRef.current = false;
+
+    if (progressBarRef.current) progressBarRef.current.style.width = '0%';
+    if (!updateRenderState) return;
+
+    setIsPlaying(false);
+    setIsVideoReady(false);
+    setShowPlayIcon(false);
+    setVideoResetToken((token) => token + 1);
+  }, [clearPlayIconTimer, clearRecoveryTimer]);
 
   useEffect(() => {
     revealSentRef.current = false;
@@ -365,10 +417,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     playAttemptIdRef.current = attemptId;
     const startedAt = Number(video.currentTime || 0);
 
-    if (recoveryTimerRef.current) {
-      window.clearTimeout(recoveryTimerRef.current);
-      recoveryTimerRef.current = null;
-    }
+    clearRecoveryTimer();
 
     video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
 
@@ -386,7 +435,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       const looksSuspended = currentVideo.paused || !readyEnough || (!advanced && !currentVideo.ended);
       if (looksSuspended) resetSuspendedVideo();
     }, 900);
-  }, [activeSrc, forcePaused, isActive, resetSuspendedVideo]);
+  }, [activeSrc, clearRecoveryTimer, forcePaused, isActive, resetSuspendedVideo]);
 
   useEffect(() => {
     if (isActive) {
@@ -488,10 +537,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       }
 
       resumeAfterAppFocusRef.current = !video.paused || isPlaying;
-      if (recoveryTimerRef.current) {
-        window.clearTimeout(recoveryTimerRef.current);
-        recoveryTimerRef.current = null;
-      }
+      clearRecoveryTimer();
 
       try {
         video.pause();
@@ -525,17 +571,14 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       window.removeEventListener('pageshow', resumeFromBackground);
       window.removeEventListener('focus', resumeFromBackground);
     };
-  }, [activeSrc, attemptPlay, forcePaused, isActive, isPlaying, pauseOnAppBackground]);
+  }, [activeSrc, attemptPlay, clearRecoveryTimer, forcePaused, isActive, isPlaying, pauseOnAppBackground]);
 
   useEffect(() => {
     if (!forcePaused) return;
     const video = videoRef.current;
     resumeAfterAppFocusRef.current = false;
     userPausedRef.current = true;
-    if (recoveryTimerRef.current) {
-      window.clearTimeout(recoveryTimerRef.current);
-      recoveryTimerRef.current = null;
-    }
+    clearRecoveryTimer();
     if (video) {
       try {
         video.pause();
@@ -544,14 +587,16 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
     if (progressBarRef.current) progressBarRef.current.style.width = '0%';
     setIsPlaying(false);
     cancelAnimationFrame(rafRef.current);
-  }, [forcePaused]);
+  }, [clearRecoveryTimer, forcePaused]);
+
+  useEffect(() => {
+    if (shouldLoad || isActive) return;
+    releaseCardVideo(true);
+  }, [isActive, releaseCardVideo, shouldLoad]);
 
   useEffect(() => () => {
-    if (recoveryTimerRef.current) {
-      window.clearTimeout(recoveryTimerRef.current);
-      recoveryTimerRef.current = null;
-    }
-  }, []);
+    releaseCardVideo(false);
+  }, [releaseCardVideo]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -571,7 +616,11 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
       setIsPlaying(false);
     }
     setShowPlayIcon(true);
-    setTimeout(() => setShowPlayIcon(false), 600);
+    clearPlayIconTimer();
+    playIconTimerRef.current = window.setTimeout(() => {
+      playIconTimerRef.current = null;
+      setShowPlayIcon(false);
+    }, 600);
   };
 
   const handleVideoEnd = () => {
@@ -594,6 +643,7 @@ function StoryCard({ story, videoSrc, isActive, shouldLoad, isMuted, avatarSize,
         <video
           key={`${activeSrc || 'empty-video'}-${videoResetToken}`}
           ref={videoRef}
+          data-story-video="true"
           src={activeSrc}
           className={`absolute inset-0 w-full h-full ${videoObjectClass} transition-opacity duration-[1400ms] ease-[cubic-bezier(0.22,1,0.36,1)]`}
           style={{
@@ -1098,6 +1148,7 @@ export default function VideoFeedPage() {
     } catch {}
   }, [user?.id]);
   const closeOverlay = useCallback(() => {
+    releaseStoryVideosInDocument();
     flushPendingViewedStories();
     if (backgroundLocation?.pathname) {
       navigate(
@@ -1113,6 +1164,7 @@ export default function VideoFeedPage() {
     navigate('/radar', { replace: true });
   }, [backgroundLocation, flushPendingViewedStories, navigate]);
   const closeToHomeFeed = useCallback(() => {
+    releaseStoryVideosInDocument();
     flushPendingViewedStories();
     try {
       sessionStorage.removeItem(VIDEO_FEED_INDEX_KEY);
