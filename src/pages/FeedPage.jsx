@@ -363,8 +363,9 @@ export default function FeedPage({ initialData }) {
   const cols = useGridColumns();
   const isDesktopViewport = cols >= 4;
   const desktopStoryRailEnhanced = isDesktopViewport;
-  const cached = initialData || getCachedFeed();
   const { user, setUser, siteSettings, bootstrapStories, setBootstrapStories } = useAuth();
+  const activeFeedFilter = getHomeStoriesViewerSeeking(user).join(',');
+  const cached = initialData || getCachedFeed(activeFeedFilter);
   const isStandaloneMobileApp = detectStandaloneMobile();
   const [profiles, setProfiles] = useState(cached?.profiles || []);
   const [homeStories, setHomeStories] = useState(() => {
@@ -684,7 +685,8 @@ export default function FeedPage({ initialData }) {
   // Initial/config load — reruns when the viewport crosses the mobile/desktop page-size boundary.
   useEffect(() => {
     if (!getToken()) { navigate('/login'); return; }
-    const cachedFeed = getCachedFeed();
+    const filter = getFeedProfileFilter(user);
+    const cachedFeed = getCachedFeed(filter);
     const currentSettings = settingsRef.current;
     const expectedCardsPerPage = getFeedCardsPerPage(currentSettings, isDesktopViewport);
     const cachedPageSize = Number(cachedFeed?.pageSize) || 0;
@@ -832,7 +834,8 @@ export default function FeedPage({ initialData }) {
         if (shouldRefreshStories) {
           void loadHomeStories({ syncBootstrap: true });
         }
-        const cachedFeed = getCachedFeed();
+        const filter = getFeedProfileFilter(user);
+        const cachedFeed = getCachedFeed(filter);
         const s = settingsRef.current;
         const nextCardsPerPage = getFeedCardsPerPage(s, isDesktopViewport);
         const nextBlockSize = nextCardsPerPage * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES);
@@ -874,7 +877,8 @@ export default function FeedPage({ initialData }) {
       if (Date.now() - lastHomeStoriesRefreshRef.current > STORY_RAIL_FOCUS_REFRESH_MIN_MS) {
         void loadHomeStories({ syncBootstrap: true });
       }
-      const cachedFeed = getCachedFeed();
+      const filter = getFeedProfileFilter(user);
+      const cachedFeed = getCachedFeed(filter);
       const s = settingsRef.current;
       const nextCardsPerPage = getFeedCardsPerPage(s, isDesktopViewport);
       const nextBlockSize = nextCardsPerPage * (s?.feedPrefetchPages ?? DEFAULT_PREFETCH_PAGES);
@@ -981,6 +985,7 @@ export default function FeedPage({ initialData }) {
       setPageCursor(nextPageCursor);
       setCachedFeed({
         profiles,
+        filterKey: getFeedProfileFilter(user),
         viewerPremium,
         settings: safeSettings,
         totalProfiles,
@@ -992,7 +997,8 @@ export default function FeedPage({ initialData }) {
         hasMore,
       });
     } else {
-      const prefetchedKey = makeFeedBlockKey(nextBlockCursor, blockSize);
+      const filter = getFeedProfileFilter(user);
+      const prefetchedKey = makeFeedBlockKey(nextBlockCursor, blockSize, filter);
       const prefetched = prefetchedBlocksRef.current.get(prefetchedKey);
       if (prefetched) {
         applyLoadedProfiles({
