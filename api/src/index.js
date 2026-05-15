@@ -141,8 +141,6 @@ const FEED_SNAPSHOT_TTL_MS = 300_000;
 const PROFILE_SNAPSHOT_FEED_MAX_WINDOW = 5000;
 const FEED_PROXIMITY_CITY_BOOST = 22;
 const FEED_PROXIMITY_REGION_BOOST = 10;
-const FEED_EARLY_REAL_WINDOW = FEED_PROFILE_LIMIT;
-const FEED_EARLY_REAL_TARGET_RATIO = 0.72;
 const STORY_CIRCLE_FALLBACK_SIZE = 88;
 const STORY_CIRCLE_FALLBACK_BORDER_PERCENT = 4;
 const STORY_CIRCLE_FALLBACK_INNER_GAP_PERCENT = 3;
@@ -404,52 +402,6 @@ function compareFeedBucketProfiles(a, b) {
   return String(b.id || '').localeCompare(String(a.id || ''));
 }
 
-function isRealFeedProfile(profile) {
-  return Number(profile?.fake ? 1 : 0) !== 1;
-}
-
-function boostRealProfilesInEarlyWindow(profiles, limit = FEED_PROFILE_LIMIT) {
-  const list = Array.isArray(profiles) ? profiles : [];
-  if (list.length <= 1) return list;
-
-  const windowSize = Math.min(list.length, Math.max(1, Number(limit) || FEED_PROFILE_LIMIT), FEED_EARLY_REAL_WINDOW);
-  const firstWindow = list.slice(0, windowSize);
-  const restWindow = list.slice(windowSize);
-  const totalReal = list.reduce((count, profile) => count + (isRealFeedProfile(profile) ? 1 : 0), 0);
-  const currentReal = firstWindow.reduce((count, profile) => count + (isRealFeedProfile(profile) ? 1 : 0), 0);
-  const targetReal = Math.min(totalReal, Math.ceil(windowSize * FEED_EARLY_REAL_TARGET_RATIO));
-
-  if (currentReal >= targetReal) return list;
-
-  const promoted = restWindow
-    .filter(isRealFeedProfile)
-    .slice(0, targetReal - currentReal);
-  if (promoted.length === 0) return list;
-
-  const promotedIds = new Set(promoted.map((profile) => String(profile?.id || '')).filter(Boolean));
-  const displaced = [];
-  let promotedIndex = 0;
-  let realCount = currentReal;
-
-  const nextFirstWindow = firstWindow.map((profile) => {
-    if (realCount >= targetReal || promotedIndex >= promoted.length || isRealFeedProfile(profile)) {
-      return profile;
-    }
-    displaced.push(profile);
-    realCount += 1;
-    const replacement = promoted[promotedIndex];
-    promotedIndex += 1;
-    return replacement;
-  });
-
-  const remainingRest = restWindow.filter((profile) => !promotedIds.has(String(profile?.id || '')));
-  return [
-    ...nextFirstWindow,
-    ...displaced,
-    ...remainingRest,
-  ];
-}
-
 function compareStoryRows(a, b) {
   const aFake = Number(a?.fake || 0);
   const bFake = Number(b?.fake || 0);
@@ -685,7 +637,7 @@ function orderFeedBaseProfiles(
 
   if (roleBuckets.length <= 1) {
     scoredProfiles.sort(compareFeedBucketProfiles);
-    return boostRealProfilesInEarlyWindow(scoredProfiles, limit).slice(0, limit);
+    return scoredProfiles.slice(0, limit);
   }
 
   const bucketMap = new Map(roleBuckets.map((bucket) => [bucket.key, []]));
@@ -698,7 +650,7 @@ function orderFeedBaseProfiles(
     const list = bucketMap.get(bucket.key) || [];
     list.sort(compareFeedBucketProfiles);
   }
-  return boostRealProfilesInEarlyWindow(interleaveRoleBuckets(roleBuckets, bucketMap, limit), limit).slice(0, limit);
+  return interleaveRoleBuckets(roleBuckets, bucketMap, limit);
 }
 
 function mapStoryRowForResponse(row, env, viewerId = '', viewerCanWatchAllStories = false) {
