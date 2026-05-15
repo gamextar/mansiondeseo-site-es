@@ -105,6 +105,75 @@ function clearStoryRailCaches() {
   } catch {}
 }
 
+function RouteLoadingFallback() {
+  const [stalled, setStalled] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStalled(true), 9000);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const reloadApp = useCallback(() => {
+    window.location.reload();
+  }, []);
+
+  const clearRuntimeCacheAndReload = useCallback(() => {
+    void (async () => {
+      try {
+        if ('caches' in window) {
+          const keys = await window.caches.keys();
+          await Promise.all(keys.map((key) => window.caches.delete(key)));
+        }
+      } catch {}
+
+      try {
+        if ('serviceWorker' in window.navigator) {
+          const registrations = await window.navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((registration) => registration.unregister()));
+        }
+      } catch {}
+
+      window.location.reload();
+    })();
+  }, []);
+
+  if (!stalled) {
+    return (
+      <div className="min-h-screen bg-mansion-base flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-mansion-base px-5 flex items-center justify-center text-text-primary">
+      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-mansion-card p-5 shadow-2xl shadow-black/50">
+        <p className="text-[10px] uppercase tracking-[0.24em] text-mansion-gold">Carga</p>
+        <h1 className="mt-3 text-xl font-semibold text-white">La app no terminó de cargar</h1>
+        <p className="mt-3 text-sm leading-6 text-text-muted">
+          Puede haber quedado un archivo viejo en cache. Reintentá la carga sin cerrar tu sesión.
+        </p>
+        <div className="mt-5 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={reloadApp}
+            className="rounded-xl bg-mansion-gold px-4 py-3 text-sm font-semibold text-black transition-colors hover:bg-mansion-gold/90"
+          >
+            Reintentar
+          </button>
+          <button
+            type="button"
+            onClick={clearRuntimeCacheAndReload}
+            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-text-primary transition-colors hover:bg-white/10"
+          >
+            Limpiar cache y recargar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function resetDocumentScroll(scrollTop = 0) {
   if (typeof window === 'undefined') return;
   const root = document.documentElement;
@@ -830,11 +899,7 @@ function AppLayout() {
         data-mobile-standalone={isStandaloneMobileApp ? 'true' : undefined}
       >
         <Suspense
-          fallback={(
-            <div className="min-h-screen bg-mansion-base flex items-center justify-center">
-              <div className="w-8 h-8 border-2 border-mansion-gold/30 border-t-mansion-gold rounded-full animate-spin" />
-            </div>
-          )}
+          fallback={<RouteLoadingFallback />}
         >
         <Routes location={backgroundLocation || location}>
           {/* Full-screen flows */}

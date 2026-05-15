@@ -77,6 +77,15 @@ export function tryRecoverFromAssetFailure() {
     href: window.location.href,
   });
 
+  let reloadStarted = false;
+  const reload = () => {
+    if (reloadStarted) return;
+    reloadStarted = true;
+    window.location.reload();
+  };
+
+  const hardReloadTimer = window.setTimeout(reload, 1500);
+
   void (async () => {
     try {
       if ('caches' in window) {
@@ -89,7 +98,8 @@ export function tryRecoverFromAssetFailure() {
       }
     } catch {}
 
-    window.location.reload();
+    window.clearTimeout(hardReloadTimer);
+    reload();
   })();
 
   return true;
