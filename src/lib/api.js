@@ -37,6 +37,7 @@ const PROFILE_FAKE_ONLINE_PERCENT_DEFAULT = 42;
 const API_GET_TIMEOUT_MS = 45_000;
 const API_MUTATION_TIMEOUT_MS = 30_000;
 const API_LOGIN_TIMEOUT_MS = 15_000;
+const API_REGISTER_TIMEOUT_MS = 75_000;
 const LOGIN_ENV_RECOVERY_KEY = 'mansion_login_env_recovery';
 const LOGIN_SW_CLEAN_KEY = 'mansion_login_sw_cleaned';
 export const STORY_FEED_CACHE_INVALIDATED_EVENT = 'mansion-story-feed-cache-invalidated';
@@ -855,23 +856,26 @@ async function apiUpload(path, options = {}) {
 export async function register({ email, password, username, role, seeking, interests, age, birthdate, province, locality, city, bio, country }) {
   const normalizedProvince = province ?? city ?? '';
   const normalizedAge = age === '' || age == null ? undefined : Number(age);
+  const body = JSON.stringify({
+    email,
+    password,
+    username,
+    role,
+    seeking,
+    interests,
+    ...(Number.isFinite(normalizedAge) ? { age: normalizedAge } : {}),
+    birthdate: birthdate || '',
+    province: normalizedProvince,
+    locality: locality || '',
+    city: normalizedProvince,
+    bio,
+    country,
+  });
+
   const data = await apiFetch('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({
-      email,
-      password,
-      username,
-      role,
-      seeking,
-      interests,
-      ...(Number.isFinite(normalizedAge) ? { age: normalizedAge } : {}),
-      birthdate: birthdate || '',
-      province: normalizedProvince,
-      locality: locality || '',
-      city: normalizedProvince,
-      bio,
-      country,
-    }),
+    body,
+    timeoutMs: API_REGISTER_TIMEOUT_MS,
   });
   // Registration now returns needsVerification instead of token
   return data;

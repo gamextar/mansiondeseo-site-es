@@ -1912,6 +1912,8 @@ export default function RegisterPage() {
         setEmailDeliveryPending(false);
         if (err.data?.code === 'EMAIL_EXISTS') {
           setApiError('EMAIL_EXISTS');
+        } else if (err.code === 'api_timeout') {
+          setApiError('La conexión se demoró al crear la cuenta. Tocá Completar Registro otra vez; si el móvil estuvo en pausa, suele resolverse en el segundo intento.');
         } else {
           setApiError(err.message || 'Error al registrar. Intenta de nuevo.');
         }
