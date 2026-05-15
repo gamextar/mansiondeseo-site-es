@@ -137,6 +137,7 @@ const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const PHOTO_VERIFICATION_STATUSES = ['code_issued', 'pending', 'approved', 'rejected', 'expired'];
 const FEED_PROFILE_LIMIT = 42;
 const FEED_SNAPSHOT_LIMIT = 180;
+const FEED_ORDER_CACHE_VERSION = 'real-first-v1';
 const FEED_SNAPSHOT_TTL_MS = 300_000;
 const PROFILE_SNAPSHOT_FEED_MAX_WINDOW = 5000;
 const FEED_PROXIMITY_CITY_BOOST = 22;
@@ -300,83 +301,25 @@ function createSeededRandom(seedValue) {
   };
 }
 
-function buildBucketInterleaveSeed(bucketDefs, bucketMap) {
-  const seedParts = [];
-  for (const bucket of bucketDefs) {
-    const list = bucketMap.get(bucket.key) || [];
-    const preview = list
-      .slice(0, 10)
-      .map((item) => String(
-        item?.id ||
-        item?.user_id ||
-        item?.story_id ||
-        item?.lastActive ||
-        item?.created_at ||
-        ''
-      ))
-      .join('|');
-    seedParts.push(`${bucket.key}:${list.length}:${preview}`);
-  }
-  return hashStringToUint32(seedParts.join('||'));
-}
-
 function interleaveRoleBuckets(bucketDefs, bucketMap, limit = FEED_PROFILE_LIMIT) {
   const output = [];
   const cursors = new Map(bucketDefs.map((bucket) => [bucket.key, 0]));
-  const random = createSeededRandom(buildBucketInterleaveSeed(bucketDefs, bucketMap));
-  let lastBucketKey = '';
-  let lastBucketStreak = 0;
+  const activeBuckets = bucketDefs.filter((bucket) => (bucketMap.get(bucket.key) || []).length > 0);
 
-  while (output.length < limit) {
-    const candidates = [];
-    let totalWeight = 0;
+  while (output.length < limit && activeBuckets.length > 0) {
+    let addedThisRound = false;
 
-    for (const bucket of bucketDefs) {
+    for (const bucket of activeBuckets) {
+      if (output.length >= limit) break;
       const list = bucketMap.get(bucket.key) || [];
       const cursor = cursors.get(bucket.key) || 0;
       if (cursor >= list.length) continue;
-
-      const remaining = list.length - cursor;
-      let weight = remaining;
-
-      if (bucket.key === lastBucketKey) {
-        weight *= lastBucketStreak >= 2 ? 0.18 : 0.42;
-      }
-
-      if (weight <= 0) continue;
-      totalWeight += weight;
-      candidates.push({ bucket, cursor, weight, totalWeight });
+      output.push(list[cursor]);
+      cursors.set(bucket.key, cursor + 1);
+      addedThisRound = true;
     }
 
-    if (candidates.length === 0) break;
-
-    const priorityCandidates = candidates.filter((candidate) => {
-      const list = bucketMap.get(candidate.bucket.key) || [];
-      const item = list[candidate.cursor];
-      return Math.max(0, Number(item?.feed_priority || 0)) > 0;
-    });
-    const selectableCandidates = priorityCandidates.length > 0 ? priorityCandidates : candidates;
-    const selectableTotalWeight = selectableCandidates.reduce((total, candidate) => total + candidate.weight, 0);
-    let selected = selectableCandidates[0];
-    if (selectableTotalWeight > 0) {
-      let cursorWeight = 0;
-      const roll = random() * selectableTotalWeight;
-      selected = selectableCandidates.find((candidate) => {
-        cursorWeight += candidate.weight;
-        return roll <= cursorWeight;
-      }) || selectableCandidates[selectableCandidates.length - 1];
-    }
-
-    const list = bucketMap.get(selected.bucket.key) || [];
-    output.push(list[selected.cursor]);
-    cursors.set(selected.bucket.key, selected.cursor + 1);
-
-    if (selected.bucket.key === lastBucketKey) {
-      lastBucketStreak += 1;
-    } else {
-      lastBucketKey = selected.bucket.key;
-      lastBucketStreak = 1;
-    }
+    if (!addedThisRound) break;
   }
 
   return output;
@@ -646,11 +589,24 @@ function orderFeedBaseProfiles(
     if (!bucketMap.has(bucketKey)) continue;
     bucketMap.get(bucketKey).push(profile);
   }
+  const realBucketMap = new Map(roleBuckets.map((bucket) => [bucket.key, []]));
+  const fakeBucketMap = new Map(roleBuckets.map((bucket) => [bucket.key, []]));
   for (const bucket of roleBuckets) {
     const list = bucketMap.get(bucket.key) || [];
     list.sort(compareFeedBucketProfiles);
+    for (const profile of list) {
+      const targetMap = Number(profile.fake ? 1 : 0) === 1 ? fakeBucketMap : realBucketMap;
+      targetMap.get(bucket.key).push(profile);
+    }
   }
-  return interleaveRoleBuckets(roleBuckets, bucketMap, limit);
+
+  const realProfiles = interleaveRoleBuckets(roleBuckets, realBucketMap, limit);
+  if (realProfiles.length >= limit) return realProfiles.slice(0, limit);
+
+  return [
+    ...realProfiles,
+    ...interleaveRoleBuckets(roleBuckets, fakeBucketMap, limit - realProfiles.length),
+  ].slice(0, limit);
 }
 
 function mapStoryRowForResponse(row, env, viewerId = '', viewerCanWatchAllStories = false) {
@@ -5065,7 +5021,7 @@ async function handleProfiles(request, env) {
     PROFILE_SNAPSHOT_FEED_MAX_WINDOW,
     Math.max(pageWindowLimit, FEED_SNAPSHOT_LIMIT + 1),
   );
-  const feedSnapshotCacheKey = `feed-snapshot:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}:${viewerCanWatchAllStories ? 'vip' : 'free'}:${geoKey}:window:${snapshotWindowLimit}`;
+  const feedSnapshotCacheKey = `feed-snapshot:${FEED_ORDER_CACHE_VERSION}:${seekingKey}:${countryKey}:${search}:${viewerInterestsKey}:${viewerCanWatchAllStories ? 'vip' : 'free'}:${geoKey}:window:${snapshotWindowLimit}`;
   const snapshotCacheHit = !fresh && isFreshCached(feedSnapshotCacheKey);
   const storyCacheHit = isFreshCached(STORY_SNAPSHOT_MANIFEST_KEY);
   const countCacheHit = false;
@@ -5080,7 +5036,7 @@ async function handleProfiles(request, env) {
       geoKey,
       priorityRotationWindowKey,
     ].join(':');
-    const realSnapshotLimit = snapshotWindowLimit;
+    const realSnapshotLimit = PROFILE_SNAPSHOT_FEED_MAX_WINDOW;
     const realRowsPromise = loadRealProfileRowsFromFeedItems(env, {
       roleValues: requestedRoleValues,
       country: settings.feedFilterByCountry ? country : '',

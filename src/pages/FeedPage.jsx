@@ -15,7 +15,7 @@ import { getBottomNavPagePadding } from '../lib/bottomNavConfig';
 import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsersKey, isViewedStoryUser, removeViewedStoryUser } from '../lib/storyViews';
 
 const FEED_CACHE_KEY = 'mansion_feed';
-const FEED_CACHE_VERSION = 2;
+const FEED_CACHE_VERSION = 3;
 const FEED_GLOBAL_VERSION_KEY = 'mansion_feed_cache_version';
 const HOME_STORIES_CACHE_PREFIX = 'mansion_home_stories:';
 const HOME_STORIES_CACHE_VERSION = 5;
