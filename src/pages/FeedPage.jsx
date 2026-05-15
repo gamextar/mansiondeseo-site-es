@@ -15,7 +15,7 @@ import { getBottomNavPagePadding } from '../lib/bottomNavConfig';
 import { applyPendingViewedStoryUsers, getPendingViewedStoryUsers, getViewedStoryUsersKey, isViewedStoryUser, removeViewedStoryUser } from '../lib/storyViews';
 
 const FEED_CACHE_KEY = 'mansion_feed';
-const FEED_CACHE_VERSION = 5;
+const FEED_CACHE_VERSION = 6;
 const FEED_GLOBAL_VERSION_KEY = 'mansion_feed_cache_version';
 const HOME_STORIES_CACHE_PREFIX = 'mansion_home_stories:';
 const HOME_STORIES_CACHE_VERSION = 5;
@@ -170,13 +170,23 @@ const AnimatedBlock = forwardRef(function AnimatedBlock({ disabled = false, moti
   return <motion.div ref={ref} {...rest} {...motionProps}>{children}</motion.div>;
 });
 
-function getCachedFeed() {
+function normalizeFeedFilterKey(value) {
+  const roles = [...new Set(parseHomeStoriesSeeking(value))].sort();
+  return roles.length ? roles.join(',') : 'all';
+}
+
+function getCachedFeed(expectedFilter = null) {
   try {
     const raw = localStorage.getItem(FEED_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     const cacheVersion = Number(parsed?.version || 0);
     if (cacheVersion !== FEED_CACHE_VERSION) return null;
+    if (expectedFilter !== null) {
+      const expectedFilterKey = normalizeFeedFilterKey(expectedFilter);
+      const cachedFilterKey = normalizeFeedFilterKey(parsed?.filterKey || '');
+      if (cachedFilterKey !== expectedFilterKey) return null;
+    }
     const knownFeedVersion = localStorage.getItem(FEED_GLOBAL_VERSION_KEY) || '';
     const cachedFeedVersion = String(parsed?.feedCacheVersion || '');
     if (knownFeedVersion && cachedFeedVersion && knownFeedVersion !== cachedFeedVersion) return null;
@@ -209,6 +219,7 @@ function setCachedFeed(data) {
     localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({
       version: FEED_CACHE_VERSION,
       feedCacheVersion,
+      filterKey: normalizeFeedFilterKey(data.filterKey || data.filter || ''),
       profiles: data.profiles || [],
       viewerPremium: data.viewerPremium || false,
       settings: {
@@ -264,14 +275,33 @@ function getHomeStoriesViewerSeeking(user) {
   }
 }
 
-function getFeedProfileFilter(user) {
+function syncStoredFeedFilter(roles) {
   try {
-    const storedFilter = parseHomeStoriesSeeking(localStorage.getItem('mansion_feed_filter') || '');
-    if (storedFilter.length > 0) return storedFilter.join(',');
+    localStorage.setItem('mansion_feed_filter', roles.length ? roles.join(',') : 'all');
+  } catch {}
+}
+
+function getFeedProfileFilter(user) {
+  const directSeeking = parseHomeStoriesSeeking(user?.seeking);
+  if (directSeeking.length > 0) {
+    syncStoredFeedFilter(directSeeking);
+    return directSeeking.join(',');
+  }
+
+  try {
+    const stored = JSON.parse(localStorage.getItem('mansion_user') || 'null');
+    const storedSeeking = parseHomeStoriesSeeking(stored?.seeking);
+    if (storedSeeking.length > 0) {
+      syncStoredFeedFilter(storedSeeking);
+      return storedSeeking.join(',');
+    }
   } catch {}
 
-  const viewerSeeking = getHomeStoriesViewerSeeking(user);
-  return viewerSeeking.length > 0 ? viewerSeeking.join(',') : '';
+  try {
+    return parseHomeStoriesSeeking(localStorage.getItem('mansion_feed_filter') || '').join(',');
+  } catch {
+    return '';
+  }
 }
 
 function getHomeStoriesCacheKey(userId, isDesktopViewport, roleKey = 'all') {
@@ -324,8 +354,8 @@ function clearCachedHomeStories() {
   } catch {}
 }
 
-function makeFeedBlockKey(cursor, pageSize) {
-  return `${Number(cursor) || 0}:${Number(pageSize) || 0}`;
+function makeFeedBlockKey(cursor, pageSize, filter = '') {
+  return `${Number(cursor) || 0}:${Number(pageSize) || 0}:${normalizeFeedFilterKey(filter)}`;
 }
 
 export default function FeedPage({ initialData }) {
@@ -433,6 +463,7 @@ export default function FeedPage({ initialData }) {
     setHasMore(!!data.hasMore);
     setCachedFeed({
       profiles: data.profiles || [],
+      filterKey: data.filterKey || '',
       viewerPremium: data.viewerPremium || false,
       settings: data.settings || {},
       totalProfiles: Number(data.totalProfiles) || 0,
@@ -460,11 +491,12 @@ export default function FeedPage({ initialData }) {
       cursor,
       pageSize: resolvedPageSize,
     });
-    return { data, resolvedPageSize };
+    return { data: { ...data, filterKey: filter }, resolvedPageSize };
   }, [isDesktopViewport, user]);
 
   const prefetchProfilesBlock = useCallback(({ cursor = 0, pageSize } = {}) => {
-    const key = makeFeedBlockKey(cursor, pageSize);
+    const filter = getFeedProfileFilter(user);
+    const key = makeFeedBlockKey(cursor, pageSize, filter);
     if (prefetchedBlocksRef.current.has(key)) return Promise.resolve(prefetchedBlocksRef.current.get(key));
     if (prefetchInFlightRef.current.has(key)) return prefetchInFlightRef.current.get(key);
 
@@ -482,10 +514,11 @@ export default function FeedPage({ initialData }) {
 
     prefetchInFlightRef.current.set(key, task);
     return task;
-  }, [fetchProfilesBlock]);
+  }, [fetchProfilesBlock, user]);
 
   const loadProfiles = useCallback(({ forceFresh = false, cursor = 0, pageSize, targetPageCursor } = {}) => {
-    const c = getCachedFeed();
+    const filter = getFeedProfileFilter(user);
+    const c = getCachedFeed(filter);
     const hasVisibleProfiles = profilesLengthRef.current > 0;
     if (!c && !hasVisibleProfiles) setLoading(true);
     const myId = ++loadIdRef.current;
@@ -514,7 +547,7 @@ export default function FeedPage({ initialData }) {
       .finally(() => {
         if (myId === loadIdRef.current) setLoading(false);
       });
-  }, [applyLoadedProfiles, fetchProfilesBlock]); // stable — reads settings from settingsRef
+  }, [applyLoadedProfiles, fetchProfilesBlock, user]); // stable — reads settings from settingsRef
 
   const loadHomeStories = useCallback(async ({ syncBootstrap = false, fresh = false } = {}) => {
     const myId = ++homeStoriesLoadIdRef.current;
