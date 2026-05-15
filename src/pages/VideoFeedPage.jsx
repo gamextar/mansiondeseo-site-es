@@ -9,7 +9,7 @@ import AvatarImg from '../components/AvatarImg';
 import { resolveMediaUrl } from '../lib/media';
 import { isSafariDesktopBrowser } from '../lib/browser';
 import { getBrowserBottomNavOffset, getStandaloneBottomNavOffset } from '../lib/bottomNavConfig';
-import { applyPendingViewedStoryUsers, clearPendingViewedStoryUsers, getViewedStoryUsers, markViewedStoryUser, queuePendingViewedStoryUser } from '../lib/storyViews';
+import { applyPendingViewedStoryUsers, clearPendingViewedStoryUsers, getViewedStoryUsers, markViewedStoryUser } from '../lib/storyViews';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -1000,7 +1000,6 @@ export default function VideoFeedPage() {
   const jumpUnlockTimer = useRef(null);
   const boundaryCooldownTimer = useRef(null);
   const viewedDispatchTimerRef = useRef(null);
-  const overlayCloseViewedTimerRef = useRef(null);
   const pwaReturnAnchorTimersRef = useRef([]);
   const pwaReturnAnchorDoneRef = useRef(false);
   const lastScrollAtRef = useRef(0);
@@ -1099,17 +1098,7 @@ export default function VideoFeedPage() {
     } catch {}
   }, [user?.id]);
   const closeOverlay = useCallback(() => {
-    if (!isOverlayPreview) {
-      flushPendingViewedStories();
-    } else {
-      if (overlayCloseViewedTimerRef.current) {
-        window.clearTimeout(overlayCloseViewedTimerRef.current);
-      }
-      overlayCloseViewedTimerRef.current = window.setTimeout(() => {
-        flushPendingViewedStories();
-        overlayCloseViewedTimerRef.current = null;
-      }, 220);
-    }
+    flushPendingViewedStories();
     if (backgroundLocation?.pathname) {
       navigate(
         {
@@ -1122,7 +1111,7 @@ export default function VideoFeedPage() {
       return;
     }
     navigate('/radar', { replace: true });
-  }, [backgroundLocation, flushPendingViewedStories, isOverlayPreview, navigate]);
+  }, [backgroundLocation, flushPendingViewedStories, navigate]);
   const closeToHomeFeed = useCallback(() => {
     flushPendingViewedStories();
     try {
@@ -1151,15 +1140,6 @@ export default function VideoFeedPage() {
       window.dispatchEvent(new Event(VIEWED_STORIES_EVENT));
     } catch {}
   }, [user?.id]);
-  const queueStoryViewed = useCallback((storyUserId, storyId = '') => {
-    const uid = String(storyUserId || '');
-    if (!uid) return;
-    try {
-      if (!user?.id) return;
-      queuePendingViewedStoryUser(user.id, uid, storyId);
-    } catch {}
-  }, [user?.id]);
-
   const infiniteStories = stories.length > 0
     ? [stories[stories.length - 1], ...stories, stories[0]]
     : [];
@@ -1390,10 +1370,6 @@ export default function VideoFeedPage() {
     const storyId = String(activeStory.story_id || activeStory.id || '').trim();
     const storyUserId = activeStory.user_id;
     const markAllowedStoryViewed = () => {
-      if (isOverlayPreview) {
-        queueStoryViewed(storyUserId, storyId);
-        return;
-      }
       markStoryViewed(storyUserId, storyId);
     };
 
@@ -1433,8 +1409,8 @@ export default function VideoFeedPage() {
         if (data?.videoLimit && !cancelled) setStoryViewLimit(data.videoLimit);
         if (!cancelled) {
           setStoryLimitBlock((current) => (current?.storyId === storyId ? null : current));
-          markAllowedStoryViewed();
         }
+        markAllowedStoryViewed();
       })
       .catch((err) => {
         const code = String(err?.data?.code || '').toUpperCase();
@@ -1456,7 +1432,7 @@ export default function VideoFeedPage() {
           return;
         }
 
-        if (!cancelled) markAllowedStoryViewed();
+        markAllowedStoryViewed();
       })
       .finally(() => {
         recordingStoryViewsRef.current.delete(storyId);
@@ -1465,7 +1441,7 @@ export default function VideoFeedPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeStory?.id, activeStory?.story_id, activeStory?.user_id, backendDailyLimit, backendLimitActive, backendRemaining, backendViewedToday, isOverlayPreview, markStoryViewed, navigate, queueStoryViewed, storyViewLimit, user?.premium]);
+  }, [activeStory?.id, activeStory?.story_id, activeStory?.user_id, backendDailyLimit, backendLimitActive, backendRemaining, backendViewedToday, markStoryViewed, navigate, storyViewLimit, user?.premium]);
 
   useEffect(() => {
     return subscribe((event) => {
@@ -1607,7 +1583,6 @@ export default function VideoFeedPage() {
     clearTimeout(jumpUnlockTimer.current);
     clearTimeout(boundaryCooldownTimer.current);
     clearTimeout(viewedDispatchTimerRef.current);
-    clearTimeout(overlayCloseViewedTimerRef.current);
     pwaReturnAnchorTimersRef.current.forEach((timerId) => clearTimeout(timerId));
     pwaReturnAnchorTimersRef.current = [];
   }, []);
