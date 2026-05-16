@@ -19,7 +19,7 @@ const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
 const CLIENT_CACHE_VERSION_KEY = 'mansion_client_cache_version';
-const CLIENT_CACHE_VERSION = 'runtime-heal-v9-dashboard-cache-reset';
+const CLIENT_CACHE_VERSION = 'runtime-heal-v10-fast-rail-preserve-session';
 const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const STORY_SNAPSHOT_CACHE_PREFIX = 'mansion_story_snapshot:';
@@ -116,7 +116,6 @@ export function clearVolatileRuntimeState({
     'mansion_home_stories:',
     'mansion_profile_detail_',
     'session:topVisited:',
-    STORY_SNAPSHOT_CACHE_PREFIX,
     STORY_SNAPSHOT_SELECTION_CACHE_PREFIX,
     'topVisited:',
   ];
@@ -146,7 +145,7 @@ function clearLegacyMediaCaches() {
   try {
     if (localStorage.getItem(CLIENT_CACHE_VERSION_KEY) === CLIENT_CACHE_VERSION) return;
 
-    clearVolatileRuntimeState({ includeStoredUser: true, includeBrowserCaches: true });
+    clearVolatileRuntimeState();
 
     localStorage.setItem(CLIENT_CACHE_VERSION_KEY, CLIENT_CACHE_VERSION);
   } catch {
@@ -2430,7 +2429,10 @@ async function loadSharedStorySnapshotFeed({ viewer = null, fresh = false } = {}
       real_only: '1',
       fresh: '1',
     });
-    const livePayload = await apiFetch(`/stories?${params.toString()}`);
+    const livePayload = await apiFetch(`/stories?${params.toString()}`, {
+      timeoutMs: 2500,
+      suppressRecoveryEvent: true,
+    });
     liveRealRows = Array.isArray(livePayload?.stories) ? livePayload.stories : [];
   } catch {
     liveRealRows = null;

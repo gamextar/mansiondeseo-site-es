@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId, useMe
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X, Crown, Maximize2, Minimize2 } from 'lucide-react';
-import { clearVolatileRuntimeState, getStories, recordStoryView, getPublicSettings, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { getStories, recordStoryView, getPublicSettings, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
@@ -1351,12 +1351,10 @@ export default function VideoFeedPage() {
     try {
       let data = await loadStories(false);
       if (!data?.stories?.length && !requestedStorySeed) {
-        clearVolatileRuntimeState({ includeBrowserCaches: true });
         data = await loadStories(true);
       }
       return applyStoriesResponse(data);
     } catch (err) {
-      clearVolatileRuntimeState({ includeBrowserCaches: true });
       try {
         return applyStoriesResponse(await loadStories(true));
       } catch {}
