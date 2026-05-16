@@ -1209,6 +1209,7 @@ export default function App() {
   const [bootstrapError, setBootstrapError] = useState(null);
   const [apiRecovery, setApiRecovery] = useState(null);
   const bootstrapStartedRef = useRef(false);
+  const bootstrapRetryTimerRef = useRef(null);
   const reportedClientErrorsRef = useRef(new Set());
   const storyFeedWsRef = useRef(null);
   const storyFeedReconnectTimerRef = useRef(null);
@@ -1590,6 +1591,17 @@ export default function App() {
     let cancelled = false;
     let detachVisibilityListener = null;
 
+    const scheduleBootstrapRetry = () => {
+      if (typeof window === 'undefined' || cancelled || !getToken()) return;
+      if (bootstrapRetryTimerRef.current) window.clearTimeout(bootstrapRetryTimerRef.current);
+      bootstrapRetryTimerRef.current = window.setTimeout(() => {
+        bootstrapRetryTimerRef.current = null;
+        if (cancelled || !getToken()) return;
+        bootstrapStartedRef.current = false;
+        runBootstrap();
+      }, 15_000);
+    };
+
     const hasSessionSettings = !!siteSettings && Object.keys(siteSettings).length > 0;
     const hasAuthToken = !!getToken();
 
@@ -1644,9 +1656,23 @@ export default function App() {
           sessionStorage.setItem('mansion_bootstrap_last_error', JSON.stringify(bootstrapErrorSnapshot));
         } catch {}
         console.warn('[bootstrap] getAppBootstrap failed', bootstrapErrorSnapshot, err);
+        const fallbackBootstrap = peekAppBootstrap();
+        const fallbackUser = getStoredUser();
+
+        if (getToken() && fallbackUser) {
+          setUser(fallbackUser);
+          setRegisteredState(true);
+          setBootstrapError(null);
+          setBootstrapUnread(typeof fallbackBootstrap?.unread === 'number' ? fallbackBootstrap.unread : null);
+          setBootstrapStories(Array.isArray(fallbackBootstrap?.stories) ? fallbackBootstrap.stories : []);
+          setBootstrapResolved(true);
+          scheduleBootstrapRetry();
+          return;
+        }
+
         if (getToken()) setBootstrapError(bootstrapErrorSnapshot);
-        setBootstrapUnread(null);
-        setBootstrapStories([]);
+        setBootstrapUnread(typeof fallbackBootstrap?.unread === 'number' ? fallbackBootstrap.unread : null);
+        setBootstrapStories(Array.isArray(fallbackBootstrap?.stories) ? fallbackBootstrap.stories : []);
         setBootstrapResolved(true);
         if (cancelled || !getToken()) return;
       });
@@ -1668,17 +1694,21 @@ export default function App() {
     return () => {
       cancelled = true;
       detachVisibilityListener?.();
+      if (bootstrapRetryTimerRef.current) {
+        window.clearTimeout(bootstrapRetryTimerRef.current);
+        bootstrapRetryTimerRef.current = null;
+      }
     };
   }, [debugFlags.skipBootstrap, setUser, siteSettings]);
 
-  const sessionRecovery = bootstrapError || apiRecovery;
+  const sessionRecovery = bootstrapError;
   const sessionRecoveryTitle = bootstrapError
     ? 'No pudimos iniciar tu sesión'
     : apiRecovery?.reason === 'slow_request'
       ? 'La app está tardando demasiado'
       : 'No pudimos cargar esta sección';
   const sessionRecoveryDescription = bootstrapError
-    ? 'Puede haber sido una conexión inestable o una respuesta lenta del servidor. Reintentá para volver a cargar la app.'
+    ? 'No encontramos una sesión local válida para continuar. Iniciá sesión de nuevo para proteger tu cuenta.'
     : apiRecovery?.reason === 'slow_request'
       ? 'La conexión con el servidor sigue abierta, pero está demorando más de lo normal. Podés reintentar sin cerrar tu cuenta.'
       : 'Parece que la conexión con la base de datos o la sesión quedó trabada. Reintentá y, si sigue igual, reiniciá la sesión segura.';

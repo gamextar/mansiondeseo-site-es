@@ -141,7 +141,7 @@ function redirectToLogin() {
 }
 
 function shouldEmitApiRecovery(path, token, options = {}) {
-  if (!token || options.suppressRecoveryEvent) return false;
+  if (!token || options.suppressRecoveryEvent || options.globalRecoveryEvent !== true) return false;
   const normalizedPath = String(path || '');
   return !normalizedPath.startsWith('/client-errors');
 }
