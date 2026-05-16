@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowRight, BadgeCheck, Crown, Eye, Heart, MapPin, MessageCircle, Sparkles, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { getFavorites, getOwnProfileDashboard, peekOwnProfileDashboard } from '../lib/api';
+import { clearVolatileRuntimeState, getFavorites, getOwnProfileDashboard, peekOwnProfileDashboard } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { formatLocation } from '../lib/location';
@@ -281,10 +281,20 @@ export default function DashboardPage() {
     setError('');
     setLoading(!dashboard);
 
-    Promise.all([
+    const loadDashboardData = () => Promise.all([
       getOwnProfileDashboard(),
       getFavorites('following', 9),
-    ])
+    ]);
+
+    loadDashboardData()
+      .catch(async (err) => {
+        clearVolatileRuntimeState({ includeBrowserCaches: true });
+        try {
+          return await loadDashboardData();
+        } catch {
+          throw err;
+        }
+      })
       .then(([dashboardData, followingData]) => {
         if (cancelled) return;
         setDashboard(dashboardData || null);

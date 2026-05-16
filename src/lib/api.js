@@ -19,7 +19,7 @@ const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
 const CLIENT_CACHE_VERSION_KEY = 'mansion_client_cache_version';
-const CLIENT_CACHE_VERSION = 'runtime-heal-v8-dynamic-cache-reset';
+const CLIENT_CACHE_VERSION = 'runtime-heal-v9-dashboard-cache-reset';
 const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const STORY_SNAPSHOT_CACHE_PREFIX = 'mansion_story_snapshot:';
@@ -107,14 +107,18 @@ export function clearVolatileRuntimeState({
     'vf_idx',
     'vf_prefetched',
     'vf_stories',
+    'visits',
   ]);
 
   const prefixes = [
     CHAT_CACHE_PREFIX,
+    'favorites:',
     'mansion_home_stories:',
     'mansion_profile_detail_',
+    'session:topVisited:',
     STORY_SNAPSHOT_CACHE_PREFIX,
     STORY_SNAPSHOT_SELECTION_CACHE_PREFIX,
+    'topVisited:',
   ];
 
   const shouldRemove = (key) => (
