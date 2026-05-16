@@ -14,7 +14,7 @@ import {
 } from './lib/assetRecovery'
 
 const SW_MIGRATION_KEY = 'mansion-sw-migration';
-const SW_MIGRATION_VERSION = 'v14-disable-auth-sw';
+const SW_MIGRATION_VERSION = 'v15-runtime-cache-heal';
 
 if (typeof window !== 'undefined' && SITE_CONFIG.redirectHosts.includes(window.location.hostname)) {
   const canonicalUrl = `${SITE_CONFIG.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;

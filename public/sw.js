@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mansion-disabled-v14';
+const CACHE_NAME = 'mansion-disabled-v15';
 
 async function clearMansionCaches() {
   try {

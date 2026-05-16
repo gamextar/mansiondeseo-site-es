@@ -7,7 +7,7 @@ import { useAuth } from '../lib/authContext';
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } };
 import ProfileCard from '../components/ProfileCard';
 import AvatarImg from '../components/AvatarImg';
-import { STORY_FEED_CACHE_INVALIDATED_EVENT, applyClientFakeOnline, getProfiles, getProfilesVersion, getStories, getStorySnapshotFeed, getToken } from '../lib/api';
+import { STORY_FEED_CACHE_INVALIDATED_EVENT, applyClientFakeOnline, clearVolatileRuntimeState, getProfiles, getProfilesVersion, getStories, getStorySnapshotFeed, getToken } from '../lib/api';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { getPrimaryProfileCrop, getPrimaryProfilePhoto } from '../lib/profileMedia';
 import { isSafariDesktopBrowser } from '../lib/browser';
@@ -488,8 +488,26 @@ export default function FeedPage({ initialData }) {
         });
         return data.data;
       })
-      .catch(() => {
+      .catch(async () => {
         if (myId !== loadIdRef.current) return;
+        const isInitialBlock = (Number(cursor) || 0) === 0;
+        const canRepairAndRetry = isInitialBlock && !forceFresh && !hasVisibleProfiles;
+        if (canRepairAndRetry) {
+          clearVolatileRuntimeState({ includeBrowserCaches: true });
+          prefetchedBlocksRef.current.clear();
+          prefetchInFlightRef.current.clear();
+          try {
+            const retry = await fetchProfilesBlock({ forceFresh: true, cursor: 0, pageSize });
+            if (myId !== loadIdRef.current) return;
+            applyLoadedProfiles({
+              data: retry.data,
+              cursor: 0,
+              resolvedPageSize: retry.resolvedPageSize,
+              targetPageCursor: 0,
+            });
+            return retry.data;
+          } catch {}
+        }
         if (!c && !hasVisibleProfiles) {
           setProfiles([]);
           setNextCursor(null);

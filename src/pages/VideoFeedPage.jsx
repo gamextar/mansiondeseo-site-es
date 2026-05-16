@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId, useMe
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Send, Plus, Volume2, VolumeX, Play, Film, ChevronLeft, ChevronRight, Gift, X, Crown, Maximize2, Minimize2 } from 'lucide-react';
-import { getStories, recordStoryView, getPublicSettings, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
+import { clearVolatileRuntimeState, getStories, recordStoryView, getPublicSettings, getPendingStoryLikes, enqueueStoryLike, flushPendingStoryLikes, subscribePendingStoryLikes, subscribeStoryLikeSync, getGiftCatalog, sendGift as apiSendGift } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import AvatarImg from '../components/AvatarImg';
@@ -1320,12 +1320,13 @@ export default function VideoFeedPage() {
   }, [isStandaloneMobileApp, standaloneMobileRoute]);
 
   const refreshStories = useCallback(async () => {
-    try {
-      const data = await getStories({
-        limit: 60,
-        focusUserId: requestedStoryUserId || '',
-        surface: 'video',
-      });
+    const loadStories = (fresh = false) => getStories({
+      limit: 60,
+      focusUserId: requestedStoryUserId || '',
+      surface: 'video',
+      fresh,
+    });
+    const applyStoriesResponse = (data) => {
       if (data.videoLimit) setStoryViewLimit(data.videoLimit);
       const apiStories = Array.isArray(data.stories) ? data.stories : [];
       const seedStillAvailable = requestedStorySeed
@@ -1345,7 +1346,20 @@ export default function VideoFeedPage() {
       apiRespondedRef.current = true;
       setStories(fresh);
       return fresh;
+    };
+
+    try {
+      let data = await loadStories(false);
+      if (!data?.stories?.length && !requestedStorySeed) {
+        clearVolatileRuntimeState({ includeBrowserCaches: true });
+        data = await loadStories(true);
+      }
+      return applyStoriesResponse(data);
     } catch (err) {
+      clearVolatileRuntimeState({ includeBrowserCaches: true });
+      try {
+        return applyStoriesResponse(await loadStories(true));
+      } catch {}
       throw err;
     }
   }, [requestedStorySeed, requestedStoryUserId, user?.id, user?.seeking]);

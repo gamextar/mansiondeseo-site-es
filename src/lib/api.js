@@ -19,7 +19,7 @@ const API_DEBUG_FLAG_KEY = 'mansion_debug_api_requests';
 const API_DEBUG_UPDATE_EVENT = 'mansion-api-debug-update';
 const STORY_LIKE_SYNC_EVENT = 'mansion-story-like-sync';
 const CLIENT_CACHE_VERSION_KEY = 'mansion_client_cache_version';
-const CLIENT_CACHE_VERSION = 'media-paths-v7-avatar-race-fix';
+const CLIENT_CACHE_VERSION = 'runtime-heal-v8-dynamic-cache-reset';
 const TOP_VISITED_CACHE_TTL_MS = 10 * 60_000;
 const CHAT_CACHE_PREFIX = 'mansion_chat_';
 const STORY_SNAPSHOT_CACHE_PREFIX = 'mansion_story_snapshot:';
@@ -71,16 +71,78 @@ const sessionCache = {
   },
 };
 
+function removeStorageKeys(storage, shouldRemove) {
+  try {
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index);
+      if (key && shouldRemove(key)) storage.removeItem(key);
+    }
+  } catch {
+    // Cache cleanup is best-effort.
+  }
+}
+
+export function clearVolatileRuntimeState({
+  includeStoredUser = false,
+  includeBrowserCaches = false,
+} = {}) {
+  if (typeof window === 'undefined') return;
+  sharedGetCache.clear();
+
+  const exactKeys = new Set([
+    'appBootstrap',
+    AUTH_ME_CACHE_KEY,
+    OWN_PROFILE_DASHBOARD_CACHE_KEY,
+    'conversations',
+    'unreadCount',
+    'mansion_bootstrap_last_error',
+    'mansion_conversations',
+    'mansion_feed',
+    'mansion_feed_cache_version',
+    'mansion_feed_dirty',
+    'mansion_feed_force_refresh',
+    'mansion_feed_scroll_y',
+    'mansion_site_settings',
+    'vf_active_story',
+    'vf_idx',
+    'vf_prefetched',
+    'vf_stories',
+  ]);
+
+  const prefixes = [
+    CHAT_CACHE_PREFIX,
+    'mansion_home_stories:',
+    'mansion_profile_detail_',
+    STORY_SNAPSHOT_CACHE_PREFIX,
+    STORY_SNAPSHOT_SELECTION_CACHE_PREFIX,
+  ];
+
+  const shouldRemove = (key) => (
+    exactKeys.has(key) ||
+    prefixes.some((prefix) => key.startsWith(prefix)) ||
+    (includeStoredUser && key === USER_KEY)
+  );
+
+  if (typeof localStorage !== 'undefined') removeStorageKeys(localStorage, shouldRemove);
+  if (typeof sessionStorage !== 'undefined') removeStorageKeys(sessionStorage, shouldRemove);
+
+  if (includeBrowserCaches && typeof caches !== 'undefined') {
+    caches.keys()
+      .then((keys) => Promise.all(
+        keys
+          .filter((key) => key.toLowerCase().includes('mansion'))
+          .map((key) => caches.delete(key))
+      ))
+      .catch(() => {});
+  }
+}
+
 function clearLegacyMediaCaches() {
   if (typeof window === 'undefined') return;
   try {
     if (localStorage.getItem(CLIENT_CACHE_VERSION_KEY) === CLIENT_CACHE_VERSION) return;
 
-    localStorage.removeItem(USER_KEY);
-
-    sessionStorage.removeItem('appBootstrap');
-    sessionStorage.removeItem(AUTH_ME_CACHE_KEY);
-    sessionStorage.removeItem(OWN_PROFILE_DASHBOARD_CACHE_KEY);
+    clearVolatileRuntimeState({ includeStoredUser: true, includeBrowserCaches: true });
 
     localStorage.setItem(CLIENT_CACHE_VERSION_KEY, CLIENT_CACHE_VERSION);
   } catch {
@@ -519,14 +581,7 @@ export function hasEverLoggedIn() {
 }
 
 function removeMatchingStorageKeys(storage, shouldRemove) {
-  try {
-    for (let index = storage.length - 1; index >= 0; index -= 1) {
-      const key = storage.key(index);
-      if (key && shouldRemove(key)) storage.removeItem(key);
-    }
-  } catch {
-    // Cache cleanup is best-effort.
-  }
+  removeStorageKeys(storage, shouldRemove);
 }
 
 function removeAllStoredChatCaches() {
