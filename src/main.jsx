@@ -14,7 +14,7 @@ import {
 } from './lib/assetRecovery'
 
 const SW_MIGRATION_KEY = 'mansion-sw-migration';
-const SW_MIGRATION_VERSION = 'v13-auth-recovery';
+const SW_MIGRATION_VERSION = 'v14-disable-auth-sw';
 
 if (typeof window !== 'undefined' && SITE_CONFIG.redirectHosts.includes(window.location.hostname)) {
   const canonicalUrl = `${SITE_CONFIG.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -90,13 +90,9 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Register service worker for PWA. Keep auth routes outside the PWA control
-// path so login behaves like a plain network form, not like cached app state.
-const normalizedPathnameForServiceWorker =
-  typeof window !== 'undefined'
-    ? ((window.location.pathname || '/').replace(/\/+$/, '') || '/')
-    : '/';
-if ('serviceWorker' in navigator && !['/login', '/recuperar-contrasena'].includes(normalizedPathnameForServiceWorker)) {
+// Remove the old PWA service worker. The authenticated app must not be served
+// from a client-side HTML cache because stale app shells can wedge auth flows.
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     void (async () => {
       try {
@@ -115,8 +111,6 @@ if ('serviceWorker' in navigator && !['/login', '/recuperar-contrasena'].include
           localStorage.setItem(SW_MIGRATION_KEY, SW_MIGRATION_VERSION);
         }
       } catch {}
-
-      navigator.serviceWorker.register(`/sw.js?${SW_MIGRATION_VERSION}`).catch(() => {});
     })();
   });
 }

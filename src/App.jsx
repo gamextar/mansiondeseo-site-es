@@ -23,7 +23,7 @@ import FeedShellProbePage from './pages/FeedShellProbePage';
 import ProfileShellProbePage from './pages/ProfileShellProbePage';
 import SafeAreaDebugPage from './pages/SafeAreaDebugPage';
 import ProfilePage from './pages/ProfilePage';
-import { STORY_FEED_CACHE_INVALIDATED_EVENT, API_RECOVERY_EVENT, API_RECOVERY_CLEAR_EVENT, getToken, getStoredUser, setToken, setStoredUser, clearAuth, clearAppBootstrapCache, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, reportClientError, hasEverLoggedIn, recoverLoginEnvironment } from './lib/api';
+import { STORY_FEED_CACHE_INVALIDATED_EVENT, getToken, getStoredUser, setToken, setStoredUser, clearAuth, clearAppBootstrapCache, getAppBootstrap, peekAppBootstrap, ensureApiDebug, markApiDebugRoute, reportClientError, hasEverLoggedIn, recoverLoginEnvironment } from './lib/api';
 import { UnreadProvider } from './hooks/useUnreadMessages';
 import InstallAppBanner from './components/InstallAppBanner';
 import ApiDebugOverlay from './components/ApiDebugOverlay';
@@ -1207,7 +1207,6 @@ export default function App() {
   const [bootShieldVisible, setBootShieldVisible] = useState(() => debugFlags.bootShield);
   const [snapshotShieldVisible, setSnapshotShieldVisible] = useState(false);
   const [bootstrapError, setBootstrapError] = useState(null);
-  const [apiRecovery, setApiRecovery] = useState(null);
   const bootstrapStartedRef = useRef(false);
   const bootstrapRetryTimerRef = useRef(null);
   const reportedClientErrorsRef = useRef(new Set());
@@ -1269,36 +1268,10 @@ export default function App() {
       setBootstrapUnread(null);
       setBootstrapStories([]);
       setBootstrapError(null);
-      setApiRecovery(null);
       setBootstrapResolved(true);
     };
     window.addEventListener('mansion-auth-expired', handleAuthExpired);
     return () => window.removeEventListener('mansion-auth-expired', handleAuthExpired);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-
-    const handleRecoveryNeeded = (event) => {
-      if (!getToken()) return;
-      setApiRecovery(event.detail || { reason: 'api_recovery_needed' });
-    };
-
-    const handleRecoveryCleared = (event) => {
-      const requestId = event.detail?.requestId;
-      setApiRecovery((current) => {
-        if (!current) return null;
-        if (requestId && current.requestId && current.requestId !== requestId) return current;
-        return null;
-      });
-    };
-
-    window.addEventListener(API_RECOVERY_EVENT, handleRecoveryNeeded);
-    window.addEventListener(API_RECOVERY_CLEAR_EVENT, handleRecoveryCleared);
-    return () => {
-      window.removeEventListener(API_RECOVERY_EVENT, handleRecoveryNeeded);
-      window.removeEventListener(API_RECOVERY_CLEAR_EVENT, handleRecoveryCleared);
-    };
   }, []);
 
   useEffect(() => {
@@ -1702,16 +1675,8 @@ export default function App() {
   }, [debugFlags.skipBootstrap, setUser, siteSettings]);
 
   const sessionRecovery = bootstrapError;
-  const sessionRecoveryTitle = bootstrapError
-    ? 'No pudimos iniciar tu sesión'
-    : apiRecovery?.reason === 'slow_request'
-      ? 'La app está tardando demasiado'
-      : 'No pudimos cargar esta sección';
-  const sessionRecoveryDescription = bootstrapError
-    ? 'No encontramos una sesión local válida para continuar. Iniciá sesión de nuevo para proteger tu cuenta.'
-    : apiRecovery?.reason === 'slow_request'
-      ? 'La conexión con el servidor sigue abierta, pero está demorando más de lo normal. Podés reintentar sin cerrar tu cuenta.'
-      : 'Parece que la conexión con la base de datos o la sesión quedó trabada. Reintentá y, si sigue igual, reiniciá la sesión segura.';
+  const sessionRecoveryTitle = 'No pudimos iniciar tu sesión';
+  const sessionRecoveryDescription = 'No encontramos una sesión local válida para continuar. Iniciá sesión de nuevo para proteger tu cuenta.';
 
   return (
     <BrowserRouter>
