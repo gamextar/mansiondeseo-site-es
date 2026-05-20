@@ -340,7 +340,7 @@ export default function DashboardPage() {
           </span>
         </Link>
       </div>
-      <main className="mx-auto w-full max-w-[88rem] px-4 sm:px-6 lg:px-10">
+      <main className="mx-auto w-full max-w-[88rem] px-1 sm:px-6 lg:px-10">
         <motion.header
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}

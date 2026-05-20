@@ -61,6 +61,19 @@ function sexLabel(role) {
   return map[role] || role || '—';
 }
 
+function accountReviewReasonLabel(reason) {
+  const map = {
+    account_deletion_requested: 'Solicitud de baja',
+    duplicate_username_conflict: 'Conflicto de username fake',
+    manual_review: 'Revisión manual',
+  };
+  return map[reason] || (reason ? 'En revisión' : 'En revisión');
+}
+
+function isAccountDeletionReview(user) {
+  return user?.account_status === 'under_review' && user?.account_review_reason === 'account_deletion_requested';
+}
+
 function publicProfilePath(userId) {
   return `/perfiles/${encodeURIComponent(String(userId || ''))}`;
 }
@@ -1110,14 +1123,29 @@ export default function AdminUsersPage() {
                                   aria-label={`Destacado / feed priority ${Number(u.feed_priority || 0)}`}
                                 />
                               )}
-                              {u.account_status === 'suspended' && (
-                                <Ban
-                                  className="w-3 h-3 text-red-400 flex-shrink-0"
-                                  title="Cuenta suspendida"
-                                  aria-label="Cuenta suspendida"
-                                />
-                              )}
-                              {Array.isArray(u.message_block_roles) && u.message_block_roles.length > 0 && (
+	                              {u.account_status === 'suspended' && (
+	                                <Ban
+	                                  className="w-3 h-3 text-red-400 flex-shrink-0"
+	                                  title="Cuenta suspendida"
+	                                  aria-label="Cuenta suspendida"
+	                                />
+	                              )}
+	                              {u.account_status === 'under_review' && (
+	                                isAccountDeletionReview(u) ? (
+	                                  <Trash2
+	                                    className="w-3 h-3 text-red-300 flex-shrink-0"
+	                                    title={`En revisión: ${accountReviewReasonLabel(u.account_review_reason)}`}
+	                                    aria-label={`En revisión: ${accountReviewReasonLabel(u.account_review_reason)}`}
+	                                  />
+	                                ) : (
+	                                  <AlertTriangle
+	                                    className="w-3 h-3 text-yellow-400 flex-shrink-0"
+	                                    title={`En revisión: ${accountReviewReasonLabel(u.account_review_reason)}`}
+	                                    aria-label={`En revisión: ${accountReviewReasonLabel(u.account_review_reason)}`}
+	                                  />
+	                                )
+	                              )}
+	                              {Array.isArray(u.message_block_roles) && u.message_block_roles.length > 0 && (
                                 <MessageCircleOff
                                   className="w-3 h-3 text-orange-300 flex-shrink-0"
                                   title={messageBlockRolesTooltip(u.message_block_roles)}
@@ -1414,12 +1442,37 @@ export default function AdminUsersPage() {
                     Suspendida
                   </span>
                 )}
-                {selected.account_status === 'under_review' && (
-                  <span className="px-2 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[10px] font-semibold">En revisión</span>
-                )}
-              </div>
+	                {selected.account_status === 'under_review' && (
+	                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-semibold ${
+	                    isAccountDeletionReview(selected)
+	                      ? 'bg-red-500/10 border-red-500/20 text-red-300'
+	                      : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
+	                  }`}>
+	                    {isAccountDeletionReview(selected) ? <Trash2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+	                    {accountReviewReasonLabel(selected.account_review_reason)}
+	                  </span>
+	                )}
+	              </div>
 
-              {selected.photo_verification && (
+	              {selected.account_status === 'under_review' && selected.account_review_reason && (
+	                <div className={`rounded-2xl border p-3 ${
+	                  isAccountDeletionReview(selected)
+	                    ? 'border-red-500/15 bg-red-500/5'
+	                    : 'border-yellow-500/15 bg-yellow-500/5'
+	                }`}>
+	                  <p className="text-[10px] uppercase tracking-wider text-text-dim">Motivo de revisión</p>
+	                  <p className="mt-1 text-sm font-semibold text-text-primary">
+	                    {accountReviewReasonLabel(selected.account_review_reason)}
+	                  </p>
+	                  <p className="mt-1 text-xs text-text-dim">
+	                    {selected.account_review_requested_at
+	                      ? `Registrado ${timeAgo(selected.account_review_requested_at)}`
+	                      : 'Sin fecha registrada'}
+	                  </p>
+	                </div>
+	              )}
+
+	              {selected.photo_verification && (
                 <div className="space-y-3 rounded-2xl border border-sky-400/15 bg-sky-500/5 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">

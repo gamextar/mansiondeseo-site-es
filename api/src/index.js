@@ -119,6 +119,8 @@ let _profileReportsReady = null;
 let _userLastIpColumnReady = null;
 let _userDeviceColumnsReady = null;
 let _userDashboardSeenColumnReady = null;
+let _userProfileRoleColumnReady = null;
+let _userReviewMetadataColumnsReady = null;
 let _accountDeletionRequestsReady = null;
 let _profileVisitStructuresReady = null;
 let _syntheticVisitStructuresReady = null;
@@ -133,6 +135,7 @@ let _feedItemTablesReady = null;
 
 const REGISTER_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
 const SEEKING_ROLE_IDS = ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'trans'];
+const USER_TABLE_ROLE_IDS = ['hombre', 'mujer', 'pareja'];
 const PAIR_ROLE_IDS = ['pareja', 'pareja_hombres', 'pareja_mujeres'];
 const PHOTO_VERIFICATION_STATUSES = ['code_issued', 'pending', 'approved', 'rejected', 'expired'];
 const FEED_PROFILE_LIMIT = 42;
@@ -424,7 +427,7 @@ async function fetchRowsPerRoleBucket(env, baseQuery, baseBindings, roleBuckets,
     const roleValues = [...new Set(bucket.roles)];
     const bucketQuery = `
       ${queryWithoutOrder}
-      AND u.role IN (${roleValues.map(() => '?').join(', ')})
+      AND ${effectiveRoleSql('u')} IN (${roleValues.map(() => '?').join(', ')})
       ${orderByClause}
       LIMIT ${perBucketLimit}
     `;
@@ -540,7 +543,7 @@ function buildFeedBaseProfiles(rows, env, activeStoryUserIds, activeStoryUrlMap)
       name: u.username,
       age: getPublicAge(u),
       ...getLocationFields(u),
-      role: mapRoleToDisplay(u.role),
+      role: mapRoleToDisplay(getEffectiveUserRole(u)),
       interests: profileInterests,
       bio: u.bio,
       photos: galleryPhotos,
@@ -562,7 +565,7 @@ function buildFeedBaseProfiles(rows, env, activeStoryUserIds, activeStoryUrlMap)
       has_active_story: hasActiveStory,
       active_story_url: activeStoryUrl,
       followers_total: Number(u.followers_total || 0),
-      _roleId: u.role,
+      _roleId: getEffectiveUserRole(u),
       _profileInterests: profileInterests,
     };
   });
@@ -926,6 +929,14 @@ async function ensureAccountDeletionRequestsTable(env) {
       await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_account_deletion_user ON account_deletion_requests(user_id, used, created_at DESC)').run();
       await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_account_deletion_token ON account_deletion_requests(token)').run();
       await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_account_deletion_expires ON account_deletion_requests(expires_at)').run();
+      try {
+        await env.DB.prepare('ALTER TABLE account_deletion_requests ADD COLUMN confirmed_at TEXT DEFAULT NULL').run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
     })().catch((err) => {
       _accountDeletionRequestsReady = null;
       throw err;
@@ -941,6 +952,7 @@ async function deleteUserCompletely(env, user) {
   await ensureUserBlocksTable(env);
   await ensureProfileReportsTable(env);
   await ensureAccountDeletionRequestsTable(env);
+  await ensureUsersReviewMetadataColumns(env);
   await ensurePhotoVerificationRequestsTable(env);
   await ensureStoriesTable(env);
   await ensureFakeStoryCandidatePool(env);
@@ -1094,6 +1106,13 @@ function getProfileFeedItemSearchText(row = {}) {
   ].filter(Boolean).join(' '));
 }
 
+function hasProfileDisplayMedia(row = {}) {
+  const avatarUrl = String(row?.avatar_url || '').trim();
+  if (avatarUrl) return true;
+  const rawPhotos = Array.isArray(row?.photos) ? row.photos : safeParseJSON(row?.photos, []);
+  return normalizeGalleryPhotos(rawPhotos, avatarUrl).length > 0;
+}
+
 function buildProfileFeedItemUpsert(env, row = {}) {
   const userId = String(row?.id || '').trim();
   const fake = Number(row?.fake || 0) === 1 ? 1 : 0;
@@ -1101,9 +1120,10 @@ function buildProfileFeedItemUpsert(env, row = {}) {
     return env.DB.prepare('DELETE FROM profile_feed_items WHERE user_id = ?').bind(userId || '');
   }
 
-  const active = row.status === undefined
-    ? 1
-    : (row.status === 'verified' && String(row.account_status || 'active') === 'active' ? 1 : 0);
+  const eligibleStatus = row.status === undefined
+    ? true
+    : row.status === 'verified' && String(row.account_status || 'active') === 'active';
+  const active = eligibleStatus && hasProfileDisplayMedia(row) ? 1 : 0;
   const payload = mapProfileSnapshotRow({ ...row, fake: 0, active_story_url: '' }, env);
   const role = String(payload.role || '');
   const country = String(payload.country || '').trim().toUpperCase();
@@ -1201,7 +1221,7 @@ async function syncRealProfileFeedItemForUser(env, userId) {
       u.country,
       u.city,
       u.locality,
-      u.role,
+      ${effectiveRoleSql('u')} AS role,
       u.interests,
       u.bio,
       u.avatar_url,
@@ -1257,7 +1277,7 @@ async function syncRealStoryFeedItemsForUser(env, userId) {
     SELECT s.id, s.user_id, s.video_url, COALESCE(s.caption, '') AS caption,
            COALESCE(s.vip_only, 0) AS vip_only, COALESCE(s.likes, 0) AS likes,
            COALESCE(s.comments, 0) AS comments, s.created_at, COALESCE(s.active, 1) AS active,
-           u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
+           u.username, u.avatar_url, u.avatar_crop, ${effectiveRoleSql('u')} AS role, COALESCE(u.fake, 0) AS fake,
            u.last_active, 0 AS visits_total, COALESCE(u.feed_priority, 0) AS feed_priority
     FROM stories s
     JOIN users u ON u.id = s.user_id
@@ -1294,7 +1314,7 @@ async function syncRealStoryFeedItemForStory(env, storyId) {
     SELECT s.id, s.user_id, s.video_url, COALESCE(s.caption, '') AS caption,
            COALESCE(s.vip_only, 0) AS vip_only, COALESCE(s.likes, 0) AS likes,
            COALESCE(s.comments, 0) AS comments, s.created_at, COALESCE(s.active, 1) AS active,
-           u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
+           u.username, u.avatar_url, u.avatar_crop, ${effectiveRoleSql('u')} AS role, COALESCE(u.fake, 0) AS fake,
            u.status, COALESCE(u.account_status, 'active') AS account_status,
            u.last_active, 0 AS visits_total, COALESCE(u.feed_priority, 0) AS feed_priority
     FROM stories s
@@ -1321,7 +1341,7 @@ async function rebuildRealFeedItems(env, { source = 'manual' } = {}) {
       SELECT s.id, s.user_id, s.video_url, COALESCE(s.caption, '') AS caption,
              COALESCE(s.vip_only, 0) AS vip_only, COALESCE(s.likes, 0) AS likes,
              COALESCE(s.comments, 0) AS comments, s.created_at, COALESCE(s.active, 1) AS active,
-             u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
+             u.username, u.avatar_url, u.avatar_crop, ${effectiveRoleSql('u')} AS role, COALESCE(u.fake, 0) AS fake,
              u.last_active, 0 AS visits_total, COALESCE(u.feed_priority, 0) AS feed_priority
       FROM stories s
       JOIN users u ON u.id = s.user_id
@@ -2020,6 +2040,26 @@ async function ensureUsersDeviceColumns(env) {
   return _userDeviceColumnsReady;
 }
 
+async function ensureUsersProfileRoleColumn(env) {
+  if (!_userProfileRoleColumnReady) {
+    _userProfileRoleColumnReady = (async () => {
+      try {
+        await env.DB.prepare("ALTER TABLE users ADD COLUMN profile_role TEXT NOT NULL DEFAULT ''").run();
+      } catch (err) {
+        const message = String(err?.message || err || '').toLowerCase();
+        if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+          throw err;
+        }
+      }
+      await env.DB.prepare("UPDATE users SET profile_role = role WHERE COALESCE(profile_role, '') = ''").run();
+    })().catch((err) => {
+      _userProfileRoleColumnReady = null;
+      throw err;
+    });
+  }
+  return _userProfileRoleColumnReady;
+}
+
 async function ensureUsersDashboardSeenColumn(env) {
   if (!_userDashboardSeenColumnReady) {
     _userDashboardSeenColumnReady = (async () => {
@@ -2040,6 +2080,65 @@ async function ensureUsersDashboardSeenColumn(env) {
   }
 
   return _userDashboardSeenColumnReady;
+}
+
+async function ensureUsersReviewMetadataColumns(env) {
+  if (!_userReviewMetadataColumnsReady) {
+    _userReviewMetadataColumnsReady = (async () => {
+      for (const statement of [
+        "ALTER TABLE users ADD COLUMN account_review_reason TEXT NOT NULL DEFAULT ''",
+        'ALTER TABLE users ADD COLUMN account_review_requested_at TEXT DEFAULT NULL',
+      ]) {
+        try {
+          await env.DB.prepare(statement).run();
+        } catch (err) {
+          const message = String(err?.message || err || '').toLowerCase();
+          if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+            throw err;
+          }
+        }
+      }
+
+      await ensureAccountDeletionRequestsTable(env);
+      await env.DB.prepare(`
+        UPDATE account_deletion_requests
+        SET confirmed_at = COALESCE(confirmed_at, created_at)
+        WHERE used = 1
+          AND confirmed_at IS NULL
+          AND user_id IN (
+            SELECT id FROM users WHERE COALESCE(account_status, 'active') = 'under_review'
+          )
+      `).run();
+      await env.DB.prepare(`
+        UPDATE users
+        SET account_review_reason = 'account_deletion_requested',
+            account_review_requested_at = COALESCE(
+              (
+                SELECT MAX(COALESCE(adr.confirmed_at, adr.created_at))
+                FROM account_deletion_requests adr
+                WHERE adr.user_id = users.id
+                  AND adr.used = 1
+              ),
+              account_review_requested_at,
+              last_active,
+              created_at
+            )
+        WHERE COALESCE(account_status, 'active') = 'under_review'
+          AND COALESCE(account_review_reason, '') = ''
+          AND EXISTS (
+            SELECT 1
+            FROM account_deletion_requests adr
+            WHERE adr.user_id = users.id
+              AND adr.used = 1
+          )
+      `).run();
+    })().catch((err) => {
+      _userReviewMetadataColumnsReady = null;
+      throw err;
+    });
+  }
+
+  return _userReviewMetadataColumnsReady;
 }
 
 async function ensurePhotoVerificationRequestsTable(env) {
@@ -2086,15 +2185,33 @@ function normalizeRoleArray(rawValue, validValues, fallback = []) {
   return [...new Set(filtered.length ? filtered : fallback)];
 }
 
+function getStorageRole(role) {
+  const normalized = String(role || '').trim();
+  if (normalized === 'pareja_hombres' || normalized === 'pareja_mujeres') return 'pareja';
+  if (normalized === 'trans') return 'mujer';
+  return USER_TABLE_ROLE_IDS.includes(normalized) ? normalized : '';
+}
+
+function getEffectiveUserRole(user = {}) {
+  const profileRole = String(user?.profile_role || '').trim();
+  if (REGISTER_ROLE_IDS.includes(profileRole)) return profileRole;
+  const role = String(user?.role || '').trim();
+  return REGISTER_ROLE_IDS.includes(role) ? role : '';
+}
+
+function effectiveRoleSql(alias = 'u') {
+  return `COALESCE(NULLIF(${alias}.profile_role, ''), ${alias}.role)`;
+}
+
 async function getReceiverMessageBlockInfo(env, receiverId) {
-  await ensureUsersMessageBlockRolesColumn(env);
+  await Promise.all([ensureUsersMessageBlockRolesColumn(env), ensureUsersProfileRoleColumn(env)]);
   const receiver = await env.DB.prepare(
-    'SELECT id, role, message_block_roles FROM users WHERE id = ?'
+    'SELECT id, role, profile_role, message_block_roles FROM users WHERE id = ?'
   ).bind(receiverId).first();
   if (!receiver) return null;
   return {
     id: receiver.id,
-    role: receiver.role,
+    role: getEffectiveUserRole(receiver),
     messageBlockRoles: normalizeRoleArray(safeParseJSON(receiver.message_block_roles, []), SEEKING_ROLE_IDS, []),
   };
 }
@@ -2102,7 +2219,7 @@ async function getReceiverMessageBlockInfo(env, receiverId) {
 async function assertMessagingAllowed(env, senderId, receiverId) {
   await ensureUserBlocksTable(env);
   const [sender, receiver, blockRow] = await Promise.all([
-    env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(senderId).first(),
+    env.DB.prepare('SELECT id, role, profile_role FROM users WHERE id = ?').bind(senderId).first(),
     getReceiverMessageBlockInfo(env, receiverId),
     env.DB.prepare(`
       SELECT blocker_id
@@ -2128,7 +2245,7 @@ async function assertMessagingAllowed(env, senderId, receiverId) {
     };
   }
 
-  const senderRole = String(sender.role || '').trim();
+  const senderRole = getEffectiveUserRole(sender);
   if (!senderRole) return { ok: true };
 
   if (receiver.messageBlockRoles.includes(senderRole)) {
@@ -2822,12 +2939,12 @@ async function rebuildSyntheticVisitCandidates(env, { perRoleLimit = SYNTHETIC_V
     const rows = [];
     for (const role of REGISTER_ROLE_IDS) {
       const { results } = await env.DB.prepare(`
-        SELECT u.id, u.role
+        SELECT u.id, ${effectiveRoleSql('u')} AS role
         FROM users u
         WHERE COALESCE(u.fake, 0) = 1
           AND u.status = 'verified'
           AND COALESCE(u.account_status, 'active') = 'active'
-          AND u.role = ?
+          AND ${effectiveRoleSql('u')} = ?
         ORDER BY u.last_active DESC, u.id DESC
         LIMIT ?
       `).bind(role, safeLimit).all();
@@ -3322,7 +3439,7 @@ function base64UrlDecode(str) {
 async function signJWT(payload, secret) {
   const header = { alg: 'HS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
-  const claims = { ...payload, iat: now, exp: now + 86400 * 7 }; // 7 days
+  const claims = { ...payload, iat: now };
   const unsigned = `${base64UrlEncode(header)}.${base64UrlEncode(claims)}`;
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -3355,7 +3472,6 @@ async function verifyJWT(token, secret) {
     const valid = await crypto.subtle.verify('HMAC', _jwtKeyCache.key, sigBytes, encoder.encode(unsigned));
     if (!valid) return null;
     const payload = JSON.parse(base64UrlDecode(payloadB64));
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
     return payload;
   } catch {
     return null;
@@ -3736,9 +3852,12 @@ async function handleRegister(request, env, ctx) {
   const body = await request.json();
   const { email, password, username, role, seeking, interests, age, birthdate, city, province, locality, bio, marital_status, sexual_orientation, message_block_roles } = body;
   const usernameValue = String(username || '').trim();
+  const roleValue = String(role || '').trim();
   await Promise.all([
     ensureUsersMessageBlockRolesColumn(env),
     ensureUsersDeviceColumns(env),
+    ensureUsersProfileRoleColumn(env),
+    ensureUsersReviewMetadataColumns(env),
     ensureUserLookupIndexes(env),
   ]);
   const requestDevice = detectRequestDevice(request);
@@ -3756,13 +3875,15 @@ async function handleRegister(request, env, ctx) {
     ? computedAge
     : (Number.isFinite(fallbackAge) ? fallbackAge : null);
 
-  if (!email || !password || !usernameValue || !role || !seeking) {
+  if (!email || !password || !usernameValue || !roleValue || !seeking) {
     return error('Campos requeridos: email, password, username, role, seeking');
   }
 
-  if (!REGISTER_ROLE_IDS.includes(role)) {
+  if (!REGISTER_ROLE_IDS.includes(roleValue)) {
     return error('Role inválido');
   }
+  const storageRoleValue = getStorageRole(roleValue);
+  if (!storageRoleValue) return error('Role inválido');
 
   if (!normalizedBirthdate && !Number.isFinite(fallbackAge)) {
     return error('Fecha de nacimiento requerida');
@@ -3777,7 +3898,7 @@ async function handleRegister(request, env, ctx) {
   }
 
   // Validate seeking: must be array of valid roles
-  const seekingArr = Array.isArray(seeking) ? seeking : [seeking];
+  const seekingArr = normalizeRoleArray(seeking, SEEKING_ROLE_IDS, []);
   if (!seekingArr.length || seekingArr.some(s => !SEEKING_ROLE_IDS.includes(s))) {
     return error('Seeking contiene valores inválidos');
   }
@@ -3826,7 +3947,12 @@ async function handleRegister(request, env, ctx) {
   if (conflictingFakeIds.length > 0) {
     await Promise.all(conflictingFakeIds.map((id) => (
       env.DB.prepare(
-        "UPDATE users SET account_status = 'under_review', duplicate_flag = 1 WHERE id = ?"
+        `UPDATE users
+         SET account_status = 'under_review',
+             duplicate_flag = 1,
+             account_review_reason = 'duplicate_username_conflict',
+             account_review_requested_at = datetime('now')
+         WHERE id = ?`
       ).bind(id).run()
     )));
     conflictingFakeIds.forEach((id) => {
@@ -3872,14 +3998,15 @@ async function handleRegister(request, env, ctx) {
   const country = body.country || detectedCountry;
 
   await env.DB.prepare(`
-    INSERT INTO users (id, email, username, password_hash, role, seeking, interests, age, birthdate, city, locality, marital_status, sexual_orientation, message_block_roles, country, bio, signup_device, last_device, status, coins, feed_priority)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?)
+    INSERT INTO users (id, email, username, password_hash, role, profile_role, seeking, interests, age, birthdate, city, locality, marital_status, sexual_orientation, message_block_roles, country, bio, signup_device, last_device, status, coins, feed_priority)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?)
   `).bind(
     userId,
     email.toLowerCase(),
     usernameValue,
     passwordHash,
-    role,
+    storageRoleValue,
+    roleValue,
     JSON.stringify(seekingArr),
     JSON.stringify(interests || []),
     ageValue,
@@ -3978,7 +4105,7 @@ async function handleVerifyCode(request, env) {
   await env.DB.prepare('UPDATE verification_tokens SET used = 1 WHERE id = ?')
     .bind(record.id).run();
 
-  const token = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
+  const token = await signJWT({ sub: user.id, email: user.email, role: getEffectiveUserRole(user) || user.role }, env.JWT_SECRET);
 
   return json({ token, user: sanitizeUser(user, env) });
 }
@@ -4303,7 +4430,7 @@ async function handleLogin(request, env, ctx) {
     });
   ctx?.waitUntil?.(presenceUpdate);
 
-  const token = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
+  const token = await signJWT({ sub: user.id, email: user.email, role: getEffectiveUserRole(user) || user.role }, env.JWT_SECRET);
 
   return json({ token, user: sanitizeUser(user, env) });
 }
@@ -4378,7 +4505,7 @@ async function handleVerifyToken(request, env) {
   }
   await bumpFeedCacheVersion(env);
 
-  const jwt = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
+  const jwt = await signJWT({ sub: user.id, email: user.email, role: getEffectiveUserRole(user) || user.role }, env.JWT_SECRET);
 
   return Response.redirect(`${getPrimaryAppOrigin(env)}/?token=${jwt}`, 302);
 }
@@ -4714,6 +4841,7 @@ async function handleConfirmAccountDeletion(request, env) {
   if (normalizedCode.length !== 6) return error('Código requerido', 400);
 
   await ensureAccountDeletionRequestsTable(env);
+  await ensureUsersReviewMetadataColumns(env);
 
   const record = await env.DB.prepare(`
     SELECT id
@@ -4730,10 +4858,12 @@ async function handleConfirmAccountDeletion(request, env) {
   if (!user) return error('Usuario no encontrado', 404);
 
   await env.DB.batch([
-    env.DB.prepare('UPDATE account_deletion_requests SET used = 1 WHERE id = ?').bind(record.id),
+    env.DB.prepare("UPDATE account_deletion_requests SET used = 1, confirmed_at = datetime('now') WHERE id = ?").bind(record.id),
     env.DB.prepare(`
       UPDATE users
       SET account_status = 'under_review',
+          account_review_reason = 'account_deletion_requested',
+          account_review_requested_at = datetime('now'),
           online = 0,
           last_active = datetime('now')
       WHERE id = ?
@@ -4842,7 +4972,7 @@ async function handleConfirmEmailChange(request, env) {
   setCachedViewer(auth.sub, user);
   setCachedFullUser(auth.sub, user);
 
-  const token = await signJWT({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET);
+  const token = await signJWT({ sub: user.id, email: user.email, role: getEffectiveUserRole(user) || user.role }, env.JWT_SECRET);
   return json({
     success: true,
     message: 'Email actualizado correctamente.',
@@ -4938,7 +5068,7 @@ async function handleOwnProfileDashboard(request, env, ctx) {
   const [activeStory, visitRows, giftRows, visitStatRow] = await Promise.all([
     env.DB.prepare('SELECT id, video_url FROM stories WHERE user_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').bind(auth.sub).first(),
     env.DB.prepare(
-      `SELECT u.id, u.username, u.avatar_url, u.avatar_thumb_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, u.role, u.premium, u.last_active,
+      `SELECT u.id, u.username, u.avatar_url, u.avatar_thumb_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, ${effectiveRoleSql('u')} AS role, u.premium, u.last_active,
               prv.last_visited_at as visited_at
        FROM profile_recent_visitors prv
        JOIN users u ON u.id = prv.visitor_id
@@ -5364,7 +5494,7 @@ async function handleProfileDetail(request, env, userId) {
       name: user.username,
       age: getPublicAge(user),
       ...getLocationFields(user),
-      role: mapRoleToDisplay(user.role),
+      role: mapRoleToDisplay(getEffectiveUserRole(user)),
       seeking: normalizeRoleArray(safeParseJSON(user.seeking, []), SEEKING_ROLE_IDS, ['hombre']),
       message_block_roles: normalizeRoleArray(safeParseJSON(user.message_block_roles, []), SEEKING_ROLE_IDS, []),
       interests: safeParseJSON(user.interests, []),
@@ -5405,7 +5535,7 @@ async function handleChatBootstrap(request, env, userId) {
 
   const [user, sender, settings, blockState] = await Promise.all([
     env.DB.prepare(
-      'SELECT id, username, age, birthdate, city, locality, role, avatar_url, avatar_crop, last_active, premium, premium_until FROM users WHERE id = ?'
+      'SELECT id, username, age, birthdate, city, locality, role, profile_role, avatar_url, avatar_crop, last_active, premium, premium_until FROM users WHERE id = ?'
     ).bind(userId).first(),
     env.DB.prepare('SELECT premium, premium_until FROM users WHERE id = ?').bind(auth.sub).first(),
     cached('settings', 300_000, () => loadSettings(env)),
@@ -5448,7 +5578,7 @@ async function handleChatBootstrap(request, env, userId) {
       name: user.username,
       age: getPublicAge(user),
       ...getLocationFields(user),
-      role: mapRoleToDisplay(user.role),
+      role: mapRoleToDisplay(getEffectiveUserRole(user)),
       photos: [],
       avatar_url: user.avatar_url,
       avatar_crop: safeParseJSON(user.avatar_crop, null),
@@ -5513,7 +5643,7 @@ async function handleSendMessage(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   await ensureMessageAttachmentColumns(env);
-  await ensureUsersMessageBlockRolesColumn(env);
+  await Promise.all([ensureUsersMessageBlockRolesColumn(env), ensureUsersProfileRoleColumn(env)]);
 
   const {
     receiver_id,
@@ -6655,7 +6785,7 @@ async function handleUpdateProfile(request, env) {
     normalizedBody.age = derivedAge;
   }
 
-  await ensureUsersMessageBlockRolesColumn(env);
+  await Promise.all([ensureUsersMessageBlockRolesColumn(env), ensureUsersProfileRoleColumn(env)]);
   const allowedFields = ['username', 'role', 'seeking', 'interests', 'message_block_roles', 'age', 'birthdate', 'city', 'locality', 'marital_status', 'sexual_orientation', 'bio', 'avatar_url', 'avatar_thumb_url', 'avatar_crop', 'premium'];
   const currentUser = await env.DB.prepare(
     "SELECT id, premium, premium_until, avatar_url, avatar_thumb_url, photos, photo_thumbs, COALESCE(fake, 0) AS fake, status, COALESCE(account_status, 'active') AS account_status FROM users WHERE id = ?"
@@ -6663,6 +6793,21 @@ async function handleUpdateProfile(request, env) {
   if (!currentUser) return error('Usuario no encontrado', 404);
   const currentGalleryPhotos = normalizeGalleryPhotos(safeParseJSON(currentUser.photos, []), currentUser.avatar_url);
   const currentPhotoThumbs = normalizePhotoThumbs(currentUser.photo_thumbs, currentGalleryPhotos);
+
+  if (normalizedBody.avatar_url !== undefined) {
+    const nextAvatarUrl = String(normalizedBody.avatar_url || '').trim();
+    if (!nextAvatarUrl) return error('La foto de perfil es obligatoria', 400);
+    if (!isTrustedMediaUrl(nextAvatarUrl, env)) return error('URL de avatar inválida', 400);
+    normalizedBody.avatar_url = nextAvatarUrl;
+  }
+
+  if (normalizedBody.avatar_thumb_url !== undefined) {
+    const nextAvatarThumbUrl = String(normalizedBody.avatar_thumb_url || '').trim();
+    if (nextAvatarThumbUrl && !isTrustedMediaUrl(nextAvatarThumbUrl, env)) {
+      return error('URL de miniatura inválida', 400);
+    }
+    normalizedBody.avatar_thumb_url = nextAvatarThumbUrl;
+  }
 
   if (normalizedBody.avatar_url !== undefined && normalizedBody.avatar_thumb_url === undefined) {
     normalizedBody.avatar_thumb_url = currentPhotoThumbs[normalizedBody.avatar_url] || '';
@@ -6715,9 +6860,12 @@ async function handleUpdateProfile(request, env) {
         updates.push(`${field} = ?`);
         values.push(nextUsername);
       } else if (field === 'role') {
-        if (!REGISTER_ROLE_IDS.includes(normalizedBody[field])) continue;
+        const nextRole = String(normalizedBody[field] || '').trim();
+        if (!REGISTER_ROLE_IDS.includes(nextRole)) continue;
         updates.push(`${field} = ?`);
-        values.push(normalizedBody[field]);
+        values.push(getStorageRole(nextRole));
+        updates.push('profile_role = ?');
+        values.push(nextRole);
       } else if (field === 'interests' || field === 'photos' || field === 'avatar_crop') {
         updates.push(`${field} = ?`);
         if (field === 'photos') {
@@ -6852,6 +7000,8 @@ function sanitizeUser(user, env) {
   return {
     ...safe,
     ...location,
+    role: getEffectiveUserRole(safe),
+    profile_role: getEffectiveUserRole(safe),
     age,
     birthdate,
     marital_status: String(safe.marital_status || '').trim(),
@@ -6902,7 +7052,7 @@ async function handleGetVisits(request, env) {
   await ensureProfileVisitStructures(env);
 
   const { results } = await env.DB.prepare(
-    `SELECT u.id, u.username, u.avatar_url, u.avatar_thumb_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, u.role, u.premium, u.last_active,
+    `SELECT u.id, u.username, u.avatar_url, u.avatar_thumb_url, u.avatar_crop, u.age, u.birthdate, u.city, u.locality, ${effectiveRoleSql('u')} AS role, u.premium, u.last_active,
             prv.last_visited_at as visited_at
      FROM profile_recent_visitors prv
      JOIN users u ON u.id = prv.visitor_id
@@ -6953,7 +7103,7 @@ async function handleGetTopVisitedProfiles(request, env) {
         u.birthdate,
         u.city,
         u.locality,
-        u.role,
+        ${effectiveRoleSql('u')} AS role,
         u.avatar_url,
         u.avatar_thumb_url,
         u.avatar_crop,
@@ -6972,7 +7122,7 @@ async function handleGetTopVisitedProfiles(request, env) {
   const bindings = [];
 
   if (roleValues.length > 0) {
-    query += ` AND u.role IN (${roleValues.map(() => '?').join(', ')})`;
+    query += ` AND ${effectiveRoleSql('u')} IN (${roleValues.map(() => '?').join(', ')})`;
     bindings.push(...roleValues);
   }
 
@@ -6993,7 +7143,7 @@ async function handleGetTopVisitedProfiles(request, env) {
       name: u.username,
       age: getPublicAge(u),
       ...getLocationFields(u),
-      role: mapRoleToDisplay(u.role),
+      role: mapRoleToDisplay(getEffectiveUserRole(u)),
       verified: !!u.verified,
       online: isOnline(u.last_active),
       premium: isPremiumActive(u),
@@ -7459,7 +7609,7 @@ function mapFavoriteNetworkProfile(record) {
     name: record.username,
     age: getPublicAge(record),
     ...getLocationFields(record),
-    role: mapRoleToDisplay(record.role),
+    role: mapRoleToDisplay(getEffectiveUserRole(record)),
     verified: !!record.verified,
     online: isOnline(record.last_active),
     premium: isPremiumActive(record),
@@ -7502,7 +7652,7 @@ async function handleGetFavorites(request, env) {
         u.birthdate,
         u.city,
         u.locality,
-        u.role,
+        ${effectiveRoleSql('u')} AS role,
         u.avatar_url,
         u.avatar_thumb_url,
         u.avatar_crop,
@@ -7533,7 +7683,7 @@ async function handleGetFavorites(request, env) {
         u.birthdate,
         u.city,
         u.locality,
-        u.role,
+        ${effectiveRoleSql('u')} AS role,
         u.avatar_url,
         u.avatar_thumb_url,
         u.avatar_crop,
@@ -7777,6 +7927,8 @@ async function handleAdminGetUsers(request, env) {
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
   if (!adminUser?.is_admin) return error('Acceso denegado', 403);
   await ensureAdminUserSearchIndexes(env);
+  await ensureUsersProfileRoleColumn(env);
+  await ensureUsersReviewMetadataColumns(env);
 
   const url = new URL(request.url);
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
@@ -7808,11 +7960,12 @@ async function handleAdminGetUsers(request, env) {
     bindings.push(Number(duplicateFilter));
   }
 
-  if (roleFilter === 'mujer' || roleFilter === 'hombre') {
-    filters.push('role = ?');
+  const effectiveRoleExpr = "COALESCE(NULLIF(profile_role, ''), role)";
+  if (REGISTER_ROLE_IDS.includes(roleFilter) && roleFilter !== 'pareja') {
+    filters.push(`${effectiveRoleExpr} = ?`);
     bindings.push(roleFilter);
   } else if (roleFilter === 'pareja') {
-    filters.push(`role IN (${PAIR_ROLE_IDS.map(() => '?').join(', ')})`);
+    filters.push(`${effectiveRoleExpr} IN (${PAIR_ROLE_IDS.map(() => '?').join(', ')})`);
     bindings.push(...PAIR_ROLE_IDS);
   }
 
@@ -7851,10 +8004,11 @@ async function handleAdminGetUsers(request, env) {
   countQuery += whereClause;
   const dataQuery = `
     WITH page_users AS (
-      SELECT id, email, username, role, seeking, message_block_roles, age, birthdate, city, locality,
+      SELECT id, email, username, role, profile_role, seeking, message_block_roles, age, birthdate, city, locality,
              marital_status, sexual_orientation, country, avatar_url, avatar_thumb_url, status,
              premium, premium_until, ghost_mode, verified, online, coins,
-             is_admin, fake, feed_priority, duplicate_flag, account_status, last_active, last_ip,
+             is_admin, fake, feed_priority, duplicate_flag, account_status,
+             account_review_reason, account_review_requested_at, last_active, last_ip,
              signup_device, last_device, created_at
       FROM users
       ${whereClause}
@@ -7905,6 +8059,8 @@ async function handleAdminGetUsers(request, env) {
     users: pageUsers.map(u => {
       return {
         ...u,
+        role: getEffectiveUserRole(u),
+        profile_role: getEffectiveUserRole(u),
         age: getPublicAge(u),
         birthdate: normalizeBirthdate(u.birthdate) || '',
         province: u.city || '',
@@ -7918,6 +8074,8 @@ async function handleAdminGetUsers(request, env) {
         fake: !!u.fake,
         feed_priority: Math.max(0, Number(u.feed_priority || 0)),
         duplicate_flag: !!u.duplicate_flag,
+        account_review_reason: u.account_review_reason || '',
+        account_review_requested_at: u.account_review_requested_at || '',
         reports_count: Number(u.reports_count || 0),
         latest_report_reason: u.latest_report_reason || '',
         latest_report_at: u.latest_report_at || '',
@@ -8811,6 +8969,8 @@ async function handleAdminGetUser(request, env, userId) {
   await ensureUsersMessageBlockRolesColumn(env);
   await ensureUsersDuplicateFlagColumn(env);
   await ensureUsersFeedPriorityColumn(env);
+  await ensureUsersProfileRoleColumn(env);
+  await ensureUsersReviewMetadataColumns(env);
   await ensureProfileReportsTable(env);
   await ensureStoriesTable(env);
   const auth = await authenticate(request, env);
@@ -8851,6 +9011,8 @@ async function handleAdminGetUser(request, env, userId) {
   return json({
     user: {
       ...safe,
+      role: getEffectiveUserRole(safe),
+      profile_role: getEffectiveUserRole(safe),
       age: getPublicAge(safe),
       birthdate: normalizeBirthdate(safe.birthdate) || '',
       province: safe.city || '',
@@ -8868,6 +9030,8 @@ async function handleAdminGetUser(request, env, userId) {
       fake: !!safe.fake,
       feed_priority: Math.max(0, Number(safe.feed_priority || 0)),
       duplicate_flag: !!safe.duplicate_flag,
+      account_review_reason: safe.account_review_reason || '',
+      account_review_requested_at: safe.account_review_requested_at || '',
       reports_count: Number(reportCount?.total || 0),
       reports,
       photo_verification: serializePhotoVerification(photoVerification, { admin: true }),
@@ -8946,6 +9110,7 @@ async function handleAdminUpdateUser(request, env, userId, ctx) {
   await ensureUsersMessageBlockRolesColumn(env);
   await ensureUsersDuplicateFlagColumn(env);
   await ensureUsersFeedPriorityColumn(env);
+  await ensureUsersReviewMetadataColumns(env);
   const auth = await authenticate(request, env);
   if (!auth) return error('No autorizado', 401);
   const adminUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.sub).first();
@@ -9005,6 +9170,14 @@ async function handleAdminUpdateUser(request, env, userId, ctx) {
   if (body.status !== undefined && ['pending', 'verified'].includes(body.status)) { updates.push('status = ?'); vals.push(body.status); }
   if (body.account_status !== undefined && ['active', 'under_review', 'suspended'].includes(body.account_status)) {
     updates.push('account_status = ?'); vals.push(body.account_status);
+    if (body.account_status === 'under_review') {
+      updates.push("account_review_reason = CASE WHEN account_review_reason = 'account_deletion_requested' THEN account_review_reason ELSE ? END");
+      vals.push('manual_review');
+      updates.push('account_review_requested_at = COALESCE(account_review_requested_at, datetime(\'now\'))');
+    } else {
+      updates.push("account_review_reason = ''");
+      updates.push('account_review_requested_at = NULL');
+    }
   }
   if (body.avatar_url !== undefined) {
     updates.push('avatar_url = ?');
@@ -9106,6 +9279,8 @@ async function handleAdminUpdateUser(request, env, userId, ctx) {
       fake: !!safe.fake,
       feed_priority: Math.max(0, Number(safe.feed_priority || 0)),
       duplicate_flag: !!safe.duplicate_flag,
+      account_review_reason: safe.account_review_reason || '',
+      account_review_requested_at: safe.account_review_requested_at || '',
     }
   });
 }
@@ -10741,7 +10916,7 @@ function mapStorySnapshotRow(row, env, { position = 0 } = {}) {
     username: row?.username || '',
     avatar_url: row?.avatar_url || '',
     avatar_crop: typeof row?.avatar_crop === 'string' ? row.avatar_crop : JSON.stringify(row?.avatar_crop || null),
-    role: row?.role || '',
+    role: getEffectiveUserRole(row),
     fake,
     last_active: row?.last_active || '',
     visits_total: Number(row?.visits_total || 0),
@@ -10855,7 +11030,7 @@ async function buildStorySnapshotRows(env, { fake = false } = {}) {
     SELECT s.id, s.user_id, s.video_url, COALESCE(s.caption, '') AS caption,
            COALESCE(s.vip_only, 0) AS vip_only, COALESCE(s.likes, 0) AS likes,
            COALESCE(s.comments, 0) AS comments, s.created_at,
-           u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
+           u.username, u.avatar_url, u.avatar_crop, ${effectiveRoleSql('u')} AS role, COALESCE(u.fake, 0) AS fake,
            u.last_active, 0 AS visits_total, COALESCE(u.feed_priority, 0) AS feed_priority
     FROM stories s
     JOIN users u ON u.id = s.user_id
@@ -11084,6 +11259,7 @@ async function readProfileSnapshotJson(env, key, { ttlMs = 10 * 60_000, bypassCa
 }
 
 async function buildFakeProfileSnapshotRows(env) {
+  await ensureUsersProfileRoleColumn(env);
   const { results } = await env.DB.prepare(`
     SELECT
       u.id,
@@ -11093,7 +11269,7 @@ async function buildFakeProfileSnapshotRows(env) {
       u.country,
       u.city,
       u.locality,
-      u.role,
+      ${effectiveRoleSql('u')} AS role,
       u.interests,
       u.bio,
       u.avatar_url,
@@ -11124,12 +11300,14 @@ async function buildFakeProfileSnapshotRows(env) {
   return (results || []).filter((row) => {
     const id = String(row?.id || '');
     if (!id || seen.has(id)) return false;
+    if (!hasProfileDisplayMedia(row)) return false;
     seen.add(id);
     return true;
   });
 }
 
 async function buildRealProfileSnapshotRows(env) {
+  await ensureUsersProfileRoleColumn(env);
   const { results } = await env.DB.prepare(`
     SELECT
       u.id,
@@ -11139,7 +11317,7 @@ async function buildRealProfileSnapshotRows(env) {
       u.country,
       u.city,
       u.locality,
-      u.role,
+      ${effectiveRoleSql('u')} AS role,
       u.interests,
       u.bio,
       u.avatar_url,
@@ -11170,6 +11348,7 @@ async function buildRealProfileSnapshotRows(env) {
   return (results || []).filter((row) => {
     const id = String(row?.id || '');
     if (!id || seen.has(id)) return false;
+    if (!hasProfileDisplayMedia(row)) return false;
     seen.add(id);
     return true;
   });
@@ -11600,7 +11779,7 @@ function getStoryFeedSelectClause({ includeLiked = false, fromRotation = false }
     SELECT s.id, s.user_id, s.video_url, COALESCE(s.caption, '') AS caption,
            COALESCE(s.vip_only, 0) AS vip_only, COALESCE(s.likes, 0) AS likes,
            COALESCE(s.comments, 0) AS comments, s.created_at,
-           u.username, u.avatar_url, u.avatar_crop, u.role, COALESCE(u.fake, 0) AS fake,
+           u.username, u.avatar_url, u.avatar_crop, ${effectiveRoleSql('u')} AS role, COALESCE(u.fake, 0) AS fake,
            u.last_active, COALESCE(ps.visits_total, 0) AS visits_total,
            ${includeLiked ? 'CASE WHEN sl.user_id IS NOT NULL THEN 1 ELSE 0 END' : '0'} AS liked
   `;
@@ -11608,7 +11787,8 @@ function getStoryFeedSelectClause({ includeLiked = false, fromRotation = false }
 
 function bindRoleFilter(parts, bindings, roleValues, column = 'u.role') {
   if (!Array.isArray(roleValues) || roleValues.length === 0) return;
-  parts.push(` AND ${column} IN (${roleValues.map(() => '?').join(', ')})`);
+  const roleColumn = column === 'u.role' ? effectiveRoleSql('u') : column;
+  parts.push(` AND ${roleColumn} IN (${roleValues.map(() => '?').join(', ')})`);
   bindings.push(...roleValues);
 }
 
@@ -11856,7 +12036,7 @@ async function rebuildFakeStoryCandidatePool(env, { source = 'unknown' } = {}) {
     SELECT s.id, s.user_id, s.video_url, COALESCE(s.caption, '') AS caption,
            COALESCE(s.vip_only, 0) AS vip_only, COALESCE(s.likes, 0) AS likes,
            COALESCE(s.comments, 0) AS comments, s.created_at,
-           u.username, u.avatar_url, u.avatar_crop, u.role, 1 AS fake,
+           u.username, u.avatar_url, u.avatar_crop, ${effectiveRoleSql('u')} AS role, 1 AS fake,
            u.last_active, 0 AS visits_total, COALESCE(u.feed_priority, 0) AS feed_priority
     FROM stories s
     JOIN users u ON u.id = s.user_id
@@ -11896,7 +12076,7 @@ async function syncFakeStoryCandidateForUser(env, userId) {
     SELECT s.id, s.user_id, s.video_url, COALESCE(s.caption, '') AS caption,
            COALESCE(s.vip_only, 0) AS vip_only, COALESCE(s.likes, 0) AS likes,
            COALESCE(s.comments, 0) AS comments, s.created_at,
-           u.username, u.avatar_url, u.avatar_crop, u.role, 1 AS fake,
+           u.username, u.avatar_url, u.avatar_crop, ${effectiveRoleSql('u')} AS role, 1 AS fake,
            u.last_active, 0 AS visits_total, COALESCE(u.feed_priority, 0) AS feed_priority
     FROM stories s
     JOIN users u ON u.id = s.user_id

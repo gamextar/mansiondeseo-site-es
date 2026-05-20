@@ -61,6 +61,9 @@ CREATE INDEX IF NOT EXISTS idx_story_feed_items_real_role ON story_feed_items(fa
 CREATE INDEX IF NOT EXISTS idx_story_feed_items_user ON story_feed_items(user_id, active, created_at DESC);
 `;
 
+const ensureProfileRoleSql = "ALTER TABLE users ADD COLUMN profile_role TEXT NOT NULL DEFAULT '';";
+const backfillProfileRoleSql = "UPDATE users SET profile_role = role WHERE COALESCE(profile_role, '') = '';";
+
 const rebuildProfilesSql = `
 DELETE FROM profile_feed_items WHERE fake = 0;
 INSERT INTO profile_feed_items (
@@ -68,11 +71,20 @@ INSERT INTO profile_feed_items (
 )
 SELECT
   u.id,
-  COALESCE(u.role, ''),
+  COALESCE(NULLIF(u.profile_role, ''), u.role, ''),
   0,
-  CASE WHEN u.status = 'verified' AND COALESCE(u.account_status, 'active') = 'active' THEN 1 ELSE 0 END,
+  CASE
+    WHEN u.status = 'verified'
+      AND COALESCE(u.account_status, 'active') = 'active'
+      AND (
+        COALESCE(TRIM(u.avatar_url), '') != ''
+        OR (COALESCE(TRIM(u.photos), '') != '' AND TRIM(u.photos) != '[]')
+      )
+    THEN 1
+    ELSE 0
+  END,
   UPPER(COALESCE(u.country, '')),
-  LOWER(TRIM(COALESCE(u.username, '') || ' ' || COALESCE(u.city, '') || ' ' || COALESCE(u.locality, '') || ' ' || COALESCE(u.bio, '') || ' ' || COALESCE(u.role, ''))),
+  LOWER(TRIM(COALESCE(u.username, '') || ' ' || COALESCE(u.city, '') || ' ' || COALESCE(u.locality, '') || ' ' || COALESCE(u.bio, '') || ' ' || COALESCE(NULLIF(u.profile_role, ''), u.role, ''))),
   COALESCE(u.feed_priority, 0),
   COALESCE(u.last_active, ''),
   datetime('now'),
@@ -84,7 +96,7 @@ SELECT
     'country', COALESCE(u.country, ''),
     'city', COALESCE(u.city, ''),
     'locality', COALESCE(u.locality, ''),
-    'role', COALESCE(u.role, ''),
+    'role', COALESCE(NULLIF(u.profile_role, ''), u.role, ''),
     'interests', COALESCE(u.interests, '[]'),
     'bio', COALESCE(u.bio, ''),
     'avatar_url', COALESCE(u.avatar_url, ''),
@@ -120,7 +132,7 @@ INSERT INTO story_feed_items (
 SELECT
   s.id,
   s.user_id,
-  COALESCE(u.role, ''),
+  COALESCE(NULLIF(u.profile_role, ''), u.role, ''),
   0,
   CASE WHEN s.active = 1 AND u.status = 'verified' AND COALESCE(u.account_status, 'active') = 'active' THEN 1 ELSE 0 END,
   COALESCE(s.vip_only, 0),
@@ -141,7 +153,7 @@ SELECT
     'username', COALESCE(u.username, ''),
     'avatar_url', COALESCE(u.avatar_url, ''),
     'avatar_crop', COALESCE(u.avatar_crop, 'null'),
-    'role', COALESCE(u.role, ''),
+    'role', COALESCE(NULLIF(u.profile_role, ''), u.role, ''),
     'fake', 0,
     'last_active', COALESCE(u.last_active, ''),
     'visits_total', 0,
@@ -163,6 +175,12 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 `;
 
 console.log('Creating feed item tables...');
+try {
+  runSql(ensureProfileRoleSql, { silent: true });
+} catch (err) {
+  if (!String(err?.message || err).toLowerCase().includes('duplicate column name')) throw err;
+}
+runSql(backfillProfileRoleSql, { silent: true });
 runSql(createTablesSql, { silent: true });
 console.log('Rebuilding real profile feed items...');
 runSql(rebuildProfilesSql, { silent: true });

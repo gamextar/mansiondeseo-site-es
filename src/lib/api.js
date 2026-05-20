@@ -199,12 +199,6 @@ function invalidateMeCache() {
   sessionCache.delete(AUTH_ME_CACHE_KEY);
 }
 
-function redirectToLogin() {
-  if (typeof window === 'undefined') return;
-  const nextPath = hasEverLoggedIn() ? '/login' : '/';
-  window.location.href = nextPath;
-}
-
 function shouldEmitApiRecovery(path, token, options = {}) {
   if (!token || options.suppressRecoveryEvent || options.globalRecoveryEvent !== true) return false;
   const normalizedPath = String(path || '');
@@ -833,11 +827,14 @@ async function apiFetch(path, options = {}) {
   let timingHeader = res.headers.get('X-Profiles-Timing') || '';
   const cacheHeader = res.headers.get('X-Profiles-Cache') || '';
 
-  // Handle 401 — token expired
+  // A single 401 from an API endpoint should not destroy the persisted session.
+  // The backend still rejects invalid/deleted/suspended accounts; the client
+  // just leaves the token in place so transient auth failures do not lock users out.
   if (res.status === 401 && token) {
-    clearAuth();
-    redirectToLogin();
-    throw new Error('Sesión expirada');
+    const err = new Error('No autorizado');
+    err.status = 401;
+    err.code = 'unauthorized';
+    throw err;
   }
 
   const data = await res.json();
@@ -905,9 +902,10 @@ async function apiBlob(path, options = {}) {
   });
 
   if (res.status === 401 && token) {
-    clearAuth();
-    redirectToLogin();
-    throw new Error('Sesión expirada');
+    const err = new Error('No autorizado');
+    err.status = 401;
+    err.code = 'unauthorized';
+    throw err;
   }
 
   if (!res.ok) {
@@ -989,9 +987,10 @@ async function apiUpload(path, options = {}) {
       });
 
       if (xhr.status === 401 && token) {
-        clearAuth();
-        redirectToLogin();
-        reject(new Error('Sesión expirada'));
+        const err = new Error('No autorizado');
+        err.status = 401;
+        err.code = 'unauthorized';
+        reject(err);
         return;
       }
 

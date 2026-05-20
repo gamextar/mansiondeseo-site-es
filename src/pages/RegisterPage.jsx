@@ -917,6 +917,7 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {}, optimi
         })}
       </div>
 
+      {OTHER_ROLES.length > 0 && (
       <div className="mt-4">
         <button
           type="button"
@@ -927,9 +928,10 @@ function RoleGrid({ selected, onSelect, title, subtitle, roleImages = {}, optimi
           <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showOtherRoles ? 'rotate-180' : ''}`} />
         </button>
       </div>
+      )}
 
       <AnimatePresence initial={false}>
-        {showOtherRoles && (
+        {OTHER_ROLES.length > 0 && showOtherRoles && (
           <motion.div
             initial={{ opacity: 0, height: 0, y: -8 }}
             animate={{ opacity: 1, height: 'auto', y: 0 }}
@@ -1066,6 +1068,7 @@ function SeekingGrid({ selected, onToggle, roleImages = {}, optimizeMotion = fal
         </div>
       </LayoutGroup>
 
+      {OTHER_ROLES.length > 0 && (
       <div className="mt-4">
         <button
           type="button"
@@ -1076,9 +1079,10 @@ function SeekingGrid({ selected, onToggle, roleImages = {}, optimizeMotion = fal
           <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showOtherRoles ? 'rotate-180' : ''}`} />
         </button>
       </div>
+      )}
 
       <AnimatePresence initial={false}>
-        {showOtherRoles && (
+        {OTHER_ROLES.length > 0 && showOtherRoles && (
           <motion.div
             initial={{ opacity: 0, height: 0, y: -8 }}
             animate={{ opacity: 1, height: 'auto', y: 0 }}
@@ -1446,14 +1450,16 @@ function VerificationScreen({ email, devCode, onVerified, onResend }) {
   const [error, setError] = useState('');
   const [resent, setResent] = useState(false);
   const [resending, setResending] = useState(false);
+  const [verifiedPayload, setVerifiedPayload] = useState(null);
 
   const handleVerify = async () => {
-    if (code.length < 6) return;
+    if (!verifiedPayload && code.length < 6) return;
     setVerifying(true);
     setError('');
     try {
-      const data = await apiVerifyCode(email, code);
-      onVerified(data);
+      const data = verifiedPayload || await apiVerifyCode(email, code);
+      if (!verifiedPayload) setVerifiedPayload(data);
+      await onVerified(data);
     } catch (err) {
       setError(err.message || 'Código inválido');
     } finally {
@@ -1539,14 +1545,14 @@ function VerificationScreen({ email, devCode, onVerified, onResend }) {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleVerify}
-          disabled={code.length < 6 || verifying}
+          disabled={(!verifiedPayload && code.length < 6) || verifying}
           className={`w-full py-4 rounded-2xl text-lg font-display font-semibold flex items-center justify-center gap-2 mt-6 transition-all ${
-            code.length === 6 && !verifying
+            (verifiedPayload || code.length === 6) && !verifying
               ? 'btn-gold'
               : 'bg-mansion-elevated text-text-dim cursor-not-allowed'
           }`}
         >
-          {verifying ? 'Verificando...' : 'Verificar'}
+          {verifying ? (verifiedPayload ? 'Subiendo foto...' : 'Verificando...') : (verifiedPayload ? 'Reintentar subida' : 'Verificar')}
           {!verifying && <ChevronRight className="w-5 h-5" />}
         </motion.button>
 
@@ -1936,33 +1942,35 @@ export default function RegisterPage() {
       localStorage.setItem('mansion_feed_filter', filterVal);
     }
 
-    // Upload photo if selected (now that we have a token)
-    if (photoFile) {
+    if (!photoFile) {
+      throw new Error('La foto de perfil es obligatoria para completar el registro.');
+    }
+
+    try {
+      const uploadResult = await uploadAvatar(photoFile, photoThumbFile);
+      const nextAvatarUrl = uploadResult?.avatar_url || uploadResult?.url || '';
+      const nextAvatarThumbUrl = uploadResult?.avatar_thumb_url || '';
+      if (!nextAvatarUrl) {
+        throw new Error('La subida no devolvió una foto válida.');
+      }
+      verifiedUser = {
+        ...verifiedUser,
+        avatar_url: nextAvatarUrl,
+        avatar_thumb_url: nextAvatarThumbUrl,
+        avatar_crop: null,
+      };
+      setUser(verifiedUser);
       try {
-        const uploadResult = await uploadAvatar(photoFile, photoThumbFile);
-        const nextAvatarUrl = uploadResult?.avatar_url || uploadResult?.url || '';
-        const nextAvatarThumbUrl = uploadResult?.avatar_thumb_url || '';
-        if (nextAvatarUrl) {
-          verifiedUser = {
-            ...verifiedUser,
-            avatar_url: nextAvatarUrl,
-            avatar_thumb_url: nextAvatarThumbUrl,
-            avatar_crop: null,
-          };
+        const fresh = await getMe({ force: true });
+        if (fresh?.user?.avatar_url) {
+          verifiedUser = fresh.user;
           setUser(verifiedUser);
-          try {
-            const fresh = await getMe({ force: true });
-            if (fresh?.user?.avatar_url) {
-              verifiedUser = fresh.user;
-              setUser(verifiedUser);
-            }
-          } catch {
-            // Keep the upload response in local state if the refresh fails.
-          }
         }
       } catch {
-        // Photo upload failed — user can retry later from profile
+        // Keep the upload response in local state if the refresh fails.
       }
+    } catch (err) {
+      throw new Error(err?.message || 'No pudimos subir tu foto. Revisá la conexión y reintentá.');
     }
 
     setRegistered(true);

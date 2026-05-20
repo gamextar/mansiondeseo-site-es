@@ -30,7 +30,6 @@ const VIEWED_STORY_SYNC_DELAY_MS = 320;
 const VIDEO_FEED_INDEX_KEY = 'vf_idx';
 const VIDEO_FEED_MUTED_KEY = 'vf_muted';
 const VIDEO_FEED_ACTIVE_STORY_KEY = 'vf_active_story';
-const MOBILE_BROWSER_VIDEO_SCROLL_OFFSET = 68;
 const VIDEO_FEED_RAIL_SOURCE = 'rail';
 
 function releaseVideoElement(video) {
@@ -1205,7 +1204,6 @@ export default function VideoFeedPage() {
 
   const standaloneMobileRoute = !isDesktopViewport && !isOverlayPreview;
   const isStandaloneMobileApp = detectStandaloneMobile();
-  const mobileBrowserRoute = standaloneMobileRoute && !isStandaloneMobileApp;
   const navBottomOffset = isStandaloneMobileApp
     ? getStandaloneBottomNavOffset()
     : getBrowserBottomNavOffset();
@@ -1275,10 +1273,9 @@ export default function VideoFeedPage() {
     if (!standaloneMobileRoute || typeof window === 'undefined') return undefined;
 
     const resetPageScroll = () => {
-      const nextScrollTop = mobileBrowserRoute ? MOBILE_BROWSER_VIDEO_SCROLL_OFFSET : 0;
-      window.scrollTo(0, nextScrollTop);
-      document.documentElement.scrollTop = nextScrollTop;
-      document.body.scrollTop = nextScrollTop;
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
     };
 
     resetPageScroll();
@@ -1294,7 +1291,7 @@ export default function VideoFeedPage() {
       if (rafA) window.cancelAnimationFrame(rafA);
       timers.forEach((timerId) => window.clearTimeout(timerId));
     };
-  }, [loading, location.key, mobileBrowserRoute, standaloneMobileRoute, stories.length]);
+  }, [loading, location.key, standaloneMobileRoute, stories.length]);
 
   useEffect(() => {
     if (!standaloneMobileRoute || !isStandaloneMobileApp || typeof window === 'undefined') return undefined;
@@ -1889,10 +1886,8 @@ export default function VideoFeedPage() {
   return (
     <div
       className={
-        mobileBrowserRoute
-          ? 'relative min-h-[calc(100vh+125px)] bg-mansion-base pb-mobile-legacy-nav lg:pb-8'
-          : standaloneMobileRoute
-          ? 'relative min-h-mobile-browser-screen overflow-hidden bg-black'
+        standaloneMobileRoute
+          ? 'fixed inset-0 overflow-hidden bg-black'
           : desktopOverlayRoute
             ? 'absolute inset-0 bg-black z-[60]'
             : 'fixed inset-0 bg-black z-[60] lg:z-40 lg:left-64 xl:left-72 lg:bg-mansion-base'
@@ -1908,11 +1903,9 @@ export default function VideoFeedPage() {
 
       <div
         className={
-          mobileBrowserRoute
-            ? 'absolute inset-0 bg-black'
-            : standaloneMobileRoute
-              ? 'relative h-mobile-browser-screen'
-              : 'relative h-full'
+          standaloneMobileRoute
+            ? 'relative h-full bg-black'
+            : 'relative h-full'
         }
       >
         {isDesktopViewport && (
@@ -2029,8 +2022,8 @@ export default function VideoFeedPage() {
             return (
               <div
                 key={`${displayIndex}-${mobileStoryKey}`}
-                className="w-full flex-shrink-0"
-                style={{ height: '100dvh' }}
+                className="w-full flex-shrink-0 snap-start snap-always"
+                style={{ height: '100%' }}
               >
                 <StoryCard
                   story={story}
