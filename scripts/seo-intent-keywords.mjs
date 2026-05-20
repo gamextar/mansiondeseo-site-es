@@ -35,14 +35,29 @@ function titleCase(value = '') {
 
 function inferIntent(term = '') {
   const normalized = normalizeText(term);
+  if (normalized.includes('contactossex')) return 'contactossex';
   if (normalized.includes('cornud')) return 'cornudos';
   if (normalized.includes('cuck')) return 'cuckold';
   if (normalized.includes('swing')) return 'swingers';
   if (normalized.includes('trio')) return 'trios';
+  if (normalized.includes('intercambio')) return 'intercambios';
+  if (normalized.includes('hotwife')) return 'hotwife';
+  if (normalized.includes('humillacion')) return 'humillacion';
+  if (normalized.includes('sumis') || normalized.includes('bdsm') || normalized.includes('dominacion')) return 'bdsm';
+  if (normalized.includes('corneador')) return 'corneador';
+  if (normalized.includes('lesbiana')) return 'lesbianas';
+  if (normalized.includes('gay') || normalized.includes('gays')) return 'gays';
+  if (normalized.includes('cross')) return 'cross';
+  if (normalized.includes('dotad')) return 'dotados';
+  if (normalized.includes('gangbang') || normalized.includes('grupal')) return 'gangbang';
+  if (normalized.includes('voyeur') || normalized.includes('exhibicion') || normalized.includes('mirones')) return 'voyeurismo';
+  if (normalized.includes('bisexual')) return 'bisexuales';
+  if (normalized.includes('madura')) return 'maduras';
+  if (normalized.includes('soltero') || normalized.includes('soltera')) return 'solteros liberales';
   if (normalized.includes('mujer')) return 'mujeres';
   if (normalized.includes('hombre')) return 'hombres';
   if (normalized.includes('pareja')) return 'parejas liberales';
-  if (normalized.includes('contactossex')) return 'contactossex';
+  if (normalized.includes('contactos')) return 'contactos';
   return 'encuentros privados';
 }
 

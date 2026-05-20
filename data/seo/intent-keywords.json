@@ -1,7 +1,57 @@
 {
   "schema": 1,
-  "notes": "Agregar keywords dentro de categories[].keywords o categories[].subcategories[].keywords. Puede ser string simple o objeto con term/location/slug/title/description/enabled.",
+  "notes": "Seed editorial para landings SEO de intención. Editable desde /admin/configuracion?section=seo o como fallback local para builds. Mantener categorías pilar y subcategorías claras para evitar canibalización.",
   "categories": [
+    {
+      "id": "swinger",
+      "label": "Swinger",
+      "intent": "swingers",
+      "keywords": [
+        {
+          "term": "swinger argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "parejas-swinger",
+          "label": "Parejas swinger",
+          "intent": "swingers",
+          "keywords": [
+            {
+              "term": "parejas swinger buenos aires",
+              "location": "Buenos Aires"
+            },
+            {
+              "term": "parejas swinger caba",
+              "location": "CABA"
+            }
+          ]
+        },
+        {
+          "id": "fiestas-swinger",
+          "label": "Fiestas swinger",
+          "intent": "swingers",
+          "keywords": [
+            {
+              "term": "fiestas swinger argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "swinger-discreto",
+          "label": "Swinger discreto",
+          "intent": "swingers",
+          "keywords": [
+            {
+              "term": "swinger discreto cordoba",
+              "location": "Córdoba"
+            }
+          ]
+        }
+      ]
+    },
     {
       "id": "cornudos",
       "label": "Cornudos",
@@ -11,24 +61,38 @@
           "term": "cornudos argentina",
           "location": "Argentina"
         }
-      ]
-    },
-    {
-      "id": "swingers",
-      "label": "Swingers",
-      "intent": "swingers",
+      ],
       "subcategories": [
         {
-          "id": "parejas",
-          "label": "Parejas swingers",
+          "id": "parejas-cornudas",
+          "label": "Parejas cornudas",
+          "intent": "cornudos",
           "keywords": [
             {
-              "term": "parejas swingers buenos aires",
+              "term": "parejas cornudas buenos aires",
               "location": "Buenos Aires"
-            },
+            }
+          ]
+        },
+        {
+          "id": "cornudo-busca",
+          "label": "Cornudo busca",
+          "intent": "cornudos",
+          "keywords": [
             {
-              "term": "contactos swinger cordoba",
-              "location": "Córdoba"
+              "term": "cornudo busca corneador argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "cornudos-discretos",
+          "label": "Cornudos discretos",
+          "intent": "cornudos",
+          "keywords": [
+            {
+              "term": "cornudos discretos rosario",
+              "location": "Rosario"
             }
           ]
         }
@@ -40,8 +104,43 @@
       "intent": "cuckold",
       "keywords": [
         {
-          "term": "cuckold mendoza",
-          "location": "Mendoza"
+          "term": "cuckold argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "cuckold-parejas",
+          "label": "Parejas cuckold",
+          "intent": "cuckold",
+          "keywords": [
+            {
+              "term": "parejas cuckold argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "cuckold-buenos-aires",
+          "label": "Cuckold Buenos Aires",
+          "intent": "cuckold",
+          "keywords": [
+            {
+              "term": "cuckold buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "cuckold-discreto",
+          "label": "Cuckold discreto",
+          "intent": "cuckold",
+          "keywords": [
+            {
+              "term": "cuckold discreto mendoza",
+              "location": "Mendoza"
+            }
+          ]
         }
       ]
     },
@@ -54,6 +153,41 @@
           "term": "parejas liberales argentina",
           "location": "Argentina"
         }
+      ],
+      "subcategories": [
+        {
+          "id": "parejas-liberales-buenos-aires",
+          "label": "Parejas liberales Buenos Aires",
+          "intent": "parejas liberales",
+          "keywords": [
+            {
+              "term": "parejas liberales buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "parejas-liberales-caba",
+          "label": "Parejas liberales CABA",
+          "intent": "parejas liberales",
+          "keywords": [
+            {
+              "term": "parejas liberales caba",
+              "location": "CABA"
+            }
+          ]
+        },
+        {
+          "id": "matrimonios-liberales",
+          "label": "Matrimonios liberales",
+          "intent": "parejas liberales",
+          "keywords": [
+            {
+              "term": "matrimonios liberales argentina",
+              "location": "Argentina"
+            }
+          ]
+        }
       ]
     },
     {
@@ -62,8 +196,779 @@
       "intent": "trios",
       "keywords": [
         {
-          "term": "trios buenos aires",
-          "location": "Buenos Aires"
+          "term": "trios argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "trios-con-parejas",
+          "label": "Tríos con parejas",
+          "intent": "trios",
+          "keywords": [
+            {
+              "term": "parejas buscan trios argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "trios-buenos-aires",
+          "label": "Tríos Buenos Aires",
+          "intent": "trios",
+          "keywords": [
+            {
+              "term": "trios buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "tercero-para-pareja",
+          "label": "Tercero para pareja",
+          "intent": "trios",
+          "keywords": [
+            {
+              "term": "tercero para pareja caba",
+              "location": "CABA"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "intercambios",
+      "label": "Intercambios",
+      "intent": "intercambios",
+      "keywords": [
+        {
+          "term": "intercambios de parejas argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "intercambio-de-parejas",
+          "label": "Intercambio de parejas",
+          "intent": "intercambios",
+          "keywords": [
+            {
+              "term": "intercambio de parejas buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "parejas-para-intercambio",
+          "label": "Parejas para intercambio",
+          "intent": "intercambios",
+          "keywords": [
+            {
+              "term": "parejas para intercambio cordoba",
+              "location": "Córdoba"
+            }
+          ]
+        },
+        {
+          "id": "intercambio-discreto",
+          "label": "Intercambio discreto",
+          "intent": "intercambios",
+          "keywords": [
+            {
+              "term": "intercambio discreto argentina",
+              "location": "Argentina"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hotwife",
+      "label": "Hotwife",
+      "intent": "hotwife",
+      "keywords": [
+        {
+          "term": "hotwife argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "hotwife-parejas",
+          "label": "Parejas hotwife",
+          "intent": "hotwife",
+          "keywords": [
+            {
+              "term": "parejas hotwife argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "hotwife-buenos-aires",
+          "label": "Hotwife Buenos Aires",
+          "intent": "hotwife",
+          "keywords": [
+            {
+              "term": "hotwife buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "hotwife-discreta",
+          "label": "Hotwife discreta",
+          "intent": "hotwife",
+          "keywords": [
+            {
+              "term": "hotwife discreta argentina",
+              "location": "Argentina"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "contactos",
+      "label": "Contactos",
+      "intent": "contactos",
+      "keywords": [
+        {
+          "term": "contactos adultos argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "contactos-discretos",
+          "label": "Contactos discretos",
+          "intent": "contactos",
+          "keywords": [
+            {
+              "term": "contactos discretos buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "contactos-liberales",
+          "label": "Contactos liberales",
+          "intent": "contactos",
+          "keywords": [
+            {
+              "term": "contactos liberales argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "contactos-privados",
+          "label": "Contactos privados",
+          "intent": "contactos",
+          "keywords": [
+            {
+              "term": "contactos privados caba",
+              "location": "CABA"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sumiso",
+      "label": "Sumiso",
+      "intent": "sumiso",
+      "keywords": [
+        {
+          "term": "sumiso argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "sumiso-busca",
+          "label": "Sumiso busca",
+          "intent": "sumiso",
+          "keywords": [
+            {
+              "term": "sumiso busca mujer argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "sumisos-buenos-aires",
+          "label": "Sumisos Buenos Aires",
+          "intent": "sumiso",
+          "keywords": [
+            {
+              "term": "sumisos buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "bdsm-suave",
+          "label": "BDSM suave",
+          "intent": "sumiso",
+          "keywords": [
+            {
+              "term": "bdsm suave argentina",
+              "location": "Argentina"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "corneador",
+      "label": "Corneador",
+      "intent": "corneador",
+      "keywords": [
+        {
+          "term": "corneador argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "corneador-para-pareja",
+          "label": "Corneador para pareja",
+          "intent": "corneador",
+          "keywords": [
+            {
+              "term": "corneador para pareja argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "corneadores-buenos-aires",
+          "label": "Corneadores Buenos Aires",
+          "intent": "corneador",
+          "keywords": [
+            {
+              "term": "corneadores buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "corneador-discreto",
+          "label": "Corneador discreto",
+          "intent": "corneador",
+          "keywords": [
+            {
+              "term": "corneador discreto caba",
+              "location": "CABA"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lesbianas",
+      "label": "Lesbianas",
+      "intent": "lesbianas",
+      "keywords": [
+        {
+          "term": "lesbianas argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "mujeres-buscan-mujeres",
+          "label": "Mujeres buscan mujeres",
+          "intent": "lesbianas",
+          "keywords": [
+            {
+              "term": "mujeres buscan mujeres buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "parejas-lesbianas",
+          "label": "Parejas lesbianas",
+          "intent": "lesbianas",
+          "keywords": [
+            {
+              "term": "parejas lesbianas argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "lesbianas-discretas",
+          "label": "Lesbianas discretas",
+          "intent": "lesbianas",
+          "keywords": [
+            {
+              "term": "lesbianas discretas caba",
+              "location": "CABA"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gays",
+      "label": "Gays",
+      "intent": "gays",
+      "keywords": [
+        {
+          "term": "gays argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "hombres-buscan-hombres",
+          "label": "Hombres buscan hombres",
+          "intent": "gays",
+          "keywords": [
+            {
+              "term": "hombres buscan hombres buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "parejas-gays",
+          "label": "Parejas gays",
+          "intent": "gays",
+          "keywords": [
+            {
+              "term": "parejas gays argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "gays-discretos",
+          "label": "Gays discretos",
+          "intent": "gays",
+          "keywords": [
+            {
+              "term": "gays discretos cordoba",
+              "location": "Córdoba"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross",
+      "label": "Cross",
+      "intent": "cross",
+      "keywords": [
+        {
+          "term": "cross argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "crossdresser",
+          "label": "Crossdresser",
+          "intent": "cross",
+          "keywords": [
+            {
+              "term": "crossdresser argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "cross-buenos-aires",
+          "label": "Cross Buenos Aires",
+          "intent": "cross",
+          "keywords": [
+            {
+              "term": "cross buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "cross-discreto",
+          "label": "Cross discreto",
+          "intent": "cross",
+          "keywords": [
+            {
+              "term": "cross discreto caba",
+              "location": "CABA"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dotados",
+      "label": "Dotados",
+      "intent": "dotados",
+      "keywords": [
+        {
+          "term": "dotados argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "hombres-dotados",
+          "label": "Hombres dotados",
+          "intent": "dotados",
+          "keywords": [
+            {
+              "term": "hombres dotados buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "dotados-caba",
+          "label": "Dotados CABA",
+          "intent": "dotados",
+          "keywords": [
+            {
+              "term": "dotados caba",
+              "location": "CABA"
+            }
+          ]
+        },
+        {
+          "id": "dotados-discretos",
+          "label": "Dotados discretos",
+          "intent": "dotados",
+          "keywords": [
+            {
+              "term": "dotados discretos argentina",
+              "location": "Argentina"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gangbang",
+      "label": "Gangbang",
+      "intent": "gangbang",
+      "keywords": [
+        {
+          "term": "gangbang argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "gangbang-parejas",
+          "label": "Parejas y gangbang",
+          "intent": "gangbang",
+          "keywords": [
+            {
+              "term": "parejas gangbang argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "gangbang-buenos-aires",
+          "label": "Gangbang Buenos Aires",
+          "intent": "gangbang",
+          "keywords": [
+            {
+              "term": "gangbang buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "fantasias-grupales",
+          "label": "Fantasías grupales",
+          "intent": "gangbang",
+          "keywords": [
+            {
+              "term": "fantasias grupales argentina",
+              "location": "Argentina"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bdsm",
+      "label": "BDSM",
+      "intent": "bdsm",
+      "keywords": [
+        {
+          "term": "bdsm argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "dominacion",
+          "label": "Dominación",
+          "intent": "bdsm",
+          "keywords": [
+            {
+              "term": "dominacion bdsm argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "sumision-consensuada",
+          "label": "Sumisión consensuada",
+          "intent": "bdsm",
+          "keywords": [
+            {
+              "term": "sumision consensuada buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "bdsm-discreto",
+          "label": "BDSM discreto",
+          "intent": "bdsm",
+          "keywords": [
+            {
+              "term": "bdsm discreto caba",
+              "location": "CABA"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "voyeurismo",
+      "label": "Voyeurismo",
+      "intent": "voyeurismo",
+      "keywords": [
+        {
+          "term": "voyeurismo argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "voyeur-parejas",
+          "label": "Parejas voyeur",
+          "intent": "voyeurismo",
+          "keywords": [
+            {
+              "term": "parejas voyeur argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "exhibicionismo",
+          "label": "Exhibicionismo",
+          "intent": "voyeurismo",
+          "keywords": [
+            {
+              "term": "exhibicionismo discreto argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "mirones",
+          "label": "Mirones",
+          "intent": "voyeurismo",
+          "keywords": [
+            {
+              "term": "mirones buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bisexuales",
+      "label": "Bisexuales",
+      "intent": "bisexuales",
+      "keywords": [
+        {
+          "term": "bisexuales argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "parejas-bisexuales",
+          "label": "Parejas bisexuales",
+          "intent": "bisexuales",
+          "keywords": [
+            {
+              "term": "parejas bisexuales argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "hombres-bisexuales",
+          "label": "Hombres bisexuales",
+          "intent": "bisexuales",
+          "keywords": [
+            {
+              "term": "hombres bisexuales buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "mujeres-bisexuales",
+          "label": "Mujeres bisexuales",
+          "intent": "bisexuales",
+          "keywords": [
+            {
+              "term": "mujeres bisexuales caba",
+              "location": "CABA"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "maduras",
+      "label": "Maduras",
+      "intent": "maduras",
+      "keywords": [
+        {
+          "term": "maduras argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "maduras-buenos-aires",
+          "label": "Maduras Buenos Aires",
+          "intent": "maduras",
+          "keywords": [
+            {
+              "term": "maduras buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "maduras-discretas",
+          "label": "Maduras discretas",
+          "intent": "maduras",
+          "keywords": [
+            {
+              "term": "maduras discretas argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "parejas-maduras",
+          "label": "Parejas maduras",
+          "intent": "maduras",
+          "keywords": [
+            {
+              "term": "parejas maduras cordoba",
+              "location": "Córdoba"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "solteros-liberales",
+      "label": "Solteros liberales",
+      "intent": "solteros liberales",
+      "keywords": [
+        {
+          "term": "solteros liberales argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "hombres-liberales",
+          "label": "Hombres liberales",
+          "intent": "solteros liberales",
+          "keywords": [
+            {
+              "term": "hombres liberales buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "mujeres-liberales",
+          "label": "Mujeres liberales",
+          "intent": "solteros liberales",
+          "keywords": [
+            {
+              "term": "mujeres liberales caba",
+              "location": "CABA"
+            }
+          ]
+        },
+        {
+          "id": "solteros-discretos",
+          "label": "Solteros discretos",
+          "intent": "solteros liberales",
+          "keywords": [
+            {
+              "term": "solteros discretos argentina",
+              "location": "Argentina"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "humillacion",
+      "label": "Humillación",
+      "intent": "humillacion",
+      "keywords": [
+        {
+          "term": "humillación erótica argentina",
+          "location": "Argentina"
+        }
+      ],
+      "subcategories": [
+        {
+          "id": "humillacion-consensuada",
+          "label": "Humillación consensuada",
+          "intent": "humillacion",
+          "keywords": [
+            {
+              "term": "humillación consensuada argentina",
+              "location": "Argentina"
+            }
+          ]
+        },
+        {
+          "id": "humillacion-bdsm",
+          "label": "Humillación BDSM",
+          "intent": "humillacion",
+          "keywords": [
+            {
+              "term": "humillación bdsm buenos aires",
+              "location": "Buenos Aires"
+            }
+          ]
+        },
+        {
+          "id": "humillacion-discreta",
+          "label": "Humillación discreta",
+          "intent": "humillacion",
+          "keywords": [
+            {
+              "term": "humillación discreta caba",
+              "location": "CABA"
+            }
+          ]
         }
       ]
     }

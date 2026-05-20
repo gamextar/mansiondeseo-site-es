@@ -53,6 +53,22 @@ const PROFILE_NAMES = {
   cornudos: ['Clara y Martin', 'Nati y Pablo', 'Mora y Andres', 'Jaz y Lucas', 'Paula y Diego', 'Meli y Gonza'],
   cuckold: ['Bianca y G', 'Eva y Marco', 'Nina y Raul', 'Lara y Nico', 'Uma y Leo', 'Sasha y Ivan'],
   trios: ['Alma', 'Renata', 'Bruno', 'Thiago', 'Delfi', 'Mateo'],
+  intercambios: ['Nora y Fede', 'Lara y Manu', 'Dani y Sol', 'Caro y Nico', 'Vicky y Leo', 'Mila y Agus'],
+  hotwife: ['Uma y Franco', 'Eva y Tom', 'Lola y Max', 'Nina y G', 'Mora y Axel', 'Sasha y Teo'],
+  contactos: ['Alma', 'Bruno', 'Luna', 'Mateo', 'Renata', 'Thiago'],
+  sumiso: ['Leo', 'Nico', 'Tomi', 'Bruno', 'Ian', 'Maxi'],
+  corneador: ['Marco', 'Dante', 'Rocco', 'Gael', 'Axel', 'Ivan'],
+  lesbianas: ['Luna', 'Mila', 'Sofi', 'Cata', 'Vera', 'Romi'],
+  gays: ['Leo', 'Bruno', 'Mateo', 'Gael', 'Nico', 'Dante'],
+  cross: ['Ariel', 'Sasha', 'Alex', 'Mika', 'Niki', 'Jaz'],
+  dotados: ['Max', 'Rocco', 'Dante', 'Axel', 'Marco', 'Thiago'],
+  gangbang: ['Lara y amigos', 'Nina y grupo', 'Mora y invitados', 'Eva y team', 'Sasha y círculo', 'Lola y crew'],
+  bdsm: ['Vera', 'Dante', 'Mika', 'Nina', 'Gael', 'Sasha'],
+  humillacion: ['Vera', 'Dante', 'Mika', 'Nina', 'Sasha', 'Gael'],
+  voyeurismo: ['Clara y Leo', 'Mora y Nico', 'Lara y Fede', 'Eva y Tomi', 'Nati y G', 'Vera y Max'],
+  bisexuales: ['Luna', 'Gael', 'Mika', 'Sofi', 'Leo', 'Jaz'],
+  maduras: ['Patricia', 'Silvina', 'Marcela', 'Viviana', 'Adriana', 'Monica'],
+  'solteros-liberales': ['Luna', 'Bruno', 'Mila', 'Gael', 'Sofi', 'Nico'],
   default: ['Camila', 'Valentina', 'Sofia', 'Lucia', 'Martina', 'Julieta', 'Agustina', 'Florencia'],
 };
 const PROFILE_MOODS = ['Discreta', 'Selectiva', 'Nueva', 'Verificada', 'Activa', 'Afinidad alta'];
@@ -67,6 +83,22 @@ const ROLE_GROUPS = {
   cuckold: ['pareja', 'pareja_hombres', 'pareja_mujeres', 'hombre', 'mujer'],
   trios: ['mujer', 'hombre', 'pareja', 'pareja_hombres', 'pareja_mujeres'],
   contactossex: ['mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'hombre'],
+  contactos: ['mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres', 'hombre'],
+  intercambios: ['pareja', 'pareja_hombres', 'pareja_mujeres', 'mujer', 'hombre'],
+  hotwife: ['pareja', 'pareja_hombres', 'pareja_mujeres', 'mujer', 'hombre'],
+  sumiso: ['hombre'],
+  corneador: ['hombre'],
+  lesbianas: ['mujer', 'pareja_mujeres'],
+  gays: ['hombre', 'pareja_hombres'],
+  cross: ['hombre', 'mujer'],
+  dotados: ['hombre'],
+  gangbang: ['pareja', 'pareja_hombres', 'pareja_mujeres', 'hombre', 'mujer'],
+  bdsm: ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres'],
+  humillacion: ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres'],
+  voyeurismo: ['pareja', 'pareja_hombres', 'pareja_mujeres', 'hombre', 'mujer'],
+  bisexuales: ['hombre', 'mujer', 'pareja', 'pareja_hombres', 'pareja_mujeres'],
+  maduras: ['mujer', 'pareja'],
+  'solteros-liberales': ['hombre', 'mujer'],
 };
 
 const ROLE_LABELS = {
@@ -134,6 +166,22 @@ function intentKey(value = '') {
   if (normalized.includes('cornud')) return 'cornudos';
   if (normalized.includes('swing')) return 'swingers';
   if (normalized.includes('trio')) return 'trios';
+  if (normalized.includes('intercambio')) return 'intercambios';
+  if (normalized.includes('hotwife')) return 'hotwife';
+  if (normalized.includes('contactos')) return 'contactos';
+  if (normalized.includes('sumis')) return 'sumiso';
+  if (normalized.includes('corneador')) return 'corneador';
+  if (normalized.includes('lesbiana')) return 'lesbianas';
+  if (normalized.includes('gay')) return 'gays';
+  if (normalized.includes('cross')) return 'cross';
+  if (normalized.includes('dotad')) return 'dotados';
+  if (normalized.includes('gangbang') || normalized.includes('grupal')) return 'gangbang';
+  if (normalized.includes('humillacion')) return 'humillacion';
+  if (normalized.includes('bdsm') || normalized.includes('dominacion')) return 'bdsm';
+  if (normalized.includes('voyeur') || normalized.includes('exhibicion') || normalized.includes('mirones')) return 'voyeurismo';
+  if (normalized.includes('bisexual')) return 'bisexuales';
+  if (normalized.includes('madura')) return 'maduras';
+  if (normalized.includes('soltero') || normalized.includes('soltera')) return 'solteros-liberales';
   if (normalized.includes('pareja')) return 'parejas';
   return 'default';
 }
@@ -170,7 +218,11 @@ function roleLabel(role = '') {
 
 function fallbackRoleLabel(key = '') {
   if (key === 'trios') return 'Perfil';
+  if (['gays', 'dotados', 'corneador', 'sumiso'].includes(key)) return 'Hombre';
+  if (['lesbianas', 'maduras'].includes(key)) return 'Mujer';
+  if (['cross', 'bdsm', 'humillacion', 'bisexuales', 'contactos', 'solteros-liberales'].includes(key)) return 'Perfil';
   if (key === 'cornudos' || key === 'cuckold' || key === 'swingers' || key === 'parejas') return 'Pareja';
+  if (['intercambios', 'hotwife', 'voyeurismo', 'gangbang'].includes(key)) return 'Pareja';
   return 'Mujer';
 }
 
