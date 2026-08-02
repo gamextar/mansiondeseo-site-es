@@ -46,6 +46,26 @@ const CANONICAL_REDIRECTS = [
   ['/parejas', '/parejas-liberales/'],
   ['/parejas/', '/parejas-liberales/'],
 ];
+// Historical SEO routes reported as 404 in Search Console. Keep these routes
+// out of the sitemap, but permanently send their accumulated signals to the
+// closest current landing. Static rules stay ahead of dynamic rules because
+// Cloudflare Pages evaluates redirect rules in order.
+const LEGACY_404_STATIC_REDIRECTS = [
+  ['/intercambio-de-parejas', '/explorar/intercambios-de-parejas-argentina/'],
+  ['/intercambio-de-parejas/', '/explorar/intercambios-de-parejas-argentina/'],
+  ['/intercambio-de-parejas/buenos-aires', '/explorar/intercambio-de-parejas-buenos-aires/'],
+  ['/intercambio-de-parejas/buenos-aires/', '/explorar/intercambio-de-parejas-buenos-aires/'],
+  ['/intercambio-de-parejas/cordoba', '/explorar/parejas-para-intercambio-cordoba/'],
+  ['/intercambio-de-parejas/cordoba/', '/explorar/parejas-para-intercambio-cordoba/'],
+];
+const LEGACY_404_DYNAMIC_REDIRECTS = [
+  ['/parejas-liberales/:city', '/parejas/:city/'],
+  ['/parejas-liberales/:city/', '/parejas/:city/'],
+  ['/hotwife-argentina/:city', '/hotwife-argentina/'],
+  ['/hotwife-argentina/:city/', '/hotwife-argentina/'],
+  ['/intercambio-de-parejas/:city', '/explorar/intercambios-de-parejas-argentina/'],
+  ['/intercambio-de-parejas/:city/', '/explorar/intercambios-de-parejas-argentina/'],
+];
 const INTENT_ROUTE_PREFIX = '/explorar';
 const PROFILE_NAMES = {
   parejas: ['Luz y Nico', 'Mara y Leo', 'Sofi y Fran', 'Vale y Tomi', 'Cami y Agus', 'Flor y Seba'],
@@ -543,7 +563,10 @@ function buildStructuredData({ page, variant, citySlug, canonical, locale, city 
   ];
 }
 
-function renderSeoPage(variant, citySlug = '') {
+// Kept temporarily as a reference for the former SEO landing markup. Static
+// routes now use the same rich template as intent routes (see renderSeoPage
+// below), so both URL families present consistent profile cards and CTAs.
+function renderLegacySeoPage(variant, citySlug = '') {
   const locale = getSeoLocale(DEFAULT_SEO_LOCALE);
   const baseVariant = normalizeRoleVariant(variant);
   const city = citySlug ? GEO_PAGES[citySlug] : null;
@@ -641,12 +664,27 @@ function renderSeoPage(variant, citySlug = '') {
 </html>`;
 }
 
-function renderIntentKeywordPage(page, intentKeywordPages) {
+function renderIntentKeywordPage(page, intentKeywordPages, options = {}) {
   const locale = getSeoLocale(DEFAULT_SEO_LOCALE);
   const { title, description, headline } = buildIntentMeta(page);
   const intro = buildIntentIntro(page);
   const profileCards = buildIntentProfileCards(page);
-  const crossLinks = buildIntentCrossLinks(page, intentKeywordPages);
+  const crossLinks = options.crossLinks || buildIntentCrossLinks(page, intentKeywordPages);
+  const breadcrumbParent = options.breadcrumbParent === false
+    ? null
+    : options.breadcrumbParent || { name: 'Explorar', url: `${SITE_ORIGIN}${INTENT_ROUTE_PREFIX}/` };
+  const breadcrumbItems = [
+    { '@type': 'ListItem', position: 1, name: 'Mansión Deseo', item: `${SITE_ORIGIN}/` },
+    ...(breadcrumbParent
+      ? [{ '@type': 'ListItem', position: 2, name: breadcrumbParent.name, item: breadcrumbParent.url }]
+      : []),
+    {
+      '@type': 'ListItem',
+      position: breadcrumbParent ? 3 : 2,
+      name: page.titleTerm,
+      item: page.canonical,
+    },
+  ];
   const structuredData = [
     {
       '@context': 'https://schema.org',
@@ -660,6 +698,7 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
         name: 'Mansión Deseo',
         url: `${SITE_ORIGIN}/`,
       },
+      ...(page.areaServed ? { areaServed: page.areaServed } : {}),
       about: [
         { '@type': 'Thing', name: page.term },
         { '@type': 'Thing', name: page.intent },
@@ -669,11 +708,7 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
     {
       '@context': 'https://schema.org',
       '@type': 'BreadcrumbList',
-      itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Mansión Deseo', item: `${SITE_ORIGIN}/` },
-        { '@type': 'ListItem', position: 2, name: 'Explorar', item: `${SITE_ORIGIN}${INTENT_ROUTE_PREFIX}/` },
-        { '@type': 'ListItem', position: 3, name: page.titleTerm, item: page.canonical },
-      ],
+      itemListElement: breadcrumbItems,
     },
     {
       '@context': 'https://schema.org',
@@ -839,6 +874,44 @@ function renderIntentKeywordPage(page, intentKeywordPages) {
 </html>`;
 }
 
+function renderSeoPage(variant, citySlug = '') {
+  const baseVariant = normalizeRoleVariant(variant);
+  const city = citySlug ? GEO_PAGES[citySlug] : null;
+  const cityStats = citySlug ? seoCityStatsBySlug.get(citySlug) : null;
+  const legacyPage = buildLocalizedPage(
+    getSeoIntentPage(DEFAULT_SEO_LOCALE, baseVariant),
+    citySlug,
+    variant,
+    cityStats
+  );
+  const canonical = canonicalUrl(variant, citySlug);
+  const currentPath = routePath(variant, citySlug);
+  const label = city
+    ? `${RELATED_LABELS[variant] || legacyPage.focus} ${city.label}`
+    : RELATED_LABELS[variant] || legacyPage.focus;
+  const richPage = {
+    ...legacyPage,
+    slug: `legacy-${routeKey(variant, citySlug)}`,
+    term: legacyPage.focus,
+    titleTerm: label,
+    h1: legacyPage.headline,
+    intent: baseVariant,
+    location: city?.label || 'Argentina',
+    routePath: currentPath,
+    canonical,
+    areaServed: city?.label,
+  };
+  const crossLinks = relatedLinks(variant, citySlug).map((item) => ({
+    routePath: item.href,
+    titleTerm: item.label,
+  }));
+
+  return renderIntentKeywordPage(richPage, [], {
+    breadcrumbParent: false,
+    crossLinks,
+  });
+}
+
 async function writeSeoPage({ variant, citySlug = '' }) {
   const route = routeKey(variant, citySlug);
   const outputDir = path.join(DIST_DIR, ...route.split('/'));
@@ -882,7 +955,17 @@ async function updateRedirects(intentKeywordPages = []) {
     return `${source} ${target} 301`;
   });
 
-  const redirectRules = [...CANONICAL_REDIRECTS.map(([from, to]) => `${from} ${to} 301`), ...canonicalRouteRedirects, ...intentRouteRedirects];
+  const staticRedirectRules = [
+    ...LEGACY_404_STATIC_REDIRECTS,
+    ...CANONICAL_REDIRECTS,
+  ].map(([from, to]) => `${from} ${to} 301`);
+  const dynamicRedirectRules = LEGACY_404_DYNAMIC_REDIRECTS.map(([from, to]) => `${from} ${to} 301`);
+  const redirectRules = [
+    ...staticRedirectRules,
+    ...canonicalRouteRedirects,
+    ...intentRouteRedirects,
+    ...dynamicRedirectRules,
+  ];
   const existingLines = redirects
     .split('\n')
     .map((line) => line.trim())
