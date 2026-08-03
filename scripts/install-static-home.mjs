@@ -58,6 +58,10 @@ function buildHeaders() {
   const blocks = [
     `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Cache-Control: no-store, max-age=0, must-revalidate`,
     `/assets/*\n  ! Cache-Control\n  Cache-Control: public, max-age=31536000, immutable`,
+    `/icon-512.png\n  ! Cache-Control\n  Cache-Control: public, max-age=604800`,
+    `/icon-192.png\n  ! Cache-Control\n  Cache-Control: public, max-age=604800`,
+    `/apple-touch-icon.png\n  ! Cache-Control\n  Cache-Control: public, max-age=604800`,
+    `/inp-monitor.js\n  ! Cache-Control\n  Cache-Control: public, max-age=3600`,
     `/sw.js\n  ! Cache-Control\n  Cache-Control: no-store, max-age=0, must-revalidate`,
     `/manifest.json\n  ! Cache-Control\n  Cache-Control: no-cache, max-age=0, must-revalidate`,
   ];
@@ -146,7 +150,7 @@ const staticHomeHtml = `<!doctype html>
 <html lang="${SITE_LOCALE.split('-')[0] || 'es'}" style="background:#08080e;color-scheme:dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>${homeTitle}</title>
   <meta name="description" content="${homeDescription}" />
   <meta name="keywords" content="parejas liberales, comunidad privada adultos, swingers argentina, acceso privado, perfiles verificados, club liberal" />
@@ -194,7 +198,7 @@ const staticHomeHtml = `<!doctype html>
     })();
   </script>
   <style>
-    :root{--bg:#08080e;--card:#111118;--elevated:#1a1a24;--border:#2a2a38;--text:#f0ede8;--muted:#888899;--dim:#555566;--gold:#c9a84c;--gold-light:#e0c97a;--crimson:#d4183d;--crimson-dark:#9b1c3a}
+    :root{--bg:#08080e;--card:#111118;--elevated:#1a1a24;--border:#2a2a38;--text:#f0ede8;--muted:#888899;--dim:#888899;--gold:#c9a84c;--gold-light:#e0c97a;--crimson:#d4183d;--crimson-dark:#9b1c3a}
     *{box-sizing:border-box}
     html{background:var(--bg)}
     body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;overflow:hidden}
