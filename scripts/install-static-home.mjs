@@ -174,6 +174,7 @@ const staticHomeHtml = `<!doctype html>
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
   <noscript><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" /></noscript>
   <script type="application/ld+json">${staticHomeStructuredData}</script>
+  <script defer src="/inp-monitor.js"></script>
   <script>
     (function(){
       try {
@@ -204,13 +205,13 @@ const staticHomeHtml = `<!doctype html>
     .ambient:before{content:"";position:absolute;top:25%;left:50%;width:384px;height:384px;transform:translateX(-50%);border-radius:999px;background:rgba(212,24,61,.05);filter:blur(64px)}
     .ambient:after{content:"";position:absolute;bottom:25%;left:25%;width:256px;height:256px;border-radius:999px;background:rgba(201,168,76,.05);filter:blur(64px)}
     .panel{position:relative;z-index:1;width:100%;max-width:384px;text-align:center}
-    .mansion-visual{position:relative;width:192px;height:224px;margin:0 auto 40px;opacity:0;animation:visualEnter .68s cubic-bezier(.2,.9,.2,1.08) .2s forwards}
+    .mansion-visual{position:relative;width:192px;height:224px;margin:0 auto 40px;opacity:1}
     .visual-glow{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
     .visual-glow:before{content:"";width:160px;height:160px;border-radius:999px;background:linear-gradient(135deg,rgba(212,24,61,.2),rgba(201,168,76,.1));filter:blur(32px)}
-    .door-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotate(-10deg);animation:doorSettle .62s cubic-bezier(.2,.9,.2,1.1) .4s forwards}
+    .door-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotate(0)}
     .door{position:relative;display:flex;width:112px;height:144px;align-items:flex-end;justify-content:center;border:2px solid rgba(201,168,76,.4);border-bottom-color:rgba(201,168,76,.34);border-radius:56px 56px 0 0;background:rgba(26,26,36,.5);padding-bottom:16px}
     .knob{width:12px;height:12px;border-radius:999px;background:var(--gold)}
-    .particle{position:absolute;width:6px;height:6px;border-radius:999px;background:var(--gold);opacity:0;animation:particleEnter .42s ease-out forwards,floatParticle 3s ease-in-out infinite}
+    .particle{position:absolute;width:6px;height:6px;border-radius:999px;background:var(--gold);opacity:.6;animation:floatParticle 3s ease-in-out infinite}
     .particle:nth-child(3){left:15%;top:10%;animation-delay:.6s,.6s}
     .particle:nth-child(4){left:25%;top:32%;animation-delay:.68s,.9s}
     .particle:nth-child(5){left:35%;top:54%;animation-delay:.76s,1.2s}
@@ -219,7 +220,7 @@ const staticHomeHtml = `<!doctype html>
     .particle:nth-child(8){left:65%;top:32%;animation-delay:1s,2.1s}
     .particle:nth-child(9){left:75%;top:54%;animation-delay:1.08s,2.4s}
     .particle:nth-child(10){left:85%;top:76%;animation-delay:1.16s,2.7s}
-    .title,.copy,.cta,.login-line,.features{opacity:0;animation:fadeInUp .5s ease-out forwards}
+    .title,.copy,.cta,.login-line,.features{opacity:1}
     .title{margin:0 0 12px;font-family:"Playfair Display",Georgia,serif;font-size:30px;line-height:1.2;font-weight:700;background:linear-gradient(90deg,var(--gold),var(--gold-light),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
     .copy{max-width:320px;margin:0 auto 32px;color:var(--muted);font-size:14px;line-height:1.63;animation-delay:.6s}
     .cta{animation-delay:.7s}
@@ -239,7 +240,6 @@ const staticHomeHtml = `<!doctype html>
     @keyframes particleEnter{from{opacity:0;transform:scale(0)}to{opacity:.6;transform:scale(1)}}
     @keyframes floatParticle{0%,100%{transform:translateY(-5px) scale(1)}50%{transform:translateY(5px) scale(1)}}
     @keyframes fadeInUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-    .title{animation-delay:.5s}
     @media(min-width:768px){.title{font-size:36px}}
     @media(max-width:374px){.features{gap:12px;font-size:11px}.copy{max-width:300px}.title{font-size:28px}}
     @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}

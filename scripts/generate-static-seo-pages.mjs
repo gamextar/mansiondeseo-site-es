@@ -592,6 +592,7 @@ function renderLegacySeoPage(variant, citySlug = '') {
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/svg+xml" href="/icon.svg" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <script defer src="/inp-monitor.js"></script>
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Mansión Deseo" />
   <meta property="og:title" content="${escapeHtml(page.title)}" />
@@ -738,6 +739,7 @@ function renderIntentKeywordPage(page, intentKeywordPages, options = {}) {
   <meta name="color-scheme" content="dark" />
   <link rel="icon" type="image/svg+xml" href="/icon.svg" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <script defer src="/inp-monitor.js"></script>
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Mansión Deseo" />
   <meta property="og:title" content="${escapeHtml(title)}" />
