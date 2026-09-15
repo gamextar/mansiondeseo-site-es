@@ -28,12 +28,16 @@ const tierMeta = ESCORT_TIERS[tier];
       decoding="async"
       fetchpriority={eager ? 'high' : 'auto'}
     />
+    <div class="listing-overlay">
+      <div class="listing-topline">
+        <span class="tier-badge" style={`--tier-color:${tierMeta.accent}`}>{tierMeta.label}</span>
+        <span class="price">Desde {new Intl.NumberFormat('es-AR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(priceAmount)} / hora</span>
+      </div>
+      <div class="listing-copy">
+        <h2>{displayName}</h2>
+        <p class="city"><span aria-hidden="true">●</span> {cityName}</p>
+        <p class="summary">{shortBio}</p>
+      </div>
+    </div>
   </a>
-  <div class="listing-meta">
-    <span class="tier-badge" style={`--tier-color:${tierMeta.accent}`}>{tierMeta.label}</span>
-    <h2><a href={`/escort/${slug}/`}>{displayName}</a></h2>
-    <p class="city">{cityName}</p>
-    <p class="price">Desde {new Intl.NumberFormat('es-AR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(priceAmount)} / hora</p>
-    <p class="summary">{shortBio}</p>
-  </div>
 </article>
