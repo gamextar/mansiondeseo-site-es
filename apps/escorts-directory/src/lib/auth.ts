@@ -1,6 +1,8 @@
 const SESSION_COOKIE = 'escort_session';
 const ADMIN_COOKIE = 'escort_admin_session';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
+// Cloudflare Workers supports PBKDF2 iteration counts up to 100,000.
+const PASSWORD_HASH_ITERATIONS = 100_000;
 
 function encode(value: string) {
   const bytes = new TextEncoder().encode(value);
@@ -86,7 +88,7 @@ export async function isAdminRequest(request: Request, env: Record<string, any>)
 export async function hashPassword(password: string) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-  const hash = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 210000, hash: 'SHA-256' }, material, 256));
+  const hash = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: PASSWORD_HASH_ITERATIONS, hash: 'SHA-256' }, material, 256));
   const toHex = (bytes: Uint8Array) => Array.from(bytes).map((byte) => byte.toString(16).padStart(2, '0')).join('');
   return `${toHex(salt)}:${toHex(hash)}`;
 }
@@ -96,7 +98,7 @@ export async function verifyPassword(password: string, stored: string) {
   if (!saltHex || !hashHex) return false;
   const salt = new Uint8Array(saltHex.match(/.{1,2}/g)?.map((part) => Number.parseInt(part, 16)) || []);
   const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-  const hash = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 210000, hash: 'SHA-256' }, material, 256));
+  const hash = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: PASSWORD_HASH_ITERATIONS, hash: 'SHA-256' }, material, 256));
   const candidate = Array.from(hash).map((byte) => byte.toString(16).padStart(2, '0')).join('');
   if (candidate.length !== hashHex.length) return false;
   let different = 0;
