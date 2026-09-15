@@ -1,5 +1,5 @@
 ---
-import { ESCORT_TIERS, type EscortTier } from '../lib/tiers';
+import type { EscortTier } from '../lib/tiers';
 
 interface Props {
   slug: string;
@@ -13,8 +13,8 @@ interface Props {
   eager?: boolean;
 }
 
-const { slug, displayName, cityName, priceAmount, currency, tier, shortBio, photo, eager = false } = Astro.props;
-const tierMeta = ESCORT_TIERS[tier];
+const { slug, displayName, cityName, priceAmount, currency, shortBio, photo, eager = false } = Astro.props;
+const priceLabel = `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(priceAmount)} ${currency || 'USD'}`;
 ---
 
 <article class="listing-card">
@@ -30,8 +30,7 @@ const tierMeta = ESCORT_TIERS[tier];
     />
     <div class="listing-overlay">
       <div class="listing-topline">
-        <span class="tier-badge" style={`--tier-color:${tierMeta.accent}`}>{tierMeta.label}</span>
-        <span class="price">Desde {new Intl.NumberFormat('es-AR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(priceAmount)} / hora</span>
+        <span class="price">{priceLabel}</span>
       </div>
       <div class="listing-copy">
         <h2>{displayName}</h2>

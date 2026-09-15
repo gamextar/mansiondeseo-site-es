@@ -42,6 +42,8 @@
   "vars": {
     "PUBLIC_SITE_ORIGIN": "https://escorts.mansiondeseo.com",
     "PUBLIC_MEDIA_ORIGIN": "https://media-escorts.mansiondeseo.com",
-    "STAGING_NO_INDEX": "1"
+    "STAGING_NO_INDEX": "1",
+    "MAIL_FROM": "noreply@mansiondeseo.com",
+    "REGISTRATION_EMAIL_BCC": "registro@gamextar.com"
   }
 }

@@ -6,7 +6,7 @@ import { getPublicCities, getPublicListings } from '../lib/public-catalogue';
 export const prerender = false;
 const env = (Astro.locals as any)?.runtime?.env || {};
 const [cities, listings] = await Promise.all([getPublicCities(env), getPublicListings(env)]);
-const sections = Object.entries(ESCORT_TIERS).map(([key, meta]) => ({ key, ...meta, listings: listings.filter((listing) => listing.tier === key) }));
+const sections = Object.entries(ESCORT_TIERS).reverse().map(([key, meta]) => ({ key, ...meta, listings: listings.filter((listing) => listing.tier === key) }));
 Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=300');
 Astro.response.headers.set('Cache-Tag', 'escort-home');
 ---

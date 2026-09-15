@@ -10,6 +10,7 @@
     "deploy": "wrangler deploy",
     "db:migrate:local": "wrangler d1 execute escorts-directory-db --local --file=db/schema.sql",
     "db:migrate:remote": "wrangler d1 execute escorts-directory-db --remote --file=db/schema.sql",
+    "db:migrate:email": "wrangler d1 execute escorts-directory-db --remote --file=db/migrations/0005_email_verification.sql",
     "db:migrate:dummy": "wrangler d1 execute escorts-directory-db --remote --file=db/migrations/0002_dummy_profiles.sql",
     "seed:dummy": "node scripts/seed-dummy-profiles.mjs"
   },

@@ -1,6 +1,18 @@
 ---
 import PublicLayout from '../layouts/PublicLayout.astro';
-export const prerender = true;
+export const prerender = false;
+const result = Astro.url.searchParams.get('registered');
+const error = Astro.url.searchParams.get('error');
+const messages = {
+  datos: 'Ingresá un email válido y una contraseña de al menos 10 caracteres.',
+  existente: 'Ese email ya tiene una cuenta. Podés ingresar al panel.',
+  acceso: 'El email o la contraseña no son correctos.',
+  sesion: 'Necesitás iniciar sesión para continuar.',
+  email: 'No pudimos enviar el email de confirmación. Revisá la configuración de correo e intentá nuevamente.',
+  sinverificar: 'Primero confirmá tu email desde el enlace que te enviamos.',
+  verificacion: 'El enlace de confirmación no es válido o ya venció.',
+  metodo: 'Iniciá el registro desde este formulario.',
+};
 ---
 
 <PublicLayout title="Publicar un anuncio | Mansión Deseo Escorts" description="Registro de anunciantes y proceso de revisión manual." canonicalPath="/registro/" noindex={true}>
@@ -8,6 +20,8 @@ export const prerender = true;
     <p class="eyebrow">Para anunciantes</p>
     <h1>Publicar un anuncio</h1>
     <p>El registro estará disponible únicamente para anunciantes. Cada perfil y fotografía queda pendiente de revisión antes de publicarse.</p>
+    {result && <p class="form-notice success">Te enviamos un enlace de confirmación. Revisá tu bandeja de entrada y la carpeta de spam.</p>}
+    {error && <p class="form-notice error">{messages[error as keyof typeof messages] || 'No pudimos completar la operación.'}</p>}
     <ol>
       <li>Crear cuenta de anunciante.</li>
       <li>Completar el perfil y cargar fotografías.</li>
@@ -18,7 +32,7 @@ export const prerender = true;
       <form class="form-card" method="post" action="/api/account/register">
         <h2>Crear cuenta</h2>
         <label>Email <input name="email" type="email" autocomplete="email" required /></label>
-        <label>Contraseña <input name="password" type="password" autocomplete="new-password" minlength="12" required /></label>
+        <label>Contraseña <input name="password" type="password" autocomplete="new-password" minlength="10" required /></label>
         <button type="submit">Crear cuenta de anunciante</button>
       </form>
       <form class="form-card" method="post" action="/api/account/login">

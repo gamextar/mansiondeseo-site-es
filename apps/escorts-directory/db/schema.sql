@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS escort_accounts (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
+  email_verified INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'suspended', 'deleted')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -36,6 +37,18 @@ CREATE TABLE IF NOT EXISTS escort_profiles (
 CREATE INDEX IF NOT EXISTS idx_escort_profiles_public_city ON escort_profiles(status, city_slug, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_escort_profiles_account ON escort_profiles(account_id, updated_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_escort_profiles_one_per_account ON escort_profiles(account_id);
+
+CREATE TABLE IF NOT EXISTS escort_email_verifications (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES escort_accounts(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_escort_email_verifications_lookup
+  ON escort_email_verifications(token, used, expires_at);
 
 CREATE TABLE IF NOT EXISTS escort_photos (
   id TEXT PRIMARY KEY,

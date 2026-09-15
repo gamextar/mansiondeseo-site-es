@@ -28,7 +28,19 @@ const cities = [
   ['cordoba', 'Córdoba'], ['rosario', 'Rosario'], ['mendoza', 'Mendoza'], ['salta', 'Salta'],
 ];
 const tiers = ['basic', 'bronze', 'silver', 'gold', 'platinum', 'diamond'];
-const prices = { basic: 50, bronze: 70, silver: 90, gold: 120, platinum: 160, diamond: 220 };
+const prices = { basic: 100, bronze: 150, silver: 200, gold: 300, platinum: 400, diamond: 500 };
+const names = [
+  'Sofía Luna', 'Valentina Ríos', 'Camila Sol', 'Martina Vega', 'Julieta Noir',
+  'Renata Bloom', 'Lucía Star', 'Emilia Rose', 'Mía Velvet', 'Catalina Sky',
+  'Abril Monroe', 'Zoe Diamante', 'Bianca Lux', 'Antonella Blue', 'Delfina Moon',
+  'Victoria Love', 'Isabella Roma', 'Alma París', 'Florencia Gold', 'Agustina Pearl',
+  'Jazmín Fox', 'Paula Sunset', 'Mora Crystal', 'Clara Milano', 'Malena Queen',
+  'Carolina Dream', 'Brenda Silk', 'Nina Royale', 'Daniela Onyx', 'Lola Glam',
+  'Eva Scarlett', 'Nerea Divine', 'Olivia Spark', 'Pía Majesty', 'Rocío Cherry',
+  'Violeta Paris', 'Lara Diamond', 'Celeste Star', 'Ambar Gold', 'Noelia Velvet',
+  'Sabrina Rose', 'Tiziana Moon', 'Aitana Blue', 'Marina Lux', 'Solange Noir',
+  'Elena Pearl', 'Bárbara Sky', 'Cielo Monroe', 'Gala Love', 'Luna Roma',
+];
 
 if (!skipMedia) {
   console.log(`Subiendo imagen pública a R2: ${publicKey}`);
@@ -51,8 +63,8 @@ for (let index = 1; index <= 50; index += 1) {
   const accountId = `dummy-account-${number}`;
   const profileId = `dummy-profile-${number}`;
   const photoId = `dummy-photo-${number}`;
-  const slug = `perfil-demo-${number}-${citySlug}`;
-  const name = `Perfil Demo ${number}`;
+  const name = names[index - 1];
+  const slug = `${name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${citySlug}`;
   const sourceKey = `source/demo-${number}/original.png`;
   const cardKey = publicKey;
   const price = prices[tier];
@@ -62,7 +74,7 @@ for (let index = 1; index <= 50; index += 1) {
   if (!skipMedia) run(['r2', 'object', 'put', `${privateBucket}/${sourceKey}`, '--file', imagePath, '--remote', '--content-type', 'image/png', '--force']);
   statements.push(
     `INSERT INTO escort_accounts (id, email, password_hash) VALUES (${sql(accountId)}, ${sql(`dummy-${number}@example.invalid`)}, ${sql('demo-only:no-login')});`,
-    `INSERT INTO escort_profiles (id, account_id, slug, display_name, city_slug, city_name, price_amount, currency, short_bio, contact_url, contact_label, status, reviewed_by, reviewed_at, published_at, is_demo) VALUES (${sql(profileId)}, ${sql(accountId)}, ${sql(slug)}, ${sql(name)}, ${sql(citySlug)}, ${sql(cityName)}, ${price}, 'USD', ${sql(`Perfil ficticio de prueba ${number} para validar la galería, el precio y el orden de visibilidad.`)}, 'https://example.invalid/demo', 'Contacto demo', 'published', 'seed', datetime('now'), datetime('now'), 1);`,
+    `INSERT INTO escort_profiles (id, account_id, slug, display_name, city_slug, city_name, price_amount, currency, short_bio, contact_url, contact_label, status, reviewed_by, reviewed_at, published_at, is_demo) VALUES (${sql(profileId)}, ${sql(accountId)}, ${sql(slug)}, ${sql(name)}, ${sql(citySlug)}, ${sql(cityName)}, ${price}, 'USD', ${sql(`Atención personalizada y disponibilidad coordinada en ${cityName}.`)}, 'https://example.invalid/demo', 'Contacto demo', 'published', 'seed', datetime('now'), datetime('now'), 1);`,
     `INSERT INTO escort_photos (id, profile_id, source_key, card_key, detail_key, width, height, alt_text, sort_order, status, reviewed_at) VALUES (${sql(photoId)}, ${sql(profileId)}, ${sql(sourceKey)}, ${sql(cardKey)}, ${sql(cardKey)}, 640, 853, ${sql(`Imagen dummy de prueba del perfil ${number}`)}, 0, 'approved', datetime('now'));`,
     `INSERT INTO escort_promotions (id, profile_id, tier, status, rotation_seed) VALUES (${sql(`dummy-promotion-${number}`)}, ${sql(profileId)}, ${sql(tier)}, 'active', ${rotation});`,
     `INSERT INTO escort_moderation_events (id, profile_id, actor_id, action, note) VALUES (${sql(`dummy-event-${number}`)}, ${sql(profileId)}, 'seed', 'approved', 'Perfil dummy de staging');`,
