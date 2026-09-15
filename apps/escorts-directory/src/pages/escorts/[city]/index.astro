@@ -1,0 +1,29 @@
+---
+import PublicLayout from '../../../layouts/PublicLayout.astro';
+import ListingCard from '../../../components/ListingCard.astro';
+import { demoCities, demoListings } from '../../../data/demo-listings';
+export const prerender = true;
+
+export function getStaticPaths() {
+  return demoCities.map((city) => ({ params: { city: city.slug }, props: { city } }));
+}
+
+const { city } = Astro.props;
+const listings = demoListings.filter((listing) => listing.citySlug === city.slug);
+---
+
+<PublicLayout
+  title={`Escorts en ${city.name} | Mansión Deseo`}
+  description={`Perfiles de escorts en ${city.name}, publicados después de revisión manual.`}
+  canonicalPath={`/escorts/${city.slug}/`}
+>
+  <section class="hero hero-compact">
+    <p class="eyebrow">Explorar por ciudad</p>
+    <h1>Escorts en {city.name}</h1>
+  </section>
+  <section class="gallery-section" aria-label={`Perfiles en ${city.name}`}>
+    <div class="listing-grid">
+      {listings.map((listing, index) => <ListingCard {...listing} eager={index < 4} />)}
+    </div>
+  </section>
+</PublicLayout>

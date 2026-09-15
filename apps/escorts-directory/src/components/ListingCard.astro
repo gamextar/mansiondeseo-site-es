@@ -1,0 +1,36 @@
+---
+import { ESCORT_TIERS, type EscortTier } from '../lib/tiers';
+
+interface Props {
+  slug: string;
+  displayName: string;
+  cityName: string;
+  tier: EscortTier;
+  shortBio: string;
+  photo: string;
+  eager?: boolean;
+}
+
+const { slug, displayName, cityName, tier, shortBio, photo, eager = false } = Astro.props;
+const tierMeta = ESCORT_TIERS[tier];
+---
+
+<article class="listing-card">
+  <a href={`/escort/${slug}/`} class="listing-image-link" aria-label={`Ver perfil de ${displayName}`}>
+    <img
+      src={photo}
+      alt={`Foto principal de ${displayName}`}
+      width="640"
+      height="853"
+      loading={eager ? 'eager' : 'lazy'}
+      decoding="async"
+      fetchpriority={eager ? 'high' : 'auto'}
+    />
+  </a>
+  <div class="listing-meta">
+    <span class="tier-badge" style={`--tier-color:${tierMeta.accent}`}>{tierMeta.label}</span>
+    <h2><a href={`/escort/${slug}/`}>{displayName}</a></h2>
+    <p class="city">{cityName}</p>
+    <p class="summary">{shortBio}</p>
+  </div>
+</article>

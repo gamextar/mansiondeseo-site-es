@@ -1,0 +1,28 @@
+---
+import PublicLayout from '../layouts/PublicLayout.astro';
+import ListingCard from '../components/ListingCard.astro';
+import { demoCities, demoListings } from '../data/demo-listings';
+export const prerender = true;
+---
+
+<PublicLayout
+  title="Escorts en Argentina | Mansión Deseo"
+  description="Directorio de escorts con perfiles públicos y revisión manual. Explorá anuncios por ciudad."
+>
+  <section class="hero">
+    <p class="eyebrow">Directorio independiente</p>
+    <h1>Escorts en Argentina</h1>
+    <p>Perfiles públicos, fotografías revisadas y búsqueda por ciudad.</p>
+  </section>
+
+  <section class="city-links" aria-label="Explorar por ciudad">
+    {demoCities.map((city) => <a href={`/escorts/${city.slug}/`}>{city.name}</a>)}
+  </section>
+
+  <section class="gallery-section" aria-labelledby="destacados-title">
+    <div class="section-heading"><h2 id="destacados-title">Perfiles destacados</h2><span>Galería pública</span></div>
+    <div class="listing-grid">
+      {demoListings.map((listing, index) => <ListingCard {...listing} eager={index < 4} />)}
+    </div>
+  </section>
+</PublicLayout>

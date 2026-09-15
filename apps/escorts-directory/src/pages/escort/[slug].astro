@@ -1,0 +1,30 @@
+---
+import PublicLayout from '../../layouts/PublicLayout.astro';
+import { ESCORT_TIERS } from '../../lib/tiers';
+import { demoListings } from '../../data/demo-listings';
+export const prerender = true;
+
+export function getStaticPaths() {
+  return demoListings.map((listing) => ({ params: { slug: listing.slug }, props: { listing } }));
+}
+
+const { listing } = Astro.props;
+const tier = ESCORT_TIERS[listing.tier];
+---
+
+<PublicLayout
+  title={`${listing.displayName} en ${listing.cityName} | Mansión Deseo`}
+  description={`${listing.displayName}: perfil público en ${listing.cityName}.`}
+  canonicalPath={`/escort/${listing.slug}/`}
+>
+  <article class="profile-page">
+    <div class="profile-photo"><img src={listing.photo} alt={`Foto principal de ${listing.displayName}`} width="1280" height="1706" fetchpriority="high" /></div>
+    <div class="profile-copy">
+      <span class="tier-badge" style={`--tier-color:${tier.accent}`}>{tier.label}</span>
+      <p class="eyebrow">{listing.cityName}</p>
+      <h1>{listing.displayName}</h1>
+      <p>{listing.shortBio}</p>
+      <p class="review-notice">Perfil de muestra. Los perfiles reales se muestran exclusivamente tras aprobación manual.</p>
+    </div>
+  </article>
+</PublicLayout>

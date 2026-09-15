@@ -1,0 +1,43 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description: string;
+  canonicalPath?: string;
+  noindex?: boolean;
+}
+
+const { title, description, canonicalPath = '/', noindex = false } = Astro.props;
+const origin = (import.meta.env.PUBLIC_SITE_ORIGIN || 'https://mansiondeseo.com').replace(/\/$/, '');
+const isStaging = import.meta.env.PUBLIC_STAGING_NO_INDEX === '1';
+const canonical = `${origin}${canonicalPath}`;
+---
+
+<!doctype html>
+<html lang="es-AR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="rating" content="adult" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {(noindex || isStaging) && <meta name="robots" content="noindex, nofollow, noarchive" />}
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Inicio">Mansión Deseo <span>Escorts</span></a>
+      <nav aria-label="Navegación principal">
+        <a href="/escorts/buenos-aires/">Buenos Aires</a>
+        <a href="/escorts/cordoba/">Córdoba</a>
+        <a class="nav-cta" href="/registro/">Publicar anuncio</a>
+      </nav>
+    </header>
+    <main><slot /></main>
+    <footer class="site-footer">
+      <p>Solo para mayores de 18 años. Los anuncios se publican luego de una revisión manual.</p>
+      <a href="/terminos/">Términos y seguridad</a>
+    </footer>
+  </body>
+</html>
