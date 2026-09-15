@@ -22,6 +22,7 @@ Proyecto independiente y sin React para el futuro catálogo público de `mansion
 - Solo derivados aprobados públicos: `ESCORT_MEDIA_PUBLIC`.
 - Derivados esperados: tarjeta 320/640px y perfil 1280px, con URLs versionadas y AVIF/WebP.
 - El dominio público de medios debe ser un Custom Domain de R2, con `Cache-Control: public, max-age=31536000, immutable` para archivos versionados.
+- Existe un endpoint público de reportes. Antes de lanzamiento, el administrador debe revisar reportes abiertos cada día y pausar el perfil inmediatamente si hay riesgo de suplantación, falta de consentimiento o posible minoría de edad.
 
 ## Niveles
 

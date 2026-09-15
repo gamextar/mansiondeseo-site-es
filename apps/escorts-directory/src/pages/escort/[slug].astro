@@ -25,6 +25,14 @@ Astro.response.headers.set('Cache-Tag', `escort-profile-${listing.slug},escort-c
       <p>{listing.shortBio}</p>
       {listing.contactUrl && <a class="contact-button" href={listing.contactUrl} rel="ugc nofollow noopener" target="_blank">{listing.contactLabel}</a>}
       <p class="review-notice">Perfil publicado luego de revisión manual.</p>
+      <details class="report-box">
+        <summary>Reportar este perfil</summary>
+        <form method="post" action={`/api/public/profiles/${listing.slug}/report`}>
+          <label>Motivo <select name="reason"><option value="suplantacion">Suplantación</option><option value="menor_de_edad">Posible menor de edad</option><option value="imagen_sin_consentimiento">Imagen sin consentimiento</option><option value="estafa">Posible estafa</option><option value="otro">Otro</option></select></label>
+          <label>Detalle <textarea name="details" maxlength="1000"></textarea></label>
+          <button class="button-danger">Enviar reporte</button>
+        </form>
+      </details>
     </div>
   </article>
 </PublicLayout>
