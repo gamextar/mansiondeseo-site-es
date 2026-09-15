@@ -1,0 +1,38 @@
+---
+import PublicLayout from '../../layouts/PublicLayout.astro';
+import { accountIdFromRequest } from '../../lib/auth';
+import { runtimeEnv } from '../../lib/runtime';
+export const prerender = false;
+
+const env = runtimeEnv(Astro.locals);
+const accountId = await accountIdFromRequest(Astro.request, env);
+if (!accountId) return Astro.redirect('/registro/');
+const profile = await env.DB?.prepare('SELECT * FROM escort_profiles WHERE account_id = ?').bind(accountId).first<any>();
+const photos = profile ? await env.DB.prepare('SELECT id, status, source_key, sort_order FROM escort_photos WHERE profile_id = ? ORDER BY sort_order').bind(profile.id).all<any>() : { results: [] };
+---
+
+<PublicLayout title="Panel de anunciante | Mansión Deseo Escorts" description="Administrá tu perfil y fotografías." canonicalPath="/panel/" noindex={true}>
+  <section class="content-page panel-page">
+    <div class="panel-heading"><div><p class="eyebrow">Cuenta de anunciante</p><h1>Tu perfil</h1></div><form method="post" action="/api/account/logout"><button class="button-secondary">Salir</button></form></div>
+    <p>Estado actual: <strong>{profile?.status || 'sin enviar'}</strong>{profile?.review_note ? ` · ${profile.review_note}` : ''}</p>
+    <form class="form-card wide" method="post" action="/api/profile">
+      <label>Nombre visible <input name="display_name" maxlength="80" value={profile?.display_name || ''} required /></label>
+      <label>Ciudad <input name="city_name" maxlength="80" value={profile?.city_name || ''} required /></label>
+      <label>Descripción breve <textarea name="short_bio" maxlength="600" required>{profile?.short_bio || ''}</textarea></label>
+      <label>Enlace de contacto <input name="contact_url" type="url" value={profile?.contact_url || ''} placeholder="https://..." required /></label>
+      <label>Texto del contacto <input name="contact_label" maxlength="32" value={profile?.contact_label || 'Contactar'} required /></label>
+      <button type="submit">Enviar para revisión</button>
+    </form>
+    {profile && <>
+      <h2>Fotografías</h2>
+      <form class="form-card wide" method="post" action="/api/profile/photo" enctype="multipart/form-data">
+        <label>Foto <input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/avif" required /></label>
+        <label>Descripción de la foto <input name="alt_text" maxlength="160" /></label>
+        <button type="submit">Subir para revisión</button>
+      </form>
+      <ul class="status-list">
+        {(photos.results || []).map((photo: any) => <li>Foto {photo.sort_order + 1}: <strong>{photo.status}</strong></li>)}
+      </ul>
+    </>}
+  </section>
+</PublicLayout>

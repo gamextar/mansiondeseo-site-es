@@ -1,8 +1,12 @@
 ---
 import PublicLayout from '../layouts/PublicLayout.astro';
 import ListingCard from '../components/ListingCard.astro';
-import { demoCities, demoListings } from '../data/demo-listings';
-export const prerender = true;
+import { getPublicCities, getPublicListings } from '../lib/public-catalogue';
+export const prerender = false;
+const env = (Astro.locals as any)?.runtime?.env || {};
+const [cities, listings] = await Promise.all([getPublicCities(env), getPublicListings(env)]);
+Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=300');
+Astro.response.headers.set('Cache-Tag', 'escort-home');
 ---
 
 <PublicLayout
@@ -16,13 +20,14 @@ export const prerender = true;
   </section>
 
   <section class="city-links" aria-label="Explorar por ciudad">
-    {demoCities.map((city) => <a href={`/escorts/${city.slug}/`}>{city.name}</a>)}
+    {cities.map((city) => <a href={`/escorts/${city.slug}/`}>{city.name} <small>({city.count})</small></a>)}
   </section>
 
   <section class="gallery-section" aria-labelledby="destacados-title">
     <div class="section-heading"><h2 id="destacados-title">Perfiles destacados</h2><span>Galería pública</span></div>
     <div class="listing-grid">
-      {demoListings.map((listing, index) => <ListingCard {...listing} eager={index < 4} />)}
+      {listings.map((listing, index) => <ListingCard {...listing} eager={index < 4} />)}
     </div>
+    {listings.length === 0 && <p class="empty-state">Todavía no hay perfiles publicados en esta ciudad.</p>}
   </section>
 </PublicLayout>

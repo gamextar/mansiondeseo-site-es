@@ -9,8 +9,9 @@ interface Props {
 }
 
 const { title, description, canonicalPath = '/', noindex = false } = Astro.props;
-const origin = (import.meta.env.PUBLIC_SITE_ORIGIN || 'https://mansiondeseo.com').replace(/\/$/, '');
-const isStaging = import.meta.env.PUBLIC_STAGING_NO_INDEX === '1';
+const env = (Astro.locals as any)?.runtime?.env || {};
+const origin = (env.PUBLIC_SITE_ORIGIN || 'https://mansiondeseo.com').replace(/\/$/, '');
+const isStaging = String(env.STAGING_NO_INDEX || '') === '1';
 const canonical = `${origin}${canonicalPath}`;
 ---
 

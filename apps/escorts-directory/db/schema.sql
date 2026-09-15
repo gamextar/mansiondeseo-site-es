@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS escort_profiles (
 
 CREATE INDEX IF NOT EXISTS idx_escort_profiles_public_city ON escort_profiles(status, city_slug, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_escort_profiles_account ON escort_profiles(account_id, updated_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_escort_profiles_one_per_account ON escort_profiles(account_id);
 
 CREATE TABLE IF NOT EXISTS escort_photos (
   id TEXT PRIMARY KEY,

@@ -1,15 +1,15 @@
 ---
 import PublicLayout from '../../../layouts/PublicLayout.astro';
 import ListingCard from '../../../components/ListingCard.astro';
-import { demoCities, demoListings } from '../../../data/demo-listings';
-export const prerender = true;
-
-export function getStaticPaths() {
-  return demoCities.map((city) => ({ params: { city: city.slug }, props: { city } }));
-}
-
-const { city } = Astro.props;
-const listings = demoListings.filter((listing) => listing.citySlug === city.slug);
+import { getPublicCities, getPublicListings } from '../../../lib/public-catalogue';
+export const prerender = false;
+const env = (Astro.locals as any)?.runtime?.env || {};
+const slug = Astro.params.city || '';
+const [cities, listings] = await Promise.all([getPublicCities(env), getPublicListings(env, slug)]);
+const city = cities.find((item) => item.slug === slug);
+if (!city) return new Response('No encontrado', { status: 404 });
+Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=300');
+Astro.response.headers.set('Cache-Tag', `escort-city-${slug}`);
 ---
 
 <PublicLayout
@@ -25,5 +25,6 @@ const listings = demoListings.filter((listing) => listing.citySlug === city.slug
     <div class="listing-grid">
       {listings.map((listing, index) => <ListingCard {...listing} eager={index < 4} />)}
     </div>
+    {listings.length === 0 && <p class="empty-state">No hay perfiles publicados actualmente.</p>}
   </section>
 </PublicLayout>

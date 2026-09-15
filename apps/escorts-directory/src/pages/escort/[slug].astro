@@ -1,15 +1,14 @@
 ---
 import PublicLayout from '../../layouts/PublicLayout.astro';
 import { ESCORT_TIERS } from '../../lib/tiers';
-import { demoListings } from '../../data/demo-listings';
-export const prerender = true;
-
-export function getStaticPaths() {
-  return demoListings.map((listing) => ({ params: { slug: listing.slug }, props: { listing } }));
-}
-
-const { listing } = Astro.props;
+import { getPublicListing } from '../../lib/public-catalogue';
+export const prerender = false;
+const env = (Astro.locals as any)?.runtime?.env || {};
+const listing = await getPublicListing(env, Astro.params.slug || '');
+if (!listing) return new Response('No encontrado', { status: 404 });
 const tier = ESCORT_TIERS[listing.tier];
+Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=300');
+Astro.response.headers.set('Cache-Tag', `escort-profile-${listing.slug},escort-city-${listing.citySlug},escort-home`);
 ---
 
 <PublicLayout
@@ -18,13 +17,14 @@ const tier = ESCORT_TIERS[listing.tier];
   canonicalPath={`/escort/${listing.slug}/`}
 >
   <article class="profile-page">
-    <div class="profile-photo"><img src={listing.photo} alt={`Foto principal de ${listing.displayName}`} width="1280" height="1706" fetchpriority="high" /></div>
+    <div class="profile-photo"><img src={listing.detailPhoto} alt={`Foto principal de ${listing.displayName}`} width="1280" height="1706" fetchpriority="high" /></div>
     <div class="profile-copy">
       <span class="tier-badge" style={`--tier-color:${tier.accent}`}>{tier.label}</span>
       <p class="eyebrow">{listing.cityName}</p>
       <h1>{listing.displayName}</h1>
       <p>{listing.shortBio}</p>
-      <p class="review-notice">Perfil de muestra. Los perfiles reales se muestran exclusivamente tras aprobación manual.</p>
+      {listing.contactUrl && <a class="contact-button" href={listing.contactUrl} rel="ugc nofollow noopener" target="_blank">{listing.contactLabel}</a>}
+      <p class="review-notice">Perfil publicado luego de revisión manual.</p>
     </div>
   </article>
 </PublicLayout>

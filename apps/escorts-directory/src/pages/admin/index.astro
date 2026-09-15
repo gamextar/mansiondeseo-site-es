@@ -1,0 +1,32 @@
+---
+import PublicLayout from '../../layouts/PublicLayout.astro';
+import { isAdminRequest } from '../../lib/auth';
+import { ESCORT_TIERS } from '../../lib/tiers';
+import { runtimeEnv } from '../../lib/runtime';
+export const prerender = false;
+
+const env = runtimeEnv(Astro.locals);
+const isAdmin = await isAdminRequest(Astro.request, env);
+const pendingRows = isAdmin ? await env.DB?.prepare("SELECT p.*, a.email FROM escort_profiles p JOIN escort_accounts a ON a.id = p.account_id WHERE p.status = 'pending_review' ORDER BY p.updated_at ASC").all<any>() : { results: [] };
+const pending = await Promise.all((pendingRows?.results || []).map(async (profile: any) => ({
+  ...profile,
+  photos: (await env.DB.prepare("SELECT id, status, sort_order FROM escort_photos WHERE profile_id = ? ORDER BY sort_order").bind(profile.id).all<any>()).results || [],
+})));
+const published = isAdmin ? await env.DB?.prepare("SELECT p.*, COALESCE((SELECT tier FROM escort_promotions ep WHERE ep.profile_id = p.id AND ep.status = 'active' ORDER BY ep.created_at DESC LIMIT 1), 'basic') AS tier FROM escort_profiles p WHERE p.status = 'published' ORDER BY p.published_at DESC LIMIT 50").all<any>() : { results: [] };
+---
+
+<PublicLayout title="Moderación | Mansión Deseo Escorts" description="Panel privado de moderación." canonicalPath="/admin/" noindex={true}>
+  <section class="content-page admin-page">
+    {!isAdmin ? <form class="form-card" method="post" action="/api/admin/login"><h1>Moderación</h1><label>Clave de administración <input name="token" type="password" autocomplete="current-password" required /></label><button>Ingresar</button></form> : <>
+      <p class="eyebrow">Moderación privada</p><h1>Perfiles pendientes</h1>
+      {pending.length === 0 && <p>No hay perfiles pendientes.</p>}
+      {pending.map((profile: any) => <article class="moderation-card">
+          <h2>{profile.display_name} · {profile.city_name}</h2><p>{profile.email}</p><p>{profile.short_bio}</p>
+          <div class="moderation-photos">{profile.photos.map((photo: any) => <div><a href={`/api/admin/photos/${photo.id}/source`} target="_blank">Ver foto {photo.sort_order + 1}</a> · {photo.status}{photo.status === 'pending_review' && <><form method="post" action={`/api/admin/photos/${photo.id}/approve`}><button>Aprobar foto</button></form><form method="post" action={`/api/admin/photos/${photo.id}/reject`}><button class="button-danger">Rechazar foto</button></form></>}</div>)}</div>
+          <div class="action-row"><form method="post" action={`/api/admin/profiles/${profile.id}/approve`}><button>Aprobar perfil</button></form><form method="post" action={`/api/admin/profiles/${profile.id}/reject`}><input name="note" placeholder="Motivo si se rechaza" /><button class="button-danger">Rechazar perfil</button></form></div>
+        </article>)}
+      <h2 class="admin-section-title">Perfiles publicados</h2>
+      {(published?.results || []).map((profile: any) => <article class="moderation-card compact"><strong>{profile.display_name}</strong> · {profile.city_name}<form method="post" action={`/api/admin/profiles/${profile.id}/promotion`}><select name="tier">{Object.entries(ESCORT_TIERS).map(([value, tier]) => <option value={value} selected={value === profile.tier}>{tier.label}</option>)}</select><input name="ends_at" type="datetime-local" /><button>Actualizar nivel</button></form></article>)}
+    </>}
+  </section>
+</PublicLayout>
