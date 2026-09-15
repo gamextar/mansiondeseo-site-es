@@ -5,7 +5,7 @@ export const prerender = false;
 export const GET: APIRoute = async ({ site, locals }) => {
   const env = (locals as any)?.runtime?.env || {};
   const origin = String(env.PUBLIC_SITE_ORIGIN || site || '').replace(/\/$/, '');
-  const [cities, listings] = await Promise.all([getPublicCities(env), getPublicListings(env, '', 50000)]);
+  const [cities, listings] = await Promise.all([getPublicCities(env), getPublicListings({ ...env, STAGING_NO_INDEX: '' }, '', 50000)]);
   const urls = [
     '/',
     ...cities.map((city) => `/escorts/${city.slug}/`),

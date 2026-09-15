@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS escort_profiles (
   display_name TEXT NOT NULL,
   city_slug TEXT NOT NULL,
   city_name TEXT NOT NULL,
+  price_amount INTEGER NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL DEFAULT 'ARS',
   short_bio TEXT NOT NULL DEFAULT '',
   contact_url TEXT NOT NULL DEFAULT '',
   contact_label TEXT NOT NULL DEFAULT '',
@@ -26,6 +28,7 @@ CREATE TABLE IF NOT EXISTS escort_profiles (
   reviewed_at TEXT DEFAULT NULL,
   published_at TEXT DEFAULT NULL,
   expires_at TEXT DEFAULT NULL,
+  is_demo INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

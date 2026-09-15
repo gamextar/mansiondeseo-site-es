@@ -5,13 +5,15 @@ interface Props {
   slug: string;
   displayName: string;
   cityName: string;
+  priceAmount: number;
+  currency: string;
   tier: EscortTier;
   shortBio: string;
   photo: string;
   eager?: boolean;
 }
 
-const { slug, displayName, cityName, tier, shortBio, photo, eager = false } = Astro.props;
+const { slug, displayName, cityName, priceAmount, currency, tier, shortBio, photo, eager = false } = Astro.props;
 const tierMeta = ESCORT_TIERS[tier];
 ---
 
@@ -31,6 +33,7 @@ const tierMeta = ESCORT_TIERS[tier];
     <span class="tier-badge" style={`--tier-color:${tierMeta.accent}`}>{tierMeta.label}</span>
     <h2><a href={`/escort/${slug}/`}>{displayName}</a></h2>
     <p class="city">{cityName}</p>
+    <p class="price">Desde {new Intl.NumberFormat('es-AR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(priceAmount)} / hora</p>
     <p class="summary">{shortBio}</p>
   </div>
 </article>

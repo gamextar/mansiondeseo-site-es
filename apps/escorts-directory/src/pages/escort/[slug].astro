@@ -22,6 +22,7 @@ Astro.response.headers.set('Cache-Tag', `escort-profile-${listing.slug},escort-c
       <span class="tier-badge" style={`--tier-color:${tier.accent}`}>{tier.label}</span>
       <p class="eyebrow">{listing.cityName}</p>
       <h1>{listing.displayName}</h1>
+      <p class="profile-price">Desde {new Intl.NumberFormat('es-AR', { style: 'currency', currency: listing.currency, maximumFractionDigits: 0 }).format(listing.priceAmount)} / hora</p>
       <p>{listing.shortBio}</p>
       {listing.contactUrl && <a class="contact-button" href={listing.contactUrl} rel="ugc nofollow noopener" target="_blank">{listing.contactLabel}</a>}
       <p class="review-notice">Perfil publicado luego de revisión manual.</p>
