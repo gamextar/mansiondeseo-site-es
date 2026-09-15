@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "mansiondeseo-escorts",
+  "workers_dev": true,
   "main": "./dist/_worker.js/index.js",
   "compatibility_date": "2026-09-15",
   "compatibility_flags": ["nodejs_compat"],
@@ -14,15 +15,15 @@
   },
   "routes": [
     {
-      "pattern": "escorts.mansiondeseo.com/*",
-      "zone_name": "mansiondeseo.com"
+      "pattern": "escorts.mansiondeseo.com",
+      "custom_domain": true
     }
   ],
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "escorts-directory-db",
-      "database_id": "REPLACE_WITH_NEW_D1_DATABASE_ID"
+      "database_id": "d8644fde-e9b4-413d-aeb0-0f9fac7359ee"
     }
   ],
   "r2_buckets": [
@@ -39,7 +40,7 @@
     "binding": "IMAGES"
   },
   "vars": {
-    "PUBLIC_SITE_ORIGIN": "https://mansiondeseo.com",
+    "PUBLIC_SITE_ORIGIN": "https://escorts.mansiondeseo.com",
     "PUBLIC_MEDIA_ORIGIN": "https://media-escorts.mansiondeseo.com",
     "STAGING_NO_INDEX": "1"
   }

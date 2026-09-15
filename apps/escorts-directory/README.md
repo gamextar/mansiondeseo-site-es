@@ -11,8 +11,7 @@ Proyecto independiente y sin React para el futuro catálogo público de `mansion
 
 ## Antes del primer deploy
 
-1. Crear la D1 y reemplazar `REPLACE_WITH_NEW_D1_DATABASE_ID` en `wrangler.jsonc`.
-2. Crear los buckets indicados y configurar los secretos `ESCORT_SESSION_SECRET` y `ESCORT_ADMIN_TOKEN` con `wrangler secret put`.
+1. Configurar los secretos `ESCORT_SESSION_SECRET` y `ESCORT_ADMIN_TOKEN` con `wrangler secret put`.
 3. Conectar `media-escorts.mansiondeseo.com` al bucket público. El bucket privado nunca debe tener dominio público.
 4. Ejecutar `npm run db:migrate:remote` y recién entonces `npm run deploy`.
 
