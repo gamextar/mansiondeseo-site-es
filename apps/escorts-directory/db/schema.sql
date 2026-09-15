@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS escort_profiles (
   city_slug TEXT NOT NULL,
   city_name TEXT NOT NULL,
   price_amount INTEGER NOT NULL DEFAULT 0,
-  currency TEXT NOT NULL DEFAULT 'ARS',
+  currency TEXT NOT NULL DEFAULT 'USD',
   short_bio TEXT NOT NULL DEFAULT '',
   contact_url TEXT NOT NULL DEFAULT '',
   contact_label TEXT NOT NULL DEFAULT '',
@@ -58,7 +58,7 @@ CREATE INDEX IF NOT EXISTS idx_escort_photos_profile_status ON escort_photos(pro
 CREATE TABLE IF NOT EXISTS escort_promotions (
   id TEXT PRIMARY KEY,
   profile_id TEXT NOT NULL REFERENCES escort_profiles(id) ON DELETE CASCADE,
-  tier TEXT NOT NULL DEFAULT 'basic' CHECK(tier IN ('basic', 'bronze', 'silver', 'gold', 'platinum')),
+  tier TEXT NOT NULL DEFAULT 'basic' CHECK(tier IN ('basic', 'bronze', 'silver', 'gold', 'platinum', 'diamond')),
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'paused', 'expired', 'cancelled')),
   starts_at TEXT NOT NULL DEFAULT (datetime('now')),
   ends_at TEXT DEFAULT NULL,

@@ -28,7 +28,7 @@ function toListing(env: Record<string, any>, row: any): CatalogueListing {
     citySlug: row.city_slug,
     cityName: row.city_name,
     priceAmount: Number(row.price_amount || 0),
-    currency: row.currency || 'ARS',
+    currency: row.currency || 'USD',
     tier: tier in ESCORT_TIERS ? tier : 'basic',
     shortBio: row.short_bio || '',
     photo: mediaUrl(env, row.card_key),

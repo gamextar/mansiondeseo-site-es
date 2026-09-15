@@ -27,15 +27,22 @@ const cities = [
   ['belgrano', 'Belgrano'], ['san-isidro', 'San Isidro'], ['la-plata', 'La Plata'], ['mar-del-plata', 'Mar del Plata'],
   ['cordoba', 'Córdoba'], ['rosario', 'Rosario'], ['mendoza', 'Mendoza'], ['salta', 'Salta'],
 ];
-const tiers = ['basic', 'bronze', 'silver', 'gold', 'platinum'];
-const prices = { basic: 25000, bronze: 30000, silver: 38000, gold: 50000, platinum: 70000 };
+const tiers = ['basic', 'bronze', 'silver', 'gold', 'platinum', 'diamond'];
+const prices = { basic: 50, bronze: 70, silver: 90, gold: 120, platinum: 160, diamond: 220 };
 
 if (!skipMedia) {
   console.log(`Subiendo imagen pública a R2: ${publicKey}`);
   run(['r2', 'object', 'put', `${publicBucket}/${publicKey}`, '--file', imagePath, '--remote', '--content-type', 'image/png', '--cache-control', 'public, max-age=31536000, immutable', '--force']);
 }
 
-const statements = ["DELETE FROM escort_profiles WHERE is_demo = 1;", "DELETE FROM escort_accounts WHERE email LIKE 'dummy-%@example.invalid';"];
+const statements = [
+  "DELETE FROM escort_moderation_events WHERE profile_id LIKE 'dummy-profile-%';",
+  "DELETE FROM escort_reports WHERE profile_id LIKE 'dummy-profile-%';",
+  "DELETE FROM escort_promotions WHERE profile_id LIKE 'dummy-profile-%';",
+  "DELETE FROM escort_photos WHERE profile_id LIKE 'dummy-profile-%';",
+  "DELETE FROM escort_profiles WHERE is_demo = 1 OR id LIKE 'dummy-profile-%';",
+  "DELETE FROM escort_accounts WHERE email LIKE 'dummy-%@example.invalid';",
+];
 
 for (let index = 1; index <= 50; index += 1) {
   const number = String(index).padStart(3, '0');
@@ -55,7 +62,7 @@ for (let index = 1; index <= 50; index += 1) {
   if (!skipMedia) run(['r2', 'object', 'put', `${privateBucket}/${sourceKey}`, '--file', imagePath, '--remote', '--content-type', 'image/png', '--force']);
   statements.push(
     `INSERT INTO escort_accounts (id, email, password_hash) VALUES (${sql(accountId)}, ${sql(`dummy-${number}@example.invalid`)}, ${sql('demo-only:no-login')});`,
-    `INSERT INTO escort_profiles (id, account_id, slug, display_name, city_slug, city_name, price_amount, currency, short_bio, contact_url, contact_label, status, reviewed_by, reviewed_at, published_at, is_demo) VALUES (${sql(profileId)}, ${sql(accountId)}, ${sql(slug)}, ${sql(name)}, ${sql(citySlug)}, ${sql(cityName)}, ${price}, 'ARS', ${sql(`Perfil ficticio de prueba ${number} para validar la galería, el precio y el orden de visibilidad.`)}, 'https://example.invalid/demo', 'Contacto demo', 'published', 'seed', datetime('now'), datetime('now'), 1);`,
+    `INSERT INTO escort_profiles (id, account_id, slug, display_name, city_slug, city_name, price_amount, currency, short_bio, contact_url, contact_label, status, reviewed_by, reviewed_at, published_at, is_demo) VALUES (${sql(profileId)}, ${sql(accountId)}, ${sql(slug)}, ${sql(name)}, ${sql(citySlug)}, ${sql(cityName)}, ${price}, 'USD', ${sql(`Perfil ficticio de prueba ${number} para validar la galería, el precio y el orden de visibilidad.`)}, 'https://example.invalid/demo', 'Contacto demo', 'published', 'seed', datetime('now'), datetime('now'), 1);`,
     `INSERT INTO escort_photos (id, profile_id, source_key, card_key, detail_key, width, height, alt_text, sort_order, status, reviewed_at) VALUES (${sql(photoId)}, ${sql(profileId)}, ${sql(sourceKey)}, ${sql(cardKey)}, ${sql(cardKey)}, 640, 853, ${sql(`Imagen dummy de prueba del perfil ${number}`)}, 0, 'approved', datetime('now'));`,
     `INSERT INTO escort_promotions (id, profile_id, tier, status, rotation_seed) VALUES (${sql(`dummy-promotion-${number}`)}, ${sql(profileId)}, ${sql(tier)}, 'active', ${rotation});`,
     `INSERT INTO escort_moderation_events (id, profile_id, actor_id, action, note) VALUES (${sql(`dummy-event-${number}`)}, ${sql(profileId)}, 'seed', 'approved', 'Perfil dummy de staging');`,

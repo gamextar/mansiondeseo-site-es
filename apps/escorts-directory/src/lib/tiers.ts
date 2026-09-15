@@ -4,6 +4,7 @@ export const ESCORT_TIERS = {
   silver: { label: 'Plata', rank: 3, accent: '#bdc3cf' },
   gold: { label: 'Oro', rank: 4, accent: '#d7aa3c' },
   platinum: { label: 'Platino', rank: 5, accent: '#8bd7e8' },
+  diamond: { label: 'Diamante', rank: 6, accent: '#d8b4ff' },
 } as const;
 
 export type EscortTier = keyof typeof ESCORT_TIERS;

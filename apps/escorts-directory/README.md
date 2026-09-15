@@ -25,4 +25,4 @@ Proyecto independiente y sin React para el futuro catálogo público de `mansion
 
 ## Niveles
 
-`basic`, `bronze`, `silver`, `gold`, `platinum`. Una promoción activa no publica ni salta la revisión de un perfil.
+`basic`, `bronze`, `silver`, `gold`, `platinum`, `diamond`. Los precios se expresan en USD. Una promoción activa no publica ni salta la revisión de un perfil.

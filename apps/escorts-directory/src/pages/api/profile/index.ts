@@ -14,20 +14,21 @@ export const POST: APIRoute = async ({ request, locals }) => {
   const displayName = normalizeText(form.get('display_name'), 80);
   const cityName = normalizeText(form.get('city_name'), 80);
   const shortBio = normalizeText(form.get('short_bio'), 600);
+  const priceAmount = Math.round(Number(form.get('price_amount')));
   const contactUrl = normalizeText(form.get('contact_url'), 500);
   const contactLabel = normalizeText(form.get('contact_label'), 32);
   const slugBase = profileSlug(displayName);
-  if (!displayName || !cityName || !shortBio || !slugBase || !isSafeContactUrl(contactUrl)) {
+  if (!displayName || !cityName || !shortBio || !slugBase || !Number.isFinite(priceAmount) || priceAmount < 1 || !isSafeContactUrl(contactUrl)) {
     return Response.redirect(new URL('/panel/?error=perfil', request.url), 303);
   }
   const existing = await db.prepare('SELECT id, slug FROM escort_profiles WHERE account_id = ?').bind(accountId).first<any>();
   if (existing) {
-    await db.prepare("UPDATE escort_profiles SET display_name = ?, city_slug = ?, city_name = ?, short_bio = ?, contact_url = ?, contact_label = ?, status = 'pending_review', review_note = '', updated_at = datetime('now') WHERE id = ?")
-      .bind(displayName, citySlug(cityName), cityName, shortBio, contactUrl, contactLabel || 'Contactar', existing.id).run();
+    await db.prepare("UPDATE escort_profiles SET display_name = ?, city_slug = ?, city_name = ?, price_amount = ?, currency = 'USD', short_bio = ?, contact_url = ?, contact_label = ?, status = 'pending_review', review_note = '', updated_at = datetime('now') WHERE id = ?")
+      .bind(displayName, citySlug(cityName), cityName, priceAmount, shortBio, contactUrl, contactLabel || 'Contactar', existing.id).run();
   } else {
     const suffix = crypto.randomUUID().slice(0, 8);
-    await db.prepare("INSERT INTO escort_profiles (id, account_id, slug, display_name, city_slug, city_name, short_bio, contact_url, contact_label, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review')")
-      .bind(crypto.randomUUID(), accountId, `${slugBase}-${suffix}`, displayName, citySlug(cityName), cityName, shortBio, contactUrl, contactLabel || 'Contactar').run();
+    await db.prepare("INSERT INTO escort_profiles (id, account_id, slug, display_name, city_slug, city_name, price_amount, currency, short_bio, contact_url, contact_label, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, 'pending_review')")
+      .bind(crypto.randomUUID(), accountId, `${slugBase}-${suffix}`, displayName, citySlug(cityName), cityName, priceAmount, shortBio, contactUrl, contactLabel || 'Contactar').run();
   }
   return Response.redirect(new URL('/panel/?saved=1', request.url), 303);
 };
