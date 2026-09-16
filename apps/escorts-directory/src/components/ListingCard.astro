@@ -13,7 +13,7 @@ interface Props {
   eager?: boolean;
 }
 
-const { slug, displayName, cityName, priceAmount, currency, shortBio, photo, eager = false } = Astro.props;
+const { slug, displayName, cityName, priceAmount, currency, photo, eager = false } = Astro.props;
 const priceLabel = `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(priceAmount)} ${currency || 'USD'}`;
 ---
 
@@ -35,7 +35,6 @@ const priceLabel = `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 
       <div class="listing-copy">
         <h2>{displayName}</h2>
         <p class="city"><span aria-hidden="true">●</span> {cityName}</p>
-        <p class="summary">{shortBio}</p>
       </div>
     </div>
   </a>
