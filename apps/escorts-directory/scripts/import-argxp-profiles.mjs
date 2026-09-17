@@ -7,6 +7,10 @@ const root = process.cwd();
 const limitArg = Number(process.argv.find((value) => value.startsWith('--limit='))?.split('=')[1] || 20);
 const limit = Math.max(1, Math.min(100, Number.isFinite(limitArg) ? limitArg : 20));
 const requestedProfile = process.argv.find((value) => value.startsWith('--profile='))?.split('=')[1] || '';
+const existingArg = process.argv.find((value) => value.startsWith('--existing='))?.split('=')[1]?.toLowerCase() || 'skip';
+const existingMode = existingArg === 'overwrite' ? 'overwrite' : 'skip';
+const delayArg = Number(process.argv.find((value) => value.startsWith('--delay-ms='))?.split('=')[1] || 2000);
+const delayMs = Math.max(0, Math.min(60000, Number.isFinite(delayArg) ? delayArg : 2000));
 const dbName = 'escorts-directory-db';
 const publicBucket = 'mansiondeseo-escorts-public';
 const privateBucket = 'mansiondeseo-escorts-private';
@@ -39,6 +43,20 @@ function normalizeWhatsAppUrl(value) {
 
 function run(args, options = {}) {
   return execFileSync('npx', ['wrangler', ...args], { cwd: root, encoding: 'utf8', ...options });
+}
+
+function profileExists(slug) {
+  const output = run(['d1', 'execute', dbName, '--remote', '--command', `SELECT 1 AS found FROM escort_profiles WHERE slug = ${sql(slug)} LIMIT 1`, '--json']);
+  try {
+    const batches = JSON.parse(output);
+    return Boolean(batches?.some((batch) => Array.isArray(batch.results) && batch.results.length));
+  } catch {
+    throw new Error(`No se pudo consultar si existe el perfil ${slug}`);
+  }
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function parsePrice(text) {
@@ -280,28 +298,18 @@ async function extractProfile(page, sourceUrl) {
   return { ...data, image: data.photos[0]?.url || data.image, sourceUrl, price, tier: tierFor(price, data.body), contactUrl: normalizeWhatsAppUrl(contactUrl) };
 }
 
-const cleanup = requestedProfile ? [] : [
-  `DELETE FROM escort_moderation_events WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
-  `DELETE FROM escort_reports WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
-  `DELETE FROM escort_promotions WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
-  `DELETE FROM escort_photos WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
-  `DELETE FROM escort_reviews WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
-  `DELETE FROM escort_profiles WHERE id LIKE ${sql(`${sourcePrefix}%`)};`,
-  `DELETE FROM escort_accounts WHERE id LIKE ${sql(`${sourcePrefix}%`)};`,
-];
-
 const browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
 const context = browser.contexts()[0];
 const page = context.pages().find((candidate) => candidate.url().startsWith('https://argxp.com/')) || await context.newPage();
-const statements = [...cleanup];
+const statements = [];
 try {
   await page.goto('https://argxp.com/', { waitUntil: 'domcontentloaded', timeout: 45000 });
   const links = await page.locator('a[href*="/ar-"]').evaluateAll((nodes) => [...new Set(nodes.map((node) => new URL(node.getAttribute('href'), location.href).href))]);
   const urls = links.filter((url) => /^https:\/\/argxp\.com\/ar-[a-z0-9-]+$/i.test(url))
     .filter((url) => !requestedProfile || url.endsWith(`/${requestedProfile}`)).slice(0, limit);
   if (!urls.length) throw new Error('No se encontraron perfiles en la portada de ARGXP');
-  console.log(`Perfiles encontrados: ${urls.length}. Importación autorizada en curso.`);
-  for (const sourceUrl of urls) {
+  console.log(`Perfiles encontrados: ${urls.length}. Modo existentes: ${existingMode}. Espera entre perfiles: ${delayMs} ms.`);
+  for (const [profileIndex, sourceUrl] of urls.entries()) {
     try {
       const profile = await extractProfile(page, sourceUrl);
       const slug = `${slugify(profile.name)}-${slugify(profile.city) || 'argentina'}`;
@@ -310,7 +318,11 @@ try {
       const photoId = `${profileId}-photo`;
       const promotionId = `${profileId}-promotion`;
       const eventId = `${profileId}-event`;
-      if (requestedProfile) {
+      if (profileExists(slug) && existingMode === 'skip') {
+        console.log(`SALTADO ${profile.name} · ${slug} ya existe (usa --existing=overwrite para actualizarlo).`);
+        continue;
+      }
+      if (existingMode === 'overwrite') {
         statements.push(
           `DELETE FROM escort_moderation_events WHERE profile_id = ${sql(profileId)};`,
           `DELETE FROM escort_reports WHERE profile_id = ${sql(profileId)};`,
@@ -352,14 +364,20 @@ try {
       console.log(`OK ${profile.name} · ${profile.city || 'Argentina'} · ${profile.price || 'sin precio'} USD · ${profile.tier} · ${importedPhotos.length} fotos · ${Object.keys(profile.details.attributes).length} campos`);
     } catch (error) {
       console.warn(`OMITIDO ${sourceUrl}: ${error.message}`);
+    } finally {
+      if (delayMs > 0 && profileIndex < urls.length - 1) await wait(delayMs);
     }
   }
-  const sqlPath = path.join(root, '.tmp-import-argxp.sql');
-  writeFileSync(sqlPath, `${statements.join('\n')}\n`);
-  try {
-    run(['d1', 'execute', dbName, '--remote', '--file', sqlPath], { stdio: 'inherit' });
-  } finally {
-    try { unlinkSync(sqlPath); } catch {}
+  if (statements.length) {
+    const sqlPath = path.join(root, '.tmp-import-argxp.sql');
+    writeFileSync(sqlPath, `${statements.join('\n')}\n`);
+    try {
+      run(['d1', 'execute', dbName, '--remote', '--file', sqlPath], { stdio: 'inherit' });
+    } finally {
+      try { unlinkSync(sqlPath); } catch {}
+    }
+  } else {
+    console.log('No hay perfiles nuevos para escribir en D1.');
   }
 } finally {
   await browser.close();
