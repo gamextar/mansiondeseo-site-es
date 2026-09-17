@@ -20,7 +20,7 @@ Astro.response.headers.set('Cache-Tag', `escort-profile-${listing.slug},escort-c
     <div class="profile-gallery">
       <div class="profile-photo"><img src={listing.detailPhoto} alt={`Foto principal de ${listing.displayName}`} width={listing.photos[0]?.width || 1280} height={listing.photos[0]?.height || 1706} fetchpriority="high" /></div>
       {listing.photos.length > 1 && <div class="profile-thumbs" aria-label={`Galería de ${listing.displayName}`}>
-        {listing.photos.map((photo, index) => <a href={photo.url} target="_blank" rel="noopener" aria-label={`Abrir foto ${index + 1}`}><img src={photo.url} alt={photo.alt} width={photo.width || 800} height={photo.height || 1422} loading="lazy" /></a>)}
+        {listing.photos.map((photo, index) => <a href={photo.url} target="_blank" rel="noopener" aria-label={`Abrir foto ${index + 1}`}><img src={photo.url} alt={photo.alt} width={photo.width || 800} height={photo.height || 1422} loading={index < 8 ? 'eager' : 'lazy'} decoding="async" /></a>)}
       </div>}
     </div>
     <div class="profile-copy">
@@ -29,10 +29,13 @@ Astro.response.headers.set('Cache-Tag', `escort-profile-${listing.slug},escort-c
       <h1>{listing.displayName}</h1>
       <p class="profile-price">{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(listing.priceAmount)} {listing.currency || 'USD'}</p>
       <p>{listing.shortBio}</p>
-      {(Boolean(listing.details.presentation) || Object.keys(listing.details.attributes || {}).length > 0 || Boolean(listing.details.availability?.length)) && <details class="profile-details" open>
+      {(Boolean(listing.details.presentation) || Object.keys(listing.details.attributes || {}).length > 0 || Boolean(listing.details.interests?.length) || Boolean(listing.details.specialServices?.length) || Boolean(listing.details.availability?.length) || Boolean(listing.details.map?.directionsUrl)) && <details class="profile-details" open>
         <summary>Información del perfil</summary>
         {listing.details.presentation && <p class="profile-presentation">{listing.details.presentation}</p>}
         {listing.details.locationReference && <p><strong>Punto de referencia:</strong> {listing.details.locationReference}</p>}
+        {listing.details.interests?.length > 0 && <div class="profile-tags"><strong>Intereses</strong><div>{listing.details.interests.map((item) => <span>{item}</span>)}</div></div>}
+        {listing.details.specialServices?.length > 0 && <div class="profile-tags"><strong>Servicios especiales</strong><div>{listing.details.specialServices.map((item) => <span>{item}</span>)}</div></div>}
+        {(listing.details.map?.directionsUrl || listing.details.map?.streetViewUrl) && <div class="profile-map-links"><strong>Ubicación</strong><div>{listing.details.map.directionsUrl && <a href={listing.details.map.directionsUrl} target="_blank" rel="noopener nofollow">Cómo llegar</a>}{listing.details.map.streetViewUrl && <a href={listing.details.map.streetViewUrl} target="_blank" rel="noopener nofollow">Street View</a>}</div></div>}
         {Object.keys(listing.details.attributes || {}).length > 0 && <dl>{Object.entries(listing.details.attributes || {}).map(([label, value]) => <div><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
         {listing.details.availability?.map((table) => <table><thead><tr>{table.headers.map((header) => <th>{header}</th>)}</tr></thead><tbody>{table.rows.map((row) => <tr>{row.map((cell) => <td>{cell}</td>)}</tr>)}</tbody></table>)}
       </details>}

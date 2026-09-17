@@ -15,7 +15,7 @@ export type CatalogueListing = {
   contactUrl: string;
   contactLabel: string;
   photos: { url: string; alt: string; width: number; height: number }[];
-  details: { presentation?: string; attributes?: Record<string, string>; availability?: { headers: string[]; rows: string[][] }[]; locationReference?: string };
+  details: { presentation?: string; attributes?: Record<string, string>; interests?: string[]; specialServices?: string[]; availability?: { headers: string[]; rows: string[][] }[]; locationReference?: string; map?: { directionsUrl?: string; streetViewUrl?: string; latitude?: number; longitude?: number } };
 };
 
 function tierCase(column: string) {

@@ -153,6 +153,14 @@ async function extractProfile(page, sourceUrl) {
     const presentation = [...document.querySelectorAll('h1,h2,h3,h4')]
       .find((heading) => /^presentación$/i.test(clean(heading.textContent)))?.parentElement?.innerText || '';
     const locationReference = expandedBody.match(/Punto de referencia:\s*([^\n]+)/i)?.[1]?.trim() || '';
+    const sectionLinks = (title) => {
+      const heading = [...document.querySelectorAll('h2')].find((node) => clean(node.textContent) === title);
+      return heading ? [...heading.parentElement.querySelectorAll('a')].map((node) => clean(node.textContent)).filter(Boolean) : [];
+    };
+    const mapLinks = [...document.querySelectorAll('a')].map((node) => ({ text: clean(node.textContent), href: node.href })).filter((item) => /map|street|como llegar|cómo llegar/i.test(`${item.text} ${item.href}`));
+    const directionsUrl = mapLinks.find((item) => /como llegar|cómo llegar/i.test(item.text))?.href || '';
+    const streetViewUrl = mapLinks.find((item) => /street view/i.test(item.text))?.href || '';
+    const coordinates = (directionsUrl || streetViewUrl).match(/(?:q|viewpoint)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/i);
     const photoUrls = [...document.images].flatMap((image) => [
       image.currentSrc || image.src || '',
       ...(image.getAttribute('srcset') || '').split(',').map((candidate) => candidate.trim().split(/\s+/)[0]).filter(Boolean),
@@ -178,7 +186,12 @@ async function extractProfile(page, sourceUrl) {
       image: typeof image === 'string' ? image : '',
       city: entity.address?.addressLocality || '',
       body,
-      details: { presentation: clean(presentation), attributes, availability, locationReference, expandedText: expandedBody },
+      details: {
+        presentation: clean(presentation), attributes,
+        interests: sectionLinks('Intereses'), specialServices: sectionLinks('Servicios especiales'),
+        availability, locationReference, expandedText: expandedBody,
+        map: { directionsUrl, streetViewUrl, latitude: coordinates ? Number(coordinates[1]) : undefined, longitude: coordinates ? Number(coordinates[2]) : undefined },
+      },
       photos: [...bestPhotos.values()],
       whatsappHref: whatsapp?.getAttribute('href') || '',
     };
