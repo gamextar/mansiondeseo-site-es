@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { isAdminRequest } from '../../../../lib/auth';
-import { runtimeEnv } from '../../../../lib/runtime';
+import { purgePublicCache, runtimeEnv } from '../../../../lib/runtime';
 
 export const prerender = false;
 
@@ -24,9 +24,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
   if (!ACTIONS.has(action) || !ids.length) return redirect(request, 'sin-seleccion');
 
   const placeholders = ids.map(() => '?').join(',');
-  const profiles = await env.DB.prepare(`SELECT id, account_id FROM escort_profiles WHERE id IN (${placeholders})`).bind(...ids).all<any>();
+  const profiles = await env.DB.prepare(`SELECT id, account_id, slug, city_slug FROM escort_profiles WHERE id IN (${placeholders})`).bind(...ids).all<any>();
   const rows = profiles.results || [];
   if (!rows.length) return redirect(request, 'sin-resultados');
+  const publicPaths = ['/', '/sitemap-index.xml', ...rows.flatMap((row: any) => [`/escort/${row.slug}/`, `/escorts/${row.city_slug}/`])];
 
   if (action === 'delete') {
     const photos = await env.DB.prepare(`SELECT source_key, card_key, detail_key FROM escort_photos WHERE profile_id IN (${placeholders})`).bind(...ids).all<any>();
@@ -44,6 +45,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     ];
     if (accountPlaceholders) statements.push(env.DB.prepare(`DELETE FROM escort_accounts WHERE id IN (${accountPlaceholders})`).bind(...accountIds));
     await env.DB.batch(statements);
+    await purgePublicCache(env, publicPaths);
     return redirect(request, `eliminados-${rows.length}`);
   }
 
@@ -57,5 +59,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
   const changed = Number(result.meta?.changes || 0);
   const eventAction = action === 'publish' ? 'approved' : action === 'pause' ? 'paused' : 'rejected';
   await env.DB.batch(ids.map((id) => env.DB.prepare("INSERT INTO escort_moderation_events (id, profile_id, actor_id, action, note) VALUES (?, ?, 'administrator', ?, ?)").bind(crypto.randomUUID(), id, eventAction, note)));
+  await purgePublicCache(env, publicPaths);
   return redirect(request, `${eventAction}-${changed}`);
 };
