@@ -22,6 +22,21 @@ function slugify(value) {
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 70);
 }
 
+function normalizeWhatsAppUrl(value) {
+  try {
+    const parsed = new URL(String(value || ''));
+    if (!/whatsapp\.com$/i.test(parsed.hostname)) return String(value || '');
+    const phone = (parsed.searchParams.get('phone') || '').replace(/\D/g, '');
+    if (!phone) return String(value || '');
+    const normalized = new URL(`https://wa.me/${phone}`);
+    const text = parsed.searchParams.get('text') || '';
+    if (text) normalized.searchParams.set('text', text);
+    return normalized.toString();
+  } catch {
+    return String(value || '');
+  }
+}
+
 function run(args, options = {}) {
   return execFileSync('npx', ['wrangler', ...args], { cwd: root, encoding: 'utf8', ...options });
 }
@@ -262,7 +277,7 @@ async function extractProfile(page, sourceUrl) {
   }
   if (!data.image && !data.photos[0]?.url) throw new Error('No se encontró imagen');
   if (!data.name) throw new Error('No se encontró nombre');
-  return { ...data, image: data.photos[0]?.url || data.image, sourceUrl, price, tier: tierFor(price, data.body), contactUrl };
+  return { ...data, image: data.photos[0]?.url || data.image, sourceUrl, price, tier: tierFor(price, data.body), contactUrl: normalizeWhatsAppUrl(contactUrl) };
 }
 
 const cleanup = requestedProfile ? [] : [
