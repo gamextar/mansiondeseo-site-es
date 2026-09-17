@@ -302,6 +302,17 @@ const browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
 const context = browser.contexts()[0];
 const page = context.pages().find((candidate) => candidate.url().startsWith('https://argxp.com/')) || await context.newPage();
 const statements = [];
+function flushStatements() {
+  if (!statements.length) return;
+  const sqlPath = path.join(root, '.tmp-import-argxp.sql');
+  writeFileSync(sqlPath, `${statements.join('\n')}\n`);
+  try {
+    run(['d1', 'execute', dbName, '--remote', '--file', sqlPath], { stdio: 'inherit' });
+  } finally {
+    try { unlinkSync(sqlPath); } catch {}
+  }
+  statements.length = 0;
+}
 try {
   await page.goto('https://argxp.com/', { waitUntil: 'domcontentloaded', timeout: 45000 });
   const links = await page.locator('a[href*="/ar-"]').evaluateAll((nodes) => [...new Set(nodes.map((node) => new URL(node.getAttribute('href'), location.href).href))]);
@@ -311,6 +322,7 @@ try {
   console.log(`Perfiles encontrados: ${urls.length}. Modo existentes: ${existingMode}. Espera entre perfiles: ${delayMs} ms.`);
   for (const [profileIndex, sourceUrl] of urls.entries()) {
     try {
+      const profileStatements = [];
       const profile = await extractProfile(page, sourceUrl);
       const slug = `${slugify(profile.name)}-${slugify(profile.city) || 'argentina'}`;
       const profileId = `${sourcePrefix}${slug}`;
@@ -323,7 +335,7 @@ try {
         continue;
       }
       if (existingMode === 'overwrite') {
-        statements.push(
+        profileStatements.push(
           `DELETE FROM escort_moderation_events WHERE profile_id = ${sql(profileId)};`,
           `DELETE FROM escort_reports WHERE profile_id = ${sql(profileId)};`,
           `DELETE FROM escort_promotions WHERE profile_id = ${sql(profileId)};`,
@@ -352,7 +364,7 @@ try {
       const cardKey = importedPhotos[0].cardKey;
       const detailKey = importedPhotos[0].cardKey;
       const fallbackBio = `Perfil público de ${profile.name} en ${profile.city || 'Argentina'}. Contacto y disponibilidad a coordinar.`;
-      statements.push(
+      profileStatements.push(
         `INSERT INTO escort_accounts (id, email, password_hash, email_verified) VALUES (${sql(accountId)}, ${sql(`${slug}@imported.invalid`)}, 'imported:no-login', 1);`,
         `INSERT INTO escort_profiles (id, account_id, slug, display_name, city_slug, city_name, price_amount, currency, short_bio, details_json, contact_url, contact_label, status, review_note, reviewed_by, reviewed_at, published_at, is_demo) VALUES (${sql(profileId)}, ${sql(accountId)}, ${sql(slug)}, ${sql(profile.name)}, ${sql(slugify(profile.city) || 'argentina')}, ${sql(profile.city || 'Argentina')}, ${profile.price}, 'USD', ${sql(profile.description || fallbackBio)}, ${sql(JSON.stringify(profile.details))}, ${sql(profile.contactUrl)}, 'WhatsApp', 'published', ${sql(`Importado con autorización desde ${profile.sourceUrl}`)}, 'argxp-authorized-import', datetime('now'), datetime('now'), 0);`,
         ...importedPhotos.map((photo) => `INSERT INTO escort_photos (id, profile_id, source_key, card_key, detail_key, width, height, alt_text, sort_order, status, reviewed_at) VALUES (${sql(`${profileId}-photo-${photo.index + 1}`)}, ${sql(profileId)}, ${sql(photo.sourceKey)}, ${sql(photo.cardKey)}, ${sql(photo.cardKey)}, ${photo.width}, ${photo.height}, ${sql(`Foto ${photo.index + 1} de ${profile.name}, ${profile.city || 'Argentina'}`)}, ${photo.index}, 'approved', datetime('now'));`),
@@ -361,24 +373,17 @@ try {
         `INSERT INTO escort_promotions (id, profile_id, tier, status, rotation_seed) VALUES (${sql(promotionId)}, ${sql(profileId)}, ${sql(profile.tier)}, 'active', ${Math.floor(Math.random() * 100000)});`,
         `INSERT INTO escort_moderation_events (id, profile_id, actor_id, action, note) VALUES (${sql(eventId)}, ${sql(profileId)}, 'argxp-authorized-import', 'approved', ${sql(`Fuente autorizada: ${profile.sourceUrl}`)});`,
       );
-      console.log(`OK ${profile.name} · ${profile.city || 'Argentina'} · ${profile.price || 'sin precio'} USD · ${profile.tier} · ${importedPhotos.length} fotos · ${Object.keys(profile.details.attributes).length} campos`);
+      statements.push(...profileStatements);
+      flushStatements();
+      console.log(`OK ${profile.name} · ${profile.city || 'Argentina'} · ${profile.price || 'sin precio'} USD · ${profile.tier} · ${importedPhotos.length} fotos · ${Object.keys(profile.details.attributes).length} campos · guardado en D1`);
     } catch (error) {
       console.warn(`OMITIDO ${sourceUrl}: ${error.message}`);
     } finally {
       if (delayMs > 0 && profileIndex < urls.length - 1) await wait(delayMs);
     }
   }
-  if (statements.length) {
-    const sqlPath = path.join(root, '.tmp-import-argxp.sql');
-    writeFileSync(sqlPath, `${statements.join('\n')}\n`);
-    try {
-      run(['d1', 'execute', dbName, '--remote', '--file', sqlPath], { stdio: 'inherit' });
-    } finally {
-      try { unlinkSync(sqlPath); } catch {}
-    }
-  } else {
-    console.log('No hay perfiles nuevos para escribir en D1.');
-  }
+  if (statements.length) flushStatements();
+  else console.log('No hay perfiles nuevos para escribir en D1.');
 } finally {
   await browser.close();
 }
