@@ -241,15 +241,21 @@ async function extractProfile(page, sourceUrl) {
       whatsappHref: whatsapp?.getAttribute('href') || '',
     };
   });
+  // Cerrar el diálogo de reseñas antes de activar el botón de contacto.
+  // El sitio de origen no permite interactuar con botones detrás del diálogo.
+  const dialogClose = page.locator('[role="dialog"] button').filter({ hasText: /close|cerrar/i });
+  if (await dialogClose.count()) await dialogClose.last().evaluate((element) => element.click()).catch(() => {});
+  await page.waitForTimeout(150);
   const price = parsePrice(data.body);
   let contactUrl = data.whatsappHref || '';
   if (!contactUrl) {
     const before = new Set(page.context().pages());
-    const button = page.getByRole('button', { name: /whatsapp/i }).last();
+    const button = page.locator('button[aria-label="boton de whatsapp"], button[aria-label="WhatsApp"]').last();
     if (await button.count()) {
       await button.click().catch(() => {});
       await page.waitForTimeout(500);
       const target = page.context().pages().find((candidate) => !before.has(candidate) && /whatsapp\.com/i.test(candidate.url()));
+      await target?.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
       contactUrl = target?.url() || '';
       await target?.close().catch(() => {});
     }
