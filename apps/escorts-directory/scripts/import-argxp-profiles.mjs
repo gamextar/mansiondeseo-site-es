@@ -307,7 +307,7 @@ function flushStatements() {
   const sqlPath = path.join(root, '.tmp-import-argxp.sql');
   writeFileSync(sqlPath, `${statements.join('\n')}\n`);
   try {
-    run(['d1', 'execute', dbName, '--remote', '--file', sqlPath], { stdio: 'inherit' });
+    run(['d1', 'execute', dbName, '--remote', '--file', sqlPath, '--yes'], { stdio: 'inherit' });
   } finally {
     try { unlinkSync(sqlPath); } catch {}
   }
