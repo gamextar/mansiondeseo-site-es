@@ -28,7 +28,7 @@ Astro.response.headers.set('Cache-Tag', `escort-profile-${listing.slug},escort-c
       <p class="eyebrow">{listing.cityName}</p>
       <h1>{listing.displayName}</h1>
       <p class="profile-price">{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(listing.priceAmount)} {listing.currency || 'USD'}</p>
-      <p>{listing.shortBio}</p>
+      {!listing.details.presentation && listing.shortBio && <p class="profile-summary">{listing.shortBio}</p>}
       {(Boolean(listing.details.presentation) || Object.keys(listing.details.attributes || {}).length > 0 || Boolean(listing.details.interests?.length) || Boolean(listing.details.specialServices?.length) || Boolean(listing.details.availability?.length) || Boolean(listing.details.map?.directionsUrl)) && <details class="profile-details" open>
         <summary>Información del perfil</summary>
         {listing.details.presentation && <p class="profile-presentation">{listing.details.presentation}</p>}
@@ -51,4 +51,16 @@ Astro.response.headers.set('Cache-Tag', `escort-profile-${listing.slug},escort-c
       </details>
     </div>
   </article>
+  {listing.reviews.length > 0 && <section class="profile-reviews" aria-labelledby="profile-reviews-title">
+    <div class="profile-reviews-heading">
+      <p class="eyebrow">Experiencias verificadas en el perfil de origen</p>
+      <h2 id="profile-reviews-title">Reseñas</h2>
+    </div>
+    <div class="review-list">
+      {listing.reviews.map((review) => <article class="review-card">
+        <div class="review-card-meta"><strong>{review.authorName}</strong>{review.relativeDate && <span>{review.relativeDate}</span>}</div>
+        <p>{review.body}</p>
+      </article>)}
+    </div>
+  </section>}
 </PublicLayout>

@@ -15,6 +15,7 @@ export type CatalogueListing = {
   contactUrl: string;
   contactLabel: string;
   photos: { url: string; alt: string; width: number; height: number }[];
+  reviews: { authorName: string; relativeDate: string; body: string }[];
   details: { presentation?: string; attributes?: Record<string, string>; interests?: string[]; specialServices?: string[]; availability?: { headers: string[]; rows: string[][] }[]; locationReference?: string; map?: { directionsUrl?: string; streetViewUrl?: string; latitude?: number; longitude?: number } };
 };
 
@@ -22,7 +23,7 @@ function tierCase(column: string) {
   return `CASE ${column} ${Object.keys(ESCORT_TIERS).map((tier, index) => `WHEN '${tier}' THEN ${index + 1}`).join(' ')} ELSE 0 END`;
 }
 
-function toListing(env: Record<string, any>, row: any, photos: any[] = []): CatalogueListing {
+function toListing(env: Record<string, any>, row: any, photos: any[] = [], reviews: any[] = []): CatalogueListing {
   const tier = String(row.tier || 'basic') as EscortTier;
   let details: CatalogueListing['details'] = {};
   try { details = JSON.parse(row.details_json || '{}'); } catch {}
@@ -40,6 +41,7 @@ function toListing(env: Record<string, any>, row: any, photos: any[] = []): Cata
     contactUrl: row.contact_url || '',
     contactLabel: row.contact_label || 'Contactar',
     photos: photos.map((photo) => ({ url: mediaUrl(env, photo.card_key || photo.detail_key), alt: photo.alt_text || row.display_name, width: Number(photo.width || 0), height: Number(photo.height || 0) })),
+    reviews: reviews.map((review) => ({ authorName: review.author_name || '', relativeDate: review.relative_date || '', body: review.body || '' })),
     details,
   };
 }
@@ -73,7 +75,8 @@ export async function getPublicListing(env: Record<string, any>, slug: string) {
   const result = await env.DB.prepare(`${commonSelect} AND p.slug = ? LIMIT 1`).bind(includeDemo, slug).first();
   if (!result) return null;
   const photos = await env.DB.prepare("SELECT card_key, detail_key, width, height, alt_text FROM escort_photos WHERE profile_id = ? AND status = 'approved' ORDER BY sort_order ASC").bind(result.id).all();
-  return toListing(env, result, photos.results || []);
+  const reviews = await env.DB.prepare("SELECT author_name, relative_date, body FROM escort_reviews WHERE profile_id = ? AND status = 'approved' ORDER BY sort_order ASC").bind(result.id).all();
+  return toListing(env, result, photos.results || [], reviews.results || []);
 }
 
 export async function getPublicCities(env: Record<string, any>) {

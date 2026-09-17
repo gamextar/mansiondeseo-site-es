@@ -121,10 +121,31 @@ async function captureImages(page, sources) {
 async function extractProfile(page, sourceUrl) {
   await page.goto(sourceUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await page.waitForTimeout(500);
+  // El navegador reutilizado puede conservar abierto el visor de LightGallery
+  // de la ficha anterior; cerrarlo evita que bloquee las pestañas del perfil.
+  const galleryClose = page.locator('[role="dialog"] button[aria-label="Close gallery"]');
+  if (await galleryClose.count()) await galleryClose.first().evaluate((element) => element.click()).catch(() => {});
+  await page.waitForTimeout(150);
   const conocer = page.locator('button').filter({ hasText: 'Conocer más' });
   if (await conocer.count()) {
     await conocer.first().click().catch(() => {});
     await page.waitForTimeout(400);
+  }
+  // Las reseñas se encuentran en un panel con estado React; hay que activarlo
+  // antes de leer el DOM y abrir el listado completo si está disponible.
+  const reviewTab = page.getByRole('tab', { name: /reseñas/i });
+  let reviewPanelId = '';
+  if (await reviewTab.count()) {
+    reviewPanelId = await reviewTab.first().getAttribute('aria-controls') || '';
+    await reviewTab.first().click().catch(() => {});
+    await page.waitForTimeout(350);
+    // El botón tiene aria-label="Button" en el sitio de origen, por eso se
+    // localiza por su texto visible y no por el nombre accesible.
+    const moreReviews = page.locator('[role="tabpanel"][data-state="active"] button').filter({ hasText: /más reseñas/i });
+    if (await moreReviews.count()) {
+      await moreReviews.first().click({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(500);
+    }
   }
   const data = await page.evaluate(() => {
     const scripts = [...document.querySelectorAll('script[type="application/ld+json"]')];
@@ -140,6 +161,19 @@ async function extractProfile(page, sourceUrl) {
     const image = Array.isArray(entity.image) ? entity.image[0] : entity.image;
     const body = document.body?.innerText || '';
     const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+    const formatRichText = (node) => {
+      if (!node) return '';
+      const clone = node.cloneNode(true);
+      clone.querySelectorAll('script,style').forEach((element) => element.remove());
+      clone.querySelectorAll('br').forEach((element) => element.replaceWith('\n'));
+      clone.querySelectorAll('div,p,li').forEach((element) => element.insertAdjacentText('afterend', '\n\n'));
+      return String(clone.textContent || '')
+        .replaceAll('\u00a0', ' ')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n[ \t]+/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    };
     const attributes = {};
     for (const row of [...document.querySelectorAll('div.grid.grid-cols-2')]) {
       const cells = [...row.children].map((cell) => clean(cell.textContent));
@@ -150,8 +184,11 @@ async function extractProfile(page, sourceUrl) {
       rows: [...table.querySelectorAll('tbody tr')].map((row) => [...row.querySelectorAll('th,td')].map((cell) => clean(cell.textContent))),
     })).filter((table) => table.rows.length);
     const expandedBody = document.body?.innerText || body;
-    const presentation = [...document.querySelectorAll('h1,h2,h3,h4')]
-      .find((heading) => /^presentación$/i.test(clean(heading.textContent)))?.parentElement?.innerText || '';
+    const presentationHeading = [...document.querySelectorAll('h1,h2,h3,h4')]
+      .find((heading) => /^presentación$/i.test(clean(heading.textContent)));
+    const presentationNode = presentationHeading?.parentElement?.querySelector(':scope > .text-base') || presentationHeading?.parentElement;
+    const presentation = formatRichText(presentationNode);
+    const shortDescription = presentation.split(/\n\s*\n/).filter(Boolean).slice(0, 2).join('\n\n').slice(0, 700) || clean(entity.description);
     const locationReference = expandedBody.match(/Punto de referencia:\s*([^\n]+)/i)?.[1]?.trim() || '';
     const sectionLinks = (title) => {
       const heading = [...document.querySelectorAll('h2')].find((node) => clean(node.textContent) === title);
@@ -162,16 +199,16 @@ async function extractProfile(page, sourceUrl) {
     const streetViewUrl = mapLinks.find((item) => /street view/i.test(item.text))?.href || '';
     const coordinates = (directionsUrl || streetViewUrl).match(/(?:q|viewpoint)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/i);
     const photoUrls = [...document.images].flatMap((image) => [
-      image.currentSrc || image.src || '',
-      ...(image.getAttribute('srcset') || '').split(',').map((candidate) => candidate.trim().split(/\s+/)[0]).filter(Boolean),
+      { url: image.currentSrc || image.src || '', naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight },
+      ...(image.getAttribute('srcset') || '').split(',').map((candidate) => ({ url: candidate.trim().split(/\s+/)[0], naturalWidth: 0, naturalHeight: 0 })).filter((candidate) => candidate.url),
     ]);
-    const photos = photoUrls.map((url) => {
+    const photos = photoUrls.map(({ url, naturalWidth, naturalHeight }) => {
       const size = url.match(/rs:fill:(\d+):(\d+)/);
       // imgproxy splits the base64 source path into 16-character URL segments.
       const encoded = (url.split('/format:webp/')[1] || '').replaceAll('/', '');
       let original = encoded;
       try { original = atob(encoded.replace(/-/g, '+').replace(/_/g, '/')); } catch {}
-      return { url, width: Number(size?.[1] || image.naturalWidth || 0), height: Number(size?.[2] || image.naturalHeight || 0), original };
+      return { url, width: Number(size?.[1] || naturalWidth || 0), height: Number(size?.[2] || naturalHeight || 0), original };
     }).filter((photo) => photo.url.includes('imgproxy.argxp.com') && photo.url.includes('watermark_url:') && photo.width >= 300 && !/staticmaps/i.test(photo.original));
     const bestPhotos = new Map();
     for (const photo of photos) {
@@ -182,16 +219,24 @@ async function extractProfile(page, sourceUrl) {
       .find((node) => /whatsapp/i.test(node.textContent || '') || /whatsapp|wa\.me/i.test(node.getAttribute('href') || ''));
     return {
       name: entity.name || document.querySelector('h1')?.textContent?.trim() || '',
-      description: entity.description || '',
+      description: shortDescription,
       image: typeof image === 'string' ? image : '',
       city: entity.address?.addressLocality || '',
       body,
       details: {
-        presentation: clean(presentation), attributes,
+        presentation, attributes,
         interests: sectionLinks('Intereses'), specialServices: sectionLinks('Servicios especiales'),
         availability, locationReference, expandedText: expandedBody,
         map: { directionsUrl, streetViewUrl, latitude: coordinates ? Number(coordinates[1]) : undefined, longitude: coordinates ? Number(coordinates[2]) : undefined },
       },
+      reviews: [...document.querySelectorAll('[role="dialog"] div.py-5, [role="tabpanel"][data-state="active"] div.py-5')]
+        .map((node) => ({
+          authorName: clean(node.querySelector('h3')?.textContent),
+          relativeDate: clean(node.querySelector('span')?.textContent),
+          body: clean(node.querySelector('p')?.textContent),
+        }))
+        .filter((review) => review.authorName && review.body)
+        .filter((review, index, all) => all.findIndex((candidate) => `${candidate.authorName}|${candidate.relativeDate}|${candidate.body}` === `${review.authorName}|${review.relativeDate}|${review.body}`) === index),
       photos: [...bestPhotos.values()],
       whatsappHref: whatsapp?.getAttribute('href') || '',
     };
@@ -219,6 +264,7 @@ const cleanup = requestedProfile ? [] : [
   `DELETE FROM escort_reports WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
   `DELETE FROM escort_promotions WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
   `DELETE FROM escort_photos WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
+  `DELETE FROM escort_reviews WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
   `DELETE FROM escort_profiles WHERE id LIKE ${sql(`${sourcePrefix}%`)};`,
   `DELETE FROM escort_accounts WHERE id LIKE ${sql(`${sourcePrefix}%`)};`,
 ];
@@ -249,6 +295,7 @@ try {
           `DELETE FROM escort_reports WHERE profile_id = ${sql(profileId)};`,
           `DELETE FROM escort_promotions WHERE profile_id = ${sql(profileId)};`,
           `DELETE FROM escort_photos WHERE profile_id = ${sql(profileId)};`,
+          `DELETE FROM escort_reviews WHERE profile_id = ${sql(profileId)};`,
           `DELETE FROM escort_profiles WHERE id = ${sql(profileId)};`,
           `DELETE FROM escort_accounts WHERE id = ${sql(accountId)};`,
         );
@@ -276,6 +323,8 @@ try {
         `INSERT INTO escort_accounts (id, email, password_hash, email_verified) VALUES (${sql(accountId)}, ${sql(`${slug}@imported.invalid`)}, 'imported:no-login', 1);`,
         `INSERT INTO escort_profiles (id, account_id, slug, display_name, city_slug, city_name, price_amount, currency, short_bio, details_json, contact_url, contact_label, status, review_note, reviewed_by, reviewed_at, published_at, is_demo) VALUES (${sql(profileId)}, ${sql(accountId)}, ${sql(slug)}, ${sql(profile.name)}, ${sql(slugify(profile.city) || 'argentina')}, ${sql(profile.city || 'Argentina')}, ${profile.price}, 'USD', ${sql(profile.description || fallbackBio)}, ${sql(JSON.stringify(profile.details))}, ${sql(profile.contactUrl)}, 'WhatsApp', 'published', ${sql(`Importado con autorización desde ${profile.sourceUrl}`)}, 'argxp-authorized-import', datetime('now'), datetime('now'), 0);`,
         ...importedPhotos.map((photo) => `INSERT INTO escort_photos (id, profile_id, source_key, card_key, detail_key, width, height, alt_text, sort_order, status, reviewed_at) VALUES (${sql(`${profileId}-photo-${photo.index + 1}`)}, ${sql(profileId)}, ${sql(photo.sourceKey)}, ${sql(photo.cardKey)}, ${sql(photo.cardKey)}, ${photo.width}, ${photo.height}, ${sql(`Foto ${photo.index + 1} de ${profile.name}, ${profile.city || 'Argentina'}`)}, ${photo.index}, 'approved', datetime('now'));`),
+        `DELETE FROM escort_reviews WHERE profile_id = ${sql(profileId)};`,
+        ...profile.reviews.map((review, reviewIndex) => `INSERT INTO escort_reviews (id, profile_id, author_name, relative_date, body, sort_order, source_url, status) VALUES (${sql(`${profileId}-review-${reviewIndex + 1}`)}, ${sql(profileId)}, ${sql(review.authorName)}, ${sql(review.relativeDate)}, ${sql(review.body)}, ${reviewIndex}, ${sql(profile.sourceUrl)}, 'approved');`),
         `INSERT INTO escort_promotions (id, profile_id, tier, status, rotation_seed) VALUES (${sql(promotionId)}, ${sql(profileId)}, ${sql(profile.tier)}, 'active', ${Math.floor(Math.random() * 100000)});`,
         `INSERT INTO escort_moderation_events (id, profile_id, actor_id, action, note) VALUES (${sql(eventId)}, ${sql(profileId)}, 'argxp-authorized-import', 'approved', ${sql(`Fuente autorizada: ${profile.sourceUrl}`)});`,
       );
