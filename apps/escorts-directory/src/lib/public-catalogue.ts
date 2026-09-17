@@ -14,14 +14,18 @@ export type CatalogueListing = {
   detailPhoto: string;
   contactUrl: string;
   contactLabel: string;
+  photos: { url: string; alt: string; width: number; height: number }[];
+  details: { presentation?: string; attributes?: Record<string, string>; availability?: { headers: string[]; rows: string[][] }[]; locationReference?: string };
 };
 
 function tierCase(column: string) {
   return `CASE ${column} ${Object.keys(ESCORT_TIERS).map((tier, index) => `WHEN '${tier}' THEN ${index + 1}`).join(' ')} ELSE 0 END`;
 }
 
-function toListing(env: Record<string, any>, row: any): CatalogueListing {
+function toListing(env: Record<string, any>, row: any, photos: any[] = []): CatalogueListing {
   const tier = String(row.tier || 'basic') as EscortTier;
+  let details: CatalogueListing['details'] = {};
+  try { details = JSON.parse(row.details_json || '{}'); } catch {}
   return {
     slug: row.slug,
     displayName: row.display_name,
@@ -35,11 +39,13 @@ function toListing(env: Record<string, any>, row: any): CatalogueListing {
     detailPhoto: mediaUrl(env, row.detail_key || row.card_key),
     contactUrl: row.contact_url || '',
     contactLabel: row.contact_label || 'Contactar',
+    photos: photos.map((photo) => ({ url: mediaUrl(env, photo.card_key || photo.detail_key), alt: photo.alt_text || row.display_name, width: Number(photo.width || 0), height: Number(photo.height || 0) })),
+    details,
   };
 }
 
 const commonSelect = `
-  SELECT p.slug, p.display_name, p.city_slug, p.city_name, p.price_amount, p.currency, p.short_bio, p.contact_url, p.contact_label,
+  SELECT p.id, p.slug, p.display_name, p.city_slug, p.city_name, p.price_amount, p.currency, p.short_bio, p.details_json, p.contact_url, p.contact_label,
     COALESCE((SELECT ep.tier FROM escort_promotions ep WHERE ep.profile_id = p.id AND ep.status = 'active' AND ep.starts_at <= datetime('now') AND (ep.ends_at IS NULL OR ep.ends_at > datetime('now')) ORDER BY ${tierCase('ep.tier')} DESC LIMIT 1), 'basic') AS tier,
     COALESCE((SELECT photo.card_key FROM escort_photos photo WHERE photo.profile_id = p.id AND photo.status = 'approved' ORDER BY photo.sort_order ASC LIMIT 1), '') AS card_key,
     COALESCE((SELECT photo.detail_key FROM escort_photos photo WHERE photo.profile_id = p.id AND photo.status = 'approved' ORDER BY photo.sort_order ASC LIMIT 1), '') AS detail_key
@@ -65,7 +71,9 @@ export async function getPublicListing(env: Record<string, any>, slug: string) {
   if (!env.DB) return null;
   const includeDemo = String(env.STAGING_NO_INDEX || '') === '1' ? 1 : 0;
   const result = await env.DB.prepare(`${commonSelect} AND p.slug = ? LIMIT 1`).bind(includeDemo, slug).first();
-  return result ? toListing(env, result) : null;
+  if (!result) return null;
+  const photos = await env.DB.prepare("SELECT card_key, detail_key, width, height, alt_text FROM escort_photos WHERE profile_id = ? AND status = 'approved' ORDER BY sort_order ASC").bind(result.id).all();
+  return toListing(env, result, photos.results || []);
 }
 
 export async function getPublicCities(env: Record<string, any>) {

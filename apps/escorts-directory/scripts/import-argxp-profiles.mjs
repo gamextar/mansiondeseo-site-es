@@ -6,6 +6,7 @@ import { chromium } from 'playwright';
 const root = process.cwd();
 const limitArg = Number(process.argv.find((value) => value.startsWith('--limit='))?.split('=')[1] || 20);
 const limit = Math.max(1, Math.min(100, Number.isFinite(limitArg) ? limitArg : 20));
+const requestedProfile = process.argv.find((value) => value.startsWith('--profile='))?.split('=')[1] || '';
 const dbName = 'escorts-directory-db';
 const publicBucket = 'mansiondeseo-escorts-public';
 const privateBucket = 'mansiondeseo-escorts-private';
@@ -78,9 +79,53 @@ async function fetchImageAsBytes(page, source) {
   return captured;
 }
 
+async function captureImages(page, sources) {
+  const wanted = new Set(sources.map((source) => source.url));
+  const captured = new Map();
+  const pending = [];
+  const handler = (response) => {
+    if (!wanted.has(response.url()) || response.request().resourceType() !== 'image') return;
+    pending.push((async () => {
+      try {
+        const bodyPromise = response.body();
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 15000));
+        const bytes = await Promise.race([bodyPromise, timeoutPromise]);
+        if (!bytes) return;
+        captured.set(response.url(), {
+          contentType: response.headers()['content-type'] || 'image/webp',
+          bytes,
+        });
+      } catch {}
+    })());
+  };
+  page.on('response', handler);
+  try {
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
+    await page.evaluate((urls) => {
+      for (const url of urls) {
+        const image = document.createElement('img');
+        image.src = url;
+        image.loading = 'eager';
+        image.style.cssText = 'position:fixed;left:-10000px;top:0;width:1px;height:1px;';
+        document.body.appendChild(image);
+      }
+    }, [...wanted]);
+    await page.waitForTimeout(3000);
+    await Promise.allSettled(pending);
+  } finally {
+    page.off('response', handler);
+  }
+  return captured;
+}
+
 async function extractProfile(page, sourceUrl) {
   await page.goto(sourceUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await page.waitForTimeout(500);
+  const conocer = page.locator('button').filter({ hasText: 'Conocer más' });
+  if (await conocer.count()) {
+    await conocer.first().click().catch(() => {});
+    await page.waitForTimeout(400);
+  }
   const data = await page.evaluate(() => {
     const scripts = [...document.querySelectorAll('script[type="application/ld+json"]')];
     let json = null;
@@ -94,6 +139,37 @@ async function extractProfile(page, sourceUrl) {
     const entity = json?.mainEntity || {};
     const image = Array.isArray(entity.image) ? entity.image[0] : entity.image;
     const body = document.body?.innerText || '';
+    const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+    const attributes = {};
+    for (const row of [...document.querySelectorAll('div.grid.grid-cols-2')]) {
+      const cells = [...row.children].map((cell) => clean(cell.textContent));
+      if (cells.length >= 2 && cells[0]) attributes[cells[0].replace(/:$/, '')] = cells.slice(1).join(' ').trim();
+    }
+    const availability = [...document.querySelectorAll('table')].map((table) => ({
+      headers: [...table.querySelectorAll('thead th')].map((cell) => clean(cell.textContent)),
+      rows: [...table.querySelectorAll('tbody tr')].map((row) => [...row.querySelectorAll('th,td')].map((cell) => clean(cell.textContent))),
+    })).filter((table) => table.rows.length);
+    const expandedBody = document.body?.innerText || body;
+    const presentation = [...document.querySelectorAll('h1,h2,h3,h4')]
+      .find((heading) => /^presentación$/i.test(clean(heading.textContent)))?.parentElement?.innerText || '';
+    const locationReference = expandedBody.match(/Punto de referencia:\s*([^\n]+)/i)?.[1]?.trim() || '';
+    const photoUrls = [...document.images].flatMap((image) => [
+      image.currentSrc || image.src || '',
+      ...(image.getAttribute('srcset') || '').split(',').map((candidate) => candidate.trim().split(/\s+/)[0]).filter(Boolean),
+    ]);
+    const photos = photoUrls.map((url) => {
+      const size = url.match(/rs:fill:(\d+):(\d+)/);
+      // imgproxy splits the base64 source path into 16-character URL segments.
+      const encoded = (url.split('/format:webp/')[1] || '').replaceAll('/', '');
+      let original = encoded;
+      try { original = atob(encoded.replace(/-/g, '+').replace(/_/g, '/')); } catch {}
+      return { url, width: Number(size?.[1] || image.naturalWidth || 0), height: Number(size?.[2] || image.naturalHeight || 0), original };
+    }).filter((photo) => photo.url.includes('imgproxy.argxp.com') && photo.url.includes('watermark_url:') && photo.width >= 300 && !/staticmaps/i.test(photo.original));
+    const bestPhotos = new Map();
+    for (const photo of photos) {
+      const old = bestPhotos.get(photo.original);
+      if (!old || photo.width * photo.height > old.width * old.height) bestPhotos.set(photo.original, photo);
+    }
     const whatsapp = [...document.querySelectorAll('a[href*="wa.me"], a[href*="whatsapp"], button')]
       .find((node) => /whatsapp/i.test(node.textContent || '') || /whatsapp|wa\.me/i.test(node.getAttribute('href') || ''));
     return {
@@ -102,6 +178,8 @@ async function extractProfile(page, sourceUrl) {
       image: typeof image === 'string' ? image : '',
       city: entity.address?.addressLocality || '',
       body,
+      details: { presentation: clean(presentation), attributes, availability, locationReference, expandedText: expandedBody },
+      photos: [...bestPhotos.values()],
       whatsappHref: whatsapp?.getAttribute('href') || '',
     };
   });
@@ -118,12 +196,12 @@ async function extractProfile(page, sourceUrl) {
       await target?.close().catch(() => {});
     }
   }
-  if (!data.image) throw new Error('No se encontró imagen en JSON-LD');
+  if (!data.image && !data.photos[0]?.url) throw new Error('No se encontró imagen');
   if (!data.name) throw new Error('No se encontró nombre');
-  return { ...data, sourceUrl, price, tier: tierFor(price, data.body), contactUrl };
+  return { ...data, image: data.photos[0]?.url || data.image, sourceUrl, price, tier: tierFor(price, data.body), contactUrl };
 }
 
-const cleanup = [
+const cleanup = requestedProfile ? [] : [
   `DELETE FROM escort_moderation_events WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
   `DELETE FROM escort_reports WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
   `DELETE FROM escort_promotions WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
@@ -139,7 +217,8 @@ const statements = [...cleanup];
 try {
   await page.goto('https://argxp.com/', { waitUntil: 'domcontentloaded', timeout: 45000 });
   const links = await page.locator('a[href*="/ar-"]').evaluateAll((nodes) => [...new Set(nodes.map((node) => new URL(node.getAttribute('href'), location.href).href))]);
-  const urls = links.filter((url) => /^https:\/\/argxp\.com\/ar-[a-z0-9-]+$/i.test(url)).slice(0, limit);
+  const urls = links.filter((url) => /^https:\/\/argxp\.com\/ar-[a-z0-9-]+$/i.test(url))
+    .filter((url) => !requestedProfile || url.endsWith(`/${requestedProfile}`)).slice(0, limit);
   if (!urls.length) throw new Error('No se encontraron perfiles en la portada de ARGXP');
   console.log(`Perfiles encontrados: ${urls.length}. Importación autorizada en curso.`);
   for (const sourceUrl of urls) {
@@ -151,21 +230,43 @@ try {
       const photoId = `${profileId}-photo`;
       const promotionId = `${profileId}-promotion`;
       const eventId = `${profileId}-event`;
-      const image = await fetchImageAsBytes(page, profile.image);
-      const ext = extensionFor(image.contentType);
-      const sourceKey = `source/argxp/${slug}/original.${ext}`;
-      const cardKey = `profiles/argxp/${slug}/card.${ext}`;
-      putR2(privateBucket, sourceKey, image.bytes, image.contentType, 'private, max-age=0, no-cache');
-      putR2(publicBucket, cardKey, image.bytes, image.contentType, 'public, max-age=31536000, immutable');
+      if (requestedProfile) {
+        statements.push(
+          `DELETE FROM escort_moderation_events WHERE profile_id = ${sql(profileId)};`,
+          `DELETE FROM escort_reports WHERE profile_id = ${sql(profileId)};`,
+          `DELETE FROM escort_promotions WHERE profile_id = ${sql(profileId)};`,
+          `DELETE FROM escort_photos WHERE profile_id = ${sql(profileId)};`,
+          `DELETE FROM escort_profiles WHERE id = ${sql(profileId)};`,
+          `DELETE FROM escort_accounts WHERE id = ${sql(accountId)};`,
+        );
+      }
+      const photoSources = profile.photos.length ? profile.photos : [{ url: profile.image, width: 696, height: 980 }];
+      const captured = await captureImages(page, photoSources);
+      const importedPhotos = [];
+      for (let photoIndex = 0; photoIndex < photoSources.length; photoIndex += 1) {
+        const source = photoSources[photoIndex];
+        const image = captured.get(source.url) || (photoIndex === 0 ? await fetchImageAsBytes(page, source.url) : null);
+        if (!image) { console.warn(`Foto omitida sin respuesta: ${source.url}`); continue; }
+        const ext = extensionFor(image.contentType);
+        const photoSlug = `${String(photoIndex + 1).padStart(2, '0')}`;
+        const sourceKey = `source/argxp/${slug}/original-${photoSlug}.${ext}`;
+        const cardKey = `profiles/argxp/${slug}/photo-${photoSlug}.${ext}`;
+        putR2(privateBucket, sourceKey, image.bytes, image.contentType, 'private, max-age=0, no-cache');
+        putR2(publicBucket, cardKey, image.bytes, image.contentType, 'public, max-age=31536000, immutable');
+        importedPhotos.push({ sourceKey, cardKey, width: source.width || 696, height: source.height || 980, index: photoIndex });
+      }
+      if (!importedPhotos.length) throw new Error('No se pudo importar ninguna foto');
+      const cardKey = importedPhotos[0].cardKey;
+      const detailKey = importedPhotos[0].cardKey;
       const fallbackBio = `Perfil público de ${profile.name} en ${profile.city || 'Argentina'}. Contacto y disponibilidad a coordinar.`;
       statements.push(
         `INSERT INTO escort_accounts (id, email, password_hash, email_verified) VALUES (${sql(accountId)}, ${sql(`${slug}@imported.invalid`)}, 'imported:no-login', 1);`,
-        `INSERT INTO escort_profiles (id, account_id, slug, display_name, city_slug, city_name, price_amount, currency, short_bio, contact_url, contact_label, status, review_note, reviewed_by, reviewed_at, published_at, is_demo) VALUES (${sql(profileId)}, ${sql(accountId)}, ${sql(slug)}, ${sql(profile.name)}, ${sql(slugify(profile.city) || 'argentina')}, ${sql(profile.city || 'Argentina')}, ${profile.price}, 'USD', ${sql(profile.description || fallbackBio)}, ${sql(profile.contactUrl)}, 'WhatsApp', 'published', ${sql(`Importado con autorización desde ${profile.sourceUrl}`)}, 'argxp-authorized-import', datetime('now'), datetime('now'), 0);`,
-        `INSERT INTO escort_photos (id, profile_id, source_key, card_key, detail_key, width, height, alt_text, sort_order, status, reviewed_at) VALUES (${sql(photoId)}, ${sql(profileId)}, ${sql(sourceKey)}, ${sql(cardKey)}, ${sql(cardKey)}, 696, 980, ${sql(`Foto de ${profile.name}, ${profile.city || 'Argentina'}`)}, 0, 'approved', datetime('now'));`,
+        `INSERT INTO escort_profiles (id, account_id, slug, display_name, city_slug, city_name, price_amount, currency, short_bio, details_json, contact_url, contact_label, status, review_note, reviewed_by, reviewed_at, published_at, is_demo) VALUES (${sql(profileId)}, ${sql(accountId)}, ${sql(slug)}, ${sql(profile.name)}, ${sql(slugify(profile.city) || 'argentina')}, ${sql(profile.city || 'Argentina')}, ${profile.price}, 'USD', ${sql(profile.description || fallbackBio)}, ${sql(JSON.stringify(profile.details))}, ${sql(profile.contactUrl)}, 'WhatsApp', 'published', ${sql(`Importado con autorización desde ${profile.sourceUrl}`)}, 'argxp-authorized-import', datetime('now'), datetime('now'), 0);`,
+        ...importedPhotos.map((photo) => `INSERT INTO escort_photos (id, profile_id, source_key, card_key, detail_key, width, height, alt_text, sort_order, status, reviewed_at) VALUES (${sql(`${profileId}-photo-${photo.index + 1}`)}, ${sql(profileId)}, ${sql(photo.sourceKey)}, ${sql(photo.cardKey)}, ${sql(photo.cardKey)}, ${photo.width}, ${photo.height}, ${sql(`Foto ${photo.index + 1} de ${profile.name}, ${profile.city || 'Argentina'}`)}, ${photo.index}, 'approved', datetime('now'));`),
         `INSERT INTO escort_promotions (id, profile_id, tier, status, rotation_seed) VALUES (${sql(promotionId)}, ${sql(profileId)}, ${sql(profile.tier)}, 'active', ${Math.floor(Math.random() * 100000)});`,
         `INSERT INTO escort_moderation_events (id, profile_id, actor_id, action, note) VALUES (${sql(eventId)}, ${sql(profileId)}, 'argxp-authorized-import', 'approved', ${sql(`Fuente autorizada: ${profile.sourceUrl}`)});`,
       );
-      console.log(`OK ${profile.name} · ${profile.city || 'Argentina'} · ${profile.price || 'sin precio'} USD · ${profile.tier}`);
+      console.log(`OK ${profile.name} · ${profile.city || 'Argentina'} · ${profile.price || 'sin precio'} USD · ${profile.tier} · ${importedPhotos.length} fotos · ${Object.keys(profile.details.attributes).length} campos`);
     } catch (error) {
       console.warn(`OMITIDO ${sourceUrl}: ${error.message}`);
     }

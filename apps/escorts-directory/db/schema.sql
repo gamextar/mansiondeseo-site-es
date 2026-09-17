@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS escort_profiles (
   price_amount INTEGER NOT NULL DEFAULT 0,
   currency TEXT NOT NULL DEFAULT 'USD',
   short_bio TEXT NOT NULL DEFAULT '',
+  details_json TEXT NOT NULL DEFAULT '{}',
   contact_url TEXT NOT NULL DEFAULT '',
   contact_label TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'pending_review', 'published', 'rejected', 'paused', 'expired')),

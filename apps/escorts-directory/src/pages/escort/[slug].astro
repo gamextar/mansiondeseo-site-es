@@ -17,13 +17,25 @@ Astro.response.headers.set('Cache-Tag', `escort-profile-${listing.slug},escort-c
   canonicalPath={`/escort/${listing.slug}/`}
 >
   <article class="profile-page">
-    <div class="profile-photo"><img src={listing.detailPhoto} alt={`Foto principal de ${listing.displayName}`} width="1280" height="1706" fetchpriority="high" /></div>
+    <div class="profile-gallery">
+      <div class="profile-photo"><img src={listing.detailPhoto} alt={`Foto principal de ${listing.displayName}`} width={listing.photos[0]?.width || 1280} height={listing.photos[0]?.height || 1706} fetchpriority="high" /></div>
+      {listing.photos.length > 1 && <div class="profile-thumbs" aria-label={`Galería de ${listing.displayName}`}>
+        {listing.photos.map((photo, index) => <a href={photo.url} target="_blank" rel="noopener" aria-label={`Abrir foto ${index + 1}`}><img src={photo.url} alt={photo.alt} width={photo.width || 800} height={photo.height || 1422} loading="lazy" /></a>)}
+      </div>}
+    </div>
     <div class="profile-copy">
       <span class="tier-badge" style={`--tier-color:${tier.accent}`}>{tier.label}</span>
       <p class="eyebrow">{listing.cityName}</p>
       <h1>{listing.displayName}</h1>
       <p class="profile-price">{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(listing.priceAmount)} {listing.currency || 'USD'}</p>
       <p>{listing.shortBio}</p>
+      {(Boolean(listing.details.presentation) || Object.keys(listing.details.attributes || {}).length > 0 || Boolean(listing.details.availability?.length)) && <details class="profile-details" open>
+        <summary>Información del perfil</summary>
+        {listing.details.presentation && <p class="profile-presentation">{listing.details.presentation}</p>}
+        {listing.details.locationReference && <p><strong>Punto de referencia:</strong> {listing.details.locationReference}</p>}
+        {Object.keys(listing.details.attributes || {}).length > 0 && <dl>{Object.entries(listing.details.attributes || {}).map(([label, value]) => <div><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
+        {listing.details.availability?.map((table) => <table><thead><tr>{table.headers.map((header) => <th>{header}</th>)}</tr></thead><tbody>{table.rows.map((row) => <tr>{row.map((cell) => <td>{cell}</td>)}</tr>)}</tbody></table>)}
+      </details>}
       {listing.contactUrl && <a class="contact-button" href={listing.contactUrl} rel="ugc nofollow noopener" target="_blank">{listing.contactLabel}</a>}
       <p class="review-notice">Perfil publicado luego de revisión manual.</p>
       <details class="report-box">
