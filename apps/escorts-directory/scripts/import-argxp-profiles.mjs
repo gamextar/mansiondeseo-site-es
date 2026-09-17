@@ -1,0 +1,184 @@
+import { execFileSync } from 'node:child_process';
+import { unlinkSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { chromium } from 'playwright';
+
+const root = process.cwd();
+const limitArg = Number(process.argv.find((value) => value.startsWith('--limit='))?.split('=')[1] || 20);
+const limit = Math.max(1, Math.min(100, Number.isFinite(limitArg) ? limitArg : 20));
+const dbName = 'escorts-directory-db';
+const publicBucket = 'mansiondeseo-escorts-public';
+const privateBucket = 'mansiondeseo-escorts-private';
+const sourcePrefix = 'argxp-import-';
+
+function sql(value) {
+  return `'${String(value ?? '').replaceAll("'", "''")}'`;
+}
+
+function slugify(value) {
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 70);
+}
+
+function run(args, options = {}) {
+  return execFileSync('npx', ['wrangler', ...args], { cwd: root, encoding: 'utf8', ...options });
+}
+
+function parsePrice(text) {
+  const match = String(text || '').match(/(\d[\d.,]*)\s*USD/i);
+  if (!match) return 0;
+  const value = Number(match[1].replace(/[.,]/g, ''));
+  return Number.isFinite(value) ? Math.round(value) : 0;
+}
+
+function tierFor(price, text) {
+  const upper = String(text || '').toUpperCase();
+  if (price >= 1000 || upper.includes('DIAMOND')) return 'diamond';
+  if (price >= 800 || upper.includes('PLATINUM')) return 'platinum';
+  if (price >= 700 || upper.includes('SAPPHIRE')) return 'gold';
+  if (price >= 600) return 'silver';
+  if (price >= 500) return 'bronze';
+  return 'basic';
+}
+
+function extensionFor(contentType) {
+  if (/png/i.test(contentType)) return 'png';
+  if (/jpeg|jpg/i.test(contentType)) return 'jpg';
+  return 'webp';
+}
+
+function putR2(bucket, key, bytes, contentType, cacheControl) {
+  const child = execFileSync('npx', [
+    'wrangler', 'r2', 'object', 'put', `${bucket}/${key}`, '--pipe', '--remote', '-y',
+    '--content-type', contentType, '--cache-control', cacheControl,
+  ], { cwd: root, input: bytes, stdio: ['pipe', 'inherit', 'inherit'] });
+  return child;
+}
+
+async function fetchImageAsBytes(page, source) {
+  let captured = null;
+  const handler = async (response) => {
+    if (response.request().resourceType() !== 'image') return;
+    const responseUrl = response.url();
+    if (responseUrl !== source && !responseUrl.includes('imgproxy.argxp.com')) return;
+    try {
+      const bytes = await response.body();
+      if (!captured || responseUrl === source) captured = { contentType: response.headers()['content-type'] || 'image/webp', bytes };
+    } catch {}
+  };
+  page.on('response', handler);
+  try {
+    await page.reload({ waitUntil: 'networkidle', timeout: 45000 });
+    await page.waitForTimeout(700);
+  } finally {
+    page.off('response', handler);
+  }
+  if (!captured) throw new Error(`No se pudo capturar la imagen ${source}`);
+  return captured;
+}
+
+async function extractProfile(page, sourceUrl) {
+  await page.goto(sourceUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await page.waitForTimeout(500);
+  const data = await page.evaluate(() => {
+    const scripts = [...document.querySelectorAll('script[type="application/ld+json"]')];
+    let json = null;
+    for (const script of scripts) {
+      try {
+        const parsed = JSON.parse(script.textContent || 'null');
+        const candidate = Array.isArray(parsed) ? parsed.find((entry) => entry?.mainEntity) : parsed;
+        if (candidate?.mainEntity) { json = candidate; break; }
+      } catch {}
+    }
+    const entity = json?.mainEntity || {};
+    const image = Array.isArray(entity.image) ? entity.image[0] : entity.image;
+    const body = document.body?.innerText || '';
+    const whatsapp = [...document.querySelectorAll('a[href*="wa.me"], a[href*="whatsapp"], button')]
+      .find((node) => /whatsapp/i.test(node.textContent || '') || /whatsapp|wa\.me/i.test(node.getAttribute('href') || ''));
+    return {
+      name: entity.name || document.querySelector('h1')?.textContent?.trim() || '',
+      description: entity.description || '',
+      image: typeof image === 'string' ? image : '',
+      city: entity.address?.addressLocality || '',
+      body,
+      whatsappHref: whatsapp?.getAttribute('href') || '',
+    };
+  });
+  const price = parsePrice(data.body);
+  let contactUrl = data.whatsappHref || '';
+  if (!contactUrl) {
+    const before = new Set(page.context().pages());
+    const button = page.getByRole('button', { name: /whatsapp/i }).last();
+    if (await button.count()) {
+      await button.click().catch(() => {});
+      await page.waitForTimeout(500);
+      const target = page.context().pages().find((candidate) => !before.has(candidate) && /whatsapp\.com/i.test(candidate.url()));
+      contactUrl = target?.url() || '';
+      await target?.close().catch(() => {});
+    }
+  }
+  if (!data.image) throw new Error('No se encontró imagen en JSON-LD');
+  if (!data.name) throw new Error('No se encontró nombre');
+  return { ...data, sourceUrl, price, tier: tierFor(price, data.body), contactUrl };
+}
+
+const cleanup = [
+  `DELETE FROM escort_moderation_events WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
+  `DELETE FROM escort_reports WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
+  `DELETE FROM escort_promotions WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
+  `DELETE FROM escort_photos WHERE profile_id LIKE ${sql(`${sourcePrefix}%`)};`,
+  `DELETE FROM escort_profiles WHERE id LIKE ${sql(`${sourcePrefix}%`)};`,
+  `DELETE FROM escort_accounts WHERE id LIKE ${sql(`${sourcePrefix}%`)};`,
+];
+
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
+const context = browser.contexts()[0];
+const page = context.pages().find((candidate) => candidate.url().startsWith('https://argxp.com/')) || await context.newPage();
+const statements = [...cleanup];
+try {
+  await page.goto('https://argxp.com/', { waitUntil: 'domcontentloaded', timeout: 45000 });
+  const links = await page.locator('a[href*="/ar-"]').evaluateAll((nodes) => [...new Set(nodes.map((node) => new URL(node.getAttribute('href'), location.href).href))]);
+  const urls = links.filter((url) => /^https:\/\/argxp\.com\/ar-[a-z0-9-]+$/i.test(url)).slice(0, limit);
+  if (!urls.length) throw new Error('No se encontraron perfiles en la portada de ARGXP');
+  console.log(`Perfiles encontrados: ${urls.length}. Importación autorizada en curso.`);
+  for (const sourceUrl of urls) {
+    try {
+      const profile = await extractProfile(page, sourceUrl);
+      const slug = `${slugify(profile.name)}-${slugify(profile.city) || 'argentina'}`;
+      const profileId = `${sourcePrefix}${slug}`;
+      const accountId = `${profileId}-account`;
+      const photoId = `${profileId}-photo`;
+      const promotionId = `${profileId}-promotion`;
+      const eventId = `${profileId}-event`;
+      const image = await fetchImageAsBytes(page, profile.image);
+      const ext = extensionFor(image.contentType);
+      const sourceKey = `source/argxp/${slug}/original.${ext}`;
+      const cardKey = `profiles/argxp/${slug}/card.${ext}`;
+      putR2(privateBucket, sourceKey, image.bytes, image.contentType, 'private, max-age=0, no-cache');
+      putR2(publicBucket, cardKey, image.bytes, image.contentType, 'public, max-age=31536000, immutable');
+      const fallbackBio = `Perfil público de ${profile.name} en ${profile.city || 'Argentina'}. Contacto y disponibilidad a coordinar.`;
+      statements.push(
+        `INSERT INTO escort_accounts (id, email, password_hash, email_verified) VALUES (${sql(accountId)}, ${sql(`${slug}@imported.invalid`)}, 'imported:no-login', 1);`,
+        `INSERT INTO escort_profiles (id, account_id, slug, display_name, city_slug, city_name, price_amount, currency, short_bio, contact_url, contact_label, status, review_note, reviewed_by, reviewed_at, published_at, is_demo) VALUES (${sql(profileId)}, ${sql(accountId)}, ${sql(slug)}, ${sql(profile.name)}, ${sql(slugify(profile.city) || 'argentina')}, ${sql(profile.city || 'Argentina')}, ${profile.price}, 'USD', ${sql(profile.description || fallbackBio)}, ${sql(profile.contactUrl)}, 'WhatsApp', 'published', ${sql(`Importado con autorización desde ${profile.sourceUrl}`)}, 'argxp-authorized-import', datetime('now'), datetime('now'), 0);`,
+        `INSERT INTO escort_photos (id, profile_id, source_key, card_key, detail_key, width, height, alt_text, sort_order, status, reviewed_at) VALUES (${sql(photoId)}, ${sql(profileId)}, ${sql(sourceKey)}, ${sql(cardKey)}, ${sql(cardKey)}, 696, 980, ${sql(`Foto de ${profile.name}, ${profile.city || 'Argentina'}`)}, 0, 'approved', datetime('now'));`,
+        `INSERT INTO escort_promotions (id, profile_id, tier, status, rotation_seed) VALUES (${sql(promotionId)}, ${sql(profileId)}, ${sql(profile.tier)}, 'active', ${Math.floor(Math.random() * 100000)});`,
+        `INSERT INTO escort_moderation_events (id, profile_id, actor_id, action, note) VALUES (${sql(eventId)}, ${sql(profileId)}, 'argxp-authorized-import', 'approved', ${sql(`Fuente autorizada: ${profile.sourceUrl}`)});`,
+      );
+      console.log(`OK ${profile.name} · ${profile.city || 'Argentina'} · ${profile.price || 'sin precio'} USD · ${profile.tier}`);
+    } catch (error) {
+      console.warn(`OMITIDO ${sourceUrl}: ${error.message}`);
+    }
+  }
+  const sqlPath = path.join(root, '.tmp-import-argxp.sql');
+  writeFileSync(sqlPath, `${statements.join('\n')}\n`);
+  try {
+    run(['d1', 'execute', dbName, '--remote', '--file', sqlPath], { stdio: 'inherit' });
+  } finally {
+    try { unlinkSync(sqlPath); } catch {}
+  }
+} finally {
+  await browser.close();
+}
+
+console.log('Importación terminada. Las fichas quedan públicas en staging y excluidas de Google por STAGING_NO_INDEX.');
