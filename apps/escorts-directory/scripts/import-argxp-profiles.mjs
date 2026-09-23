@@ -1,5 +1,5 @@
-import { execFileSync } from 'node:child_process';
-import { unlinkSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 
@@ -11,6 +11,10 @@ const existingArg = process.argv.find((value) => value.startsWith('--existing=')
 const existingMode = existingArg === 'overwrite' ? 'overwrite' : 'skip';
 const delayArg = Number(process.argv.find((value) => value.startsWith('--delay-ms='))?.split('=')[1] || 2000);
 const delayMs = Math.max(0, Math.min(60000, Number.isFinite(delayArg) ? delayArg : 2000));
+const cdpUrl = process.argv.find((value) => value.startsWith('--cdp-url='))?.split('=').slice(1).join('=')
+  || process.env.ARGXP_CDP_URL
+  || 'http://127.0.0.1:9222';
+const noAutoBrowser = process.argv.includes('--no-auto-browser');
 const dbName = 'escorts-directory-db';
 const publicBucket = 'mansiondeseo-escorts-public';
 const privateBucket = 'mansiondeseo-escorts-private';
@@ -57,6 +61,65 @@ function profileExists(slug) {
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function findChromeExecutable() {
+  const configured = process.env.ARGXP_CHROME_PATH;
+  if (configured) return configured;
+  const candidates = process.platform === 'darwin'
+    ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Chromium.app/Contents/MacOS/Chromium']
+    : process.platform === 'win32'
+      ? [process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Google/Chrome/Application/chrome.exe'), 'chrome.exe']
+      : ['google-chrome', 'chromium', 'chromium-browser'];
+  return candidates.find((candidate) => candidate && (candidate.includes('/') ? existsSync(candidate) : true));
+}
+
+function cdpPort() {
+  try {
+    return new URL(cdpUrl).port || '9222';
+  } catch {
+    return '9222';
+  }
+}
+
+function launchChrome() {
+  const executable = findChromeExecutable();
+  if (!executable) {
+    throw new Error('No se encontró Google Chrome/Chromium. Define ARGXP_CHROME_PATH o usa --no-auto-browser.');
+  }
+  const profileDir = process.env.ARGXP_CHROME_PROFILE || path.join(root, '.chrome-argxp-profile');
+  mkdirSync(profileDir, { recursive: true });
+  const child = spawn(executable, [
+    `--remote-debugging-port=${cdpPort()}`,
+    '--remote-debugging-address=127.0.0.1',
+    `--user-data-dir=${profileDir}`,
+    'https://argxp.com/',
+  ], { detached: true, stdio: 'ignore' });
+  child.unref();
+  console.log(`Chrome iniciado automáticamente con el perfil ${profileDir}.`);
+  console.log('La primera vez, inicia sesión en ArgXP en esa ventana; la sesión quedará guardada para las próximas importaciones.');
+}
+
+async function connectBrowser() {
+  try {
+    return { browser: await chromium.connectOverCDP(cdpUrl), owned: false };
+  } catch (initialError) {
+    if (noAutoBrowser) {
+      throw new Error(`No se pudo conectar a ${cdpUrl}. Inicia Chrome con depuración o elimina --no-auto-browser. Detalle: ${initialError.message}`);
+    }
+    launchChrome();
+    const deadline = Date.now() + 30000;
+    let lastError = initialError;
+    while (Date.now() < deadline) {
+      try {
+        return { browser: await chromium.connectOverCDP(cdpUrl), owned: true };
+      } catch (error) {
+        lastError = error;
+        await wait(500);
+      }
+    }
+    throw new Error(`Chrome no estuvo disponible en ${cdpUrl} después de 30 segundos. Detalle: ${lastError.message}`);
+  }
 }
 
 function parsePrice(text) {
@@ -298,7 +361,7 @@ async function extractProfile(page, sourceUrl) {
   return { ...data, image: data.photos[0]?.url || data.image, sourceUrl, price, tier: tierFor(price, data.body), contactUrl: normalizeWhatsAppUrl(contactUrl) };
 }
 
-const browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
+const { browser, owned: ownsBrowser } = await connectBrowser();
 const context = browser.contexts()[0];
 const page = context.pages().find((candidate) => candidate.url().startsWith('https://argxp.com/')) || await context.newPage();
 const statements = [];
@@ -385,7 +448,8 @@ try {
   if (statements.length) flushStatements();
   else console.log('No hay perfiles nuevos para escribir en D1.');
 } finally {
-  await browser.close();
+  // No cerrar el Chrome del usuario cuando la conexión CDP ya existía.
+  if (ownsBrowser) await browser.close();
 }
 
 console.log('Importación terminada. Las fichas quedan públicas en staging y excluidas de Google por STAGING_NO_INDEX.');

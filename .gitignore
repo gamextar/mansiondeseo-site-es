@@ -1,6 +1,8 @@
 _rewrite.py
 .DS_Store
 node_modules/
+.chrome-argxp-profile/
+.tmp-import-argxp.sql
 dist/
 dist-astro/
 build/

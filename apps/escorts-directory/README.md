@@ -23,6 +23,20 @@ Proyecto independiente y sin React para el futuro catálogo público de `mansion
 - El dominio público de medios debe ser un Custom Domain de R2, con `Cache-Control: public, max-age=31536000, immutable` para archivos versionados.
 - Existe un endpoint público de reportes. Antes de lanzamiento, el administrador debe revisar reportes abiertos cada día y pausar el perfil inmediatamente si hay riesgo de suplantación, falta de consentimiento o posible minoría de edad.
 
+## Importación desde ArgXP
+
+`npm run import:argxp` intenta conectarse a Chrome por CDP en `127.0.0.1:9222`. Si no encuentra una sesión abierta, inicia automáticamente Chrome con el perfil persistente `.chrome-argxp-profile` y espera hasta 30 segundos a que esté disponible. La primera vez hay que iniciar sesión manualmente en esa ventana; las siguientes ejecuciones reutilizan la sesión guardada.
+
+Opciones útiles:
+
+```bash
+npm run import:argxp -- --limit=100 --existing=skip --delay-ms=3000
+npm run import:argxp -- --cdp-url=http://127.0.0.1:9333
+npm run import:argxp -- --no-auto-browser
+```
+
+También se puede definir `ARGXP_CHROME_PATH`, `ARGXP_CHROME_PROFILE` o `ARGXP_CDP_URL` si se necesita una instalación, perfil o puerto diferente.
+
 ## Niveles
 
 `basic`, `bronze`, `silver`, `gold`, `platinum`, `diamond`. Los precios se expresan en USD. Una promoción activa no publica ni salta la revisión de un perfil.
