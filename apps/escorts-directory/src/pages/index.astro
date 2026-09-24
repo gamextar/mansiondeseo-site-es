@@ -14,6 +14,7 @@ Astro.response.headers.set('Cache-Tag', 'escort-home');
 <PublicLayout
   title="Escorts en Argentina | Mansión Deseo"
   description="Directorio de escorts con perfiles públicos y revisión manual. Explorá anuncios por ciudad."
+  preloadImage={listings[0]?.photo}
 >
   <section class="hero">
     <p class="eyebrow">Directorio independiente</p>
@@ -25,10 +26,10 @@ Astro.response.headers.set('Cache-Tag', 'escort-home');
     {cities.map((city) => <a href={`/escorts/${city.slug}/`}>{city.name} <small>({city.count})</small></a>)}
   </section>
 
-  {sections.map((section) => <section class={`gallery-section tier-section tier-${section.key}`} aria-labelledby={`tier-${section.key}-title`}>
+  {sections.map((section, sectionIndex) => <section class={`gallery-section tier-section tier-${section.key}`} aria-labelledby={`tier-${section.key}-title`}>
     <div class="section-heading"><div><p class="eyebrow" style={`--tier-color:${section.accent}`}>{section.label}</p><h2 id={`tier-${section.key}-title`}>{section.label}</h2></div><span>{section.listings.length} perfiles</span></div>
     {section.listings.length > 0 ? <div class="listing-grid">
-      {section.listings.map((listing, index) => <ListingCard {...listing} eager={index < 4} />)}
+      {section.listings.map((listing, index) => <ListingCard {...listing} eager={sectionIndex === 0 && index === 0} />)}
     </div> : <p class="empty-state">Todavía no hay perfiles publicados en este nivel.</p>}
   </section>)}
 </PublicLayout>

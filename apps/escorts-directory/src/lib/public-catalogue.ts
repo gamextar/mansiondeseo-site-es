@@ -11,6 +11,7 @@ export type CatalogueListing = {
   tier: EscortTier;
   shortBio: string;
   photo: string;
+  photoSmall: string;
   detailPhoto: string;
   contactUrl: string;
   contactLabel: string;
@@ -35,6 +36,8 @@ const CITY_GROUPS: Record<string, { name: string; slugs: string[] }> = {
 function toListing(env: Record<string, any>, row: any, photos: any[] = [], reviews: any[] = []): CatalogueListing {
   const tier = String(row.tier || 'basic') as EscortTier;
   let details: CatalogueListing['details'] = {};
+  const cardKey = String(row.card_key || '');
+  const smallCardKey = cardKey.endsWith('/card-640.avif') ? cardKey.replace(/\/card-640\.avif$/, '/card-320.avif') : '';
   try { details = JSON.parse(row.details_json || '{}'); } catch {}
   return {
     slug: row.slug,
@@ -46,6 +49,7 @@ function toListing(env: Record<string, any>, row: any, photos: any[] = [], revie
     tier: tier in ESCORT_TIERS ? tier : 'basic',
     shortBio: row.short_bio || '',
     photo: mediaUrl(env, row.card_key),
+    photoSmall: smallCardKey ? mediaUrl(env, smallCardKey) : '',
     detailPhoto: mediaUrl(env, row.detail_key || row.card_key),
     contactUrl: row.contact_url || '',
     contactLabel: row.contact_label || 'Contactar',

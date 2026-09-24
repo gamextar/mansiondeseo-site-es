@@ -10,11 +10,13 @@ interface Props {
   tier: EscortTier;
   shortBio: string;
   photo: string;
+  photoSmall?: string;
   eager?: boolean;
 }
 
-const { slug, displayName, cityName, priceAmount, currency, photo, eager = false } = Astro.props;
+const { slug, displayName, cityName, priceAmount, currency, photo, photoSmall = '', eager = false } = Astro.props;
 const priceLabel = `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(priceAmount)} ${currency || 'USD'}`;
+const srcset = photoSmall ? `${photoSmall} 320w, ${photo} 640w` : undefined;
 ---
 
 <article class="listing-card">
@@ -24,6 +26,8 @@ const priceLabel = `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 
       alt={`Foto principal de ${displayName}`}
       width="640"
       height="853"
+      srcset={srcset}
+      sizes="(max-width: 800px) 50vw, 25vw"
       loading={eager ? 'eager' : 'lazy'}
       decoding="async"
       fetchpriority={eager ? 'high' : 'auto'}

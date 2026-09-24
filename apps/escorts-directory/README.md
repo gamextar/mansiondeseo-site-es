@@ -37,6 +37,8 @@ npm run import:argxp -- --no-auto-browser
 
 También se puede definir `ARGXP_CHROME_PATH`, `ARGXP_CHROME_PROFILE` o `ARGXP_CDP_URL` si se necesita una instalación, perfil o puerto diferente.
 
+Después de una importación autorizada, entrar en `/admin/` y usar `Optimizar lote` para convertir las imágenes importadas a AVIF responsive (`320`, `640` y `1280` px). El proceso está limitado a ocho fotos por lote para no saturar Workers Images; repetirlo hasta que no queden imágenes pendientes de optimización.
+
 ## Niveles
 
 `basic`, `bronze`, `silver`, `gold`, `platinum`, `diamond`. Los precios se expresan en USD. Una promoción activa no publica ni salta la revisión de un perfil.

@@ -22,6 +22,7 @@ Astro.response.headers.set('Cache-Tag', `escort-city-${slug}`);
   title={`Escorts en ${city.name} | Mansión Deseo`}
   description={metaDescription}
   canonicalPath={`/escorts/${city.slug}/`}
+  preloadImage={listings[0]?.photo}
 >
   <section class="hero hero-compact">
     <p class="eyebrow">Explorar por ciudad</p>
@@ -30,7 +31,7 @@ Astro.response.headers.set('Cache-Tag', `escort-city-${slug}`);
   </section>
   <section class="gallery-section" aria-label={`Perfiles en ${city.name}`}>
     <div class="listing-grid">
-      {listings.map((listing, index) => <ListingCard {...listing} eager={index < 4} />)}
+    {listings.map((listing, index) => <ListingCard {...listing} eager={index === 0} />)}
     </div>
     {listings.length === 0 && <p class="empty-state">No hay perfiles publicados actualmente.</p>}
   </section>

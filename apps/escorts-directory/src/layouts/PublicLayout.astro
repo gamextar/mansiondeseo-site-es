@@ -6,9 +6,10 @@ interface Props {
   description: string;
   canonicalPath?: string;
   noindex?: boolean;
+  preloadImage?: string;
 }
 
-const { title, description, canonicalPath = '/', noindex = false } = Astro.props;
+const { title, description, canonicalPath = '/', noindex = false, preloadImage = '' } = Astro.props;
 const env = (Astro.locals as any)?.runtime?.env || {};
 const origin = (env.PUBLIC_SITE_ORIGIN || 'https://mansiondeseo.com').replace(/\/$/, '');
 const isStaging = String(env.STAGING_NO_INDEX || '') === '1';
@@ -24,6 +25,7 @@ const canonical = `${origin}${canonicalPath}`;
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
+    {preloadImage && <link rel="preload" as="image" href={preloadImage} fetchpriority="high" />}
     {(noindex || isStaging) && <meta name="robots" content="noindex, nofollow, noarchive" />}
   </head>
   <body>
