@@ -11,13 +11,16 @@ if (!city) return new Response('No encontrado', { status: 404 });
 const intro = slug === 'buenos-aires'
   ? 'Encontrá perfiles de escorts en Buenos Aires y sus principales zonas: Palermo, Recoleta, Puerto Madero, Belgrano, Núñez y otros barrios del área metropolitana.'
   : `Explorá perfiles públicos de escorts en ${city.name}, con fotografías, ubicación y contacto directo.`;
+const metaDescription = slug === 'buenos-aires'
+  ? 'Escorts en Buenos Aires: perfiles públicos de Palermo, Recoleta, Puerto Madero, Belgrano y otras zonas, con fotografías y contacto directo.'
+  : `Perfiles de escorts en ${city.name}, publicados después de revisión manual.`;
 Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=300');
 Astro.response.headers.set('Cache-Tag', `escort-city-${slug}`);
 ---
 
 <PublicLayout
   title={`Escorts en ${city.name} | Mansión Deseo`}
-  description={`Perfiles de escorts en ${city.name}, publicados después de revisión manual.`}
+  description={metaDescription}
   canonicalPath={`/escorts/${city.slug}/`}
 >
   <section class="hero hero-compact">
