@@ -3,6 +3,7 @@ import path from 'node:path';
 import { SITE_LOCALE, SITE_ORIGIN } from '../src/lib/siteConfig.js';
 
 const DIST_DIR = path.resolve('dist');
+const ESCORTS_ORIGIN = 'https://escorts.mansiondeseo.com';
 const indexPath = path.join(DIST_DIR, 'index.html');
 const appDir = path.join(DIST_DIR, 'app');
 const appPath = path.join(appDir, 'index.html');
@@ -134,8 +135,8 @@ await rename(indexPath, appPath);
 await Promise.all([...appRoutes].map((route) => writeAppRoute(route, appHtml)));
 const prewarmAssetHrefs = collectAppAssetHrefs(appHtml);
 const ogLocale = SITE_LOCALE.replace('-', '_');
-const homeTitle = 'Mansión Deseo | Acceso privado para adultos';
-const homeDescription = 'Comunidad privada y selecta para adultos registrados, pensada para parejas y usuarios solos que valoran perfiles verificados y acceso discreto.';
+const homeTitle = 'Escorts en Argentina | Mansión Deseo';
+const homeDescription = 'Directorio de escorts en Argentina con perfiles públicos, fotografías revisadas y contacto directo por ciudad.';
 const staticHomeStructuredData = JSON.stringify({
   '@context': 'https://schema.org',
   '@type': 'WebSite',
@@ -153,7 +154,7 @@ const staticHomeHtml = `<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>${homeTitle}</title>
   <meta name="description" content="${homeDescription}" />
-  <meta name="keywords" content="parejas liberales, comunidad privada adultos, swingers argentina, acceso privado, perfiles verificados, club liberal" />
+  <meta name="keywords" content="escorts argentina, escorts buenos aires, escorts rosario, escorts cordoba, perfiles de escorts" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="${SITE_ORIGIN}/" />
   <meta name="theme-color" content="#08080E" />
@@ -252,7 +253,7 @@ const staticHomeHtml = `<!doctype html>
 <body>
   <main class="welcome">
     <div class="ambient" aria-hidden="true"></div>
-    <section class="panel" aria-label="Mansión Deseo">
+    <section class="panel" aria-label="Escorts en Argentina">
       <div class="mansion-visual" aria-hidden="true">
         <div class="visual-glow"></div>
         <div class="door-wrap">
@@ -268,35 +269,35 @@ const staticHomeHtml = `<!doctype html>
         <span class="particle"></span>
       </div>
 
-      <h1 class="title">Mansión Deseo</h1>
+      <h1 class="title">Escorts en Argentina</h1>
       <p class="copy">
-        Un espacio selecto para quienes buscan experiencias únicas con discreción total,
-        perfiles verificados y conexiones reales entre parejas y usuarios solos.
+        Explorá perfiles públicos por ciudad, revisá sus fotografías y contactá directamente.
+        La comunidad privada de Mansion Deseo continúa disponible para adultos registrados.
       </p>
 
       <div class="cta">
-        <a class="register-btn" href="/registro/" id="registerLink">
-          Registrarme
+        <a class="register-btn" href="${ESCORTS_ORIGIN}" id="escortsLink">
+          Ver escorts en Argentina
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
         </a>
       </div>
 
       <p class="login-line">
-        <span>¿Ya tienes cuenta? </span><a href="/login/">Acceder</a>
+        <span>¿Buscás la comunidad privada? </span><a href="/registro/">Registrarte</a> · <a href="/login/">Acceder</a>
       </p>
 
       <div class="features" aria-label="Beneficios">
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.9 2.9 8.5 8.5 2.9 9.9l5.6 1.4 1.4 5.6 1.4-5.6 5.6-1.4-5.6-1.4-1.4-5.6Z"></path><path d="M19 15v4"></path><path d="M21 17h-4"></path></svg> Perfiles verificados</span>
         <span>•</span>
-        <span>Confidencial</span>
+        <span>Contacto directo</span>
         <span>•</span>
-        <span>Acceso Privado</span>
+        <span>Comunidad privada</span>
       </div>
     </section>
   </main>
   <script>
     (function(){
-      var registerLink = document.getElementById('registerLink');
+      var registerLink = document.getElementById('escortsLink');
       function removeMatchingStorageKeys(storage, shouldRemove) {
         try {
           for (var index = storage.length - 1; index >= 0; index -= 1) {
