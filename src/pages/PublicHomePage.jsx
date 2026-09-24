@@ -6,7 +6,7 @@ import { useAuth } from '../lib/authContext';
 import { hasEverLoggedIn, login as apiLogin } from '../lib/api';
 import { SITE_ORIGIN } from '../lib/siteConfig';
 
-const ACTIVE_COUPLES_NOW = '1.248';
+const ESCORTS_ORIGIN = 'https://escorts.mansiondeseo.com';
 
 const benefits = [
   {
@@ -34,8 +34,8 @@ export default function PublicHomePage() {
   const [loggingIn, setLoggingIn] = useState(false);
 
   useSeoMeta({
-    title: 'Mansión Deseo | Acceso privado para parejas liberales',
-    description: 'Mansión Deseo es una comunidad privada para parejas liberales y adultos que valoran la discreción, la verificación y el acceso curado.',
+    title: 'Escorts en Argentina | Mansión Deseo',
+    description: 'Directorio de escorts en Argentina con perfiles públicos, fotografías revisadas y contacto directo por ciudad.',
     canonical: `${SITE_ORIGIN}/`,
   });
 
@@ -44,7 +44,7 @@ export default function PublicHomePage() {
     '@type': 'WebSite',
     name: 'Mansión Deseo',
     url: `${SITE_ORIGIN}/`,
-    description: 'Comunidad privada para parejas liberales con acceso curado, privacidad y perfiles verificados.',
+    description: 'Directorio de escorts en Argentina con perfiles públicos y revisión manual.',
   }, 'website-home');
 
   if (user) {
@@ -142,25 +142,32 @@ export default function PublicHomePage() {
       <main className="mx-auto w-full max-w-7xl px-6 sm:px-8 lg:px-10">
         <section className="flex max-w-5xl flex-col justify-center py-24 sm:py-28 lg:min-h-[calc(100svh-11rem)] lg:py-32">
           <h1 className="max-w-4xl font-display text-5xl font-medium leading-[1.05] text-[#f4f4f4] sm:text-6xl lg:text-7xl">
-            Mansión Deseo, el club privado donde el deseo entra sin ruido.
+            Escorts en Argentina, con perfiles que podés conocer.
           </h1>
           <p className="mt-8 max-w-2xl text-lg font-light leading-8 text-white/64 sm:text-xl">
-            Acceso reservado, perfiles cuidados y privacidad diseñada para explorar con elegancia.
+            Explorá perfiles públicos por ciudad, revisá sus fotografías y contactá directamente. La comunidad privada continúa disponible para quienes buscan conectar con otras personas adultas.
           </p>
           <div className="mt-10">
-            <Link
-              to="/registro"
+            <a
+              href={ESCORTS_ORIGIN}
               className="inline-flex min-h-12 items-center gap-3 bg-[#c5a059] px-7 py-3 text-sm font-semibold text-black transition-colors hover:bg-[#d4b36c] focus:outline-none focus:ring-2 focus:ring-[#c5a059]/50 focus:ring-offset-2 focus:ring-offset-black"
             >
-              Solicitar Acceso
+              Ver escorts en Argentina
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </a>
+            <Link
+              to="/registro"
+              className="ml-3 inline-flex min-h-12 items-center border border-white/25 px-6 py-3 text-sm font-medium text-white/80 transition-colors hover:border-[#c5a059] hover:text-[#c5a059]"
+            >
+              Entrar a la comunidad
             </Link>
           </div>
         </section>
 
-        <section className="border-y border-white/[0.08] py-8 text-center" aria-label="Actividad actual">
+        <section className="border-y border-white/[0.08] py-8 text-center" aria-label="Directorio de escorts">
           <p className="text-sm font-light text-white/70">
-            <span className="font-medium text-[#c5a059]">{ACTIVE_COUPLES_NOW}</span> Parejas activas ahora
+            Perfiles públicos disponibles en distintas zonas de Argentina ·{' '}
+            <a href={ESCORTS_ORIGIN} className="font-medium text-[#c5a059] hover:underline">Explorar el directorio</a>
           </p>
         </section>
 
@@ -177,11 +184,26 @@ export default function PublicHomePage() {
             </article>
           ))}
         </section>
+        <section className="border-t border-white/[0.08] py-20 lg:py-28" aria-labelledby="community-title">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#c5a059]">Comunidad Mansion Deseo</p>
+          <h2 id="community-title" className="mt-5 max-w-2xl font-display text-3xl font-medium text-[#f4f4f4] sm:text-4xl">
+            El espacio de contactos continúa como comunidad secundaria.
+          </h2>
+          <p className="mt-5 max-w-2xl text-sm font-light leading-7 text-white/58">
+            Parejas, tríos y adultos que buscan conectar pueden continuar utilizando las secciones públicas y el acceso privado de Mansion Deseo.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link to="/parejas" className="border border-white/20 px-5 py-3 text-sm text-white/75 transition-colors hover:border-[#c5a059] hover:text-[#c5a059]">Parejas</Link>
+            <Link to="/trios" className="border border-white/20 px-5 py-3 text-sm text-white/75 transition-colors hover:border-[#c5a059] hover:text-[#c5a059]">Tríos</Link>
+            <Link to="/swingers" className="border border-white/20 px-5 py-3 text-sm text-white/75 transition-colors hover:border-[#c5a059] hover:text-[#c5a059]">Swingers</Link>
+          </div>
+        </section>
       </main>
 
       <footer className="mx-auto flex w-full max-w-7xl flex-col gap-5 border-t border-white/[0.08] px-6 py-10 text-xs text-white/38 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
         <span>© 2026 Mansión Deseo · Mayores de 18 años.</span>
         <nav className="flex flex-wrap gap-x-6 gap-y-3" aria-label="Privacidad y redes">
+          <a href={ESCORTS_ORIGIN} className="transition-colors hover:text-[#c5a059]">Escorts</a>
           <Link to="/privacidad" className="transition-colors hover:text-[#c5a059]">Privacidad</Link>
           <Link to="/terminos" className="transition-colors hover:text-[#c5a059]">Términos</Link>
           <a href="https://instagram.com/mansiondeseo" className="transition-colors hover:text-[#c5a059]" rel="noreferrer" target="_blank">Instagram</a>
