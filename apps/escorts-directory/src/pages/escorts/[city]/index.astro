@@ -8,6 +8,9 @@ const slug = Astro.params.city || '';
 const [cities, listings] = await Promise.all([getPublicCities(env), getPublicListings(env, slug)]);
 const city = cities.find((item) => item.slug === slug);
 if (!city) return new Response('No encontrado', { status: 404 });
+const intro = slug === 'buenos-aires'
+  ? 'Encontrá perfiles de escorts en Buenos Aires y sus principales zonas: Palermo, Recoleta, Puerto Madero, Belgrano, Núñez y otros barrios del área metropolitana.'
+  : `Explorá perfiles públicos de escorts en ${city.name}, con fotografías, ubicación y contacto directo.`;
 Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=300');
 Astro.response.headers.set('Cache-Tag', `escort-city-${slug}`);
 ---
@@ -20,6 +23,7 @@ Astro.response.headers.set('Cache-Tag', `escort-city-${slug}`);
   <section class="hero hero-compact">
     <p class="eyebrow">Explorar por ciudad</p>
     <h1>Escorts en {city.name}</h1>
+    <p>{intro}</p>
   </section>
   <section class="gallery-section" aria-label={`Perfiles en ${city.name}`}>
     <div class="listing-grid">

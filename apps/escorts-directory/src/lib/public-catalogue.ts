@@ -23,6 +23,15 @@ function tierCase(column: string) {
   return `CASE ${column} ${Object.keys(ESCORT_TIERS).map((tier, index) => `WHEN '${tier}' THEN ${index + 1}`).join(' ')} ELSE 0 END`;
 }
 
+// Agrupación editorial para posicionar Buenos Aires sin duplicar perfiles.
+// Los barrios siguen teniendo sus propias páginas y también aparecen dentro del área metropolitana.
+const CITY_GROUPS: Record<string, { name: string; slugs: string[] }> = {
+  'buenos-aires': {
+    name: 'Buenos Aires',
+    slugs: ['buenos-aires', 'caba', 'palermo', 'puerto-madero', 'recoleta', 'nunez', 'barrio-norte', 'belgrano', 'martinez', 'microcentro', 'monserrat', 'nordelta'],
+  },
+};
+
 function toListing(env: Record<string, any>, row: any, photos: any[] = [], reviews: any[] = []): CatalogueListing {
   const tier = String(row.tier || 'basic') as EscortTier;
   let details: CatalogueListing['details'] = {};
@@ -58,13 +67,19 @@ const commonSelect = `
 export async function getPublicListings(env: Record<string, any>, city = '', limit?: number) {
   if (!env.DB) return [] as CatalogueListing[];
   const resolvedLimit = Number.isFinite(limit) ? Number(limit) : (String(env.STAGING_NO_INDEX || '') === '1' ? 60 : 48);
-  const filter = city ? ' AND p.city_slug = ?' : '';
+  const cityGroup = CITY_GROUPS[city];
+  const groupPlaceholders = cityGroup?.slugs.map(() => '?').join(', ');
+  const filter = cityGroup
+    ? ` AND p.city_slug IN (${groupPlaceholders})`
+    : city ? ' AND p.city_slug = ?' : '';
   // A daily deterministic shuffle rotates listings within the same paid level.
   const rotation = `abs((COALESCE((SELECT ep.rotation_seed FROM escort_promotions ep WHERE ep.profile_id = p.id AND ep.status = 'active' ORDER BY ep.created_at DESC LIMIT 1), 0) + CAST(strftime('%j', 'now') AS INTEGER) * 7919) % 2147483647)`;
   const query = `${commonSelect}${filter} ORDER BY ${tierCase('tier')} DESC, ${rotation} ASC, p.published_at DESC LIMIT ?`;
   const includeDemo = String(env.STAGING_NO_INDEX || '') === '1' ? 1 : 0;
-  const result = city
-    ? await env.DB.prepare(query).bind(includeDemo, city, resolvedLimit).all()
+  const result = cityGroup
+    ? await env.DB.prepare(query).bind(includeDemo, ...cityGroup.slugs, resolvedLimit).all()
+    : city
+      ? await env.DB.prepare(query).bind(includeDemo, city, resolvedLimit).all()
     : await env.DB.prepare(query).bind(includeDemo, resolvedLimit).all();
   return (result.results || []).map((row: any) => toListing(env, row));
 }
@@ -83,5 +98,12 @@ export async function getPublicCities(env: Record<string, any>) {
   if (!env.DB) return [] as { slug: string; name: string; count: number }[];
   const includeDemo = String(env.STAGING_NO_INDEX || '') === '1' ? 1 : 0;
   const result = await env.DB.prepare("SELECT city_slug AS slug, city_name AS name, COUNT(*) AS count FROM escort_profiles WHERE status = 'published' AND (is_demo = 0 OR ? = 1) GROUP BY city_slug, city_name ORDER BY count DESC, name ASC").bind(includeDemo).all();
-  return (result.results || []).map((row: any) => ({ slug: row.slug, name: row.name, count: Number(row.count || 0) }));
+  const cities = (result.results || []).map((row: any) => ({ slug: row.slug, name: row.name, count: Number(row.count || 0) }));
+  const buenosAires = CITY_GROUPS['buenos-aires'];
+  const buenosAiresCount = cities
+    .filter((city) => buenosAires.slugs.includes(city.slug))
+    .reduce((total, city) => total + city.count, 0);
+  return buenosAiresCount > 0
+    ? [{ slug: 'buenos-aires', name: buenosAires.name, count: buenosAiresCount }, ...cities]
+    : cities;
 }
